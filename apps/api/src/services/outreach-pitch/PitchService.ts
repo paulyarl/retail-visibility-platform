@@ -25,6 +25,7 @@ import { renderPitchText, type ReviewPair, type AssemblePitchInput, type Footpri
 import {
   buildOutreachLinkVars,
   resolveCampaignSeedId,
+  resolveIntakeLinkVarsForCampaign,
 } from '../outreach-openers/outreach-link-vars';
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -141,7 +142,10 @@ export class PitchService extends BaseService {
     let ctaUrl: string | null = null;
     try {
       const seedId = await resolveCampaignSeedId(input.campaignId);
-      const linkVars = await buildOutreachLinkVars(seedId);
+      const linkVars = {
+        ...(await buildOutreachLinkVars(seedId)),
+        ...(await resolveIntakeLinkVarsForCampaign(input.campaignId)),
+      };
       ctaUrl = linkVars.qr_url_report_in_person ?? linkVars.report_url ?? linkVars.claim_short_url ?? null;
     } catch {
       ctaUrl = null;

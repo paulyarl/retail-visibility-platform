@@ -17,6 +17,7 @@ import {
   generateDisputeIntakeId,
   generateDisputeAttachmentId,
   generateDisputeToken,
+  generateIntakeShortCode,
 } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
 import type { RequestCtx } from '../context';
@@ -62,6 +63,10 @@ export interface DisputeIntakeRecord {
   status_flag: string | null;
   submitted_at: Date | null;
   viewed_at: Date | null;
+  intake_kind: string;
+  evidence_payload: any;
+  short_code: string | null;
+  viewed_count: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -92,26 +97,78 @@ export class DisputeIntakeRepository {
     const ttlDays = input.ttlDays ?? unifiedConfig.recoveryIntakeTokenTtlDays;
     const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
 
-    try {
-      const record = await prisma.mkt_dispute_intake.create({
-        data: {
-          id,
-          campaign_id: input.campaignId,
-          tenant_id: input.tenantId || null,
-          access_token: accessToken,
-          expires_at: expiresAt,
-          intake_kind: input.intakeKind || 'dispute',
-        },
-      });
-      logger.info('Dispute intake created', ctx, { intakeId: id, campaignId: input.campaignId });
-      return record as unknown as DisputeIntakeRecord;
-    } catch (error) {
-      logger.error('Failed to create dispute intake', ctx, {
-        error: (error as Error).message,
-        campaignId: input.campaignId,
-      });
-      throw error;
+    // Mint a 6-char short code for tracked /i/{code} links. Retry on the
+    // partial-unique index — 32^6 ≈ 1B codes, collisions are rare but cheap
+    // to retry.
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const shortCode = generateIntakeShortCode();
+      try {
+        const record = await prisma.mkt_dispute_intake.create({
+          data: {
+            id,
+            campaign_id: input.campaignId,
+            tenant_id: input.tenantId || null,
+            access_token: accessToken,
+            expires_at: expiresAt,
+            intake_kind: input.intakeKind || 'dispute',
+            short_code: shortCode,
+          },
+        });
+        logger.info('Dispute intake created', ctx, { intakeId: id, campaignId: input.campaignId });
+        return record as unknown as DisputeIntakeRecord;
+      } catch (error: any) {
+        lastError = error;
+        const isShortCodeCollision =
+          error?.code === 'P2002' &&
+          String(error?.meta?.target ?? '').includes('short_code');
+        if (!isShortCodeCollision) break;
+        logger.warn('Intake short code collision — retrying', ctx, { attempt });
+      }
     }
+
+    logger.error('Failed to create dispute intake', ctx, {
+      error: (lastError as Error)?.message,
+      campaignId: input.campaignId,
+    });
+    throw lastError;
+  }
+
+  /**
+   * Mint (or return the existing) short code for an intake row. Used to
+   * backfill rows created before migration 301.
+   */
+  async ensureShortCode(id: string, ctx?: RequestCtx): Promise<string | null> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const shortCode = generateIntakeShortCode();
+      try {
+        const record = await prisma.mkt_dispute_intake.update({
+          where: { id, short_code: null },
+          data: { short_code: shortCode },
+        });
+        return record.short_code;
+      } catch (error: any) {
+        // P2025 = row not matched (already has a code) — read it back
+        if (error?.code === 'P2025') {
+          const existing = await prisma.mkt_dispute_intake.findUnique({
+            where: { id },
+            select: { short_code: true },
+          });
+          return existing?.short_code ?? null;
+        }
+        const isShortCodeCollision =
+          error?.code === 'P2002' &&
+          String(error?.meta?.target ?? '').includes('short_code');
+        if (!isShortCodeCollision) {
+          logger.error('Failed to mint intake short code', ctx, {
+            error: error?.message,
+            intakeId: id,
+          });
+          throw error;
+        }
+      }
+    }
+    return null;
   }
 
   // ====================
@@ -167,6 +224,19 @@ export class DisputeIntakeRepository {
     }
   }
 
+  async findByShortCode(shortCode: string, ctx?: RequestCtx): Promise<DisputeIntakeRecord | null> {
+    try {
+      const record = await prisma.mkt_dispute_intake.findFirst({
+        where: { short_code: shortCode },
+        include: { mkt_dispute_attachments: true },
+      });
+      return record as unknown as DisputeIntakeRecord | null;
+    } catch (error) {
+      logger.error('Failed to find dispute intake by short code', ctx, { error: (error as Error).message });
+      throw error;
+    }
+  }
+
   async findAllByCampaign(campaignId: string, ctx?: RequestCtx): Promise<DisputeIntakeRecord[]> {
     try {
       const records = await prisma.mkt_dispute_intake.findMany({
@@ -196,6 +266,42 @@ export class DisputeIntakeRepository {
       });
     } catch (error) {
       logger.error('Failed to mark dispute intake viewed', ctx, { error: (error as Error).message, intakeId: id });
+      throw error;
+    }
+  }
+
+  /**
+   * Record an intake-link open: viewed_at stamps the first open (mirrors
+   * markViewed), viewed_count increments on every open (migration 301).
+   */
+  async recordView(id: string, isFirstView: boolean, ctx?: RequestCtx): Promise<void> {
+    try {
+      await prisma.mkt_dispute_intake.update({
+        where: { id },
+        data: {
+          viewed_count: { increment: 1 },
+          ...(isFirstView ? { viewed_at: new Date() } : {}),
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to record intake view', ctx, { error: (error as Error).message, intakeId: id });
+      throw error;
+    }
+  }
+
+  /**
+   * Backfill tenant_id on an intake row that was created before the
+   * campaign's seed link (or tenant) existed. No-op when the row already
+   * carries a tenant.
+   */
+  async backfillTenantId(id: string, tenantId: string, ctx?: RequestCtx): Promise<void> {
+    try {
+      await prisma.mkt_dispute_intake.update({
+        where: { id },
+        data: { tenant_id: tenantId },
+      });
+    } catch (error) {
+      logger.error('Failed to backfill intake tenant', ctx, { error: (error as Error).message, intakeId: id });
       throw error;
     }
   }

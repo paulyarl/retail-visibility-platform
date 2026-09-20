@@ -3419,6 +3419,7 @@ model mkt_campaigns_list {
   seed_decision                                                                   String?                              @db.VarChar(20)
   seed_decision_at                                                                DateTime?                            @db.Timestamptz(6)
   seed_decision_by                                                                String?                              @db.VarChar(255)
+  repair_fulfillment                                                              Json?
   directory_seed_campaign_links                                                   directory_seed_campaign_links[]
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
@@ -3707,6 +3708,8 @@ model mkt_dispute_intake {
   owner_phone             String?                   @db.VarChar(40)
   intake_kind             String                    @default("dispute") @db.VarChar(40)
   evidence_payload        Json?
+  short_code              String?                   @db.VarChar(8)
+  viewed_count            Int                       @default(0)
   mkt_dispute_attachments mkt_dispute_attachments[]
   mkt_campaigns_list      mkt_campaigns_list        @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dispute_intake_campaign")
   mkt_intake_definitions  mkt_intake_definitions    @relation(fields: [intake_kind], references: [intake_kind], onDelete: NoAction, onUpdate: NoAction, map: "fk_dispute_intake_kind")
@@ -3839,6 +3842,7 @@ model mkt_intake_definitions {
   updated_by         String?              @db.VarChar(255)
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
   updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  trigger_guard      Json?
   mkt_dispute_intake mkt_dispute_intake[]
 
   @@index([is_active, is_draft], map: "idx_mkt_intake_definitions_active")

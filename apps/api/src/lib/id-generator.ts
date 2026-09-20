@@ -2259,6 +2259,23 @@ export function generateClaimShortCode(): string {
   return generateClaimShortCodeNano();
 }
 
+// ─── Intake Short Codes (tracked /i/{code} intake links) ─────────────────
+// Same curated 32-char alphabet as gallery/claim codes. 6-char codes back
+// the /i/{shortCode} redirect → /recovery/intake?token=… for every intake
+// kind (dispute, gbp_optimization, profile_repair_access, …). The short code
+// resolves through the mkt_dispute_intake row, so it survives token reissue.
+const INTAKE_SHORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const generateIntakeShortCodeNano = customAlphabet(INTAKE_SHORT_CODE_ALPHABET, 6);
+
+/**
+ * Generate a 6-char intake short code for SMS/email/QR-friendly URLs.
+ * Used in /i/{shortCode} redirects to /recovery/intake?token={access_token}.
+ * No prefix — the short code IS the URL segment.
+ */
+export function generateIntakeShortCode(): string {
+  return generateIntakeShortCodeNano();
+}
+
 // ─── Intelligence Profiles (Sprint 1 — Seek Intelligence Scope) ──────────
 // Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
 // Profile IDs are human-readable slugs (e.g. 'auto_repair_us'), not nanoid-based,

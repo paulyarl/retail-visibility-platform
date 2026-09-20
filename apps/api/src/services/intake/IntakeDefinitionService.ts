@@ -72,6 +72,17 @@ export interface NicheOverride {
   owner_copy_overrides?: Partial<OwnerCopy>;
 }
 
+/**
+ * Declarative condition evaluated against the campaign row before an intake
+ * link is auto-minted (migration 301). `path` is a dotted campaign field path
+ * (e.g. "repair_fulfillment.mode"); `op` ∈ equals|not_equals|in|exists.
+ */
+export interface TriggerGuardCondition {
+  path: string;
+  op: 'equals' | 'not_equals' | 'in' | 'exists';
+  value?: any;
+}
+
 export interface IntakeDefinition {
   intake_kind: string;
   label: string;
@@ -79,6 +90,7 @@ export interface IntakeDefinition {
   driver: 'code' | 'registry';
   service_category: string | null;
   trigger_stages: string[];
+  trigger_guard: TriggerGuardCondition[] | null;
   submitted_stage: string | null;
   form_schema: FormField[];
   field_mappings: FieldMapping[];
@@ -88,6 +100,48 @@ export interface IntakeDefinition {
   version: number;
   is_active: boolean;
   is_draft: boolean;
+}
+
+/**
+ * Evaluate a definition's trigger_guard against a campaign row.
+ * Conditions are ANDed; a missing/absent guard always passes.
+ * Missing dotted path fails `equals`/`in`, passes `not_equals`, fails `exists`.
+ */
+export function evaluateTriggerGuard(
+  guard: TriggerGuardCondition[] | null | undefined,
+  campaign: Record<string, any> | null | undefined,
+): boolean {
+  if (!Array.isArray(guard) || guard.length === 0) return true;
+  if (!campaign) return false;
+
+  const readPath = (obj: any, path: string): { found: boolean; value: any } => {
+    let cur = obj;
+    for (const part of path.split('.')) {
+      if (cur == null || typeof cur !== 'object' || !(part in cur)) {
+        return { found: false, value: undefined };
+      }
+      cur = cur[part];
+    }
+    return { found: true, value: cur };
+  };
+
+  return guard.every((cond) => {
+    if (!cond || typeof cond.path !== 'string' || !cond.path) return true;
+    const { found, value } = readPath(campaign, cond.path);
+    switch (cond.op) {
+      case 'equals':
+        return found && value === cond.value;
+      case 'not_equals':
+        return !found || value !== cond.value;
+      case 'in':
+        return found && Array.isArray(cond.value) && cond.value.includes(value);
+      case 'exists':
+        return found && value !== null && value !== undefined;
+      default:
+        // Unknown op — fail closed so a typo doesn't silently auto-mint
+        return false;
+    }
+  });
 }
 
 // ====================
@@ -188,6 +242,7 @@ export class IntakeDefinitionService {
       driver: (row.driver as 'code' | 'registry') || 'registry',
       service_category: row.service_category,
       trigger_stages: Array.isArray(row.trigger_stages) ? row.trigger_stages : [],
+      trigger_guard: Array.isArray(row.trigger_guard) ? row.trigger_guard : null,
       submitted_stage: row.submitted_stage,
       form_schema: Array.isArray(row.form_schema) ? row.form_schema : [],
       field_mappings: Array.isArray(row.field_mappings) ? row.field_mappings : [],
@@ -247,7 +302,12 @@ export class IntakeDefinitionService {
    * service_category matches (or is NULL = matches any). Used by the
    * auto-generation hook in MarketingCampaignService.
    */
-  async getDefinitionsForTrigger(stage: string, serviceCategory?: string | null, ctx?: RequestCtx): Promise<IntakeDefinition[]> {
+  async getDefinitionsForTrigger(
+    stage: string,
+    serviceCategory?: string | null,
+    ctx?: RequestCtx,
+    campaign?: Record<string, any> | null,
+  ): Promise<IntakeDefinition[]> {
     await this.loadCache(ctx);
     const all = Array.from(this.cache.values());
     return all.filter((def) => {
@@ -259,6 +319,9 @@ export class IntakeDefinitionService {
       if (def.service_category && serviceCategory && def.service_category !== serviceCategory) {
         return false;
       }
+      // Declarative trigger_guard — ANDed conditions on the campaign row
+      // (migration 301). Evaluated after stage + service_category pass.
+      if (!evaluateTriggerGuard(def.trigger_guard, campaign)) return false;
       return true;
     });
   }

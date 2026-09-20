@@ -32,6 +32,7 @@ import {
   resolveCampaignSeedId,
   resolveClaimUrlForSeed,
   buildOutreachLinkVars,
+  resolveIntakeLinkVarsForCampaign,
 } from '../outreach-openers/outreach-link-vars';
 import {
   runDeliverableQualityGate,
@@ -334,9 +335,12 @@ export class DeliverableSourceService extends BaseService {
     try {
       const seedId = await resolveCampaignSeedId(campaignId);
       const built = await buildOutreachLinkVars(seedId);
+      const intakeVars = await resolveIntakeLinkVarsForCampaign(campaignId);
       if (claimUrl) linkVars.claim_url = claimUrl;
       if (built.claim_short_url) linkVars.claim_short_url = built.claim_short_url;
       if (built.report_url) linkVars.report_url = built.report_url;
+      if (intakeVars.intake_url) linkVars.intake_url = intakeVars.intake_url;
+      if (intakeVars.intake_short_url) linkVars.intake_short_url = intakeVars.intake_short_url;
     } catch (e) {
       logger.warn('Failed to resolve deliverable link variables', ctx, {
         error: (e as Error).message, campaignId,

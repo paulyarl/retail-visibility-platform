@@ -50,6 +50,15 @@ export interface SubmitResult {
   alreadySubmitted: boolean;
 }
 
+export interface IntakeLinkResult {
+  intakeId: string;
+  token: string;
+  /** Canonical long URL — /recovery/intake?token=… */
+  url: string;
+  /** Tracked short URL — /i/{code} (empty string if minting failed). */
+  shortUrl: string;
+}
+
 // ====================
 // SERVICE
 // ====================
@@ -78,7 +87,7 @@ export class DisputeIntakeService extends BaseService {
     campaignId: string,
     ctx?: RequestCtx,
     intakeKind: string = 'dispute',
-  ): Promise<{ intakeId: string; token: string; url: string }> {
+  ): Promise<IntakeLinkResult> {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
@@ -87,31 +96,64 @@ export class DisputeIntakeService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
+      // W1a tenant cascade: prefer campaign.tenant_id, fall back to the
+      // primary directory_seed_campaign_links row's tenant.
+      const tenantId = await this.resolveIntakeTenantId(campaign, ctx);
+
       // Reuse existing intake row if one exists for this (campaign, kind) pair.
       // Reissue the token + reset expiry rather than creating a duplicate.
       const existing = await this.repo.findByCampaign(campaignId, intakeKind, ctx);
       if (existing) {
+        // Backfill tenant_id on rows minted before a seed link existed.
+        if (!existing.tenant_id && tenantId) {
+          await this.repo.backfillTenantId(existing.id, tenantId, ctx);
+        }
         const reissued = await this.repo.reissueToken(existing.id, undefined, ctx);
+        const shortCode = existing.short_code || (await this.repo.ensureShortCode(existing.id, ctx));
         const url = this.buildIntakeUrl(reissued.access_token);
+        const shortUrl = shortCode ? this.buildIntakeShortUrl(shortCode) : '';
         logger.info('Intake link reissued', ctx, { campaignId, intakeId: existing.id, intakeKind });
-        return { intakeId: existing.id, token: reissued.access_token, url };
+        return { intakeId: existing.id, token: reissued.access_token, url, shortUrl };
       }
 
       const record = await this.repo.create({
         campaignId,
-        tenantId: campaign.tenant_id || undefined,
+        tenantId: tenantId || undefined,
         intakeKind,
       }, ctx);
 
       const url = this.buildIntakeUrl(record.access_token);
+      const shortUrl = record.short_code ? this.buildIntakeShortUrl(record.short_code) : '';
       logger.info('Intake link generated', ctx, { campaignId, intakeId: record.id, intakeKind });
-      return { intakeId: record.id, token: record.access_token, url };
+      return { intakeId: record.id, token: record.access_token, url, shortUrl };
     } catch (error) {
       logger.error('Failed to generate intake link', ctx, {
         error: (error as Error).message,
         campaignId,
       });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * W1a — tenant resolution for intake rows: campaign.tenant_id first, then
+   * the primary seed-link's tenant, then any linked seed's tenant.
+   */
+  private async resolveIntakeTenantId(campaign: { id: string; tenant_id: string | null }, ctx?: RequestCtx): Promise<string | null> {
+    if (campaign.tenant_id) return campaign.tenant_id;
+    try {
+      const link = await this.prisma.directory_seed_campaign_links.findFirst({
+        where: { campaign_id: campaign.id },
+        orderBy: [{ link_role: 'asc' }, { created_at: 'asc' }],
+        select: { tenant_id: true },
+      });
+      return link?.tenant_id ?? null;
+    } catch (error) {
+      logger.warn('Seed-link tenant lookup failed during intake generation', ctx, {
+        error: (error as Error).message,
+        campaignId: campaign.id,
+      });
+      return null;
     }
   }
 
@@ -130,10 +172,9 @@ export class DisputeIntakeService extends BaseService {
         return { expired: true };
       }
 
-      // Stamp viewed_at on first resolve (mirrors GET /pay handler)
-      if (!record.viewed_at) {
-        await this.repo.markViewed(record.id, ctx);
-      }
+      // Stamp viewed_at on first resolve + count every open (W4 — the
+      // tracked /i/{code} link lands here after the scan redirect).
+      await this.repo.recordView(record.id, !record.viewed_at, ctx);
 
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: record.campaign_id },
@@ -524,7 +565,7 @@ export class DisputeIntakeService extends BaseService {
   // REISSUE LINK
   // ====================
 
-  async reissueLink(campaignId: string, intakeKind: string = 'dispute', ctx?: RequestCtx): Promise<{ intakeId: string; token: string; url: string }> {
+  async reissueLink(campaignId: string, intakeKind: string = 'dispute', ctx?: RequestCtx): Promise<IntakeLinkResult> {
     try {
       const existing = await this.repo.findByCampaign(campaignId, intakeKind, ctx);
       if (!existing) {
@@ -532,10 +573,27 @@ export class DisputeIntakeService extends BaseService {
         return this.generateIntakeLink(campaignId, ctx, intakeKind);
       }
 
+      // Backfill tenant_id if the campaign/seed link gained one since the
+      // intake row was minted (W1a).
+      if (!existing.tenant_id) {
+        const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: campaignId },
+          select: { id: true, tenant_id: true },
+        });
+        if (campaign) {
+          const tenantId = await this.resolveIntakeTenantId(campaign, ctx);
+          if (tenantId) {
+            await this.repo.backfillTenantId(existing.id, tenantId, ctx);
+          }
+        }
+      }
+
       const reissued = await this.repo.reissueToken(existing.id, undefined, ctx);
+      const shortCode = existing.short_code || (await this.repo.ensureShortCode(existing.id, ctx));
       const url = this.buildIntakeUrl(reissued.access_token);
+      const shortUrl = shortCode ? this.buildIntakeShortUrl(shortCode) : '';
       logger.info('Dispute intake link reissued via reissue endpoint', ctx, { campaignId, intakeId: existing.id, intakeKind });
-      return { intakeId: existing.id, token: reissued.access_token, url };
+      return { intakeId: existing.id, token: reissued.access_token, url, shortUrl };
     } catch (error) {
       logger.error('Failed to reissue dispute intake link', ctx, {
         error: (error as Error).message,
@@ -726,12 +784,59 @@ export class DisputeIntakeService extends BaseService {
   }
 
   // ====================
+  // RESOLVE SHORT CODE (W4 — tracked /i/{code} links)
+  // ====================
+
+  /**
+   * Resolve a 6-char intake short code for the /i/{shortCode} redirect page.
+   * Returns the current access token + tenant for scan attribution. The short
+   * code survives token reissue — always resolves to the live token.
+   */
+  async resolveShortCode(
+    shortCode: string,
+    ctx?: RequestCtx,
+  ): Promise<{ token: string; intakeKind: string; tenantId: string } | null> {
+    try {
+      const record = await this.repo.findByShortCode(shortCode, ctx);
+      if (!record) return null;
+
+      let tenantId = record.tenant_id;
+      if (!tenantId) {
+        const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: record.campaign_id },
+          select: { id: true, tenant_id: true },
+        });
+        if (campaign) {
+          tenantId = await this.resolveIntakeTenantId(campaign, ctx);
+          if (tenantId) {
+            await this.repo.backfillTenantId(record.id, tenantId, ctx).catch(() => {});
+          }
+        }
+      }
+
+      return {
+        token: record.access_token,
+        intakeKind: record.intake_kind,
+        tenantId: tenantId || 'platform',
+      };
+    } catch (error) {
+      logger.error('Failed to resolve intake short code', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
   // HELPERS
   // ====================
 
   private buildIntakeUrl(token: string): string {
     const webUrl = unifiedConfig.webUrl;
     return `${webUrl}/recovery/intake?token=${encodeURIComponent(token)}`;
+  }
+
+  private buildIntakeShortUrl(shortCode: string): string {
+    const webUrl = unifiedConfig.webUrl;
+    return `${webUrl}/i/${shortCode}`;
   }
 }
 

@@ -89,6 +89,45 @@ export async function resolveClaimUrlForCampaign(campaignId: string): Promise<st
 }
 
 /**
+ * W4 — intake link vars for a campaign (Profile Repair Fulfillment Sprint).
+ *
+ *   intake_url        — canonical /recovery/intake?token=… long URL
+ *   intake_short_url  — tracked /i/{code} URL (SMS/email/QR-friendly)
+ *
+ * Resolution order for multi-intake campaigns: the unsubmitted
+ * profile_repair_access intake first (the DFY access link is what outreach
+ * sends), then any other unsubmitted intake, then the most recent intake.
+ * Absent when the campaign has no intake rows — callers merge the map so
+ * {{intake_short_url}} stays a visible placeholder rather than fabricating.
+ */
+export async function resolveIntakeLinkVarsForCampaign(campaignId: string): Promise<OutreachLinkVars> {
+  const vars: OutreachLinkVars = {};
+  try {
+    const rows = await prisma.mkt_dispute_intake.findMany({
+      where: { campaign_id: campaignId },
+      select: { access_token: true, short_code: true, intake_kind: true, submitted_at: true },
+      orderBy: { created_at: 'desc' },
+    });
+    if (rows.length === 0) return vars;
+
+    const pick =
+      rows.find((r) => r.intake_kind === 'profile_repair_access' && !r.submitted_at) ??
+      rows.find((r) => !r.submitted_at && r.short_code) ??
+      rows[0];
+
+    const base = webBase();
+    if (!base) return vars;
+    vars.intake_url = `${base}/recovery/intake?token=${encodeURIComponent(pick.access_token)}`;
+    if (pick.short_code) {
+      vars.intake_short_url = `${base}/i/${pick.short_code}`;
+    }
+  } catch {
+    // Lookup failure — leave keys absent
+  }
+  return vars;
+}
+
+/**
  * Resolve the full tracked-link variable set for a seed:
  *   report_url, claim_url, claim_short_url,
  *   qr_url_mail, qr_url_walkin, qr_url_claim_social, qr_url_claim_email,

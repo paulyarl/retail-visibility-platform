@@ -158,13 +158,16 @@ const REVIEW_TRANSITIONS: Record<string, string[]> = {
   // permanently-closed business is discovered mid-outreach (verify-operating-
   // status flow). 'lost' remains the no-response auto-advance target.
   shown:          ['paid', 'lost', 'dead', 'tenant_onboarded'],
-  paid:           ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
-  delivered:      ['retainer_pitched', 'closed', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted'],
+  paid:           ['delivered', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted', 'repair_access_submitted'],
+  delivered:      ['retainer_pitched', 'closed', 'tenant_onboarded', 'gbp_intake_submitted', 'review_setup_submitted', 'repair_access_submitted'],
   // Registry-driven intake submitted stages — flow back to delivered for
   // the normal pipeline to continue (operator sees the intake evidence +
   // proceeds with fulfillment)
   gbp_intake_submitted:    ['delivered', 'tenant_onboarded'],
   review_setup_submitted:  ['delivered', 'tenant_onboarded'],
+  // DFY profile-repair access intake submitted (Profile Repair Fulfillment
+  // Sprint W3c) — flows back to delivered so fulfillment continues.
+  repair_access_submitted: ['delivered', 'tenant_onboarded'],
   retainer_pitched: ['retainer_won', 'closed'],
   retainer_won:   ['lost', 'tenant_onboarded'],
   lost:           ['seek', 'tenant_onboarded'],   // resurrection: late QR/demo conversion (G1)
@@ -2897,6 +2900,7 @@ export class MarketingCampaignService extends BaseService {
             toStage,
             campaign?.service_category || null,
             ctx,
+            campaign,
           );
           for (const def of defs) {
             try {
@@ -2950,11 +2954,72 @@ export class MarketingCampaignService extends BaseService {
         changedBy,
       });
 
+      // Loop-back hook (Profile Repair Fulfillment Sprint W7): when a
+      // Track B sibling spawned via platform escalation reaches
+      // resolved_and_closed, mark the parent campaign's platform_status
+      // entry verified.
+      if (toStage === 'resolved_and_closed') {
+        await this.recordEscalatedPlatformResolved(campaign, ctx);
+      }
+
       logger.info('Campaign stage transitioned', ctx, { campaignId, fromStage, toStage, triggerType });
       return updated;
     } catch (error) {
       logger.error('Failed to transition campaign stage', ctx, { error: (error as Error).message, campaignId, toStage });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * When a Track B sibling campaign resolves, flip the escalated platform
+   * on the parent Track A campaign's repair_fulfillment.platform_status to
+   * 'verified'. Best-effort — logs + continues on failure.
+   */
+  private async recordEscalatedPlatformResolved(
+    sibling: any,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    try {
+      const rf = (sibling?.repair_fulfillment as Record<string, any> | null) ?? null;
+      const from = rf?.escalated_from;
+      const parentId = from?.campaign_id;
+      const platform = from?.platform;
+      if (!parentId || !platform) return;
+
+      const parent = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: parentId },
+        select: { id: true, repair_fulfillment: true },
+      });
+      if (!parent) {
+        logger.warn('Escalation loop-back: parent campaign not found', ctx, { siblingId: sibling.id, parentId });
+        return;
+      }
+
+      const parentRf = { ...((parent.repair_fulfillment as Record<string, any>) ?? {}) };
+      const status = { ...((parentRf.platform_status as Record<string, any>) ?? {}) };
+      const entry = { ...((status[platform] as Record<string, any>) ?? {}) };
+      entry.status = 'verified';
+      entry.verified_at = new Date().toISOString();
+      if (entry.note !== undefined) {
+        entry.note = `${entry.note} [resolved via escalation ${sibling.id}]`;
+      }
+      status[platform] = entry;
+      parentRf.platform_status = status;
+
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: parentId },
+        data: { repair_fulfillment: parentRf },
+      });
+      logger.info('Escalated platform marked verified on parent campaign', ctx, {
+        siblingId: sibling.id,
+        parentId,
+        platform,
+      });
+    } catch (error) {
+      logger.error('Escalation loop-back failed', ctx, {
+        error: (error as Error).message,
+        siblingId: sibling?.id,
+      });
     }
   }
 

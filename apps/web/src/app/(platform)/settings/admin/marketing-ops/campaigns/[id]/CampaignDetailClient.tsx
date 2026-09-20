@@ -34,6 +34,7 @@ import CascadePanel from '@/components/marketing-ops/CascadePanel';
 import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
 import RepairBriefingCard from '@/components/marketing-ops/RepairBriefingCard';
+import RepairExecutionCard from '@/components/marketing-ops/RepairExecutionCard';
 import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageCard';
 import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
@@ -289,12 +290,16 @@ export default function CampaignDetailClient({
   const [pgLoading, setPgLoading] = useState(false);
   const [pgSubmitting, setPgSubmitting] = useState(false);
   const [pgError, setPgError] = useState<string | null>(null);
-  const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
+  const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string; executionId: string }>({
     templateId: '',
     deliverableType: 'review_responses',
     isPreview: true,
     content: '',
+    executionId: '',
   });
+  // W6c — completed fulfill executions for the citation_repair_package
+  // execution picker. Loaded lazily when that type is selected.
+  const [fulfillExecutions, setFulfillExecutions] = useState<PromptExecution[]>([]);
   // Deliverable source material — signal-derived eligible types + readiness.
   // Spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md
   const [eligibleTypes, setEligibleTypes] = useState<DeliverableType[] | null>(null);
@@ -497,6 +502,30 @@ export default function CampaignDetailClient({
     })();
     return () => { cancelled = true; };
   }, [showGenerateModal, campaignId]);
+
+  // W6c — when the citation package type is selected, list the campaign's
+  // completed fulfill executions so the operator picks which import renders.
+  useEffect(() => {
+    if (!showGenerateModal || genForm.deliverableType !== 'citation_repair_package') {
+      setFulfillExecutions([]);
+      return;
+    }
+    let cancelled = false;
+    marketingOpsService
+      .listExecutions({ campaignId, status: 'completed' })
+      .then((execs) => {
+        if (cancelled) return;
+        const fulfill = execs
+          .filter((e) => e.prompt_type === 'fulfill' || e.output_schema?.name === 'citation_repair_package')
+          .sort((a, b) => (b.executed_at || '').localeCompare(a.executed_at || ''));
+        setFulfillExecutions(fulfill);
+        if (fulfill.length > 0) {
+          setGenForm((f) => (f.executionId ? f : { ...f, executionId: fulfill[0].id }));
+        }
+      })
+      .catch(() => { if (!cancelled) setFulfillExecutions([]); });
+    return () => { cancelled = true; };
+  }, [showGenerateModal, genForm.deliverableType, campaignId]);
 
   // Auto-select the default layout template once per deliverable type (G-8).
   // Fires only when the type changes — so an explicit "No template" choice is
@@ -1420,6 +1449,10 @@ export default function CampaignDetailClient({
                 {repairExecution && (
                   <RepairBriefingCard execution={repairExecution} campaignId={campaignId} />
                 )}
+                {/* Repair Execution Card — Track A package configuration +
+                    per-platform verification tracking (W2/W7). Only renders
+                    for profile_repair campaigns. */}
+                <RepairExecutionCard campaign={campaign} onRefresh={fetchCampaign} />
                 {/* Outreach & Follow-Up card — only for business-scope campaigns
                     in outreach stages (preview_built/shown/paid). */}
                 {campaign.scope === 'business'
@@ -2579,10 +2612,41 @@ export default function CampaignDetailClient({
                     ['seo_content', 'SEO Content'],
                     ['lead_magnet', 'Lead Magnet'],
                     ['product_visibility_preview', 'Product Visibility Preview'],
+                    // W6c/W8 — execution-driven (imported fulfill output) and
+                    // assembled (platform_status grid) types, neither
+                    // signal-gated. Offered on profile_repair campaigns.
+                    ...(campaign?.campaign_category === 'profile_repair'
+                      ? [
+                          ['citation_repair_package', 'Citation & Profile Repair Package'] as [DeliverableType, string],
+                          ['repair_completion_report', 'Repair Completion Report'] as [DeliverableType, string],
+                        ]
+                      : []),
                   ] as [DeliverableType, string][])
-                    .filter(([v]) => !eligibleTypes || eligibleTypes.length === 0 || eligibleTypes.includes(v))
+                    .filter(([v]) => v === 'citation_repair_package' || v === 'repair_completion_report' || !eligibleTypes || eligibleTypes.length === 0 || eligibleTypes.includes(v))
                     .map(([v, label]) => <option key={v} value={v}>{label}</option>)}
                 </select>
+                {genForm.deliverableType === 'citation_repair_package' && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fulfill execution (source content)</label>
+                    {fulfillExecutions.length === 0 ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        No completed fulfill executions — run the citation-package fulfill prompt and import the analyst output first.
+                      </p>
+                    ) : (
+                      <select
+                        value={genForm.executionId}
+                        onChange={(e) => setGenForm({ ...genForm, executionId: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                      >
+                        {fulfillExecutions.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {(e.executed_at || '').slice(0, 10)} · {e.ai_model || 'external'} · {e.id.slice(0, 12)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
                 {genForm.deliverableType === 'review_responses' && (
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Review responses are built in the{' '}
@@ -2665,6 +2729,9 @@ export default function CampaignDetailClient({
                   try {
                     await marketingOpsService.generateDeliverable(campaignId, {
                       templateId: genForm.templateId || undefined,
+                      executionId: genForm.deliverableType === 'citation_repair_package'
+                        ? genForm.executionId || undefined
+                        : undefined,
                       deliverableType: genForm.deliverableType,
                       isPreview: genForm.isPreview,
                       content: genForm.content || undefined,

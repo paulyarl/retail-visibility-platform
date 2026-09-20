@@ -57,6 +57,7 @@ import type { ArchetypeCode } from './outreach-openers/archetype-selection';
 import {
   buildOutreachLinkVars,
   resolveCampaignSeedId,
+  resolveIntakeLinkVarsForCampaign,
 } from './outreach-openers/outreach-link-vars';
 import { computeSignalSeverity, severityRank, type SignalSeverity } from './outreach-openers/signal-magnitude';
 import type { BusinessAnalysisAuditData } from './outreach-openers/archetype-selection';
@@ -235,7 +236,10 @@ export class CallScriptService extends BaseService {
     // Tracked link + QR variables (§5.1) — report_url, claim_url,
     // claim_short_url, qr_url_* — resolved from the seed's claim/report kits.
     const seedId = await resolveCampaignSeedId(campaignId);
-    const linkVars = await buildOutreachLinkVars(seedId);
+    const linkVars = {
+      ...(await buildOutreachLinkVars(seedId)),
+      ...(await resolveIntakeLinkVarsForCampaign(campaignId)),
+    };
 
     const mergeContext: PhoneMergeContext = {
       business: businessName,
@@ -460,6 +464,8 @@ export class CallScriptService extends BaseService {
     // Tracked link + QR variables (§5.1). Explicit report_url/claim_url keep
     // their seed-side precedence (short claim URL preferred for verbal
     // handoff); the qr_url_* keys come from the shared resolver.
+    // Seed-scoped assembly (no campaign in context) — intake link vars are
+    // campaign-scoped, so only the seed-side resolver applies here.
     const linkVars = await buildOutreachLinkVars(seedId);
     const merge: Record<string, string | null> = {
       ...linkVars,

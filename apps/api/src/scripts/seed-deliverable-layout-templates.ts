@@ -23,10 +23,13 @@
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { logger } from '../logger';
 
-const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V1';
+const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V3';
 
 const CLAIM_CTA =
   'Claim your listing and correct your details here — it takes about two minutes and there is no cost.';
+
+const RETAINER_NEXT_STEP =
+  'Keep this coverage active — an ongoing listing-synchronization retainer re-verifies these platforms monthly and catches new drift before it costs you customers.';
 
 interface LayoutTemplate {
   id: string;
@@ -36,6 +39,7 @@ interface LayoutTemplate {
   orientation: string;
   title: string;
   subtitle: string;
+  nextStep?: string;
 }
 
 const TEMPLATES: LayoutTemplate[] = [
@@ -79,6 +83,26 @@ const TEMPLATES: LayoutTemplate[] = [
     deliverableType: 'product_visibility_preview', pageSize: 'letter', orientation: 'portrait',
     title: 'Product Visibility Preview', subtitle: 'Help customers find and verify what you sell',
   },
+  // Profile Repair Fulfillment Sprint (W5c) — the shared Track A package
+  // artifact. The composed content already carries the §5.1 section order
+  // (Canonical NAP → per-platform fix sheets → claim links → verification
+  // checklist → submission guide), so the layout is a single text-less body
+  // rendering that content between a title block and the claim CTA.
+  {
+    id: 'mdt-default-citation-repair-package', name: 'Default — Citation & Profile Repair Package',
+    deliverableType: 'citation_repair_package', pageSize: 'letter', orientation: 'portrait',
+    title: 'Citation & Profile Repair Package', subtitle: 'Per-platform fix sheets, claim links, and verification checklist',
+  },
+  // W8 — completion report assembled from repair_fulfillment.platform_status
+  // + checklist progress (RepairFulfillmentService.buildCompletionReport).
+  // The retainer pitch is inside the content; the closing CTA is retainer,
+  // not claim.
+  {
+    id: 'mdt-default-repair-completion-report', name: 'Default — Repair Completion Report',
+    deliverableType: 'repair_completion_report', pageSize: 'letter', orientation: 'portrait',
+    title: 'Repair Completion Report', subtitle: 'Verified outcomes per platform and what happens next',
+    nextStep: RETAINER_NEXT_STEP,
+  },
 ];
 
 /**
@@ -96,7 +120,7 @@ function buildLayoutSpec(t: LayoutTemplate): any {
       { type: 'spacing', height: 8 },
       { type: 'divider' },
       { type: 'subheading', text: 'Next step' },
-      { type: 'body', text: CLAIM_CTA },
+      { type: 'body', text: t.nextStep ?? CLAIM_CTA },
     ],
   };
 }

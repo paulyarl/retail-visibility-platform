@@ -1084,6 +1084,10 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       await this.provisionGbpBridge(gbpBridgeCustomerId, r.tenant_id);
     }
 
+    // W1c — propagate the claim to every campaign linked to this seed:
+    // tenant_id/customer_id backfill + repair_fulfillment.seed_claimed stamp.
+    await this.propagateClaimToLinkedCampaigns(r.seed_id, r.tenant_id, platformUserId);
+
     // Embed the gateway upgrade preview so the claim success screen can
     // render the Entry Presence mode cards without a platform (Auth0)
     // session (claim handoff spec). A failure here must never fail the claim.
@@ -1133,6 +1137,90 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         upgradeOptions: upgradePreview.upgradeOptions,
       } : {}),
     };
+  }
+
+  /**
+   * W1c — claim propagation to seed-linked campaigns (Profile Repair
+   * Fulfillment Sprint). For every campaign in directory_seed_campaign_links
+   * for this seed:
+   *   - fill campaign.tenant_id only when currently null
+   *   - resolve customers via linked_user_id and set campaign.customer_id
+   *   - merge { seed_claimed: true, claimed_at } into repair_fulfillment
+   *   - backfill tenant_id on unsubmitted intake rows
+   *
+   * Deliberately does NOT call MarketingCampaignService.linkTenant() — that
+   * path can force a tenant_onboarded stage transition, which would yank an
+   * in-flight repair campaign out of its pipeline.
+   *
+   * Best-effort: a propagation failure must never fail the claim — errors
+   * are logged and the loop continues.
+   */
+  private async propagateClaimToLinkedCampaigns(
+    seedId: string,
+    tenantId: string,
+    platformUserId?: string,
+  ): Promise<void> {
+    try {
+      const links = await prisma.directory_seed_campaign_links.findMany({
+        where: { seed_id: seedId },
+        select: { campaign_id: true },
+      });
+      if (links.length === 0) return;
+
+      // Resolve the customer row once via the claiming platform user.
+      let customerId: string | null = null;
+      if (platformUserId) {
+        const custRows = await prisma.$queryRaw<any[]>`
+          SELECT id FROM customers WHERE linked_user_id = ${platformUserId} LIMIT 1
+        `;
+        customerId = custRows[0]?.id ?? null;
+      }
+
+      const claimedAt = new Date().toISOString();
+      for (const link of links) {
+        try {
+          const campaign = await prisma.mkt_campaigns_list.findUnique({
+            where: { id: link.campaign_id },
+            select: { id: true, tenant_id: true, customer_id: true, repair_fulfillment: true },
+          });
+          if (!campaign) continue;
+
+          const rf = {
+            ...((campaign.repair_fulfillment as Record<string, any> | null) ?? {}),
+            seed_claimed: true,
+            claimed_at: claimedAt,
+          };
+
+          await prisma.mkt_campaigns_list.update({
+            where: { id: campaign.id },
+            data: {
+              repair_fulfillment: rf,
+              ...(campaign.tenant_id ? {} : { tenant_id: tenantId }),
+              ...(!campaign.customer_id && customerId ? { customer_id: customerId } : {}),
+            },
+          });
+
+          // Backfill tenant_id on unsubmitted intake rows so write-behind
+          // adapters + scan attribution resolve tenant context.
+          await prisma.mkt_dispute_intake.updateMany({
+            where: { campaign_id: campaign.id, tenant_id: null, submitted_at: null },
+            data: { tenant_id: tenantId },
+          });
+        } catch (err) {
+          logger.warn('DirectoryClaimService: claim propagation failed for linked campaign', undefined, {
+            seedId,
+            campaignId: link.campaign_id,
+            error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err) },
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('DirectoryClaimService: claim propagation failed', undefined, {
+        seedId,
+        tenantId,
+        error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err) },
+      });
+    }
   }
 
   // ─── Operator approval: list / approve / reject ──────────────────────
@@ -1372,6 +1460,10 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     if (r.customer_id) {
       await this.provisionGbpBridge(r.customer_id, r.tenant_id);
     }
+
+    // W1c — propagate the claim to every campaign linked to this seed
+    // (tenant/customer backfill + repair_fulfillment.seed_claimed stamp).
+    await this.propagateClaimToLinkedCampaigns(r.seed_id, r.tenant_id, platformUserId);
 
     // Grant the owner free Market Intel access (spec §13). Fire-and-forget
     // — a failure here must not roll back the claim. The unlock is keyed

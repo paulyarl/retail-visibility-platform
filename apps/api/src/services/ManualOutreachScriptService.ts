@@ -47,6 +47,7 @@ import { HOOK_ANGLE_KEYS } from './outreach-openers/hook-library';
 import {
   buildOutreachLinkVars,
   resolveCampaignSeedId,
+  resolveIntakeLinkVarsForCampaign,
 } from './outreach-openers/outreach-link-vars';
 
 export type { ManualPlayTemplate };
@@ -746,7 +747,10 @@ export class ManualOutreachScriptService extends BaseService {
     // claim_short_url, qr_url_* — resolved from the seed's claim/report kits.
     // Absent keys keep their {{placeholder}} visible in the script.
     const seedId = await resolveCampaignSeedId(campaignId);
-    const linkVars = await buildOutreachLinkVars(seedId);
+    const linkVars = {
+      ...(await buildOutreachLinkVars(seedId)),
+      ...(await resolveIntakeLinkVarsForCampaign(campaignId)),
+    };
 
     const merge: Record<string, string | null> = {
       business: campaign.business_name ?? null,

@@ -93,6 +93,7 @@ export type DeliverableType =
   | 'recovery_resolution'
   | 'reinstatement_appeal'
   | 'citation_repair_package'
+  | 'repair_completion_report'
   | 'product_visibility_preview';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
@@ -160,6 +161,8 @@ export interface Campaign {
   repair_track?: RepairTrack | null;
   repair_issue_type?: string | null;
   repair_triage_briefing?: TriageRecommendation | null;
+  // Profile Repair Fulfillment Sprint (migration 301) — Track A package state.
+  repair_fulfillment?: RepairFulfillment | null;
   pipeline?: 'review' | 'recovery';
   title: string | null;
   business_name: string | null;
@@ -266,6 +269,86 @@ export interface Campaign {
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country?: string | null;
   business_origin_region?: string | null;
+}
+
+// ─── Profile Repair Fulfillment (W2/W7) ──────────────────────────────────
+
+export interface RepairPlatformStatusEntry {
+  status: string;
+  access_answer?: string;
+  note?: string | null;
+  verified_at?: string | null;
+  updated_at?: string;
+  escalated_campaign_id?: string | null;
+}
+
+export interface RepairFulfillment {
+  tier?: 'standard' | 'plus' | 'premium';
+  mode?: 'diy' | 'dfy';
+  platforms?: string[];
+  sla_hours?: number;
+  canonical_nap?: {
+    business_name?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    phone?: string;
+    website?: string;
+  } | null;
+  access_intake_id?: string;
+  access_collected_at?: string | null;
+  sla_due_at?: string | null;
+  seed_id?: string | null;
+  seed_claimed?: boolean;
+  claimed_at?: string | null;
+  platform_status?: Record<string, RepairPlatformStatusEntry>;
+  completion?: { report_deliverable_id?: string | null; remaining_actions?: string[] };
+  escalated_from?: { campaign_id: string; platform: string; escalated_at: string };
+}
+
+export interface RepairExecutionReadModel {
+  campaign_id: string;
+  stage: string;
+  repair_fulfillment: RepairFulfillment;
+  tier: string | null;
+  mode: string | null;
+  platforms: string[];
+  sla_hours: number | null;
+  sla_due_at: string | null;
+  access_collected_at: string | null;
+  canonical_nap: RepairFulfillment['canonical_nap'];
+  platform_status: Record<string, RepairPlatformStatusEntry>;
+  seed: {
+    seed_id: string;
+    link_role: string;
+    nap_match_confidence: string | null;
+    nap_match_summary: any;
+    seed_status: string | null;
+    seed_claimed: boolean;
+    claimed_at: string | null;
+  } | null;
+  access_intake: {
+    intake_id: string;
+    short_code: string | null;
+    short_url: string | null;
+    submitted_at: string | null;
+    viewed_count: number;
+    expires_at: string | null;
+    attachment_count: number;
+  } | null;
+}
+
+export interface SeedLinkSuggestion {
+  seed_id: string;
+  tenant_id: string;
+  listing_id: string | null;
+  business_name: string | null;
+  city: string | null;
+  state: string | null;
+  status: string;
+  nap_match_confidence: string;
+  nap_match_summary: any;
 }
 
 export interface CampaignLineageEntry {
@@ -3363,6 +3446,88 @@ class MarketingOpsService extends AdminApiSingleton {
 
   getDeliverableDownloadUrl(deliverableId: string): string {
     return `${BASE_URL}/deliverables/${deliverableId}/download`;
+  }
+
+  // ─── Profile Repair Fulfillment (W2/W7) ───────────────────────────────
+
+  async getRepairExecution(campaignId: string): Promise<RepairExecutionReadModel> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/repair-execution`,
+      {},
+      `mkt-ops-repair-execution-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch repair execution');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async patchRepairFulfillment(campaignId: string, patch: {
+    tier?: 'standard' | 'plus' | 'premium';
+    mode?: 'diy' | 'dfy';
+    platforms?: string[];
+    sla_hours?: number;
+  }): Promise<{ repair_fulfillment: RepairFulfillment; access_intake?: { intakeId: string; shortUrl: string; url: string } | null }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/repair-fulfillment`,
+      { method: 'PATCH', body: JSON.stringify(patch) },
+      `mkt-ops-repair-fulfillment-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update repair fulfillment');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async updateRepairPlatformStatus(campaignId: string, platform: string, patch: {
+    status: string;
+    note?: string;
+  }): Promise<{ platform: string; entry: RepairPlatformStatusEntry }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/repair-fulfillment/platforms/${encodeURIComponent(platform)}`,
+      { method: 'PATCH', body: JSON.stringify(patch) },
+      `mkt-ops-repair-platform-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update platform status');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async escalateRepairPlatform(campaignId: string, platform: string, input: {
+    issue_type: string;
+    notes?: string;
+  }): Promise<{ sibling: Campaign; platform_status: RepairPlatformStatusEntry }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/repair-fulfillment/platforms/${encodeURIComponent(platform)}/escalate`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-repair-escalate-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to escalate platform');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async getSeedLinkSuggestions(campaignId: string): Promise<SeedLinkSuggestion[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/seed-link-suggestions`,
+      {},
+      `mkt-ops-seed-suggestions-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch seed-link suggestions');
+    }
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
   }
 
   async sendDeliverable(deliverableId: string, sentMethod: string): Promise<Deliverable> {

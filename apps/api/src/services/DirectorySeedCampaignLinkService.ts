@@ -184,6 +184,93 @@ class DirectorySeedCampaignLinkService {
   // ============================
 
   /**
+   * W1d — seed-link suggestions for a campaign (Profile Repair Fulfillment
+   * Sprint). Finds candidate seeds for the campaign's business and scores
+   * each with computeNapMatch, returning the top five.
+   *
+   * Candidate pool: seeds in the campaign's city+state, plus any seed whose
+   * listing phone matches the campaign phone. Scored, sorted by confidence
+   * (high > medium > low > none) then by number of matched fields.
+   */
+  async suggestSeedLinks(
+    campaignId: string,
+  ): Promise<Array<{
+    seedId: string;
+    businessName: string;
+    confidence: NapConfidence;
+    napMatchSummary: NapMatchResult;
+    alreadyLinked: boolean;
+  }>> {
+    const campRows = await prisma.$queryRaw<any[]>`
+      SELECT business_name, address_line1, address_city, address_state, phone, phones
+      FROM mkt_campaigns_list WHERE id = ${campaignId} LIMIT 1
+    `;
+    const camp = campRows[0];
+    if (!camp) throw new Error('campaign_not_found');
+
+    const city = (camp.address_city ?? '').trim();
+    const state = (camp.address_state ?? '').trim();
+    const phoneDigits = (camp.phone ?? '').replace(/[^0-9]/g, '').slice(-10);
+    const extraPhones: string[] = Array.isArray(camp.phones)
+      ? camp.phones
+          .map((p: any) => String(p?.phone ?? p ?? '').replace(/[^0-9]/g, '').slice(-10))
+          .filter((d: string) => d.length >= 10)
+      : [];
+    const allPhones = Array.from(new Set([phoneDigits, ...extraPhones].filter(Boolean)));
+
+    // Candidate pool: same city+state OR phone match on the listing.
+    const candidates = await prisma.$queryRaw<any[]>`
+      SELECT dps.id AS seed_id, dl.business_name, dl.city, dl.state, dl.phone
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE (
+        (lower(dl.city) = lower(${city}) AND lower(dl.state) = lower(${state}) AND ${city} <> '' AND ${state} <> '')
+        OR (
+          ${allPhones.length} > 0
+          AND right(regexp_replace(coalesce(dl.phone, ''), '[^0-9]', '', 'g'), 10) = ANY(${allPhones}::text[])
+        )
+      )
+      LIMIT 50
+    `;
+
+    if (candidates.length === 0) return [];
+
+    const linked = await prisma.directory_seed_campaign_links.findMany({
+      where: { campaign_id: campaignId },
+      select: { seed_id: true },
+    });
+    const linkedSet = new Set(linked.map((l) => l.seed_id));
+
+    const confidenceRank: Record<NapConfidence, number> = { high: 3, medium: 2, low: 1, none: 0 };
+
+    const scored = await Promise.all(
+      candidates.map(async (c) => {
+        const napMatch = await this.computeNapMatch(c.seed_id, campaignId);
+        const matchCount =
+          Number(napMatch.businessNameMatch) +
+          Number(napMatch.addressMatch) +
+          Number(napMatch.phoneMatch) +
+          Number(napMatch.cityMatch);
+        return {
+          seedId: c.seed_id as string,
+          businessName: (c.business_name as string) ?? '',
+          confidence: napMatch.confidence,
+          napMatchSummary: napMatch,
+          alreadyLinked: linkedSet.has(c.seed_id),
+          _rank: confidenceRank[napMatch.confidence] * 10 + matchCount,
+        };
+      }),
+    );
+
+    return scored
+      .sort((a, b) => b._rank - a._rank)
+      .slice(0, 5)
+      .map(({ _rank, ...rest }) => rest);
+  }
+
+
+
+  /**
    * Link a seed to a campaign. If NAP matches with high confidence,
    * auto-project campaign signals onto the seed listing. Otherwise
    * just record the link with the NAP summary for the operator to review.

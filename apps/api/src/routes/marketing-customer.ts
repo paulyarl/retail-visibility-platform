@@ -26,6 +26,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import * as fs from 'fs';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { CustomerTokenService } from '../services/CustomerTokenService';
@@ -212,6 +213,49 @@ router.get('/receipts/:revenueId/pdf', requireCustomerAuth, requirePlatformConte
   } catch (error: any) {
     logger.error('[marketing-customer] GET /receipts/:revenueId/pdf error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to generate PDF' });
+  }
+});
+
+// ── Deliverable download (W6d — Profile Repair Fulfillment Sprint) ──────
+//
+// Streams the generated PDF from storage_path (local uploads dir). Ownership
+// check: the deliverable's campaign must belong to this customer. Delivery
+// gate mirrors the projection rule in MarketingCustomerProjection — the
+// deliverable is visible (and downloadable) once delivery_status='delivered'
+// or the campaign has reached paid/delivered.
+
+router.get('/deliverables/:id/download', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+    const deliverable = await prisma.mkt_deliverables_list.findUnique({
+      where: { id: req.params.id },
+      include: { mkt_campaigns_list: { select: { customer_id: true, stage: true } } },
+    });
+
+    if (!deliverable || deliverable.mkt_campaigns_list?.customer_id !== customerId) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    const stage = deliverable.mkt_campaigns_list.stage;
+    const delivered =
+      deliverable.delivery_status === 'delivered' ||
+      stage === 'delivered' ||
+      stage === 'paid';
+    if (!delivered || deliverable.is_watermarked) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    const file = await MarketingDeliverableService.getInstance().getDeliverableFilePath(deliverable.id, req.ctx);
+    if (!file || !fs.existsSync(file.filePath)) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    res.setHeader('Content-Type', file.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    fs.createReadStream(file.filePath).pipe(res);
+  } catch (error: any) {
+    logger.error('[marketing-customer] GET /deliverables/:id/download error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to download deliverable' });
   }
 });
 

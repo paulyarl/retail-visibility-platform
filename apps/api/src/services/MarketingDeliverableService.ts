@@ -30,6 +30,7 @@ export type DeliverableType =
   | 'recovery_resolution'
   | 'reinstatement_appeal'
   | 'citation_repair_package'
+  | 'repair_completion_report'
   | 'product_visibility_preview';
 
 export interface DeliverableTemplateInput {
@@ -58,6 +59,8 @@ export interface DeliverableInput {
   generatedBy?: string;
   sentAt?: Date;
   sentMethod?: string;
+  deliveryStatus?: string;
+  deliveredAt?: Date;
 }
 
 export class MarketingDeliverableService extends BaseService {
@@ -249,6 +252,8 @@ export class MarketingDeliverableService extends BaseService {
     if (input.brandingApplied !== undefined) data.branding_applied = input.brandingApplied;
     if (input.sentAt !== undefined) data.sent_at = input.sentAt;
     if (input.sentMethod !== undefined) data.sent_method = input.sentMethod;
+    if (input.deliveryStatus !== undefined) data.delivery_status = input.deliveryStatus;
+    if (input.deliveredAt !== undefined) data.delivered_at = input.deliveredAt;
 
     try {
       return await this.prisma.mkt_deliverables_list.update({ where: { id }, data });
@@ -424,9 +429,14 @@ export class MarketingDeliverableService extends BaseService {
 
   async markAsSent(deliverableId: string, sentMethod: string, ctx?: RequestCtx): Promise<any> {
     try {
+      // W6d — sending is the delivery event: stamp delivery_status/delivered_at
+      // so the customer-portal projection gate (delivery_status='delivered')
+      // and the download route unlock.
       return await this.updateDeliverable(deliverableId, {
         sentAt: new Date(),
         sentMethod,
+        deliveryStatus: 'delivered',
+        deliveredAt: new Date(),
       }, ctx);
     } catch (error) {
       logger.error('Failed to mark deliverable as sent', ctx, { error: (error as Error).message, deliverableId });
@@ -446,6 +456,7 @@ export class MarketingDeliverableService extends BaseService {
       recovery_resolution: 'Recovery Resolution',
       reinstatement_appeal: 'Reinstatement Appeal',
       citation_repair_package: 'Citation & Profile Repair Package',
+      repair_completion_report: 'Repair Completion Report',
       product_visibility_preview: 'Product Visibility Preview',
     };
     return labels[type] || type;
@@ -579,7 +590,32 @@ export class MarketingDeliverableService extends BaseService {
         where: { id: executionId },
         select: { filtered_output: true, raw_output: true },
       });
-      return execution?.filtered_output || execution?.raw_output || '';
+      const text = execution?.filtered_output || execution?.raw_output || '';
+      if (!text) return '';
+
+      // W6b — fulfill executions store a JSON blob ({deliverableText,
+      // submissionGuide}); printing it verbatim would render the raw JSON.
+      // Compose the structured output into the package's §5.1 markdown shape;
+      // non-JSON outputs (other prompt types) pass through unchanged.
+      try {
+        const parsed = JSON.parse(
+          text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(),
+        );
+        if (parsed && typeof parsed === 'object' &&
+            (typeof parsed.deliverableText === 'string' || typeof parsed.submissionGuide === 'string')) {
+          const parts = ['## Citation & Profile Repair Package'];
+          if (typeof parsed.deliverableText === 'string' && parsed.deliverableText.trim()) {
+            parts.push(parsed.deliverableText.trim());
+          }
+          if (typeof parsed.submissionGuide === 'string' && parsed.submissionGuide.trim()) {
+            parts.push('## Submission Guide', parsed.submissionGuide.trim());
+          }
+          return parts.join('\n\n');
+        }
+      } catch {
+        // Not JSON — fall through to raw text
+      }
+      return text;
     } catch {
       return '';
     }
@@ -770,6 +806,8 @@ export class MarketingDeliverableService extends BaseService {
           is_watermarked: false,
           sent_at: new Date(),
           sent_method: 'paid_download',
+          delivery_status: 'delivered',
+          delivered_at: new Date(),
         },
       });
 

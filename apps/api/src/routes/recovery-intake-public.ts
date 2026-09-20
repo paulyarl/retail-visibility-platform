@@ -32,6 +32,7 @@ import {
 } from '../validators/profile-repair-intake.schema';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import type { QrSurfaceType } from '../services/QrAnalyticsService';
 
 const router = express.Router();
 
@@ -349,6 +350,80 @@ router.get(
       });
       return res.status(500).json({ success: false, error: 'Failed to load options' });
     }
+  }),
+);
+
+// ====================
+// GET /api/public/intake-scan/:shortCode — tracked /i/{code} resolve
+// ====================
+// Profile Repair Fulfillment Sprint W4c. The /i/{shortCode} frontend page
+// calls this once: resolves the 6-char code to the CURRENT access token
+// (short codes survive token reissue), records a qr_scan_events row for
+// surface attribution, and returns { token, intakeKind } so the page can
+// redirect to /recovery/intake?token=….
+//
+// surface param maps to the qr_scan_events surface:
+//   sms|email|qr|call → 'intake_link_{surface}'
+// Unknown / missing surface → 400 (reject, do NOT silently default — a typo
+// would cross-contaminate per-surface scan attribution). Mirrors the
+// claim-scan route in directory-claim-qr.ts.
+
+const INTAKE_SCAN_SURFACES = {
+  sms: 'intake_link_sms',
+  email: 'intake_link_email',
+  qr: 'intake_link_qr',
+  call: 'intake_link_call',
+} as const satisfies Record<string, QrSurfaceType>;
+
+router.get(
+  '/public/intake-scan/:shortCode',
+  asyncErrorWrapper(async (req, res) => {
+    const { shortCode } = req.params;
+    const surfaceParam = (req.query.surface as string) || '';
+    const surface = INTAKE_SCAN_SURFACES[surfaceParam as keyof typeof INTAKE_SCAN_SURFACES];
+    if (!surface) {
+      return res.status(400).json({ success: false, error: 'invalid_surface' });
+    }
+
+    let token: string | null = null;
+    let intakeKind: string | null = null;
+    let tenantId = 'platform';
+
+    try {
+      const resolved = await disputeIntakeService.resolveShortCode(shortCode, req.ctx);
+      if (resolved) {
+        token = resolved.token;
+        intakeKind = resolved.intakeKind;
+        tenantId = resolved.tenantId;
+      }
+    } catch {
+      // Short-code lookup failure — still record the scan with platform tenant
+    }
+
+    // Scan tracking is best-effort — never block the redirect on it.
+    try {
+      const { trackQrScanEvent } = await import('../services/QrAnalyticsService.js');
+      await trackQrScanEvent({
+        tenantId,
+        surface,
+        consumer: 'merchant',
+        source: 'intake_link',
+        referrer: req.headers.referer || undefined,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+    } catch (error) {
+      logger.error('[recovery-intake-public] GET /intake-scan/:shortCode tracking error', req.ctx, {
+        error: (error as Error).message,
+        shortCode,
+        surface,
+      });
+    }
+
+    if (!token) {
+      return res.status(404).json({ success: false, error: 'intake_link_not_found' });
+    }
+
+    return res.json({ success: true, data: { token, intakeKind } });
   }),
 );
 

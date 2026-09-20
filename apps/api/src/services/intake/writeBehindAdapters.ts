@@ -730,6 +730,196 @@ const adapters: Record<string, WriteBehindAdapter> = {
       });
     }
   },
+
+  // ─── repair_fulfillment_write ───────────────────────────────────
+  // Profile Repair Fulfillment Sprint (W3). Consumes the platform_access
+  // object from the profile_repair_access intake and merges it into the
+  // campaign's repair_fulfillment JSONB. Campaign-scoped — no tenant needed.
+  //
+  // Writes:
+  //   access_collected_at  = now
+  //   access_intake_id     = this intake row
+  //   sla_due_at           = now + sla_hours (only when ≥1 platform granted)
+  //   platform_status[platform] = { status, access_answer, updated_at }
+  //     granted → access_granted, cannot_grant → blocked,
+  //     not_applicable → not_applicable, pending → awaiting_access
+  repair_fulfillment_write: async (value: any, adapterCtx: AdapterContext) => {
+    if (!value || typeof value !== 'object') return;
+
+    try {
+      const {
+        ACCESS_FIELD_TO_PLATFORM,
+        ACCESS_ANSWER_TO_STATUS,
+      } = await import('../../lib/repair-tiers.js');
+
+      const campaign = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: adapterCtx.campaignId },
+        select: { id: true, repair_fulfillment: true },
+      });
+      if (!campaign) {
+        logger.warn('repair_fulfillment_write: campaign not found — payload only', adapterCtx.ctx, {
+          campaignId: adapterCtx.campaignId,
+        });
+        return;
+      }
+
+      const rf = { ...((campaign.repair_fulfillment as Record<string, any> | null) ?? {}) };
+      const now = new Date();
+      const nowIso = now.toISOString();
+
+      const statusMap = { ...((rf.platform_status as Record<string, any>) ?? {}) };
+      let anyGranted = false;
+      for (const [fieldKey, answer] of Object.entries(value)) {
+        const platform = ACCESS_FIELD_TO_PLATFORM[fieldKey];
+        if (!platform || typeof answer !== 'string') continue;
+        const status = ACCESS_ANSWER_TO_STATUS[answer] ?? 'awaiting_access';
+        if (answer === 'granted') anyGranted = true;
+        statusMap[platform] = {
+          ...((statusMap[platform] as Record<string, any>) ?? {}),
+          status,
+          access_answer: answer,
+          updated_at: nowIso,
+        };
+      }
+      rf.platform_status = statusMap;
+      rf.platform_access = value;
+      rf.access_collected_at = nowIso;
+      rf.access_intake_id = adapterCtx.intakeId;
+
+      // SLA clock starts only when at least one platform access is granted.
+      const slaHours = typeof rf.sla_hours === 'number' ? rf.sla_hours : null;
+      if (anyGranted && slaHours) {
+        rf.sla_due_at = new Date(now.getTime() + slaHours * 60 * 60 * 1000).toISOString();
+      }
+
+      await prisma.mkt_campaigns_list.update({
+        where: { id: adapterCtx.campaignId },
+        data: { repair_fulfillment: rf },
+      });
+
+      logger.info('repair_fulfillment_write: access merged', adapterCtx.ctx, {
+        campaignId: adapterCtx.campaignId,
+        intakeId: adapterCtx.intakeId,
+        anyGranted,
+        slaDueAt: rf.sla_due_at ?? null,
+      });
+    } catch (error) {
+      logger.error('repair_fulfillment_write failed', adapterCtx.ctx, {
+        error: (error as Error).message,
+        campaignId: adapterCtx.campaignId,
+      });
+    }
+  },
+
+  // ─── repair_canonical_nap_write ─────────────────────────────────
+  // Profile Repair Fulfillment Sprint (W3). Stores the owner-confirmed
+  // canonical NAP in repair_fulfillment (always — campaign-scoped), then
+  // writes owner-confirmed provenance rows for business_name / address /
+  // phone / website on the linked seed.
+  //
+  // Seed resolution order:
+  //   1. primary directory_seed_campaign_links row for the campaign
+  //   2. first directory_presence_seeds row for the tenant
+  // No seed → retain payload + warn (evidence_payload is the system of
+  // record; the operator links a seed later and can re-derive).
+  repair_canonical_nap_write: async (value: any, adapterCtx: AdapterContext) => {
+    if (!value || typeof value !== 'object') return;
+
+    try {
+      // Always persist on the campaign — the fulfill prompt + package
+      // render read canonical_nap from repair_fulfillment.
+      const campaign = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: adapterCtx.campaignId },
+        select: { id: true, repair_fulfillment: true },
+      });
+      if (!campaign) {
+        logger.warn('repair_canonical_nap_write: campaign not found — payload only', adapterCtx.ctx, {
+          campaignId: adapterCtx.campaignId,
+        });
+        return;
+      }
+      const rf = { ...((campaign.repair_fulfillment as Record<string, any> | null) ?? {}) };
+      rf.canonical_nap = value;
+      await prisma.mkt_campaigns_list.update({
+        where: { id: adapterCtx.campaignId },
+        data: { repair_fulfillment: rf },
+      });
+
+      // Resolve the seed: primary campaign link first, tenant fallback.
+      const linkRows = await prisma.$queryRaw<any[]>`
+        SELECT seed_id, tenant_id FROM directory_seed_campaign_links
+        WHERE campaign_id = ${adapterCtx.campaignId}
+        ORDER BY CASE link_role WHEN 'primary' THEN 0 ELSE 1 END, created_at
+        LIMIT 1
+      `;
+      let seedId: string | null = linkRows[0]?.seed_id ?? null;
+      let tenantId: string | null = linkRows[0]?.tenant_id ?? adapterCtx.tenantId ?? null;
+
+      if (!seedId && tenantId) {
+        const seedRows = await prisma.$queryRaw<any[]>`
+          SELECT id FROM directory_presence_seeds WHERE tenant_id = ${tenantId}
+          ORDER BY created_at LIMIT 1
+        `;
+        seedId = seedRows[0]?.id ?? null;
+      }
+
+      if (!seedId || !tenantId) {
+        logger.warn('repair_canonical_nap_write: no seed/tenant resolved — canonical_nap retained on campaign only', adapterCtx.ctx, {
+          campaignId: adapterCtx.campaignId,
+          intakeId: adapterCtx.intakeId,
+        });
+        return;
+      }
+
+      const { generateDirectoryFieldProvenanceId } = await import('../../lib/id-generator.js');
+      const FIELD_KEYS: Array<[string, string | null]> = [
+        ['business_name', typeof value.business_name === 'string' ? value.business_name : null],
+        ['address', typeof value.address === 'string' ? value.address : null],
+        ['phone', typeof value.phone === 'string' ? value.phone : null],
+        ['website', typeof value.website === 'string' ? value.website : null],
+      ];
+
+      for (const [fieldKey, fieldValue] of FIELD_KEYS) {
+        if (!fieldValue) continue;
+        await prisma.$executeRaw`
+          INSERT INTO directory_field_provenance (
+            id, seed_id, tenant_id, field_key, value,
+            source_name, accessed_at, confidence, show_on_public,
+            evidence_state, created_at, updated_at
+          ) VALUES (
+            ${generateDirectoryFieldProvenanceId(tenantId)},
+            ${seedId},
+            ${tenantId},
+            ${fieldKey},
+            ${fieldValue},
+            'owner_intake',
+            now(),
+            'high',
+            true,
+            'owner_confirmed',
+            now(), now()
+          )
+          ON CONFLICT (seed_id, field_key) DO UPDATE
+          SET value = EXCLUDED.value,
+              source_name = EXCLUDED.source_name,
+              accessed_at = EXCLUDED.accessed_at,
+              confidence = EXCLUDED.confidence,
+              evidence_state = EXCLUDED.evidence_state,
+              updated_at = now()
+        `;
+      }
+
+      logger.info('repair_canonical_nap_write: canonical NAP + provenance written', adapterCtx.ctx, {
+        campaignId: adapterCtx.campaignId,
+        seedId,
+      });
+    } catch (error) {
+      logger.error('repair_canonical_nap_write failed', adapterCtx.ctx, {
+        error: (error as Error).message,
+        campaignId: adapterCtx.campaignId,
+      });
+    }
+  },
 };
 
 // ====================

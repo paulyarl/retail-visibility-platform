@@ -2765,6 +2765,9 @@ class DirectoryPresenceSeedService {
         addressCountry: 'US',
         hasWebsite: websiteUrl ? 'yes' : undefined,
         notes,
+        // W1b — propagate the seed's tenant so intakes/adapters resolve
+        // tenant context before the claim lands.
+        tenantId: s.tenant_id || undefined,
       },
       requestCtx,
     );
@@ -2799,6 +2802,22 @@ class DirectoryPresenceSeedService {
       linkRole,
       ctx,
     );
+
+    // W1b — stamp repair_fulfillment.seed_id, preserving any existing
+    // fulfillment keys. Best-effort: the campaign+link already exist.
+    try {
+      const rf = (campaign.repair_fulfillment as Record<string, any> | null) ?? {};
+      await prisma.mkt_campaigns_list.update({
+        where: { id: campaign.id },
+        data: { repair_fulfillment: { ...rf, seed_id: seedId } },
+      });
+    } catch (rfErr) {
+      logger.warn('createCampaignFromSeed — repair_fulfillment.seed_id merge failed', undefined, {
+        campaignId: campaign.id,
+        seedId,
+        error: (rfErr as Error).message,
+      });
+    }
 
     return {
       campaign,

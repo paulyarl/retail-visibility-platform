@@ -30,6 +30,7 @@ vi.mock('../../prisma', () => ({
     mkt_dispute_attachments: mockDisputeAttachments,
     mkt_campaigns_list: mockCampaignsList,
     mkt_stage_history_list: mockStageHistory,
+    directory_seed_campaign_links: { findFirst: vi.fn().mockResolvedValue(null) },
   },
 }));
 
@@ -43,6 +44,7 @@ vi.mock('../../lib/id-generator', () => ({
   generateDisputeIntakeId: () => 'mdint-test-001',
   generateDisputeAttachmentId: () => 'mdatt-test-001',
   generateDisputeToken: () => 'test-dispute-token-32chars-aaaa',
+  generateIntakeShortCode: () => 'XY34AB',
 }));
 
 vi.mock('../../config/unifiedConfig', () => ({
@@ -130,6 +132,10 @@ const mockIntakeRecord = {
   status_flag: null,
   submitted_at: null,
   viewed_at: null,
+  intake_kind: 'dispute',
+  evidence_payload: null,
+  short_code: null,
+  viewed_count: 0,
   created_at: new Date(),
   updated_at: new Date(),
   mkt_dispute_attachments: [],
@@ -193,21 +199,26 @@ describe('DisputeIntakeService', () => {
       expect(mockDisputeIntake.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'mdint-1' },
-          data: { viewed_at: expect.any(Date) },
+          data: expect.objectContaining({ viewed_at: expect.any(Date) }),
         }),
       );
     });
 
-    it('does not stamp viewed_at on second resolve', async () => {
+    it('does not stamp viewed_at on second resolve (viewed_count still increments)', async () => {
       mockDisputeIntake.findUnique.mockResolvedValue({
         ...mockIntakeRecord,
         viewed_at: pastDate(1),
       });
+      mockDisputeIntake.update.mockResolvedValue({});
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
 
       await DisputeIntakeService.resolveIntake('valid-token');
 
-      expect(mockDisputeIntake.update).not.toHaveBeenCalled();
+      // W4 — every open increments viewed_count; viewed_at only on the first
+      const calls = mockDisputeIntake.update.mock.calls;
+      expect(calls.length).toBe(1);
+      expect(calls[0][0].data).not.toHaveProperty('viewed_at');
+      expect(calls[0][0].data.viewed_count).toEqual({ increment: 1 });
     });
 
     it('marks alreadySubmitted=true when submitted_at is set', async () => {
@@ -523,6 +534,155 @@ describe('DisputeIntakeService', () => {
           attachmentIds: [],
         }),
       ).rejects.toThrow('Validation failed');
+    });
+  });
+
+  // ─── W4 — tracked short links ───────────────────────────────────
+
+  describe('short codes (W4)', () => {
+    it('mints a short code on create and returns the /i/ short URL', async () => {
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+      mockDisputeIntake.findFirst.mockResolvedValue(null);
+      mockDisputeIntake.create.mockResolvedValue({
+        ...mockIntakeRecord,
+        short_code: 'XY34AB',
+      });
+
+      const result = await DisputeIntakeService.generateIntakeLink('mcamp-1');
+
+      expect(result.shortUrl).toBe('http://localhost:3000/i/XY34AB');
+      expect(result.url).toContain('/recovery/intake?token=');
+    });
+
+    it('lazily backfills a short code on a legacy row at reissue', async () => {
+      // Legacy row — no short_code yet
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+      mockDisputeIntake.findFirst.mockResolvedValue(mockIntakeRecord);
+      mockDisputeIntake.update
+        .mockResolvedValueOnce({ ...mockIntakeRecord, access_token: 'reissued-token' }) // reissueToken
+        .mockResolvedValueOnce({ ...mockIntakeRecord, short_code: 'XY34AB' }); // ensureShortCode update
+
+      const result = await DisputeIntakeService.generateIntakeLink('mcamp-1');
+
+      // ensureShortCode writes short_code only when still null
+      expect(mockDisputeIntake.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mdint-1', short_code: null },
+          data: { short_code: 'XY34AB' },
+        }),
+      );
+      expect(result.shortUrl).toBe('http://localhost:3000/i/XY34AB');
+    });
+
+    it('keeps the existing short code across token reissue', async () => {
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+      mockDisputeIntake.findFirst.mockResolvedValue({ ...mockIntakeRecord, short_code: 'PQR789' });
+      mockDisputeIntake.update.mockResolvedValue({
+        ...mockIntakeRecord,
+        short_code: 'PQR789',
+        access_token: 'new-token-after-rotation',
+      });
+
+      const result = await DisputeIntakeService.generateIntakeLink('mcamp-1');
+
+      // Code is stable — the printed/QR link survives token rotation
+      expect(result.shortUrl).toBe('http://localhost:3000/i/PQR789');
+      // ensureShortCode path (where short_code: null) is NOT invoked
+      expect(mockDisputeIntake.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ short_code: null }) }),
+      );
+    });
+
+    it('resolveShortCode returns the current token + kind + tenant', async () => {
+      mockDisputeIntake.findFirst.mockResolvedValue({
+        ...mockIntakeRecord,
+        short_code: 'XY34AB',
+        intake_kind: 'profile_repair_access',
+        tenant_id: 'tid-1',
+      });
+
+      const result = await DisputeIntakeService.resolveShortCode('XY34AB');
+
+      expect(result).toEqual({
+        token: 'valid-token-32chars-aaaaaaaaaaaa',
+        intakeKind: 'profile_repair_access',
+        tenantId: 'tid-1',
+      });
+    });
+
+    it('resolveShortCode returns null for unknown codes', async () => {
+      mockDisputeIntake.findFirst.mockResolvedValue(null);
+      expect(await DisputeIntakeService.resolveShortCode('NOPE42')).toBeNull();
+    });
+
+    it('resolveShortCode backfills tenant from the campaign when missing', async () => {
+      mockDisputeIntake.findFirst.mockResolvedValue({
+        ...mockIntakeRecord,
+        short_code: 'XY34AB',
+        tenant_id: null,
+      });
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign); // tenant_id: tid-1
+      mockDisputeIntake.update.mockResolvedValue({});
+
+      const result = await DisputeIntakeService.resolveShortCode('XY34AB');
+
+      expect(result?.tenantId).toBe('tid-1');
+      expect(mockDisputeIntake.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mdint-1' },
+          data: { tenant_id: 'tid-1' },
+        }),
+      );
+    });
+
+    it('resolveShortCode falls back to platform tenant when nothing resolves', async () => {
+      mockDisputeIntake.findFirst.mockResolvedValue({
+        ...mockIntakeRecord,
+        short_code: 'XY34AB',
+        tenant_id: null,
+      });
+      mockCampaignsList.findUnique.mockResolvedValue({ ...mockCampaign, tenant_id: null });
+
+      const result = await DisputeIntakeService.resolveShortCode('XY34AB');
+      expect(result?.tenantId).toBe('platform');
+    });
+  });
+
+  // ─── W4 — view tracking ─────────────────────────────────────────
+
+  describe('view tracking (W4)', () => {
+    it('increments viewed_count and stamps viewed_at on first resolve', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue(mockIntakeRecord);
+      mockDisputeIntake.update.mockResolvedValue({});
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+
+      await DisputeIntakeService.resolveIntake('valid-token');
+
+      expect(mockDisputeIntake.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mdint-1' },
+          data: expect.objectContaining({
+            viewed_count: { increment: 1 },
+            viewed_at: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('increments viewed_count without re-stamping viewed_at on repeat opens', async () => {
+      mockDisputeIntake.findUnique.mockResolvedValue({
+        ...mockIntakeRecord,
+        viewed_at: pastDate(1),
+        viewed_count: 3,
+      });
+      mockDisputeIntake.update.mockResolvedValue({});
+      mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
+
+      await DisputeIntakeService.resolveIntake('valid-token');
+
+      const updateData = mockDisputeIntake.update.mock.calls[0][0].data;
+      expect(updateData.viewed_count).toEqual({ increment: 1 });
+      expect(updateData).not.toHaveProperty('viewed_at');
     });
   });
 });

@@ -1037,7 +1037,7 @@ const cycleEngagementSchema = z.object({
 
 const deliverableTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'citation_repair_package', 'repair_completion_report']),
   category: z.string().max(100).optional(),
   layout_spec: z.any(),
   page_size: z.string().max(20).optional(),
@@ -1050,7 +1050,7 @@ const deliverableTemplateUpdateSchema = deliverableTemplateCreateSchema.partial(
 const deliverableCreateSchema = z.object({
   execution_id: z.string().optional(),
   template_id: z.string().optional(),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'citation_repair_package', 'repair_completion_report']),
   status: z.enum(['preview', 'paid', 'archived']),
   file_name: z.string().min(1).max(255),
   storage_path: z.string().min(1).max(500),
@@ -1551,6 +1551,109 @@ router.post('/:id/verify-operating-status', async (req: any, res: Response) => {
       changedBy: req.user?.id,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Profile Repair Fulfillment (Sprint W1d/W2/W7) ──────────────────────
+
+// W1d — top-5 seed-link suggestions for this campaign (NAP-match scored).
+router.get('/:id/seed-link-suggestions', async (req: any, res: Response) => {
+  try {
+    const { default: DirectorySeedCampaignLinkService } = await import('../services/DirectorySeedCampaignLinkService.js');
+    const suggestions = await DirectorySeedCampaignLinkService.suggestSeedLinks(req.params.id);
+    res.json({ success: true, data: suggestions });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// W7 — execution read model for the RepairExecutionCard.
+router.get('/:id/repair-execution', async (req: any, res: Response) => {
+  try {
+    const { default: RepairFulfillmentService } = await import('../services/RepairFulfillmentService.js');
+    const data = await RepairFulfillmentService.getRepairExecution(req.params.id, getCtx(req));
+    res.json({ success: true, data });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// W2 — operator package configuration (tier / mode / platforms / SLA).
+const repairFulfillmentPatchSchema = z.object({
+  tier: z.enum(['standard', 'plus', 'premium']).optional(),
+  mode: z.enum(['diy', 'dfy']).optional(),
+  platforms: z.array(z.string().min(1)).optional(),
+  sla_hours: z.number().int().min(1).max(720).optional(),
+});
+
+router.patch('/:id/repair-fulfillment', async (req: any, res: Response) => {
+  try {
+    const parsed = repairFulfillmentPatchSchema.parse(req.body ?? {});
+    const { default: RepairFulfillmentService } = await import('../services/RepairFulfillmentService.js');
+    const result = await RepairFulfillmentService.updateRepairFulfillment(
+      req.params.id,
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// W7 — per-platform verification status update.
+const platformStatusPatchSchema = z.object({
+  status: z.enum([
+    'awaiting_access', 'access_granted', 'in_progress', 'verified', 'done',
+    'blocked', 'not_applicable', 'customer_pending', 'customer_reported', 'escalated',
+  ]),
+  note: z.string().max(2000).optional(),
+});
+
+router.patch('/:id/repair-fulfillment/platforms/:platform', async (req: any, res: Response) => {
+  try {
+    const parsed = platformStatusPatchSchema.parse(req.body ?? {});
+    const { default: RepairFulfillmentService } = await import('../services/RepairFulfillmentService.js');
+    const result = await RepairFulfillmentService.updatePlatformStatus(
+      req.params.id,
+      req.params.platform,
+      parsed,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// W7 — escalate a platform to a Track B sibling campaign (atomic).
+const platformEscalateSchema = z.object({
+  issue_type: z.string().min(1, 'issue_type is required'),
+  notes: z.string().max(2000).optional(),
+});
+
+router.post('/:id/repair-fulfillment/platforms/:platform/escalate', async (req: any, res: Response) => {
+  try {
+    const parsed = platformEscalateSchema.parse(req.body ?? {});
+    const { default: RepairFulfillmentService } = await import('../services/RepairFulfillmentService.js');
+    const result = await RepairFulfillmentService.escalatePlatform(
+      req.params.id,
+      req.params.platform,
+      { issueType: parsed.issue_type, notes: parsed.notes, changedBy: req.user?.id },
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
@@ -3612,7 +3715,7 @@ router.delete('/branding/:id', async (req: any, res: Response) => {
 const deliverableGenerateSchema = z.object({
   template_id: z.string().optional(),
   execution_id: z.string().optional(),
-  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview']),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview', 'citation_repair_package', 'repair_completion_report']),
   is_preview: z.boolean().default(true),
   content: z.string().optional(),
   // G-6: platform-staff override for a type whose governing signals did not fire.
@@ -3638,8 +3741,19 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
       });
     }
 
+    // W6c — execution-driven types (citation_repair_package) source content
+    // from the picked fulfill execution, not from signals/source material.
+    // Skip the eligibility gate and the G-15 source resolution entirely —
+    // extractContentFromExecution composes the imported analyst output.
+    const executionDriven = Boolean(parsed.execution_id);
+
+    // W8 — repair_completion_report is assembled deterministically from
+    // repair_fulfillment + checklist progress (spec §5.3). Not signal-gated
+    // and not a fulfill execution — the grid IS the content source.
+    const assembledReport = parsed.deliverable_type === 'repair_completion_report';
+
     // G-6: enforce signal-derived eligibility unless the caller overrides.
-    if (!parsed.content && !parsed.allow_override) {
+    if (!parsed.content && !parsed.allow_override && !executionDriven && !assembledReport) {
       const eligibility = await DeliverableSourceService.resolveEligibleTypes(req.params.campaignId, ctx);
       if (!eligibility.types.includes(parsed.deliverable_type as any)) {
         return res.status(400).json({
@@ -3654,15 +3768,24 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
 
     // G-15: resolve content from source material in the caller (not inside
     // MarketingDeliverableService), keeping the base service prompt-agnostic.
+    const { default: RepairFulfillmentService } = await import('../services/RepairFulfillmentService.js');
+
     let content = parsed.content;
     let warnings: string[] = [];
-    if (!content) {
+    let remainingActions: string[] = [];
+    if (!content && !executionDriven && !assembledReport) {
       const resolved = await DeliverableSourceService.resolveDeliverableContent(
         req.params.campaignId, parsed.deliverable_type as any, ctx,
       );
       content = resolved.content ?? undefined;
       // Gates surface as warnings, not hard blocks (§7.4).
       warnings = [...resolved.qualityGate.issues, ...resolved.repetitionGate.issues];
+    } else if (!content && assembledReport) {
+      const report = await RepairFulfillmentService.buildCompletionReport(
+        req.params.campaignId, ctx,
+      );
+      content = report.content;
+      remainingActions = report.remaining_actions;
     }
 
     const deliverable = await MarketingDeliverableService.generateDeliverable({
@@ -3674,6 +3797,15 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
       content,
       generatedBy: req.user?.id,
     }, ctx);
+
+    // W8 — stamp repair_fulfillment.completion so the execution card and
+    // retainer handoff can read the report linkage (best-effort).
+    if (assembledReport && deliverable?.id) {
+      await RepairFulfillmentService.stampCompletionReport(
+        req.params.campaignId, deliverable.id, remainingActions, ctx,
+      );
+    }
+
     res.status(201).json({ success: true, data: deliverable, warnings });
   } catch (error) {
     if (error instanceof z.ZodError) {

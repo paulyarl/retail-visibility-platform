@@ -552,9 +552,11 @@ export class MarketingExecutionService extends BaseService {
               effectiveVariables.audit_results = seekDefaults.audit_results;
             }
           } else if (promptType === 'fulfill') {
-            const fulfillDefaults = repairService.buildFulfillVariables(input.campaign, audit);
-            if (!effectiveVariables.audit_results || !String(effectiveVariables.audit_results).trim()) {
-              effectiveVariables.audit_results = fulfillDefaults.audit_results;
+            const fulfillDefaults = await repairService.buildFulfillVariables(input.campaign, audit);
+            for (const key of ['audit_results', 'seek_briefing', 'repair_tier', 'delivery_mode', 'repair_platforms'] as const) {
+              if (!effectiveVariables[key] || !String(effectiveVariables[key]).trim()) {
+                effectiveVariables[key] = fulfillDefaults[key];
+              }
             }
           } else if (promptType === 'recovery_resolution') {
             let intake = input.campaign.mkt_dispute_intake?.[0];

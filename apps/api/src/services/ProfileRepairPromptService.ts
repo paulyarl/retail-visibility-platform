@@ -253,9 +253,143 @@ export class ProfileRepairPromptService extends BaseService {
     };
   }
 
-  buildFulfillVariables(campaign: any, latestAudit: any): Record<string, string> {
+  /**
+   * W5a — serialize the latest per-issue seek execution (output_schema
+   * 'profile_repair_audit') into a compact markdown briefing for the fulfill
+   * prompt: { issueType, scope.specifics, scope.affected_platforms, impact,
+   * pitch.value_preview }. Returns null when no completed seek execution
+   * exists — the fulfill prompt degrades to audit_results-only context.
+   */
+  async serializeSeekBriefing(
+    campaignId: string,
+  ): Promise<{ markdown: string; affectedPlatforms: string[] } | null> {
+    try {
+      const executions = await this.prisma.mkt_prompt_executions_list.findMany({
+        where: { campaign_id: campaignId, status: 'completed' },
+        include: {
+          mkt_prompt_templates_list: { select: { output_schema: true } },
+        },
+        orderBy: { created_at: 'desc' },
+        take: 15,
+      });
+
+      const execution = executions.find((e: any) => {
+        const schema = e.mkt_prompt_templates_list?.output_schema;
+        const name = schema?.name ?? schema?.outputSchema?.name;
+        return name === 'profile_repair_audit';
+      });
+      if (!execution?.filtered_output && !execution?.raw_output) return null;
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(
+          this.stripJsonArtifacts(execution.filtered_output || execution.raw_output || ''),
+        );
+      } catch {
+        return null;
+      }
+      const briefing = parsed?.profile_repair_audit;
+      if (!briefing || typeof briefing !== 'object') return null;
+
+      const affectedPlatforms: string[] = Array.isArray(briefing.scope?.affected_platforms)
+        ? briefing.scope.affected_platforms.map((p: any) => String(p))
+        : [];
+
+      const lines: string[] = ['## Repair Briefing (seek-stage diagnosis)'];
+      if (briefing.issueType) lines.push(`- Issue type: ${briefing.issueType}`);
+      if (affectedPlatforms.length > 0) {
+        lines.push(`- Affected platforms: ${affectedPlatforms.join(', ')}`);
+      }
+      if (briefing.scope?.summary) lines.push(`- Scope: ${briefing.scope.summary}`);
+      if (briefing.scope?.specifics) lines.push(`- Specifics: ${briefing.scope.specifics}`);
+      const impact = briefing.impact;
+      if (impact && typeof impact === 'object') {
+        const parts = [
+          impact.primary_consequence,
+          impact.estimated_reach_loss,
+          impact.competitive_gap,
+        ].filter(Boolean);
+        if (parts.length > 0) lines.push(`- Impact: ${parts.join(' | ')}`);
+      }
+      if (briefing.pitch?.value_preview) {
+        lines.push(`- Value preview: ${briefing.pitch.value_preview}`);
+      }
+
+      return { markdown: lines.join('\n'), affectedPlatforms };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * W5a — fulfill prompt variables. Extends the audit-only baseline with the
+   * seek briefing, purchased tier, delivery mode, and the derived repair
+   * platform scope:
+   *
+   *   repair_platforms = repair_fulfillment.platforms     (purchased scope, W2)
+   *                    ∩ briefing.scope.affected_platforms (diagnosed scope)
+   *                    ?? affected_platforms               (fallback when unset)
+   *
+   * All returned keys are defaults — a caller-supplied `repair_platforms` in
+   * the Prompt Workspace variables still wins (same fill-if-empty pattern as
+   * `interactive_verification`), enabling ad-hoc rescope.
+   */
+  async buildFulfillVariables(campaign: any, latestAudit: any): Promise<Record<string, string>> {
+    const { REPAIR_TIER_CATALOG, REPAIR_PLATFORM_LABELS, isRepairTier } = await import(
+      '../lib/repair-tiers.js'
+    );
+
+    const rf = (campaign?.repair_fulfillment as Record<string, any> | null) ?? {};
+    const briefing = campaign?.id ? await this.serializeSeekBriefing(campaign.id) : null;
+
+    // Purchased scope → normalized platform keys.
+    const toPlatformKey = (p: string): string => {
+      const norm = p.trim().toLowerCase().replace(/[\s-]+/g, '_');
+      if (norm in REPAIR_PLATFORM_LABELS) return norm;
+      const byLabel = Object.entries(REPAIR_PLATFORM_LABELS).find(
+        ([, label]) => label.toLowerCase() === p.trim().toLowerCase(),
+      );
+      return byLabel?.[0] ?? norm;
+    };
+
+    const purchased: string[] = Array.isArray(rf.platforms)
+      ? rf.platforms.map((p: any) => toPlatformKey(String(p)))
+      : [];
+    const diagnosed = (briefing?.affectedPlatforms ?? []).map(toPlatformKey);
+
+    let repairPlatforms: string[];
+    if (purchased.length > 0 && diagnosed.length > 0) {
+      const diagnosedSet = new Set(diagnosed);
+      const intersection = purchased.filter((p) => diagnosedSet.has(p));
+      repairPlatforms = intersection.length > 0 ? intersection : purchased;
+    } else {
+      repairPlatforms = purchased.length > 0 ? purchased : diagnosed;
+    }
+
+    const tierKey = typeof rf.tier === 'string' && isRepairTier(rf.tier) ? rf.tier : null;
+    const tierSpec = tierKey ? REPAIR_TIER_CATALOG[tierKey] : null;
+    const repairTier = tierSpec
+      ? `${tierSpec.label} tier — up to ${tierSpec.platforms.length} platforms (${tierSpec.platforms
+          .map((p) => REPAIR_PLATFORM_LABELS[p])
+          .join(', ')}), ${tierSpec.slaHours}h SLA`
+      : '';
+
+    const mode = rf.mode === 'dfy' ? 'dfy' : rf.mode === 'diy' ? 'diy' : '';
+    const deliveryMode =
+      mode === 'dfy'
+        ? 'dfy — done-for-you: the operator executes every fix on delegated access; the package is the internal fix-sheet, framed for handoff'
+        : mode === 'diy'
+          ? 'diy — do-it-yourself: the customer executes the fixes; write the package for the owner to follow step by step'
+          : '';
+
     return {
       audit_results: this.serializeAuditResults(latestAudit?.audit_data ?? {}),
+      seek_briefing: briefing?.markdown ?? '',
+      repair_tier: repairTier,
+      delivery_mode: deliveryMode,
+      repair_platforms: repairPlatforms
+        .map((p) => REPAIR_PLATFORM_LABELS[p as keyof typeof REPAIR_PLATFORM_LABELS] ?? p)
+        .join(', '),
     };
   }
 
@@ -672,7 +806,7 @@ export class ProfileRepairPromptService extends BaseService {
       if (template.prompt_type === 'recovery_resolution' || templateId === PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID) {
         variablesUsed = this.buildResolutionVariables(campaign, intake);
       } else if (template.prompt_type === 'fulfill' || templateId === PROFILE_REPAIR_CITATION_PACKAGE_TEMPLATE_ID) {
-        variablesUsed = this.buildFulfillVariables(campaign, latestAudit);
+        variablesUsed = await this.buildFulfillVariables(campaign, latestAudit);
       } else {
         variablesUsed = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
       }
@@ -739,7 +873,7 @@ export class ProfileRepairPromptService extends BaseService {
       if (template.prompt_type === 'recovery_resolution' || templateId === PROFILE_REPAIR_RESOLUTION_TEMPLATE_ID) {
         variablesUsed = this.buildResolutionVariables(campaign, intake);
       } else if (template.prompt_type === 'fulfill' || templateId === PROFILE_REPAIR_CITATION_PACKAGE_TEMPLATE_ID) {
-        variablesUsed = this.buildFulfillVariables(campaign, latestAudit);
+        variablesUsed = await this.buildFulfillVariables(campaign, latestAudit);
       } else {
         variablesUsed = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
       }
@@ -895,6 +1029,75 @@ export class ProfileRepairPromptService extends BaseService {
           },
           ctx,
         );
+      }
+
+      // W6a — fulfill import → citation_repair_package deliverable.
+      // Mirrors the reinstatement_appeal block above: deliverable row + the
+      // deliverable_text / submission_guide sections. No stage transition on
+      // import — the operator reviews, then generates + sends the PDF.
+      // Idempotent: a non-preview citation_repair_package already on the
+      // campaign means a prior import landed — return its id, never double up.
+      if (template.prompt_type === 'fulfill' || templateId === PROFILE_REPAIR_CITATION_PACKAGE_TEMPLATE_ID) {
+        const existing = await this.prisma.mkt_deliverables_list.findFirst({
+          where: {
+            campaign_id: campaignId,
+            deliverable_type: 'citation_repair_package',
+            status: { not: 'preview' },
+          },
+          orderBy: { created_at: 'desc' },
+        });
+
+        if (existing) {
+          deliverableId = existing.id;
+        } else {
+          deliverableId = generateDeliverableId();
+
+          await this.prisma.mkt_deliverables_list.create({
+            data: {
+              id: deliverableId,
+              campaign_id: campaignId,
+              execution_id: execution.id,
+              template_id: templateId,
+              deliverable_type: 'citation_repair_package',
+              status: 'drafted',
+              file_name: `citation-repair-package-${campaignId}.json`,
+              storage_path: `recovery/${campaignId}/${deliverableId}.json`,
+              mime_type: 'application/json',
+              generated_by: ctx?.userId || 'operator-external',
+            },
+          });
+
+          await this.prisma.mkt_deliverable_section.createMany({
+            data: [
+              {
+                id: generateDeliverableSectionId(),
+                deliverable_id: deliverableId,
+                campaign_id: campaignId,
+                section_type: 'deliverable_text',
+                title: 'Citation & Profile Repair Package',
+                content: parsedJson.deliverableText,
+                source: 'external',
+                quality_gate_passed: true,
+                quality_gate_issues: [],
+                status: 'draft',
+                section_index: 0,
+              },
+              {
+                id: generateDeliverableSectionId(),
+                deliverable_id: deliverableId,
+                campaign_id: campaignId,
+                section_type: 'submission_guide',
+                title: 'Submission Guide',
+                content: parsedJson.submissionGuide,
+                source: 'external',
+                quality_gate_passed: true,
+                quality_gate_issues: [],
+                status: 'draft',
+                section_index: 1,
+              },
+            ],
+          });
+        }
       }
 
       await promptService.updateExecution(

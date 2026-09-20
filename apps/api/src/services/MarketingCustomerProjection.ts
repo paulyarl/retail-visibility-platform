@@ -149,8 +149,14 @@ export async function projectCampaign(
         deliverables.push({
           id: d.id,
           title: d.title || `${serviceCategoryLabel} deliverable`,
-          type: d.type || 'document',
-          downloadUrl: d.file_url || null,
+          type: d.deliverable_type || 'document',
+          // W6d — mkt_deliverables_list has no file_url column; the real file
+          // lives at storage_path and streams through the authenticated
+          // download route. Only expose the link when a rendered PDF exists —
+          // import-created rows (JSON storage_path) aren't customer downloads.
+          downloadUrl: d.mime_type === 'application/pdf' && d.storage_path
+            ? `/api/customer/marketing/deliverables/${d.id}/download`
+            : null,
           deliveredAt: d.delivered_at || null,
         });
       }
