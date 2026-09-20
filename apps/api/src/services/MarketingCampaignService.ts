@@ -2899,18 +2899,22 @@ export class MarketingCampaignService extends BaseService {
       }
 
       // Registry-driven intake auto-gen: for campaigns running the review
-      // pipeline (review_management, triage_management, or profile_repair on
-      // the standard track), check mkt_intake_definitions for registry kinds
-      // whose trigger_stages include the target stage. Generate an intake
-      // link for each match. Best-effort — failure must NOT block the
-      // transition.
+      // pipeline (review_management, triage_management, profile_repair on
+      // the standard track, or the PB-08 website-gap playbook), check
+      // mkt_intake_definitions for registry kinds whose trigger_stages include
+      // the target stage. Generate an intake link for each match. Best-effort —
+      // failure must NOT block the transition.
       //
       // profile_repair + escalated is excluded here because it gets dispute
-      // intake via the recovery block above.
+      // intake via the recovery block above. PB-08 also carries
+      // category='profile_repair' but no repair track — it is included so the
+      // website_build intake (trigger_guard: playbook_code = 'PB-08') fires.
+      const isWebsiteGap = category === 'profile_repair' && (campaign as any).playbook_code === 'PB-08';
       const runsReviewPipeline =
         category === 'review_management' ||
         category === 'triage_management' ||
-        (category === 'profile_repair' && repairTrack === 'standard');
+        (category === 'profile_repair' && repairTrack === 'standard') ||
+        isWebsiteGap;
       if (runsReviewPipeline) {
         try {
           const { intakeDefinitionService } = await import('./intake/IntakeDefinitionService.js');

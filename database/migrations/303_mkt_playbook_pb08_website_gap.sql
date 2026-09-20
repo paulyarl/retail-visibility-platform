@@ -17,7 +17,10 @@
 --      treatment as WC_MISSING_WEBSITE).
 --   5. Seed PB-08 starter checklist steps (pbcs-pb08-*).
 --   6. Seed the website_build mkt_intake_definitions row (§8.5 / §9.7 G-6 —
---      mkt_dispute_intake.intake_kind is a FK to this table).
+--      mkt_dispute_intake.intake_kind is a FK to this table), wired to
+--      auto-offer at the `paid` stage when playbook_code = 'PB-08' via the
+--      declarative trigger_guard (migration 301). Resolves OQ-8's playbook
+--      linkage without new code.
 --
 -- Post-migration cascade priority:
 --   PB-04(1) > PB-05(2) > PB-01(3) > PB-02(4) > PB-07(5) > PB-06(6) > PB-08(7) > PB-03(8)
@@ -229,5 +232,7 @@ COMMIT;
 -- SELECT matching_rules->'dual'->'groupA' FROM mkt_playbook_catalog WHERE code = 'PB-05';
 -- SELECT matching_rules->'none' FROM mkt_playbook_catalog WHERE code IN ('PB-02','PB-06');
 -- SELECT intake_kind FROM mkt_intake_definitions WHERE intake_kind = 'website_build';
+-- SELECT trigger_stages, trigger_guard FROM mkt_intake_definitions WHERE intake_kind = 'website_build';
+--   Expect trigger_stages=["paid"], trigger_guard=[{path:playbook_code, equals, PB-08}].
 -- SELECT COUNT(*) FROM mkt_playbook_checklist_steps s JOIN mkt_playbook_catalog c ON c.id = s.playbook_id WHERE c.code = 'PB-08';
 --   Expect 7.
