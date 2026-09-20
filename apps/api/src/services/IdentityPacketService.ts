@@ -63,6 +63,15 @@ export interface IdentityPacketLedgerEntry {
 export interface IdentityPacket {
   campaignId: string;
   businessName: string | null;
+  /**
+   * Resolved business city/state — campaign structured address first, then
+   * audit metadata (matched → requested), then the campaign's market scope.
+   * Same precedence the seed-create path uses (DirectoryPresenceSeedService),
+   * plus the market-scope fallback the seed-create form applies. Carried for
+   * the Verify record modal prefill — city/state are not scored fields.
+   */
+  addressCity: string | null;
+  addressState: string | null;
   identityStatus: IdentityStatus;
   operationalStatus: OperationalStatus;
   callConfirmed: boolean | null;
@@ -94,6 +103,8 @@ export interface AssembleInput {
     city?: string | null;
     state?: string | null;
     address_line1?: string | null;
+    address_city?: string | null;
+    address_state?: string | null;
     phone?: string | null;
     website_url?: string | null;
   } | null;
@@ -216,6 +227,24 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     snap_ebt: null,
     attributes: input.attributes?.length ? `${input.attributes.length} attribute(s)` : null,
   };
+
+  // Resolved business city/state — not scored fields (IdentityFieldKey has no
+  // city/state), but the Verify record modal prefills from them. Precedence
+  // mirrors DirectoryPresenceSeedService (structured campaign address → audit
+  // matched → audit requested), then falls back to the campaign's market
+  // scope — the same `address_city || city` fallback the seed-create form uses.
+  const addressCity =
+    campaign?.address_city ||
+    meta.matched_business?.city ||
+    meta.requested_business?.city ||
+    campaign?.city ||
+    null;
+  const addressState =
+    campaign?.address_state ||
+    meta.matched_business?.state ||
+    meta.requested_business?.state ||
+    campaign?.state ||
+    null;
 
   const evidence: Record<IdentityFieldKey, IdentitySourceRef[]> = {
     name: [],
@@ -417,6 +446,8 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
   return {
     campaignId: input.campaignId,
     businessName: canonical.name,
+    addressCity,
+    addressState,
     identityStatus,
     operationalStatus,
     callConfirmed: input.callConfirmed ?? null,
@@ -448,6 +479,8 @@ class IdentityPacketService {
         city: true,
         state: true,
         address_line1: true,
+        address_city: true,
+        address_state: true,
         phone: true,
         website_url: true,
       },

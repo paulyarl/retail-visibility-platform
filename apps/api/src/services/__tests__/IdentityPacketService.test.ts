@@ -214,6 +214,67 @@ describe('assembleIdentityPacket', () => {
     expect(p.seed).toEqual({ id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market' });
   });
 
+  it('resolves addressCity/addressState for the Verify record prefill', () => {
+    // Structured campaign address wins over audit metadata and market scope.
+    const structured = assembleIdentityPacket(
+      base({
+        campaign: { ...campaign, address_city: 'Carmel', address_state: 'IN' },
+        audit: {
+          ...strongAudit,
+          audit_metadata: {
+            ...strongAudit.audit_metadata,
+            matched_business: { business_name: 'Arsema Market', city: 'Indianapolis', state: 'IN' },
+            requested_business: { business_name: 'Arsema Market', city: 'Indianapolis', state: 'IN' },
+          },
+        },
+      }),
+    );
+    expect(structured.addressCity).toBe('Carmel');
+    expect(structured.addressState).toBe('IN');
+
+    // Audit matched_business fills in when the structured columns are empty.
+    const fromAudit = assembleIdentityPacket(
+      base({
+        audit: {
+          ...strongAudit,
+          audit_metadata: {
+            ...strongAudit.audit_metadata,
+            matched_business: { business_name: 'Arsema Market', city: 'Carmel', state: 'IN' },
+            requested_business: { business_name: 'Arsema Market', city: 'Indianapolis', state: 'IN' },
+          },
+        },
+      }),
+    );
+    expect(fromAudit.addressCity).toBe('Carmel');
+    expect(fromAudit.addressState).toBe('IN');
+
+    // requested_business when matched is absent; market scope last; null when
+    // nothing knows the business's city.
+    const fromRequested = assembleIdentityPacket(
+      base({
+        campaign: { ...campaign, city: null, state: null },
+        audit: {
+          ...strongAudit,
+          audit_metadata: {
+            ...strongAudit.audit_metadata,
+            requested_business: { business_name: 'Arsema Market', city: 'Gary', state: 'IN' },
+          },
+        },
+      }),
+    );
+    expect(fromRequested.addressCity).toBe('Gary');
+
+    const fromScope = assembleIdentityPacket(base());
+    expect(fromScope.addressCity).toBe('Indianapolis');
+    expect(fromScope.addressState).toBe('IN');
+
+    const unknown = assembleIdentityPacket(
+      base({ campaign: null, audit: null }),
+    );
+    expect(unknown.addressCity).toBeNull();
+    expect(unknown.addressState).toBeNull();
+  });
+
   it('scores an unaudited business from operator evidence alone', () => {
     // The Identity tab's zero-state: no audit, so nothing is sourced yet.
     const empty = assembleIdentityPacket(base({ audit: null }));

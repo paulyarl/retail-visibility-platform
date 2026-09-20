@@ -348,10 +348,16 @@ export default function IdentityPacketCard({
     id: campaignId,
     business_name: packet.businessName,
     category: canonicalValue('primary_category'),
+    // City/state aren't scored packet fields — the packet resolves them
+    // separately (structured campaign address → audit metadata → market scope).
+    city: packet.addressCity,
+    state: packet.addressState,
     business_snapshot: {
       verified_nap: {
         name: canonicalValue('name'),
         address: canonicalValue('address'),
+        city: packet.addressCity,
+        state: packet.addressState,
         phone: canonicalValue('phone'),
         website: canonicalValue('website'),
         category: canonicalValue('primary_category'),
