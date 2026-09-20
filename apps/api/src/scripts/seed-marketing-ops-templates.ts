@@ -31,6 +31,7 @@ const SEED_TEMPLATES = [
     id: 'mpt-seed-seek-001',
     name: 'Seek: Business Audit',
     promptType: 'seek' as const,
+    category: 'Digital Audit',
     body: `You are a local business marketing analyst. Research the following business and provide a structured audit:
 
 Business: {{business_name}}
@@ -68,6 +69,7 @@ Format as structured JSON.`,
     id: 'mpt-seed-seek-002',
     name: 'Seek: Category Analysis',
     promptType: 'seek' as const,
+    category: 'Market Analysis',
     body: `You are a local market research analyst. Analyze the {{category}} landscape in {{city}}.
 
 Provide:
@@ -92,6 +94,7 @@ Format as structured JSON.`,
     id: 'mpt-seed-seek-003',
     name: 'Seek: City Ecosystem',
     promptType: 'seek' as const,
+    category: 'Market Analysis',
     body: `You are a local market ecosystem analyst. Provide an overview of the business landscape in {{city}}.
 
 Provide:
@@ -115,6 +118,7 @@ Format as structured JSON.`,
     id: 'mpt-seed-fulfill-001',
     name: 'Fulfill: Review Responses',
     promptType: 'fulfill' as const,
+    category: 'Review Response',
     body: `You are a professional review response writer for local businesses. Write responses to the following reviews for {{business_name}} in {{city}}, a {{category}} business.
 
 Business voice/tone: {{voice}}
@@ -148,6 +152,7 @@ ${FULFILL_TONE}`,
     id: 'mpt-seed-fulfill-002',
     name: 'Fulfill: Service Menu',
     promptType: 'fulfill' as const,
+    category: 'Deliverables',
     body: `You are a professional copywriter for local businesses. Create a compelling service menu for {{business_name}}, a {{category}} business.
 
 Services offered:
@@ -177,6 +182,7 @@ ${FULFILL_TONE}`,
     id: 'mpt-seed-fulfill-003',
     name: 'Fulfill: GBP Optimization',
     promptType: 'fulfill' as const,
+    category: 'Deliverables',
     body: `You are a Google Business Profile optimization expert. Create an optimization plan for {{business_name}}, a {{category}} business in {{city}}.
 
 Services offered:
@@ -212,6 +218,7 @@ ${FULFILL_TONE}`,
     id: 'mpt-seed-filter-001',
     name: 'Filter: Response Quality',
     promptType: 'filter' as const,
+    category: 'Review Response',
     body: `You are a quality assurance reviewer for AI-generated review responses. Evaluate the following responses for {{business_name}}.
 
 Business voice: {{voice}}
@@ -246,6 +253,7 @@ End with: Overall pass rate (X/N responses passed all checks).`,
     id: 'mpt-seed-retainer-001',
     name: 'Retainer: Follow-up Sequence',
     promptType: 'retainer' as const,
+    category: 'Retainer',
     body: `You are a customer success strategist for local business marketing services. Create a 4-week follow-up sequence for {{business_name}}, a {{category}} business in {{city}} that just received their marketing deliverable.
 
 The retainer pitch in Week 4 should be tailored to the business type. If {{business_name}} is a product/inventory business (grocery store, bakery, specialty market, pharmacy — i.e., a business that sells physical inventory rather than labor/services), the Week 4 retainer pitch should reference: monthly storefront + product photography, GBP photo refresh, catalog updates, hours/holiday-hours sync, availability-inquiry monitoring, and local visibility reporting. If {{business_name}} is a service business (HVAC, plumbing, dental, law firm), the Week 4 retainer pitch should reference: GBP monitoring, review responses, monthly reports, and content posts.
@@ -292,6 +300,7 @@ async function main() {
           data: {
             name: template.name,
             prompt_type: template.promptType,
+            category: template.category,
             body: template.body,
             variables: template.variables,
             output_schema: (template as any).outputSchema ?? null,
@@ -308,6 +317,7 @@ async function main() {
             id: template.id,
             name: template.name,
             prompt_type: template.promptType,
+            category: template.category,
             body: template.body,
             variables: template.variables,
             output_schema: (template as any).outputSchema ?? null,

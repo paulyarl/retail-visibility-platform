@@ -28,6 +28,7 @@ const TEMPLATE = {
   name: 'Seek: Business Category Identification',
   promptType: 'seek' as const,
   scope: 'business' as const,
+  category: 'Category Identification',
   body: `You are a local business categorization analyst. Your task is to identify the correct niche category for a business when the operator cannot determine it.
 
 Business: {{business_name}}
@@ -146,6 +147,7 @@ async function main() {
   if (existing) {
     await service.updateTemplate(TEMPLATE.id, {
       name: TEMPLATE.name,
+      category: TEMPLATE.category,
       body: TEMPLATE.body,
       variables: TEMPLATE.variables,
       outputSchema: TEMPLATE.outputSchema,
@@ -157,6 +159,7 @@ async function main() {
       name: TEMPLATE.name,
       promptType: TEMPLATE.promptType,
       scope: TEMPLATE.scope,
+      category: TEMPLATE.category,
       body: TEMPLATE.body,
       variables: TEMPLATE.variables,
       outputSchema: TEMPLATE.outputSchema,

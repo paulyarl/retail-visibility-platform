@@ -38,6 +38,7 @@ interface SeedTemplate {
   id: string;
   name: string;
   promptType: 'seek' | 'fulfill';
+  category: string;
   body: string;
   variables: string[];
   outputSchema: { name: string } | null;
@@ -245,6 +246,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     id: 'mpt-review-intake',
     name: 'Seek: Review Intake',
     promptType: 'seek',
+    category: 'Deliverables',
     body: REVIEW_INTAKE_BODY,
     variables: ['business_name', 'category', 'city', 'raw_reviews'],
     outputSchema: { name: REVIEW_INTAKE_SCHEMA_NAME },
@@ -254,16 +256,17 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     id: 'mpt-deliverable-source-material',
     name: 'Seek: Deliverable Source Material',
     promptType: 'seek',
+    category: 'Deliverables',
     body: SOURCE_MATERIAL_BODY,
     variables: ['business_name', 'city', 'category', 'detected_signals', 'audit_results', 'prior_outreach', 'review_intake'],
     outputSchema: { name: DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME },
     isDefault: false,
   },
-  { id: 'mpt-seed-fulfill-004', name: 'Fulfill: Testimonial Cards', promptType: 'fulfill', body: FULFILL_004, variables: ['business_name', 'category', 'city', 'testimonials', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-005', name: 'Fulfill: NAP Consistency Report', promptType: 'fulfill', body: FULFILL_005, variables: ['business_name', 'category', 'city', 'nap_status', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-004', name: 'Fulfill: Testimonial Cards', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_004, variables: ['business_name', 'category', 'city', 'testimonials', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-005', name: 'Fulfill: NAP Consistency Report', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_005, variables: ['business_name', 'category', 'city', 'nap_status', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {
@@ -278,6 +281,7 @@ async function main() {
       const data = {
         name: template.name,
         prompt_type: template.promptType,
+        category: template.category,
         body: template.body,
         variables: template.variables,
         output_schema: template.outputSchema,
