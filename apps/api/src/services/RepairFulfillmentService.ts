@@ -313,6 +313,49 @@ export class RepairFulfillmentService extends BaseService {
     }
   }
 
+  /**
+   * Seed platform_status rows when the citation_repair_package deliverable
+   * is generated (spec §4: "DIY by seeding customer_pending per platform
+   * when the package deliverable is generated"). DFY rows are written by
+   * the access-intake adapter instead — this is a no-op for mode='dfy'.
+   * Existing entries are never clobbered.
+   */
+  async seedPlatformStatusesOnPackageGeneration(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ seeded: string[] }> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { id: true, repair_fulfillment: true },
+      });
+      if (!campaign) throw new NotFoundError(`Campaign ${campaignId} not found`);
+
+      const rf = { ...((campaign.repair_fulfillment as Record<string, any> | null) ?? {}) };
+      if (rf.mode !== 'diy' || !Array.isArray(rf.platforms)) return { seeded: [] };
+
+      const statusMap = { ...((rf.platform_status as Record<string, any>) ?? {}) };
+      const seeded: string[] = [];
+      for (const platform of rf.platforms as string[]) {
+        if (statusMap[platform]) continue;
+        statusMap[platform] = { status: 'customer_pending', updated_at: new Date().toISOString() };
+        seeded.push(platform);
+      }
+      if (seeded.length === 0) return { seeded };
+
+      rf.platform_status = statusMap;
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { repair_fulfillment: rf },
+      });
+
+      logger.info('DIY platform statuses seeded', ctx, { campaignId, seeded });
+      return { seeded };
+    } catch (error) {
+      throw this.handleError(error, ctx);
+    }
+  }
+
   // ====================
   // W7 — PLATFORM ESCALATION (Track A → Track B sibling)
   // ====================

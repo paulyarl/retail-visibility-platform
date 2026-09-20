@@ -3806,6 +3806,15 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
       );
     }
 
+    // Spec §4 — DIY mode seeds customer_pending per platform when the
+    // package deliverable is generated (DFY rows come from the access
+    // intake adapter; the method no-ops for mode='dfy').
+    if (parsed.deliverable_type === 'citation_repair_package' && deliverable?.id) {
+      await RepairFulfillmentService.seedPlatformStatusesOnPackageGeneration(
+        req.params.campaignId, ctx,
+      );
+    }
+
     res.status(201).json({ success: true, data: deliverable, warnings });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -315,6 +315,50 @@ describe('RepairFulfillmentService', () => {
     });
   });
 
+  // ─── seedPlatformStatusesOnPackageGeneration (spec §4 — DIY seeding) ──
+
+  describe('seedPlatformStatusesOnPackageGeneration', () => {
+    it('seeds customer_pending for each scoped platform in DIY', async () => {
+      mockCampaigns.findUnique.mockResolvedValue(
+        trackACampaign({ tier: 'standard', mode: 'diy', platforms: ['google', 'yelp'] }),
+      );
+      mockCampaigns.update.mockResolvedValue({});
+
+      const r = await RepairFulfillmentService.seedPlatformStatusesOnPackageGeneration('mcamp-track-a');
+      expect(r.seeded).toEqual(['google', 'yelp']);
+      const written = mockCampaigns.update.mock.calls[0][0].data.repair_fulfillment;
+      expect(written.platform_status.google.status).toBe('customer_pending');
+      expect(written.platform_status.yelp.status).toBe('customer_pending');
+    });
+
+    it('is a no-op for DFY mode (adapter owns the rows)', async () => {
+      mockCampaigns.findUnique.mockResolvedValue(
+        trackACampaign({ tier: 'standard', mode: 'dfy', platforms: ['google'] }),
+      );
+
+      const r = await RepairFulfillmentService.seedPlatformStatusesOnPackageGeneration('mcamp-track-a');
+      expect(r.seeded).toEqual([]);
+      expect(mockCampaigns.update).not.toHaveBeenCalled();
+    });
+
+    it('does not clobber existing platform entries', async () => {
+      mockCampaigns.findUnique.mockResolvedValue(
+        trackACampaign({
+          tier: 'standard',
+          mode: 'diy',
+          platforms: ['google', 'yelp'],
+          platform_status: { google: { status: 'verified', verified_at: 'x' } },
+        }),
+      );
+      mockCampaigns.update.mockResolvedValue({});
+
+      const r = await RepairFulfillmentService.seedPlatformStatusesOnPackageGeneration('mcamp-track-a');
+      expect(r.seeded).toEqual(['yelp']);
+      const written = mockCampaigns.update.mock.calls[0][0].data.repair_fulfillment;
+      expect(written.platform_status.google).toEqual({ status: 'verified', verified_at: 'x' });
+    });
+  });
+
   // ─── escalatePlatform (W7c) ──────────────────────────────────────
 
   describe('escalatePlatform', () => {
