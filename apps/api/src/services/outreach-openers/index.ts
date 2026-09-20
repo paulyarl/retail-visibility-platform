@@ -72,6 +72,7 @@ export {
   CALL_SCRIPT_ASK_DECLINE_FALLBACK,
   CALL_SCRIPT_CLOSE,
   CALL_SCRIPT_OBJECTIONS,
+  WEBSITE_CALL_SCRIPT_OBJECTIONS,
   type HookAngle,
   type HookTemplate,
   type ObjectionRow,

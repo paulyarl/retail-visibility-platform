@@ -135,12 +135,12 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('HookSuggestionService.suggestForCampaign', () => {
-  it('returns all 15 hooks ranked', async () => {
+  it('returns all 20 hooks ranked', async () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(15);
-    // Ranks are 1–15, sequential
-    for (let i = 0; i < 15; i++) {
+    expect(result.suggestions).toHaveLength(20);
+    // Ranks are 1–20, sequential
+    for (let i = 0; i < 20; i++) {
       expect(result.suggestions[i].rank).toBe(i + 1);
     }
   });
@@ -195,6 +195,36 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     expect(result.suggestions[0].matchedSignals).toContain('DS_CLAIMED_STATUS');
   });
 
+  it('priority order — the angle matching the highest-severity signal leads (A7 website bundle)', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A7',
+      source: 'fallback',
+      reason: 'test',
+    });
+    mockGetTriageResult.mockResolvedValue(makeTriageResult([
+      'WC_BROKEN_WEBSITE',   // crisis
+      'WC_STALE_WEBSITE',    // material
+      'WC_MOBILE_FRICTION',  // borderline — matched only by non-affinity click_to_call
+    ]));
+    // Severity is derived from the audit — a non-null audit is required or
+    // every signal degrades to 'borderline'.
+    mockGetLatestAuditData.mockResolvedValue({ auditData: {} });
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+    const angles = result.suggestions.map((s) => s.angle);
+
+    // The crisis-matching website angle leads.
+    expect(angles[0]).toBe('website_repair');
+    expect(result.suggestions[0].matchedSignals).toContain('WC_BROKEN_WEBSITE');
+    // Crisis (website_repair) outranks material (website_scaling), which
+    // outranks a no-match A7 hook.
+    expect(angles.indexOf('website_repair')).toBeLessThan(angles.indexOf('website_scaling'));
+    expect(angles.indexOf('website_scaling')).toBeLessThan(angles.indexOf('website_foundation'));
+    // A non-affinity hook matching only a borderline signal ranks below every
+    // A7-affinity hook (affinity is the top-level priority alignment).
+    expect(angles.indexOf('click_to_call')).toBeGreaterThan(angles.indexOf('website_foundation'));
+  });
+
   it('availability_inquiry tops the ranking when WC_MISSING_AVAILABILITY_INQUIRY fired under A6', async () => {
     mockResolveCampaignArchetype.mockResolvedValue({
       archetype: 'A6',
@@ -220,14 +250,17 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     mockGetTriageResult.mockResolvedValue(makeTriageResult(['RA_LOW_REVIEW_VOLUME']));
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
-    const topAngles = result.suggestions.slice(0, 5).map((s) => s.angle);
+    const topAngles = result.suggestions.slice(0, 8).map((s) => s.angle);
 
-    // A4-affinity hooks (gbp_verification, website_foundation, website_repair,
-    // availability_inquiry, click_to_call) should still rank above
-    // signal-matched non-affinity hooks
+    // The A4-affinity tier (catalog order): gbp_verification, website_foundation,
+    // website_repair, website_tiers, website_visibility, availability_inquiry,
+    // click_to_call, zero_footprint — 8 hooks, all ahead of signal-matched
+    // non-affinity hooks.
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
     expect(topAngles).toContain('website_repair');
+    expect(topAngles).toContain('website_tiers');
+    expect(topAngles).toContain('website_visibility');
     expect(topAngles).toContain('availability_inquiry');
     expect(topAngles).toContain('click_to_call');
   });
@@ -237,7 +270,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(15);
+    expect(result.suggestions).toHaveLength(20);
     // All matchedSignals should be empty
     for (const s of result.suggestions) {
       expect(s.matchedSignals).toEqual([]);
@@ -249,7 +282,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(15);
+    expect(result.suggestions).toHaveLength(20);
   });
 });
 
@@ -442,7 +475,7 @@ describe('Emerging-archetype rank boost', () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
     // Without boost, the ranking should match the Sprint 1 logic
-    expect(result.suggestions).toHaveLength(15);
+    expect(result.suggestions).toHaveLength(20);
     // gbp_verification has A3 archetype affinity — should be #1
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
@@ -452,7 +485,7 @@ describe('Emerging-archetype rank boost', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(15);
+    expect(result.suggestions).toHaveLength(20);
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
 });

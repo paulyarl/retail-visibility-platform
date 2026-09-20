@@ -754,3 +754,35 @@ export const CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
     response: 'Will do — what\'s the best address? And if you have a minute later, I\'d love to walk you through the one or two things that stood out most.',
   },
 ];
+
+// ─── Website-playbook objection table (PB-08 / A7) ───────────────────────
+//
+// The website call has its own live objections — "I don't need a website",
+// "I already have one", "too expensive", "I don't want an online store",
+// "no time". The responses lean on the platform's website OFFERINGS
+// (tiered builds, optional ecommerce, grow-with-you, done-for-you) rather
+// than a generic "the rundown is free" — this is where the offering angles
+// win the call. Prepended for A7 campaigns so the operator sees the
+// on-point rebuttals first, then the generic five.
+export const WEBSITE_CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
+  {
+    objection: 'I don\'t need a website — my customers just walk in',
+    response: 'Totally fair, and a lot of my best clients said the same thing. The catch is the people who *don\'t* know you yet search first — and right now they\'re finding someone else. It\'s smaller than most owners expect to fix. Want me to send what the first tier would look like?',
+  },
+  {
+    objection: 'I already have a website',
+    response: 'Good — then this is really about whether it\'s still working for you. Most of the ones I come across were built years ago and never touched since, so they quietly fall behind. The rundown shows what\'s missing and what a refresh would take — yours to keep either way.',
+  },
+  {
+    objection: 'I can\'t afford a new website right now',
+    response: 'That\'s exactly why we build these in tiers — you start with the pages that bring in customers now, and add the rest only when it\'s earning its keep. Nothing big up front. Want me to send what the first tier would look like?',
+  },
+  {
+    objection: 'I don\'t sell online / I don\'t want an online store',
+    response: 'You don\'t have to — we can keep it to a simple site that shows what you carry and how to reach you. If you ever want to switch ordering on later, it\'s a switch, not a rebuild.',
+  },
+  {
+    objection: 'I don\'t have time to deal with a website',
+    response: 'That\'s the whole point — you shouldn\'t have to. We handle the build; you give us the basics once, and we take it from there. Two minutes today is honestly about it.',
+  },
+];

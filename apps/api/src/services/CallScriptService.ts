@@ -43,6 +43,7 @@ import {
   CALL_SCRIPT_ASK_DECLINE_FALLBACK,
   CALL_SCRIPT_CLOSE,
   CALL_SCRIPT_OBJECTIONS,
+  WEBSITE_CALL_SCRIPT_OBJECTIONS,
   type HookAngle,
   type HookTemplate,
   type ObjectionRow,
@@ -193,7 +194,7 @@ export class CallScriptService extends BaseService {
    * 3. Resolve phone merge fields.
    * 4. Read the worksheet for call context (who to ask for, team signal).
    * 5. Resolve the active gallery short URL for the SMS handoff.
-   * 6. Return the assembled script with all 13 ranked hook options.
+   * 6. Return the assembled script with all ranked hook options.
    */
   async assembleForCampaign(
     campaignId: string,
@@ -314,7 +315,7 @@ export class CallScriptService extends BaseService {
         : 'borderline');
     }
 
-    // 6. Rank + resolve all 15 hooks (with emerging-archetype boost + severity weighting)
+    // 6. Rank + resolve every hook (with emerging-archetype boost + severity weighting)
     const ranked = this.rankPhoneHooks(resolved.archetype, signalCodes, mergeContext, emergingAngles, signalSeverity);
 
     // 7. Select the hook for Stage 2
@@ -372,7 +373,9 @@ export class CallScriptService extends BaseService {
         close: closeStage,
       },
       hookOptions: ranked,
-      objections: CALL_SCRIPT_OBJECTIONS,
+      objections: resolved.archetype === 'A7'
+        ? [...WEBSITE_CALL_SCRIPT_OBJECTIONS, ...CALL_SCRIPT_OBJECTIONS]
+        : CALL_SCRIPT_OBJECTIONS,
       callContext: {
         phone: campaign.phone,
         owner_name: ownerName,
@@ -837,7 +840,7 @@ export class CallScriptService extends BaseService {
   // ─── Ranking (phone hooks) ────────────────────────────────────────────
 
   /**
-   * Rank all 15 hooks for the phone channel. Same ranking logic as
+   * Rank every hook for the phone channel. Same ranking logic as
    * HookSuggestionService but resolves phone_hook instead of email body.
    * Emerging-archetype boost applied after archetype affinity, before
    * signal-match tie-break.

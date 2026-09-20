@@ -23,6 +23,8 @@ import {
   type HookAngle,
 } from '../outreach-openers/hook-library';
 import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
+import { KNOWN_SIGNAL_CODES } from '../triage/signal-taxonomy';
+import { computeSignalSeverity } from '../outreach-openers/signal-magnitude';
 
 const VALID_ARCHETYPES: ArchetypeCode[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
 
@@ -195,7 +197,7 @@ describe('getHook', () => {
 });
 
 describe('isValidHookAngle', () => {
-  it('returns true for all 13 catalog angles', () => {
+  it('returns true for every catalog angle', () => {
     for (const angle of HOOK_ANGLE_KEYS) {
       expect(isValidHookAngle(angle)).toBe(true);
     }
@@ -205,5 +207,54 @@ describe('isValidHookAngle', () => {
     expect(isValidHookAngle('nonexistent')).toBe(false);
     expect(isValidHookAngle('')).toBe(false);
     expect(isValidHookAngle('GBP_VERIFICATION')).toBe(false); // case-sensitive
+  });
+});
+
+// ─── Website signal ↔ angle alignment contract ───────────────────────────
+//
+// The angle set is signal-driven: every angle declares its governing
+// `signals[]`, and the ranking (HookSuggestionService + CallScriptService)
+// orders angles by matched-signal severity. These guards lock the contract so
+// a future signal or angle edit can't silently break the alignment.
+
+describe('website signal ↔ angle alignment', () => {
+  const WC_SIGNALS = KNOWN_SIGNAL_CODES.filter((c) => c.startsWith('WC_'));
+  const ANGLED_WC_SIGNALS = new Set(
+    HOOK_LIBRARY.flatMap((h) => h.signals).filter((s) => s.startsWith('WC_')),
+  );
+
+  it('every website signal carries an explicit severity tier', () => {
+    // Explicitly non-material tiers; everything else in the WC_ family is
+    // 'material'. A new WC_ code that forgets a severity would fall through
+    // the `?? 'borderline'` default and fail here.
+    const NON_MATERIAL: Record<string, string> = {
+      WC_MISSING_WEBSITE: 'crisis',
+      WC_BROKEN_WEBSITE: 'crisis',
+      WC_LEGACY_BUILDER_SITE: 'borderline',
+      WC_MOBILE_FRICTION: 'borderline',
+      WC_MISSING_AVAILABILITY_INQUIRY: 'borderline',
+      WC_MISSING_PICKUP_DELIVERY: 'borderline',
+    };
+    for (const code of WC_SIGNALS) {
+      const severity = computeSignalSeverity(code, {} as any);
+      expect(severity, `severity for ${code}`).toBe(NON_MATERIAL[code] ?? 'material');
+    }
+  });
+
+  it('only the two intentionally-routed signals lack a website angle', () => {
+    const uncovered = WC_SIGNALS.filter((c) => !ANGLED_WC_SIGNALS.has(c)).sort();
+    // WC_URL_MISMATCH → repair/NAP family (PB-01/A3, PB-05 dual);
+    // WC_MISSING_PICKUP_DELIVERY → product family (PB-07/A6).
+    // Both route to another playbook's angle family by design.
+    expect(uncovered).toEqual(['WC_MISSING_PICKUP_DELIVERY', 'WC_URL_MISMATCH']);
+  });
+
+  it('the A7 angle family carries the website gap + offering angles', () => {
+    const a7 = HOOK_LIBRARY.filter((h) => h.archetypes.includes('A7')).map((h) => h.angle);
+    // Gap angles + the four platform-offering angles.
+    expect(a7).toEqual(expect.arrayContaining([
+      'website_foundation', 'website_repair', 'third_party_presence',
+      'website_tiers', 'website_ecommerce', 'website_scaling', 'website_visibility',
+    ]));
   });
 });

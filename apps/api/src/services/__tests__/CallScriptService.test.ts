@@ -223,11 +223,11 @@ describe('CallScriptService.assembleForCampaign', () => {
       .rejects.toThrow('phone_required');
   });
 
-  it('returns all 15 ranked hook options', async () => {
+  it('returns every ranked hook option', async () => {
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    expect(result.hookOptions).toHaveLength(15);
-    for (let i = 0; i < 15; i++) {
+    expect(result.hookOptions).toHaveLength(20);
+    for (let i = 0; i < 20; i++) {
       expect(result.hookOptions[i].rank).toBe(i + 1);
     }
   });
@@ -308,6 +308,21 @@ describe('CallScriptService.assembleForCampaign', () => {
     }
   });
 
+  it('prepends the website-playbook objections for A7 campaigns', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A7',
+      source: 'fallback',
+      reason: 'test',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    // 5 generic + 5 website-playbook rows, website first.
+    expect(result.objections).toHaveLength(10);
+    expect(result.objections.some((o) => /don't need a website/i.test(o.objection))).toBe(true);
+    expect(result.objections.some((o) => /afford/i.test(o.objection))).toBe(true);
+  });
+
   it('callContext includes phone, owner_name, team_signal', async () => {
     mockGetForCampaign.mockResolvedValue({
       owner_name: 'Maria',
@@ -386,15 +401,45 @@ describe('CallScriptService.assembleForCampaign', () => {
     });
 
     const result = await CallScriptService.assembleForCampaign('camp-001');
-    const topAngles = result.hookOptions.slice(0, 5).map((h) => h.angle);
+    // The A4-affinity tier (catalog order): gbp_verification, website_foundation,
+    // website_repair, website_tiers, website_visibility, availability_inquiry,
+    // click_to_call, zero_footprint — 8 hooks, all ahead of non-affinity hooks.
+    const topAngles = result.hookOptions.slice(0, 8).map((h) => h.angle);
 
-    // A4-affinity: gbp_verification, website_foundation, website_repair,
-    // availability_inquiry, click_to_call
     expect(topAngles).toContain('gbp_verification');
     expect(topAngles).toContain('website_foundation');
     expect(topAngles).toContain('website_repair');
+    expect(topAngles).toContain('website_tiers');
+    expect(topAngles).toContain('website_visibility');
     expect(topAngles).toContain('availability_inquiry');
     expect(topAngles).toContain('click_to_call');
+  });
+
+  it('priority order — the hook matching the highest-severity signal leads (A7 website bundle)', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A7',
+      source: 'fallback',
+      reason: 'test',
+    });
+    mockGetTriageResult.mockResolvedValue({
+      detectedSignals: [
+        { code: 'WC_BROKEN_WEBSITE', label: 'Broken', contributedToRule: true },
+        { code: 'WC_STALE_WEBSITE', label: 'Stale', contributedToRule: true },
+        { code: 'WC_MOBILE_FRICTION', label: 'Mobile', contributedToRule: true },
+      ],
+    });
+    // Severity is derived from the audit — a non-null audit is required.
+    mockGetLatestAuditData.mockResolvedValue({ auditData: {} });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+    const angles = result.hookOptions.map((h) => h.angle);
+
+    // Same ordering as HookSuggestionService — the call script shares the
+    // ranking, so scripts stay aligned with the pitch.
+    expect(angles[0]).toBe('website_repair');
+    expect(angles.indexOf('website_repair')).toBeLessThan(angles.indexOf('website_scaling'));
+    expect(angles.indexOf('website_scaling')).toBeLessThan(angles.indexOf('website_foundation'));
+    expect(angles.indexOf('click_to_call')).toBeGreaterThan(angles.indexOf('website_foundation'));
   });
 
   // ─── Emerging-archetype boost + channel hint (Sprint 2) ────────────────
