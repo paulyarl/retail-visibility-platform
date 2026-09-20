@@ -670,6 +670,30 @@ describe('extractSignals — emits SignalCode[] from campaign + audit + BBB', ()
     expect(signals).toContain('CP_NAP_PHONE_DRIFT');
   });
 
+  it('DS_CLAIMED_STATUS — audit profile_status "unclaimed" fires (audit vocabulary)', () => {
+    const signals = extractSignals(makeInput({
+      campaign: { ...makeInput().campaign, gbp_claimed: undefined } as any,
+      auditData: { platforms: { google: { profile_status: 'unclaimed' } } } as any,
+    }));
+    expect(signals).toContain('DS_CLAIMED_STATUS');
+  });
+
+  it('DS_CLAIMED_STATUS — only unclaimed variants fire; likely_claimed / unable_to_verify do not', () => {
+    const fire = extractSignals(makeInput({
+      campaign: { ...makeInput().campaign, gbp_claimed: undefined } as any,
+      auditData: { platforms: { google: { profile_status: 'likely_unclaimed' } } } as any,
+    }));
+    expect(fire).toContain('DS_CLAIMED_STATUS');
+
+    for (const status of ['claimed', 'likely_claimed', 'unable_to_verify']) {
+      const quiet = extractSignals(makeInput({
+        campaign: { ...makeInput().campaign, gbp_claimed: undefined } as any,
+        auditData: { platforms: { google: { profile_status: status } } } as any,
+      }));
+      expect(quiet).not.toContain('DS_CLAIMED_STATUS');
+    }
+  });
+
   it('WC_MISSING_CTA — website audit has no CTA', () => {
     const signals = extractSignals(makeInput({
       auditData: {

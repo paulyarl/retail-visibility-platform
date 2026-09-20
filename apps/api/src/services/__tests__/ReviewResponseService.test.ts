@@ -39,6 +39,7 @@ vi.mock('../../config/unifiedConfig', () => ({
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
+  HttpError: class HttpError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
 }));
 

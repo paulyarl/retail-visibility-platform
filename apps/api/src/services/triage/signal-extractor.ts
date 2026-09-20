@@ -94,6 +94,23 @@ function isNoLike(value: string | boolean | undefined): boolean {
   return false;
 }
 
+/**
+ * True when a profile_status indicates the profile is not owner-claimed.
+ *
+ * The business-analysis audit vocabulary (profileStatusEnum in
+ * business-analysis.schema.ts) is:
+ *   'claimed' | 'likely_claimed' | 'unclaimed' | 'likely_unclaimed' | 'unable_to_verify'
+ * Only the unclaimed variants fire DS_CLAIMED_STATUS. 'unable_to_verify' is
+ * deliberately NOT treated as unclaimed — unverifiability is not evidence of an
+ * unclaimed profile. The legacy isNoLike values are still honored.
+ */
+function isUnclaimedStatus(value: string | boolean | undefined): boolean {
+  if (typeof value === 'boolean') return !value;
+  if (typeof value !== 'string') return false;
+  const v = value.trim().toLowerCase();
+  return v === 'unclaimed' || v === 'likely_unclaimed' || isNoLike(v);
+}
+
 function isCrisisBbbGrade(grade: string | undefined): boolean {
   if (!grade) return false;
   const g = grade.toUpperCase().trim();
@@ -253,7 +270,7 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
     if (!signals.has('DS_CLAIMED_STATUS')) {
       if (campaign.gbp_claimed === false) {
         signals.add('DS_CLAIMED_STATUS');
-      } else if (google?.profile_status && isNoLike(google.profile_status)) {
+      } else if (google?.profile_status && isUnclaimedStatus(google.profile_status)) {
         signals.add('DS_CLAIMED_STATUS');
       }
     }

@@ -9,12 +9,41 @@ const {
   mockDeliverables,
   mockSections,
   mockIntakes,
-} = vi.hoisted(() => ({
-  mockCampaigns: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
-  mockDeliverables: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
-  mockSections: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), createMany: vi.fn() },
-  mockIntakes: { findUnique: vi.fn() },
-}));
+  mockPromptService,
+  mockCampaignService,
+  mockOutreachService,
+  mockAiResult,
+  mockProvider,
+} = vi.hoisted(() => {
+  const mockOutreachService = {
+    logContact: vi.fn().mockResolvedValue({}),
+    getInstance: () => mockOutreachService,
+  };
+  const mockAiResult = {
+    content: '{"recovery_resolution": {"deliverableText": "This is a professionally drafted response to the complaint that acknowledges the issue and offers a fair resolution. We take all feedback seriously.", "submissionGuide": "1. Log into your Google Business Profile. 2. Navigate to Reviews. 3. Click Reply. 4. Paste the response. 5. Click Post."}}',
+    usage: { totalTokens: 450 },
+  };
+  return {
+    mockCampaigns: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    mockDeliverables: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
+    mockSections: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), createMany: vi.fn() },
+    mockIntakes: { findUnique: vi.fn(), findFirst: vi.fn() },
+    mockPromptService: {
+      createExecution: vi.fn(),
+      getExecution: vi.fn(),
+      updateExecution: vi.fn(),
+    },
+    mockCampaignService: {
+      transitionStage: vi.fn(),
+    },
+    mockOutreachService,
+    mockAiResult,
+    mockProvider: {
+      generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
+      isAvailable: vi.fn().mockReturnValue(true),
+    },
+  };
+});
 
 vi.mock('../../prisma', () => ({
   prisma: {
@@ -45,41 +74,21 @@ vi.mock('../../config/unifiedConfig', () => ({
 }));
 
 // Mock MarketingPromptService
-const mockPromptService = {
-  createExecution: vi.fn(),
-  getExecution: vi.fn(),
-  updateExecution: vi.fn(),
-};
 vi.mock('../MarketingPromptService', () => ({
   default: mockPromptService,
 }));
 
 // Mock MarketingCampaignService
-const mockCampaignService = {
-  transitionStage: vi.fn(),
-};
 vi.mock('../MarketingCampaignService', () => ({
   default: mockCampaignService,
 }));
 
 // Mock MarketingOutreachService
-const mockOutreachService = {
-  logContact: vi.fn().mockResolvedValue({}),
-  getInstance: () => mockOutreachService,
-};
 vi.mock('../MarketingOutreachService', () => ({
   MarketingOutreachService: { getInstance: () => mockOutreachService },
 }));
 
 // Mock AiProviderFactory (default export is the singleton instance)
-const mockAiResult = {
-  content: '{"recovery_resolution": {"deliverableText": "This is a professionally drafted response to the complaint that acknowledges the issue and offers a fair resolution. We take all feedback seriously.", "submissionGuide": "1. Log into your Google Business Profile. 2. Navigate to Reviews. 3. Click Reply. 4. Paste the response. 5. Click Post."}}',
-  usage: { totalTokens: 450 },
-};
-const mockProvider = {
-  generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
-  isAvailable: vi.fn().mockReturnValue(true),
-};
 vi.mock('../ai-providers/AiProviderFactory', () => ({
   default: {
     getChatConfig: vi.fn().mockResolvedValue({ provider: mockProvider, model: 'gpt-4o-mini' }),
@@ -193,11 +202,11 @@ describe('RecoveryResolutionService — admin operations', () => {
     it('archives existing deliverable and enqueues a new execution', async () => {
       mockDeliverables.findFirst.mockResolvedValue(mockDeliverable);
       mockDeliverables.update.mockResolvedValue({});
-      mockIntakes.findUnique.mockResolvedValue(mockIntake);
+      mockIntakes.findFirst.mockResolvedValue(mockIntake);
       mockCampaigns.findUnique.mockResolvedValue({
         ...mockCampaign,
         mkt_audits_list: [],
-        mkt_dispute_intake: mockIntake,
+        mkt_dispute_intake: [mockIntake],
       });
       mockPromptService.createExecution.mockResolvedValue({ id: 'mpe-new-002' });
 
@@ -217,7 +226,7 @@ describe('RecoveryResolutionService — admin operations', () => {
 
     it('throws if no intake found', async () => {
       mockDeliverables.findFirst.mockResolvedValue(null);
-      mockIntakes.findUnique.mockResolvedValue(null);
+      mockIntakes.findFirst.mockResolvedValue(null);
 
       await expect(RecoveryResolutionService.regenerate('mcamp-1')).rejects.toThrow('not found');
     });

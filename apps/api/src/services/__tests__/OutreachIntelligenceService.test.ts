@@ -56,6 +56,7 @@ vi.mock('../../lib/id-generator', () => ({
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
+  HttpError: class HttpError extends Error {},
   NotFoundError: class NotFoundError extends Error {
     constructor(msg: string) { super(msg); this.name = 'NotFoundError'; }
   },

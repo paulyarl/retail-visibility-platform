@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
+    resolveCategoryIntelligence: vi.fn(async (_category: string, _city?: string | null, _platform?: string | null) => null),
     resolveGoldStandard: vi.fn(async (_category: string, _platform?: string | null) => null),
     serializeGoldStandard: vi.fn((_profile: any, _role: string) => ''),
     resolveBronzeStandard: vi.fn(async () => null),
@@ -126,6 +127,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     vi.clearAllMocks();
     // Reset default behavior: resolve returns null, resolveGoldStandard returns null
     mockProfileService.resolve.mockImplementation(async () => null);
+    mockProfileService.resolveCategoryIntelligence.mockImplementation(async () => null);
     mockProfileService.resolveGoldStandard.mockImplementation(async () => null);
     mockProfileService.serializeGoldStandard.mockImplementation(() => '');
     // Reset composer to a default composed body
@@ -165,7 +167,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
   });
 
   it('business seek + matching category → amplification + intelligence_mode profile', async () => {
-    mockProfileService.resolve.mockResolvedValueOnce({
+    mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce({
       id: 'auto_repair_us',
       version: 1,
       category_key: 'auto repair',
@@ -188,7 +190,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
   });
 
   it('business seek + mismatched category → byte-identical base render + none', async () => {
-    mockProfileService.resolve.mockResolvedValueOnce(null);
+    mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
 
     const template = makeTemplate('seek');
     const campaign = makeCampaign('business', 'Unknown Category');
@@ -223,7 +225,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
   });
 
   it('business seek + inactive profile version → treated as absent (resolve returns null)', async () => {
-    mockProfileService.resolve.mockResolvedValueOnce(null);
+    mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
 
     const template = makeTemplate('seek');
     const campaign = makeCampaign('business', 'Auto Repair');
@@ -240,7 +242,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
   });
 
   it('business seek + case/whitespace variant of category → resolve called with raw category', async () => {
-    mockProfileService.resolve.mockResolvedValueOnce({
+    mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce({
       id: 'auto_repair_us',
       version: 1,
       status: 'active',
@@ -256,10 +258,10 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     expect(resolution.intelligence_mode).toBe('profile');
-    // Business-scope §1B path calls resolve with no focus (category-only
-    // match). Migration 205 — the campaign's city is now passed as the 3rd
-    // arg so business audits resolve a city-scoped profile.
-    expect(mockProfileService.resolve).toHaveBeenCalledWith('  Auto Repair  ', undefined, 'Test City', undefined, undefined);
+    // Business-scope §1B path resolves category intelligence with the raw
+    // category string. Migration 205 — the campaign's city is now passed as the
+    // 2nd arg so business audits resolve a city-scoped profile.
+    expect(mockProfileService.resolveCategoryIntelligence).toHaveBeenCalledWith('  Auto Repair  ', 'Test City', undefined, undefined);
   });
 
   it('fulfill prompt → no amplification (gate: seek-only)', async () => {
@@ -354,11 +356,11 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
       expect(resolution.intelligence_mode).toBe('none');
       expect(resolution.profile_id).toBeNull();
-      expect(mockProfileService.resolve).not.toHaveBeenCalled();
+      expect(mockProfileService.resolveCategoryIntelligence).not.toHaveBeenCalled();
     });
 
     it('signal_triage + populated audit_signals + active profile → appends category block with framing directive', async () => {
-      mockProfileService.resolve.mockResolvedValueOnce({
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce({
         id: 'auto_repair_us',
         version: 1,
         status: 'active',
@@ -381,7 +383,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     it('signal_triage + populated audit_signals + no profile + no gold standard → base render only', async () => {
-      mockProfileService.resolve.mockResolvedValueOnce(null);
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
       mockProfileService.resolveGoldStandard.mockResolvedValueOnce(null);
 
       const template = makeRepairTemplate();
@@ -400,7 +402,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     it('signal_triage + populated audit_signals + no profile + gold standard → injects benchmark (§4.5 decoupling)', async () => {
-      mockProfileService.resolve.mockResolvedValueOnce(null);
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
       const goldStandard = { id: 'gs-auto-repair-001', version: 3, reference_platform: 'google' };
       mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
       mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD BENCHMARK ===\nExpected fields...');
@@ -424,6 +426,37 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       // business-scope repair campaign → null passthrough
       expect(mockProfileService.serializeGoldStandard).toHaveBeenCalledWith(goldStandard, 'benchmark');
       expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith('Auto Repair', null, 'Test City', 'TS', undefined);
+    });
+
+    it('signal_triage + gold-standard-only category → CI block suppressed, never a focus-less resolve', async () => {
+      // Regression: a focus-less resolve() returns the newest active row for
+      // (category, city) regardless of focus — i.e. the gold_standards profile
+      // when no discovery profile exists. That rendered an EMPTY category-
+      // intelligence shell and duplicated the gold-standard block under a second
+      // header (same profile id). CI must resolve discovery-focus only, and the
+      // benchmark must inject exactly once.
+      mockProfileService.resolveCategoryIntelligence.mockResolvedValueOnce(null);
+      const goldStandard = { id: 'gs-african-grocery-001', version: 8, reference_platform: null };
+      mockProfileService.resolveGoldStandard.mockResolvedValueOnce(goldStandard);
+      mockProfileService.serializeGoldStandard.mockReturnValueOnce('=== GOLD STANDARD BENCHMARK ===\nExpected fields...');
+
+      const template = makeRepairTemplate();
+      const campaign = makeCampaign('business', 'African Grocery Store');
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template,
+        campaign,
+        variables: { audit_signals: 'nap_drift\nplatform_gap' },
+      });
+
+      expect(renderedPrompt).not.toContain('CATEGORY INTELLIGENCE (SUPPLEMENTARY');
+      expect(renderedPrompt).not.toContain('=== END CATEGORY INTELLIGENCE ===');
+      expect(renderedPrompt).toContain('GOLD STANDARD BENCHMARK');
+      // Exactly one profile id in play — the benchmark's, not a duplicated CI id.
+      expect(resolution.profile_id).toBe('gs-african-grocery-001');
+      // CI resolution is focus-aware; the focus-less resolve is never used here.
+      expect(mockProfileService.resolve).not.toHaveBeenCalled();
+      expect(mockProfileService.resolveCategoryIntelligence).toHaveBeenCalledWith('African Grocery Store', 'Test City', undefined, undefined);
     });
   });
 

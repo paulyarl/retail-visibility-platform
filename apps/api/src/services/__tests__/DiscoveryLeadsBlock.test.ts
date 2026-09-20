@@ -18,11 +18,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockCatalogService, mockGeographyGridService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async () => null),
+    resolveCategoryIntelligence: vi.fn(async () => null),
     resolveGoldStandard: vi.fn(async () => null),
     serializeGoldStandard: vi.fn(() => ''),
+    resolveBronzeStandard: vi.fn(async () => null),
+    serializeBronzeStandard: vi.fn(async () => ''),
     renderBusinessProfileBlock: vi.fn(
       (profile: any, _city?: string | null, headerTitle?: string) =>
         `\n${headerTitle ? `=== ${headerTitle} ===\n` : ''}PROFILE_BLOCK:${profile.id}:v${profile.version}`,
@@ -43,7 +46,21 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
       focus: input.focus,
     })),
   };
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService };
+  const mockMarketContextLoader = {
+    loadMarketContext: vi.fn(async () => ({ category: {}, location: {} })),
+    hasCategoryIntelligence: vi.fn(() => false),
+    hasLocationIntelligence: vi.fn(() => false),
+  };
+  const mockCatalogService = {
+    applicableReasons: vi.fn(async () => []),
+    currentRevision: vi.fn(async () => 1),
+    serializeCatalogBlock: vi.fn(() => ''),
+  };
+  const mockGeographyGridService = {
+    getGrid: vi.fn(async () => null),
+    upsertGrid: vi.fn(async () => undefined),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockCatalogService, mockGeographyGridService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -78,6 +95,24 @@ vi.mock('../MarketingHotProspectService', () => ({
   },
 }));
 
+vi.mock('../intelligence/MarketContextLoader', () => ({
+  MarketContextLoader: {
+    getInstance: () => mockMarketContextLoader,
+  },
+}));
+
+vi.mock('../intelligence/BronzeReasonCatalogService', () => ({
+  BronzeReasonCatalogService: {
+    getInstance: () => mockCatalogService,
+  },
+}));
+
+vi.mock('../intelligence/GeographyGridService', () => ({
+  GeographyGridService: {
+    getInstance: () => mockGeographyGridService,
+  },
+}));
+
 import { MarketingExecutionService } from '../MarketingExecutionService';
 
 describe('Discovery Leads block (Migration 253 — GAP-E3)', () => {
@@ -88,8 +123,14 @@ describe('Discovery Leads block (Migration 253 — GAP-E3)', () => {
     vi.clearAllMocks();
     // Defaults: no profile, no gold standard → byte-identical base render
     mockProfileService.resolve.mockImplementation(async () => null);
+    mockProfileService.resolveCategoryIntelligence.mockImplementation(async () => null);
     mockProfileService.resolveGoldStandard.mockImplementation(async () => null);
     mockProfileService.serializeGoldStandard.mockImplementation(() => '');
+    mockProfileService.resolveBronzeStandard.mockImplementation(async () => null);
+    mockProfileService.serializeBronzeStandard.mockImplementation(async () => '');
+    mockMarketContextLoader.loadMarketContext.mockImplementation(async () => ({ category: {}, location: {} }));
+    mockCatalogService.serializeCatalogBlock.mockImplementation(() => '');
+    mockGeographyGridService.getGrid.mockImplementation(async () => null);
   });
 
   const makeTemplate = (promptType: string, category = '', body = 'Hello {{business_name}} in {{category}}') => ({

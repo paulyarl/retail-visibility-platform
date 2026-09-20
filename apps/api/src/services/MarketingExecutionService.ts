@@ -1637,7 +1637,11 @@ export class MarketingExecutionService extends BaseService {
         };
       }
 
-      const profile = await profileService.resolve(category, undefined, businessCity, undefined, ctx);
+      // CI is discovery-focus only (competitive → emerging). Resolving with no
+      // focus would return the newest active row regardless of focus — which is
+      // the gold_standards profile when no discovery profile exists, rendering
+      // an empty CI block and duplicating the gold-standard block below.
+      const profile = await profileService.resolveCategoryIntelligence(category, businessCity, undefined, ctx);
       if (!profile) {
         // No active intelligence profile — but there may still be a gold
         // standard benchmark to inject (Triage & Repair Outreach Problems
@@ -1741,7 +1745,9 @@ export class MarketingExecutionService extends BaseService {
     }
 
     // 4. Category audit path (generic audits — unconditional append)
-    const profile = await profileService.resolve(category, undefined, businessCity, undefined, ctx);
+    // CI is discovery-focus only (competitive → emerging); see the signal_triage
+    // path above for why a focus-less resolve is unsafe here.
+    const profile = await profileService.resolveCategoryIntelligence(category, businessCity, undefined, ctx);
 
     if (!profile) {
       // No active intelligence profile — but there may still be a gold

@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockFormatCategoryId, mockFormatVocab, mockVocabService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async () => null),
+    resolveCategoryIntelligence: vi.fn(async () => null),
     resolveGoldStandard: vi.fn(async () => null),
     serializeGoldStandard: vi.fn(() => ''),
     resolveBronzeStandard: vi.fn(async () => null),

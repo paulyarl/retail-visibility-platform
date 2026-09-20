@@ -3,6 +3,7 @@ import { resolvePaymentGateway } from './PaymentGatewayResolver';
 import { resolveFulfillment } from './FulfillmentResolver';
 import { resolveBarcodeScan } from './BarcodeScanResolver';
 import { resolveProductOptions } from './ProductOptionsResolver';
+import { resolveProductType } from './ProductTypeResolver';
 import { resolveFeaturedOptions } from './FeaturedOptionsResolver';
 import { resolveIntegrationOptions } from './IntegrationOptionsResolver';
 import { resolveQuickstartOptions } from './QuickstartOptionsResolver';
@@ -104,10 +105,12 @@ describe('ProductOptionsResolver', () => {
     expect(result.enabled).toBe(false);
   });
 
+  // Type gating (physical/digital/hybrid/service) moved to ProductTypeResolver
+  // when the options resolver was split into creation/layout/sections groups.
   it('allows physical and digital when tier supports them', () => {
-    const result = resolveProductOptions(
-      { product_enabled: true, product_physical: true, product_digital: true },
-      { product_physical_enabled: true, product_digital_enabled: true }
+    const result = resolveProductType(
+      { product_types_enabled: true, product_types_physical: true, product_types_digital: true },
+      { product_types_enabled: true, selected_product_types: ['physical', 'digital'] }
     );
     expect(result.enabled).toBe(true);
     expect(result.effective_types).toContain('physical');
@@ -124,11 +127,10 @@ describe('ProductOptionsResolver', () => {
 });
 
 describe('FeaturedOptionsResolver', () => {
-  it('returns enabled and all types when tier has no featured config (fail-open)', () => {
+  it('returns disabled when tier has no featured config (fail-closed)', () => {
     const result = resolveFeaturedOptions({}, null);
-    expect(result.enabled).toBe(true);
-    expect(result.allowed_types).toContain('store_selection');
-    expect(result.allowed_types).toContain('bestseller');
+    expect(result.enabled).toBe(false);
+    expect(result.allowed_types).toEqual([]);
   });
 
   it('exposes tenant types when tier allows them', () => {

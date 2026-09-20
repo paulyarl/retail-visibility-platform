@@ -118,9 +118,10 @@ describe('ReviewCascadeService', () => {
         outcome: 'left_message',
         contact_channel: 'phone',
       });
+      // Elapsed is measured from the LAST cascade contact — must be >= 4 days.
       mockOutreachLog.findMany.mockResolvedValue([
+        { contact_date: new Date(Date.now() - 5 * DAY_MS) },
         { contact_date: new Date(Date.now() - 4 * DAY_MS) },
-        { contact_date: new Date(Date.now() - 3 * DAY_MS) },
       ]);
 
       const result = await ReviewCascadeService.getInstance().run();
@@ -172,9 +173,61 @@ describe('ReviewCascadeService', () => {
   // ─── Channel availability ───────────────────────────────────────
 
   describe('run — channel availability', () => {
-    it('skips Day 2 SMS when phone is null (logs skipped step)', async () => {
+    // Channel-unavailable steps fall back to email when the campaign has one
+    // (added in the Recovery Management sprint — the cascade keeps momentum
+    // instead of stalling). A step only logs SKIPPED when email is missing too.
+    it('falls back to email for Day 2 SMS when phone is null', async () => {
       mockCampaigns.findMany.mockResolvedValue([
         makeCampaign({ stageEnteredDaysAgo: 3, phone: null }),
+      ]);
+      mockOutreachLog.findFirst.mockResolvedValue({
+        outcome: 'left_message',
+        contact_channel: 'email',
+      });
+      mockOutreachLog.findMany.mockResolvedValue([
+        { contact_date: new Date(Date.now() - 2 * DAY_MS) },
+      ]);
+
+      const result = await ReviewCascadeService.getInstance().run();
+
+      expect(result.fired).toBe(1);
+      expect(mockLogContact).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contactChannel: 'email',
+          notes: expect.stringContaining('FALLBACK'),
+        }),
+        undefined,
+      );
+    });
+
+    it('falls back to email for Day 4 DM when social_profiles is empty', async () => {
+      mockCampaigns.findMany.mockResolvedValue([
+        makeCampaign({ stageEnteredDaysAgo: 5, socialProfiles: [] }),
+      ]);
+      mockOutreachLog.findFirst.mockResolvedValue({
+        outcome: 'left_message',
+        contact_channel: 'phone',
+      });
+      mockOutreachLog.findMany.mockResolvedValue([
+        { contact_date: new Date(Date.now() - 5 * DAY_MS) },
+        { contact_date: new Date(Date.now() - 4 * DAY_MS) },
+      ]);
+
+      const result = await ReviewCascadeService.getInstance().run();
+
+      expect(result.fired).toBe(1);
+      expect(mockLogContact).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contactChannel: 'email',
+          notes: expect.stringContaining('FALLBACK'),
+        }),
+        undefined,
+      );
+    });
+
+    it('logs SKIPPED when the primary channel and email are both unavailable', async () => {
+      mockCampaigns.findMany.mockResolvedValue([
+        makeCampaign({ stageEnteredDaysAgo: 3, phone: null, email: null }),
       ]);
       mockOutreachLog.findFirst.mockResolvedValue({
         outcome: 'left_message',
@@ -191,31 +244,6 @@ describe('ReviewCascadeService', () => {
       expect(mockLogContact).toHaveBeenCalledWith(
         expect.objectContaining({
           contactChannel: 'phone',
-          notes: expect.stringContaining('SKIPPED'),
-        }),
-        undefined,
-      );
-    });
-
-    it('skips Day 4 DM when social_profiles is empty', async () => {
-      mockCampaigns.findMany.mockResolvedValue([
-        makeCampaign({ stageEnteredDaysAgo: 5, socialProfiles: [] }),
-      ]);
-      mockOutreachLog.findFirst.mockResolvedValue({
-        outcome: 'left_message',
-        contact_channel: 'phone',
-      });
-      mockOutreachLog.findMany.mockResolvedValue([
-        { contact_date: new Date() },
-        { contact_date: new Date() },
-      ]);
-
-      const result = await ReviewCascadeService.getInstance().run();
-
-      expect(result.fired).toBe(0);
-      expect(mockLogContact).toHaveBeenCalledWith(
-        expect.objectContaining({
-          contactChannel: 'social',
           notes: expect.stringContaining('SKIPPED'),
         }),
         undefined,

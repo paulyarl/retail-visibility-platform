@@ -28,6 +28,7 @@ vi.mock('../../logger', () => ({
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
+  HttpError: class HttpError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
 }));
 

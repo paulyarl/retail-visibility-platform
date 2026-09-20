@@ -342,7 +342,7 @@ describe('getTeaserSummary (§4.1)', () => {
     expect(result.hasAudit).toBe(true);
     expect(result.cards.growthOpportunities).toEqual({
       available: true,
-      teaser: '3 actionable gaps identified',
+      teaser: '3 actionable gaps spotted',
       count: 3,
     });
     expect(result.cards.howItStacksUp).toEqual({
@@ -370,7 +370,7 @@ describe('getTeaserSummary (§4.1)', () => {
 
     expect(result.cards.growthOpportunities).toEqual({
       available: true,
-      teaser: '1 actionable gap identified',
+      teaser: '1 actionable gap spotted',
       count: 1,
     });
   });
@@ -389,10 +389,10 @@ describe('getTeaserSummary (§4.1)', () => {
     const result = await service.getTeaserSummary('some-slug');
 
     expect(result.cards.howItStacksUp.available).toBe(false);
-    expect(result.cards.howItStacksUp.teaser).toBe('Category signal evaluation pending');
+    expect(result.cards.howItStacksUp.teaser).toBe('Signal check still in progress');
     // Growth opportunities also unavailable (count 0).
     expect(result.cards.growthOpportunities.available).toBe(false);
-    expect(result.cards.growthOpportunities.teaser).toBe('0 actionable gaps identified');
+    expect(result.cards.growthOpportunities.teaser).toBe('0 actionable gaps spotted');
   });
 
   it('loads market context via MarketContextLoader with seed category/city/state', async () => {

@@ -143,7 +143,7 @@ describe('ProfileRepairPromptService', () => {
   });
 
   describe('buildFulfillVariables', () => {
-    it('formats audit_results Markdown for citation package', () => {
+    it('formats audit_results Markdown for citation package', async () => {
       const campaign = { id: 'camp-1' };
       const latestAudit = {
         audit_data: {
@@ -155,7 +155,7 @@ describe('ProfileRepairPromptService', () => {
         },
       };
 
-      const vars = service.buildFulfillVariables(campaign, latestAudit);
+      const vars = await service.buildFulfillVariables(campaign, latestAudit);
       expect(vars.audit_results).toContain('## Canonical NAP');
       expect(vars.audit_results).toContain('Best Plumbing');
     });

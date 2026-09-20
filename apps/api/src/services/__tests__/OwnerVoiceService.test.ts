@@ -44,6 +44,7 @@ vi.mock('../ai-providers', () => ({
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
+  HttpError: class HttpError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
 }));
 

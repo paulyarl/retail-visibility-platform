@@ -845,6 +845,34 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   /**
+   * Resolve the category-intelligence (CI) profile for a category/city.
+   *
+   * CI profiles live under the discovery focuses — 'competitive' (established
+   * market) then 'emerging' (thin/emerging market) — i.e. the category
+   * intelligence produced by a Proving Ground discovery run. Gold-standard rows
+   * are deliberately excluded: they are a separate benchmark dimension with a
+   * different configuration shape (expected_fields / candidates), so rendering
+   * one as the CI block yields an empty shell while duplicating the gold-
+   * standard block. Callers that want the benchmark must use
+   * resolveGoldStandard.
+   *
+   * Returns null when neither focus exists — the common case for campaigns
+   * created outside a Proving Ground context, which never ran category
+   * intelligence. Callers then degrade to a base render (a gold standard, if
+   * one exists, still injects independently).
+   */
+  async resolveCategoryIntelligence(
+    category: string,
+    city?: string | null,
+    platform?: string | null,
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile | null> {
+    const competitive = await this.resolve(category, 'competitive', city, platform, ctx);
+    if (competitive) return competitive;
+    return this.resolve(category, 'emerging', city, platform, ctx);
+  }
+
+  /**
    * Get a specific version of a profile (for historical fidelity, §43).
    * Immutable version rows — the exact version used by a historical run
    * is always retrievable.

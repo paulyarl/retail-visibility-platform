@@ -6,6 +6,7 @@ const {
   mockSlots,
   mockCampaigns,
   mockVoiceProfile,
+  mockPromptExecutions,
   aiMock,
 } = vi.hoisted(() => ({
   mockSlots: {
@@ -17,6 +18,9 @@ const {
   },
   mockCampaigns: { findUnique: vi.fn() },
   mockVoiceProfile: { findUnique: vi.fn() },
+  // G-1b review-intake lookup (DeliverableSourceService.getReviewIntake) —
+  // default null so ingest falls back to the audit path.
+  mockPromptExecutions: { findFirst: vi.fn().mockResolvedValue(null) },
   aiMock: { generateChatCompletion: vi.fn() },
 }));
 
@@ -25,6 +29,7 @@ vi.mock('../../prisma', () => ({
     mkt_deliverable_review_slot: mockSlots,
     mkt_campaigns_list: mockCampaigns,
     mkt_owner_voice_profile: mockVoiceProfile,
+    mkt_prompt_executions_list: mockPromptExecutions,
     mkt_audits_list: {},
   },
 }));
@@ -42,6 +47,7 @@ vi.mock('../ai-providers', () => ({
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
+  HttpError: class HttpError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
 }));
 
@@ -165,7 +171,7 @@ describe('ReviewSlotService', () => {
       mockCampaigns.findUnique.mockResolvedValue({ id: 'mcamp-1', mkt_audits_list: [] });
 
       await expect(ReviewSlotService.getInstance().ingestReviews('mcamp-1'))
-        .rejects.toThrow(/No business_analysis audit/i);
+        .rejects.toThrow(/No reviews found/i);
     });
 
     it('throws when no unanswered reviews found', async () => {
@@ -180,7 +186,7 @@ describe('ReviewSlotService', () => {
       }));
 
       await expect(ReviewSlotService.getInstance().ingestReviews('mcamp-1'))
-        .rejects.toThrow(/No unanswered reviews/i);
+        .rejects.toThrow(/No reviews found/i);
     });
   });
 
