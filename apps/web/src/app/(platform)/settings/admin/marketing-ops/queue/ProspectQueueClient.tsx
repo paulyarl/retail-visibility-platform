@@ -981,11 +981,17 @@ export default function ProspectQueueClient() {
                               discovery card's queue action. */}
                           {(() => {
                             const attribution = (entry.business_snapshot as any)?.bronze_attribution;
-                            if (!Array.isArray(attribution) || attribution.length === 0) return null;
-                            const tip = attribution.map((a: any) => `${a.reason_key}${a.basis ? ` — ${a.basis}` : ''}`).join('\n');
+                            const weaknesses = (entry.business_snapshot as any)?.competitive_weaknesses;
+                            const hasBronze = Array.isArray(attribution) && attribution.length > 0;
+                            const hasWeaknesses = Array.isArray(weaknesses) && weaknesses.length > 0;
+                            if (!hasBronze && !hasWeaknesses) return null;
+                            const tip = [
+                              ...(hasBronze ? attribution.map((a: any) => `bronze: ${a.reason_key}${a.basis ? ` — ${a.basis}` : ''}`) : []),
+                              ...(hasWeaknesses ? weaknesses.map((w: any) => `weakness: ${w.weakness_key}${w.basis ? ` — ${w.basis}` : ''}`) : []),
+                            ].join('\n');
                             return (
                               <div className="flex flex-wrap items-center gap-1 mt-1 max-w-[180px]">
-                                {attribution.slice(0, 2).map((a: any) => (
+                                {hasBronze && attribution.slice(0, 2).map((a: any) => (
                                   <span
                                     key={a.reason_key}
                                     className="inline-block rounded px-1 py-0.5 text-[9px] font-mono bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700"
@@ -994,9 +1000,26 @@ export default function ProspectQueueClient() {
                                     bronze:{a.reason_key}
                                   </span>
                                 ))}
-                                {attribution.length > 2 && (
+                                {hasBronze && attribution.length > 2 && (
                                   <span className="text-[9px] text-gray-400" title={tip}>
                                     +{attribution.length - 2}
+                                  </span>
+                                )}
+                                {/* Competitive weaknesses (spec §7) — the
+                                    incumbent's named exposures, merged onto
+                                    the snapshot by the dual-lane dedup (§8). */}
+                                {hasWeaknesses && weaknesses.slice(0, 2).map((w: any) => (
+                                  <span
+                                    key={w.weakness_key}
+                                    className="inline-block rounded px-1 py-0.5 text-[9px] font-mono bg-rose-50 text-rose-800 border border-rose-300 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-700"
+                                    title={w.basis ? `${w.weakness_key} — ${w.basis}` : w.weakness_key}
+                                  >
+                                    weakness:{w.weakness_key}
+                                  </span>
+                                ))}
+                                {hasWeaknesses && weaknesses.length > 2 && (
+                                  <span className="text-[9px] text-gray-400" title={tip}>
+                                    +{weaknesses.length - 2}
                                   </span>
                                 )}
                               </div>

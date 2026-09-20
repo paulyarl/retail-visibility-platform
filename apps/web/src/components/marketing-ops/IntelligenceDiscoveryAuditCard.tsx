@@ -66,6 +66,16 @@ export interface DiscoveredBusiness {
     reason_key: string;
     basis?: string | null;
   }> | null;
+  /** Competitive weakness attribution (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC
+   *  §6) — the incumbent's named exposures, emitted only under competitive
+   *  focus. The pitch wedge: "we see you — can we help with this?" */
+  competitive_weaknesses?: Array<{
+    weakness_key: string;
+    basis?: string | null;
+  }> | null;
+  /** Optional benchmark marker — a leader observed as reference point, not
+   *  a prospect (spec §3). Card-display only. */
+  benchmark_only?: boolean | null;
   notes?: string;
   [key: string]: any;
 }
@@ -266,6 +276,9 @@ export default function IntelligenceDiscoveryAuditCard({
           // campaign → audit ("Discovery leads") preserves which catalog
           // reason surfaced this prospect (spec §7.4).
           bronze_attribution: Array.isArray(biz.bronze_attribution) ? biz.bronze_attribution : undefined,
+          // Competitive weaknesses ride the same snapshot — the incumbent's
+          // named exposures become the downstream pitch wedge (spec §7).
+          competitive_weaknesses: Array.isArray(biz.competitive_weaknesses) ? biz.competitive_weaknesses : undefined,
         },
         priority: biz.business_seek_priority === 'high' ? 'high' : 'normal',
         // Intelligence discovery columns
@@ -500,6 +513,26 @@ export default function IntelligenceDiscoveryAuditCard({
                         ))}
                       </div>
                     )}
+                    {/* Competitive weaknesses — the incumbent's named
+                        exposures, the pitch wedge (spec §7) */}
+                    {(Array.isArray(biz.competitive_weaknesses) && biz.competitive_weaknesses.length > 0) || biz.benchmark_only ? (
+                      <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                        {biz.benchmark_only && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
+                            benchmark
+                          </span>
+                        )}
+                        {(biz.competitive_weaknesses ?? []).map((w, wi) => (
+                          <span
+                            key={wi}
+                            title={w.basis ?? undefined}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700"
+                          >
+                            weakness: {w.weakness_key}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {/* Notes (e.g. disambiguation notes) */}
                     {biz.notes && (
                       <div className="mt-1.5">

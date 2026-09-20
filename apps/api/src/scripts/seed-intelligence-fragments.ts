@@ -327,8 +327,12 @@ that represent the benchmark for the category in this market. Specifically seek:
 The competitive focus builds the BENCHMARKING SET — who leads this market. This
 context helps frame the emerging prospects' gaps relative to the competitive standard.
 
-Note: competitive-focus businesses are generally NOT prospects for outreach
-(they already have strong digital presence). They are context for the emerging set.
+Note: leaders are SELECTED for their strengths — the visibility signals that
+make them the market's benchmarks. Weaknesses are not the selection criterion;
+they are documented during selection, and they become the outreach wedge: the
+named pain the pitch speaks to ("we see you — can we help with this?"). A
+leader with no observable weakness is a benchmark (context for the emerging
+set), not a prospect; flag it benchmark_only: true.
 
 === COMPETITIVE GOLD-STANDARD SELECTION ===
 For COMPETITIVE focus, select and identify the strongest category-qualified
@@ -383,7 +387,64 @@ Do NOT compute the emerging prospect set in this run — thin-footprint,
 hidden-trust, and single-platform discovery are emerging-focus work. Competitive
 focus is benchmarking-only: find the established, mainstream-visible,
 category-qualified leaders that set the standard the emerging prospects will
-later be measured against.`,
+later be measured against.
+
+=== COMPETITIVE WEAKNESS VOCABULARY ===
+A competitive candidate's weaknesses are the named exposures that convert
+"leader observed" into "prospect". Weaknesses are exposures, not verdicts:
+name what is exploitable, never frame it as a defect claim.
+
+ASYMMETRY — strong somewhere, weak elsewhere:
+- social_dominant_directory_weak: active/strong social presence; sparse, stale,
+  or absent directory listings (frequent social posts; thin GBP/Yelp; missing
+  hours/attributes on directories).
+- directory_dominant_social_weak: strong directory presence; weak, dormant, or
+  absent social (complete GBP with photos/reviews; no Facebook/IG or
+  months-silent pages).
+- single_platform_concentration: dominant on one platform; thin or absent on
+  all others (deep profile on exactly one platform; nothing corroborating
+  elsewhere).
+
+DRIFT — was strong, decaying:
+- stale_content_surface: ranking on momentum; no recent posts, photos, offers,
+  or updates (last post/photo months old; review replies stopped).
+- nap_drift: name/address/phone inconsistent or stale across platforms
+  (conflicting hours, old address on one platform, name variants).
+- reputation_fragility: high review volume but declining rating or a recent
+  negative cluster (rating trend down; recent reviews sharply lower than
+  lifetime average).
+- review_velocity_decline: review cadence has dropped versus the business's
+  prior pace (monthly review counts trending down over trailing periods).
+- category_drift: platform category labels diverge from the business's actual
+  specialization (GBP primary category generic while offerings are
+  specialized; labels conflict across platforms).
+
+ABSENCE — a surface is missing entirely:
+- unclaimed_secondary_profiles: claimed/managed on the primary platform;
+  unclaimed elsewhere ("Own this business?" prompts on secondary platforms).
+- website_gap: strong platform profiles; weak, dated, or absent website (no
+  website on profiles; template site with stale content).
+- no_conversion_path: visible but no booking, ordering, or contact surface (no
+  appointment/order link; phone-only contact on every surface).
+- review_response_absent: high review volume with zero owner engagement (no
+  owner responses across a large review corpus; Q&A unanswered).
+
+THINNESS — present but shallow:
+- thin_service_surface: leader by name recognition; sparse services,
+  attributes, or menu detail (category inferred from name/reviews, not listed
+  services; empty attributes).
+- thin_media_surface: strong profile skeleton; few or dated photos (low photo
+  count relative to review volume; photos years old).
+
+WEAKNESS EMISSION: weaknesses are documented WHILE evaluating leaders — they
+are not a selection filter. Emit one competitive_weaknesses entry per
+applicable weakness — { "weakness_key": "<key exactly as listed>", "basis":
+"<one line — the observation that identifies the exposure>" }. A qualifying
+candidate with business_seek_recommended: true SHOULD carry at least one
+entry — the weakness is the pitch wedge (no pain, no pitch). Use only keys
+from this vocabulary; if a real exposure fits none of them, do not mint a
+new key — record the observation in the candidate's notes instead (operators
+promote recurring novel exposures into this list).`,
     variables: ['focus'],
     outputSchema: null,
     isDefault: false,

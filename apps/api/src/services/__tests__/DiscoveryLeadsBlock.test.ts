@@ -266,6 +266,51 @@ describe('Discovery Leads block (Migration 253 — GAP-E3)', () => {
     expect(resolution.discovery_leads_injected).toBe(true);
   });
 
+  it('T3d-weakness: renders competitive weaknesses as verify-leads (spec §7), field presence not focus', async () => {
+    const template = makeTemplate('seek');
+    const campaign = makeCampaign({
+      discovery_context: {
+        focus: 'competitive',
+        competitive_weaknesses: [
+          { weakness_key: 'review_response_absent', basis: '312 Google reviews, zero owner responses' },
+          { weakness_key: 'nap_drift' },
+        ],
+      },
+    });
+
+    const { renderedPrompt, resolution } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: undefined,
+    });
+
+    expect(renderedPrompt).toContain('=== DISCOVERY LEADS (VERIFY — NOT FINDINGS) ===');
+    expect(renderedPrompt).toContain('Competitive weaknesses');
+    expect(renderedPrompt).toContain('- review_response_absent — 312 Google reviews, zero owner responses');
+    expect(renderedPrompt).toContain('- nap_drift');
+    expect(resolution.discovery_leads_injected).toBe(true);
+  });
+
+  it('T3d-dual-lane: weaknesses render even when context focus is emerging (field presence keys render — spec §8)', async () => {
+    const template = makeTemplate('seek');
+    const campaign = makeCampaign({
+      discovery_context: {
+        focus: 'emerging',
+        bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs sweep' }],
+        competitive_weaknesses: [{ weakness_key: 'website_gap', basis: 'no website on GBP' }],
+      },
+    });
+
+    const { renderedPrompt } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: undefined,
+    });
+
+    expect(renderedPrompt).toContain('- trade_manifest_only — customs sweep');
+    expect(renderedPrompt).toContain('- website_gap — no website on GBP');
+  });
+
   it('T3d: focus omission — context without focus renders without the focus parenthetical', async () => {
     const template = makeTemplate('seek');
     const campaign = makeCampaign({
@@ -439,6 +484,72 @@ describe('Discovery Leads block (Migration 253 — GAP-E3)', () => {
   it('T5b-bronze-absent: signal_triage renders no bronze origin block when context has no attribution', async () => {
     const template = makeTemplate('seek', 'profile_repair');
     const campaign = makeCampaign({ discovery_context: sampleContext });
+
+    const { renderedPrompt } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: { audit_signals: 'DS_CLAIMED_STATUS' },
+    });
+
+    expect(renderedPrompt).not.toContain('PROSPECT ORIGIN');
+  });
+
+  it('T5b-weakness: signal_triage renders COMPETITIVE WEAKNESSES origin block with scan-claimed caveat (spec §7)', async () => {
+    const template = makeTemplate('seek', 'profile_repair');
+    const campaign = makeCampaign({
+      discovery_context: {
+        focus: 'competitive',
+        competitive_weaknesses: [
+          { weakness_key: 'review_response_absent', basis: '312 Google reviews, zero owner responses' },
+        ],
+      },
+    });
+
+    const { renderedPrompt } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: { audit_signals: 'DS_CLAIMED_STATUS' },
+    });
+
+    // Full leads block stays suppressed for triage (T5b invariant).
+    expect(renderedPrompt).not.toContain('DISCOVERY LEADS');
+    // Weaknesses render as the scan's CLAIMED exposure — not verified fact.
+    expect(renderedPrompt).toContain('=== PROSPECT ORIGIN — COMPETITIVE WEAKNESSES ===');
+    expect(renderedPrompt).toContain('- review_response_absent — 312 Google reviews, zero owner responses');
+    expect(renderedPrompt).toContain('scan-time claims, not audit findings');
+    expect(renderedPrompt).toContain('confirm before pitching');
+  });
+
+  it('T5b-dual: both attribution kinds → combined DISCOVERY ATTRIBUTION block (spec §8)', async () => {
+    const template = makeTemplate('seek', 'profile_repair');
+    const campaign = makeCampaign({
+      discovery_context: {
+        focus: 'emerging',
+        bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs sweep' }],
+        competitive_weaknesses: [{ weakness_key: 'website_gap', basis: 'no website on GBP' }],
+      },
+    });
+
+    const { renderedPrompt } = await service.resolvePrompt({
+      template,
+      campaign,
+      variables: { audit_signals: 'DS_CLAIMED_STATUS' },
+    });
+
+    expect(renderedPrompt).toContain('=== PROSPECT ORIGIN — DISCOVERY ATTRIBUTION ===');
+    expect(renderedPrompt).toContain('- trade_manifest_only — customs sweep');
+    expect(renderedPrompt).toContain('- website_gap — no website on GBP');
+    expect(renderedPrompt).toContain('pitch the differential');
+    // Neither single-lane block header appears when the combined block renders.
+    expect(renderedPrompt).not.toContain('PROSPECT ORIGIN — BRONZE DISCOVERY ATTRIBUTION');
+    expect(renderedPrompt).not.toContain('PROSPECT ORIGIN — COMPETITIVE WEAKNESSES');
+  });
+
+  it('T5b-weakness-absent: signal_triage renders no origin block when context has neither attribution', async () => {
+    const template = makeTemplate('seek', 'profile_repair');
+    const campaign = makeCampaign({
+      discovery_context: { ...sampleContext, competitive_weaknesses: undefined },
+    });
 
     const { renderedPrompt } = await service.resolvePrompt({
       template,

@@ -456,6 +456,88 @@ describe('validateDiscoveryContext — bronze_attribution', () => {
   });
 });
 
+// ─── Competitive weakness attribution (spec §6) ───────────────────────────
+
+describe('intelligence_discovery schema — competitive_weaknesses', () => {
+  it('accepts a candidate with competitive_weaknesses entries', () => {
+    const data = validDiscovery({
+      focus: 'competitive',
+      discovered_businesses: [validCandidate({
+        competitive_weaknesses: [
+          { weakness_key: 'review_response_absent', basis: '312 Google reviews, zero owner responses' },
+          { weakness_key: 'single_platform_concentration' },
+        ],
+      })],
+      qualifying_businesses: [validCandidate({
+        competitive_weaknesses: [
+          { weakness_key: 'review_response_absent', basis: '312 Google reviews, zero owner responses' },
+          { weakness_key: 'single_platform_concentration' },
+        ],
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts null competitive_weaknesses and benchmark_only flag', () => {
+    const data = validDiscovery({
+      focus: 'competitive',
+      discovered_businesses: [validCandidate({
+        competitive_weaknesses: null,
+        benchmark_only: true,
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts candidates without competitive_weaknesses (emerging lane / legacy)', () => {
+    const data = validDiscovery();
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a competitive_weaknesses entry missing weakness_key', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        competitive_weaknesses: [{ basis: 'no key' }] as any,
+      })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── validateDiscoveryContext — competitive weakness carry (spec §7) ──────
+
+describe('validateDiscoveryContext — competitive_weaknesses', () => {
+  it('keeps a weakness-only context (weaknesses count as content)', () => {
+    const ctx = validateDiscoveryContext({
+      focus: 'competitive',
+      competitive_weaknesses: [{ weakness_key: 'nap_drift', basis: 'old address on Yelp' }],
+    });
+    expect(ctx).not.toBeNull();
+    expect(ctx?.competitive_weaknesses?.[0]?.weakness_key).toBe('nap_drift');
+  });
+
+  it('keeps a dual-lane context (both attribution kinds coexist — spec §8)', () => {
+    const ctx = validateDiscoveryContext({
+      bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs sweep' }],
+      competitive_weaknesses: [{ weakness_key: 'website_gap', basis: 'no website on GBP' }],
+    });
+    expect(ctx).not.toBeNull();
+    expect(ctx?.bronze_attribution).toHaveLength(1);
+    expect(ctx?.competitive_weaknesses).toHaveLength(1);
+  });
+
+  it('drops weakness entries missing weakness_key (invalid context → null)', () => {
+    const ctx = validateDiscoveryContext({
+      competitive_weaknesses: [{ basis: 'no key' }] as any,
+    });
+    expect(ctx).toBeNull();
+  });
+});
+
 // ─── Platform analysis section ────────────────────────────────────────────
 
 describe('intelligence_discovery schema — platform_analysis section', () => {

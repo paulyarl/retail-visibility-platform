@@ -341,6 +341,11 @@ class MarketingProspectQueueServiceClass extends BaseService {
         if (existingQueued.status === 'campaign_created' && existingQueued.processed_campaign_id) {
           return { kind: 'campaign_exists', campaignId: existingQueued.processed_campaign_id };
         }
+        // Dual-lane attribution merge (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC
+        // §8): a prospect found in both discovery lanes accumulates
+        // attribution rather than last-write-win — union-merge the incoming
+        // lane's attribution into the existing entry.
+        await this.mergeAttributionOnDedup(existingQueued, snapshot, input.discovery_provenance, ctx);
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
 
@@ -672,6 +677,95 @@ class MarketingProspectQueueServiceClass extends BaseService {
   }
 
   /**
+   * Dual-lane attribution merge (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC §8).
+   *
+   * When a second discovery lane queues an already-queued identity, the
+   * existing entry accumulates attribution rather than last-write-winning —
+   * the PG merge pattern applied to attribution-bearing rows. Union by key
+   * (`reason_key` / `weakness_key` / `source`+`url`); on duplicate keys the
+   * entry with a non-empty `basis` wins. Attribution fields live on
+   * `business_snapshot`; provenance lives on its own column. No-op when the
+   * incoming payload contributes nothing new.
+   */
+  private async mergeAttributionOnDedup(
+    existing: any,
+    incomingSnapshot: Record<string, any>,
+    incomingProvenance: Record<string, any>[] | undefined,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const existingSnapshot = (existing.business_snapshot as Record<string, any>) ?? {};
+
+    const unionByKey = (
+      existingArr: any,
+      incomingArr: any,
+      keyOf: (e: any) => string | null,
+    ): any[] | undefined => {
+      const inc: any[] = Array.isArray(incomingArr) ? incomingArr : [];
+      if (inc.length === 0) return undefined;
+      const ex: any[] = Array.isArray(existingArr) ? existingArr : [];
+      const byKey = new Map<string, any>();
+      const keyless: any[] = [];
+      for (const e of ex) {
+        const k = keyOf(e);
+        if (k) byKey.set(k, e); else keyless.push(e);
+      }
+      let added = 0;
+      for (const e of inc) {
+        const k = keyOf(e);
+        if (!k) { keyless.push(e); added++; continue; }
+        const prev = byKey.get(k);
+        // New key or a basis upgrade (existing empty, incoming non-empty)
+        // both count as a change worth persisting.
+        if (!prev || (!prev.basis && e.basis)) {
+          byKey.set(k, e);
+          added++;
+        }
+      }
+      return added > 0 ? [...byKey.values(), ...keyless] : undefined;
+    };
+
+    const mergedBronze = unionByKey(
+      existingSnapshot.bronze_attribution,
+      incomingSnapshot.bronze_attribution,
+      (e) => e?.reason_key ?? null,
+    );
+    const mergedWeaknesses = unionByKey(
+      existingSnapshot.competitive_weaknesses,
+      incomingSnapshot.competitive_weaknesses,
+      (e) => e?.weakness_key ?? null,
+    );
+    const mergedProvenance = unionByKey(
+      existing.discovery_provenance,
+      incomingProvenance,
+      (e) => (e?.source ? `${e.source}|${e.url ?? ''}` : null),
+    );
+
+    if (!mergedBronze && !mergedWeaknesses && !mergedProvenance) return;
+
+    const data: any = {};
+    if (mergedBronze || mergedWeaknesses) {
+      data.business_snapshot = {
+        ...existingSnapshot,
+        ...(mergedBronze ? { bronze_attribution: mergedBronze } : {}),
+        ...(mergedWeaknesses ? { competitive_weaknesses: mergedWeaknesses } : {}),
+      };
+      existing.business_snapshot = data.business_snapshot;
+    }
+    if (mergedProvenance) {
+      data.discovery_provenance = mergedProvenance;
+      existing.discovery_provenance = mergedProvenance;
+    }
+
+    await this.prisma.mkt_prospect_queue.update({ where: { id: existing.id }, data });
+    logger.info('addToQueue: merged dual-lane attribution into existing queue entry', ctx, {
+      existingId: existing.id,
+      bronze: mergedBronze?.length ?? 0,
+      weaknesses: mergedWeaknesses?.length ?? 0,
+      provenance: mergedProvenance?.length ?? 0,
+    });
+  }
+
+  /**
    * Create a campaign from a queued entry by replaying the stored snapshot
    * through the existing derive services. Idempotent — repeat calls return
    * the already-created campaign. Ownership carries forward: if the entry
@@ -942,6 +1036,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
             // by the discovery card's Queue/Verify action) — the catalog
             // reason(s) directly responsible for the find (spec §7.4).
             bronze_attribution: (snapshot.bronze_attribution as any[]) ?? undefined,
+            // Competitive weaknesses ride the same snapshot — the incumbent's
+            // named exposures, the pitch wedge (COMPETITIVE_WEAKNESS_SPEC §7).
+            // Both kinds may coexist on a dual-lane merged prospect (§8).
+            competitive_weaknesses: (snapshot.competitive_weaknesses as any[]) ?? undefined,
           };
           discoveryContext = validateDiscoveryContext(rawContext);
           if (!discoveryContext) {

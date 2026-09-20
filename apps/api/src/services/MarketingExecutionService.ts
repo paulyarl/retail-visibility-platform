@@ -1704,12 +1704,14 @@ export class MarketingExecutionService extends BaseService {
         });
       }
 
-      // Bronze reason attribution (spec §7.4) — compact prospect-origin block.
-      // The full Discovery Leads block stays suppressed for triage (T5b), but
-      // attribution is provenance (how the prospect was found), not a
-      // hypothesis — it is pitch framing for the briefing's Pitch section.
-      // '' when the campaign carries no bronze attribution.
-      const bronzeOriginBlock = this.renderBronzeAttributionBlock(input.campaign);
+      // Prospect-origin attribution (bronze spec §7.4 + competitive weakness
+      // spec §8) — compact provenance block. The full Discovery Leads block
+      // stays suppressed for triage (T5b): attribution is pipeline
+      // provenance, not a hypothesis — pitch framing for the briefing's Pitch
+      // section. Renders a combined DISCOVERY ATTRIBUTION block when the
+      // prospect carries both lanes' attribution; weakness claims are labeled
+      // scan-claimed (§7 epistemic caveat). '' when no attribution exists.
+      const prospectOriginBlock = this.renderProspectOriginBlock(input.campaign);
 
       // CI is discovery-focus only (competitive → emerging). Resolving with no
       // focus would return the newest active row regardless of focus — which is
@@ -1732,7 +1734,7 @@ export class MarketingExecutionService extends BaseService {
             // repair signals are the sole hypothesis input for triage.
             let gsAmplified = baseRendered + '\n' + gsBlock
               + (signalWeightBlock ? '\n' + signalWeightBlock : '')
-              + (bronzeOriginBlock ? '\n\n' + bronzeOriginBlock : '');
+              + (prospectOriginBlock ? '\n\n' + prospectOriginBlock : '');
             const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
             if (marketCtxBlock) {
               gsAmplified = gsAmplified + '\n' + marketCtxBlock;
@@ -1754,7 +1756,7 @@ export class MarketingExecutionService extends BaseService {
         }
         let noProfileAmplified = baseRendered
           + (signalWeightBlock ? '\n' + signalWeightBlock : '')
-          + (bronzeOriginBlock ? '\n\n' + bronzeOriginBlock : '');
+          + (prospectOriginBlock ? '\n\n' + prospectOriginBlock : '');
         const marketCtxNoProfile = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
         if (marketCtxNoProfile) {
           noProfileAmplified = noProfileAmplified + '\n' + marketCtxNoProfile;
@@ -1799,8 +1801,8 @@ export class MarketingExecutionService extends BaseService {
       if (signalWeightBlock) {
         amplified = amplified + '\n' + signalWeightBlock;
       }
-      if (bronzeOriginBlock) {
-        amplified = amplified + '\n\n' + bronzeOriginBlock;
+      if (prospectOriginBlock) {
+        amplified = amplified + '\n\n' + prospectOriginBlock;
       }
 
       // Market context injection (seed gains market awareness): category
@@ -2152,12 +2154,13 @@ export class MarketingExecutionService extends BaseService {
     }
 
     // Drop if no signals AND no provenance AND no priority/fit/identity meta
-    // AND no bronze attribution (nothing to render as leads).
+    // AND no attribution of either lane (nothing to render as leads).
     const signals = Array.isArray(ctx.discovery_signals) ? ctx.discovery_signals : [];
     const provenance = Array.isArray(ctx.discovery_provenance) ? ctx.discovery_provenance : [];
     const attribution = Array.isArray(ctx.bronze_attribution) ? ctx.bronze_attribution : [];
+    const weaknesses = Array.isArray(ctx.competitive_weaknesses) ? ctx.competitive_weaknesses : [];
     const hasMeta = ctx.business_seek_priority || ctx.category_fit || ctx.identity_confidence;
-    if (signals.length === 0 && provenance.length === 0 && !hasMeta && attribution.length === 0) return '';
+    if (signals.length === 0 && provenance.length === 0 && !hasMeta && attribution.length === 0 && weaknesses.length === 0) return '';
 
     // ─── Focus parenthetical ───────────────────────────────────────────
     const focusLabel =
@@ -2237,6 +2240,18 @@ export class MarketingExecutionService extends BaseService {
       lines.push('');
     }
 
+    // Competitive weaknesses (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC §7) —
+    // exposures the scan claimed about this incumbent. Unlike bronze
+    // attribution (pipeline provenance), these are checkable claims — they
+    // render under the leads umbrella: verify like any other hypothesis.
+    if (weaknesses.length > 0) {
+      lines.push('Competitive weaknesses (exposures the scan claimed — verify like any lead):');
+      for (const w of weaknesses) {
+        lines.push(`- ${w.weakness_key}${w.basis ? ` — ${w.basis}` : ''}`);
+      }
+      lines.push('');
+    }
+
     // Absence rules paragraph (mandatory — spec §8.5)
     lines.push('Absence rules: "not found on a platform during discovery" is a discovery');
     lines.push('signal, not proof of absence. Re-verify platform absence yourself before');
@@ -2293,6 +2308,109 @@ export class MarketingExecutionService extends BaseService {
       'this business, which is often the sharpest version of the outreach story',
       '(e.g. "we found you in customs records because you have no web presence").',
       'Never present it to the owner as a verdict about the business itself.',
+    );
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Render the prospect-origin attribution block for the signal_triage path —
+   * the unified entry point covering both discovery lanes
+   * (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC §8).
+   *
+   * Attribution presence is the lane-awareness vector: bronze_attribution
+   * populated ⇒ emerging lane touched the prospect; competitive_weaknesses
+   * populated ⇒ competitive lane touched it. Both populated (a dual-lane
+   * merged prospect) renders a combined DISCOVERY ATTRIBUTION block that
+   * frames the differential. Single-lane contexts render their own block.
+   *
+   * Returns '' when the campaign carries no attribution of either kind.
+   */
+  private renderProspectOriginBlock(campaign: any): string {
+    const rawContext = campaign?.discovery_context;
+    if (!rawContext || typeof rawContext !== 'object') return '';
+
+    let ctx: DiscoveryContext;
+    try {
+      ctx = discoveryContextSchema.parse(rawContext);
+    } catch {
+      return '';
+    }
+
+    const attribution = Array.isArray(ctx.bronze_attribution)
+      ? ctx.bronze_attribution.filter((a) => a && typeof a.reason_key === 'string' && a.reason_key.trim())
+      : [];
+    const weaknesses = Array.isArray(ctx.competitive_weaknesses)
+      ? ctx.competitive_weaknesses.filter((w) => w && typeof w.weakness_key === 'string' && w.weakness_key.trim())
+      : [];
+
+    if (attribution.length === 0) return this.renderCompetitiveWeaknessesBlock(weaknesses);
+    if (weaknesses.length === 0) return this.renderBronzeAttributionBlock(campaign);
+
+    // Both lanes — combined block framing the differential (spec §8).
+    const lines: string[] = [
+      '=== PROSPECT ORIGIN — DISCOVERY ATTRIBUTION ===',
+      'This prospect carries attribution from BOTH discovery lanes. The entries',
+      'below record HOW the prospect was found and WHERE the incumbent is',
+      'exposed — pipeline provenance carrying framing material, not audit',
+      'findings.',
+      '',
+      'Bronze attribution (the discovery blind spot that surfaced this business):',
+    ];
+    for (const a of attribution) {
+      lines.push(`- ${a.reason_key}${a.basis ? ` — ${a.basis}` : ''}`);
+    }
+    lines.push('');
+    lines.push('Competitive weaknesses (exposures the scan claimed — confirm before pitching):');
+    for (const w of weaknesses) {
+      lines.push(`- ${w.weakness_key}${w.basis ? ` — ${w.basis}` : ''}`);
+    }
+    lines.push('');
+    lines.push(
+      'Use these together as pitch framing: the blind spot that surfaced this',
+      'prospect and the incumbent\'s exposure describe the same market gap from',
+      'two directions — pitch the differential ("leaders are weak exactly where',
+      'you were found"), not two unrelated facts. Weaknesses are the scan\'s',
+      'claimed exposures — confirm before presenting them as fact, and never',
+      'present either to the owner as a verdict about the business itself.',
+    );
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Render the "Prospect Origin — Competitive Weaknesses" block for the
+   * signal_triage path (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC §7).
+   *
+   * Epistemic caveat (sharper than bronze's): a weakness is a scan-time
+   * claim ABOUT the business — the same class as an INT signal lead — not
+   * pure pipeline provenance. The block therefore presents weaknesses as
+   * the scan's claimed exposure ("confirm before pitching"), pitch framing
+   * for the briefing's Pitch section.
+   *
+   * Takes pre-filtered entries (called from renderProspectOriginBlock).
+   * Returns '' when empty — byte-identical render for campaigns that did
+   * not arrive via a competitive-attributed find.
+   */
+  private renderCompetitiveWeaknessesBlock(weaknesses: Array<{ weakness_key: string; basis?: string | null }>): string {
+    if (weaknesses.length === 0) return '';
+
+    const lines: string[] = [
+      '=== PROSPECT ORIGIN — COMPETITIVE WEAKNESSES ===',
+      'This prospect was surfaced by a competitive discovery scan — it is one of',
+      'the market\'s visible leaders, selected for its strengths. The entries',
+      'below are the scan\'s claimed exposures: the named pain the pitch speaks',
+      'to ("we see you — can we help with this?").',
+      '',
+    ];
+    for (const w of weaknesses) {
+      lines.push(`- ${w.weakness_key}${w.basis ? ` — ${w.basis}` : ''}`);
+    }
+    lines.push('');
+    lines.push(
+      'These are scan-time claims, not audit findings — confirm before pitching,',
+      'and never present them to the owner as a verdict about the business.',
+      'Framed as opportunity, they are the outreach wedge.',
     );
 
     return lines.join('\n');

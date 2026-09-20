@@ -135,6 +135,25 @@ const discoveredBusinessSchema = z.object({
       basis: z.string().nullable().optional(),
     }).passthrough(),
   ).nullable().optional(),
+
+  // Competitive weakness attribution
+  // (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC §6) — present only under
+  // focus 'competitive'. Leaders are selected on strength; weaknesses
+  // are documented during selection and become the pitch wedge — the
+  // named pain that converts "leader observed" into "we see you". A
+  // leader with no observable weakness is a benchmark, not a prospect
+  // (§3). Optional + nullable; legacy payloads import cleanly.
+  competitive_weaknesses: z.array(
+    z.object({
+      weakness_key: z.string().min(1),
+      // One-line basis — the observation that names the exposure.
+      basis: z.string().nullable().optional(),
+    }).passthrough(),
+  ).nullable().optional(),
+
+  // Optional marker (§3): candidate observed as a reference point, not a
+  // prospect. Scan/card-display only — not carried downstream.
+  benchmark_only: z.boolean().nullable().optional(),
 }).passthrough();
 
 // ─── Top-level schema ────────────────────────────────────────────────────
@@ -386,7 +405,11 @@ Return a single JSON object with this structure:
       ],
       "bronze_attribution": [
         { "reason_key": "<catalog reason key from the BRONZE STANDARD block>", "basis": "<one line — which vector or signal produced this find>" }
-      ]
+      ],
+      "competitive_weaknesses": [
+        { "weakness_key": "<weakness key from the COMPETITIVE FOCUS weakness vocabulary>", "basis": "<one line — the observation that names the exposure>" }
+      ],
+      "benchmark_only": <true | false — optional>,
     }
   ],
   "qualifying_businesses": [<FULL duplicate records — same structure as discovered_businesses, excludes outside_market, national_chain, national_franchise, regional_chain. Do NOT emit references like {"business_name": "...", "note": "see discovered_businesses"} — repeat the complete record for each qualifying business>],
@@ -442,6 +465,7 @@ Rules:
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 - BRONZE REASON ATTRIBUTION: When a "=== BRONZE STANDARD — MARKET CALIBRATION ===" block is present in the prompt, attribute each candidate to the catalog reason(s) DIRECTLY RESPONSIBLE for the find — the reason whose expected_vectors surfaced the business, or whose signal vocabulary is what identifies it as category-qualified-but-invisible. Emit one bronze_attribution entry per responsible reason with its reason_key exactly as given in the block and a one-line basis naming the vector or signal that produced the find. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway gets NO attribution, and a candidate that merely looks like a bronze exemplar but was not reached through the reason's vector gets none either. When NO bronze calibration block is present, or no reason was responsible for a candidate, OMIT bronze_attribution entirely.
+- COMPETITIVE WEAKNESS ATTRIBUTION: When focus is "competitive", leaders are selected for their strengths — weaknesses are documented during selection, not used as a selection filter. Attribute each qualifying candidate to the weakness(es) observed during evaluation — named exposures from the weakness vocabulary in the COMPETITIVE FOCUS block. Emit one competitive_weaknesses entry per weakness with its weakness_key exactly as given and a one-line basis naming the observation that identifies the exposure. A recommended qualifying candidate SHOULD carry at least one entry — the weakness is the pitch wedge (no pain, no pitch). A leader with no observable weakness is a benchmark, not a prospect: emit benchmark_only: true and no weaknesses. When focus is "emerging", OMIT competitive_weaknesses and benchmark_only entirely.
 `;
 
 // ─── Discovery Context (Migration 253 — GAP-E3) ──────────────────────────
@@ -481,6 +505,17 @@ export const discoveryContextSchema = z.object({
       basis: z.string().nullable().optional(),
     }).passthrough(),
   ).optional(),
+  // Competitive Weakness Attribution (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC
+  // §7) — the incumbent's named exposures, carried forward from the scan's
+  // per-candidate competitive_weaknesses so downstream surfaces can frame
+  // the pitch differential. Both attribution kinds may coexist on a merged
+  // prospect (§8).
+  competitive_weaknesses: z.array(
+    z.object({
+      weakness_key: z.string().min(1),
+      basis: z.string().nullable().optional(),
+    }).passthrough(),
+  ).optional(),
 }).passthrough();
 
 export type DiscoveryContext = z.infer<typeof discoveryContextSchema>;
@@ -499,7 +534,8 @@ export function validateDiscoveryContext(raw: unknown): DiscoveryContext | null 
     const hasProvenance = Array.isArray(parsed.discovery_provenance) && parsed.discovery_provenance.length > 0;
     const hasMeta = parsed.business_seek_priority || parsed.category_fit || parsed.identity_confidence;
     const hasBronzeAttribution = Array.isArray(parsed.bronze_attribution) && parsed.bronze_attribution.length > 0;
-    if (!hasSignals && !hasProvenance && !hasMeta && !hasBronzeAttribution) return null;
+    const hasCompetitiveWeaknesses = Array.isArray(parsed.competitive_weaknesses) && parsed.competitive_weaknesses.length > 0;
+    if (!hasSignals && !hasProvenance && !hasMeta && !hasBronzeAttribution && !hasCompetitiveWeaknesses) return null;
     return parsed;
   } catch {
     return null;

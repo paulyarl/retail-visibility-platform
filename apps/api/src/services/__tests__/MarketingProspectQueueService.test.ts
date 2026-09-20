@@ -416,6 +416,100 @@ describe('MarketingProspectQueueService', () => {
       expect(result.kind).toBe('already_queued');
       expect(mockQueue.create).not.toHaveBeenCalled();
     });
+
+    // ─── Dual-lane attribution merge (spec §8) ───────────────────────────
+    // A prospect found in both discovery lanes accumulates attribution on
+    // the existing queue entry rather than last-write-winning.
+
+    it('dual-lane merge: second-lane queue action unions attribution into the existing snapshot', async () => {
+      const existing = queueRow({
+        id: 'pque-existing-001',
+        business_snapshot: {
+          ...scanSnapshot(),
+          bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs sweep' }],
+        },
+        discovery_provenance: [{ source: 'Google', role: 'primary' }],
+      });
+      mockQueue.findFirst.mockResolvedValue(existing);
+      mockQueue.update.mockImplementation(({ data }: any) => Promise.resolve({ ...existing, ...data }));
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
+        source_kind: 'intelligence_seek',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: {
+          competitive_weaknesses: [{ weakness_key: 'review_response_absent', basis: '312 reviews, no responses' }],
+        },
+        discovery_provenance: [{ source: 'Yelp', role: 'corroboration' }],
+      });
+
+      expect(result.kind).toBe('already_queued');
+      expect(mockQueue.create).not.toHaveBeenCalled();
+      expect(mockQueue.update).toHaveBeenCalledWith({
+        where: { id: 'pque-existing-001' },
+        data: expect.objectContaining({
+          business_snapshot: expect.objectContaining({
+            bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs sweep' }],
+            competitive_weaknesses: [{ weakness_key: 'review_response_absent', basis: '312 reviews, no responses' }],
+          }),
+          discovery_provenance: [
+            { source: 'Google', role: 'primary' },
+            { source: 'Yelp', role: 'corroboration' },
+          ],
+        }),
+      });
+    });
+
+    it('dual-lane merge: duplicate keys dedupe and a basis upgrade wins', async () => {
+      const existing = queueRow({
+        id: 'pque-existing-001',
+        business_snapshot: {
+          ...scanSnapshot(),
+          competitive_weaknesses: [
+            { weakness_key: 'website_gap' },                          // no basis
+            { weakness_key: 'nap_drift', basis: 'old Yelp address' }, // has basis
+          ],
+        },
+      });
+      mockQueue.findFirst.mockResolvedValue(existing);
+      mockQueue.update.mockImplementation(({ data }: any) => Promise.resolve({ ...existing, ...data }));
+
+      await MarketingProspectQueueService.addToQueue({
+        business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
+        source_kind: 'intelligence_seek',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: {
+          competitive_weaknesses: [
+            { weakness_key: 'website_gap', basis: 'no site on GBP' }, // same key, better basis
+            { weakness_key: 'nap_drift', basis: 'worse' },            // same key, existing basis kept
+          ],
+        },
+      });
+
+      const updateArg = mockQueue.update.mock.calls[0][0];
+      expect(updateArg.data.business_snapshot.competitive_weaknesses).toEqual([
+        { weakness_key: 'website_gap', basis: 'no site on GBP' },
+        { weakness_key: 'nap_drift', basis: 'old Yelp address' },
+      ]);
+    });
+
+    it('dual-lane merge: no attribution in the incoming payload → no write', async () => {
+      const existing = queueRow({ id: 'pque-existing-001' });
+      mockQueue.findFirst.mockResolvedValue(existing);
+
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
+        source_kind: 'scan_unmatched',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: scanSnapshot(),
+      });
+
+      expect(result.kind).toBe('already_queued');
+      expect(mockQueue.update).not.toHaveBeenCalled();
+    });
   });
 
   // ─── list ──────────────────────────────────────────────────────────────

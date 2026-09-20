@@ -39,9 +39,10 @@ by definition (competitive + platform = businesses *present* on the target
 platform), so there is no "why was it hidden" to answer.
 
 Competitive attribution is **exposure**: competitive candidates are the
-market's *leaders* — highly visible incumbents — and the attribution names
-**their weaknesses**. The weakness is the qualification rationale: the
-exploitable gap that converts "leader observed" into "prospect."
+market's *leaders* — selected for their visibility, not their gaps — and
+the attribution names **their weaknesses**, documented during selection.
+The weakness is the pitch rationale: the named pain that converts "leader
+observed" into "we see you — can we help?"
 
 | | Bronze attribution | Competitive weakness |
 |---|---|---|
@@ -56,16 +57,25 @@ semantics differ, and downstream consumers must not assume bronze's causal
 contract. The `{key, basis}` *shape* is identical so the existing carry and
 render plumbing is reused without modification.
 
-## 3. Qualification semantics — absence is meaningful here
+## 3. Selection vs. documentation — weaknesses are the pitch, not the filter
 
-A structural difference from bronze that is worth stating plainly: a
-competitive candidate with **no** observable weakness is a benchmark, not a
+Leaders are **selected for their strengths** — the visibility signals that
+make them the market's benchmarks. Weaknesses are not the selection
+criterion; they are **documented during selection** and become the outreach
+wedge: the named pain the pitch speaks to ("we see you — can we help with
+this?").
+
+A structural consequence worth stating plainly: a leader with **no**
+observable weakness has no pain to pitch — it is a benchmark, not a
 prospect. Weakness presence is therefore expected — not optional — on
 recommended candidates.
 
+- Selection is strength-driven; weakness documentation rides the same
+  evaluation pass.
 - A qualifying candidate with `business_seek_recommended: true` SHOULD carry
-  at least one `competitive_weaknesses` entry.
-- A qualifying candidate that passes every observable check MAY emit
+  at least one `competitive_weaknesses` entry — the weakness *is* the pitch
+  wedge (no pain, no pitch).
+- A qualifying candidate with no observable weakness MAY emit
   `benchmark_only: true` (optional flag) to record "observed as a reference
   point, not a prospect."
 - This is a **prompt-level expectation, not a schema refinement**. The
@@ -238,13 +248,19 @@ requires of existing code.
 
 Two clarifications:
 
-- **`discovery_context.focus` stays single-valued.** It records the
-  *originating run's* focus (`resolveRunFocus` on the queue entry's run) —
-  a merged prospect carrying both attributions still has exactly one
-  `focus` value. Every renderer therefore keys off **field presence**, not
-  `focus`: the combined block renders whenever both attribution arrays are
-  non-empty, and each lane's block/subsection renders whenever its own
-  array is non-empty, regardless of which run produced the entry.
+- **`discovery_context.focus` stays single-valued — and doesn't need to be
+  more.** It records the *originating run's* focus (`resolveRunFocus` on
+  the queue entry's run), but **attribution presence is itself the
+  lane-awareness vector**: `bronze_attribution` populated ⇒ emerging lane
+  touched this prospect; `competitive_weaknesses` populated ⇒ competitive
+  lane touched it. A consumer never needs `focus` to know which lanes
+  produced the entry — the populated arrays encode the full lane
+  provenance, and the vector scales to any number of attribution kinds
+  without a schema change. Every renderer therefore keys off **field
+  presence**, not `focus`: the combined block renders whenever both
+  attribution arrays are non-empty, and each lane's block/subsection
+  renders whenever its own array is non-empty, regardless of which run
+  produced the entry.
 - **Seed-level merges are future surface.** `directory_presence_seeds` rows
   don't carry `business_snapshot`, so the PG verdict path has nothing to
   union today; the rule is stated so that any future attribution-bearing
@@ -315,14 +331,13 @@ needs a story, it uses attribution.
 | Component | File |
 |---|---|
 | Discovery output schema + prompt suffix | `apps/api/src/validators/intelligence-discovery.schema.ts` |
-| Vocabulary injection | `seek_intelligence_focus_competitive` fragment (seeded — `apps/api/src/scripts/seed-intelligence-discovery-templates.ts` / fragments seed) |
+| Vocabulary injection | `seek_intelligence_focus_competitive` fragment (`apps/api/src/scripts/seed-intelligence-fragments.ts` — re-run `pnpm seed:intelligence-fragments` against local + prd) |
 | Context carry | `discoveryContextSchema` + `validateDiscoveryContext` (same file) |
 | Snapshot assembly (explicit — required edit) | `apps/web/src/components/marketing-ops/IntelligenceDiscoveryAuditCard.tsx` — `handleQueue` builds `business_snapshot` field-by-field (~L252–269); add `competitive_weaknesses` beside `bronze_attribution`. **Not spread — the field does not ride free** |
 | Snapshot → context carry | `apps/api/src/services/MarketingProspectQueueService.ts` (~L944, beside `bronze_attribution`) |
 | Queue dedup merge (§8 — the one behavioral change) | `apps/api/src/services/MarketingProspectQueueService.ts` — `addToQueue` `already_queued` branch (~L336–345) |
 | Leads block + triage block | `apps/api/src/services/MarketingExecutionService.ts` — `renderDiscoveryLeadsBlock` (~L2142), new `renderCompetitiveWeaknessesBlock` beside `renderBronzeAttributionBlock` (~L2264) |
-| Label map | `COMPETITIVE_WEAKNESS_LABELS` beside `INT_SIGNAL_LABELS` in `MarketingExecutionService.ts` + `MarketingCampaignService.ts` |
-| UI chips | `IntelligenceDiscoveryAuditCard.tsx`, `ProspectQueueClient.tsx`, `ProvingGroundCockpitClient.tsx` (beside existing `bronze_attribution` rendering) |
+| UI chips | `IntelligenceDiscoveryAuditCard.tsx`, `ProspectQueueClient.tsx`, `ProvingGroundCockpitClient.tsx` (beside existing `bronze_attribution` rendering; keys render raw like `reason_key` — no label map) |
 
 ## 11. Test plan sketch
 
