@@ -138,6 +138,7 @@ export interface IdentityPacket {
   /** Resolved business city/state for the Verify record prefill (not scored fields). */
   addressCity: string | null;
   addressState: string | null;
+  addressZip: string | null;
   identityStatus: 'confirmed' | 'ambiguous' | 'mismatched';
   operationalStatus: 'active' | 'likely_active' | 'inactive' | 'unable_to_verify';
   callConfirmed: boolean | null;

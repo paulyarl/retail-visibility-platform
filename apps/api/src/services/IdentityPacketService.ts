@@ -65,14 +65,15 @@ export interface IdentityPacket {
   campaignId: string;
   businessName: string | null;
   /**
-   * Resolved business city/state — campaign structured address first, then
-   * audit metadata (matched → requested), then the campaign's market scope.
-   * Same precedence the seed-create path uses (DirectoryPresenceSeedService),
-   * plus the market-scope fallback the seed-create form applies. Carried for
-   * the Verify record modal prefill — city/state are not scored fields.
+   * Resolved business city/state/zip — campaign structured address first,
+   * then the audit's canonical NAP, then audit metadata (matched → parsed
+   * combined address → requested); city/state may finally fall back to the
+   * campaign's market scope (shared lib/canonical-nap contract). Carried for
+   * the Verify record modal prefill — these are not scored fields.
    */
   addressCity: string | null;
   addressState: string | null;
+  addressZip: string | null;
   identityStatus: IdentityStatus;
   operationalStatus: OperationalStatus;
   callConfirmed: boolean | null;
@@ -229,13 +230,14 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     attributes: input.attributes?.length ? `${input.attributes.length} attribute(s)` : null,
   };
 
-  // Resolved business city/state — not scored fields (IdentityFieldKey has no
-  // city/state), but the Verify record modal prefills from them. One shared
-  // contract (lib/canonical-nap); market scope is allowed here because this
-  // is a prefill hint the operator confirms, not a seed gate.
+  // Resolved business city/state/zip — not scored fields (IdentityFieldKey
+  // has no city/state/zip), but the Verify record modal prefills from them.
+  // One shared contract (lib/canonical-nap); market scope is allowed here
+  // because this is a prefill hint the operator confirms, not a seed gate.
   const resolvedNap = resolveCampaignNap(campaign, audit, { marketScopeFallback: true });
   const addressCity = resolvedNap.city;
   const addressState = resolvedNap.state;
+  const addressZip = resolvedNap.zip;
 
   const evidence: Record<IdentityFieldKey, IdentitySourceRef[]> = {
     name: [],
@@ -439,6 +441,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     businessName: canonical.name,
     addressCity,
     addressState,
+    addressZip,
     identityStatus,
     operationalStatus,
     callConfirmed: input.callConfirmed ?? null,

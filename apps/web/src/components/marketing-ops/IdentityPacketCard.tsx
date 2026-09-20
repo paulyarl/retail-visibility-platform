@@ -348,8 +348,8 @@ export default function IdentityPacketCard({
     id: campaignId,
     business_name: packet.businessName,
     category: canonicalValue('primary_category'),
-    // City/state aren't scored packet fields — the packet resolves them
-    // separately (structured campaign address → audit metadata → market scope).
+    // City/state/zip aren't scored packet fields — the packet resolves them
+    // separately via the shared lib/canonical-nap contract.
     city: packet.addressCity,
     state: packet.addressState,
     business_snapshot: {
@@ -358,6 +358,7 @@ export default function IdentityPacketCard({
         address: canonicalValue('address'),
         city: packet.addressCity,
         state: packet.addressState,
+        zip: packet.addressZip,
         phone: canonicalValue('phone'),
         website: canonicalValue('website'),
         category: canonicalValue('primary_category'),

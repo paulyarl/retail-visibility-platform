@@ -214,11 +214,16 @@ describe('assembleIdentityPacket', () => {
     expect(p.seed).toEqual({ id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market' });
   });
 
-  it('resolves addressCity/addressState for the Verify record prefill', () => {
+  it('resolves addressCity/addressState/addressZip for the Verify record prefill', () => {
     // Structured campaign address wins over audit metadata and market scope.
     const structured = assembleIdentityPacket(
       base({
-        campaign: { ...campaign, address_city: 'Carmel', address_state: 'IN' },
+        campaign: {
+          ...campaign,
+          address_city: 'Carmel',
+          address_state: 'IN',
+          address_zip: '46032',
+        },
         audit: {
           ...strongAudit,
           audit_metadata: {
@@ -231,6 +236,7 @@ describe('assembleIdentityPacket', () => {
     );
     expect(structured.addressCity).toBe('Carmel');
     expect(structured.addressState).toBe('IN');
+    expect(structured.addressZip).toBe('46032');
 
     // Audit matched_business fills in when the structured columns are empty.
     const fromAudit = assembleIdentityPacket(
@@ -273,6 +279,7 @@ describe('assembleIdentityPacket', () => {
     );
     expect(unknown.addressCity).toBeNull();
     expect(unknown.addressState).toBeNull();
+    expect(unknown.addressZip).toBeNull();
   });
 
   it('scores an unaudited business from operator evidence alone', () => {
