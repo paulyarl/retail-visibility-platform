@@ -1,13 +1,13 @@
 /**
  * HookSuggestionService — Server-side starter hook suggestions
  *
- * Ranks the 12 hook angles from the catalog against a campaign's resolved
+ * Ranks the hook angles from the catalog against a campaign's resolved
  * archetype + detected signals, and returns copy with merge fields resolved
  * (salutation from Sprint 1's worksheet, city, category, sender name).
  *
  * Ranking: archetype-affinity hooks first, ordered by signal-match count
- * (deterministic tie-break by catalog order). Returns all 12, ranked — the
- * operator can always pick off-rank.
+ * (deterministic tie-break by catalog order). Returns the full catalog, ranked
+ * — the operator can always pick off-rank.
  *
  * Merge resolution never fabricates — missing values keep the placeholder
  * visible so the operator sees what's unresolved.
@@ -213,7 +213,7 @@ export class HookSuggestionService extends BaseService {
   // ─── Ranking ──────────────────────────────────────────────────────────
 
   /**
-   * Rank all 13 hooks: archetype-affinity first, emerging-archetype boost
+   * Rank the full hook catalog: archetype-affinity first, emerging-archetype boost
    * (ordered by list position), signal-match severity-weighted tie-break,
    * catalog order as the final deterministic fallback.
    *

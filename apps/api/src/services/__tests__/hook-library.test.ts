@@ -76,8 +76,8 @@ const REGISTERED_SIGNALS = new Set([
 ]);
 
 describe('Hook Library catalog', () => {
-  it('has exactly 16 entries', () => {
-    expect(HOOK_LIBRARY).toHaveLength(16);
+  it('has exactly 20 entries', () => {
+    expect(HOOK_LIBRARY).toHaveLength(20);
   });
 
   it('every angle key is unique', () => {
@@ -86,7 +86,7 @@ describe('Hook Library catalog', () => {
   });
 
   it('HOOK_ANGLE_KEYS matches the library', () => {
-    expect(HOOK_ANGLE_KEYS).toHaveLength(16);
+    expect(HOOK_ANGLE_KEYS).toHaveLength(20);
     expect(HOOK_ANGLE_KEYS).toEqual(HOOK_LIBRARY.map((h) => h.angle));
   });
 

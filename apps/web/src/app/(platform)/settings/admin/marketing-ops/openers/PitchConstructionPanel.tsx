@@ -129,13 +129,18 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     'Quick note about {{business}}\'s online presence',
     '{{business}} — no way to browse your products before visiting',
   ],
-  // A7 — Website Gap (web presence)
+  // A7 — Website Gap (web presence + platform website offerings)
   A7: [
     'Preview - what customers see when they look for you',
     '{{business}} — customers can\'t find a real website',
     '{{business}} — your website is a Facebook page',
     'Quick note about {{business}}\'s website',
     '{{business}} — the site link isn\'t loading',
+    // Offering angles (platform website product)
+    '{{business}} — you don\'t have to build the whole site at once',
+    '{{business}} — a site you won\'t have to redo next year',
+    '{{business}} — just get found, or actually sell online?',
+    '{{business}} — the pages that actually get you found',
   ],
 };
 
@@ -191,6 +196,8 @@ const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{remaining}} more pages are mapped out. Want them?',
     'There are {{remaining}} more pieces staged. Say the word.',
     'I\'ve handled {{remaining}} more sections beyond these. Should I send them?',
+    // Offering angle — tiers
+    'The first tier\'s ready to go — the {{remaining}} pages beyond it whenever you are.',
   ],
 };
 
@@ -243,6 +250,8 @@ const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
     'Reply with "go" and I\'ll send the website plan. — {{name}}',
     '— {{name}} | {{phone}}',
     'Text "site" to {{phone}} and I\'ll send the homepage mockup. — {{name}}',
+    // Offering angle — the build package
+    'Text "build" to {{phone}} and I\'ll send the full build package. — {{name}}',
   ],
 };
 

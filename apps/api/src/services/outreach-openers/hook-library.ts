@@ -43,6 +43,13 @@ export type HookAngle =
   | 'website_foundation'
   | 'website_repair'
   | 'third_party_presence'
+  // Website OFFERING angles (platform product-led, not gap-led) — the pitch
+  // sells the platform's website capabilities: package tiers, ecommerce,
+  // scaling, visibility. Spec: WEBSITE_GAP_AUDIT_PLAYBOOK_SPEC (angles).
+  | 'website_tiers'
+  | 'website_ecommerce'
+  | 'website_scaling'
+  | 'website_visibility'
   | 'product_category_pages'
   | 'availability_inquiry'
   | 'review_acquisition'
@@ -271,6 +278,116 @@ Want me to sketch out what that could look like, no obligation?
       soft_cta: 'Want me to sketch out what that could look like, no obligation?',
     },
     phone_hook: 'I went looking for your website and what I found was a social page standing in for one — nothing a customer can land on that actually looks like your business. Totally normal for a lot of great local shops. But when someone searches for {{category}} in {{city}} and the only thing that comes up is a social page, a chunk of them just keep scrolling to the next result. I do simple storefront websites for shops like yours — nothing fancy, just something that shows up under your own name, loads fast, shows off what you carry, and gets people in. Want me to sketch out what that could look like, no obligation?',
+  },
+
+  // 4d. website_tiers — platform OFFERING angle: package tiers, start simple
+  //     and grow. Not a gap pitch — a "you don't have to build it all at once"
+  //     angle that sells the tiered build.
+  {
+    angle: 'website_tiers',
+    label: 'Website packages — start simple, scale up',
+    archetypes: ['A7', 'A4'],
+    signals: ['WC_MISSING_WEBSITE', 'WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN', 'WC_POOR_SITE_QUALITY'],
+    subject: 'you don\'t have to build the whole site at once',
+    body: `{{salutation}} Quick thought on the website side — a lot of owners figure a real site means a big, expensive project, so it keeps getting pushed to "someday."
+
+It really doesn't have to work that way.
+
+We build these in tiers — you start with the pages that win you customers right now (services, hours, a way to get in touch), then add the rest — ordering, booking, more pages — only when it's earning its keep. Nothing big up front.
+
+I can put together what the first tier would look like for {{business}}, no obligation.
+
+Want me to send it over?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'A lot of owners figure a real site means a big, expensive project',
+      reassurance: 'It really doesn\'t have to work that way.',
+      quantified_upside: 'Start with the pages that win customers now, add the rest when it\'s earning',
+      audit_offer: 'What the first tier would look like for {{business}} — no obligation',
+      soft_cta: 'Want me to send it over?',
+    },
+    phone_hook: 'Quick thought on the website side — a lot of owners figure a real site means a big, expensive project, so it keeps getting pushed to "someday." It really doesn\'t have to work that way. We build these in tiers — you start with the pages that win you customers right now, then add the rest only when it\'s earning its keep. I can put together what the first tier would look like for {{business}}, no obligation. Want me to send it over?',
+  },
+
+  // 4e. website_ecommerce — platform OFFERING angle: ecommerce options.
+  {
+    angle: 'website_ecommerce',
+    label: 'Selling online — ecommerce options',
+    archetypes: ['A7', 'A6'],
+    signals: ['WC_MISSING_PRODUCT_BROWSING', 'DS_MISSING_PRODUCT_CATALOG', 'WC_MISSING_WEBSITE', 'WC_THIRD_PARTY_DOMAIN'],
+    subject: 'just get found, or actually sell online?',
+    body: `{{salutation}} One thing I hear a lot from shops like yours — "I don't need a website, my customers just come in."
+
+Fair enough, and that works great right up until someone wants to buy from you at 9pm, or from two towns over.
+
+The good news is you don't have to pick one. We can start with a simple site that shows what you carry, then switch on ordering or checkout later — only once it's actually bringing in sales.
+
+Want me to sketch what selling online could look like for {{business}}?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: '"I don\'t need a website, my customers just come in"',
+      reassurance: 'That works great — right up until someone wants to buy at 9pm.',
+      quantified_upside: 'You don\'t have to pick one: get found now, switch on checkout when it pays',
+      audit_offer: 'Sketch what selling online could look like for {{business}}',
+      soft_cta: 'Want me to sketch it out?',
+    },
+    phone_hook: 'One thing I hear a lot from shops like yours — "I don\'t need a website, my customers just come in." Fair enough, and that works great right up until someone wants to buy from you at 9pm, or from two towns over. The good news is you don\'t have to pick one. We can start with a simple site that shows what you carry, then switch on ordering or checkout later, only once it\'s bringing in sales. Want me to sketch what selling online could look like for {{business}}?',
+  },
+
+  // 4f. website_scaling — platform OFFERING angle: a site that grows with you.
+  {
+    angle: 'website_scaling',
+    label: 'A site that grows with the business',
+    archetypes: ['A7'],
+    signals: ['WC_MISSING_WEBSITE', 'WC_POOR_SITE_QUALITY', 'WC_STALE_WEBSITE', 'WC_LEGACY_BUILDER_SITE'],
+    subject: 'a site you won\'t have to redo next year',
+    body: `{{salutation}} Most of the shop sites I come across were built once, years ago, and never touched since — so they slowly fall out of date.
+
+That's the trap with a one-and-done build.
+
+We build yours so it can grow with you: add a page when you add a service, update your hours without calling a developer, turn on booking or ordering when you're ready. No full redo in a year.
+
+Want me to show you what that looks like for {{business}}?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Built once years ago and never touched since',
+      reassurance: 'That\'s the trap with a one-and-done build.',
+      quantified_upside: 'Add pages, hours, booking as you grow — no full redo in a year',
+      audit_offer: 'Show what a grow-with-you build looks like for {{business}}',
+      soft_cta: 'Want me to show you?',
+    },
+    phone_hook: 'Most of the shop sites I come across were built once, years ago, and never touched since — so they slowly fall out of date. That\'s the trap with a one-and-done build. We build yours so it can grow with you: add a page when you add a service, update your hours without calling a developer, turn on booking or ordering when you\'re ready. No full redo in a year. Want me to show you what that looks like for {{business}}?',
+  },
+
+  // 4g. website_visibility — platform OFFERING angle: get found for what you
+  //     sell (site-side discoverability, distinct from local_seo's listing/GBP
+  //     optimization).
+  {
+    angle: 'website_visibility',
+    label: 'Website visibility — get found for what you sell',
+    archetypes: ['A7', 'A4'],
+    signals: ['WC_MISSING_SERVICE_PAGES', 'WC_MISSING_WEBSITE', 'WC_POOR_SITE_QUALITY', 'WC_CATEGORY_MISMATCH'],
+    subject: 'the pages that actually get you found',
+    body: `{{salutation}} Here's what most shop sites miss: they've got a homepage and a contact page, and that's about it — so search engines have nothing to rank you for.
+
+The sites that get found have a page for each thing people actually search. One for "same-day tire repair," one for "emergency plumbing in {{city}}" — that kind of thing. Those pages do the finding for you.
+
+I can map out the handful of pages that would move the needle for {{business}}, and what each one needs to say.
+
+Want me to send it over?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'A homepage and a contact page — and nothing to rank you for',
+      reassurance: 'Here\'s what most shop sites miss.',
+      quantified_upside: 'One page per thing people search does the finding for you',
+      audit_offer: 'Map the handful of pages that would move the needle for {{business}}',
+      soft_cta: 'Want me to send it over?',
+    },
+    phone_hook: 'Here\'s what most shop sites miss: they\'ve got a homepage and a contact page, and that\'s about it — so search engines have nothing to rank you for. The sites that get found have a page for each thing people actually search. One for "same-day tire repair," one for "emergency plumbing in {{city}}" — that kind of thing. Those pages do the finding for you. I can map out the handful of pages that would move the needle for {{business}}, and what each one needs to say. Want me to send it over?',
   },
 
   // 5. product_category_pages
