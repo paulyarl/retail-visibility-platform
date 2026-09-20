@@ -44,6 +44,7 @@ import {
   CALL_SCRIPT_CLOSE,
   CALL_SCRIPT_OBJECTIONS,
   WEBSITE_CALL_SCRIPT_OBJECTIONS,
+  REPAIR_CALL_SCRIPT_OBJECTIONS,
   type HookAngle,
   type HookTemplate,
   type ObjectionRow,
@@ -373,9 +374,7 @@ export class CallScriptService extends BaseService {
         close: closeStage,
       },
       hookOptions: ranked,
-      objections: resolved.archetype === 'A7'
-        ? [...WEBSITE_CALL_SCRIPT_OBJECTIONS, ...CALL_SCRIPT_OBJECTIONS]
-        : CALL_SCRIPT_OBJECTIONS,
+      objections: this.objectionsForArchetype(resolved.archetype),
       callContext: {
         phone: campaign.phone,
         owner_name: ownerName,
@@ -838,6 +837,21 @@ export class CallScriptService extends BaseService {
   }
 
   // ─── Ranking (phone hooks) ────────────────────────────────────────────
+
+  /**
+   * Archetype-scoped objection set. Website (A7) and repair (A3/A5) campaigns
+   * get their own on-point objections prepended ahead of the generic five;
+   * every other archetype gets the generic set only.
+   */
+  private objectionsForArchetype(archetype: ArchetypeCode): ObjectionRow[] {
+    if (archetype === 'A7') {
+      return [...WEBSITE_CALL_SCRIPT_OBJECTIONS, ...CALL_SCRIPT_OBJECTIONS];
+    }
+    if (archetype === 'A3' || archetype === 'A5') {
+      return [...REPAIR_CALL_SCRIPT_OBJECTIONS, ...CALL_SCRIPT_OBJECTIONS];
+    }
+    return CALL_SCRIPT_OBJECTIONS;
+  }
 
   /**
    * Rank every hook for the phone channel. Same ranking logic as

@@ -24,6 +24,7 @@ import {
 } from '../outreach-openers/hook-library';
 import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
 import { KNOWN_SIGNAL_CODES } from '../triage/signal-taxonomy';
+import { isRepairSignal } from '../triage/signal-taxonomy';
 import { computeSignalSeverity } from '../outreach-openers/signal-magnitude';
 
 const VALID_ARCHETYPES: ArchetypeCode[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
@@ -78,8 +79,8 @@ const REGISTERED_SIGNALS = new Set([
 ]);
 
 describe('Hook Library catalog', () => {
-  it('has exactly 20 entries', () => {
-    expect(HOOK_LIBRARY).toHaveLength(20);
+  it('has exactly 23 entries', () => {
+    expect(HOOK_LIBRARY).toHaveLength(23);
   });
 
   it('every angle key is unique', () => {
@@ -88,7 +89,7 @@ describe('Hook Library catalog', () => {
   });
 
   it('HOOK_ANGLE_KEYS matches the library', () => {
-    expect(HOOK_ANGLE_KEYS).toHaveLength(20);
+    expect(HOOK_ANGLE_KEYS).toHaveLength(23);
     expect(HOOK_ANGLE_KEYS).toEqual(HOOK_LIBRARY.map((h) => h.angle));
   });
 
@@ -241,12 +242,12 @@ describe('website signal ↔ angle alignment', () => {
     }
   });
 
-  it('only the two intentionally-routed signals lack a website angle', () => {
+  it('only the intentionally-routed signal lacks a website angle', () => {
     const uncovered = WC_SIGNALS.filter((c) => !ANGLED_WC_SIGNALS.has(c)).sort();
-    // WC_URL_MISMATCH → repair/NAP family (PB-01/A3, PB-05 dual);
-    // WC_MISSING_PICKUP_DELIVERY → product family (PB-07/A6).
-    // Both route to another playbook's angle family by design.
-    expect(uncovered).toEqual(['WC_MISSING_PICKUP_DELIVERY', 'WC_URL_MISMATCH']);
+    // WC_MISSING_PICKUP_DELIVERY → product family (PB-07/A6) by design.
+    // WC_URL_MISMATCH is repair-class and now covered by nap_normalization
+    // (see the repair contract below).
+    expect(uncovered).toEqual(['WC_MISSING_PICKUP_DELIVERY']);
   });
 
   it('the A7 angle family carries the website gap + offering angles', () => {
@@ -256,5 +257,38 @@ describe('website signal ↔ angle alignment', () => {
       'website_foundation', 'website_repair', 'third_party_presence',
       'website_tiers', 'website_ecommerce', 'website_scaling', 'website_visibility',
     ]));
+  });
+});
+
+// ─── Repair signal ↔ angle alignment contract ────────────────────────────
+//
+// The repair playbook (PB-01 / PB-05 / PB-06 — A3 / A5) owns the repair-class
+// signals. These guards lock the same contract as the website bundle.
+
+describe('repair signal ↔ angle alignment', () => {
+  const REPAIR_SIGNALS = KNOWN_SIGNAL_CODES.filter((c) => isRepairSignal(c));
+  const ANGLED_SIGNALS = new Set(HOOK_LIBRARY.flatMap((h) => h.signals));
+
+  it('every repair-class signal has at least one angle', () => {
+    const uncovered = REPAIR_SIGNALS.filter((c) => !ANGLED_SIGNALS.has(c));
+    // A repair signal with no angle means a repair campaign whose top signal
+    // is that code would rank no matching angle by signal.
+    expect(uncovered).toEqual([]);
+  });
+
+  it('repair signals carry explicit severities', () => {
+    expect(computeSignalSeverity('DS_BROKEN_PROFILE_LINK', {} as any)).toBe('crisis');
+    expect(computeSignalSeverity('WC_BROKEN_WEBSITE', {} as any)).toBe('crisis');
+    expect(computeSignalSeverity('WC_URL_MISMATCH', {} as any)).toBe('material');
+    expect(computeSignalSeverity('DS_OUTDATED_HOLIDAY_HOURS', {} as any)).toBe('borderline');
+  });
+
+  it('the A3/A5 family carries the repair offering angles', () => {
+    const a3 = HOOK_LIBRARY.filter((h) => h.archetypes.includes('A3')).map((h) => h.angle);
+    const a5 = HOOK_LIBRARY.filter((h) => h.archetypes.includes('A5')).map((h) => h.angle);
+    for (const angle of ['profile_claim_service', 'repair_tiers', 'listing_monitoring']) {
+      expect(a3, `A3 missing ${angle}`).toContain(angle);
+      expect(a5, `A5 missing ${angle}`).toContain(angle);
+    }
   });
 });

@@ -50,6 +50,12 @@ export type HookAngle =
   | 'website_ecommerce'
   | 'website_scaling'
   | 'website_visibility'
+  // Repair OFFERING angles (platform product-led) — the pitch sells the
+  // repair playbook's capabilities: claim service, phased/tiered repair
+  // (incl. done-for-you), and ongoing listing monitoring.
+  | 'profile_claim_service'
+  | 'repair_tiers'
+  | 'listing_monitoring'
   | 'product_category_pages'
   | 'availability_inquiry'
   | 'review_acquisition'
@@ -111,7 +117,7 @@ export const HOOK_LIBRARY: HookTemplate[] = [
     angle: 'gbp_verification',
     label: 'Google Business Profile verification & optimization',
     archetypes: ['A3', 'A4'],
-    signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_SERVICE_MENU', 'DS_OUTDATED_HOURS', 'DS_PHOTO_DEFICIT'],
+    signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_SERVICE_MENU', 'DS_OUTDATED_HOURS', 'DS_PHOTO_DEFICIT', 'DS_BROKEN_PROFILE_LINK', 'DS_OUTDATED_HOLIDAY_HOURS'],
     subject: 'quick question about your Google listing',
     body: `{{salutation}} I was looking up {{category}} in {{city}} earlier and noticed your Google listing is probably sitting around a C-minus for completeness — hours, categories, photos, that kind of thing.
 
@@ -141,7 +147,7 @@ Want me to send over what I found?
     angle: 'nap_normalization',
     label: 'Business-name and NAP normalization',
     archetypes: ['A3'],
-    signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT'],
+    signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'WC_URL_MISMATCH'],
     subject: 'your business shows up a little differently everywhere',
     body: `{{salutation}} Quick one — I pulled up your business across a few directories (Google, Yelp, Facebook) and noticed the name and phone number don't quite match everywhere.
 
@@ -169,7 +175,7 @@ Want me to send it over?
     angle: 'hours_sync',
     label: 'Hours synchronization',
     archetypes: ['A3'],
-    signals: ['DS_OUTDATED_HOURS'],
+    signals: ['DS_OUTDATED_HOURS', 'DS_OUTDATED_HOLIDAY_HOURS'],
     subject: 'are your hours right everywhere?',
     body: `{{salutation}} I noticed your posted hours aren't quite the same across your listings — one place says open, another's a little different.
 
@@ -390,6 +396,87 @@ Want me to send it over?
     phone_hook: 'Here\'s what most shop sites miss: they\'ve got a homepage and a contact page, and that\'s about it — so search engines have nothing to rank you for. The sites that get found have a page for each thing people actually search. One for "same-day tire repair," one for "emergency plumbing in {{city}}" — that kind of thing. Those pages do the finding for you. I can map out the handful of pages that would move the needle for {{business}}, and what each one needs to say. Want me to send it over?',
   },
 
+  // 4h. profile_claim_service — repair OFFERING angle: claim & verify the
+  //     listing. Not a drift pitch — sells the claim/verification service.
+  {
+    angle: 'profile_claim_service',
+    label: 'Claim & verify your listing',
+    archetypes: ['A3', 'A5'],
+    signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_PROFILE'],
+    subject: 'your Google listing isn\'t claimed yet',
+    body: `{{salutation}} Quick one — I noticed your Google listing isn't claimed, which means anyone can suggest edits to it (and a couple of the directories already disagree with each other).
+
+Happens all the time, and it's an easy fix.
+
+An unclaimed listing is the one customers see first, and right now nobody's steering it — so your hours, photos, and category are whatever Google guessed.
+
+I can walk you through claiming it in about ten minutes, or just do it for you if you'd rather hand it off.
+
+Want me to send the steps?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Your Google listing isn\'t claimed — anyone can suggest edits',
+      reassurance: 'Happens all the time, and it\'s an easy fix.',
+      quantified_upside: 'The listing customers see first is running on Google\'s guesses',
+      audit_offer: 'Claim it in ~10 minutes — or we do it for you',
+      soft_cta: 'Want me to send the steps?',
+    },
+    phone_hook: 'Quick one — I noticed your Google listing isn\'t claimed, which means anyone can suggest edits to it, and a couple of the directories already disagree with each other. Happens all the time, and it\'s an easy fix. An unclaimed listing is the one customers see first, and right now nobody\'s steering it. I can walk you through claiming it in about ten minutes, or just do it for you. Want me to send the steps?',
+  },
+
+  // 4i. repair_tiers — repair OFFERING angle: phased/tiered repair, incl. DFY.
+  {
+    angle: 'repair_tiers',
+    label: 'Repair packages — fix the worst first, in phases',
+    archetypes: ['A3', 'A5'],
+    signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'DS_BROKEN_PROFILE_LINK', 'DS_CLAIMED_STATUS'],
+    subject: 'you don\'t have to fix all of it at once',
+    body: `{{salutation}} I pulled up your listings and a few things are off — the name and phone don't match everywhere, and one of your profile links is dead.
+
+Good news: you don't have to fix all of it in one go.
+
+We work these in phases — the single issue costing you the most customers first (usually the phone number, since that's what people act on), then the rest. And if you'd rather not touch it at all, we can do the fixes for you and just show you the before-and-after.
+
+Want me to send the priority list?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Name and phone don\'t match everywhere, and one link is dead',
+      reassurance: 'You don\'t have to fix all of it in one go.',
+      quantified_upside: 'Fix the issue costing you the most customers first, phase the rest',
+      audit_offer: 'Priority list of what to fix first — or we handle it for you',
+      soft_cta: 'Want me to send the priority list?',
+    },
+    phone_hook: 'I pulled up your listings and a few things are off — the name and phone don\'t match everywhere, and one of your profile links is dead. Good news: you don\'t have to fix all of it in one go. We work these in phases, the issue costing you the most customers first, usually the phone number, then the rest. And if you\'d rather not touch it at all, we can do the fixes for you. Want me to send the priority list?',
+  },
+
+  // 4j. listing_monitoring — repair OFFERING angle: ongoing sync retainer.
+  {
+    angle: 'listing_monitoring',
+    label: 'Listing monitoring — keep it from drifting again',
+    archetypes: ['A3', 'A5'],
+    signals: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'DS_OUTDATED_HOURS', 'DS_OUTDATED_HOLIDAY_HOURS'],
+    subject: 'who keeps your listings in sync?',
+    body: `{{salutation}} Quick question — once your listings are cleaned up, who keeps them that way?
+
+Most owners fix the drift once and then it quietly comes back: a new directory scrapes an old phone number, someone edits your hours, a listing goes stale.
+
+We re-check yours on a schedule and catch it before a customer ever sees it — so you're not back here in six months.
+
+Want me to show you what the monitoring covers?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Once your listings are cleaned up, who keeps them that way?',
+      reassurance: 'Most owners fix the drift once — then it quietly comes back.',
+      quantified_upside: 'We catch new drift before a customer sees it',
+      audit_offer: 'Show what the listing monitoring covers',
+      soft_cta: 'Want me to show you?',
+    },
+    phone_hook: 'Quick question — once your listings are cleaned up, who keeps them that way? Most owners fix the drift once and then it quietly comes back: a new directory scrapes an old phone number, someone edits your hours, a listing goes stale. We re-check yours on a schedule and catch it before a customer ever sees it, so you\'re not back here in six months. Want me to show you what the monitoring covers?',
+  },
+
   // 5. product_category_pages
   {
     angle: 'product_category_pages',
@@ -535,7 +622,7 @@ Want me to send mine over?
     angle: 'cross_platform_expansion',
     label: 'Cross-platform profile expansion',
     archetypes: ['A3', 'A5'],
-    signals: ['DS_MISSING_PROFILE'],
+    signals: ['DS_MISSING_PROFILE', 'DS_BROKEN_PROFILE_LINK'],
     subject: 'you\'re on Google — but that might be it',
     body: `{{salutation}} Looked you up and found you on one platform, but not much beyond that — Yelp, Facebook, Nextdoor, that sort of thing.
 
@@ -784,5 +871,36 @@ export const WEBSITE_CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
   {
     objection: 'I don\'t have time to deal with a website',
     response: 'That\'s the whole point — you shouldn\'t have to. We handle the build; you give us the basics once, and we take it from there. Two minutes today is honestly about it.',
+  },
+];
+
+// ─── Repair-playbook objection table (PB-01 / PB-05 / PB-06 — A3 / A5) ───
+//
+// The listing-repair call has its own objections — "my listing's fine",
+// "I already have someone", "I don't want to give access", "I'll fix it
+// myself", "isn't that Google's job?". The responses lean on the repair
+// OFFERINGS (claim service, phased/tiered repair, done-for-you delegated
+// access, monitoring) rather than a generic "the rundown is free".
+// Prepended for A3/A5 campaigns.
+export const REPAIR_CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
+  {
+    objection: 'My listing\'s fine — I already checked it',
+    response: 'It usually looks right on Google — that\'s the one everyone checks. The drift tends to show up on the other directories people use, and that\'s where customers get the wrong number. The rundown maps each one, worst first. Yours to keep either way.',
+  },
+  {
+    objection: 'I already have someone handling this',
+    response: 'Good — then the rundown will show you exactly what they\'re covering and where the gaps still are. It\'s still free, and it\'s yours to keep.',
+  },
+  {
+    objection: 'I don\'t want to give anyone access to my profile',
+    response: 'You don\'t have to. We start with what\'s public — no access needed to show you what\'s wrong. And if you ever want us to make the fixes, you grant a limited manager role, never a password.',
+  },
+  {
+    objection: 'I\'ll just fix it myself',
+    response: 'Honestly, you can — the rundown gives you the exact list, worst first. If it turns into a weekend of directory logins, that\'s where we can just do it for you.',
+  },
+  {
+    objection: 'Isn\'t that Google\'s job?',
+    response: 'Google mostly reflects what the other directories feed it — so the fix is on the listing side, not something you can call Google about. That\'s the part we handle.',
   },
 ];

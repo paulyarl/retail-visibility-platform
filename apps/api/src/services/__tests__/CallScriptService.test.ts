@@ -226,8 +226,8 @@ describe('CallScriptService.assembleForCampaign', () => {
   it('returns every ranked hook option', async () => {
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    expect(result.hookOptions).toHaveLength(20);
-    for (let i = 0; i < 20; i++) {
+    expect(result.hookOptions).toHaveLength(23);
+    for (let i = 0; i < 23; i++) {
       expect(result.hookOptions[i].rank).toBe(i + 1);
     }
   });
@@ -298,7 +298,12 @@ describe('CallScriptService.assembleForCampaign', () => {
     expect(result.stages.verify).toContain('Tetees Market');
   });
 
-  it('returns the objection table (5 rows)', async () => {
+  it('returns the generic objection table (5 rows) for a non-scoped archetype', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A1',
+      source: 'fallback',
+      reason: 'test',
+    });
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
     expect(result.objections).toHaveLength(5);
@@ -440,6 +445,49 @@ describe('CallScriptService.assembleForCampaign', () => {
     expect(angles.indexOf('website_repair')).toBeLessThan(angles.indexOf('website_scaling'));
     expect(angles.indexOf('website_scaling')).toBeLessThan(angles.indexOf('website_foundation'));
     expect(angles.indexOf('click_to_call')).toBeGreaterThan(angles.indexOf('website_foundation'));
+  });
+
+  it('prepends the repair-playbook objections for A3 campaigns', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A3',
+      source: 'fallback',
+      reason: 'test',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    // 5 generic + 5 repair rows, repair first.
+    expect(result.objections).toHaveLength(10);
+    expect(result.objections.some((o) => /my listing'?s fine/i.test(o.objection))).toBe(true);
+    expect(result.objections.some((o) => /google'?s job/i.test(o.objection))).toBe(true);
+  });
+
+  it('priority order — the hook matching the highest-severity repair signal leads (A3 repair bundle)', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A3',
+      source: 'fallback',
+      reason: 'test',
+    });
+    mockGetTriageResult.mockResolvedValue({
+      detectedSignals: [
+        { code: 'DS_BROKEN_PROFILE_LINK', label: 'Broken link', contributedToRule: true },
+        { code: 'CP_NAP_PHONE_DRIFT', label: 'Phone drift', contributedToRule: true },
+        { code: 'DS_OUTDATED_HOLIDAY_HOURS', label: 'Holiday hours', contributedToRule: true },
+      ],
+    });
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: { nap_consistency: { phone_variations: ['317-555-0100', '317-555-0199'] } },
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+    const angles = result.hookOptions.map((h) => h.angle);
+
+    // Same ordering as HookSuggestionService — scripts stay aligned with the pitch.
+    expect(angles[0]).toBe('repair_tiers');
+    expect(angles.indexOf('gbp_verification')).toBeLessThan(angles.indexOf('cross_platform_expansion'));
+    expect(angles.indexOf('cross_platform_expansion')).toBeLessThan(angles.indexOf('nap_normalization'));
+    expect(angles.indexOf('nap_normalization')).toBeLessThan(angles.indexOf('hours_sync'));
+    expect(angles.indexOf('hours_sync')).toBeLessThan(angles.indexOf('website_repair'));
   });
 
   // ─── Emerging-archetype boost + channel hint (Sprint 2) ────────────────

@@ -92,7 +92,7 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     'Quick note about the {{theme}} complaints on {{business}}',
     '{{business}} — I drafted replies to your negative reviews',
   ],
-  // A3 — Listing Inconsistency (NAP drift)
+  // A3 — Listing Inconsistency (NAP drift + repair offerings)
   A3: [
     'Preview - your listings across Google, Yelp, and Facebook',
     '{{business}} — your address is different on Yelp',
@@ -102,6 +102,10 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{business}} — your profiles are unclaimed on {{remaining}} directories',
     '{{business}} — listings you don\'t control are live right now',
     'Preview - your unclaimed listings across {{remaining}} platforms',
+    // Repair offering angles (platform product)
+    '{{business}} — your Google listing isn\'t claimed yet',
+    '{{business}} — you don\'t have to fix all of it at once',
+    '{{business}} — who keeps your listings in sync?',
   ],
   // A4 — Conversion / CTA Gap (website)
   A4: [
@@ -111,15 +115,19 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     'Quick note about {{business}}\'s website',
     '{{business}} — every visitor has to call to become a customer',
   ],
-  // A5 — Multi-Signal Footprint (combined)
+  // A5 — Multi-Signal Footprint (combined + repair offerings)
   A5: [
     'Preview - your listings and your reviews',
     '{{business}} — wrong directions and unanswered reviews',
-    '{{business}} — two gaps I found in your footprint',
+    '{{business}} — two gaps I found looking you up',
     'Quick note about {{business}}\'s online presence',
     '{{business}} — listings + reviews, both need work',
     '{{business}} — unclaimed listings and unanswered reviews',
     'Preview - your unclaimed profiles and review gaps',
+    // Repair offering angles (platform product)
+    '{{business}} — your listing isn\'t claimed yet',
+    '{{business}} — fix the worst of it first',
+    '{{business}} — who keeps it all in sync?',
   ],
   // A6 — Product Visibility Gap (discoverability)
   A6: [
@@ -157,45 +165,45 @@ const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
     'I\'ve drafted replies to the other {{remaining}} negative reviews — ready when you are.',
     '{{remaining}} more responses to the {{theme}} reviews are ready. Want them?',
     'There are {{remaining}} more negative reviews I\'ve handled. Say the word.',
-    'I\'ve addressed {{remaining}} more reviews on the same pattern. Should I send them?',
+    'I\'ve addressed {{remaining}} more reviews on the same theme. Should I send them?',
   ],
   A3: [
-    'The full listing reconciliation — across {{remaining}} directories — is ready today.',
-    'I\'ve mapped every variation across the other {{remaining}} directories. Ready when you are.',
-    '{{remaining}} more directories are reconciled and waiting. Want the list?',
-    'There are {{remaining}} more platforms with the wrong info. Say the word.',
-    'I\'ve corrected the other {{remaining}} listings. Should I send the diff?',
-    'The other {{remaining}} profiles are unclaimed — anyone can edit them right now. Let\'s get them claimed and repaired.',
+    'Your corrected listings — all {{remaining}} directories — are ready today.',
+    'I\'ve mapped every difference across the other {{remaining}} directories. Ready when you are.',
+    '{{remaining}} more directories are cleaned up and waiting. Want the list?',
+    'There are {{remaining}} more platforms showing the wrong info. Say the word.',
+    'I\'ve corrected the other {{remaining}} listings. Should I send them?',
+    'The other {{remaining}} profiles are unclaimed — anyone can edit them right now. Let\'s get them claimed and fixed.',
     'These {{remaining}} listings are sitting unmanaged. I can get them claimed and corrected today.',
   ],
   A4: [
-    'The full CTA fix — booking button, click-to-call, and the {{remaining}} follow-on tweaks — is ready today.',
-    'I\'ve drafted the other {{remaining}} conversion fixes. Ready when you are.',
-    '{{remaining}} more tweaks are staged and waiting. Want them?',
-    'There are {{remaining}} more friction points I\'ve mapped. Say the word.',
-    'I\'ve handled {{remaining}} more conversion gaps beyond this one. Should I send them?',
+    'The full fix — a booking button, click-to-call, and the other {{remaining}} spots customers get stuck — is ready today.',
+    'I\'ve drafted the other {{remaining}} fixes. Ready when you are.',
+    '{{remaining}} more spots are mapped and waiting. Want them?',
+    'There are {{remaining}} more places customers get stuck. Say the word.',
+    'I\'ve handled {{remaining}} more beyond this one. Should I send them?',
   ],
   A5: [
-    'The full fix — listings and the {{remaining}} review responses — is ready today.',
-    'I\'ve drafted the other {{remaining}} pieces. Ready when you are.',
+    'The full fix — your listings and the {{remaining}} review responses — is ready today.',
+    'I\'ve drafted the other {{remaining}} parts. Ready when you are.',
     '{{remaining}} more sections are written and waiting. Want them?',
     'There are {{remaining}} more gaps mapped out. Say the word.',
-    'I\'ve handled {{remaining}} more items across both fronts. Should I send them?',
-    'The other {{remaining}} profiles are unclaimed and unmanaged — let\'s get them claimed and repaired today.',
+    'I\'ve handled {{remaining}} more across your listings and reviews. Should I send them?',
+    'The other {{remaining}} profiles are unclaimed and unmanaged — let\'s get them claimed and fixed today.',
   ],
   A6: [
     'The full product visibility plan — photos, catalog, and the {{remaining}} sections — is ready today.',
-    'I\'ve drafted the other {{remaining}} pieces of the visibility plan. Ready when you are.',
-    '{{remaining}} more sections are ready — fulfillment, hours sync, the rest. Want them?',
-    'There are {{remaining}} more pieces staged. Say the word.',
-    'I\'ve handled {{remaining}} more sections beyond these. Should I send them?',
+    'I\'ve drafted the other {{remaining}} parts of the plan. Ready when you are.',
+    '{{remaining}} more sections are ready — pickup/delivery, hours, the rest. Want them?',
+    'There are {{remaining}} more parts staged. Say the word.',
+    'I\'ve handled {{remaining}} more beyond these. Should I send them?',
   ],
   A7: [
-    'The full website plan — the report, the mockup, and the {{remaining}} sections — is ready today.',
-    'I\'ve drafted the other {{remaining}} pieces of the build plan. Ready when you are.',
+    'The full website plan — the report, the mockup, and the {{remaining}} pages — is ready today.',
+    'I\'ve drafted the other {{remaining}} parts of the build plan. Ready when you are.',
     '{{remaining}} more pages are mapped out. Want them?',
-    'There are {{remaining}} more pieces staged. Say the word.',
-    'I\'ve handled {{remaining}} more sections beyond these. Should I send them?',
+    'There are {{remaining}} more parts staged. Say the word.',
+    'I\'ve handled {{remaining}} more beyond these. Should I send them?',
     // Offering angle — tiers
     'The first tier\'s ready to go — the {{remaining}} pages beyond it whenever you are.',
   ],
@@ -219,16 +227,16 @@ const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
   A3: [
     '— {{name}} | {{email}} | {{phone}}',
     '— {{name}}, VisibleShelf — {{email}}',
-    'Reply with "go" and I\'ll send the full reconciliation. — {{name}}',
+    'Reply with "go" and I\'ll send the full list. — {{name}}',
     '— {{name}} | {{phone}}',
-    'Text "list" to {{phone}} and I\'ll send the directory diff. — {{name}}',
+    'Text "list" to {{phone}} and I\'ll send the corrected listings. — {{name}}',
   ],
   A4: [
     '— {{name}} | {{email}} | {{phone}}',
     '— {{name}}, VisibleShelf — {{email}}',
-    'Reply with "go" and I\'ll send the full CTA fix. — {{name}}',
+    'Reply with "go" and I\'ll send the rest of the fixes. — {{name}}',
     '— {{name}} | {{phone}}',
-    'Text "fix" to {{phone}} and I\'ll send the conversion tweaks. — {{name}}',
+    'Text "fix" to {{phone}} and I\'ll send the rest. — {{name}}',
   ],
   A5: [
     '— {{name}} | {{email}} | {{phone}}',

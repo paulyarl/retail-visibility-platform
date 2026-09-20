@@ -135,12 +135,12 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('HookSuggestionService.suggestForCampaign', () => {
-  it('returns all 20 hooks ranked', async () => {
+  it('returns all 23 hooks ranked', async () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(20);
+    expect(result.suggestions).toHaveLength(23);
     // Ranks are 1–20, sequential
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 23; i++) {
       expect(result.suggestions[i].rank).toBe(i + 1);
     }
   });
@@ -159,8 +159,9 @@ describe('HookSuggestionService.suggestForCampaign', () => {
   });
 
   it('archetype-affinity hooks rank first', async () => {
-    // A3 archetype: gbp_verification, nap_normalization, hours_sync,
-    // cross_platform_expansion have A3 affinity
+    // A3 archetype → 9 affinity angles (catalog order): gbp_verification,
+    // nap_normalization, hours_sync, website_repair, profile_claim_service,
+    // repair_tiers, listing_monitoring, cross_platform_expansion, zero_footprint
     mockResolveCampaignArchetype.mockResolvedValue({
       archetype: 'A3',
       source: 'fallback',
@@ -168,15 +169,17 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     });
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
-    const top5 = result.suggestions.slice(0, 5).map((s) => s.angle);
+    const topAngles = result.suggestions.slice(0, 9).map((s) => s.angle);
 
-    // All A3-affinity hooks should be in the top 5
-    // (gbp_verification, nap_normalization, hours_sync, website_repair, cross_platform_expansion)
-    expect(top5).toContain('gbp_verification');
-    expect(top5).toContain('nap_normalization');
-    expect(top5).toContain('hours_sync');
-    expect(top5).toContain('website_repair');
-    expect(top5).toContain('cross_platform_expansion');
+    expect(topAngles).toContain('gbp_verification');
+    expect(topAngles).toContain('nap_normalization');
+    expect(topAngles).toContain('hours_sync');
+    expect(topAngles).toContain('website_repair');
+    expect(topAngles).toContain('profile_claim_service');
+    expect(topAngles).toContain('repair_tiers');
+    expect(topAngles).toContain('listing_monitoring');
+    expect(topAngles).toContain('cross_platform_expansion');
+    expect(topAngles).toContain('zero_footprint');
   });
 
   it('signal-match count breaks ties within archetype-affinity tier', async () => {
@@ -225,6 +228,35 @@ describe('HookSuggestionService.suggestForCampaign', () => {
     expect(angles.indexOf('click_to_call')).toBeGreaterThan(angles.indexOf('website_foundation'));
   });
 
+  it('priority order — the angle matching the highest-severity repair signal leads (A3 repair bundle)', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A3',
+      source: 'fallback',
+      reason: 'test',
+    });
+    mockGetTriageResult.mockResolvedValue(makeTriageResult([
+      'DS_BROKEN_PROFILE_LINK',     // crisis
+      'CP_NAP_PHONE_DRIFT',         // material (with material drift below)
+      'DS_OUTDATED_HOLIDAY_HOURS',  // borderline
+    ]));
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: { nap_consistency: { phone_variations: ['317-555-0100', '317-555-0199'] } },
+    });
+
+    const result = await HookSuggestionService.suggestForCampaign('camp-001');
+    const angles = result.suggestions.map((s) => s.angle);
+
+    // repair_tiers matches the crisis signal + the material drift (highest
+    // severity-weighted sum) → leads; the offering angle surfaces at peak pain.
+    expect(angles[0]).toBe('repair_tiers');
+    expect(result.suggestions[0].matchedSignals).toContain('DS_BROKEN_PROFILE_LINK');
+    // crisis > material > borderline-matching > no-match
+    expect(angles.indexOf('gbp_verification')).toBeLessThan(angles.indexOf('cross_platform_expansion'));
+    expect(angles.indexOf('cross_platform_expansion')).toBeLessThan(angles.indexOf('nap_normalization'));
+    expect(angles.indexOf('nap_normalization')).toBeLessThan(angles.indexOf('hours_sync'));
+    expect(angles.indexOf('hours_sync')).toBeLessThan(angles.indexOf('website_repair'));
+  });
+
   it('availability_inquiry tops the ranking when WC_MISSING_AVAILABILITY_INQUIRY fired under A6', async () => {
     mockResolveCampaignArchetype.mockResolvedValue({
       archetype: 'A6',
@@ -270,7 +302,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(20);
+    expect(result.suggestions).toHaveLength(23);
     // All matchedSignals should be empty
     for (const s of result.suggestions) {
       expect(s.matchedSignals).toEqual([]);
@@ -282,7 +314,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(20);
+    expect(result.suggestions).toHaveLength(23);
   });
 });
 
@@ -475,7 +507,7 @@ describe('Emerging-archetype rank boost', () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
     // Without boost, the ranking should match the Sprint 1 logic
-    expect(result.suggestions).toHaveLength(20);
+    expect(result.suggestions).toHaveLength(23);
     // gbp_verification has A3 archetype affinity — should be #1
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
@@ -485,7 +517,7 @@ describe('Emerging-archetype rank boost', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(20);
+    expect(result.suggestions).toHaveLength(23);
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
 });
