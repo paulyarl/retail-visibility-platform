@@ -8,6 +8,7 @@ import {
 import marketingOpsService, {
   Campaign, RepairExecutionReadModel, RepairPlatformStatusEntry,
 } from '@/services/MarketingOpsService';
+import { isWebsiteGapCampaign } from './repairCampaignGate';
 import {
   ESCALATABLE_STATUSES, REPAIR_PLATFORM_LABELS, REPAIR_PLATFORM_STATUSES,
   REPAIR_STATUS_LABELS, REPAIR_TIER_CATALOG, RepairMode, RepairPlatform,
@@ -65,7 +66,7 @@ export default function RepairExecutionCard({ campaign, onRefresh }: RepairExecu
   // Inline platform-status edits
   const [updatingPlatform, setUpdatingPlatform] = useState<string | null>(null);
 
-  const isProfileRepair = campaign.campaign_category === 'profile_repair';
+  const isProfileRepair = campaign.campaign_category === 'profile_repair' && !isWebsiteGapCampaign(campaign);
 
   const fetchExecution = async () => {
     setLoading(true);

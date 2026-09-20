@@ -164,9 +164,14 @@ ON CONFLICT (id) DO NOTHING;
 -- ─── 6. website_build intake definition (§8.5) ───────────────────────────
 -- intake_kind is a natural-key PK referenced by mkt_dispute_intake.intake_kind
 -- (FK, migration 173). Without this row the intake cannot be created.
+--
+-- Playbook linkage (spec OQ-8, resolved here): the intake auto-offers when a
+-- campaign reaches the `paid` stage AND its playbook_code is PB-08. The
+-- declarative trigger_guard (migration 301) reads the campaign row, so this
+-- needs no code — mirroring how profile_repair gates on repair_fulfillment.mode.
 INSERT INTO mkt_intake_definitions (
   intake_kind, label, description, driver,
-  service_category, trigger_stages, submitted_stage,
+  service_category, trigger_stages, trigger_guard, submitted_stage,
   form_schema, field_mappings, owner_copy, niche_overrides,
   downstream_agent, version, is_active, is_draft
 ) VALUES (
@@ -175,7 +180,8 @@ INSERT INTO mkt_intake_definitions (
   'Owner supplies the inputs a website build needs: domain preference/ownership, business description, service or product list, photos/assets, hours, owner voice, and the category-content specifics the audit flagged.',
   'registry',
   NULL,
-  '[]'::jsonb,
+  '["paid"]'::jsonb,
+  '[{"path":"playbook_code","op":"equals","value":"PB-08"}]'::jsonb,
   'intake_submitted',
   '[
     { "key": "domain_preference", "type": "text", "label": "Preferred domain (if you own one, list it)", "required": false },
@@ -205,6 +211,8 @@ INSERT INTO mkt_intake_definitions (
 ON CONFLICT (intake_kind) DO UPDATE SET
   label = EXCLUDED.label,
   description = EXCLUDED.description,
+  trigger_stages = EXCLUDED.trigger_stages,
+  trigger_guard = EXCLUDED.trigger_guard,
   form_schema = EXCLUDED.form_schema,
   field_mappings = EXCLUDED.field_mappings,
   owner_copy = EXCLUDED.owner_copy,

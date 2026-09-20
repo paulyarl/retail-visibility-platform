@@ -54,6 +54,7 @@ export const FULFILL_TEMPLATE_BY_TYPE: Record<string, string> = {
   seo_content: 'mpt-seed-fulfill-006',
   lead_magnet: 'mpt-seed-fulfill-007',
   product_visibility_preview: 'mpt-seed-fulfill-008',
+  website_mockup: 'mpt-seed-fulfill-009',
 };
 
 // ─── Signal → deliverable type mapping (spec §3.2) ───────────────────────
@@ -92,6 +93,15 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
   product_visibility_preview: [
     'DS_MISSING_PRODUCT_CATALOG', 'WC_MISSING_PRODUCT_BROWSING',
     'WC_MISSING_AVAILABILITY_INQUIRY', 'WC_MISSING_PICKUP_DELIVERY',
+  ],
+  // PB-08 (website gap) — the visual homepage mockup. Fires for any website
+  // absence or deficiency: no site, third-party/builder/parked/unfinished,
+  // broken, or a poor-quality owned site.
+  website_mockup: [
+    'WC_MISSING_WEBSITE', 'WC_THIRD_PARTY_DOMAIN', 'WC_BUILDER_SUBDOMAIN',
+    'WC_PARKED_DOMAIN', 'WC_UNFINISHED_SITE', 'WC_BROKEN_WEBSITE',
+    'WC_UNSECURED_WEBSITE', 'WC_LEGACY_BUILDER_SITE', 'WC_STALE_WEBSITE',
+    'WC_POOR_SITE_QUALITY', 'WC_CATEGORY_MISMATCH',
   ],
 };
 
@@ -501,6 +511,7 @@ export class DeliverableSourceService extends BaseService {
       case 'seo_content': return 'service_pages';
       case 'lead_magnet': return 'offer';
       case 'product_visibility_preview': return 'product_visibility';
+      case 'website_mockup': return 'website_mockup';
       case 'service_menu': return 'services';
       case 'gbp_audit': return 'gbp_audit';
       default: return 'source_material';

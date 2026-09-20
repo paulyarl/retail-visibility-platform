@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb, Copy, ClipboardPaste, FileText } from 'lucide-react';
 import marketingOpsService, { Campaign, RepairTrack, TriageRecommendation } from '@/services/MarketingOpsService';
 import OutreachProblemsSection from './OutreachProblemsSection';
+import { isWebsiteGapCampaign } from './repairCampaignGate';
 
 interface RepairTrackPanelProps {
   campaign: Campaign;
@@ -50,10 +51,13 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
   // Render for profile_repair campaigns, triage_management campaigns (PB-05
   // sets triage_management — the repair triage briefing is the bridge from
   // triage to the repair track), or any campaign with a persisted briefing.
+  // PB-08 (website gap) also carries campaign_category='profile_repair' but
+  // has no repair track — gate it out so the repair UI never surfaces there.
   if (
-    campaign.campaign_category !== 'profile_repair' &&
-    campaign.campaign_category !== 'triage_management' &&
-    !campaign.repair_triage_briefing
+    (campaign.campaign_category !== 'profile_repair' &&
+      campaign.campaign_category !== 'triage_management' &&
+      !campaign.repair_triage_briefing) ||
+    isWebsiteGapCampaign(campaign)
   ) {
     return null;
   }

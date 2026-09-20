@@ -107,6 +107,17 @@ const productVisibilitySourceSchema = z.object({
   photo_types_missing: z.array(z.string()).optional(),
 }).passthrough();
 
+// PB-08 (website gap) — source block for the visual homepage mockup. The
+// positioning report + build scope come from the website_positioning audit.
+const websiteMockupSourceSchema = z.object({
+  presence_state: z.string().nullable().optional(),
+  ownership: z.string().nullable().optional(),
+  positioning_gaps: z.array(z.string()).optional(),
+  category_expectations: z.array(z.string()).optional(),
+  must_have_pages: z.array(z.string()).optional(),
+  build_scope: z.string().nullable().optional(),
+}).passthrough();
+
 export const deliverableSourceMaterialSchema = z.object({
   // The canonical signal set the analyst consumed (filtered to deliverable-
   // relevant families — spec G-12).
@@ -121,6 +132,7 @@ export const deliverableSourceMaterialSchema = z.object({
     seo_content: seoContentSourceSchema.nullable().optional(),
     lead_magnet: leadMagnetSourceSchema.nullable().optional(),
     product_visibility_preview: productVisibilitySourceSchema.nullable().optional(),
+    website_mockup: websiteMockupSourceSchema.nullable().optional(),
   }).passthrough(),
 
   data_quality: z.object({
@@ -151,7 +163,8 @@ Return your response as JSON matching this exact schema:
     "nap_report": { "canonical": { "name": "<string|null>", "address": "<string|null>", "phone": "<string|null>" }, "platform_status": [{ "platform": "<string>", "name": "<string|null>", "address": "<string|null>", "phone": "<string|null>", "status": "consistent|drift|missing|unverified" }], "material_issues": ["<string>"] } | null,
     "seo_content": { "service_pages": [{ "service": "<string>", "target_terms": ["<string>"], "differentiators": ["<string>"], "local_context": "<string|null>" }], "public_narrative": "<string|null>" } | null,
     "lead_magnet": { "offer": { "title": "<string>", "promise": "<string>", "audience": "<string|null>" }, "friction_points": ["<string>"], "conversion_opportunities": ["<string>"] } | null,
-    "product_visibility_preview": { "product_categories": ["<string>"], "catalog_gaps": ["<string>"], "browsing_gaps": ["<string>"], "availability_inquiry_present": <boolean|null>, "pickup_delivery_present": <boolean|null>, "photo_types_missing": ["<string>"] } | null
+    "product_visibility_preview": { "product_categories": ["<string>"], "catalog_gaps": ["<string>"], "browsing_gaps": ["<string>"], "availability_inquiry_present": <boolean|null>, "pickup_delivery_present": <boolean|null>, "photo_types_missing": ["<string>"] } | null,
+    "website_mockup": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>" } | null
   },
   "data_quality": { "verified_fields": ["<string>"], "unavailable_fields": ["<string>"], "limitations": ["<string>"] }
 }

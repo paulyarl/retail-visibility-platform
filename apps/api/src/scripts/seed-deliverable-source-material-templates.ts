@@ -1,10 +1,11 @@
 /**
  * Seed script: Deliverable Source Material prompt templates
  *
- * Seeds 7 templates (spec §6.1):
+ * Seeds 8 templates (spec §6.1):
  *   - mpt-review-intake                  (seek)   review_intake              §5.7
  *   - mpt-deliverable-source-material    (seek)   deliverable_source_material §5.1
- *   - mpt-seed-fulfill-004..008          (fulfill) raw_json                  §5.2
+ *   - mpt-seed-fulfill-004..009          (fulfill) raw_json                  §5.2
+ *     (009 = Website Mockup — PB-08 / A7, spec OQ-2)
  *
  * Idempotent — deterministic IDs, update-in-place. Bump SEED_VERSION_MARKER
  * to force a body re-sync on already-seeded rows.
@@ -30,7 +31,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V3 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V4 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -111,6 +112,7 @@ Signal -> deliverable type:
 - seo_content               <- WC_MISSING_SERVICE_PAGES, WC_MISSING_WEBSITE, DS_MISSING_SERVICE_MENU
 - lead_magnet               <- WC_MISSING_CTA, WC_MOBILE_FRICTION, RA_LOW_REVIEW_VOLUME
 - product_visibility_preview <- DS_MISSING_PRODUCT_CATALOG, WC_MISSING_PRODUCT_BROWSING, WC_MISSING_AVAILABILITY_INQUIRY, WC_MISSING_PICKUP_DELIVERY
+- website_mockup             <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
 
 RULES
 - Ground every field in the supplied audit results or parsed review intake. Do not
@@ -241,6 +243,31 @@ ${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
+// PB-08 (website gap) — the visual homepage mockup, the strongest FITD
+// artifact the website playbook offers (spec OQ-2). Source block is the
+// website_positioning audit's presence state + positioning gaps + build scope.
+const FULFILL_009 = `${SEED_VERSION_MARKER}
+You are producing a website homepage mockup for {{business_name}}, a {{category}}
+business in {{city}}.
+
+Web-presence state and positioning gaps:
+{{website_mockup}}
+
+TASK
+Describe the proposed homepage section by section — above the fold, the sections
+in order, the category-specific trust signals that make it look like THIS
+business, and what was deliberately left out — plus the must-have pages the
+build needs. Ground every section in the supplied gaps and make it specific to
+this business and category.
+
+RULES
+- Ground every section in the supplied gaps. Do not invent capabilities or assets.
+- Output JSON: { "sections": [{ "title", "content" }] }
+
+${CLAIM_CTA}
+
+${FULFILL_TONE}`;
+
 const SEED_TEMPLATES: SeedTemplate[] = [
   {
     id: 'mpt-review-intake',
@@ -267,6 +294,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
   { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-009', name: 'Fulfill: Website Mockup', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_009, variables: ['business_name', 'category', 'city', 'website_mockup', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {

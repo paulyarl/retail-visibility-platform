@@ -23,7 +23,7 @@
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { logger } from '../logger';
 
-const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V3';
+const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V4';
 
 const CLAIM_CTA =
   'Claim your listing and correct your details here — it takes about two minutes and there is no cost.';
@@ -82,6 +82,15 @@ const TEMPLATES: LayoutTemplate[] = [
     id: 'mdt-default-product-visibility', name: 'Default — Product Visibility Preview',
     deliverableType: 'product_visibility_preview', pageSize: 'letter', orientation: 'portrait',
     title: 'Product Visibility Preview', subtitle: 'Help customers find and verify what you sell',
+  },
+  // PB-08 (website gap) — the visual homepage mockup (spec OQ-2). Landscape
+  // reads like a screen; the content is the section-by-section mockup +
+  // must-have pages from the website_positioning audit.
+  {
+    id: 'mdt-default-website-mockup', name: 'Default — Website Mockup',
+    deliverableType: 'website_mockup', pageSize: 'letter', orientation: 'landscape',
+    title: 'Website Mockup', subtitle: 'What your new site will look like, section by section',
+    nextStep: RETAINER_NEXT_STEP,
   },
   // Profile Repair Fulfillment Sprint (W5c) — the shared Track A package
   // artifact. The composed content already carries the §5.1 section order

@@ -20,10 +20,11 @@ import {
 const MODAL_TYPES = [
   'review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards',
   'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview',
+  'website_mockup',
 ];
 
 describe('signal → deliverable type mapping (§3.2)', () => {
-  it('covers all eight modal deliverable types', () => {
+  it('covers all modal deliverable types', () => {
     for (const t of MODAL_TYPES) {
       expect(TYPE_GOVERNING_SIGNALS[t], `missing governing signals for ${t}`).toBeDefined();
       expect(TYPE_GOVERNING_SIGNALS[t].length).toBeGreaterThan(0);

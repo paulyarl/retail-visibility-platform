@@ -19,6 +19,7 @@ import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCatego
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import WebsitePositioningAuditCard from '@/components/marketing-ops/WebsitePositioningAuditCard';
+import { isWebsiteGapCampaign } from '@/components/marketing-ops/repairCampaignGate';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import EnrichmentAuditCard from '@/components/marketing-ops/EnrichmentAuditCard';
 import CategoryIdentificationAuditCard from '@/components/marketing-ops/CategoryIdentificationAuditCard';
@@ -2680,10 +2681,13 @@ export default function CampaignDetailClient({
                     ['seo_content', 'SEO Content'],
                     ['lead_magnet', 'Lead Magnet'],
                     ['product_visibility_preview', 'Product Visibility Preview'],
+                    ['website_mockup', 'Website Mockup'],
                     // W6c/W8 — execution-driven (imported fulfill output) and
                     // assembled (platform_status grid) types, neither
-                    // signal-gated. Offered on profile_repair campaigns.
-                    ...(campaign?.campaign_category === 'profile_repair'
+                    // signal-gated. Offered on profile_repair campaigns —
+                    // excluding PB-08 website-gap campaigns, which share the
+                    // category but have no repair track/fulfillment.
+                    ...(campaign?.campaign_category === 'profile_repair' && !isWebsiteGapCampaign(campaign)
                       ? [
                           ['citation_repair_package', 'Citation & Profile Repair Package'] as [DeliverableType, string],
                           ['repair_completion_report', 'Repair Completion Report'] as [DeliverableType, string],

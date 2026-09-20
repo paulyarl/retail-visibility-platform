@@ -94,7 +94,8 @@ export type DeliverableType =
   | 'reinstatement_appeal'
   | 'citation_repair_package'
   | 'repair_completion_report'
-  | 'product_visibility_preview';
+  | 'product_visibility_preview'
+  | 'website_mockup';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 
@@ -258,6 +259,9 @@ export interface Campaign {
   engagementCycle?: number;
   archetype?: string | null;
   archetypeLabel?: string | null;
+  // Migration 184 — the accepted playbook for this campaign (e.g. 'PB-08').
+  // Present on the raw campaign row (the detail/list responses spread it).
+  playbook_code?: string | null;
   // Intelligence scope fields (Sprint 3 — Migration 200)
   intelligence_focus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | null;
   intelligence_zip_codes?: string | null;

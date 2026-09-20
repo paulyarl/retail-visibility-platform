@@ -31,7 +31,10 @@ export type DeliverableType =
   | 'reinstatement_appeal'
   | 'citation_repair_package'
   | 'repair_completion_report'
-  | 'product_visibility_preview';
+  | 'product_visibility_preview'
+  // PB-08 (website gap) — the visual homepage mockup, the strongest FITD
+  // artifact the website playbook offers (spec OQ-2).
+  | 'website_mockup';
 
 export interface DeliverableTemplateInput {
   name: string;
