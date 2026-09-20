@@ -19,6 +19,7 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import type { RequestCtx } from '../context';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { formatCampaignAddress } from '../lib/canonical-nap';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import MarketingCampaignService from './MarketingCampaignService';
 import { resolveCampaignArchetype } from './OutreachOpenerService';
@@ -927,31 +928,11 @@ export class CallScriptService extends BaseService {
 
   /**
    * Format the campaign address into a single spoken string.
-   * Mirrors OutreachIntelligenceService.formatAddress.
+   * Shared NAP contract — lib/canonical-nap (structured columns, market-scope
+   * city/state as the display fallback).
    */
   private formatAddress(campaign: any): string | null {
-    const parts = [
-      campaign.address_line1,
-      campaign.address_city,
-      campaign.address_state,
-    ].filter((p: any) => p && String(p).trim().length > 0);
-
-    if (parts.length === 0) return null;
-
-    const line1 = campaign.address_line1?.trim();
-    const city = campaign.address_city?.trim();
-    const state = campaign.address_state?.trim();
-
-    if (line1 && city && state) {
-      return `${line1}, ${city}, ${state}`;
-    }
-    if (line1 && city) {
-      return `${line1}, ${city}`;
-    }
-    if (city && state) {
-      return `${city}, ${state}`;
-    }
-    return parts.map((p: any) => String(p).trim()).join(', ');
+    return formatCampaignAddress(campaign);
   }
 
   /**

@@ -19,6 +19,7 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import { resolveCampaignNap } from '../lib/canonical-nap';
 import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
@@ -2164,9 +2165,6 @@ class DirectoryPresenceSeedService {
 
     const d = (audit.audit_data ?? {}) as any;
     const meta = d.audit_metadata ?? {};
-    const nap = d.nap_consistency ?? {};
-    const website = d.website ?? {};
-    const google = d.platforms?.google ?? {};
     const dataQuality = d.data_quality ?? {};
 
     if (meta.identity_status === 'mismatched') {
@@ -2189,30 +2187,19 @@ class DirectoryPresenceSeedService {
       }
     }
 
-    const businessName =
-      campaign.business_name ||
-      meta.matched_business?.business_name ||
-      meta.requested_business?.business_name;
-    let address = campaign.address_line1 || nap.canonical_address;
-    const city =
-      campaign.address_city ||
-      meta.matched_business?.city ||
-      meta.requested_business?.city;
-    const state =
-      campaign.address_state ||
-      meta.matched_business?.state ||
-      meta.requested_business?.state;
-    const zipCode = campaign.address_zip || nap.canonical_zip;
-    const phone = campaign.phone || nap.canonical_phone;
-    const websiteUrl = campaign.website_url || website.url;
+    // Canonical NAP — one resolution contract (lib/canonical-nap). Strict lane:
+    // no market-scope fallback — a guessed city must not satisfy the gate.
+    const resolvedNap = resolveCampaignNap(campaign, d);
+    const businessName = resolvedNap.name;
+    const address = resolvedNap.address;
+    const city = resolvedNap.city;
+    const state = resolvedNap.state;
+    const zipCode = resolvedNap.zip;
+    const phone = resolvedNap.phone;
+    const websiteUrl = resolvedNap.website;
 
     if (!businessName || !address || !city || !state) {
       throw new Error('incomplete_nap');
-    }
-
-    // If we only have the canonical full address, use the first line as the street address.
-    if (!campaign.address_line1 && nap.canonical_address) {
-      address = nap.canonical_address.split(',')[0].trim();
     }
 
     // Idempotency: return an existing primary-linked seed

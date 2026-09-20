@@ -29,6 +29,7 @@ import {
   inferTimezoneFromState,
   parseHours,
 } from '@/lib/business-hours';
+import { addressParser } from '@/lib/address-parser';
 
 /**
  * Minimal shape the modal needs from the queue row. Deliberately structural
@@ -92,13 +93,31 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
   const snap = entry.business_snapshot ?? {};
   const nap = snap.verified_nap ?? snap.nap ?? {};
 
+  // The snapshot's `address` may be a combined "street, city, state zip"
+  // string (scan canonical NAP, or a verified value written before the
+  // structured split). If it parses, prefill the street field with the
+  // street component only — submitting the whole blob as address_line1
+  // would double city/state in every composed display. Parsed components
+  // fill city/state/zip only when nothing more authoritative supplies them.
+  const rawAddressInit = String(nap.address ?? snap.address ?? '');
+  const parsedAddressInit =
+    rawAddressInit && addressParser.canParse(rawAddressInit)
+      ? addressParser.parse(rawAddressInit)
+      : null;
+  const streetInit = parsedAddressInit
+    ? [parsedAddressInit.address_line1, parsedAddressInit.address_line2]
+        .filter(Boolean)
+        .join(', ') || rawAddressInit
+    : rawAddressInit;
+
   const [form, setForm] = useState(() => ({
     outcome: 'operational' as VerificationOutcome,
     verifiedName: nap.name ?? entry.business_name ?? '',
     verifiedPhone: nap.phone ?? snap.phone ?? '',
-    verifiedAddress: nap.address ?? snap.address ?? '',
-    verifiedCity: nap.city ?? entry.city ?? '',
-    verifiedState: nap.state ?? entry.state ?? '',
+    verifiedAddress: streetInit,
+    verifiedCity: nap.city ?? entry.city ?? parsedAddressInit?.city ?? '',
+    verifiedState: nap.state ?? entry.state ?? parsedAddressInit?.state ?? '',
+    verifiedZip: nap.zip ?? snap.address_zip ?? snap.zip_code ?? parsedAddressInit?.postal_code ?? '',
     verifiedWebsite: nap.website ?? snapshotWebsite(snap.website),
     verifiedEmail: nap.email ?? snap.email ?? '',
     verifiedCategory: entry.category ?? nap.category ?? snap.category ?? '',
@@ -178,7 +197,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
   };
   const CONFLICT_FIELD_INITIAL: Record<string, string> = {
     name: nap.name ?? entry.business_name ?? '',
-    address: nap.address ?? snap.address ?? '',
+    address: streetInit,
     phone: nap.phone ?? snap.phone ?? '',
     website: nap.website ?? snapshotWebsite(snap.website),
     primary_category: entry.category ?? nap.category ?? snap.category ?? '',
@@ -212,6 +231,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
         verifiedAddress: form.verifiedAddress || undefined,
         verifiedCity: form.verifiedCity || undefined,
         verifiedState: form.verifiedState || undefined,
+        verifiedZip: form.verifiedZip || undefined,
         verifiedWebsite: form.verifiedWebsite || undefined,
         verifiedEmail: form.verifiedEmail || undefined,
         verifiedCategory: form.verifiedCategory || undefined,
@@ -318,11 +338,36 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
                   onChange={(e) => setForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                 />
+                {/* Smart-paste: a full pasted address ("123 Main St, Kansas
+                    City, MO 64124") splits into its fields — same behavior
+                    as the campaign form + seed-create page. Suite/unit stays
+                    on the street line; parsed components land in their
+                    fields when present. */}
                 <input
                   type="text"
                   placeholder="Street address"
                   value={form.verifiedAddress}
-                  onChange={(e) => setForm((f) => ({ ...f, verifiedAddress: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (addressParser.canParse(value)) {
+                      const parsed = addressParser.parse(value);
+                      setForm((f) => ({
+                        ...f,
+                        verifiedAddress:
+                          [parsed.address_line1, parsed.address_line2]
+                            .filter(Boolean)
+                            .join(', ') || value,
+                        verifiedCity: parsed.city ?? f.verifiedCity,
+                        verifiedState: parsed.state ?? f.verifiedState,
+                        verifiedZip: parsed.postal_code ?? f.verifiedZip,
+                      }));
+                      if (parsed.state && !hoursTimezoneLocked.current) {
+                        setHoursTimezone((cur) => inferTimezoneFromState(parsed.state) ?? cur);
+                      }
+                    } else {
+                      setForm((f) => ({ ...f, verifiedAddress: value }));
+                    }
+                  }}
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                 />
                 <div className="flex gap-2">
@@ -345,6 +390,13 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
                       }
                     }}
                     className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="ZIP"
+                    value={form.verifiedZip}
+                    onChange={(e) => setForm((f) => ({ ...f, verifiedZip: e.target.value }))}
+                    className="w-24 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                   />
                 </div>
               </>

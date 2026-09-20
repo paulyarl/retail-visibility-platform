@@ -320,7 +320,7 @@ export default function NewPresenceSeedPage() {
     setAddress(String(parsed?.address_line1 || rawAddress));
     setCity(String(verified.city || entry.city || parsed?.city || ''));
     setState(US_STATES.includes(stateRaw) ? stateRaw : '');
-    setZipCode(String(snap.zip_code || parsed?.postal_code || '').trim());
+    setZipCode(String(verified.zip || snap.address_zip || snap.zip_code || parsed?.postal_code || '').trim());
     setPhone(phone);
     setWebsite(website);
     setPrimaryCategory(String(verified.category || entry.category || '').trim());
@@ -396,20 +396,29 @@ export default function NewPresenceSeedPage() {
 
   const applyCampaignProspect = (campaign: Campaign) => {
     const name = String(campaign.business_name || campaign.title || '').trim();
-    const address = [campaign.address_line1, campaign.address_line2]
-      .filter(Boolean)
-      .join(', ');
+    // Legacy rows may carry a combined "street, city, state zip" in
+    // address_line1 — split it so the seed doesn't inherit a doubled
+    // address. Parsed components backfill columns that were never set.
+    const parsedLine1 =
+      campaign.address_line1 && addressParser.canParse(campaign.address_line1)
+        ? addressParser.parse(campaign.address_line1)
+        : null;
+    const address = parsedLine1
+      ? [parsedLine1.address_line1, parsedLine1.address_line2, campaign.address_line2]
+          .filter(Boolean)
+          .join(', ')
+      : [campaign.address_line1, campaign.address_line2].filter(Boolean).join(', ');
     const phone = String(campaign.phone || '').trim();
     const website = String(campaign.website_url || '').trim();
-    const stateRaw = String(campaign.address_state || campaign.state || '')
+    const stateRaw = String(campaign.address_state || parsedLine1?.state || campaign.state || '')
       .trim()
       .toUpperCase();
 
     setBusinessName(name);
     setAddress(address);
-    setCity(String(campaign.address_city || campaign.city || ''));
+    setCity(String(campaign.address_city || parsedLine1?.city || campaign.city || ''));
     setState(US_STATES.includes(stateRaw) ? stateRaw : '');
-    setZipCode(String(campaign.address_zip || ''));
+    setZipCode(String(campaign.address_zip || parsedLine1?.postal_code || ''));
     setPhone(phone);
     setWebsite(website);
     setPrimaryCategory(String(campaign.category || '').trim());

@@ -1292,6 +1292,46 @@ describe('MarketingProspectQueueService', () => {
       );
     });
 
+    it('splits a combined verifiedAddress into street + city/state/zip at the write boundary', async () => {
+      const verifyRow = queueRow({
+        status: 'verify_then_outreach',
+        verification: { requested_at: '2026-09-01T00:00:00Z', requested_by: ACTING_USER_ID },
+      });
+      mockQueue.findUnique.mockResolvedValue(verifyRow);
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve({ ...verifyRow, ...data, status: 'queued' }),
+      );
+
+      await MarketingProspectQueueService.resolveVerification({
+        queueEntryId: 'pque-test-001',
+        outcome: 'operational',
+        verifiedAddress: '2605 Independence Avenue, Kansas City, MO 64124',
+        nextAction: 'requeue',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            city: 'Kansas City',
+            state: 'MO',
+            business_snapshot: expect.objectContaining({
+              address: '2605 Independence Avenue',
+              address_city: 'Kansas City',
+              address_state: 'MO',
+              address_zip: '64124',
+              verified_nap: expect.objectContaining({
+                address: '2605 Independence Avenue',
+                city: 'Kansas City',
+                state: 'MO',
+                zip: '64124',
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+
     // Migration 296 — opening hours captured on the verification call.
     it('writes verified opening hours onto the snapshot (verified_nap.hours + flat hours)', async () => {
       const verifyRow = queueRow({

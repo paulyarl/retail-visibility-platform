@@ -21,6 +21,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateOutreachIntelligenceId } from '../lib/id-generator';
+import { formatCampaignAddress } from '../lib/canonical-nap';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 
@@ -631,24 +632,11 @@ export class OutreachIntelligenceService extends BaseService {
 
   /**
    * Format the campaign address into a single string for the payload snapshot.
+   * Shared NAP contract — lib/canonical-nap (structured columns, market-scope
+   * city/state as the display fallback).
    */
   private formatAddress(campaign: any): string | null {
-    const parts = [
-      campaign.address_line1,
-      campaign.address_city,
-      campaign.address_state,
-    ].filter((p: any) => p && String(p).trim().length > 0);
-
-    if (parts.length === 0) return null;
-
-    const line1 = campaign.address_line1?.trim();
-    const city = campaign.address_city?.trim();
-    const state = campaign.address_state?.trim();
-
-    if (line1 && city && state) return `${line1}, ${city}, ${state}`;
-    if (line1 && city) return `${line1}, ${city}`;
-    if (city && state) return `${city}, ${state}`;
-    return line1 ?? city ?? state ?? null;
+    return formatCampaignAddress(campaign);
   }
 
   /**

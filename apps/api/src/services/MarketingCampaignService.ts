@@ -16,6 +16,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ValidationError, ConflictError, HttpError } from '../middleware/errorHandler';
 import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId, generateProspectQueueId } from '../lib/id-generator';
+import { addressParser } from '../lib/address-parser';
 import CampaignTriageService from './CampaignTriageService';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
 import DemoTenantService from './DemoTenantService';
@@ -49,6 +50,7 @@ export interface CampaignVerificationInput {
   verifiedAddress?: string;
   verifiedCity?: string;
   verifiedState?: string;
+  verifiedZip?: string;
   verifiedWebsite?: string;
   verifiedEmail?: string;
   verifiedCategory?: string;
@@ -2508,9 +2510,24 @@ export class MarketingCampaignService extends BaseService {
     if (input.verifiedPhone?.trim()) napPatch.phone = input.verifiedPhone.trim();
     if (input.verifiedEmail?.trim()) napPatch.email = input.verifiedEmail.trim();
     if (input.verifiedWebsite?.trim()) napPatch.websiteUrl = input.verifiedWebsite.trim();
-    if (input.verifiedAddress?.trim()) napPatch.addressLine1 = input.verifiedAddress.trim();
-    if (input.verifiedCity?.trim()) napPatch.addressCity = input.verifiedCity.trim();
-    if (input.verifiedState?.trim()) napPatch.addressState = input.verifiedState.trim();
+    // A pasted full address ("2605 Independence Ave, Kansas City, MO 64124")
+    // must not land whole in address_line1 while city/state land separately —
+    // that doubles them in every composed display. Split it at the write
+    // boundary; explicit verifiedCity/verifiedState/verifiedZip inputs still
+    // win over parsed components.
+    const rawAddress = input.verifiedAddress?.trim() || '';
+    const parsedAddress =
+      rawAddress && addressParser.canParse(rawAddress) ? addressParser.parse(rawAddress) : null;
+    if (rawAddress) {
+      napPatch.addressLine1 = parsedAddress?.address_line1?.trim() || rawAddress;
+      if (parsedAddress?.address_line2?.trim()) napPatch.addressLine2 = parsedAddress.address_line2.trim();
+    }
+    const verifiedCity = input.verifiedCity?.trim() || parsedAddress?.city?.trim() || undefined;
+    const verifiedState = input.verifiedState?.trim() || parsedAddress?.state?.trim() || undefined;
+    const verifiedZip = input.verifiedZip?.trim() || parsedAddress?.postal_code?.trim() || undefined;
+    if (verifiedCity) napPatch.addressCity = verifiedCity;
+    if (verifiedState) napPatch.addressState = verifiedState;
+    if (verifiedZip) napPatch.addressZip = verifiedZip;
     if (input.verifiedCategory?.trim()) napPatch.category = input.verifiedCategory.trim();
     if (input.verifiedHours) napPatch.businessHours = input.verifiedHours as any;
     if (input.verifiedSocialProfiles?.length) napPatch.socialProfiles = input.verifiedSocialProfiles as any;
@@ -2574,9 +2591,10 @@ export class MarketingCampaignService extends BaseService {
           const verified: Array<[string, string]> = (
             [
               [input.verifiedName, 'business_name'],
-              [input.verifiedAddress, 'address'],
-              [input.verifiedCity, 'city'],
-              [input.verifiedState, 'state'],
+              [napPatch.addressLine1, 'address'],
+              [verifiedCity, 'city'],
+              [verifiedState, 'state'],
+              [verifiedZip, 'zip_code'],
               [input.verifiedPhone, 'phone'],
               [input.verifiedWebsite, 'website'],
               [input.verifiedEmail, 'email'],
@@ -2679,6 +2697,7 @@ export class MarketingCampaignService extends BaseService {
                     : k === 'address' ? 'address'
                     : k === 'city' ? 'city'
                     : k === 'state' ? 'state'
+                    : k === 'zip_code' ? 'zip_code'
                     : k === 'phone' ? 'phone'
                     : k === 'website' ? 'website'
                     : k === 'email' ? 'email'

@@ -19,6 +19,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import { resolveCampaignNap } from '../lib/canonical-nap';
 import IdentityEvidenceService, {
   type IdentityEvidenceRow,
   type OwnerContact,
@@ -229,22 +230,12 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
   };
 
   // Resolved business city/state — not scored fields (IdentityFieldKey has no
-  // city/state), but the Verify record modal prefills from them. Precedence
-  // mirrors DirectoryPresenceSeedService (structured campaign address → audit
-  // matched → audit requested), then falls back to the campaign's market
-  // scope — the same `address_city || city` fallback the seed-create form uses.
-  const addressCity =
-    campaign?.address_city ||
-    meta.matched_business?.city ||
-    meta.requested_business?.city ||
-    campaign?.city ||
-    null;
-  const addressState =
-    campaign?.address_state ||
-    meta.matched_business?.state ||
-    meta.requested_business?.state ||
-    campaign?.state ||
-    null;
+  // city/state), but the Verify record modal prefills from them. One shared
+  // contract (lib/canonical-nap); market scope is allowed here because this
+  // is a prefill hint the operator confirms, not a seed gate.
+  const resolvedNap = resolveCampaignNap(campaign, audit, { marketScopeFallback: true });
+  const addressCity = resolvedNap.city;
+  const addressState = resolvedNap.state;
 
   const evidence: Record<IdentityFieldKey, IdentitySourceRef[]> = {
     name: [],

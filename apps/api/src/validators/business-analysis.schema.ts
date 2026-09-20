@@ -404,6 +404,13 @@ const napConsistencySchema = z.object({
   overall_status: napStatusEnum,
   canonical_name: z.string().nullable().optional(),
   canonical_address: z.string().nullable().optional(),
+  // Structured canonical components — consumed by lib/canonical-nap for NAP
+  // resolution. Declared (not just passthrough-tolerated) so the contract is
+  // explicit; analysts may emit either the combined canonical_address or
+  // these components, and the resolver handles both.
+  canonical_city: z.string().nullable().optional(),
+  canonical_state: z.string().nullable().optional(),
+  canonical_zip: z.string().nullable().optional(),
   canonical_phone: z.string().nullable().optional(),
   name_variations: z.array(z.string()).optional(),
   address_variations: z.array(z.string()).optional(),

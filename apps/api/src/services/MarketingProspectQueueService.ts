@@ -25,6 +25,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateProspectQueueId } from '../lib/id-generator';
+import { addressParser } from '../lib/address-parser';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
@@ -107,6 +108,7 @@ export interface VerificationResolutionInput {
   verifiedAddress?: string;
   verifiedCity?: string;
   verifiedState?: string;
+  verifiedZip?: string;
   // Enrichment fields captured on the verification call — written onto the
   // queue entry's snapshot (and category column) so the campaign derive path
   // re-enriches the prospect's record instead of inheriting stale data.
@@ -140,6 +142,7 @@ export interface VerificationRecord {
   verified_address?: string;
   verified_city?: string;
   verified_state?: string;
+  verified_zip?: string;
   verified_website?: string;
   verified_email?: string;
   verified_category?: string;
@@ -782,6 +785,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           addressLine1: (verifiedNap.address as string) ?? (snapshot.address as string) ?? undefined,
           addressCity: (verifiedNap.city as string) ?? (snapshot.address_city as string) ?? undefined,
           addressState: (verifiedNap.state as string) ?? (snapshot.address_state as string) ?? undefined,
+          addressZip: (verifiedNap.zip as string) ?? (snapshot.address_zip as string) ?? undefined,
           ownerNames,
           // Authoritative identity enrichment captured on the verification call.
           socialProfiles: verifiedSocialProfiles,
@@ -973,7 +977,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           addressLine1: (verifiedNap.address as string) ?? (snapshot.address as string) ?? undefined,
           addressCity: (verifiedNap.city as string) ?? (snapshot.address_city as string) ?? undefined,
           addressState: (verifiedNap.state as string) ?? (snapshot.address_state as string) ?? undefined,
-          addressZip: (snapshot.address_zip as string) ?? undefined,
+          addressZip: (verifiedNap.zip as string) ?? (snapshot.address_zip as string) ?? undefined,
           addressCountry: (snapshot.address_country as string) ?? undefined,
           ownerNames,
           // Authoritative identity enrichment captured on the verification
@@ -1253,6 +1257,18 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }));
 
       const prior = (existing.verification as any) ?? {};
+      // A pasted full address ("123 Main St, Kansas City, MO 64124") must not
+      // land whole in the street slot while city/state land separately — that
+      // doubles them in every composed display downstream. Split it here at
+      // the write boundary; explicit verifiedCity/verifiedState/verifiedZip
+      // inputs still win over parsed components.
+      const rawAddress = input.verifiedAddress?.trim() || '';
+      const parsedAddress =
+        rawAddress && addressParser.canParse(rawAddress) ? addressParser.parse(rawAddress) : null;
+      const verifiedCity = input.verifiedCity?.trim() || parsedAddress?.city?.trim() || undefined;
+      const verifiedState = input.verifiedState?.trim() || parsedAddress?.state?.trim() || undefined;
+      const verifiedZip = input.verifiedZip?.trim() || parsedAddress?.postal_code?.trim() || undefined;
+
       const resolvedVerification: VerificationRecord = {
         ...prior,
         resolved_at: new Date().toISOString(),
@@ -1261,8 +1277,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
         verified_name: input.verifiedName,
         verified_phone: input.verifiedPhone,
         verified_address: input.verifiedAddress,
-        verified_city: input.verifiedCity,
-        verified_state: input.verifiedState,
+        verified_city: verifiedCity,
+        verified_state: verifiedState,
+        verified_zip: verifiedZip,
         verified_website: input.verifiedWebsite,
         verified_email: input.verifiedEmail,
         verified_category: input.verifiedCategory,
@@ -1280,8 +1297,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // values with blanks.
       const napPatch: any = {};
       if (input.verifiedName && input.verifiedName.trim()) napPatch.business_name = input.verifiedName.trim();
-      if (input.verifiedCity && input.verifiedCity.trim()) napPatch.city = input.verifiedCity.trim();
-      if (input.verifiedState && input.verifiedState.trim()) napPatch.state = input.verifiedState.trim();
+      if (verifiedCity) napPatch.city = verifiedCity;
+      if (verifiedState) napPatch.state = verifiedState;
       if (input.verifiedCategory && input.verifiedCategory.trim()) napPatch.category = input.verifiedCategory.trim();
 
       // Merge verified NAP + enrichment into the business_snapshot so the
@@ -1293,9 +1310,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const verifiedNap: Record<string, any> = {};
       if (input.verifiedName?.trim()) verifiedNap.name = input.verifiedName.trim();
       if (input.verifiedPhone?.trim()) verifiedNap.phone = input.verifiedPhone.trim();
-      if (input.verifiedAddress?.trim()) verifiedNap.address = input.verifiedAddress.trim();
-      if (input.verifiedCity?.trim()) verifiedNap.city = input.verifiedCity.trim();
-      if (input.verifiedState?.trim()) verifiedNap.state = input.verifiedState.trim();
+      if (input.verifiedAddress?.trim()) {
+        verifiedNap.address = parsedAddress?.address_line1?.trim() || input.verifiedAddress.trim();
+        if (parsedAddress?.address_line2?.trim()) verifiedNap.address2 = parsedAddress.address_line2.trim();
+      }
+      if (verifiedCity) verifiedNap.city = verifiedCity;
+      if (verifiedState) verifiedNap.state = verifiedState;
+      if (verifiedZip) verifiedNap.zip = verifiedZip;
       if (input.verifiedWebsite?.trim()) verifiedNap.website = input.verifiedWebsite.trim();
       if (input.verifiedEmail?.trim()) verifiedNap.email = input.verifiedEmail.trim();
       if (input.verifiedCategory?.trim()) verifiedNap.category = input.verifiedCategory.trim();
@@ -1320,6 +1341,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (verifiedNap.address) flatEnrichment.address = verifiedNap.address;
       if (verifiedNap.city) flatEnrichment.address_city = verifiedNap.city;
       if (verifiedNap.state) flatEnrichment.address_state = verifiedNap.state;
+      if (verifiedNap.zip) flatEnrichment.address_zip = verifiedNap.zip;
       if (verifiedNap.owner_name) flatEnrichment.owner_name = verifiedNap.owner_name;
       // Migration 296 — hours are an object, not a string, so they get their
       // own flat snapshot key (`hours`) that the seed create paths read.

@@ -15,6 +15,7 @@ import type { RequestCtx } from '../context';
 import { MarketingPromptService, extractJsonCandidates, stripLlmJsonArtifacts } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import { generateMarketingAuditId } from '../lib/id-generator';
+import { formatCampaignAddress } from '../lib/canonical-nap';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
@@ -2709,12 +2710,7 @@ PAYLOAD 2 — bronze_standard_scan
       business_origin: [campaign.business_origin_country, campaign.business_origin_region]
         .filter(Boolean).join(', '),
       platform: campaign.intelligence_platform || '',
-      business_address: [
-        campaign.address_line1,
-        campaign.address_city,
-        campaign.address_state,
-        campaign.address_zip,
-      ].filter(Boolean).join(', ') || '',
+      business_address: formatCampaignAddress(campaign, null, { includeZip: true }) || '',
       business_phone: campaign.phone || campaign.contact_info || '',
     };
 

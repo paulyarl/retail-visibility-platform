@@ -109,6 +109,45 @@ describe('resolveCampaignVerification', () => {
     expect(ev.notes).toContain('operational');
   });
 
+  it('splits a combined verifiedAddress into structured columns at the write boundary', async () => {
+    // The operator pasted the whole "street, city, state zip" into the street
+    // field — the blob must not land in address_line1 alongside separately
+    // populated city/state (that doubles them in every composed display).
+    await MarketingCampaignService.resolveCampaignVerification('camp-1', {
+      outcome: 'operational',
+      verifiedAddress: '2605 Independence Avenue, Kansas City, MO 64124',
+    });
+
+    const updateArg = mockCampaignsList.update.mock.calls[0][0];
+    expect(updateArg.data.address_line1).toBe('2605 Independence Avenue');
+    expect(updateArg.data.address_city).toBe('Kansas City');
+    expect(updateArg.data.address_state).toBe('MO');
+    expect(updateArg.data.address_zip).toBe('64124');
+  });
+
+  it('lets explicit verifiedCity/verifiedState/verifiedZip override parsed components', async () => {
+    await MarketingCampaignService.resolveCampaignVerification('camp-1', {
+      outcome: 'operational',
+      verifiedAddress: '2605 Independence Avenue, Kansas City, MO 64124',
+      verifiedCity: 'Independence',
+      verifiedZip: '64050',
+    });
+
+    const updateArg = mockCampaignsList.update.mock.calls[0][0];
+    expect(updateArg.data.address_line1).toBe('2605 Independence Avenue');
+    expect(updateArg.data.address_city).toBe('Independence');
+    expect(updateArg.data.address_state).toBe('MO'); // parsed state kept
+    expect(updateArg.data.address_zip).toBe('64050');
+  });
+
+  it('writes an unparseable street verbatim into address_line1', async () => {
+    await MarketingCampaignService.resolveCampaignVerification('camp-1', {
+      outcome: 'operational',
+      verifiedAddress: '745 S Gammon Rd',
+    });
+    expect(mockCampaignsList.update.mock.calls[0][0].data.address_line1).toBe('745 S Gammon Rd');
+  });
+
   it('records owner-only evidence when no NAP field was verified', async () => {
     await MarketingCampaignService.resolveCampaignVerification('camp-1', {
       outcome: 'operational',
