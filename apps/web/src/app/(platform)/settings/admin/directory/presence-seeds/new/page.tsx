@@ -17,6 +17,14 @@ import { clientLogger } from '@/lib/client-logger';
 import { addressParser } from '@/lib/address-parser';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
+import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
+import {
+  DAYS,
+  EMPTY_HOURS,
+  inferTimezoneFromState,
+  parseHours,
+  type DayHours,
+} from '@/lib/business-hours';
 import { Plus, ArrowLeft, Trash2, Search, Loader2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -60,27 +68,6 @@ const US_STATES = [
   'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
 ];
 
-const DAYS = [
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
-] as const;
-
-interface DayHours {
-  open: string;
-  close: string;
-  closed: boolean;
-}
-
-const EMPTY_HOURS: Record<string, DayHours> = DAYS.reduce((acc, day) => {
-  acc[day] = { open: '09:00', close: '18:00', closed: true };
-  return acc;
-}, {} as Record<string, DayHours>);
-
 export default function NewPresenceSeedPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -102,6 +89,8 @@ export default function NewPresenceSeedPage() {
   });
   const [businessHoursTimezone, setBusinessHoursTimezone] =
     useState('America/New_York');
+  const [hoursSource, setHoursSource] = useState('');
+  const [hoursSourceUrl, setHoursSourceUrl] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [seedBatch, setSeedBatch] = useState('');
@@ -366,6 +355,24 @@ export default function NewPresenceSeedPage() {
     const provUrl = entry.source_campaign_id
       ? `/settings/admin/marketing-ops/campaigns/${entry.source_campaign_id}`
       : '/settings/admin/marketing-ops/queue';
+
+    // Hours captured on the verification call ride on the snapshot
+    // (verified_nap.hours first, then the flat key — same precedence as the
+    // queue → campaign promotion path). Reset when the entry has none so a
+    // previously loaded prospect's hours don't leak into this one.
+    const queueHours = (snap.verified_nap?.hours ?? snap.hours) as
+      | Record<string, any>
+      | undefined;
+    const hasQueueHours = !!queueHours && typeof queueHours === 'object';
+    setBusinessHours(parseHours(hasQueueHours ? queueHours : null));
+    setBusinessHoursTimezone(
+      (queueHours?.timezone as string | undefined) ||
+        inferTimezoneFromState(stateRaw) ||
+        'America/New_York',
+    );
+    setHoursSource(hasQueueHours ? provSource : '');
+    setHoursSourceUrl(hasQueueHours ? provUrl : '');
+
     setProvenance(
       provenanceRowsFor(
         [
@@ -423,6 +430,21 @@ export default function NewPresenceSeedPage() {
     setNotes('');
 
     const provUrl = `/settings/admin/marketing-ops/campaigns/${campaign.id}`;
+
+    // Migration 296 — campaigns carry business_hours captured on the
+    // verification call; prefill them so they flow onto the seed listing.
+    const campaignHours = campaign.business_hours;
+    const hasCampaignHours =
+      !!campaignHours && typeof campaignHours === 'object';
+    setBusinessHours(parseHours(hasCampaignHours ? campaignHours : null));
+    setBusinessHoursTimezone(
+      (campaignHours?.timezone as string | undefined) ||
+        inferTimezoneFromState(stateRaw) ||
+        'America/New_York',
+    );
+    setHoursSource(hasCampaignHours ? 'campaign_record' : '');
+    setHoursSourceUrl(hasCampaignHours ? provUrl : '');
+
     const sameAsUrls = [
       ...(Array.isArray(campaign.directory_profiles)
         ? campaign.directory_profiles.map((p) => p?.url).filter(Boolean)
@@ -629,6 +651,31 @@ export default function NewPresenceSeedPage() {
       }
     }
 
+    // Business hours — send the day-map + timezone with the create so the
+    // listing's business_hours is written at ingest (the same field the
+    // automated campaign → seed path uses); the post-create call below still
+    // syncs the canonical business_hours_list the public hours endpoints read.
+    const hasHours = DAYS.some((day) => !businessHours[day].closed);
+    if (hasHours) {
+      const hoursObj: Record<string, DayHours> = {};
+      for (const day of DAYS) hoursObj[day] = businessHours[day];
+      payload.businessHours = { ...hoursObj, timezone: businessHoursTimezone };
+      // Hours provenance — mirrors the seed edit form: a dedicated `hours`
+      // row replaces any generic one when a source is provided.
+      if (hoursSource.trim() || hoursSourceUrl.trim()) {
+        payload.provenance = [
+          ...(payload.provenance || []).filter((p) => p.fieldKey !== 'hours'),
+          {
+            fieldKey: 'hours',
+            sourceName: hoursSource.trim() || undefined,
+            sourceUrl: hoursSourceUrl.trim() || undefined,
+            confidence: 'high' as const,
+            showOnPublic: true,
+          },
+        ];
+      }
+    }
+
     try {
       setSubmitting(true);
       const seed = await directoryPresenceAdminService.createSeed(payload);
@@ -637,8 +684,9 @@ export default function NewPresenceSeedPage() {
         return;
       }
 
-      // Delegate hours/timezone to the existing tenant business-hours services.
-      const hasHours = DAYS.some((day) => !businessHours[day].closed);
+      // Sync the canonical business_hours_list (the table the public hours
+      // endpoints read) — the create payload above wrote the listing and
+      // business-profile copies only.
       if (hasHours && seed.tenantId) {
         const periods = DAYS.filter((day) => !businessHours[day].closed).map(
           (day) => ({
@@ -1026,108 +1074,23 @@ export default function NewPresenceSeedPage() {
         <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Business Hours</h2>
           <p className="text-xs text-gray-500">
-            Unsourced hours are omitted from the public listing. When set, hours
-            and timezone are sent to the tenant business-hours service so the
-            public place page is timezone aware.
+            Only set hours when sourced — unsourced hours are omitted from the
+            public listing per the directory presence contract. Paste the block
+            from the Google Business Profile "Hours" section to parse all days
+            at once, then fine-tune per day. When set, hours and timezone are
+            sent to the tenant business-hours service so the public place page
+            is timezone aware.
           </p>
-
-          <div className="mb-3">
-            <label className={labelClass}>Timezone</label>
-            <select
-              className={inputClass}
-              value={businessHoursTimezone}
-              onChange={(e) => setBusinessHoursTimezone(e.target.value)}
-            >
-              {[
-                'America/New_York',
-                'America/Chicago',
-                'America/Denver',
-                'America/Los_Angeles',
-                'America/Phoenix',
-                'America/Anchorage',
-                'Pacific/Honolulu',
-                'UTC',
-                'Europe/London',
-                'Europe/Paris',
-                'Europe/Berlin',
-                'Europe/Madrid',
-                'Asia/Tokyo',
-                'Asia/Hong_Kong',
-                'Asia/Singapore',
-                'Australia/Sydney',
-              ].map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            {DAYS.map((day) => {
-              const h = businessHours[day];
-              return (
-                <div
-                  key={day}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
-                >
-                  <div className="md:col-span-3">
-                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={!h.closed}
-                        onChange={(e) =>
-                          setBusinessHours((prev) => ({
-                            ...prev,
-                            [day]: { ...prev[day], closed: !e.target.checked },
-                          }))
-                        }
-                      />
-                      <span className="capitalize">{day}</span>
-                    </label>
-                  </div>
-                  {!h.closed && (
-                    <>
-                      <div className="md:col-span-4">
-                        <input
-                          type="time"
-                          className={inputClass}
-                          value={h.open}
-                          onChange={(e) =>
-                            setBusinessHours((prev) => ({
-                              ...prev,
-                              [day]: { ...prev[day], open: e.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="md:col-span-1 text-center text-xs text-gray-400">
-                        to
-                      </div>
-                      <div className="md:col-span-4">
-                        <input
-                          type="time"
-                          className={inputClass}
-                          value={h.close}
-                          onChange={(e) =>
-                            setBusinessHours((prev) => ({
-                              ...prev,
-                              [day]: { ...prev[day], close: e.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                    </>
-                  )}
-                  {h.closed && (
-                    <div className="md:col-span-9 text-sm text-gray-400">
-                      Closed
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <BusinessHoursEditor
+            hours={businessHours}
+            timezone={businessHoursTimezone}
+            onHoursChange={setBusinessHours}
+            onTimezoneChange={setBusinessHoursTimezone}
+            sourceName={hoursSource}
+            sourceUrl={hoursSourceUrl}
+            onSourceNameChange={setHoursSource}
+            onSourceUrlChange={setHoursSourceUrl}
+          />
         </section>
 
         {/* Classification */}
