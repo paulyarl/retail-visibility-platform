@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Download, FileText, CheckCircle, Clock, Package, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Download, FileText, CheckCircle, Clock, Package, ExternalLink, Wrench, AlertCircle, ArrowUpRight } from 'lucide-react';
 import marketingCustomerService, {
   CustomerCampaignProjection,
 } from '@/services/MarketingCustomerService';
@@ -127,6 +127,96 @@ export default function CampaignDetailPage() {
           ))}
         </div>
       </div>
+
+      {/* Repair progress (profile_repair campaigns with a configured package) */}
+      {campaign.repair && (
+        <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-gray-400" /> Repair progress
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                  {campaign.repair.tierLabel} package
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                  {campaign.repair.modeLabel}
+                </span>
+              </div>
+            </div>
+            {campaign.repair.slaHours && (
+              <p className="text-sm text-gray-500 mt-2">
+                {campaign.repair.slaHours}-hour turnaround
+                {campaign.repair.slaDueAt ? ` · due ${formatDate(campaign.repair.slaDueAt)}` : ''}
+              </p>
+            )}
+          </div>
+
+          {/* DFY access-form banner */}
+          {campaign.repair.accessForm && campaign.repair.accessForm.state !== 'submitted' && (
+            <div className="mx-6 mt-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <p className="text-sm text-amber-800">
+                  {campaign.repair.accessForm.state === 'expired'
+                    ? 'Your access form link has expired — please contact support for a new one.'
+                    : 'We need access to your profiles to start the fixes. Please complete the access form.'}
+                </p>
+              </div>
+              {campaign.repair.accessForm.url && (
+                <a
+                  href={campaign.repair.accessForm.url}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+                >
+                  Complete form <ArrowUpRight className="w-4 h-4" />
+                </a>
+              )}
+            </div>
+          )}
+          {campaign.repair.accessForm?.state === 'submitted' && (
+            <div className="mx-6 mt-4 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+              <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+              <p className="text-sm text-green-800">Access details received — we're on it.</p>
+            </div>
+          )}
+          {campaign.repair.mode === 'diy' && !campaign.repair.accessForm && (
+            <div className="mx-6 mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-sm text-gray-600">
+                Apply the fixes in your repair package below, then let us know when each profile is updated.
+              </p>
+            </div>
+          )}
+
+          {/* Per-platform status */}
+          <div className="divide-y divide-gray-100 mt-2">
+            {campaign.repair.platforms.map((p) => (
+              <div
+                key={p.platform}
+                className={`px-6 py-4 ${p.needsCustomerAction ? 'border-l-4 border-amber-400 bg-amber-50/40' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-gray-900 text-sm">{p.label}</p>
+                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+                    p.status === 'verified' || p.status === 'done' ? 'bg-green-50 text-green-700' :
+                    p.needsCustomerAction ? 'bg-amber-100 text-amber-800' :
+                    p.status === 'blocked' ? 'bg-red-50 text-red-700' :
+                    p.status === 'escalated' ? 'bg-purple-50 text-purple-700' :
+                    p.status === 'not_applicable' ? 'bg-gray-100 text-gray-500' :
+                    'bg-blue-50 text-blue-700'
+                  }`}>
+                    {p.statusLabel}
+                  </span>
+                </div>
+                {p.note && <p className="text-xs text-gray-500 mt-1">{p.note}</p>}
+                {p.verifiedAt && (
+                  <p className="text-xs text-green-600 mt-1">Verified {formatDate(p.verifiedAt)}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Deliverables */}
       <div className="bg-white rounded-xl border border-gray-200">

@@ -116,6 +116,17 @@ router.get('/campaigns', requireCustomerAuth, requirePlatformContext, async (req
       include: {
         mkt_deliverables_list: true,
         marketing_revenue: { orderBy: { created_at: 'desc' } },
+        mkt_dispute_intake: {
+          where: { intake_kind: 'profile_repair_access' },
+          select: {
+            intake_kind: true,
+            short_code: true,
+            submitted_at: true,
+            viewed_at: true,
+            viewed_count: true,
+            expires_at: true,
+          },
+        },
       },
       orderBy: { date_paid: 'desc' },
     });
@@ -135,6 +146,17 @@ router.get('/campaigns/:id', requireCustomerAuth, requirePlatformContext, async 
       include: {
         mkt_deliverables_list: true,
         marketing_revenue: { orderBy: { created_at: 'desc' } },
+        mkt_dispute_intake: {
+          where: { intake_kind: 'profile_repair_access' },
+          select: {
+            intake_kind: true,
+            short_code: true,
+            submitted_at: true,
+            viewed_at: true,
+            viewed_count: true,
+            expires_at: true,
+          },
+        },
       },
     });
     if (!campaign) {

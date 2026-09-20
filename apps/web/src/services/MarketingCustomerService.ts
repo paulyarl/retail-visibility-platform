@@ -49,6 +49,30 @@ export interface CustomerReceiptProjection {
   businessName: string;
 }
 
+export interface CustomerRepairPlatformProgress {
+  platform: string;
+  label: string;
+  status: string;
+  statusLabel: string;
+  needsCustomerAction: boolean;
+  verifiedAt: string | null;
+  note: string | null;
+}
+
+export interface CustomerRepairProgress {
+  tier: string;
+  tierLabel: string;
+  mode: string;
+  modeLabel: string;
+  slaHours: number | null;
+  slaDueAt: string | null;
+  platforms: CustomerRepairPlatformProgress[];
+  accessForm: {
+    state: 'sent' | 'opened' | 'submitted' | 'expired';
+    url: string | null;
+  } | null;
+}
+
 export interface CustomerCampaignProjection {
   id: string;
   displayId: string;
@@ -63,6 +87,7 @@ export interface CustomerCampaignProjection {
   websiteUrl: string | null;
   deliverables: CustomerDeliverableProjection[];
   receipts: CustomerReceiptProjection[];
+  repair: CustomerRepairProgress | null;
 }
 
 export interface CustomerPortalOverview {

@@ -155,14 +155,17 @@ describe('projectCampaign', () => {
       ...baseCampaign,
       stage: 'delivered',
       mkt_deliverables_list: [
-        { id: 'del-1', title: 'Report', type: 'pdf', file_url: 'https://files.example.com/d1.pdf', delivered_at: new Date('2026-02-01'), delivery_status: 'delivered' },
-        { id: 'del-2', title: 'Preview', type: 'pdf', file_url: 'https://files.example.com/d2.pdf', delivered_at: null, delivery_status: 'preview' },
+        { id: 'del-1', title: 'Report', deliverable_type: 'audit_report', mime_type: 'application/pdf', storage_path: 'deliverables/d1.pdf', delivered_at: new Date('2026-02-01'), delivery_status: 'delivered' },
+        { id: 'del-2', title: 'Preview', deliverable_type: 'audit_report', mime_type: 'application/json', storage_path: 'deliverables/d2.json', delivered_at: null, delivery_status: 'preview' },
       ],
     };
     const result = await projectCampaign(campaign);
     expect(result!.deliverables).toHaveLength(2); // both shown because stage=delivered
     expect(result!.deliverables[0].title).toBe('Report');
-    expect(result!.deliverables[0].downloadUrl).toBe('https://files.example.com/d1.pdf');
+    // PDF with storage_path → authenticated download route (W6d)
+    expect(result!.deliverables[0].downloadUrl).toBe('/api/customer/marketing/deliverables/del-1/download');
+    // JSON import row → no customer download link
+    expect(result!.deliverables[1].downloadUrl).toBeNull();
   });
 
   it('projects receipts from marketing_revenue', async () => {
@@ -208,6 +211,184 @@ describe('projectCampaigns', () => {
     ];
     const results = await projectCampaigns(campaigns);
     expect(results).toHaveLength(0);
+  });
+});
+
+// ── Repair progress projection (PROFILE_REPAIR_CUSTOMER_PROGRESS_SPEC) ──
+
+describe('projectCampaign — repair progress', () => {
+  const repairCampaign = {
+    id: 'mkt-r1',
+    display_id: 'MKT-R1',
+    business_name: 'Repair Biz',
+    city: 'Kansas City',
+    category: 'profile_repair',
+    service_category: 'profile_repair',
+    stage: 'delivered',
+    date_paid: new Date('2026-01-15'),
+    date_delivered: new Date('2026-01-20'),
+    website_url: null,
+    mkt_deliverables_list: [],
+    marketing_revenue: [],
+    mkt_dispute_intake: [],
+    repair_fulfillment: {
+      tier: 'standard',
+      mode: 'dfy',
+      sla_hours: 48,
+      sla_due_at: '2026-01-22T00:00:00Z',
+      platforms: ['google', 'facebook'],
+      platform_status: {
+        google: { status: 'verified', verified_at: '2026-01-19T00:00:00Z', note: 'NAP corrected' },
+        facebook: { status: 'awaiting_access' },
+      },
+    },
+  };
+
+  it('returns null repair when repair_fulfillment is absent', async () => {
+    const result = await projectCampaign({
+      ...repairCampaign,
+      repair_fulfillment: null,
+    });
+    expect(result!.repair).toBeNull();
+  });
+
+  it('returns null repair when no tier is configured', async () => {
+    const result = await projectCampaign({
+      ...repairCampaign,
+      repair_fulfillment: { mode: 'dfy', platforms: ['google'] },
+    });
+    expect(result!.repair).toBeNull();
+  });
+
+  it('projects tier, mode, SLA, and customer-legible platform statuses', async () => {
+    const result = await projectCampaign(repairCampaign);
+    const repair = result!.repair!;
+    expect(repair.tierLabel).toBe('Standard');
+    expect(repair.mode).toBe('dfy');
+    expect(repair.modeLabel).toBe('We apply the fixes');
+    expect(repair.slaHours).toBe(48);
+    expect(repair.platforms).toHaveLength(2);
+    expect(repair.platforms[0]).toMatchObject({
+      platform: 'google',
+      label: 'Google Business Profile',
+      status: 'verified',
+      statusLabel: 'Verified',
+      needsCustomerAction: false,
+      note: 'NAP corrected',
+    });
+    expect(repair.platforms[1]).toMatchObject({
+      platform: 'facebook',
+      status: 'awaiting_access',
+      statusLabel: 'Waiting for account access',
+      needsCustomerAction: true, // dfy
+    });
+  });
+
+  it('flags customer_pending as customer action in DIY only', async () => {
+    const diy = await projectCampaign({
+      ...repairCampaign,
+      repair_fulfillment: {
+        tier: 'standard',
+        mode: 'diy',
+        platforms: ['google'],
+        platform_status: { google: { status: 'customer_pending' } },
+      },
+    });
+    expect(diy!.repair!.platforms[0].needsCustomerAction).toBe(true);
+    expect(diy!.repair!.platforms[0].statusLabel).toBe('Action needed from you');
+
+    const dfy = await projectCampaign({
+      ...repairCampaign,
+      repair_fulfillment: {
+        tier: 'standard',
+        mode: 'dfy',
+        platforms: ['google'],
+        platform_status: { google: { status: 'customer_pending' } },
+      },
+    });
+    expect(dfy!.repair!.platforms[0].needsCustomerAction).toBe(false);
+  });
+
+  it('does not expose escalated_campaign_id or access_token', async () => {
+    const result = await projectCampaign({
+      ...repairCampaign,
+      mkt_dispute_intake: [
+        {
+          intake_kind: 'profile_repair_access',
+          short_code: 'abc12345',
+          submitted_at: null,
+          viewed_at: null,
+          viewed_count: 0,
+          expires_at: new Date(Date.now() + 86400000),
+          access_token: 'secret-token-value',
+        },
+      ],
+      repair_fulfillment: {
+        tier: 'standard',
+        mode: 'dfy',
+        platforms: ['google'],
+        platform_status: {
+          google: { status: 'escalated', escalated_campaign_id: 'mkt-sibling-9' },
+        },
+      },
+    });
+    const serialized = JSON.stringify(result!.repair);
+    expect(serialized).not.toContain('mkt-sibling-9');
+    expect(serialized).not.toContain('secret-token-value');
+    expect(result!.repair!.platforms[0].statusLabel).toBe('Escalated for specialist review');
+  });
+
+  it('derives accessForm states for DFY', async () => {
+    const mk = (intake: any) =>
+      projectCampaign({
+        ...repairCampaign,
+        mkt_dispute_intake: intake ? [{ intake_kind: 'profile_repair_access', ...intake }] : [],
+      });
+
+    // sent — exists but never opened
+    const sent = await mk({ short_code: 'abc12345', submitted_at: null, viewed_count: 0, viewed_at: null, expires_at: new Date(Date.now() + 86400000) });
+    expect(sent!.repair!.accessForm).toEqual({ state: 'sent', url: '/i/abc12345' });
+
+    // opened
+    const opened = await mk({ short_code: 'abc12345', submitted_at: null, viewed_count: 2, viewed_at: new Date(), expires_at: new Date(Date.now() + 86400000) });
+    expect(opened!.repair!.accessForm!.state).toBe('opened');
+
+    // submitted — url hidden
+    const submitted = await mk({ short_code: 'abc12345', submitted_at: new Date(), viewed_count: 3, expires_at: new Date(Date.now() + 86400000) });
+    expect(submitted!.repair!.accessForm).toEqual({ state: 'submitted', url: null });
+
+    // expired
+    const expired = await mk({ short_code: 'abc12345', submitted_at: null, viewed_count: 0, expires_at: new Date(Date.now() - 86400000) });
+    expect(expired!.repair!.accessForm!.state).toBe('expired');
+
+    // no intake row yet — still DFY → accessForm null
+    const none = await mk(null);
+    expect(none!.repair!.accessForm).toBeNull();
+  });
+
+  it('has no accessForm in DIY mode', async () => {
+    const result = await projectCampaign({
+      ...repairCampaign,
+      mkt_dispute_intake: [
+        { intake_kind: 'profile_repair_access', short_code: 'abc12345', submitted_at: null },
+      ],
+      repair_fulfillment: { tier: 'standard', mode: 'diy', platforms: ['google'] },
+    });
+    expect(result!.repair!.accessForm).toBeNull();
+  });
+
+  it('defaults missing platform_status entry by mode', async () => {
+    const diy = await projectCampaign({
+      ...repairCampaign,
+      repair_fulfillment: { tier: 'standard', mode: 'diy', platforms: ['yelp'] },
+    });
+    expect(diy!.repair!.platforms[0].status).toBe('customer_pending');
+
+    const dfy = await projectCampaign({
+      ...repairCampaign,
+      repair_fulfillment: { tier: 'standard', mode: 'dfy', platforms: ['yelp'] },
+    });
+    expect(dfy!.repair!.platforms[0].status).toBe('in_progress');
   });
 });
 

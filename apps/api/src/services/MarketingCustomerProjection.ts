@@ -9,6 +9,7 @@
 import { prisma } from '../prisma';
 import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { REPAIR_PLATFORM_LABELS, REPAIR_TIER_CATALOG, type RepairPlatform, type RepairTier } from '../lib/repair-tiers';
 import type { RequestCtx } from '../context';
 
 // ── Customer-facing status model (§7.3) ────────────────────────────────
@@ -100,6 +101,132 @@ export interface CustomerCampaignProjection {
   businessProspectId: string | null;
   isPrimarySibling: boolean;
   engagementCycle: number;
+  // Profile-repair progress (customer-safe slice of repair_fulfillment)
+  repair: CustomerRepairProgress | null;
+}
+
+export interface CustomerRepairPlatformProgress {
+  platform: string;
+  label: string;
+  status: string;
+  statusLabel: string;
+  needsCustomerAction: boolean;
+  verifiedAt: Date | null;
+  note: string | null;
+}
+
+export interface CustomerRepairProgress {
+  tier: string;
+  tierLabel: string;
+  mode: string;
+  modeLabel: string;
+  slaHours: number | null;
+  slaDueAt: Date | null;
+  platforms: CustomerRepairPlatformProgress[];
+  accessForm: {
+    state: 'sent' | 'opened' | 'submitted' | 'expired';
+    url: string | null;
+  } | null;
+}
+
+/**
+ * Map an internal RepairPlatformStatus to a customer-legible label and
+ * whether the row represents an outstanding customer action.
+ * (docs/LocalBiz/PROFILE_REPAIR_CUSTOMER_PROGRESS_SPEC.md §2)
+ */
+function projectRepairPlatformStatus(
+  status: string,
+  mode: string,
+): { statusLabel: string; needsCustomerAction: boolean } {
+  switch (status) {
+    case 'customer_pending':
+      return { statusLabel: 'Action needed from you', needsCustomerAction: mode === 'diy' };
+    case 'customer_reported':
+      return { statusLabel: 'Submitted — under review', needsCustomerAction: false };
+    case 'awaiting_access':
+      return { statusLabel: 'Waiting for account access', needsCustomerAction: mode === 'dfy' };
+    case 'access_granted':
+      return { statusLabel: 'Access received', needsCustomerAction: false };
+    case 'verified':
+      return { statusLabel: 'Verified', needsCustomerAction: false };
+    case 'done':
+      return { statusLabel: 'Completed', needsCustomerAction: false };
+    case 'blocked':
+      return { statusLabel: 'Needs attention', needsCustomerAction: false };
+    case 'not_applicable':
+      return { statusLabel: 'Not applicable', needsCustomerAction: false };
+    case 'escalated':
+      return { statusLabel: 'Escalated for specialist review', needsCustomerAction: false };
+    default:
+      return {
+        statusLabel: mode === 'diy' ? 'Action needed from you' : 'In progress',
+        needsCustomerAction: mode === 'diy',
+      };
+  }
+}
+
+/**
+ * Customer-safe slice of repair_fulfillment (spec §1). Returns null when
+ * no repair package is configured. Never exposes access_token,
+ * escalated_campaign_id, or canonical_nap contact details.
+ */
+function projectRepairProgress(campaign: any): CustomerRepairProgress | null {
+  const rf = campaign.repair_fulfillment as Record<string, any> | null;
+  if (!rf || !rf.tier) return null;
+
+  const mode: string = rf.mode ?? 'diy';
+  const tierKey = rf.tier as RepairTier;
+  const tierLabel = REPAIR_TIER_CATALOG[tierKey]?.label ?? String(rf.tier);
+  const platformStatus: Record<string, any> = rf.platform_status ?? {};
+  const platformKeys: string[] = Array.isArray(rf.platforms) ? rf.platforms : [];
+
+  const platforms: CustomerRepairPlatformProgress[] = platformKeys.map((platform) => {
+    const entry = platformStatus[platform] ?? {};
+    const status = entry.status ?? (mode === 'diy' ? 'customer_pending' : 'in_progress');
+    const { statusLabel, needsCustomerAction } = projectRepairPlatformStatus(status, mode);
+    return {
+      platform,
+      label: REPAIR_PLATFORM_LABELS[platform as RepairPlatform] ?? platform.replace(/_/g, ' '),
+      status,
+      statusLabel,
+      needsCustomerAction,
+      verifiedAt: entry.verified_at ? new Date(entry.verified_at) : null,
+      note: entry.note ?? null,
+    };
+  });
+
+  // DFY access-form state — filtered mkt_dispute_intake include
+  // (intake_kind = 'profile_repair_access'; access_token never selected).
+  let accessForm: CustomerRepairProgress['accessForm'] = null;
+  if (mode === 'dfy') {
+    const intake = (campaign.mkt_dispute_intake ?? []).find(
+      (i: any) => i.intake_kind === 'profile_repair_access',
+    );
+    if (intake) {
+      const expired = !intake.submitted_at && intake.expires_at && new Date(intake.expires_at) < new Date();
+      accessForm = {
+        state: intake.submitted_at
+          ? 'submitted'
+          : expired
+            ? 'expired'
+            : (intake.viewed_count ?? 0) > 0 || intake.viewed_at
+              ? 'opened'
+              : 'sent',
+        url: intake.submitted_at || !intake.short_code ? null : `/i/${intake.short_code}`,
+      };
+    }
+  }
+
+  return {
+    tier: String(rf.tier),
+    tierLabel,
+    mode,
+    modeLabel: mode === 'dfy' ? 'We apply the fixes' : 'You apply the fixes',
+    slaHours: rf.sla_hours ?? null,
+    slaDueAt: rf.sla_due_at ? new Date(rf.sla_due_at) : null,
+    platforms,
+    accessForm,
+  };
 }
 
 export interface CustomerDeliverableProjection {
@@ -197,6 +324,7 @@ export async function projectCampaign(
     businessProspectId: campaign.business_prospect_id || null,
     isPrimarySibling: campaign.is_primary_sibling ?? false,
     engagementCycle: campaign.engagement_cycle ?? 1,
+    repair: projectRepairProgress(campaign),
   };
 }
 
@@ -247,6 +375,17 @@ export async function buildPortalOverview(
       mkt_deliverables_list: true,
       marketing_revenue: {
         orderBy: { created_at: 'desc' },
+      },
+      mkt_dispute_intake: {
+        where: { intake_kind: 'profile_repair_access' },
+        select: {
+          intake_kind: true,
+          short_code: true,
+          submitted_at: true,
+          viewed_at: true,
+          viewed_count: true,
+          expires_at: true,
+        },
       },
     },
     orderBy: { date_paid: 'desc' },
