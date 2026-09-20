@@ -54,6 +54,10 @@ Repeat each command with `--config prd` for production.
 - **`insertAfter` fingerprints only the first 80 chars of the insertion.** Never combine multiple bindings into one `insertAfter` call — if the first chunk is already present, the whole insertion is skipped and the later chunks are silently dropped while the version marker still gets appended.
 - **`removeSection` deletes up to the next `##`/`###` heading and swallows headingless content.** A binding inserted between a removable directive and the next heading gets eaten on the next run. Insert headingless bindings (e.g. `MARKET_CONTEXT_BINDING`) AFTER all `removeSection` calls in the transform so each run self-heals.
 
+**Third failure mode (bit us 2026-09-20, same seed): the two V2 variants use DIFFERENT signal-list formats.** `mpt-6oeuiizo` (Signal-Aligned) uses markdown bullets — `` * `WC_BROKEN_WEBSITE`: ... `` — while `mpt-j9bbem3l` (Category-Integrated / "Cohesive") uses plain lines — `WC_BROKEN_WEBSITE: ...` (no bullet, no backticks). A transform that anchors on only one form **throws** `Anchor not found` on the other (and the whole template update is aborted). Two lessons:
+- An `insertAfter` anchor that may be absent must be guarded (`if (out.includes(anchor))`) or replaced with a format-aware helper. `replaceFirst` no-ops silently when the `from` is missing; `insertAfter` throws — so a pre-existing silent no-op can become a hard failure the moment you add an `insertAfter` on the same anchor.
+- When amending a signal-definition list, handle BOTH formats (`broadenWcBrokenWebsite` / `appendWebsiteGapDefinitions` in the seed are the reference pattern).
+
 ## Business Audit — Platform Availability Control (render controls)
 
 Spec: `docs/LocalBiz/AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC.md` (status block is current as of 2026-09-18).

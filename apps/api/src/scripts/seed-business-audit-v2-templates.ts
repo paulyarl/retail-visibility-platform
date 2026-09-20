@@ -372,6 +372,57 @@ const WC_GAP_SIGNAL_DEFINITIONS = '\n' + [
   'Do NOT emit WC_LEGACY_BUILDER_SITE / WC_STALE_WEBSITE / WC_POOR_SITE_QUALITY / WC_CATEGORY_MISMATCH from `unable_to_verify` — they are quality judgments and require content-verified page content.',
 ].join('\n');
 
+// The Category-Integrated variant (mpt-j9bbem3l) uses a PLAIN "CODE: description"
+// signal list (no markdown bullets, no backticks) — e.g.
+//   WC_BROKEN_WEBSITE: Website URL returns 404, SSL error, or dead domain.
+// whereas Signal-Aligned (mpt-6oeuiizo) uses "* `CODE`: description". The §6.1
+// insertion must match whichever format the target body actually uses, or it
+// throws on the anchor. These are the plain-form equivalents.
+const WC_BROKEN_WEBSITE_DEFINITION_PLAIN_FROM = 'WC_BROKEN_WEBSITE: Website URL returns 404, SSL error, or dead domain.';
+const WC_BROKEN_WEBSITE_DEFINITION_PLAIN_TO = 'WC_BROKEN_WEBSITE: Website URL returns 404, SSL error, dead domain, or redirects to a bot-defense / notification-permission / login / access-blocking page that prevents an ordinary visitor from reaching business content (per the Website Accessibility Verification directive).';
+
+const WC_GAP_SIGNAL_DEFINITIONS_PLAIN = '\n' + [
+  'WC_THIRD_PARTY_DOMAIN: the "website" is a social / messaging / profile platform page (facebook.com, instagram.com, wa.me, api.whatsapp.com, x.com/twitter.com, tiktok.com, linktr.ee, yelp.com, nextdoor.com, t.me, m.me, threads.net, snapchat.com) OR the site status is social_media_only — the website field is a social page, not an owned site. Emit on sight.',
+  'WC_BUILDER_SUBDOMAIN: the site is a free builder subdomain (*.wixsite.com, *.wordpress.com, *.godaddysites.com, *.weebly.com, *.square.site, *.business.site, *.blogspot.com, *.tripod.com, *.angelfire.com, *.homestead.com, *.webs.com, *.jimdo.com, *.site123.me, *.strikingly.com, *.webnode.com, *.myshopify.com, *.bigcartel.com) — a live page, but no owned domain. Emit on sight.',
+  'WC_PARKED_DOMAIN: the domain resolves to a parked / for-sale / registrar placeholder page. Emit on sight.',
+  'WC_UNFINISHED_SITE: a "coming soon" / under-construction / template-default page that was never finished. Emit on sight.',
+  'WC_UNSECURED_WEBSITE: the owned site serves plain HTTP or has an untrusted certificate. Emit on sight (only for an owned site — not for third-party/builder hosts where TLS is the platform\'s).',
+  'WC_LEGACY_BUILDER_SITE: owned domain fingerprinted as a legacy / low-cost builder (Wix assets, wp-content, GoDaddy generator meta, visible builder branding, table-layout-era markup). Requires content-verified.',
+  'WC_STALE_WEBSITE: stale content signals — old copyright year, expired promos, dated news posts, seasonal content out of season. Requires content-verified.',
+  'WC_POOR_SITE_QUALITY: poorly designed / broken layout / unreadable / low-quality per the audit rubric. Requires content-verified.',
+  'WC_CATEGORY_MISMATCH: site content doesn\'t match the business\'s actual category — template leftovers, wrong-industry copy, or content for a different business. Requires content-verified.',
+  '',
+  'Do NOT emit WC_LEGACY_BUILDER_SITE / WC_STALE_WEBSITE / WC_POOR_SITE_QUALITY / WC_CATEGORY_MISMATCH from unable_to_verify — they are quality judgments and require content-verified page content.',
+].join('\n');
+
+/**
+ * Broaden the WC_BROKEN_WEBSITE signal definition to include access-blocking
+ * redirects, in whichever signal-list format the body uses. Idempotent; a
+ * no-op (never throws) when neither form is present.
+ */
+function broadenWcBrokenWebsite(out: string): string {
+  let next = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
+  next = replaceFirst(next, WC_BROKEN_WEBSITE_DEFINITION_PLAIN_FROM, WC_BROKEN_WEBSITE_DEFINITION_PLAIN_TO);
+  return next;
+}
+
+/**
+ * §6.1 (PB-08 / A7) — append the nine website-gap signal definitions after the
+ * WC_BROKEN_WEBSITE definition, matching the body's signal-list format.
+ * Idempotent via insertAfter's fingerprint check; a no-op (never throws) when
+ * no anchor is present, so a format the seed doesn't recognize cannot abort
+ * the whole template transform.
+ */
+function appendWebsiteGapDefinitions(out: string): string {
+  if (out.includes(WC_BROKEN_WEBSITE_DEFINITION_TO)) {
+    return insertAfter(out, WC_BROKEN_WEBSITE_DEFINITION_TO, WC_GAP_SIGNAL_DEFINITIONS);
+  }
+  if (out.includes(WC_BROKEN_WEBSITE_DEFINITION_PLAIN_TO)) {
+    return insertAfter(out, WC_BROKEN_WEBSITE_DEFINITION_PLAIN_TO, WC_GAP_SIGNAL_DEFINITIONS_PLAIN);
+  }
+  return out;
+}
+
 // ─── §6.1 scoring amendment: google_profile_maintenance rubric.
 //     The old rule scored unverifiability as health — "0 points when the
 //     profile appears maintained OR STATUS IS UNAVAILABLE" — so the more
@@ -1015,13 +1066,13 @@ function transformCategoryIntegrated(body: string): string {
   }
 
   // 4e. Broaden WC_BROKEN_WEBSITE signal definition to include access-blocking
-  //     redirects. Idempotent (no-op if already updated).
-  out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
+  //     redirects (format-aware). Idempotent (no-op if already updated).
+  out = broadenWcBrokenWebsite(out);
 
   // 4f. §6.1 (PB-08/A7) — append the nine website-gap signal definitions
-  //     after the WC_BROKEN_WEBSITE definition. Idempotent (insertAfter skips
-  //     when the fingerprint is already present).
-  out = insertAfter(out, WC_BROKEN_WEBSITE_DEFINITION_TO, WC_GAP_SIGNAL_DEFINITIONS);
+  //     after the WC_BROKEN_WEBSITE definition, in this body's list format.
+  //     Idempotent; no-op if no anchor is present.
+  out = appendWebsiteGapDefinitions(out);
 
   // 4e1. §6.1 scoring amendment — split the google_profile_maintenance rubric
   //      so unverifiability is excluded from the denominator instead of being
@@ -1464,12 +1515,13 @@ function transformSignalAligned(body: string): string {
   }
 
   // 19e. Broaden WC_BROKEN_WEBSITE signal definition to include access-blocking
-  //      redirects. Idempotent (no-op if already updated).
-  out = replaceFirst(out, WC_BROKEN_WEBSITE_DEFINITION_FROM, WC_BROKEN_WEBSITE_DEFINITION_TO);
+  //      redirects (format-aware). Idempotent (no-op if already updated).
+  out = broadenWcBrokenWebsite(out);
 
   // 19f. §6.1 (PB-08/A7) — append the nine website-gap signal definitions
-  //      after the WC_BROKEN_WEBSITE definition. Idempotent.
-  out = insertAfter(out, WC_BROKEN_WEBSITE_DEFINITION_TO, WC_GAP_SIGNAL_DEFINITIONS);
+  //      after the WC_BROKEN_WEBSITE definition, in this body's list format.
+  //      Idempotent; no-op if no anchor is present.
+  out = appendWebsiteGapDefinitions(out);
 
   // 19e1. §6.1 scoring amendment — split the google_profile_maintenance rubric
   //       so unverifiability is excluded from the denominator instead of being

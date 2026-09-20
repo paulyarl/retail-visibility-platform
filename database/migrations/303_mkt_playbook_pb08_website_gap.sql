@@ -17,10 +17,8 @@
 --      treatment as WC_MISSING_WEBSITE).
 --   5. Seed PB-08 starter checklist steps (pbcs-pb08-*).
 --   6. Seed the website_build mkt_intake_definitions row (§8.5 / §9.7 G-6 —
---      mkt_dispute_intake.intake_kind is a FK to this table), wired to
---      auto-offer at the `paid` stage when playbook_code = 'PB-08' via the
---      declarative trigger_guard (migration 301). Resolves OQ-8's playbook
---      linkage without new code.
+--      mkt_dispute_intake.intake_kind is a FK to this table). Seeded inert;
+--      the playbook trigger linkage ships in migration 304.
 --
 -- Post-migration cascade priority:
 --   PB-04(1) > PB-05(2) > PB-01(3) > PB-02(4) > PB-07(5) > PB-06(6) > PB-08(7) > PB-03(8)
@@ -168,13 +166,13 @@ ON CONFLICT (id) DO NOTHING;
 -- intake_kind is a natural-key PK referenced by mkt_dispute_intake.intake_kind
 -- (FK, migration 173). Without this row the intake cannot be created.
 --
--- Playbook linkage (spec OQ-8, resolved here): the intake auto-offers when a
--- campaign reaches the `paid` stage AND its playbook_code is PB-08. The
--- declarative trigger_guard (migration 301) reads the campaign row, so this
--- needs no code — mirroring how profile_repair gates on repair_fulfillment.mode.
+-- NOTE: the playbook linkage (trigger_stages/trigger_guard) ships in migration
+-- 304 — this row is seeded inert here. 303 is already applied, so its content
+-- is frozen; the DO UPDATE below deliberately does NOT touch trigger_stages or
+-- trigger_guard, which keeps a 303 re-run from clobbering 304's wiring.
 INSERT INTO mkt_intake_definitions (
   intake_kind, label, description, driver,
-  service_category, trigger_stages, trigger_guard, submitted_stage,
+  service_category, trigger_stages, submitted_stage,
   form_schema, field_mappings, owner_copy, niche_overrides,
   downstream_agent, version, is_active, is_draft
 ) VALUES (
@@ -183,8 +181,7 @@ INSERT INTO mkt_intake_definitions (
   'Owner supplies the inputs a website build needs: domain preference/ownership, business description, service or product list, photos/assets, hours, owner voice, and the category-content specifics the audit flagged.',
   'registry',
   NULL,
-  '["paid"]'::jsonb,
-  '[{"path":"playbook_code","op":"equals","value":"PB-08"}]'::jsonb,
+  '[]'::jsonb,
   'intake_submitted',
   '[
     { "key": "domain_preference", "type": "text", "label": "Preferred domain (if you own one, list it)", "required": false },
@@ -214,8 +211,6 @@ INSERT INTO mkt_intake_definitions (
 ON CONFLICT (intake_kind) DO UPDATE SET
   label = EXCLUDED.label,
   description = EXCLUDED.description,
-  trigger_stages = EXCLUDED.trigger_stages,
-  trigger_guard = EXCLUDED.trigger_guard,
   form_schema = EXCLUDED.form_schema,
   field_mappings = EXCLUDED.field_mappings,
   owner_copy = EXCLUDED.owner_copy,
@@ -232,7 +227,6 @@ COMMIT;
 -- SELECT matching_rules->'dual'->'groupA' FROM mkt_playbook_catalog WHERE code = 'PB-05';
 -- SELECT matching_rules->'none' FROM mkt_playbook_catalog WHERE code IN ('PB-02','PB-06');
 -- SELECT intake_kind FROM mkt_intake_definitions WHERE intake_kind = 'website_build';
--- SELECT trigger_stages, trigger_guard FROM mkt_intake_definitions WHERE intake_kind = 'website_build';
---   Expect trigger_stages=["paid"], trigger_guard=[{path:playbook_code, equals, PB-08}].
+--   (trigger_stages/trigger_guard are wired by migration 304.)
 -- SELECT COUNT(*) FROM mkt_playbook_checklist_steps s JOIN mkt_playbook_catalog c ON c.id = s.playbook_id WHERE c.code = 'PB-08';
 --   Expect 7.
