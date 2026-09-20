@@ -241,45 +241,36 @@ router.get('/categories/search', async (req: Request, res: Response) => {
 
     const maxResults = limit ? parseInt(limit as string, 10) : 20;
 
-    // Use direct SQL query instead of service to avoid Prisma connection pool issues
-    const result = await getDirectPool().query(`
-      SELECT 
-        dc.id,
-        dc.name,
-        dc.slug,
-        dc."googleCategoryId",
-        COALESCE(dcp.store_count, 0) as store_count,
-        COALESCE(dcp.product_count, 0) as total_products
-      FROM directory_category dc
-      LEFT JOIN (
-        SELECT 
-          category_slug,
-          COUNT(DISTINCT tenant_id) as store_count,
-          SUM(CAST(actual_product_count AS INTEGER)) as product_count
-        FROM directory_category_products 
-        WHERE is_published = true
-        GROUP BY category_slug
-      ) dcp ON dcp.category_slug = dc.slug
-      WHERE dc."tenantId" = 'platform' AND dc."isActive" = true
-      ORDER BY dc."sortOrder" ASC, dc.name ASC
-    `);
-
-    // Filter categories by search query
-    const searchLower = q.toLowerCase();
-    const filtered = result.rows.filter((cat: any) =>
-      cat.name.toLowerCase().includes(searchLower) ||
-      cat.slug.toLowerCase().includes(searchLower)
+    // Search the same canonical source as GET /categories (platform_categories).
+    // directory_category is per-tenant (no 'platform' rows) and was the wrong
+    // table — every query returned empty. ILIKE is case-insensitive.
+    const result = await getDirectPool().query(
+      `SELECT
+        pc.id,
+        pc.name,
+        pc.slug,
+        pc.google_category_id AS "googleCategoryId",
+        0 as store_count,
+        0 as total_products,
+        COUNT(*) OVER() AS total_count
+      FROM platform_categories pc
+      WHERE pc.is_active = true
+        AND (pc.name ILIKE $1 OR pc.slug ILIKE $1)
+      ORDER BY pc.sort_order ASC, pc.name ASC
+      LIMIT $2`,
+      [`%${q}%`, maxResults]
     );
 
-    const limited = filtered.slice(0, maxResults);
+    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
+    const categories = result.rows.map(({ total_count, ...cat }: any) => cat);
 
     res.json({
       success: true,
       data: {
         query: q,
-        categories: limited,
-        totalCount: filtered.length,
-        returnedCount: limited.length,
+        categories,
+        totalCount,
+        returnedCount: categories.length,
       },
     });
   } catch (error) {
