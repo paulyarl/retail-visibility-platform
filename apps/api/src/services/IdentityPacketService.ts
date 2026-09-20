@@ -74,6 +74,13 @@ export interface IdentityPacket {
   addressCity: string | null;
   addressState: string | null;
   addressZip: string | null;
+  /**
+   * Raw business_hours captured on the campaign record (operator-verified on
+   * a call, or GBP enrichment). Carried so the Verify record modal can
+   * prefill the hours editor on re-open — the scored `hours` field holds a
+   * display summary, not the day-map.
+   */
+  businessHours: Record<string, any> | null;
   identityStatus: IdentityStatus;
   operationalStatus: OperationalStatus;
   callConfirmed: boolean | null;
@@ -107,8 +114,10 @@ export interface AssembleInput {
     address_line1?: string | null;
     address_city?: string | null;
     address_state?: string | null;
+    address_zip?: string | null;
     phone?: string | null;
     website_url?: string | null;
+    business_hours?: Record<string, any> | null;
   } | null;
   /** Latest non-stub business_analysis audit_data, or null. */
   audit: any | null;
@@ -192,6 +201,42 @@ export function newestOwnerContact(rows: IdentityEvidenceRow[]): OwnerContact | 
   return null;
 }
 
+const HOURS_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+const DAY_ABBR: Record<string, string> = {
+  monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu',
+  friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
+};
+
+const to12h = (t: string): string => {
+  const [h, m] = String(t).split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return String(t);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+/**
+ * Compact one-line summary of the stored business_hours day-map for the
+ * packet's `hours` field — consecutive days with identical hours collapse
+ * into a range ("Mon–Fri 9:30 AM–8:30 PM · Sat–Sun Closed"). Returns null
+ * when no day entries exist so the field reads as uncaptured, not fabricated.
+ */
+function summarizeBusinessHours(raw: any): string | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const days = HOURS_DAYS
+    .map((d) => ({ d, h: raw[d] }))
+    .filter((e) => e.h && typeof e.h === 'object');
+  if (days.length === 0) return null;
+  const groups: Array<{ from: string; to: string; label: string }> = [];
+  for (const { d, h } of days) {
+    const label = h.closed ? 'Closed' : `${to12h(h.open)}–${to12h(h.close)}`;
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.to = d;
+    else groups.push({ from: d, to: d, label });
+  }
+  return groups
+    .map((g) => `${g.from === g.to ? DAY_ABBR[g.from] : `${DAY_ABBR[g.from]}–${DAY_ABBR[g.to]}`} ${g.label}`)
+    .join(' · ');
+}
+
 /**
  * Assemble + score an identity packet from already-fetched rows. Pure.
  */
@@ -224,7 +269,10 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
       null,
     phone: campaign?.phone ?? nap.canonical_phone ?? meta.matched_business?.phone ?? null,
     website: campaign?.website_url ?? website.url ?? null,
-    hours: null,
+    // Captured hours live on the campaign record (verification call / GBP
+    // enrichment) — summarize them so the packet's hours field answers
+    // "were hours captured?" instead of rendering blank.
+    hours: summarizeBusinessHours(campaign?.business_hours),
     primary_category: campaign?.category ?? meta.matched_business?.category ?? null,
     snap_ebt: null,
     attributes: input.attributes?.length ? `${input.attributes.length} attribute(s)` : null,
@@ -442,6 +490,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     addressCity,
     addressState,
     addressZip,
+    businessHours: campaign?.business_hours ?? null,
     identityStatus,
     operationalStatus,
     callConfirmed: input.callConfirmed ?? null,
@@ -475,8 +524,10 @@ class IdentityPacketService {
         address_line1: true,
         address_city: true,
         address_state: true,
+        address_zip: true,
         phone: true,
         website_url: true,
+        business_hours: true,
       },
     });
 

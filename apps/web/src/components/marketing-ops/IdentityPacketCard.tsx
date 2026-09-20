@@ -359,6 +359,9 @@ export default function IdentityPacketCard({
         city: packet.addressCity,
         state: packet.addressState,
         zip: packet.addressZip,
+        // Captured hours ride the snapshot so the modal's hours editor
+        // re-prefills on re-open (same shape the queue path stores).
+        hours: packet.businessHours ?? undefined,
         phone: canonicalValue('phone'),
         website: canonicalValue('website'),
         category: canonicalValue('primary_category'),

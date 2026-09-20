@@ -139,6 +139,9 @@ export interface IdentityPacket {
   addressCity: string | null;
   addressState: string | null;
   addressZip: string | null;
+  /** Raw business_hours day-map from the campaign record (Verify modal
+   *  prefill); the scored `hours` field carries a display summary. */
+  businessHours: Record<string, any> | null;
   identityStatus: 'confirmed' | 'ambiguous' | 'mismatched';
   operationalStatus: 'active' | 'likely_active' | 'inactive' | 'unable_to_verify';
   callConfirmed: boolean | null;

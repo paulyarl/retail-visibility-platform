@@ -282,6 +282,50 @@ describe('assembleIdentityPacket', () => {
     expect(unknown.addressZip).toBeNull();
   });
 
+  it('surfaces captured business_hours as the canonical hours field + raw day-map', () => {
+    const hours = {
+      monday: { open: '09:30', close: '20:30', closed: false },
+      tuesday: { open: '09:30', close: '20:30', closed: false },
+      wednesday: { open: '09:30', close: '20:30', closed: false },
+      thursday: { open: '09:30', close: '20:30', closed: false },
+      friday: { open: '09:30', close: '20:30', closed: false },
+      saturday: { open: '09:30', close: '20:30', closed: false },
+      sunday: { open: '09:30', close: '20:30', closed: false },
+      timezone: 'America/Chicago',
+    };
+    const p = assembleIdentityPacket(
+      base({ campaign: { ...campaign, business_hours: hours } }),
+    );
+    // Identical days collapse into a single range — the packet answers
+    // "were hours captured?" at a glance.
+    expect(p.fields.find((f) => f.field === 'hours')?.value).toBe('Mon–Sun 9:30 AM–8:30 PM');
+    expect(p.businessHours).toEqual(hours);
+  });
+
+  it('groups mixed open/closed days in the hours summary', () => {
+    const p = assembleIdentityPacket(
+      base({
+        campaign: {
+          ...campaign,
+          business_hours: {
+            monday: { open: '09:00', close: '17:00', closed: false },
+            tuesday: { open: '09:00', close: '17:00', closed: false },
+            sunday: { open: '00:00', close: '00:00', closed: true },
+          },
+        },
+      }),
+    );
+    expect(p.fields.find((f) => f.field === 'hours')?.value).toBe(
+      'Mon–Tue 9:00 AM–5:00 PM · Sun Closed',
+    );
+  });
+
+  it('reads the hours field as uncaptured when none are stored', () => {
+    const p = assembleIdentityPacket(base());
+    expect(p.fields.find((f) => f.field === 'hours')?.value).toBeNull();
+    expect(p.businessHours).toBeNull();
+  });
+
   it('scores an unaudited business from operator evidence alone', () => {
     // The Identity tab's zero-state: no audit, so nothing is sourced yet.
     const empty = assembleIdentityPacket(base({ audit: null }));

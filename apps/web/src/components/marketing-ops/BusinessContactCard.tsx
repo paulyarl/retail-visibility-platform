@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Phone, Mail, Globe, Share2, Sparkles, ExternalLink, RefreshCw, MapPin, User, Store, Star, CheckCircle, XCircle, HelpCircle, ListChecks } from 'lucide-react';
+import { Phone, Mail, Globe, Share2, Sparkles, ExternalLink, RefreshCw, MapPin, User, Store, Star, CheckCircle, XCircle, HelpCircle, ListChecks, Clock } from 'lucide-react';
 import type { Campaign } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
+import { computeStoreStatus } from '@/lib/hours-utils';
+import { formatHoursForDisplay } from '@/lib/business-hours';
 
 /**
  * BusinessContactCard — Overview tab block showing each contact channel with
@@ -46,6 +48,23 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
   const ownerNames = campaign.owner_names ?? [];
   const additionalPhones = campaign.phones ?? [];
   const directoryProfiles = campaign.directory_profiles ?? [];
+
+  // Captured opening hours (verification call / GBP enrichment) — live
+  // open/closed status in the row, full week on hover. computeStoreStatus
+  // keys days capitalized ("Monday"); the stored day-map is lowercase.
+  const storeStatus = (() => {
+    const raw = campaign.business_hours;
+    if (!raw || typeof raw !== 'object') return null;
+    const normalized: Record<string, any> = {
+      timezone: raw.timezone,
+      special: raw.special,
+    };
+    for (const d of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']) {
+      if (raw[d]) normalized[d[0].toUpperCase() + d.slice(1)] = raw[d];
+    }
+    return computeStoreStatus(normalized);
+  })();
+  const hoursSummary = campaign.business_hours ? formatHoursForDisplay(campaign.business_hours) : null;
 
   // Compose a single display string for the structured address.
   const addressParts: string[] = [];
@@ -155,6 +174,12 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
           value={website}
           action={website ? { href: website, label: 'Open', icon: <ExternalLink className="h-3 w-3" />, external: true } : undefined}
         />
+        <ContactRow
+          icon={<Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
+          label="Hours"
+          value={storeStatus?.label ?? null}
+          title={hoursSummary ?? undefined}
+        />
         {socials.length > 0 ? (
           socials.map((sp) => (
             <ContactRow
@@ -240,10 +265,12 @@ interface ContactRowProps {
   icon: React.ReactNode;
   label: string;
   value: string | null | undefined;
+  /** Full detail for the value (e.g. the complete weekly hours) on hover. */
+  title?: string;
   action?: { href: string; label: string; icon: React.ReactNode; external?: boolean };
 }
 
-function ContactRow({ icon, label, value, action }: ContactRowProps) {
+function ContactRow({ icon, label, value, title, action }: ContactRowProps) {
   return (
     <div className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/50">
       <div className="flex items-center gap-2 overflow-hidden">
@@ -251,7 +278,7 @@ function ContactRow({ icon, label, value, action }: ContactRowProps) {
         <div className="min-w-0">
           <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
           {value ? (
-            <div className="truncate text-sm text-gray-900 dark:text-gray-100">{value}</div>
+            <div className="truncate text-sm text-gray-900 dark:text-gray-100" title={title}>{value}</div>
           ) : (
             <div className="text-sm text-gray-400 dark:text-gray-500">— <span className="text-xs">Add in Edit</span></div>
           )}
