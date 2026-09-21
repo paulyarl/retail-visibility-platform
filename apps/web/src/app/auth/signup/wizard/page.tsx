@@ -154,109 +154,109 @@ export default function SignupWizardPage() {
       image: '/images/wizard/step-01-mission.png',
       iconImage: '/images/wizard/icon-01-mission.png',
       title: "Big-Box Retailers Built This for Themselves. Now It's Yours.",
-      description: "Big-box retailers built end-to-end inventory visibility and commerce for themselves. Small retailers were left without an affordable path to compete — until now. VisibleShelf changes that: start with a free listing, add Clover when you're ready to sync inventory. No IT team required.",
-      highlight: "Free to start • Clover-connected • Google-visible"
+      description: "Big-box chains built real-time shelf visibility for themselves. Independent retailers were left with static pins on a map while shoppers were routed to Amazon or national chains. VisibleShelf brings your physical inventory online: start free with your directory listing, connect your POS when you're ready. No IT team required.",
+      highlight: "Make your shelves visible • Drive in-store foot traffic • Free to start"
     },
     {
       image: '/images/wizard/step-08-get-started.png',
       iconImage: '/images/wizard/icon-08-get-started.png',
       title: "Directory — You May Already Be Listed",
-      description: "We build listings from public information, so your business may already be on VisibleShelf. Claim it free, correct your details, and keep it fresh — that part never costs anything. When you're ready, Starter ($19/mo) makes it yours: your logo, your story, your photos, richer layouts.",
-      highlight: "Free to claim • Starter $19/mo to own your listing"
+      description: "Your physical store may already have a place page built from public records. Claim it free in 60 seconds to verify your hours, phone, and address so nearby shoppers find you accurately. Plus, get 5 free product slots to showcase your signature items immediately. Upgrade to Starter ($19/mo) when you want enhanced brand layouts, photos, and your store story.",
+      highlight: "Free to claim • 5 free shelf slots • Zero risk"
     },
     {
       image: '/images/wizard/step-02-discovery.png',
       iconImage: '/images/wizard/icon-02-discovery.png',
       title: "Discovery — Get Found on Google",
-      description: "Your products show up in Google Search, Google Shopping, and Google Maps — powered by real-time Clover inventory sync. No manual uploads. No spreadsheets. Just connect your POS and watch your store appear exactly where shoppers are already looking.",
-      highlight: "Real-time Google visibility + Directory listing"
+      description: "When shoppers search for specific items nearby — from specialty flours to hard-to-find provisions — search engines show your physical store as the in-stock destination. Real-time POS inventory sync means no spreadsheets and no manual updates. Turn local item searches into in-store shoppers.",
+      highlight: "Item-level Google search • 'In-Stock Nearby' signals • Real-time POS sync"
     },
     {
       image: '/images/wizard/step-03-storefront.png',
       iconImage: '/images/wizard/icon-03-storefront.png',
-      title: "Storefront — Own Your Platform Presence",
-      description: "Shoppers are finding you on Google — now give them a branded storefront to explore. Your full inventory, store hours, and contact details in one professional page. They can browse everything you carry and reach out directly. Your store, your brand, your way.",
-      highlight: "Branded storefront + Platform search & browse"
+      title: "Storefront — Own Your Digital Presence",
+      description: "Shoppers finding your store online get a branded, mobile-friendly digital storefront. They can browse your aisles, check current prices, view store hours, and see your full inventory from their phones before walking through your door. Your brand, your prices, your customers.",
+      highlight: "Mobile storefront • Full aisle browsing • Drives store visits"
     },
     {
       image: '/images/wizard/step-04-commitment.png',
       iconImage: '/images/wizard/icon-04-commitment.png',
-      title: "Commitment — Capture Intent & Drive Foot Traffic",
-      description: "You're a physical retailer. Shoppers browse online, but they buy in your store. Collect a small holding fee (10–15%) so their visit is committed, then close the sale at your Clover POS. No abandoned inventory. No wasted prep time. Just deposit-backed visits with real financial commitment.",
-      highlight: "Deposit-based reservations • Committed store visits • Clover POS synced"
+      title: "Commitment — Turn Online Search into Foot Traffic",
+      description: "Shoppers browse online, but they buy inside your store. Let customers reserve high-demand items with a small deposit (10–15%) so their store visit is committed. When they arrive at your counter, close the sale at your POS. Zero abandoned holds, zero wasted prep, and guaranteed foot traffic.",
+      highlight: "Deposit-backed reservations • Guaranteed foot traffic • POS-synced"
     },
     {
       image: '/images/wizard/step-05-ecommerce.png',
       iconImage: '/images/wizard/icon-05-ecommerce.png',
-      title: "E-commerce — Sell Online, Fully & Simply",
-      description: "No physical store? No problem. Close the complete sale online with full payment collection and delivery fulfillment. Clean checkout with no deposit confusion. Built for online-only merchants who need straightforward e-commerce without the enterprise price tag or complexity.",
-      highlight: "Full online payments + Delivery + Clean checkout"
+      title: "Storefront Checkout — In-Store Pickup & Direct Orders",
+      description: "Enable 1-click online checkout for customers who want to pay in full and pick up at your counter, or support local fulfillment. Your store register is the fulfillment hub: customers buy online, walk in to pick up their bag, and you pay 0% marketplace commission — no DoorDash 30% cut.",
+      highlight: "1-Click checkout • Counter pickup • 0% marketplace commission"
     },
     {
       image: '/images/wizard/step-06-omnichannel.png',
       iconImage: '/images/wizard/icon-06-omnichannel.png',
       title: "Omnichannel — Physical + Online, Unified",
-      description: "You have both a physical storefront and online presence. Let shoppers choose their path: pay in full for delivery, or pay a deposit and pick up in-store. One inventory. One platform. Every way to buy. The shopper decides what works for them — you just fulfill.",
-      highlight: "Shoppers choose: full payment OR deposit & pickup"
+      description: "Give your shoppers total flexibility: pay in full for fast curbside pickup, place a deposit to reserve an item on the shelf, or order for local delivery. One unified inventory synced across your store and your digital storefront. Every way to buy, anchored to your physical location.",
+      highlight: "Counter pickup + deposit reserve + unified inventory"
     },
     {
       image: '/images/wizard/step-07-enterprise.png',
       iconImage: '/images/wizard/icon-07-enterprise.png',
       title: "Enterprise — Complete Business Solution",
-      description: "Multi-location chains, franchises, and regional retailers need more than features — they need a platform that scales with them. Enterprise-grade analytics, dedicated onboarding, custom contracts, and unified billing across every location. White-label options for organizations that demand their own brand.",
-      highlight: "Multi-location + API access + Dedicated support"
+      description: "For multi-location retailers, franchise grocers, and regional store networks. Centralize inventory visibility across all physical locations, unified billing, cross-store search, and enterprise-grade foot-traffic analytics. White-label options for regional co-ops and retail groups.",
+      highlight: "Multi-location network • Centralized inventory • Enterprise analytics"
     }
   ];
 
   const businessTypes = [
     { value: 'retail', label: 'Retail Store' },
-    { value: 'restaurant', label: 'Restaurant' },
-    { value: 'pharmacy', label: 'Pharmacy' },
     { value: 'grocery', label: 'Grocery Store' },
     { value: 'convenience', label: 'Convenience Store' },
-    { value: 'other', label: 'Other' }
+    { value: 'restaurant', label: 'Restaurant / Food Service' },
+    { value: 'pharmacy', label: 'Pharmacy' },
+    { value: 'other', label: 'Other Retail Business' }
   ];
 
   const tierOptions = [
     {
       value: 'directory_presence',
       label: 'Directory Presence (Free)',
-      description: 'Claimable listing on the VisibleShelf directory — claim it free, correct your details, keep it fresh'
+      description: 'Claim your listing, verify store hours & phone, and activate 5 free shelf slots'
     },
     {
       value: 'presence',
       label: 'Starter ($19/mo)',
-      description: 'Own your directory listing — your logo, story, photos, and richer layouts'
+      description: 'Enhance your listing with custom branding, store story, photo gallery, and richer layouts'
     },
     { 
       value: 'discovery', 
       label: 'Discovery ($29/mo)',
-      description: 'Get found on Google — real-time Clover sync, SEO pages, and directory listing'
+      description: 'Get found on Google with item-level search indexing and real-time POS sync (75 products)'
     },
     { 
       value: 'storefront', 
       label: 'Storefront ($59/mo)',
-      description: 'Branded platform presence where shoppers browse your full inventory and contact you'
+      description: 'Branded digital storefront with mobile browsing and customer contact (200 products)'
     },
     { 
       value: 'commitment', 
       label: 'Commitment ($79/mo)',
-      description: 'Deposit-based commerce for physical retailers — turn browsing into committed store visits'
+      description: 'Deposit-backed reservations that turn online item search into committed walk-in foot traffic'
     },
     { 
       value: 'ecommerce', 
-      label: 'E-commerce ($99/mo)',
-      description: 'Full online sales with payment collection and delivery — clean checkout, no deposit confusion'
+      label: 'Storefront Checkout ($99/mo)',
+      description: 'Full online checkout for in-store counter pickup and local orders with 0% marketplace commission'
     },
     { 
       value: 'omnichannel', 
       label: 'Omnichannel ($149/mo)',
-      description: 'Unified commerce — shoppers choose full payment/delivery OR deposit/pickup'
+      description: 'Unified commerce: counter pickup, deposit reservations, and real-time in-store inventory sync'
     },
     { 
       value: 'enterprise', 
       label: 'Enterprise ($499/mo)',
-      description: 'Complete business solution with multi-location, enterprise analytics, and dedicated support'
+      description: 'Multi-location store network with centralized inventory, API access, and dedicated onboarding'
     }
   ];
 
@@ -427,22 +427,31 @@ export default function SignupWizardPage() {
               )}
             </div>
 
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-3">
               <button
                 onClick={handleBack}
-                className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 text-sm font-medium transition-colors"
                 disabled={step === 1}
               >
                 Back
               </button>
               
-              <div className="text-sm text-neutral-500">
-                Step {step} of {totalSteps}
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setStep(totalSteps)}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium underline"
+                >
+                  Skip to Signup
+                </button>
+                <span className="text-sm text-neutral-500">
+                  Step {step} of {totalSteps}
+                </span>
               </div>
               
               <button
                 onClick={handleNext}
-                className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 text-sm font-medium transition-colors"
               >
                 Next
               </button>
@@ -682,9 +691,9 @@ export default function SignupWizardPage() {
             )}
           </div>
           
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Ready to get started?</h2>
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Claim your store & bring your shelves online</h2>
           <p className="text-neutral-600 mb-6">
-            Tell us about your business and we'll have you up and running in minutes.
+            Tell us about your physical retail store to activate your presence. Start free — no credit card required.
           </p>
           
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -807,9 +816,9 @@ export default function SignupWizardPage() {
             </div>
 
             <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
-              <h4 className="font-semibold text-neutral-900 mb-3">Which tier fits your goals?</h4>
+              <h4 className="font-semibold text-neutral-900 mb-1">Which tier fits your store goals?</h4>
               <p className="text-sm text-neutral-600 mb-4">
-                Based on the slides you just saw, where do you want to start?
+                Start with a free claimed directory listing or select an upgraded visibility tier.
               </p>
               <div>
                 <label htmlFor="preferredTier" className="block text-sm font-medium text-neutral-700 mb-2">
@@ -838,13 +847,13 @@ export default function SignupWizardPage() {
               </div>
             </div>
 
-            <div className="bg-primary-50 rounded-xl p-4">
-              <h4 className="font-semibold text-primary-900 mb-2">Start Free, Upgrade When Ready</h4>
+            <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
+              <h4 className="font-semibold text-primary-900 mb-2">Your Store, Your Inventory, Your Customers</h4>
               <p className="text-primary-700 text-sm mb-2">
-                A claimed directory listing costs nothing. Paid plans include a 14-day trial — no credit card required.
+                A claimed directory listing with 5 free shelf slots is completely free forever. Paid tiers include a 14-day trial with no credit card required.
               </p>
-              <div className="text-xs text-primary-600">
-                Switch tiers or cancel anytime — your listing stays yours either way.
+              <div className="text-xs text-primary-600 font-medium">
+                Zero delivery logistics • 0% commission on in-store sales • Switch tiers or cancel anytime.
               </div>
             </div>
 
@@ -917,18 +926,25 @@ export default function SignupWizardPage() {
 
             {/* Progress Steps */}
             <div className="flex items-center justify-center mb-8">
-              <div className="flex items-center space-x-2">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((stepNumber) => (
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((stepNumber) => (
                   <div key={stepNumber} className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                      step >= stepNumber 
-                        ? 'bg-primary-600 text-white' 
-                        : 'bg-neutral-200 text-neutral-500'
-                    }`}>
-                      {stepNumber}
-                    </div>
-                    {stepNumber < 8 && (
-                      <div className={`w-6 h-0.5 ml-2 ${
+                    <button
+                      type="button"
+                      onClick={() => setStep(stepNumber)}
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                        step === stepNumber
+                          ? 'bg-primary-600 text-white ring-2 ring-primary-300 ring-offset-1 shadow-sm'
+                          : step > stepNumber
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-neutral-200 text-neutral-500 hover:bg-neutral-300'
+                      }`}
+                      title={stepNumber === 9 ? 'Step 9: Complete Signup' : `Step ${stepNumber}: ${benefitSteps[stepNumber - 1]?.title}`}
+                    >
+                      {stepNumber === 9 ? '★' : stepNumber}
+                    </button>
+                    {stepNumber < 9 && (
+                      <div className={`w-3 sm:w-5 h-0.5 ml-1 sm:ml-2 ${
                         step > stepNumber ? 'bg-primary-600' : 'bg-neutral-200'
                       }`} />
                     )}
