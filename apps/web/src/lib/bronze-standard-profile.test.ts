@@ -3,6 +3,7 @@ import {
   bronzeScopeLabel,
   bronzeStandardSummary,
   isBronzeStandardProfile,
+  slugifyReasonKey,
 } from './bronze-standard-profile';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
 
@@ -140,5 +141,15 @@ describe('bronzeScopeLabel', () => {
       'Indianapolis, IN',
     );
     expect(bronzeScopeLabel({ reason_key: 'x', scope_platform: 'yelp' })).toBe('@yelp');
+  });
+});
+
+describe('slugifyReasonKey', () => {
+  it('converts label to valid snake_case reason key', () => {
+    expect(slugifyReasonKey('Exclusively visible on community-specific classifieds')).toBe(
+      'exclusively_visible_on_community_specific_classifieds',
+    );
+    expect(slugifyReasonKey('123 Numbers First')).toBe('reason_123_numbers_first');
+    expect(slugifyReasonKey('Special chars & symbols! %')).toBe('special_chars_symbols');
   });
 });

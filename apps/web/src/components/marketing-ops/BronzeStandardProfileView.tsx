@@ -1,31 +1,46 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Accordion,
   Alert,
   Anchor,
   Badge,
   Box,
+  Button,
   Divider,
   Group,
+  Modal,
+  NumberInput,
   Paper,
   ScrollArea,
+  SegmentedControl,
+  Select,
   Stack,
   Table,
   Text,
+  TextInput,
+  Textarea,
   Tooltip,
 } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconBulb,
+  IconCheck,
   IconDatabase,
   IconExternalLink,
   IconInfoCircle,
   IconListCheck,
   IconMapPin,
+  IconPlus,
+  IconSparkles,
   IconTarget,
 } from '@tabler/icons-react';
-import type { IntelligenceProfile } from '@/services/MarketingOpsService';
+import { notifications } from '@mantine/notifications';
+import marketingOpsService, {
+  type BronzeReasonInput,
+  type IntelligenceProfile,
+} from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 import {
   BRONZE_COVERAGE_STATUS_META,
@@ -38,12 +53,14 @@ import {
   bronzePlatformLabel,
   bronzeProfileConfig,
   bronzeScopeLabel,
+  slugifyReasonKey,
   type BronzeCatalogSnapshotRow,
   type BronzeCoverageStatus,
   type BronzeDiscoveredBy,
   type BronzeDigitalQuality,
   type BronzeOperationalStatus,
   type BronzeSlot,
+  type BronzeSuggestedReason,
 } from '@/lib/bronze-standard-profile';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -191,6 +208,7 @@ export default function BronzeStandardProfileView({ profile }: Props) {
   const vectors = config.vector_execution_log ?? [];
   const prohibited = config.prohibited_inferences ?? [];
   const notApplicable = config.not_applicable_reasons ?? [];
+  const suggested = config.suggested_reasons ?? [];
   const scopeMix = config.scope_mix ?? {};
 
   const snapshotByKey = new Map<string, BronzeCatalogSnapshotRow>();
@@ -201,6 +219,115 @@ export default function BronzeStandardProfileView({ profile }: Props) {
   const slotCount = coverage.reduce((n, c) => n + (c.slots?.length ?? 0), 0);
   const executedVectors = vectors.filter((v) => v.executed).length;
   const scope = profileScopeLabel(profile);
+
+  // Authoring modal state for analyst-suggested reasons
+  const [selectedSuggestion, setSelectedSuggestion] = useState<BronzeSuggestedReason | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
+
+  const [authorForm, setAuthorForm] = useState({
+    reason_key: '',
+    label: '',
+    definition: '',
+    signals: '',
+    expected_vectors: '',
+    priority: 3,
+    scope_mode: 'category_family' as 'universal' | 'category' | 'category_family' | 'location',
+    scope_category_key: '',
+    scope_city: '',
+    scope_state: '',
+    scope_platform: '' as string,
+  });
+
+  const handleOpenAddModal = (s: BronzeSuggestedReason) => {
+    const defaultKey = s.reason_key || slugifyReasonKey(s.proposed_label);
+    const isFamily = Boolean(s.category_family_applicable);
+    const initialScopeMode: 'universal' | 'category' | 'category_family' | 'location' = isFamily
+      ? 'category_family'
+      : s.scope_level === 'universal'
+      ? 'universal'
+      : s.scope_level === 'location'
+      ? 'location'
+      : 'category';
+
+    const defaultCategoryKey = isFamily
+      ? (s.suggested_category_scope || 'grocery')
+      : (s.suggested_category_scope || config.category_key || profile.category_key || '');
+
+    setAuthorForm({
+      reason_key: defaultKey,
+      label: s.proposed_label,
+      definition: s.proposed_definition,
+      signals: (s.observed_signals ?? []).join('\n'),
+      expected_vectors: (s.expected_vectors ?? []).join('\n'),
+      priority: 3,
+      scope_mode: initialScopeMode,
+      scope_category_key: initialScopeMode === 'universal' ? '' : defaultCategoryKey,
+      scope_city: initialScopeMode === 'location' ? (config.reference_city || profile.reference_city || '') : '',
+      scope_state: initialScopeMode === 'location' ? (config.reference_state || profile.reference_state || '') : '',
+      scope_platform: s.suggested_scope_platform || '',
+    });
+    setSelectedSuggestion(s);
+    setModalError(null);
+    setModalOpen(true);
+  };
+
+  const handleSaveReason = async () => {
+    const key = authorForm.reason_key.trim();
+    if (!key) {
+      setModalError('Reason key is required');
+      return;
+    }
+    if (!/^[a-z][a-z0-9_]{1,79}$/.test(key)) {
+      setModalError('Reason key must be lowercase snake_case (2-80 chars, starting with a letter)');
+      return;
+    }
+    if (!authorForm.label.trim()) {
+      setModalError('Label is required');
+      return;
+    }
+    if (!authorForm.definition.trim()) {
+      setModalError('Definition is required');
+      return;
+    }
+
+    setSubmitting(true);
+    setModalError(null);
+
+    try {
+      const isUniversal = authorForm.scope_mode === 'universal';
+      const isLocation = authorForm.scope_mode === 'location';
+
+      const input: BronzeReasonInput = {
+        label: authorForm.label.trim(),
+        definition: authorForm.definition.trim(),
+        signals: authorForm.signals.split('\n').map((l) => l.trim()).filter(Boolean),
+        expected_vectors: authorForm.expected_vectors.split('\n').map((l) => l.trim()).filter(Boolean),
+        priority: Number(authorForm.priority) || 3,
+        scope_category_key: isUniversal ? null : (authorForm.scope_category_key.trim() || null),
+        scope_city: isLocation ? (authorForm.scope_city.trim() || null) : null,
+        scope_state: isLocation ? (authorForm.scope_state.trim() || null) : null,
+        scope_platform: (authorForm.scope_platform.trim() as any) || null,
+      };
+
+      const created = await marketingOpsService.createBronzeReason(key, input);
+      setAddedKeys((prev) => new Set([...prev, key]));
+      setModalOpen(false);
+
+      notifications.show({
+        title: 'Added to Bronze Reason Catalog',
+        message: `Reason "${created?.label || key}" added to catalog (revision r${created?.introduced_in_revision ?? 'new'}). Future scans will evaluate this discovery mechanic.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (err: any) {
+      setModalError(err.message || 'Failed to add reason to catalog');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Stack gap="md">
@@ -241,10 +368,17 @@ export default function BronzeStandardProfileView({ profile }: Props) {
               <Text size="xs" c="dimmed">Vectors Executed</Text>
               <Text size="sm" fw={500}>{executedVectors} / {vectors.length}</Text>
             </Stack>
+            {suggested.length > 0 && (
+              <Stack gap={0}>
+                <Text size="xs" c="dimmed">Suggested Blind Spots</Text>
+                <Text size="sm" fw={600} c="blue.7">{suggested.length}</Text>
+              </Stack>
+            )}
           </Group>
           <Text size="xs" c="dimmed">
             A slot is a floor, not a ranking — the lowest digital quality that still qualifies as a real,
-            operating, category-fit business. Slots calibrate discovery; they are not prospect verdicts
+            operating physical retail business with walk-in customer shelves. Non-storefront, virtual, or
+            delivery-only entities are disqualified. Slots calibrate discovery; they are not prospect verdicts
             or competitive benchmarks.
           </Text>
         </Stack>
@@ -370,6 +504,119 @@ export default function BronzeStandardProfileView({ profile }: Props) {
               )}
             </Stack>
           </Paper>
+
+          {/* ─── Suggested Discovery Blind Spots ─── */}
+          {suggested.length > 0 && (
+            <Paper withBorder radius="md" p="md" style={{ backgroundColor: 'var(--mantine-color-blue-0)', borderColor: 'var(--mantine-color-blue-3)' }}>
+              <Stack gap="sm">
+                <Group justify="space-between" wrap="wrap">
+                  <SectionHeader icon={<IconSparkles size={16} color="var(--mantine-color-blue-6)" />} title="Suggested Discovery Blind Spots" count={suggested.length} />
+                  <Badge size="xs" variant="light" color="blue">Analyst Feedback</Badge>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Novel discovery mechanics detected during the scan that do not match existing catalog reasons.
+                  Operators can review and author them into the bronze catalog, choosing whether to scope them
+                  to this category, generalize to a category family (niche), or promote to universal.
+                </Text>
+                <Stack gap="xs">
+                  {suggested.map((s, idx) => {
+                    const key = s.reason_key || slugifyReasonKey(s.proposed_label);
+                    const isAdded = addedKeys.has(key);
+                    const isFamily = Boolean(s.category_family_applicable);
+                    return (
+                      <Paper key={idx} withBorder radius="sm" p="sm" bg="white">
+                        <Stack gap="xs">
+                          <Group justify="space-between" align="flex-start" wrap="wrap">
+                            <Stack gap={2}>
+                              <Group gap="xs" wrap="wrap">
+                                <Text size="sm" fw={600}>{s.proposed_label}</Text>
+                                {s.reason_key && <Text size="xs" c="dimmed" ff="monospace">({s.reason_key})</Text>}
+                                {isFamily ? (
+                                  <Badge size="xs" variant="light" color="teal">
+                                    Category Family: {s.suggested_category_scope || 'niche'}
+                                  </Badge>
+                                ) : s.scope_level === 'universal' ? (
+                                  <Badge size="xs" variant="light" color="blue">Universal Candidate</Badge>
+                                ) : (
+                                  <Badge size="xs" variant="light" color="violet">
+                                    Category: {s.suggested_category_scope || config.category_key || profile.category_key || 'specific'}
+                                  </Badge>
+                                )}
+                                {s.suggested_scope_platform && (
+                                  <Badge size="xs" variant="dot" color="indigo">
+                                    @{bronzePlatformLabel(s.suggested_scope_platform)}
+                                  </Badge>
+                                )}
+                              </Group>
+                            </Stack>
+                            <Button
+                              size="xs"
+                              variant={isAdded ? 'light' : 'filled'}
+                              color={isAdded ? 'green' : 'blue'}
+                              leftSection={isAdded ? <IconCheck size={14} /> : <IconPlus size={14} />}
+                              disabled={isAdded}
+                              onClick={() => handleOpenAddModal(s)}
+                            >
+                              {isAdded ? 'Added to Catalog' : 'Add to Catalog'}
+                            </Button>
+                          </Group>
+
+                          <Text size="xs" c="gray.7">{s.proposed_definition}</Text>
+
+                          {s.observed_signals && s.observed_signals.length > 0 && (
+                            <Stack gap={2}>
+                              <Text size="xs" fw={600}>Observed signals</Text>
+                              <Group gap={4} wrap="wrap">
+                                {s.observed_signals.map((sig, i) => (
+                                  <Badge key={i} size="xs" variant="light" color="violet">{sig}</Badge>
+                                ))}
+                              </Group>
+                            </Stack>
+                          )}
+
+                          {s.expected_vectors && s.expected_vectors.length > 0 && (
+                            <Stack gap={2}>
+                              <Text size="xs" fw={600}>Expected vectors</Text>
+                              <Group gap={4} wrap="wrap">
+                                {s.expected_vectors.map((vec, i) => (
+                                  <Badge key={i} size="xs" variant="light" color="indigo">{vec}</Badge>
+                                ))}
+                              </Group>
+                            </Stack>
+                          )}
+
+                          {s.exemplar_lead && (
+                            <Paper withBorder radius="xs" p="xs" style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                              <Stack gap={2}>
+                                <Group gap="xs">
+                                  <Text size="xs" fw={600}>Exemplar Lead:</Text>
+                                  <Text size="xs" fw={600} c="blue.7">{s.exemplar_lead.business_name}</Text>
+                                  {s.exemplar_lead.observed_platform && (
+                                    <Badge size="xs" variant="outline" color="gray">
+                                      {bronzePlatformLabel(s.exemplar_lead.observed_platform)}
+                                    </Badge>
+                                  )}
+                                </Group>
+                                {s.exemplar_lead.address && (
+                                  <Text size="xs" c="dimmed">Address: {s.exemplar_lead.address}</Text>
+                                )}
+                                {s.exemplar_lead.discovery_vector && (
+                                  <Text size="xs" c="dimmed">Vector: {s.exemplar_lead.discovery_vector}</Text>
+                                )}
+                                {s.exemplar_lead.notes && (
+                                  <Text size="xs" c="dimmed">Notes: {s.exemplar_lead.notes}</Text>
+                                )}
+                              </Stack>
+                            </Paper>
+                          )}
+                        </Stack>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+            </Paper>
+          )}
 
           {/* ─── Not applicable reasons ─── */}
           {notApplicable.length > 0 && (
@@ -524,6 +771,191 @@ export default function BronzeStandardProfileView({ profile }: Props) {
           </Box>
         </Stack>
       </ScrollArea>
+
+      {/* ─── Add Reason to Catalog Modal ─── */}
+      <Modal
+        opened={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={
+          <Group gap="xs">
+            <IconPlus size={16} />
+            <Text fw={600} size="sm">Add Suggested Reason to Catalog</Text>
+          </Group>
+        }
+        size="lg"
+      >
+        <Stack gap="md">
+          {modalError && (
+            <Alert color="red" icon={<IconAlertTriangle size={16} />}>
+              {modalError}
+            </Alert>
+          )}
+
+          <Text size="xs" c="dimmed">
+            Author this analyst-suggested blind spot into the authoritative Bronze Reason Catalog for physical retail businesses.
+            Choose the appropriate scope level: generalize to a broader niche/family (e.g. &apos;grocery&apos;),
+            keep it category-specific, or promote to universal.
+          </Text>
+
+          <TextInput
+            label="Reason Key"
+            description="Immutable snake_case identifier (lowercase letters, numbers, underscores)"
+            placeholder="e.g. ethnic_community_classifieds_only"
+            value={authorForm.reason_key}
+            onChange={(e) => setAuthorForm((prev) => ({ ...prev, reason_key: e.currentTarget.value }))}
+            required
+            ff="monospace"
+          />
+
+          <TextInput
+            label="Label"
+            description="Human-readable short name"
+            placeholder="e.g. Exclusively visible on community-specific classifieds"
+            value={authorForm.label}
+            onChange={(e) => setAuthorForm((prev) => ({ ...prev, label: e.currentTarget.value }))}
+            required
+          />
+
+          <Textarea
+            label="Definition"
+            description="Why this blind spot hides businesses and how discovery fails"
+            placeholder="Explain the discovery mechanics..."
+            rows={3}
+            value={authorForm.definition}
+            onChange={(e) => setAuthorForm((prev) => ({ ...prev, definition: e.currentTarget.value }))}
+            required
+          />
+
+          <Stack gap={4}>
+            <Text size="xs" fw={500}>Scope Level</Text>
+            <SegmentedControl
+              size="xs"
+              value={authorForm.scope_mode}
+              onChange={(val) => {
+                const mode = val as typeof authorForm.scope_mode;
+                let newCat = authorForm.scope_category_key;
+                if (mode === 'universal') newCat = '';
+                else if (mode === 'category_family') {
+                  newCat = selectedSuggestion?.suggested_category_scope || 'grocery';
+                } else if (mode === 'category') {
+                  newCat = config.category_key || profile.category_key || '';
+                }
+                setAuthorForm((prev) => ({
+                  ...prev,
+                  scope_mode: mode,
+                  scope_category_key: newCat,
+                  scope_city: mode === 'location' ? (config.reference_city || profile.reference_city || '') : '',
+                  scope_state: mode === 'location' ? (config.reference_state || profile.reference_state || '') : '',
+                }));
+              }}
+              data={[
+                { value: 'category_family', label: 'Category Family / Niche' },
+                { value: 'category', label: 'Specific Category' },
+                { value: 'universal', label: 'Universal' },
+                { value: 'location', label: 'Market Specific' },
+              ]}
+            />
+          </Stack>
+
+          {authorForm.scope_mode !== 'universal' && (
+            <TextInput
+              label={authorForm.scope_mode === 'category_family' ? 'Category Family / Niche Key' : 'Category Key'}
+              description={
+                authorForm.scope_mode === 'category_family'
+                  ? "Broaden to a category family (e.g. 'grocery', 'specialty retail', 'auto repair') to cover related sweeps."
+                  : 'Applies only to this specific category.'
+              }
+              placeholder="e.g. grocery"
+              value={authorForm.scope_category_key}
+              onChange={(e) => setAuthorForm((prev) => ({ ...prev, scope_category_key: e.currentTarget.value }))}
+            />
+          )}
+
+          {authorForm.scope_mode === 'location' && (
+            <Group grow>
+              <TextInput
+                label="City"
+                placeholder="e.g. Indianapolis"
+                value={authorForm.scope_city}
+                onChange={(e) => setAuthorForm((prev) => ({ ...prev, scope_city: e.currentTarget.value }))}
+              />
+              <TextInput
+                label="State"
+                placeholder="e.g. IN"
+                maxLength={2}
+                value={authorForm.scope_state}
+                onChange={(e) => setAuthorForm((prev) => ({ ...prev, scope_state: e.currentTarget.value.toUpperCase() }))}
+              />
+            </Group>
+          )}
+
+          <Select
+            label="Platform Scope"
+            description="Leave cross-platform unless the discovery mechanic is bound to a single platform"
+            data={[
+              { value: '', label: 'Cross-platform (none)' },
+              { value: 'google', label: 'Google' },
+              { value: 'yelp', label: 'Yelp' },
+              { value: 'facebook', label: 'Facebook' },
+              { value: 'bbb', label: 'BBB' },
+              { value: 'apple_maps', label: 'Apple Maps' },
+              { value: 'bing', label: 'Bing' },
+            ]}
+            value={authorForm.scope_platform}
+            onChange={(val) => setAuthorForm((prev) => ({ ...prev, scope_platform: val || '' }))}
+            clearable
+          />
+
+          <Textarea
+            label="Signals (one per line)"
+            description="Searchable signal vocabulary an agent or analyst can pattern-match"
+            rows={2}
+            value={authorForm.signals}
+            onChange={(e) => setAuthorForm((prev) => ({ ...prev, signals: e.currentTarget.value }))}
+          />
+
+          <Textarea
+            label="Expected Vectors (one per line)"
+            description="Discovery vectors / specialized sources that reach this blind spot"
+            rows={2}
+            value={authorForm.expected_vectors}
+            onChange={(e) => setAuthorForm((prev) => ({ ...prev, expected_vectors: e.currentTarget.value }))}
+          />
+
+          <NumberInput
+            label="Priority"
+            description="1 (highest) to 5 (lowest) — orders slot-filling effort"
+            min={1}
+            max={5}
+            value={authorForm.priority}
+            onChange={(val) => setAuthorForm((prev) => ({ ...prev, priority: typeof val === 'number' ? val : 3 }))}
+          />
+
+          {selectedSuggestion?.exemplar_lead && (
+            <Paper withBorder radius="sm" p="xs" bg="gray.0">
+              <Text size="xs" fw={600} mb={2}>Observed Exemplar Lead from Scan:</Text>
+              <Text size="xs"><strong>{selectedSuggestion.exemplar_lead.business_name}</strong></Text>
+              {selectedSuggestion.exemplar_lead.notes && (
+                <Text size="xs" c="dimmed">{selectedSuggestion.exemplar_lead.notes}</Text>
+              )}
+            </Paper>
+          )}
+
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={() => setModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              color="blue"
+              onClick={handleSaveReason}
+              loading={submitting}
+              leftSection={<IconCheck size={16} />}
+            >
+              Save to Catalog
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

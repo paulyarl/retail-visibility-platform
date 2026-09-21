@@ -94,6 +94,7 @@ describe('BronzeStandardProfileView', () => {
     expect(html).toContain('Exemplar Slots');
     expect(html).toContain('Vectors Executed');
     expect(html).toContain('A slot is a floor, not a ranking');
+    expect(html).toContain('physical retail business with walk-in customer shelves');
   });
 
   it('renders the scope mix by scope level', () => {
@@ -141,5 +142,43 @@ describe('BronzeStandardProfileView', () => {
     // are in the markup; an empty reason's note only renders once the operator
     // expands that item (Accordion keepMounted defaults to false).
     expect(html).not.toContain('No exemplar found in this market during this pass.');
+  });
+
+  it('renders suggested discovery blind spots with category family signal and Add to Catalog button', () => {
+    const profileWithSuggestions = {
+      ...PROFILE,
+      configuration_json: {
+        ...(PROFILE.configuration_json as any),
+        suggested_reasons: [
+          {
+            reason_key: 'ethnic_community_classifieds_only',
+            proposed_label: 'Exclusively visible on community-specific classifieds',
+            proposed_definition: 'Business bypasses mainstream directories; operations exist only in diaspora bulletin boards.',
+            observed_signals: ['no platform presence', 'listed in local diaspora directory archive'],
+            expected_vectors: ['diaspora business registry'],
+            scope_level: 'category_family',
+            category_family_applicable: true,
+            suggested_category_scope: 'grocery',
+            exemplar_lead: {
+              business_name: 'Afro-Indy Market',
+              discovery_vector: 'diaspora business registry',
+              notes: 'Verified operational through community classifieds scan',
+            },
+          },
+        ],
+      },
+    } as unknown as IntelligenceProfile;
+
+    const rendered = renderToStaticMarkup(
+      createElement(MantineProvider, null, createElement(BronzeStandardProfileView, { profile: profileWithSuggestions })),
+    );
+
+    expect(rendered).toContain('Suggested Discovery Blind Spots');
+    expect(rendered).toContain('Exclusively visible on community-specific classifieds');
+    expect(rendered).toContain('Category Family: grocery');
+    expect(rendered).toContain('Add to Catalog');
+    expect(rendered).toContain('Afro-Indy Market');
+    expect(rendered).toContain('diaspora business registry');
+    expect(rendered).toContain('Suggested Blind Spots');
   });
 });

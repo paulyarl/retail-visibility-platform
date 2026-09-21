@@ -81,6 +81,38 @@ export interface BronzeScopeMix {
   [k: string]: any;
 }
 
+export interface BronzeSuggestedReasonExemplarLead {
+  business_name: string;
+  address?: string | null;
+  observed_platform?: string | null;
+  discovery_vector?: string;
+  notes?: string;
+  [k: string]: any;
+}
+
+export interface BronzeSuggestedReason {
+  reason_key?: string;
+  proposed_label: string;
+  proposed_definition: string;
+  observed_signals?: string[];
+  expected_vectors?: string[];
+  scope_level?: 'universal' | 'category' | 'category_family' | 'location';
+  /**
+   * Signal indicating whether this blind spot generalizes across a category
+   * family (e.g. grocery, food service, specialty trade) or is strictly
+   * narrow to this specific category.
+   */
+  category_family_applicable?: boolean;
+  /**
+   * The suggested category or category family scope (e.g. "grocery" instead of
+   * "african grocery store", or null if universal).
+   */
+  suggested_category_scope?: string | null;
+  suggested_scope_platform?: string | null;
+  exemplar_lead?: BronzeSuggestedReasonExemplarLead;
+  [k: string]: any;
+}
+
 export interface BronzeProfileConfig {
   category_key?: string;
   category_name?: string;
@@ -91,6 +123,7 @@ export interface BronzeProfileConfig {
   catalog_snapshot?: BronzeCatalogSnapshotRow[];
   reason_coverage?: BronzeReasonCoverageEntry[];
   not_applicable_reasons?: string[];
+  suggested_reasons?: BronzeSuggestedReason[];
   scope_mix?: BronzeScopeMix;
   vector_execution_log?: BronzeVectorLogEntry[];
   prohibited_inferences?: string[];
@@ -169,6 +202,15 @@ export const BRONZE_SCOPE_MIX_LABELS: Array<{ key: keyof BronzeScopeMix; label: 
 
 export function bronzePlatformLabel(key: string): string {
   return BRONZE_PLATFORM_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** Converts a suggested label or string to a valid bronze reason_key slug (/^[a-z][a-z0-9_]{1,79}$/). */
+export function slugifyReasonKey(text: string): string {
+  let s = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!s || !/^[a-z]/.test(s)) {
+    s = `reason_${s}`.replace(/^_+|_+$/g, '');
+  }
+  return s.slice(0, 80);
 }
 
 /** `universal` | `cat:<key>` | `City, ST` | `@platform` — mirrors the catalog admin's scope label. */

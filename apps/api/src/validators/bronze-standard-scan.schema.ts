@@ -114,6 +114,38 @@ const reasonCoverageSchema = z.object({
   empty_slot_note: z.string().nullable().optional(),
 }).passthrough();
 
+// ─── Suggested reason (analyst-detected uncataloged blind spot) ───────────
+
+const suggestedReasonExemplarLeadSchema = z.object({
+  business_name: z.string().min(1),
+  address: z.string().nullable().optional(),
+  observed_platform: observedPlatformEnum.nullable().optional(),
+  discovery_vector: z.string().optional(),
+  notes: z.string().optional(),
+}).passthrough();
+
+const suggestedReasonSchema = z.object({
+  reason_key: z.string().optional(),
+  proposed_label: z.string().min(1),
+  proposed_definition: z.string().min(1),
+  observed_signals: z.array(z.string()).default([]),
+  expected_vectors: z.array(z.string()).optional(),
+  scope_level: z.enum(['universal', 'category', 'category_family', 'location']).optional(),
+  /**
+   * Signal indicating whether this blind spot generalizes across a category
+   * family (e.g. grocery, food service, specialty trade) or is strictly
+   * narrow to this specific category.
+   */
+  category_family_applicable: z.boolean().optional(),
+  /**
+   * The suggested category or category family scope (e.g. "grocery" instead of
+   * "african grocery store", or null if universal).
+   */
+  suggested_category_scope: z.string().nullable().optional(),
+  suggested_scope_platform: observedPlatformEnum.nullable().optional(),
+  exemplar_lead: suggestedReasonExemplarLeadSchema.optional(),
+}).passthrough();
+
 // ─── Catalog snapshot row (stage-1 national profile embeds these) ───────
 
 const catalogSnapshotRowSchema = z.object({
@@ -150,6 +182,13 @@ export const bronzeStandardScanSchema = z.object({
 
   /** Reasons that failed the scope predicate — keys only, never coverage entries (§4.1). */
   not_applicable_reasons: z.array(z.string()).optional(),
+
+  /**
+   * Uncataloged blind spots detected during the scan. When an analyst identifies
+   * a verified operating, category-fit business obscured by an uncataloged discovery
+   * mechanism, they propose it here rather than force-fitting it into an existing reason.
+   */
+  suggested_reasons: z.array(suggestedReasonSchema).optional(),
 
   /** Portable/locale ratio visibility (§3.6.3). */
   scope_mix: z.object({
@@ -232,6 +271,26 @@ Return a single JSON object with this structure (the Bronze Standard Scan result
 
   "not_applicable_reasons": ["<reason_key>", ...],
 
+  "suggested_reasons": [
+    {
+      "proposed_label": "<human-readable short name for the blind spot>",
+      "proposed_definition": "<why this blind spot hides businesses and how discovery fails>",
+      "observed_signals": ["<observable signal 1>", ...],
+      "expected_vectors": ["<vector that surfaced or would surface this blind spot>", ...],
+      "scope_level": "universal|category|category_family|location",
+      "category_family_applicable": <true if this blind spot applies to a category family/niche (e.g. grocery, food service), false if narrow to this specific category only>,
+      "suggested_category_scope": "<suggested broader category or family key e.g. 'grocery', or null if universal>",
+      "suggested_scope_platform": "<null|google|yelp|facebook|bbb|apple_maps|bing>",
+      "exemplar_lead": {
+        "business_name": "<string>",
+        "observed_platform": "<null|platform>",
+        "address": "<string|null>",
+        "discovery_vector": "<string>",
+        "notes": "<string>"
+      }
+    }
+  ],
+
   "scope_mix": {
     "universal": <int>, "category": <int>, "location": <int>,
     "category_location": <int>, "platform_bound": <int>
@@ -257,6 +316,13 @@ Rules:
   operationally verified (operational_status active or likely_active —
   unable_to_verify does NOT qualify), and low digital quality in a way the
   reason explains.
+- PHYSICAL RETAIL STOREFRONT MANDATE: The platform's mission is to make physical
+  shelves visible for businesses where customers walk through the door. A business
+  with inventory but no physical walk-in retail outlet (e.g. delivery-app-only /
+  DoorDash virtual listing, ghost kitchen, dark store, warehouse-only, online-only)
+  is strictly DISQUALIFIED, no matter how strong the category or assortment signal.
+  Every qualifying bronze slot MUST be an operating physical storefront with walk-in
+  customer access.
 - discovered_by is mandatory per slot. discovered_by values other than
   bronze_establishment_scan are for slots carried forward from out-of-loop
   fills — a scan's own fills use the scan's provenance.
@@ -274,6 +340,14 @@ Rules:
 - Cap slots at 2 per reason — two exemplars calibrate; more is token cost
   without marginal signal. Emit the empty-slot report for unfilled reasons;
   do NOT emit the full platform x reason grid.
+- UNCATALOGED BLIND SPOT SUGGESTIONS: If you detect a verified operating business
+  with category assortment fit that is invisible due to a distinct discovery
+  mechanism NOT in the catalog, do NOT force-fit it into an existing reason slot.
+  Suggest it under suggested_reasons. Propose a label, definition, observed
+  signals, expected vectors, and set category_family_applicable (true/false) to
+  signal whether the blind spot generalizes across the category family or is
+  specific to this exact category. A suggested reason must describe a DISCOVERY
+  MECHANIC (why it is hidden), never a business attribute (size, age, etc.).
 - PROHIBITED INFERENCES: low digital quality describes observable online
   fields only — never infer low revenue, low customer volume, poor products,
   poor service, or sales readiness. A bronze slot is NOT a prospect verdict or

@@ -231,6 +231,39 @@ describe('bronzeStandardScanSchema', () => {
     };
     expect(bronzeStandardScanSchema.safeParse(valid).success).toBe(true);
   });
+
+  it('accepts analyst-suggested uncataloged blind spots with category family signal and exemplar lead', () => {
+    const valid = {
+      ...BASE,
+      suggested_reasons: [
+        {
+          reason_key: 'ethnic_community_classifieds_only',
+          proposed_label: 'Exclusively visible on community-specific classifieds',
+          proposed_definition: 'Business bypasses mainstream directories; operations exist only in diaspora bulletin boards.',
+          observed_signals: ['no platform presence', 'listed in local diaspora directory archive'],
+          expected_vectors: ['diaspora business registry'],
+          scope_level: 'category_family',
+          category_family_applicable: true,
+          suggested_category_scope: 'grocery',
+          suggested_scope_platform: null,
+          exemplar_lead: {
+            business_name: 'Afro-Indy Market',
+            observed_platform: null,
+            discovery_vector: 'diaspora business registry',
+            notes: 'Verified operational through community classifieds scan',
+          },
+        },
+      ],
+    };
+    const parsed = bronzeStandardScanSchema.safeParse(valid);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.suggested_reasons).toHaveLength(1);
+      expect(parsed.data.suggested_reasons?.[0].category_family_applicable).toBe(true);
+      expect(parsed.data.suggested_reasons?.[0].suggested_category_scope).toBe('grocery');
+      expect(parsed.data.suggested_reasons?.[0].exemplar_lead?.business_name).toBe('Afro-Indy Market');
+    }
+  });
 });
 
 describe('OUTPUT_SCHEMA_REGISTRY — bronze_standard_scan registration', () => {
