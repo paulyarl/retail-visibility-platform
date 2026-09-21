@@ -274,26 +274,29 @@ export function buildCtaFixesPrompt(
 
 // ─── Mobile Catalog Preview (A6 — Product Visibility) ────────────────────
 
-const MOBILE_CATALOG_PROMPT = `You are preparing a mobile product-category website mockup for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+const MOBILE_CATALOG_PROMPT = `You are preparing a mobile shelf-visibility mockup for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
-This business currently has no way for customers to browse products online before visiting. The goal is a lightweight, mobile-first catalog structure that shows what products are carried — not a full e-commerce store.
+This business's storefront is indexed but its inventory is not — customers have no way to see what's on the physical shelves before visiting. The goal is a lightweight, mobile-first shelf catalog that shows what products are carried — not a full e-commerce store and never a shipping operation. Shoppers browse on their phone, then walk in and buy at the counter.
 
 Known product categories (from GBP or audit):
 {{product_categories}}
 
 Task: Design a mobile catalog mockup with:
 
+## First Five Shelf Slots
+[Structure the free-claim entry point: the first five product slots should be the high-velocity signature items and specialty products customers already call to verify — the items that make this shop worth the trip. Use observed products from the audit when available; name categories the business plausibly carries when not, but NEVER invent specific inventory or brands that weren't observed.]
+
 ## Recommended Category Structure
 [List 5-8 top-level product categories based on the business type and known categories. Each category should be a tap-able tile on mobile.]
 
 ## Page Layout (Mobile-First)
-[Describe the homepage layout: hero image, category tiles, search bar placement, click-to-call/WhatsApp/SMS action button position. Keep it simple — one screen, no scroll required for the main navigation.]
+[Describe the homepage layout: hero image, category tiles, search bar placement, click-to-call/WhatsApp/SMS action button position, and a visible "pick up at our counter" cue. Keep it simple — one screen, no scroll required for the main navigation.]
 
 ## Sample Product Category Page
-[Pick one category and describe what its page looks like: product grid, item cards (photo + name + price range), back-to-categories button, inquiry CTA.]
+[Pick one category and describe what its page looks like: product grid, item cards (photo + name + price range), back-to-categories button, availability-inquiry CTA.]
 
 ## Action Placements
-[Where to place click-to-call, WhatsApp, and SMS buttons so customers can check availability without leaving the page. Recommend the single highest-priority action for this business type.]
+[Where to place click-to-call, WhatsApp, and SMS buttons so customers can check availability without leaving the page, plus the counter-pickup cue. Recommend the single highest-priority action for this business type.]
 
 Keep it concrete — the owner should be able to hand this to a web person and say "build this."
 
@@ -359,34 +362,39 @@ Output as structured text.`;
 
 // ─── Fulfillment Pathway (A6 — Product Visibility) ───────────────────────
 
-const FULFILLMENT_PATHWAY_PROMPT = `You are preparing a pickup/delivery pathway setup plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+const FULFILLMENT_PATHWAY_PROMPT = `You are preparing a counter-fulfillment pathway setup plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current fulfillment status:
 {{fulfillment_status}}
 
+The strategic frame: the physical store counter IS the fulfillment center. The store already owns the shelves, the stock, the staff, and the pickup point — walk-in traffic and counter pickup convert online visibility into sales with zero delivery logistics and zero marketplace commission. Delivery marketplaces take roughly a quarter to a third of basket value; counter pickup keeps all of it. Delivery is an optional later step, never the foundation.
+
 Task: Create a fulfillment setup plan with:
 
 ## Recommended Fulfillment Options
-[Rank in-store pickup, curbside pickup, and local delivery by feasibility for this business type. For a small grocery store, in-store pickup is usually step 1; curbside is step 2; local delivery is optional step 3. Justify each recommendation.]
+[Rank counter pickup first for this business type — it is the zero-logistics path that uses the store the owner already runs. Curbside pickup is an optional step 2 for businesses whose customers expect it. Local delivery is optional step 3 at most — flag the commission cost of marketplace apps if it comes up. Justify each recommendation.]
+
+## Why the Counter Wins
+[Explain in 3-4 sentences why the physical counter beats delivery logistics for this business: no driver coordination, no packaging overhead, no marketplace commission, and the customer who walks in to pick up often leaves with more than they ordered. Only claim the impulse-item/basket expansion benefit if the business type supports it — a grocery or specialty market yes, a single-item shop maybe not.]
 
 ## Platform Setup Steps
 [For the top-recommended option, provide step-by-step setup instructions:
-- What to enable on GBP (e.g., "Curbside pickup" attribute)
-- What to add to the website (if any) — a simple "Order for pickup" form or phone-based ordering
-- Payment handling — cash on pickup vs. Stripe link vs. phone payment
+- What to enable on GBP (e.g., "In-store pickup" / "Curbside pickup" attributes)
+- What to add to the shelf catalog — a simple "Reserve for counter pickup" or phone-based ordering path
+- Payment handling — cash or card at the counter vs. Stripe link vs. phone payment
 Keep it to 5-7 steps total.]
 
 ## Order Flow SOP
-[Standard operating procedure for the owner when an order comes in:
+[Standard operating procedure for the owner when an order or reservation comes in:
 1. Receive order (channel)
-2. Confirm availability
-3. Pick/pack
-4. Notify customer (ready for pickup)
-5. Handoff (in-store or curbside)
-6. Payment collection
+2. Confirm availability on the shelf
+3. Set aside / pick
+4. Notify customer (ready at the counter)
+5. Handoff at the counter
+6. Payment collection at the register
 Keep it as a simple checklist the owner can tape to the counter.]
 
-Keep it realistic for a one-person or small-team operation.
+Keep it realistic for a one-person or small-team operation — the whole point is that the store already does this every day.
 
 Output as structured text.`;
 

@@ -30,6 +30,8 @@ const {
   mockQueryRaw,
   mockGetClaimKitMeta,
   mockGetReportKitMeta,
+  mockExecFindMany,
+  mockAuditFindFirst,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockGetTriageResult: vi.fn(),
@@ -41,6 +43,8 @@ const {
   mockQueryRaw: vi.fn(),
   mockGetClaimKitMeta: vi.fn(),
   mockGetReportKitMeta: vi.fn(),
+  mockExecFindMany: vi.fn(),
+  mockAuditFindFirst: vi.fn(),
 }));
 
 vi.mock('../MarketingCampaignService', () => ({
@@ -62,6 +66,8 @@ vi.mock('../../prisma', () => ({
     $executeRawUnsafe: mockExecuteRawUnsafe,
     $queryRaw: mockQueryRaw,
     users: { findUnique: mockUsersFindUnique },
+    mkt_prompt_executions_list: { findMany: mockExecFindMany },
+    mkt_audits_list: { findFirst: mockAuditFindFirst },
   },
 }));
 
@@ -182,6 +188,8 @@ beforeEach(() => {
   mockQueryRaw.mockResolvedValue([]);
   mockGetClaimKitMeta.mockResolvedValue(null);
   mockGetReportKitMeta.mockResolvedValue(null);
+  mockExecFindMany.mockResolvedValue([]);
+  mockAuditFindFirst.mockResolvedValue(null);
 });
 
 // ─── resolveTemplate ─────────────────────────────────────────────────────
@@ -479,5 +487,61 @@ describe('free construction variables (fields keys not in slot schema)', () => {
     queueSelects([{ match: 'FROM mkt_campaign_manual_scripts', rows: [doc] }]);
     const [view] = await ManualOutreachScriptService.listForCampaign('mcamp-test01');
     expect(view.resolved_body).toBe('In Manualville we say hi to Patel Brothers.');
+  });
+});
+
+// ─── Phase 2.3: {{analyst_hook}} resolution order ────────────────────────
+
+describe('analyst_hook merge variable', () => {
+  const TRIAGE_HOOK = 'When customers search for fufu nearby, they get sent to a chain — your shelves are invisible.';
+
+  it('resolves from the accepted triage briefing pitch.opener_hook first', async () => {
+    mockGetCampaign.mockResolvedValue(
+      makeCampaign({ repair_triage_briefing: { pitch: { opener_hook: TRIAGE_HOOK } } }),
+    );
+    mockExecFindMany.mockResolvedValue([
+      { raw_output: JSON.stringify({ profile_repair_audit: { pitch: { opener_hook: 'issue hook' } } }) },
+    ]);
+    mockAuditFindFirst.mockResolvedValue({
+      audit_data: { alignment_scoring: { primary_outreach_hook: 'audit hook' } },
+    });
+    const ctx = await ManualOutreachScriptService.mergeContextForCampaign('mcamp-test01');
+    expect(ctx.analyst_hook).toBe(TRIAGE_HOOK);
+  });
+
+  it('falls back to the latest per-issue briefing execution raw_output', async () => {
+    mockExecFindMany.mockResolvedValue([
+      { raw_output: 'not json' },
+      { raw_output: JSON.stringify({ profile_repair_audit: { pitch: { opener_hook: 'issue hook' } } }) },
+    ]);
+    mockAuditFindFirst.mockResolvedValue({
+      audit_data: { alignment_scoring: { primary_outreach_hook: 'audit hook' } },
+    });
+    const ctx = await ManualOutreachScriptService.mergeContextForCampaign('mcamp-test01');
+    expect(ctx.analyst_hook).toBe('issue hook');
+  });
+
+  it('falls back to the business-analysis audit primary_outreach_hook', async () => {
+    mockAuditFindFirst.mockResolvedValue({
+      audit_data: { alignment_scoring: { primary_outreach_hook: 'audit hook' } },
+    });
+    const ctx = await ManualOutreachScriptService.mergeContextForCampaign('mcamp-test01');
+    expect(ctx.analyst_hook).toBe('audit hook');
+  });
+
+  it('leaves the placeholder unresolved when no hook exists (never fabricates)', async () => {
+    const ctx = await ManualOutreachScriptService.mergeContextForCampaign('mcamp-test01');
+    expect(ctx.analyst_hook).toBeUndefined();
+  });
+
+  it('ignores empty-string hooks and keeps falling back', async () => {
+    mockGetCampaign.mockResolvedValue(
+      makeCampaign({ repair_triage_briefing: { pitch: { opener_hook: '   ' } } }),
+    );
+    mockAuditFindFirst.mockResolvedValue({
+      audit_data: { alignment_scoring: { primary_outreach_hook: 'audit hook' } },
+    });
+    const ctx = await ManualOutreachScriptService.mergeContextForCampaign('mcamp-test01');
+    expect(ctx.analyst_hook).toBe('audit hook');
   });
 });

@@ -225,22 +225,27 @@ that fixes it — not a sales pitch. The tone is quiet, specific, and useful.
 You are not a vendor. You are someone who did the homework for them.`;
 
 /**
- * Product-visibility preamble for A6. Leads with product discoverability,
- * not reviews. Used for product/inventory businesses (grocery stores,
- * bakeries, specialty markets) with no online product browsing.
+ * Product-visibility preamble for A6. Leads with the shelf blind spot —
+ * the storefront is indexed but the inventory is not — not reviews. Used
+ * for physical retail businesses (grocery stores, bakeries, specialty
+ * markets) whose shelves are invisible to local search. The fix is
+ * shelf visibility with counter pickup — never a shipping operation.
  */
 const PRODUCT_VISIBILITY_PREAMBLE = `You are a local-business visibility auditor. You pulled this business's
 public footprint across Google Business Profile, Yelp, and their website,
-and found that customers have no reliable way to confirm what products
-they carry, whether they're open, or whether an item is in stock before
-traveling to the store.
+and found that customers have no reliable way to see what's physically on
+their shelves — no way to confirm what products they carry, whether an
+item is in stock, or whether it's worth the trip before traveling to the
+store. The storefront is indexed; the inventory is not.
 
 You're writing a cold first-touch outreach opener to the small business
 owner. The goal: prove you actually looked at their online presence,
-surface the specific product-discoverability gap, and offer a concrete
-deliverable that fixes it — not a sales pitch. The tone is quiet,
-specific, and useful. You are not a vendor. You are someone who did
-the homework for them.`;
+surface the specific shelf-visibility gap, and offer a concrete
+deliverable that fixes it — not a sales pitch. The fix is making the
+physical shelves visible to nearby shoppers who then pick up at the
+store counter — the store is the fulfillment point, never a shipping
+operation. The tone is quiet, specific, and useful. You are not a vendor.
+You are someone who did the homework for them.`;
 
 /**
  * Shared NAP + signal magnitude context note appended to every archetype
@@ -656,21 +661,27 @@ Task: Write the opener, ~80 words max body:
 2. One sentence: "Pulled together a quick visibility snapshot for
    [business_name]."
 
-3. The hook — lead with the product-discoverability gap. Pick the
-   strongest gap from the fields. ONE observation only:
+3. The hook — lead with the shelf-visibility gap: the storefront is
+   indexed but the inventory is not. Pick the strongest gap from the
+   fields. ONE observation only:
    - If has_website is false: "Customers searching for [business_name]
-     online find a Google listing but no website — no way to browse
-     products, check what's in stock, or confirm hours before driving
-     to you."
+     online find a Google listing but no way to see what's on your
+     shelves — no product browsing, no stock check, no way to confirm
+     hours before driving to you."
    - If has_website is true but has_product_browsing is false: "Your
-     website's up but there's no way for customers to browse products
-     or check availability before coming in — every visit is a guess."
+     website's up but there's no way for customers to see what you
+     actually carry or check if it's in stock before coming in —
+     every visit is a guess."
    - If has_availability_inquiry is false: "There's no way for a
-     customer to message or call to check if a specific product is in
-     stock — they have to drive there to find out."
+     customer to check if a specific product is in stock before they
+     come in — they have to drive there to find out."
+   When the fields show a signature item or specialty the shop carries,
+   naming it makes the gap concrete ("when someone searches for
+   [item] nearby, they get sent to a chain").
 
-4. One line: "Three previews attached — the mobile catalog mockup,
-   the GBP photo optimization, and the availability-inquiry flow."
+4. One line: "Shelf-visibility preview attached — the first five shelf
+   slots as a mobile catalog, plus the GBP in-stock photo plan.
+   Customers browse online and pick up at your counter."
 
 5. Close: "{{close_line}}"
 
@@ -678,7 +689,8 @@ Task: Write the opener, ~80 words max body:
 
 Forbidden: "online booking," "scheduling," "service menu," "project
 photos," pricing/tier jargon, exclamation points, emojis, stacking
-multiple gaps in the hook, overstating the severity when
+multiple gaps in the hook, framing the offer as shipping, delivery
+fleets, or mail-order fulfillment, overstating the severity when
 primary_signal_severity is "borderline" or "cosmetic".
 
 Output the opener only.`;

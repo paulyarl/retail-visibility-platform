@@ -77,8 +77,8 @@ const ARCHETYPE_KEYWORDS: Record<string, ArchetypeKeywords> = {
     itchLabel: '"pieces", "sections", "gaps", "listings", or "responses"',
   },
   A6: {
-    itch: [/\bphotos?\b/i, /\bcatalog\b/i, /\bvisibility\b/i, /\bproducts?\b/i, /\bstore\b/i, /\bstorefront\b/i, /\bbrowse\b/i, /\binventory\b/i, /\bdiscoverability\b/i, /\bavailability\b/i, /\bplan\b/i, /\bsections?\b/i, /\bpieces?\b/i],
-    itchLabel: '"photos", "catalog", "visibility", "products", or "store"',
+    itch: [/\bphotos?\b/i, /\bcatalog\b/i, /\bvisibility\b/i, /\bproducts?\b/i, /\bstore\b/i, /\bstorefront\b/i, /\bbrowse\b/i, /\binventory\b/i, /\bdiscoverability\b/i, /\bavailability\b/i, /\bplan\b/i, /\bsections?\b/i, /\bpieces?\b/i, /\bshel(f|ves)\b/i, /\bin[- ]stock\b/i, /\bcounter\b/i, /\bpickup\b/i, /\bwalk[- ]?in\b/i],
+    itchLabel: '"photos", "catalog", "visibility", "products", "shelf", "in-stock", or "pickup"',
     offTopic: [/\breviews?\b/i, /\bbooking\b/i, /\breservations?\b/i],
     offTopicLabel: 'reviews or booking (this is a product-discoverability archetype, not a review or booking problem)',
   },

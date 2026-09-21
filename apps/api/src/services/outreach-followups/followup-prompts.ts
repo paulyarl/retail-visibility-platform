@@ -453,15 +453,16 @@ Task: Write the follow-up, ~70 words max body:
 
 3. New proof (USE THE DATA DIFF):
    - If new GBP photos appeared: "noticed [N] new photos on your Google
-     listing — though the product catalog is still invisible online."
+     listing — though what's on your shelves is still invisible online."
    - If the website gained product browsing: "your site's now showing
-     product categories — good start, though availability inquiry is
+     product categories — good start, though the stock-check path is
      still missing."
-   - If nothing product-related changed: "the product-discoverability
-     gap is still there — customers still can't browse before visiting."
+   - If nothing product-related changed: "the shelf-visibility gap is
+     still there — customers still can't see what you carry before
+     driving over."
    - Do NOT stack numbers. Lead with the single most relevant change.
 
-4. One line: "Updated the catalog mockup and GBP photo plan — new previews attached."
+4. One line: "Updated the shelf mockup and GBP photo plan — new previews attached."
 
 5. Close: "{{close_line}}"
 
@@ -487,8 +488,9 @@ Task: Write the follow-up, ~60 words max body:
    last week —"
 
 3. Reminder:
-   "the three previews are still there — the mobile catalog mockup,
-   the GBP photo optimization, and the availability-inquiry flow."
+   "the shelf-visibility previews are still there — the first five
+   shelf slots as a mobile catalog, the GBP in-stock photo plan, and
+   the counter pickup pathway."
 
 4. Soft re-engagement: "Happy to walk through any of them if useful."
 

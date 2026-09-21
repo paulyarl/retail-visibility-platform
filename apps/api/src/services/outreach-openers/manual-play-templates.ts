@@ -18,6 +18,7 @@
  * Merge placeholders resolved at read time by ManualOutreachScriptService:
  *   {{business}} {{address}} {{category}} {{city}} {{operator_name}}
  *   {{sender_name}} (alias of operator_name) {{salutation}} {{claim_url}}
+ *   {{analyst_hook}} (latest briefing/audit opener hook — Phase 2.3)
  *   plus any field key ({{observed_gap}} resolves from the field value).
  *
  * No DB access, no async, no side effects — pure data module.
@@ -274,6 +275,202 @@ If anything is wrong, you can claim the listing and correct it yourself here: {{
 Here's the free report for {{business}}: {{qr_url_report_text}}
 
 It shows how {{business}} appears across public sources and what was missing. If anything looks off, claim the listing and fix it yourself — {{claim_short_url}} (about two minutes, no cost).
+
+— {{operator_name}}`,
+  },
+  {
+    key: 'shelf_visibility_claim',
+    label: 'Physical shelf visibility & 5 free slots',
+    description:
+      'Audit/scan flagged a physical retailer whose shelves are invisible to ' +
+      'local search — Google sees the building, not the inventory. Lead with ' +
+      'the analyst hook, offer the free claim + 5 shelf slots, and anchor ' +
+      'walk-in foot traffic with counter pickup.',
+    anchorType: 'customer_discovery_problem',
+    hookAngle: 'product_category_pages',
+    suggestedWhenSignal: 'DS_MISSING_PRODUCT_CATALOG',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject / header',
+        role: 'header',
+        placeholder: 'Email subject or pitch header',
+        defaultValue: 'your shelves are invisible to local shoppers',
+      },
+      {
+        key: 'opener_text',
+        label: 'Opener (first-touch)',
+        role: 'opener',
+        placeholder: 'First-touch opener text',
+        defaultValue: `{{analyst_hook}}
+
+Google knows your building, but it has no idea what is on your shelves. When nearby shoppers search for items you actually carry — like {{signature_item}} — they get sent to Amazon or the big-box chains.
+
+We set up your store page with 5 free shelf slots so local searchers see what you have in stock and walk into your store to buy. Customers browse online and pick up at your counter — no delivery fees, no commissions.
+
+I put together a quick preview for {{business}} — want me to send it over?
+
+— {{sender_name}}`,
+      },
+      {
+        key: 'closer_text',
+        label: 'Closer',
+        role: 'closer',
+        placeholder: 'Close line / offer',
+        defaultValue:
+          'The first 5 shelf slots are free on your claimed listing — pick the items customers call about most and we index them for local search: {{claim_url}}',
+      },
+      {
+        key: 'operator_thesis',
+        label: 'Operator thesis',
+        role: 'thesis',
+        placeholder: 'What this play is trying to accomplish',
+        defaultValue:
+          'Audit/scan shows a physical retailer with unindexed shelf inventory. Verify the gap with the owner, then pivot to the free claim + 5 shelf slots with counter pickup.',
+      },
+      {
+        key: 'verification_question',
+        label: 'Verification question',
+        role: 'thesis',
+        placeholder: 'Question that confirms the audit finding',
+        defaultValue:
+          'I noticed customers searching for items like {{signature_item}} near {{city}} cannot see that you carry them — is that right?',
+      },
+      {
+        key: 'pain_question',
+        label: 'Pain probe',
+        role: 'thesis',
+        placeholder: 'Question that surfaces the pain',
+        defaultValue:
+          'When someone nearby searches for a specialty item you stock, how do they find out you have it today?',
+      },
+      {
+        key: 'recommended_transition',
+        label: 'Recommended transition',
+        role: 'thesis',
+        placeholder: 'Pivot from verification into the pitch',
+        defaultValue:
+          'That gap is exactly what I wanted to talk about — we can put 5 of your signature items on your free listing so local searchers see what is in stock and walk through your door.',
+      },
+      {
+        key: 'observed_gap',
+        label: 'Observed gap',
+        role: 'note',
+        placeholder: 'What the audit/scan showed, in operator words',
+        defaultValue:
+          'physical shelves invisible to local search — the building is indexed, the inventory is not',
+      },
+      {
+        key: 'signature_item',
+        label: 'Signature item',
+        role: 'note',
+        placeholder: 'A signature/specialty item the analyst spotted (e.g. cassava flour, halal ribeye)',
+        defaultValue: 'your specialty items',
+      },
+    ],
+    scriptBody: `Hi, are you the owner or manager of {{business}}? — I will keep it quick.
+
+I work with local {{category}} retailers in {{city}}. We ran a visibility scan on {{business}} and noticed something specific: Google knows your building, but it has no idea what is on your shelves. When someone nearby searches for items you actually carry — like {{signature_item}} — they get sent to a big-box chain.
+
+Quick question — when someone nearby searches for a specialty item you stock, how do they find out you have it today?
+
+[If they confirm the gap]
+We set up your listing with 5 free product slots so shoppers see your stock and walk through your door. Customers browse online, reserve, and pick up at your counter — no delivery fees, no commissions.
+
+I can send you the preview first — it shows exactly what local shoppers see today. What is the best email — or I can text you the link?
+The claim link is here if you want to look now: {{claim_url}} (or scan the card I left — {{qr_url_walkin}}).
+
+— {{operator_name}}`,
+  },
+  {
+    key: 'delivery_app_margin_recapture',
+    label: 'Delivery app margin recapture',
+    description:
+      'Physical retailer is active on delivery apps and losing 20–30% of ' +
+      'every basket to marketplace commissions. Pitch the store as the ' +
+      'fulfillment hub: a direct mobile ordering channel with counter ' +
+      'pickup at 0% commission.',
+    anchorType: 'customer_discovery_problem',
+    hookAngle: 'availability_inquiry',
+    suggestedWhenSignal: 'WC_MISSING_PICKUP_DELIVERY',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject / header',
+        role: 'header',
+        placeholder: 'Email subject or pitch header',
+        defaultValue: 'keep the margin delivery apps take',
+      },
+      {
+        key: 'opener_text',
+        label: 'Opener (first-touch)',
+        role: 'opener',
+        placeholder: 'First-touch opener text',
+        defaultValue: `{{salutation}} Love what you have built at {{business}} in {{city}}. I noticed you are active on delivery apps, which means you are giving up 20% to 30% of your basket on every order.
+
+For a physical shop, your store is already the fulfillment hub — customers would gladly pick up at your counter if they had a 1-click mobile menu. We set up your private ordering app with 0% commission so you keep 100% of your retail margin.
+
+Here is a preview of how your counter pickup app looks: {{report_url}}. Want to chat for 2 minutes?
+
+— {{sender_name}}`,
+      },
+      {
+        key: 'closer_text',
+        label: 'Closer',
+        role: 'closer',
+        placeholder: 'Close line / offer',
+        defaultValue:
+          'Every order through your own app keeps the full basket margin — the customer picks up at your counter. Want me to scope it? {{claim_url}}',
+      },
+      {
+        key: 'operator_thesis',
+        label: 'Operator thesis',
+        role: 'thesis',
+        placeholder: 'What this play is trying to accomplish',
+        defaultValue:
+          'Retailer pays marketplace commissions on orders their own counter could fulfill. Probe how much volume runs through delivery apps, then pivot to the direct ordering channel at 0% commission.',
+      },
+      {
+        key: 'verification_question',
+        label: 'Verification question',
+        role: 'thesis',
+        placeholder: 'Question that confirms the audit finding',
+        defaultValue:
+          'I saw {{business}} listed on the delivery apps — how much of your weekly volume runs through them?',
+      },
+      {
+        key: 'pain_question',
+        label: 'Pain probe',
+        role: 'thesis',
+        placeholder: 'Question that surfaces the pain',
+        defaultValue:
+          'On a typical basket that goes through a delivery app, how much of it do you actually keep after their cut?',
+      },
+      {
+        key: 'recommended_transition',
+        label: 'Recommended transition',
+        role: 'thesis',
+        placeholder: 'Pivot from verification into the pitch',
+        defaultValue:
+          'That commission is exactly what I wanted to talk about — your regulars would order direct and pick up at your counter if they had a 1-click app, and you keep the whole basket.',
+      },
+      {
+        key: 'observed_gap',
+        label: 'Observed gap',
+        role: 'note',
+        placeholder: 'What the audit/scan showed, in operator words',
+        defaultValue:
+          'active on delivery apps with no direct ordering channel — marketplace commission on every basket',
+      },
+    ],
+    scriptBody: `Hi, is this {{business}}? Quick question for the owner — I will keep it under a minute.
+
+On a typical $60 grocery basket ordered through a delivery app, the marketplace keeps $15 to $18 in commission fees. Your physical store already has the stock and the staff — why pay a delivery fleet for local customers who can pick up at your counter?
+
+We build direct mobile ordering apps for local retailers with zero commission cuts — customers browse your aisles on their phone, order ahead, and pick up at your register.
+
+I have a preview of your store menu ready — what is the best email or cell to send it to?
+The report is here if you want to look now: {{report_url}}.
 
 — {{operator_name}}`,
   },

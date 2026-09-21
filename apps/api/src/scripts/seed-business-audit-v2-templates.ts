@@ -50,7 +50,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-20-website-gap-signals-5 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-21-opener-hook-6 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -656,6 +656,27 @@ Rules:
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
 `;
 
+// ─── Directive: Primary Outreach Hook (PHYSICAL_RETAIL_PLAYBOOK_ALIGNMENT
+//     SPRINT_PLAN Phase 2.3c). alignment_scoring.primary_outreach_hook feeds
+//     the {{analyst_hook}} merge variable in the Manual outreach lane — it is
+//     promoted verbatim into openers, so it must be finished copy grounded in
+//     THIS audit's evidence, not filler. Has a heading so removeSection
+//     manages re-runs; inserted AFTER the Operator Outreach Problems
+//     directive (anchored on its final line) in each transform.
+const OPENER_HOOK_DIRECTIVE = `
+### Primary Outreach Hook — REQUIRED
+
+Populate \`alignment_scoring.primary_outreach_hook\` with a 1–2 sentence outreach opener the operator can speak or paste verbatim in first-touch outreach to the owner. This field feeds the outreach pipeline directly — it is promoted into the operator's manual plays and opener drafts — so write it as finished copy, not a description of copy.
+
+Rules:
+* Evidence-specific — name the observed platform + the concrete gap + a signature item or category detail verified in THIS audit (e.g., for an African grocery: "When customers nearby search for berbere and injera, Google sends them to the supermarket across town — your shelves are invisible."). A hook that could be sent unchanged to any business in any category is a failure.
+* Physical-retail framing — when the business is a walk-in retail outlet and the audit surfaces product-visibility, product-catalog, availability-inquiry, or pickup gaps, lead with the shelf blind spot: the storefront is indexed but the inventory is not, so shoppers searching for specific items are routed to chains or delivery apps. Frame the store as the fulfillment point — customers browse online and pick up at the counter — never as a shipping operation.
+* One gap only — lead with the single most painful verified finding; do not stack multiple unrelated gaps.
+* Plain spoken language — no jargon ("NAP", "citations", "SEO audit"), no tier or package names, no dollar amounts or pricing, no invented statistics. The downstream outreach quality gate rejects these on promotion.
+* Ground every claim in the audit data — never fabricate observed evidence. When the audit is too thin for a specific hook, write the most concrete honest sentence the evidence supports rather than generic filler ("baseline audit", "improve online presence").
+* Emit \`null\` when no outreach angle exists — a balanced/healthy audit with no painful verified gap produces \`null\`, not a manufactured pitch.
+`;
+
 // ─── Prompt 2 (Signal-Aligned) missing CI instruction sections ───────────
 
 const STORE_FORMAT_SECTION_MD = `
@@ -1047,6 +1068,10 @@ function transformCategoryIntegrated(body: string): string {
   //      4j2 runs after ALL removeSection calls so each run self-heals.
   out = removeSection(out, '### Operator Outreach Problems');
 
+  // 4c4. Remove any prior version of the Primary Outreach Hook directive
+  //      (seed version bump). Re-inserted at 4j3, after Outreach Problems.
+  out = removeSection(out, '### Primary Outreach Hook');
+
   // 4d. Website Accessibility Verification directive — insert at the end of
   //     the Website Assessment section (after the intrusive-testing line).
   //     Idempotent via fingerprint. Fallback anchors cover variant bodies
@@ -1221,6 +1246,14 @@ function transformCategoryIntegrated(body: string): string {
     OUTREACH_PROBLEMS_DIRECTIVE,
   );
 
+  // 4j3. Primary Outreach Hook directive — anchored on the Outreach Problems
+  //      directive's final line (guaranteed present by step 4j2).
+  out = insertAfter(
+    out,
+    'Never dry, never dull.',
+    OPENER_HOOK_DIRECTIVE,
+  );
+
   // 4k. Align the binding text with the blocks the runtime actually injects —
   //     position claims, the phantom city_profile field, undocumented category
   //     fields, and the category_signals name collision. Idempotent.
@@ -1260,6 +1293,11 @@ function transformSignalAligned(body: string): string {
   //     directive (seed version bump). The re-insertion at step 19h runs
   //     after ALL removeSection calls (0c, 0c2, 19c) so each run self-heals.
   out = removeSection(out, '### Operator Outreach Problems');
+
+  // 0c3. Remove any prior version of the Primary Outreach Hook directive
+  //     (seed version bump). Re-inserted at step 19i, after Outreach
+  //     Problems.
+  out = removeSection(out, '### Primary Outreach Hook');
 
   // 1. Insert the binding sections after the business identity block's
   //    last line (the "do not treat blank as a negative signal" note).
@@ -1635,6 +1673,14 @@ function transformSignalAligned(body: string): string {
     out,
     'Omit the field entirely when no category context was provided.',
     OUTREACH_PROBLEMS_DIRECTIVE,
+  );
+
+  // 19i. Primary Outreach Hook directive — anchored on the Outreach Problems
+  //      directive's final line (guaranteed present by step 19h).
+  out = insertAfter(
+    out,
+    'Never dry, never dull.',
+    OPENER_HOOK_DIRECTIVE,
   );
 
   // 20. Append seed version marker for idempotency tracking.

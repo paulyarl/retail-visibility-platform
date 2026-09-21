@@ -23,7 +23,7 @@ import { logger } from '../logger';
 
 const TEMPLATE_ID = 'mpt-profile-repair-triage-default';
 
-const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v5: bronze-attribution-origin-block -->';
+const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v6: shelf-visibility-pitch-clause -->';
 
 const NEW_BODY = `You are a local business profile repair analyst producing an operator briefing.
 
@@ -73,6 +73,8 @@ Use the category intelligence block (appended below) to frame the pitch WHEN IT 
 When a PLATFORM SIGNAL WEIGHTS block is appended (after the supplementary blocks), it tells you which platforms actually carry this category's customer traffic — measured, not assumed — and names a LEAD PLATFORM when the business is weak on a platform that matters. Aim the pitch there: primary_angle and opener_hook land hardest on the highest-weight platform where the audit shows the business is weak. Ground "where your customers are" claims in the block's measured basis; never recite the raw weight number in owner-facing copy.
 
 A PROSPECT ORIGIN — BRONZE DISCOVERY ATTRIBUTION block may be appended, but only for prospects that arrived via the emerging-focus discovery lane (the bronze calibration block is injected there). Competitive-lane and manually sourced prospects never carry it — its absence means nothing. When present, it names the discovery blind spot(s) that surfaced this prospect — provenance, not a finding. It is often the sharpest pitch framing available: "we found you in customs records because your public footprint is thin" lands harder than a generic deficiency claim. Let it inform primary_angle and opener_hook, but never present it to the owner as a verdict about the business itself — a reason names a discovery mechanism, not a defect.
+
+When the audit surfaces product-visibility or shelf-discovery gaps — a missing product catalog, no product browsing, no availability-inquiry channel, no pickup path — the prospect is a physical retailer whose shelves are invisible to local search. In that case, primary_angle and opener_hook lead with the shelf blind spot: the storefront is indexed but the inventory is not, so shoppers searching for specific items get routed to chains or delivery apps. Frame the fix as making the physical shelves visible — customers browse online and pick up at the store counter; the store is the fulfillment point, never a shipping operation.
 
 Use the above to craft:
 - **primary_angle**: the main hook for the opener — not "your NAP is inconsistent" but the business consequence (e.g., "customers outside your community can't find you on Google Maps")

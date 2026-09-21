@@ -808,6 +808,61 @@ export class ManualOutreachScriptService extends BaseService {
       // Best-effort — {{lead_platform}} stays a visible placeholder.
     }
 
+    // {{analyst_hook}} — the analyst-authored personalized opener hook
+    // (Phase 2.3a, PHYSICAL_RETAIL_PLAYBOOK_ALIGNMENT_SPRINT_PLAN). Carries
+    // the evidence-specific pitch upstream artifacts already emit into the
+    // Manual tab's field slots. Resolution order:
+    //   1. accepted triage briefing pitch.opener_hook (campaign JSONB)
+    //   2. latest per-issue repair briefing pitch.opener_hook (execution raw_output)
+    //   3. latest business-analysis audit alignment_scoring.primary_outreach_hook
+    // Best-effort: unresolved leaves the {{analyst_hook}} placeholder visible.
+    try {
+      const triageHook = (campaign as any).repair_triage_briefing?.pitch?.opener_hook;
+      if (typeof triageHook === 'string' && triageHook.trim()) {
+        merge.analyst_hook = triageHook.trim();
+      }
+      if (!merge.analyst_hook) {
+        const briefExecs = await this.prisma.mkt_prompt_executions_list.findMany({
+          where: {
+            campaign_id: campaignId,
+            template_id: { startsWith: 'mpt-profile-repair-' },
+            status: 'completed',
+            raw_output: { not: null },
+          },
+          orderBy: { executed_at: 'desc' },
+          take: 5,
+          select: { raw_output: true },
+        });
+        for (const exec of briefExecs) {
+          try {
+            const parsed = JSON.parse(exec.raw_output as string);
+            const hook =
+              parsed?.profile_repair_audit?.pitch?.opener_hook ??
+              parsed?.profile_repair_triage?.pitch?.opener_hook;
+            if (typeof hook === 'string' && hook.trim()) {
+              merge.analyst_hook = hook.trim();
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+      if (!merge.analyst_hook) {
+        const auditRow = await this.prisma.mkt_audits_list.findFirst({
+          where: { campaign_id: campaignId, platform: 'business_analysis' },
+          orderBy: { created_at: 'desc' },
+          select: { audit_data: true },
+        });
+        const hook = (auditRow?.audit_data as any)?.alignment_scoring?.primary_outreach_hook;
+        if (typeof hook === 'string' && hook.trim()) {
+          merge.analyst_hook = hook.trim();
+        }
+      }
+    } catch {
+      // Best-effort — {{analyst_hook}} stays a visible placeholder.
+    }
+
     // Values are `string | null` internally; resolveMerge keeps the
     // placeholder on null. Cast to the outward shape.
     const out: Record<string, string> = {};

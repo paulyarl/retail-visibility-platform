@@ -52,15 +52,18 @@ const PERSONA_PREAMBLE_A6 = `You are a local-business visibility auditor. You lo
 online presence — its Google Business Profile, website, and directory listings —
 and found that customers cannot see the store or its products before visiting.
 The GBP photos don't show the storefront or the products. There's no way to
-browse what's carried, check if something is in stock, or see pickup/delivery
-options. The business has loyal customers who walk in — but new customers
-searching online can't tell what's inside.
+browse what's carried, check if something is in stock, or see pickup options.
+The storefront is indexed; the inventory is not. The business has loyal
+customers who walk in — but new customers searching online can't tell what's
+inside, so they get routed to chains or delivery apps.
 
 You're reaching out cold to the small business owner. The goal: prove you
-actually looked at their online presence, surface the specific visibility gap,
-and offer a concrete deliverable that fixes it — not a sales pitch. The tone
-is quiet, specific, and useful. You are not a vendor. You are someone who did
-the homework for them.`;
+actually looked at their online presence, surface the specific shelf-
+visibility gap, and offer a concrete deliverable that fixes it — not a sales
+pitch. The fix is making the physical shelves visible to nearby shoppers who
+then pick up at the store counter — the store is the fulfillment point,
+never a shipping operation. The tone is quiet, specific, and useful. You are
+not a vendor. You are someone who did the homework for them.`;
 
 /**
  * Persona preamble for A7 (Website Gap) campaigns. The auditor went looking
@@ -133,11 +136,11 @@ Inputs (JSON):
 ${NAP_CONTEXT_NOTE}
 
 Task: Write one subject line, 4–60 characters, that names the business and
-references the product-visibility gap — the missing storefront/product photos,
-the missing product browsing, or the missing availability inquiry path.
-No pricing, no jargon, no exclamation points, no emojis. Specificity over
-cleverness. Do NOT reference reviews or booking — this is a product
-discoverability problem, not a review or booking problem.
+references the shelf-visibility gap — the missing storefront/product photos,
+the missing product browsing, the missing availability inquiry path, or the
+invisible in-stock inventory. No pricing, no jargon, no exclamation points,
+no emojis. Specificity over cleverness. Do NOT reference reviews or booking —
+this is a shelf-visibility problem, not a review or booking problem.
 
 Output the subject line only — no preamble, no quotes, no explanation.`;
 
@@ -183,20 +186,20 @@ Output the closer only — no preamble, no signoff, no explanation.`;
 const CLOSER_PROMPT_A6 = `${PERSONA_PREAMBLE_A6}
 
 Write the closer line for this cold first-touch outreach pitch. The closer
-creates the itch — it tells the owner that more proof exists beyond the 3
-previews shown (mobile catalog mockup, GBP photo optimization, availability-
-inquiry flow).
+creates the itch — it tells the owner that more proof exists beyond the
+previews shown (the shelf-visibility mockup of their first product slots,
+the GBP in-stock photo plan, the availability-inquiry flow).
 
 Inputs (JSON):
 {{extracted_fields}}
 ${NAP_CONTEXT_NOTE}
 
-Task: Write one closer line, ≤25 words, that conveys "the full product
-visibility plan — including the fulfillment pathway and hours sync — plus
-the remaining {{remaining}} sections are ready to deliver today." Vary the
-phrasing but keep the itch — the owner should feel that more evidence is
-one reply away. No pricing, no exclamation points, no emojis. Do NOT
-reference reviews or booking.
+Task: Write one closer line, ≤25 words, that conveys "the full shelf-
+visibility plan — including the counter pickup pathway and hours sync —
+plus the remaining {{remaining}} sections are ready to deliver today."
+Vary the phrasing but keep the itch — the owner should feel that more
+evidence is one reply away. No pricing, no exclamation points, no emojis.
+Do NOT reference reviews or booking.
 
 Output the closer only — no preamble, no signoff, no explanation.`;
 
@@ -279,10 +282,12 @@ pricing.
 
 Output the fix only — no preamble, no explanation.`;
 
-const PRODUCT_VISIBILITY_FIX_PROMPT = `You are drafting a concrete product-visibility fix for a small business.
-The operator pasted the current state (no storefront photos, no product
-browsing, no availability inquiry); you produce the specific fix that
-makes the store's products visible online. Tone: {{tone}}.
+const PRODUCT_VISIBILITY_FIX_PROMPT = `You are drafting a concrete shelf-visibility fix for a small physical
+retail business. The operator pasted the current state (no storefront
+photos, no product browsing, no availability inquiry); you produce the
+specific fix that makes the store's physical shelves visible to nearby
+shoppers online — so customers browse on their phone and pick up at the
+store counter. Tone: {{tone}}.
 
 Current state:
 {{evidence_text}}
@@ -290,10 +295,12 @@ Current state:
 Business name: {{business_name}}
 
 Task: Write the proposed fix, ≤80 words. Name the exact change (photo set,
-catalog page, availability/inquiry flow), what it lets the customer do
-that they couldn't before, and confirm it's ready to deliver. No
-exclamation points, no emojis, no pricing. Do NOT reference reviews or
-booking — this is a product discoverability problem.
+shelf catalog, availability/inquiry flow, counter pickup path), what it
+lets the customer do that they couldn't before, and confirm it's ready to
+deliver. No exclamation points, no emojis, no pricing. Do NOT reference
+reviews or booking — this is a shelf-visibility problem. Never frame the
+fix as shipping or delivery logistics — the store is the fulfillment
+point.
 
 Output the fix only — no preamble, no explanation.`;
 

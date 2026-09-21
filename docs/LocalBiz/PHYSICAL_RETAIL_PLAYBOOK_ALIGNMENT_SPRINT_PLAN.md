@@ -28,6 +28,12 @@ An audit of the live database (`nbwsiobosqawrugnqddo`), playbooks, prompt templa
 3. **`mpt-seed-fulfill-008` (Product Visibility Preview Deliverable):**
    The deliverable prompt instructs sections for catalog structure, GBP photos, and pickup/delivery, but does not explicitly direct the AI to frame the **physical store register as the fulfillment counter** (0% commissions, customer transports for free, basket expansion).
    *Gap G-4:* this is only one of **two** prompt surfaces that produce this deliverable. The section-level prompts that actually build the preview live in `apps/api/src/services/deliverable/prompts.ts` and are **not touched** by this plan as originally written. See Phase 4.
+4. **The analyst's personalized hook never reaches the outreach lane:**
+   The business-analysis audit already emits `alignment_scoring.primary_outreach_hook` (schema field at `business-analysis.schema.ts`; models fill it today — quality ranges from evidence-specific to generic filler), and the triage/per-issue briefings emit `pitch.opener_hook`. But **nothing carries any of them downstream** — `primary_outreach_hook` has zero consumers (dead data), and the Manual tab's `opener_text` field cannot see either. The operator rewrites the pitch by hand instead of reviewing the analyst's evidence-grounded line. Phase 2.3 closes this with an `{{analyst_hook}}` merge variable — dual-mode for free, since externally-imported audits land in `audit_data` identically.
+
+### Dual-Mode Execution Note
+
+Every prompt surface this plan touches is already dual-mode: the **same prompt body** feeds the internal AI lane (`MarketingExecutionService.executeSingle`) and the external lane (operator copies the resolved prompt to an external agent, pastes back through `MarketingPromptService.importExternalResult` / `POST /openers/import` / `importFollowUp` / `DeliverableSectionService.updateSection`). One edit propagates to both lanes — but until now nothing verified the external lane sees the new copy. Phase 5.11/5.12 make the round-trip explicit. The Manual plays are external-by-design (the operator *is* the executor); their personalization comes from merge-context injection, not AI generation.
 
 ---
 
@@ -40,6 +46,7 @@ An audit of the live database (`nbwsiobosqawrugnqddo`), playbooks, prompt templa
 | **D3** | How should the deliverable template be updated? | **Update `seed-deliverable-source-material-templates.ts` AND `services/deliverable/prompts.ts`.** The seed bumps `SEED_VERSION_MARKER`; the section prompts are edited in place. Both must ship. |
 | **D4** | New `shelf_visibility` hook angle, or reuse `product_category_pages`? | **Reuse `product_category_pages` for the plays; treat a new `shelf_visibility` angle as optional Phase 3 work.** `product_category_pages` already carries `archetypes:['A6']` and is the A6 product-listing angle. Adding a 24th angle forces updates to a hard-coded count test (`hook-library.test.ts` asserts 23) and the stale web `HOOK_ANGLES` mirror. If the new angle is kept, the play's `hookAngle` must be `'shelf_visibility'`, not `'product_category_pages'` (the two are currently inconsistent — G-7). |
 | **D5** | Are the checklist-step bodies that quote the old offer title in scope? | **Out of scope for this sprint, but recorded (G-11).** Migrations 174/175 hard-code "Monthly Product Visibility & Local Discovery Retainer" in `mkt_playbook_checklist_steps` copy. Renaming `retainer_pitch_title` leaves that copy stale; a follow-up migration (307) should re-word it. |
+| **D6** | How does the analyst's observed gap reach the operator's opener without hand-copying? | **Emit upstream, carry via merge variable (Phase 2.3).** Add `{{analyst_hook}}` to `ManualOutreachScriptService.buildMergeContext` resolving triage `pitch.opener_hook` → per-issue `pitch.opener_hook` → audit `alignment_scoring.primary_outreach_hook`; default `shelf_visibility_claim`'s `opener_text` to `{{analyst_hook}}`. A dedicated `product_visibility` per-issue briefing (2.3d) is optional — `issueType` is `z.string()` and `repair_issue_type` is free varchar, so it needs no schema or CHECK-constraint work. |
 
 ---
 
@@ -93,6 +100,7 @@ Add two code-defined manual outreach play templates into `apps/api/src/services/
 - **Hook Angle:** `'product_category_pages'` (A6 affinity already). Use `'shelf_visibility'` **only** if Phase 3.1 is kept.
 - **Suggested When Signal:** `'DS_MISSING_PRODUCT_CATALOG'` (single value — `suggestedWhenSignal` is a string, not an array)
 - **Fields (`fields[]`):** `subject` (header), `opener_text` (opener), `closer_text` (closer), `operator_thesis` (thesis), `verification_question` (thesis), `pain_question` (thesis), `recommended_transition` (thesis), `observed_gap` (note), **`signature_item` (note)** — see G-6. `{{signature_item}}` is **not** a global merge key; it must be a declared field slot or it renders literally.
+- **`opener_text` prefill (Phase 2.3b):** `defaultValue` opens with `{{analyst_hook}}` — the analyst's evidence-grounded hook lands in the opener slot automatically once a briefing/audit hook exists, and stays a visible placeholder when none does (never fabricated — same contract as `{{lead_platform}}`). The narrative below remains the fallback the operator edits into place.
 - **Core Narrative:**
   - *Opener (Text/Email) → `opener_text`:*
     > *"{{salutation}} I was looking at {{category}} stores in {{city}} and noticed {{business}} has a verified address on Google, but no products listed online. When nearby shoppers search for specialty items like {{signature_item}}, Google sends them to Amazon or supermarket chains because your shelves are invisible online. We set up your store page with 5 free shelf slots so local searchers see what you have in stock and walk into your store to buy. I put together a quick preview for {{business}} — want me to send it over? — {{sender_name}}"*
@@ -112,6 +120,46 @@ Add two code-defined manual outreach play templates into `apps/api/src/services/
     > *"Hi, is this {{business}}? Quick question for the owner: on a typical $60 grocery basket ordered through DoorDash, you lose $15 to $18 in commission fees. Your physical store already has the stock and staff — why pay a delivery fleet for local customers who can pick up at your counter? We build direct mobile ordering apps for local retailers with zero commission cuts. I have a preview of your store menu ready — what's the best email or cell to send it to?"*
 
 > **Quality-gate hazard (G-12):** the spoken script contains literal dollar amounts (`$60`, `$15 to $18`). The outreach quality gate's `FORBIDDEN_PATTERNS` reject `$[\d,]+` ("pricing ($ amount)") for **all** archetypes, and A6 additionally rejects review/booking vocabulary. If these plays are promoted into the pitch pipeline via `POST /openers/import`, either (a) keep the `$` figures only in the operator-spoken `scriptBody` (not promoted as an opener), or (b) reword to "20–30% of every basket" without dollar signs. Decide before authoring.
+
+### 2.3 Analyst `opener_hook` Handoff — Evidence → Personalized Opener (D6)
+
+**The gap:** upstream artifacts already emit personalized hooks, but nothing carries them into the Manual tab — the operator rewrites the pitch from memory. This phase closes the loop so the gap the analyst observed during the scan **becomes the play's opener** without re-authoring.
+
+Existing emission points — all dual-mode (internal run and `importExternalResult` paste produce identical persisted shapes):
+
+| Source | Field | Status today |
+|---|---|---|
+| Business-analysis audit | `audit_data.alignment_scoring.primary_outreach_hook` | Emitted, **zero consumers** — dead data (G-17); quality unconstrained (ranges from evidence-specific to filler) |
+| Triage briefing | `repair_triage_briefing.pitch.opener_hook` (campaign JSONB, migration 232) | Emitted; promoted only via "Create Opener from Hook" → `createFromBriefing` |
+| Per-issue briefings | `pitch.opener_hook` + `outreach_problems[].hook` | Emitted for `nap_drift` / `unclaimed_profile` / `platform_gap` — **no product-visibility issue exists** |
+
+#### 2.3a `{{analyst_hook}}` merge variable — `ManualOutreachScriptService.buildMergeContext`
+Add a best-effort resolution block (mirrors the `{{lead_platform}}` pattern — try/catch, unresolved leaves a visible placeholder):
+1. `campaign.repair_triage_briefing.pitch.opener_hook` (accepted triage pitch)
+2. Latest `profile_repair_audit` seek execution's `pitch.opener_hook`
+3. Latest business-analysis audit's `audit_data.alignment_scoring.primary_outreach_hook`
+4. Unresolved → `{{analyst_hook}}` stays visible (never fabricated)
+
+Surfaces automatically in `GET /:campaignId/manual-script-merge-context` (the Construction Variables panel), so the operator can *see* what the analyst wrote before using it.
+
+#### 2.3b Play wiring — `shelf_visibility_claim`
+`opener_text` field `defaultValue` opens with `{{analyst_hook}}` (see Phase 2.1). The placeholder stores literally in `mkt_campaign_manual_scripts.fields` and resolves at read time (`toView` → `resolveMerge`), so a doc created before the briefing exists **self-heals** once a hook lands. `ManualScriptPanel.promoteOpener` already ships `resolved_fields.opener_text` to `importOpener` — the promoted opener carries the analyst's words and passes through `runQualityGate` like any external import. **Zero frontend change required.**
+
+#### 2.3c Hook-quality directive — `seed-business-audit-v2-templates.ts`
+`primary_outreach_hook` is emitted but unconstrained — observed live outputs range from evidence-specific to generic filler (*"General local marketing & reputation management baseline audit"*). Add an `OPENER_HOOK_DIRECTIVE` to both V2 variants:
+- 1–2 sentences, specific to THIS business: name the observed platform + the concrete gap + a signature item/category evidence — e.g. *"When customers search for berbere and injera near {city}, Google sends them to the chain across town — your shelves are invisible."*
+- For physical-retail categories with product-visibility gaps, lead with the shelf/blind-spot framing: store as fulfillment center, counter pickup, 5 free shelf slots.
+- No `$` amounts, tier/package names, or jargon — `FORBIDDEN_PATTERNS` rejects them on downstream promotion.
+- **Seed-discipline caution (AGENTS.md):** the two V2 variants use different formats; guard the `insertAfter` anchor (`if (out.includes(anchor))`) or use a format-aware helper; bump the marker.
+- **Cheap complement:** one paragraph in `seed-profile-repair-triage-briefing.ts` — when product-visibility signals dominate, `pitch.opener_hook` leads with the shelf-visibility gap (the Bronze attribution block is already injected there).
+
+#### 2.3d (OPTIONAL) Dedicated `product_visibility` per-issue briefing — `seed-profile-repair-issue-briefings.ts`
+Add a 4th `TEMPLATES` entry `mpt-profile-repair-shelf-visibility-seek`, `issueType: 'product_visibility'`, same `profile_repair_audit` output shape — emits `pitch.opener_hook` + `outreach_problems[]` bound to shelf/discovery gaps.
+- Cheap because: `issueType` is `z.string()` in `profile-repair-output.schema.ts` (no schema change); `repair_issue_type` is free varchar (no CHECK constraint).
+- Requires: `PROFILE_REPAIR_SHELF_VISIBILITY_TEMPLATE_ID` const + a `resolveSeekTemplateId` case in `ProfileRepairPromptService.ts`, and the option in the `repair_issue_type` select in `CampaignFormClient.tsx`.
+- Dual-mode free: external analysts import through `importExternalResult` under the same `profile_repair_audit` schema.
+
+**Deferred (record, don't build):** a per-prospect `suggested_hook` on the Bronze discovery scan itself. Bronze output feeds prospect seeding; the campaign-level hooks above fire at seek stage where the audit evidence exists. Revisit if operators want the hook visible on the prospect-queue card.
 
 ---
 
@@ -179,6 +227,9 @@ The A6 preview is generated section-by-section by `DeliverableSectionService.gen
 | **5.7** | TypeScript Check Web | `pnpm checkweb` | Zero errors — **fails if the web `HookAngle`/`HOOK_ANGLES` mirror drifts** (G-3) |
 | **5.8** | Re-run Deliverable Seed (local) | `doppler run --config local -- npx tsx src/scripts/seed-deliverable-source-material-templates.ts` | `mpt-seed-fulfill-008` updated in DB |
 | **5.9** | Repeat Seed for Prod | `doppler run --config prd -- npx tsx src/scripts/seed-deliverable-source-material-templates.ts` | Production DB synchronized |
+| **5.10** | Re-run briefing seeds (local + prd) | `doppler run --config <cfg> -- npx tsx src/scripts/seed-business-audit-v2-templates.ts` (+ `seed-profile-repair-triage-briefing.ts` / `seed-profile-repair-issue-briefings.ts` if 2.3c/2.3d kept) | `OPENER_HOOK_DIRECTIVE` marker present; new briefing template row exists if 2.3d kept |
+| **5.11** | External-lane render check | Prompt Workspace: resolve the A6 opener prompt, `mpt-seed-fulfill-008`, and a `fulfillment_pathway`/`mobile_catalog_preview` section prompt | The text an operator copies to an external agent carries the new counter-pickup / 5-slot framing — the shared prompt body is the single source for both lanes (G-18) |
+| **5.12** | External round-trip smoke test | (a) Paste an externally-written A6 opener through `POST /openers/import`; (b) import an external `profile_repair_audit`/business-analysis payload via `importExternalResult`; (c) open the Manual tab on that campaign | `source='external'` stamped; quality-gate issues surface (incl. `$` rejection — G-12); imported `primary_outreach_hook`/`pitch.opener_hook` resolves into `{{analyst_hook}}` in `shelf_visibility_claim`'s `opener_text` (G-18) |
 
 ---
 
@@ -204,6 +255,8 @@ Findings from the 2026-09-21 gap-analysis pass (code + live DB), each now folded
 | **G-16** | **Med** | "Counter fulfillment" framing not propagated to A6 pitch/header/closer/follow-up prompts or the `A6_PROMPT` preview line; `preview_deliverable_type` still says "Product Visibility". | Phase 3.2/3.3. |
 | **G-14** | **Info** | `mkt_prompt_templates_list` is the real table (plan implied otherwise); `mpt-seed-fulfill-008` is live with `V5` marker. | Phase 4.2 note. |
 | **G-15** | **Info** | `SEED_VERSION_MARKER` bump is cosmetic — the seed upserts unconditionally. | Phase 4.2 note. |
+| **G-17** | **Med** | `alignment_scoring.primary_outreach_hook` is emitted by every business-analysis audit but has **no consumer** — dead data; observed live outputs range from evidence-specific to generic filler, and no directive constrains it. | Phase 2.3a (merge-var fallback) + 2.3c (hook-quality directive). |
+| **G-18** | **Med** | Dual-mode propagation was assumed, not verified: the external lane reads the same prompt bodies, but no step covered the render → paste → import round-trip, and no step confirmed an imported hook reaches the Manual tab. | Phase 5.11/5.12. |
 
 ---
 
@@ -216,9 +269,12 @@ database/migrations/
 apps/api/src/
   ├── services/
   │   ├── outreach-openers/
-  │   │   ├── manual-play-templates.ts (Add shelf_visibility_claim & delivery_app_margin_recapture)
+  │   │   ├── manual-play-templates.ts (Add shelf_visibility_claim & delivery_app_margin_recapture;
+  │   │   │                            opener_text defaultValue opens with {{analyst_hook}} — 2.3b)
   │   │   ├── hook-library.ts (OPTIONAL — add shelf_visibility angle)
   │   │   └── archetype-prompts.ts (A6_PROMPT: counter fulfillment, 5 free slots, preview-line alignment)
+  │   ├── ManualOutreachScriptService.ts (buildMergeContext: {{analyst_hook}} resolution)  ← ADDED (2.3a)
+  │   ├── ProfileRepairPromptService.ts (template const + resolveSeekTemplateId case)      ← ADDED (2.3d, optional)
   │   ├── deliverable/
   │   │   └── prompts.ts (FULFILLMENT_PATHWAY_PROMPT + MOBILE_CATALOG_PROMPT)   ← ADDED (G-4)
   │   ├── outreach-pitch/
@@ -227,9 +283,14 @@ apps/api/src/
   │   └── outreach-followups/
   │       └── followup-prompts.ts (A6 doing/telling templates)                       ← ADDED (G-16)
   └── scripts/
-      └── seed-deliverable-source-material-templates.ts (FULFILL_008 body + SEED_VERSION_MARKER V6)
+      ├── seed-deliverable-source-material-templates.ts (FULFILL_008 body + SEED_VERSION_MARKER V6)
+      ├── seed-business-audit-v2-templates.ts (OPENER_HOOK_DIRECTIVE + marker bump — 2.3c)  ← ADDED
+      ├── seed-profile-repair-triage-briefing.ts (A6 shelf clause — 2.3c, optional)         ← ADDED
+      └── seed-profile-repair-issue-briefings.ts (mpt-profile-repair-shelf-visibility-seek) ← ADDED (2.3d, optional)
 
 apps/web/src/
+  ├── app/(platform)/settings/admin/marketing-ops/campaigns/
+  │   └── CampaignFormClient.tsx (repair_issue_type option — 2.3d only)                     ← ADDED
   └── services/
       └── MarketingOpsService.ts (HookAngle union + HOOK_ANGLES mirror)              ← ADDED (G-3, only if Phase 3.1)
 

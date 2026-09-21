@@ -31,7 +31,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V5 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V6 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -225,16 +225,25 @@ ${CLAIM_CTA}
 ${FULFILL_TONE}`;
 
 const FULFILL_008 = `${SEED_VERSION_MARKER}
-You are producing a product-visibility preview for {{business_name}}, a {{category}}
-business in {{city}}.
+You are producing a shelf-visibility preview for {{business_name}}, a {{category}}
+business in {{city}} — a physical store whose building is indexed but whose
+shelves are invisible to local search.
 
-Product-visibility gaps:
+Shelf-visibility gaps:
 {{product_visibility}}
 
 TASK
-Produce the product-visibility preview sections: mobile catalog structure, GBP photo
-shot list + captions, availability-inquiry flow, pickup/delivery pathway, and an
+Produce the shelf-visibility preview sections: the first five shelf slots as a
+mobile catalog (built around the high-velocity signature items and specialty
+products customers call to verify — use observed products when supplied, never
+invented inventory), a GBP in-stock photo shot list + captions, an
+availability-inquiry flow, a counter-fulfillment pathway, and an
 hours/holiday-hours sync plan — each grounded in the supplied gaps.
+
+For the counter-fulfillment pathway, frame the physical store counter as the
+fulfillment center: shoppers browse online, then walk in and pick up at the
+counter — zero delivery logistics and no marketplace commission. Delivery is an
+optional later step, never the foundation.
 
 RULES
 - Ground every section in the supplied gaps. Do not invent inventory or capabilities.
