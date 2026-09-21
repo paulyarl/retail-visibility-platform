@@ -7,6 +7,45 @@
 - `pnpm prisma:generate` — Regenerate Prisma Client (run after schema changes)
 - `doppler run --config local -- pnpm prisma db pull` — Pull DB schema into `prisma/schema.prisma` (run from `apps/api`)
 - `doppler run --config local -- pnpm prisma generate` — Regenerate client with Doppler secrets
+- `cd apps/web && npx vitest run` — web unit tests (vitest, node environment, `src/**/*.test.ts`). Run a single file by path.
+
+### Web component render tests (no jsdom needed)
+
+`apps/web` has no jsdom/testing-library, but Mantine 9 ships **pre-compiled CSS modules** (`.module.mjs` are plain JS class-name maps, no CSS imports), so a component can be server-rendered in the existing node-environment vitest project:
+
+```ts
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MantineProvider } from '@mantine/core';
+
+const html = renderToStaticMarkup(
+  createElement(MantineProvider, null, createElement(SomeView, { profile })),
+);
+expect(html).toContain('…');
+```
+
+Wrap in `MantineProvider` or Mantine throws `MantineProvider was not found in component tree`. Pattern: `apps/web/src/components/marketing-ops/BronzeStandardProfileView.test.ts`. Note `Accordion` panels are unmounted while collapsed (`keepMounted` defaults to false), so assert collapsed-panel copy only after expanding.
+
+### Intelligence profile view dispatch (3 shapes, 2 surfaces)
+
+`configuration_json` has three shapes and each needs its own view — a mismatch renders a header-only shell:
+
+| Shape | Detection | View |
+|---|---|---|
+| `gold_standard_scan` (`expected_fields`, `candidates`) | `isGoldStandardProfile` (colocated in `GoldStandardProfileView.tsx`) | `GoldStandardProfileView` |
+| `bronze_standard_scan` (`reason_coverage`, `catalog_snapshot`, `vector_execution_log`, `scope_mix`) | `isBronzeStandardProfile` (`apps/web/src/lib/bronze-standard-profile.ts`) | `BronzeStandardProfileView` |
+| §10 Category Intelligence Profile (`terminology`, `specialized_sources`, `category_signals`) | fallback | `CategoryProfileView` |
+
+Both surfaces must dispatch: `IntelligenceProfilesClient` (View modal) and `IntelligenceEstablishmentPanel` (campaign Overview tab). The panel renders `activeProfile ?? bestMatchingDraft` — a draft shows as a labeled preview, so an establishment campaign's overview renders the scan output **before** activation too.
+
+### Bronze catalog snapshot — DB truth, not the model's echo
+
+A bronze profile's `catalog_snapshot` is documented as a verbatim embedding of the scope-applicable catalog rows (§4), but the model re-echoes ~17 rows by hand and **the injected block is its only source**. Two consequences to keep in mind when touching either side:
+
+- `BronzeReasonCatalogService.serializeCatalogBlock` must emit each reason's `Scope:` line (`formatBronzeReasonScope`) — without it the model can only fill `scope_*` with nulls, so a category-scoped reason (`trade_manifest_only`, `wholesale_or_hybrid_role` in migration 291) comes back reading as `universal` and `scope_mix` is wrong. The block is injected at render time, so fixing it needs **no seed re-run**.
+- The bronze import hook (`MarketingPromptService`, `schemaName === 'bronze_standard_scan'`) rebuilds `catalog_snapshot` + `scope_mix` + `catalog_revision` from `mkt_bronze_reason_catalog` via `buildBronzeCatalogSnapshot(applicableReasons(scope))` whenever the payload carried a snapshot. `scope_mix` counts by geographic level AND counts platform-scoped reasons separately in `platform_bound` (independent axis, §3.6.5) — a platform-only reason is `universal` + `platform_bound`.
+
+Live profiles scanned before this fix keep the all-`universal` snapshot; the next establishment scan re-imports a correct one (no backfill script).
 
 ## Seed Scripts — Re-run Discipline
 

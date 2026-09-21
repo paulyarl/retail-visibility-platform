@@ -357,6 +357,79 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       const block = await service.serializeBronzeStandard(PROFILE({ configuration_json: null as any }), 'discovery');
       expect(block).toBe('');
     });
+
+    // ── Scope as scan context (spec §3.6.1 / §6.2.1) ──────────────────────
+    // The analyst hunting these reasons needs each reason's scope: it says how
+    // far a finding generalizes and which empty status applies (proof is
+    // scope-relative). Both blocks must carry it — and the definition, not
+    // just the variable.
+    const scopedProfile = PROFILE({
+      version: 3,
+      reference_city: 'Kansas City',
+      reference_state: 'MO',
+      configuration_json: {
+        catalog_revision: 1,
+        reason_coverage: [
+          {
+            reason_key: 'trade_manifest_only',
+            status: 'filled',
+            slots: [{ business_name: 'Arsema Food Mart', discovered_by: 'bronze_establishment_scan' }],
+          },
+          { reason_key: 'community_only_presence', status: 'empty_unproven', slots: [], empty_slot_note: 'executed, returned 0' },
+        ],
+        catalog_snapshot: [
+          {
+            reason_key: 'trade_manifest_only',
+            label: 'Trade / import-only visibility',
+            priority: 1,
+            provenance: 'derived',
+            scope_category_key: 'african grocery store',
+            scope_city: null,
+            scope_state: null,
+            scope_platform: null,
+          },
+          {
+            reason_key: 'community_only_presence',
+            label: 'Community-known, no reviews',
+            priority: 3,
+            provenance: 'derived',
+            scope_category_key: null,
+            scope_city: null,
+            scope_state: null,
+            scope_platform: null,
+          },
+        ],
+        vector_execution_log: [{ vector: 'church bulletins', executed: true, returned: 0 }],
+      } as any,
+    });
+
+    it('establishment_reference carries each reason\'s scope + the scope definition', async () => {
+      const block = await service.serializeBronzeStandard(scopedProfile, 'establishment_reference');
+
+      expect(block).toContain('Scope: category=african grocery store');
+      expect(block).toContain('Scope: universal');
+      // The definition travels with the block so the line is usable.
+      expect(block).toContain('REASON SCOPE');
+      expect(block).toContain('proof is scope-relative');
+      expect(block).toContain('empty_proven_elsewhere');
+    });
+
+    it('discovery annotates exemplars + empty slots with the reason scope', async () => {
+      const block = await service.serializeBronzeStandard(scopedProfile, 'discovery');
+
+      expect(block).toContain('[trade_manifest_only] Arsema Food Mart [scope: category=african grocery store]');
+      expect(block).toContain('[community_only_presence] empty_unproven — executed, returned 0 [scope: universal]');
+      expect(block).toContain('REASON SCOPE');
+    });
+
+    it('omits the scope annotation when the profile has no catalog snapshot (never guesses)', async () => {
+      const block = await service.serializeBronzeStandard(coverageProfile, 'discovery');
+
+      expect(block).not.toContain('[scope: universal]');
+      expect(block).not.toContain('[scope: category=');
+      // …but the rule still reaches the analyst, since it governs the empty status.
+      expect(block).toContain('proof is scope-relative');
+    });
   });
 
   // §10.2 regression — the whole reason bronze uses its own intelligence_focus

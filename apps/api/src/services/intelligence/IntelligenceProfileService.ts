@@ -31,6 +31,7 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateIntelligenceProfileId } from '../../lib/id-generator';
+import { BRONZE_SCOPE_SEMANTICS, formatBronzeReasonScope } from './bronze-scope';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -3040,6 +3041,8 @@ export class IntelligenceProfileService extends BaseService {
         'DIRECTIVE: This is the national bronze standard for this category — the established map of what INVISIBLE looks like, typed by discovery-blind-spot reason. Your city scan MUST produce exactly one reason_coverage entry for each applicable reason below. Each reason is a discovery vector: execute its expected_vectors against the reference market, evaluate candidates against the three-part gate (category-qualified by assortment evidence, operationally verified — unable_to_verify never qualifies, low digital quality the reason explains), and record filled slots or the correct empty status with the execution outcome. Reasons marked proven at national scope but empty here are reported empty_proven_elsewhere; reasons with no exemplar at any evaluable scope are empty_unproven — but you still hunt them (the hunt is how they become proven).',
       );
       lines.push('');
+      lines.push(BRONZE_SCOPE_SEMANTICS);
+      lines.push('');
 
       // The catalog snapshot is the authoritative reason list when present;
       // otherwise derive it from reason_coverage keys.
@@ -3047,6 +3050,7 @@ export class IntelligenceProfileService extends BaseService {
         lines.push('--- Reason Catalog (snapshot) ---');
         for (const r of catalogSnapshot) {
           lines.push(`  [${r.reason_key}]${r.priority ? ` (priority ${r.priority})` : ''} ${r.label ?? ''}`);
+          lines.push(`    Scope: ${formatBronzeReasonScope(r)}`);
           if (r.definition) lines.push(`    ${r.definition}`);
           if (Array.isArray(r.signals) && r.signals.length) {
             lines.push('    Signals:');
@@ -3085,7 +3089,21 @@ export class IntelligenceProfileService extends BaseService {
         'ATTRIBUTION: When a candidate in your output exists in your result set BECAUSE of a reason below — its expected_vectors surfaced the business, or its signal vocabulary is what identifies the business as category-qualified-but-invisible — record that reason in the candidate\'s bronze_attribution array as { "reason_key": "<key>", "basis": "<which vector or signal produced the find>" }. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway carries no bronze_attribution.',
       );
       lines.push('');
+      lines.push(BRONZE_SCOPE_SEMANTICS);
+      lines.push('');
     }
+
+    // Per-reason scope, when the profile carries a catalog snapshot (national
+    // profiles always do; a city profile may not). Reasons without a known
+    // scope simply carry no annotation — never a guessed one.
+    const scopeByReason = new Map<string, string>();
+    for (const r of catalogSnapshot) {
+      if (r?.reason_key) scopeByReason.set(r.reason_key, formatBronzeReasonScope(r));
+    }
+    const scopeSuffix = (reasonKey: string): string => {
+      const s = scopeByReason.get(reasonKey);
+      return s ? ` [scope: ${s}]` : '';
+    };
 
     // ── Filled slots (capped per reason) + empty-slot report ──────────
     const filledEntries = coverage.filter((e: any) => e.status === 'filled' && Array.isArray(e.slots) && e.slots.length > 0);
@@ -3096,7 +3114,7 @@ export class IntelligenceProfileService extends BaseService {
       for (const entry of filledEntries) {
         const slots = (entry.slots as any[]).slice(0, MAX_SLOTS_PER_REASON);
         for (const s of slots) {
-          lines.push(`  [${entry.reason_key}] ${s.business_name}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}`);
+          lines.push(`  [${entry.reason_key}] ${s.business_name}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}${scopeSuffix(entry.reason_key)}`);
           if (s.digital_quality) lines.push(`    Digital quality: ${s.digital_quality}`);
           if (s.category_fit_evidence) lines.push(`    Category fit: ${s.category_fit_evidence}`);
           if (s.operational_evidence) lines.push(`    Operational: ${s.operational_evidence}`);
@@ -3123,7 +3141,7 @@ export class IntelligenceProfileService extends BaseService {
     if (emptyEntries.length > 0) {
       lines.push('--- Empty-Slot Report ---');
       for (const e of emptyEntries) {
-        lines.push(`  [${e.reason_key}] ${e.status}${e.empty_slot_note ? ` — ${e.empty_slot_note}` : ''}`);
+        lines.push(`  [${e.reason_key}] ${e.status}${e.empty_slot_note ? ` — ${e.empty_slot_note}` : ''}${scopeSuffix(e.reason_key)}`);
       }
       lines.push('');
     }

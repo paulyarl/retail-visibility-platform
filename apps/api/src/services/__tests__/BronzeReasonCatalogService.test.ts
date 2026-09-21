@@ -9,7 +9,10 @@
  *   - deprecateReason: deprecated_in_revision stamp, superseded_by validation,
  *     double-deprecate rejection
  *   - uncoveredReasons: staleness predicate issues the raw query
- *   - serializeCatalogBlock: emits revision + rows
+ *   - serializeCatalogBlock: emits revision + rows + each reason's scope
+ *   - buildBronzeCatalogSnapshot / formatBronzeReasonScope: the §4 DB-truth
+ *     snapshot + §3.6.3 scope_mix (regression: category-scoped reasons must
+ *     not read as universal)
  *   - audit() called with actorType 'user'
  */
 
@@ -52,7 +55,11 @@ vi.mock('../../audit', () => ({
   audit: (...args: any[]) => mockAudit(...args),
 }));
 
-import { BronzeReasonCatalogService } from '../intelligence/BronzeReasonCatalogService';
+import {
+  BronzeReasonCatalogService,
+  buildBronzeCatalogSnapshot,
+  formatBronzeReasonScope,
+} from '../intelligence/BronzeReasonCatalogService';
 import { ConflictError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 
 const CTX = { userId: 'op-test', tenantId: 'platform' } as any;
@@ -330,6 +337,124 @@ describe('BronzeReasonCatalogService', () => {
 
     it('returns empty string for an empty catalog', () => {
       expect(service.serializeCatalogBlock([], 1)).toBe('');
+    });
+
+    it('emits each reason\'s scope so the model can echo it into the snapshot (§3.6.1)', () => {
+      const row = (overrides: Record<string, any>) => ({
+        reason_key: 'r', label: 'R', definition: 'd',
+        signals: [], expected_vectors: [], priority: 1, ...overrides,
+      });
+      const block = service.serializeCatalogBlock([
+        row({ reason_key: 'universal_reason' }),
+        row({ reason_key: 'category_reason', scope_category_key: 'african grocery store' }),
+        row({ reason_key: 'location_reason', scope_city: 'Indianapolis', scope_state: 'IN' }),
+        row({ reason_key: 'platform_reason', scope_category_key: 'african grocery store', scope_platform: 'yelp' }),
+      ] as any, 3);
+
+      expect(block).toContain('Scope: universal');
+      expect(block).toContain('Scope: category=african grocery store');
+      expect(block).toContain('Scope: location=Indianapolis, IN');
+      expect(block).toContain('Scope: category=african grocery store; platform=yelp');
+    });
+
+    it('defines what scope means for the analyst — not just the variable', () => {
+      const block = service.serializeCatalogBlock([
+        { reason_key: 'r', label: 'R', definition: 'd', signals: [], expected_vectors: [], priority: 1 } as any,
+      ], 1);
+
+      // The definition the analyst needs to use scope wisely — the selection
+      // filter first (why this reason is in the block at all), then what it
+      // governs.
+      expect(block).toContain('REASON SCOPE');
+      expect(block).toContain('Scope is the filter that selected this block');
+      expect(block).toContain('would not appear in another category\'s block');
+      expect(block).toContain('scope is never a reason to skip one');
+      expect(block).toContain('category=<key>');
+      expect(block).toContain('location=<city, ST>');
+      expect(block).toContain('a platform-bound one is a per-platform finding');
+      expect(block).toContain('whole-business visibility verdict');
+      // The scope-relative proof rule (§6.2.1) — the judgement scope changes.
+      expect(block).toContain('proof is scope-relative');
+      expect(block).toContain('empty_proven_elsewhere');
+      expect(block).toContain('empty_unproven');
+      // …and what to record.
+      expect(block).toContain('scope_mix');
+      expect(block).toContain('platform_bound');
+    });
+  });
+
+  describe('formatBronzeReasonScope', () => {
+    it('labels a wildcard row universal and joins the set scope parts', () => {
+      expect(formatBronzeReasonScope({
+        scope_category_key: null, scope_city: null, scope_state: null, scope_platform: null,
+      })).toBe('universal');
+      expect(formatBronzeReasonScope({
+        scope_category_key: 'african grocery store', scope_city: 'Indianapolis', scope_state: 'IN', scope_platform: 'yelp',
+      })).toBe('category=african grocery store; location=Indianapolis, IN; platform=yelp');
+    });
+
+    it('renders a city without a state without a dangling separator', () => {
+      expect(formatBronzeReasonScope({
+        scope_category_key: null, scope_city: 'Indianapolis', scope_state: null, scope_platform: null,
+      })).toBe('location=Indianapolis');
+    });
+  });
+
+  describe('buildBronzeCatalogSnapshot (§4 — DB-truth snapshot)', () => {
+    const row = (overrides: Record<string, any>) => ({
+      reason_key: 'r', label: 'L', definition: 'D', signals: ['s'], expected_vectors: ['v'],
+      priority: 1, provenance: 'derived',
+      scope_category_key: null, scope_city: null, scope_state: null, scope_platform: null,
+      ...overrides,
+    });
+
+    it('embeds every scope column and derives scope_mix by level + the platform axis', () => {
+      const { catalog_snapshot, scope_mix } = buildBronzeCatalogSnapshot([
+        row({ reason_key: 'u' }),
+        row({ reason_key: 'c', scope_category_key: 'african grocery store' }),
+        row({ reason_key: 'l', scope_city: 'Indianapolis', scope_state: 'IN' }),
+        row({ reason_key: 'cl', scope_category_key: 'african grocery store', scope_city: 'Indianapolis', scope_state: 'IN' }),
+        row({ reason_key: 'p', scope_platform: 'yelp' }),
+      ] as any);
+
+      // Platform is the independent axis (§3.6.5): a platform-only reason is
+      // geographically universal AND counted in platform_bound.
+      expect(scope_mix).toEqual({
+        universal: 2, category: 1, location: 1, category_location: 1, platform_bound: 1,
+      });
+      expect(catalog_snapshot).toHaveLength(5);
+      expect(catalog_snapshot[1]).toMatchObject({
+        reason_key: 'c',
+        scope_category_key: 'african grocery store',
+        scope_city: null,
+        scope_state: null,
+        scope_platform: null,
+        provenance: 'derived',
+      });
+      expect(catalog_snapshot[0]).toMatchObject({ signals: ['s'], expected_vectors: ['v'] });
+    });
+
+    it('regression — a category-scoped reason never reads as universal', () => {
+      // The live defect: migration 291 seeds trade_manifest_only +
+      // wholesale_or_hybrid_role as category-scoped, but the persisted
+      // snapshot came back with every scope column null and scope_mix
+      // { universal: 17, category: 0 }.
+      const { catalog_snapshot, scope_mix } = buildBronzeCatalogSnapshot([
+        row({ reason_key: 'trade_manifest_only', scope_category_key: 'african grocery store' }),
+        row({ reason_key: 'wholesale_or_hybrid_role', scope_category_key: 'african grocery store', priority: 3 }),
+      ] as any);
+
+      expect(scope_mix).toMatchObject({ universal: 0, category: 2 });
+      expect(catalog_snapshot.map((r) => r.scope_category_key)).toEqual([
+        'african grocery store', 'african grocery store',
+      ]);
+    });
+
+    it('treats a city without a state as universal scope (location is city + state, §3.6.1)', () => {
+      const { scope_mix } = buildBronzeCatalogSnapshot([
+        row({ reason_key: 'orphan_city', scope_city: 'Indianapolis', scope_state: null }),
+      ] as any);
+      expect(scope_mix).toMatchObject({ universal: 1, location: 0 });
     });
   });
 });

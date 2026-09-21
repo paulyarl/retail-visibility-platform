@@ -848,6 +848,88 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
   });
 
+  // ─── Bronze standard calibration injection (stage-3 consumer, spec §7) ───
+  // The emerging discovery scan is the primary bronze consumer: the resolved
+  // city (or national, via cascade) bronze profile is injected as MARKET
+  // CALIBRATION framing — exemplars + empty-slot report + vector log.
+  // Competitive never receives it (§9); absence produces a soft degraded
+  // note, not a block.
+  describe('intelligence-scope composer path — bronze standard calibration', () => {
+    const makeIntelTemplate = (body = 'Discover {{category}} in {{city}}') => ({
+      body,
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_discovery' },
+      outputSchema: { name: 'intelligence_discovery' },
+    });
+
+    const makeIntelCampaign = (focus = 'emerging', platform: string | null = null) => ({
+      id: 'camp-intel-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Kansas City',
+      state: 'MO',
+      intelligence_focus: focus,
+      intelligence_platform: platform,
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('injects the MARKET CALIBRATION block on emerging discovery when a bronze profile resolves', async () => {
+      const bronzeProfile = { id: 'bz-kc-001', version: 2, reference_city: 'Kansas City', reference_state: 'MO' };
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(bronzeProfile);
+      mockProfileService.serializeBronzeStandard.mockReturnValueOnce(
+        '=== BRONZE STANDARD — MARKET CALIBRATION ===\nexemplars + empty slots + vector log',
+      );
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE STANDARD — MARKET CALIBRATION');
+      expect(resolution.bronze_standard_profile_id).toBe('bz-kc-001');
+      expect(resolution.bronze_standard_profile_version).toBe(2);
+      // Resolved with the campaign's category + market + platform, and
+      // serialized with the 'discovery' role (calibration, not hunt list).
+      expect(mockProfileService.resolveBronzeStandard).toHaveBeenCalledWith(
+        'African Grocery Store', null, 'Kansas City', 'MO', undefined,
+      );
+      expect(mockProfileService.serializeBronzeStandard).toHaveBeenCalledWith(bronzeProfile, 'discovery', undefined);
+    });
+
+    it('appends the absent-calibration note on emerging discovery when no bronze profile resolves', async () => {
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(null);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('NO BRONZE STANDARD PROFILE — BLIND-SPOT CALIBRATION ABSENT');
+      // NB: the discovery schema's prompt suffix quotes the block name in its
+      // attribution rules, so assert on the injection itself — the serializer
+      // is never reached when nothing resolves.
+      expect(mockProfileService.serializeBronzeStandard).not.toHaveBeenCalled();
+      expect(resolution.bronze_standard_profile_id).toBeNull();
+      expect(resolution.bronze_standard_profile_version).toBeNull();
+    });
+
+    it('never injects bronze into competitive discovery (spec §9)', async () => {
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('competitive', null),
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolveBronzeStandard).not.toHaveBeenCalled();
+      expect(mockProfileService.serializeBronzeStandard).not.toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('BLIND-SPOT CALIBRATION');
+      expect(resolution.bronze_standard_profile_id).toBeNull();
+    });
+  });
+
   // ─── Platform discovery focus directive (focus amplifier) ────────────────
   describe('intelligence-scope composer path — platform discovery focus directive', () => {
     const makeIntelTemplate = (body = 'Discover {{category}} in {{city}}') => ({

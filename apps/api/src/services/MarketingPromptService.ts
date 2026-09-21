@@ -1173,6 +1173,52 @@ export class MarketingPromptService extends BaseService {
             });
           }
 
+          // §4 — the catalog_snapshot is a verbatim embedding of the DB
+          // catalog rows at scan scope, and scope_mix is the portable/locale
+          // ratio derived from them. Both are rebuilt here from the catalog
+          // table rather than trusted from the payload: the model echoes 17
+          // rows by hand, and until the injected block carried scope it could
+          // only fill scope_* with nulls (every category-scoped reason came
+          // back reading as universal). Only rebuilt when the scan produced a
+          // snapshot — the city template's contract is reason coverage.
+          const payloadSnapshot = (parsedJson as any).catalog_snapshot;
+          if (Array.isArray(payloadSnapshot) && payloadSnapshot.length > 0) {
+            const { BronzeReasonCatalogService, buildBronzeCatalogSnapshot } =
+              await import('./intelligence/BronzeReasonCatalogService.js');
+            const catalogService = BronzeReasonCatalogService.getInstance();
+            const [catalogRows, catalogRevision] = await Promise.all([
+              catalogService.applicableReasons({
+                categoryKey: parsedJson.category_key,
+                city: referenceCity,
+                state: referenceState,
+                platform: scanPlatform,
+              }, ctx),
+              catalogService.currentRevision(),
+            ]);
+            if (catalogRows.length > 0) {
+              const { catalog_snapshot, scope_mix } = buildBronzeCatalogSnapshot(catalogRows);
+              configurationJson = {
+                ...configurationJson,
+                catalog_snapshot,
+                scope_mix,
+                catalog_revision: catalogRevision,
+              };
+              logger.info('Bronze catalog snapshot rebuilt from the catalog table', ctx, {
+                campaignId: input.campaignId,
+                catalogRevision,
+                snapshotRows: catalog_snapshot.length,
+                payloadRows: payloadSnapshot.length,
+                scopeMix: scope_mix,
+              });
+            } else {
+              // Catalog table empty (migration not applied?) — keep the
+              // payload's snapshot rather than overwriting it with nothing.
+              logger.warn('Bronze catalog empty — keeping the payload catalog_snapshot', ctx, {
+                campaignId: input.campaignId,
+              });
+            }
+          }
+
           const profile = await profileService.importAsDraft({
             categoryKey: parsedJson.category_key,
             categoryName: parsedJson.category_name,

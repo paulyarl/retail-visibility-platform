@@ -35,6 +35,16 @@ import {
   normalizeReferenceState,
   normalizePlatformScope,
 } from './IntelligenceProfileService';
+import {
+  BRONZE_SCOPE_RECORDING_INSTRUCTION,
+  BRONZE_SCOPE_SEMANTICS,
+  formatBronzeReasonScope,
+} from './bronze-scope';
+
+// Re-exported so callers (and tests) can keep importing the scope vocabulary
+// from the catalog service; the definition lives in ./bronze-scope so
+// IntelligenceProfileService can use it without importing this service.
+export { formatBronzeReasonScope } from './bronze-scope';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -102,6 +112,80 @@ export const BRONZE_SCOPE_PLATFORMS = [
 ] as const;
 
 const REASON_KEY_PATTERN = /^[a-z][a-z0-9_]{1,79}$/;
+
+// ─── Catalog snapshot construction (§4 — DB truth) ───────────────────────
+
+/** One row of a profile's `catalog_snapshot` (spec §4). */
+export interface BronzeCatalogSnapshotRow {
+  reason_key: string;
+  label: string;
+  definition: string;
+  signals: string[];
+  expected_vectors: string[];
+  priority: number;
+  scope_category_key: string | null;
+  scope_city: string | null;
+  scope_state: string | null;
+  scope_platform: string | null;
+  provenance: string;
+}
+
+/** §3.6.3 portable/locale ratio: reason counts by scope level + the independent platform axis. */
+export interface BronzeScopeMix {
+  universal: number;
+  category: number;
+  location: number;
+  category_location: number;
+  platform_bound: number;
+}
+
+/**
+ * Build a profile's `catalog_snapshot` + `scope_mix` from catalog rows —
+ * the §4 "verbatim embedding" the model cannot produce faithfully (it never
+ * sees scope unless the injected block carries it, and it re-echoes 17 rows
+ * by hand). Callers pass `applicableReasons(scope)` rows.
+ *
+ * `platform_bound` is the independent platform axis (§3.6.5): a
+ * platform-scoped reason counts in its geographic level AND in
+ * `platform_bound`.
+ */
+export function buildBronzeCatalogSnapshot(rows: BronzeReason[]): {
+  catalog_snapshot: BronzeCatalogSnapshotRow[];
+  scope_mix: BronzeScopeMix;
+} {
+  const scope_mix: BronzeScopeMix = {
+    universal: 0,
+    category: 0,
+    location: 0,
+    category_location: 0,
+    platform_bound: 0,
+  };
+  const catalog_snapshot = rows.map((r) => {
+    const hasCategory = !!r.scope_category_key;
+    // §3.6.1 — location scope is city + state together.
+    const hasLocation = !!(r.scope_city && r.scope_state);
+    if (hasCategory && hasLocation) scope_mix.category_location += 1;
+    else if (hasCategory) scope_mix.category += 1;
+    else if (hasLocation) scope_mix.location += 1;
+    else scope_mix.universal += 1;
+    if (r.scope_platform) scope_mix.platform_bound += 1;
+
+    return {
+      reason_key: r.reason_key,
+      label: r.label,
+      definition: r.definition,
+      signals: r.signals ?? [],
+      expected_vectors: r.expected_vectors ?? [],
+      priority: r.priority,
+      scope_category_key: r.scope_category_key ?? null,
+      scope_city: r.scope_city ?? null,
+      scope_state: r.scope_state ?? null,
+      scope_platform: r.scope_platform ?? null,
+      provenance: r.provenance,
+    };
+  });
+  return { catalog_snapshot, scope_mix };
+}
 
 // ─── Service ─────────────────────────────────────────────────────────────
 
@@ -509,8 +593,14 @@ export class BronzeReasonCatalogService extends BaseService {
    * Serialize scope-applicable catalog rows as the stage-1 hunt list. The
    * national bronze establishment prompt cannot snapshot a catalog it never
    * saw — this block IS the catalog it snapshots. Emits each reason's key,
-   * label, definition, signals, expected vectors, and priority, plus the
-   * catalog revision the snapshot is stamped at.
+   * label, scope, definition, signals, expected vectors, and priority, plus
+   * the catalog revision the snapshot is stamped at.
+   *
+   * The Scope line is load-bearing: without it the model has no source for
+   * catalog_snapshot[].scope_* or scope_mix, so a category-scoped reason
+   * comes back reading as universal (§3.6.1/§3.6.3). The import hook also
+   * rebuilds both from the catalog table (buildBronzeCatalogSnapshot) — this
+   * line keeps the scan itself honest about which reasons are portable.
    */
   serializeCatalogBlock(rows: BronzeReason[], catalogRevision: number): string {
     if (!rows.length) return '';
@@ -520,10 +610,14 @@ export class BronzeReasonCatalogService extends BaseService {
       `Catalog revision: ${catalogRevision}`,
       'These are the discovery-blind-spot reasons your scan must cover. Each reason is a slot axis: hunt for the lowest-quality OPERATING category qualifier that matches the reason\'s signal vocabulary. Record the catalog_revision in your output.',
       '',
+      BRONZE_SCOPE_SEMANTICS,
+      BRONZE_SCOPE_RECORDING_INSTRUCTION,
+      '',
     ];
     for (const r of rows) {
       lines.push(`--- [${r.reason_key}] (priority ${r.priority}) ---`);
       lines.push(`Label: ${r.label}`);
+      lines.push(`Scope: ${formatBronzeReasonScope(r)}`);
       lines.push(`Definition: ${r.definition}`);
       if (r.signals?.length) {
         lines.push('Signals:');

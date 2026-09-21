@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockTx, mockPrisma, mockProfileService, mockCampaignService } = vi.hoisted(() => {
+const { mockTx, mockPrisma, mockProfileService, mockCampaignService, mockCatalogService } = vi.hoisted(() => {
   const mockTx = {
     mkt_prompt_executions_list: { create: vi.fn(async ({ data }: any) => ({ ...data })) },
     mkt_audits_list: { create: vi.fn() },
@@ -31,12 +31,25 @@ const { mockTx, mockPrisma, mockProfileService, mockCampaignService } = vi.hoist
     mergeBronzeCoverage: vi.fn((_prior: any, incoming: any) => incoming ?? []),
   };
   const mockCampaignService = { getCampaign: vi.fn() };
-  return { mockTx, mockPrisma, mockProfileService, mockCampaignService };
+  const mockCatalogService = {
+    applicableReasons: vi.fn(async () => []),
+    currentRevision: vi.fn(async () => 9),
+  };
+  return { mockTx, mockPrisma, mockProfileService, mockCampaignService, mockCatalogService };
 });
 
 vi.mock('../prisma', () => ({ prisma: mockPrisma }));
 vi.mock('../logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/MarketingCampaignService', () => ({ default: mockCampaignService }));
+// Keep the pure snapshot builders real (they are the thing under test in the
+// rebuild assertions); only the DB-bound singleton is stubbed.
+vi.mock('../services/intelligence/BronzeReasonCatalogService', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    BronzeReasonCatalogService: { getInstance: () => mockCatalogService },
+  };
+});
 vi.mock('../services/intelligence/IntelligenceProfileService', () => ({
   IntelligenceProfileService: { getInstance: () => mockProfileService },
   normalizeCategoryKey: (s: string) => s.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' '),
@@ -178,5 +191,84 @@ describe('importExternalResult — bronze_standard_scan hook', () => {
     });
 
     expect(mockProfileService.mergeBronzeCoverage).not.toHaveBeenCalled();
+  });
+
+  // §4 — the snapshot is a verbatim embedding of the DB catalog rows. The
+  // model's echo is lossy (it never sees scope unless the injected block
+  // carries it), so the hook rebuilds it from the catalog table.
+  const CATALOG_ROWS = [
+    {
+      reason_key: 'absent_from_platform', label: 'Absent', definition: 'd', signals: ['s'],
+      expected_vectors: ['platform-presence audit'], priority: 1, provenance: 'derived',
+      scope_category_key: null, scope_city: null, scope_state: null, scope_platform: null,
+    },
+    {
+      reason_key: 'trade_manifest_only', label: 'Trade', definition: 'd', signals: [],
+      expected_vectors: [], priority: 1, provenance: 'derived',
+      scope_category_key: 'african grocery store', scope_city: null, scope_state: null, scope_platform: null,
+    },
+  ];
+
+  it('rebuilds catalog_snapshot + scope_mix from the catalog table when the scan produced one', async () => {
+    mockCatalogService.applicableReasons.mockResolvedValue(CATALOG_ROWS as any);
+    mockCatalogService.currentRevision.mockResolvedValue(9);
+    const rawOutput = JSON.stringify({
+      ...JSON.parse(PAYLOAD),
+      catalog_snapshot: [{ reason_key: 'trade_manifest_only', scope_category_key: null, scope_city: null }],
+      scope_mix: { universal: 1, category: 0, location: 0, category_location: 0, platform_bound: 0 },
+    });
+
+    await service.importExternalResult({
+      campaignId: 'camp-bronze-1',
+      templateId: TEMPLATE.id,
+      rawOutput,
+    });
+
+    const config = mockProfileService.importAsDraft.mock.calls[0][0].configurationJson as any;
+    // Snapshot + mix come from the catalog rows, not the payload's echo.
+    expect(config.catalog_revision).toBe(9);
+    expect(config.scope_mix).toMatchObject({ universal: 1, category: 1, platform_bound: 0 });
+    expect(config.catalog_snapshot.map((r: any) => r.scope_category_key)).toEqual([
+      null,
+      'african grocery store',
+    ]);
+    // …resolved at this profile's scope (city/state from the campaign).
+    expect(mockCatalogService.applicableReasons).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryKey: 'african grocery store', city: 'Indianapolis', state: 'IN' }),
+      undefined,
+    );
+  });
+
+  it('keeps the payload snapshot when the catalog table is empty (migration unapplied)', async () => {
+    mockCatalogService.applicableReasons.mockResolvedValue([] as any);
+    const rawOutput = JSON.stringify({
+      ...JSON.parse(PAYLOAD),
+      catalog_snapshot: [{ reason_key: 'trade_manifest_only', scope_category_key: null }],
+      scope_mix: { universal: 1, category: 0, location: 0, category_location: 0, platform_bound: 0 },
+    });
+
+    await service.importExternalResult({
+      campaignId: 'camp-bronze-1',
+      templateId: TEMPLATE.id,
+      rawOutput,
+    });
+
+    const config = mockProfileService.importAsDraft.mock.calls[0][0].configurationJson as any;
+    expect(config.catalog_snapshot).toHaveLength(1);
+    expect(config.scope_mix).toMatchObject({ universal: 1 });
+    expect(config.catalog_revision).toBe(1);
+  });
+
+  it('leaves a snapshot-less payload alone (the city scan contracts on reason coverage)', async () => {
+    await service.importExternalResult({
+      campaignId: 'camp-bronze-1',
+      templateId: TEMPLATE.id,
+      rawOutput: PAYLOAD,
+    });
+
+    const config = mockProfileService.importAsDraft.mock.calls[0][0].configurationJson as any;
+    expect(mockCatalogService.applicableReasons).not.toHaveBeenCalled();
+    expect(config.catalog_revision).toBe(1);
+    expect(config.catalog_snapshot).toBeUndefined();
   });
 });
