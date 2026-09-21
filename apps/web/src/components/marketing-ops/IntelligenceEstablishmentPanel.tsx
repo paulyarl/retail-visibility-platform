@@ -102,14 +102,16 @@ const FOCUS_THEME: Record<
  * its focus and requires operator review + activation before downstream
  * consumption.
  *
- * - If a draft profile was imported from the establishment scan, shows a link
- *   to review and activate it in the Intelligence Profiles page.
- * - If an active profile already exists for this category/focus/scope, shows
- *   its version, last-activated date, and an operator-friendly structured view
+ * - Shows the profile for this category/focus/scope as an operator-friendly
+ *   structured view — the active profile when one exists, otherwise the
+ *   best-matching draft (labeled as a draft preview, with the activation link),
+ *   so the overview renders the scan's output before activation too
  *   (GoldStandardProfileView for gold-standard-shaped configs,
  *   BronzeStandardProfileView for the bronze_standard_scan shape,
  *   CategoryProfileView for the §10 Category Intelligence Profile shape used
  *   by emerging/competitive establishment scans).
+ * - Lists draft profiles awaiting review with a link to activate them in the
+ *   Intelligence Profiles page.
  * - For gold_standards, additionally renders the per-platform gold-standard
  *   slot coverage card (counts analyst-flagged gold-standard candidates).
  */
@@ -203,13 +205,23 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
     return platform === 'apple_maps' ? 'Apple Maps' : platform === 'bbb' ? 'BBB' : platform.charAt(0).toUpperCase() + platform.slice(1);
   };
 
-  // Per-platform gold-standard slot counts + occupants from the active
+  // The profile the detail card renders: the active profile when one exists,
+  // otherwise the best-matching draft (the draft list is scope-sorted above)
+  // so the campaign overview shows the profile before activation — a bronze
+  // establishment campaign has no active profile until the operator activates
+  // the imported draft. Drafts render as a preview only: they stay inert
+  // until activated in the Intelligence Profiles workspace.
+  const bestDraft = draftProfiles[0] ?? null;
+  const detailProfile = activeProfile ?? bestDraft;
+  const detailIsDraft = !activeProfile && bestDraft != null;
+
+  // Per-platform gold-standard slot counts + occupants from the rendered
   // profile's candidates. Gold-standards-only — emerging/competitive profiles
   // do not carry is_gold_standard candidate flags.
   const profileSlotCounts: Record<string, number> = (() => {
     const counts: Record<string, number> = {};
-    if (!activeProfile?.configuration_json) return counts;
-    const config = activeProfile.configuration_json as any;
+    if (!detailProfile?.configuration_json) return counts;
+    const config = detailProfile.configuration_json as any;
     const candidates: Array<{ platform_evaluations?: Array<{ platform: string; is_gold_standard?: boolean | null }> }> =
       Array.isArray(config.candidates) ? config.candidates : [];
     for (const c of candidates) {
@@ -224,8 +236,8 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
 
   const profileSlotOccupants: Record<string, Array<{ business_name: string; city?: string; state?: string; quality_score?: number | null; profile_url?: string | null }>> = (() => {
     const map: Record<string, Array<{ business_name: string; city?: string; state?: string; quality_score?: number | null; profile_url?: string | null }>> = {};
-    if (!activeProfile?.configuration_json) return map;
-    const config = activeProfile.configuration_json as any;
+    if (!detailProfile?.configuration_json) return map;
+    const config = detailProfile.configuration_json as any;
     const candidates: Array<{
       business_name: string;
       city?: string;
@@ -297,34 +309,48 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
               </div>
             </div>
           ) : (
-            <div className="text-sm text-gray-400">No active profile yet</div>
+            <div className="text-sm text-gray-400">
+              {bestDraft
+                ? `No active profile yet — draft v${bestDraft.version} awaiting activation`
+                : 'No active profile yet'}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Active profile — operator-friendly structured view. Gold-standard
+      {/* Profile detail — operator-friendly structured view. Gold-standard
           shapes render GoldStandardProfileView; bronze_standard_scan shapes
           render BronzeStandardProfileView; the §10 Category Intelligence
-          Profile shape (emerging/competitive) renders CategoryProfileView. */}
-      {!loading && activeProfile && (
+          Profile shape (emerging/competitive) renders CategoryProfileView.
+          Falls back to the best-matching draft so the overview shows the
+          profile before activation (the scan's output is what the operator
+          reviews when deciding to activate). */}
+      {!loading && detailProfile && (
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Active {theme.label} Profile Details
+              {detailIsDraft ? `Draft ${theme.label} Profile Details` : `Active ${theme.label} Profile Details`}
             </h5>
             <a
               href="/settings/admin/marketing-ops/intelligence-profiles"
               className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
             >
-              Manage in Intelligence Profiles →
+              {detailIsDraft ? 'Review & Activate →' : 'Manage in Intelligence Profiles →'}
             </a>
           </div>
-          {isGoldStandardProfile(activeProfile) ? (
-            <GoldStandardProfileView profile={activeProfile} />
-          ) : isBronzeStandardProfile(activeProfile) ? (
-            <BronzeStandardProfileView profile={activeProfile} />
+          {detailIsDraft && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+              Draft v{detailProfile.version} — inert until activated. Activating it retires the previously
+              active {theme.label.toLowerCase()} profile for this category and focus; nothing downstream
+              consumes it before then.
+            </p>
+          )}
+          {isGoldStandardProfile(detailProfile) ? (
+            <GoldStandardProfileView profile={detailProfile} />
+          ) : isBronzeStandardProfile(detailProfile) ? (
+            <BronzeStandardProfileView profile={detailProfile} />
           ) : (
-            <CategoryProfileView profile={activeProfile} />
+            <CategoryProfileView profile={detailProfile} />
           )}
         </div>
       )}
@@ -333,7 +359,7 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
           Mirrors the discovery overview's slot card so the establishment
           report states how many of the up-to-4 slots per platform are filled
           by the analyst-flagged establishment candidates. */}
-      {isGoldStandard && !loading && activeProfile && (
+      {isGoldStandard && !loading && detailProfile && (
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Gold Standard Slots
