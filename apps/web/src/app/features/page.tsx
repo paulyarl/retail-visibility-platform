@@ -452,13 +452,14 @@ const tiers = [
     layer: 'presence',
     price: 'Free',
     period: '',
-    tagline: "You're on the map",
-    description: 'A truthful, claimable listing in the VisibleShelf directory — sourced from public information.',
+    tagline: "Put your store on the map",
+    description: 'A verified, claimable listing in the VisibleShelf directory — claim it free, verify hours, and activate 5 free shelf slots.',
     trial: 'Always free',
     features: [
       'Listed in the VisibleShelf directory',
-      'Name, address, phone, hours & map when sourced',
+      'Verified name, address, phone & store hours',
       'Claim your listing and correct your details',
+      '5 free product slots for signature items',
       'Directory QR code',
       'SNAP/EBT visibility badge when sourced'
     ],
@@ -475,7 +476,7 @@ const tiers = [
     price: '$19',
     period: '/month',
     tagline: 'Own your directory listing',
-    description: 'The directory visibility surface — your logo, story, photos, and richer layouts.',
+    description: 'The directory visibility surface — your logo, store story, photo gallery, and richer layouts.',
     trial: '14-day free trial',
     features: [
       'Everything in Directory Presence',
@@ -496,14 +497,14 @@ const tiers = [
     price: '$29',
     period: '/month',
     tagline: 'Get found on Google',
-    description: 'The Google visibility surface — Search, Shopping, and Maps.',
+    description: 'Item-level Google search & Maps visibility with real-time POS inventory sync.',
     trial: '14-day free trial',
     features: [
       'Everything in Directory Presence',
-      'Google Search indexing',
+      'Google Search indexing for products',
       'Google Shopping visibility',
       "Google Maps / See What's In Store",
-      'Product pages hosted on VisibleShelf',
+      'Up to 75 products indexed',
       'Directory QR codes'
     ],
     excluded: ['Platform storefront', 'Any checkout'],
@@ -518,15 +519,15 @@ const tiers = [
     layer: 'presence',
     price: '$59',
     period: '/month',
-    tagline: 'Open your platform store',
-    description: 'The platform marketplace surface — a branded storefront shoppers can browse.',
+    tagline: 'Open your digital storefront',
+    description: 'The branded digital storefront surface — shoppers browse your aisles, check prices, and contact you.',
     trial: '14-day free trial',
     features: [
       'Everything in Discovery',
-      'Branded public storefront',
-      'Platform search & browse',
-      'Product categories & filtering',
-      'Store profile, hours & details',
+      'Branded mobile web storefront (PWA)',
+      'Platform search & full aisle browse',
+      'Up to 200 products indexed',
+      'Store profile, hours & directions',
       'Shopper inquiry / contact seller'
     ],
     excluded: ['Any checkout'],
@@ -543,7 +544,7 @@ const tiers = [
     price: '$79',
     period: '/month',
     tagline: 'Take deposits, drive foot traffic',
-    description: 'Deposit-based commerce with in-store pickup.',
+    description: 'Deposit-based commerce for physical retailers — turn online item searches into committed store visits.',
     trial: '14-day free trial',
     features: [
       'Everything in the presence tiers',
@@ -562,26 +563,26 @@ const tiers = [
     color: 'from-green-500 to-emerald-600'
   },
   {
-    name: 'E-commerce',
+    name: 'Storefront Checkout',
     layer: 'commerce',
     price: '$99',
     period: '/month',
-    tagline: 'Sell with full online payment',
-    description: 'Complete online payment with delivery and shipping.',
+    tagline: 'In-store pickup & direct online checkout',
+    description: 'Complete online checkout for counter pickup and local orders with 0% marketplace commission.',
     trial: '14-day free trial',
     features: [
       'Everything in the presence tiers',
-      'Full online payment collection',
-      'Delivery / fulfilment',
-      'Shipping integration',
-      'Order management',
-      'Conversion analytics'
+      '1-Click online payment collection',
+      'In-store & curbside counter pickup',
+      '0% commission on orders (keep 100% margin)',
+      'Local fulfillment & shipping options',
+      'Order management dashboard'
     ],
     excluded: ['Deposit payment options'],
     commerceMode: 'Payments: full payment only',
     cta: 'Start free trial',
     popular: false,
-    badge: 'FULL PAYMENT',
+    badge: 'CHECKOUT',
     color: 'from-cyan-500 to-blue-600'
   },
   {
@@ -589,13 +590,13 @@ const tiers = [
     layer: 'commerce',
     price: '$149',
     period: '/month',
-    tagline: 'Every channel, every payment',
-    description: 'Deposit or full payment, pickup, delivery, and shipping.',
+    tagline: 'Every channel, unified at your counter',
+    description: 'Deposit reservations or full payment, counter pickup, and real-time POS sync.',
     trial: '14-day free trial',
     features: [
       'Everything in the presence tiers',
       'Flexible payment (deposit OR full payment)',
-      'Delivery / fulfilment & shipping',
+      'In-store pickup & local fulfillment',
       'Advanced analytics',
       'API access & custom integrations',
       'Priority directory placement'
@@ -656,13 +657,13 @@ export default function FeaturesPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <Badge className="mb-4">Free to start — claim your listing</Badge>
+            <Badge className="mb-4">Built for Independent Physical Retailers</Badge>
             <h1 className="text-5xl md:text-6xl font-bold text-neutral-900 mb-6">
-              Get found. Get claimed.<br />
-              <span className="text-primary-600">Get selling — when you're ready.</span>
+              Make your physical shelves visible.<br />
+              <span className="text-primary-600">Turn local search into in-store foot traffic.</span>
             </h1>
             <p className="text-xl text-neutral-600 mb-8 max-w-3xl mx-auto">
-              One platform for the whole journey: a free directory listing sourced from public information, Google visibility, your own storefront, and the tools to turn discovery into sales. No developer, no agency.
+              Google knows your building, but can&apos;t see what&apos;s on your shelves. VisibleShelf brings your physical inventory online: start free with your claimed directory listing, index products on Google, and let nearby shoppers reserve for counter pickup with 0% commission.
             </p>
             <div className="flex items-center justify-center gap-4">
               <a href={withUTM('/directory/add-business')}>
@@ -686,11 +687,10 @@ export default function FeaturesPage() {
             className="text-center mb-12"
           >
             <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 mb-4">
-              The Challenge Every Local Retailer Faces
+              The Invisible Shelf Problem
             </h2>
             <p className="text-lg text-neutral-600 max-w-3xl mx-auto leading-relaxed">
-              You're competing against chains with unlimited budgets and entire IT departments. 
-              They have developers, marketers, and data scientists. You have... a to-do list a mile long.
+              When local customers search for specialty items on their phones, search engines send them to Amazon or big-box chains because your inventory isn&apos;t indexed. Meanwhile, delivery apps take 25%–30% of your margins for gig drivers. Your physical store already has a built-in advantage: your store IS the fulfillment center.
             </p>
           </motion.div>
           
@@ -707,27 +707,27 @@ export default function FeaturesPage() {
               <ul className="space-y-3 text-neutral-700">
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 mt-1">•</span>
-                  <span>Hire a developer ($5,000-$20,000)</span>
+                  <span>Static map pin with zero shelf inventory</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 mt-1">•</span>
-                  <span>Wait 3-6 months for launch</span>
+                  <span>Nearby customers diverted to Amazon or chains</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 mt-1">•</span>
-                  <span>Pay monthly maintenance fees</span>
+                  <span>25%–30% marketplace cut taken by delivery apps</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 mt-1">•</span>
-                  <span>Manually update every product</span>
+                  <span>Hire an expensive developer ($5,000–$20,000)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 mt-1">•</span>
-                  <span>Hope Google finds you (eventually)</span>
+                  <span>Manual spreadsheets and double-entry errors</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 mt-1">•</span>
-                  <span>Compete with outdated tools</span>
+                  <span>No customer relationship ownership</span>
                 </li>
               </ul>
             </motion.div>
@@ -739,32 +739,32 @@ export default function FeaturesPage() {
               transition={{ duration: 0.6, delay: 0.3 }}
             >
               <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center gap-2">
-                <span>✅</span> Our Way
+                <span>✅</span> The VisibleShelf Way
               </h3>
               <ul className="space-y-3 text-neutral-700">
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Generate a starter catalog in seconds</strong></span>
+                  <span><strong>Physical shelves indexed for local search</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Live on Google in minutes</strong></span>
+                  <span><strong>Turn online item search into walk-in foot traffic</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Beautiful storefront, no coding</strong></span>
+                  <span><strong>Your store is the fulfillment hub (zero driver fees)</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Auto-sync across all channels</strong></span>
+                  <span><strong>0% commission on in-store sales</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Compete with major retailers</strong></span>
+                  <span><strong>Real-time POS inventory synchronization</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 mt-1">•</span>
-                  <span><strong>Start with a free listing</strong></span>
+                  <span><strong>Start free with a claimed directory listing &amp; 5 slots</strong></span>
                 </li>
               </ul>
             </motion.div>
@@ -780,22 +780,20 @@ export default function FeaturesPage() {
               Built by Retailers, for Retailers
             </h3>
             <p className="text-lg text-neutral-600 max-w-2xl mx-auto leading-relaxed mb-6">
-              We're not a tech company trying to understand retail. We're retailers who learned 
-              tech because we were tired of expensive, complicated solutions that didn't work 
-              for real businesses like ours.
+              We&apos;re retailers who built the bridge between physical shelves and local search. We know you don&apos;t need an expensive e-commerce agency to ship boxes across the country — you need nearby customers to walk through your front door to buy what is already in stock.
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm text-neutral-700">
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-xs">
                 <span className="text-xl">🏪</span>
-                <span>Real retail experience</span>
+                <span className="font-medium">Physical Store Fulfillment</span>
               </div>
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-xs">
                 <span className="text-xl">💰</span>
-                <span>Small business pricing</span>
+                <span className="font-medium">0% Commission on Sales</span>
               </div>
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
-                <span className="text-xl">🤝</span>
-                <span>Built for your success</span>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-xs">
+                <span className="text-xl">🔍</span>
+                <span className="font-medium">Real-Time Shelf Visibility</span>
               </div>
             </div>
           </motion.div>
@@ -2755,12 +2753,12 @@ export default function FeaturesPage() {
               <div className="p-6 bg-green-50 rounded-lg">
                 <h4 className="font-semibold text-green-900 mb-4">We Own the Gap</h4>
                 <p className="text-sm text-green-800 mb-4">
-                  VisibleShelf is built specifically for the retailers everyone else forgot — with the exact features they need.
+                  VisibleShelf is built specifically for independent retailers with physical stores — with the exact tools to make their shelves visible.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-700">Designed for local retailers with physical stores</span>
+                    <span className="text-sm text-green-700">Physical store is the fulfillment hub (zero driver logistics)</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -2768,7 +2766,7 @@ export default function FeaturesPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-700">Commitment commerce model protects retailers</span>
+                    <span className="text-sm text-green-700">0% commission on in-store sales (protect your margins)</span>
                   </div>
                 </div>
               </div>
@@ -2776,8 +2774,7 @@ export default function FeaturesPage() {
 
             <div className="mt-8 p-4 bg-gradient-to-r from-purple-50 to-red-50 rounded-lg text-center">
               <p className="text-sm text-neutral-800 font-semibold">
-                🎯 <strong>Positioning Statement:</strong> We bridge local retail inventory to 
-                online discovery — with deposit-backed visits — built for the retailers who need it most.
+                🎯 <strong>Positioning Statement:</strong> We bridge physical retail shelves to local online discovery — with in-store counter pickup and deposit-backed visits — built for the retailers who need it most.
               </p>
             </div>
           </div>
@@ -3101,15 +3098,15 @@ export default function FeaturesPage() {
       <section className="py-20 bg-primary-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to be found — and ready to sell?
+            Ready to bring your physical shelves online?
           </h2>
-          <p className="text-xl text-primary-100 mb-8">
-            Your business may already be listed. Claim it free, choose how you show up, and turn on commerce when you're ready.
+          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
+            Your store may already be listed in our directory. Claim it free in 60 seconds, index your signature items, and turn nearby search into walk-in foot traffic.
           </p>
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <a href={withUTM('/directory/add-business')}>
               <Button size="lg" variant="secondary">
-                Claim Your Free Listing
+                Claim Your Free Store Listing
               </Button>
             </a>
             <Link href="/settings/contact">
