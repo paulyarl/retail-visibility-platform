@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { MarketingOpsService, type IntelligenceProfile, type IntelligenceFocus, type Campaign } from '@/services/MarketingOpsService';
 import GoldStandardProfileView, { isGoldStandardProfile } from './GoldStandardProfileView';
+import BronzeStandardProfileView from './BronzeStandardProfileView';
+import { isBronzeStandardProfile } from '@/lib/bronze-standard-profile';
 import CategoryProfileView from './CategoryProfileView';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 
@@ -105,6 +107,7 @@ const FOCUS_THEME: Record<
  * - If an active profile already exists for this category/focus/scope, shows
  *   its version, last-activated date, and an operator-friendly structured view
  *   (GoldStandardProfileView for gold-standard-shaped configs,
+ *   BronzeStandardProfileView for the bronze_standard_scan shape,
  *   CategoryProfileView for the §10 Category Intelligence Profile shape used
  *   by emerging/competitive establishment scans).
  * - For gold_standards, additionally renders the per-platform gold-standard
@@ -300,7 +303,8 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
       </div>
 
       {/* Active profile — operator-friendly structured view. Gold-standard
-          shapes render GoldStandardProfileView; the §10 Category Intelligence
+          shapes render GoldStandardProfileView; bronze_standard_scan shapes
+          render BronzeStandardProfileView; the §10 Category Intelligence
           Profile shape (emerging/competitive) renders CategoryProfileView. */}
       {!loading && activeProfile && (
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
@@ -317,6 +321,8 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
           </div>
           {isGoldStandardProfile(activeProfile) ? (
             <GoldStandardProfileView profile={activeProfile} />
+          ) : isBronzeStandardProfile(activeProfile) ? (
+            <BronzeStandardProfileView profile={activeProfile} />
           ) : (
             <CategoryProfileView profile={activeProfile} />
           )}

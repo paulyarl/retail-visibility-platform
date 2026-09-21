@@ -3384,9 +3384,13 @@ export class IntelligenceProfileService extends BaseService {
   // before discovery campaigns can run.
   //
   // Slot dimensions:
-  //   gold_standards: per platform (reference_platform), nationwide (city/state null)
-  //   emerging:       per city (reference_city)
-  //   competitive:    per city (reference_city)
+  //   gold_standards:   per platform (reference_platform), nationwide (city/state null)
+  //   bronze_standards: national establishment at city/state null; the stage-2
+  //                     city scan (discovery-kind) fills a CITY bronze profile
+  //                     at reference_city. Platform is an optional scope on
+  //                     either position (BRONZE_STANDARD_SPEC §3.6.5, §4, §6).
+  //   emerging:         per city (reference_city)
+  //   competitive:      per city (reference_city)
   //
   // Also returns the distinct cities seen across all intelligence-scope
   // campaigns (from mkt_campaigns_list) so the UI can show the city
@@ -3506,13 +3510,16 @@ export class IntelligenceProfileService extends BaseService {
       // (the platform slot reuses the all-platforms establishment profile),
       // and emerging/competitive discovery campaigns produce audits and
       // queue candidates rather than profiles — so the establishment and
-      // discovery dimensions must be tracked separately.
+      // discovery dimensions must be tracked separately. Bronze city scans
+      // (discovery-kind) DO produce a profile — the draft city bronze
+      // profile — but via a completed execution, not an audit row.
       const discoveryCampaignIds = intelligenceCampaigns
         .filter((c) => !inactiveStages.has(c.stage) &&
           c.intelligence_campaign_kind === 'discovery' &&
           (c.intelligence_focus === 'emerging' ||
             c.intelligence_focus === 'competitive' ||
-            c.intelligence_focus === 'gold_standards'))
+            c.intelligence_focus === 'gold_standards' ||
+            c.intelligence_focus === 'bronze_standards'))
         .map((c) => c.id);
       const executedDiscoveryIds = new Set<string>();
       if (discoveryCampaignIds.length > 0) {
@@ -3539,14 +3546,17 @@ export class IntelligenceProfileService extends BaseService {
       for (const c of intelligenceCampaigns) {
         if (inactiveStages.has(c.stage)) continue;
         const focus = c.intelligence_focus as IntelligenceFocus | null;
-        if (focus !== 'emerging' && focus !== 'competitive' && focus !== 'gold_standards') continue;
+        if (focus !== 'emerging' && focus !== 'competitive' && focus !== 'gold_standards' && focus !== 'bronze_standards') continue;
         const catName = (c.category ?? '').trim();
         if (!catName) continue;
         const cityNorm = (c.city ?? '').trim();
         // Gold standards are platform-dimensioned (nationwide); emerging and
         // competitive are city-dimensioned, so their slots ignore platform.
-        const isGold = focus === 'gold_standards';
-        const platNorm = isGold && c.intelligence_platform && c.intelligence_platform !== 'all'
+        // Bronze matches on BOTH axes: the stage-1 establishment is
+        // nationwide (city/state null) while the stage-2 scan is
+        // city-scoped, and either may carry an optional platform scope.
+        const isPlatformDimensioned = focus === 'gold_standards' || focus === 'bronze_standards';
+        const platNorm = isPlatformDimensioned && c.intelligence_platform && c.intelligence_platform !== 'all'
           ? c.intelligence_platform
           : null;
         const nameKey = catName.toLowerCase();
@@ -3560,12 +3570,13 @@ export class IntelligenceProfileService extends BaseService {
           entriesByName.set(nameKey, entry);
         }
         // Position matcher: city-scoped focuses match on city only — the
-        // city chip ignores platform — while gold standards match on
-        // platform (nationwide = null on both sides).
+        // city chip ignores platform — while platform-dimensioned focuses
+        // also require a platform match (gold: platform is THE dimension;
+        // bronze: city AND platform, both null for the national position).
         const samePosition = (s: any) =>
           s.focus === focus &&
           (s.city ?? '') === cityNorm &&
-          (!isGold || (s.platform ?? '') === (platNorm ?? ''));
+          (!isPlatformDimensioned || (s.platform ?? '') === (platNorm ?? ''));
 
         if (c.intelligence_campaign_kind === 'establishment') {
           // Establishment campaign — surface as 'inflight' when the position
@@ -3674,11 +3685,12 @@ export class IntelligenceProfileService extends BaseService {
           category_key,
           category_name,
           slots: slots.sort((a, b) => {
-            // Sort: gold_standards first, then emerging, then competitive,
-            // then proving_ground; within each focus, by city/platform name.
-            const focusOrder = { gold_standards: 0, emerging: 1, competitive: 2, proving_ground: 3, bronze_standards: 4 };
-            const fo = focusOrder[a.focus as keyof typeof focusOrder] ?? 3;
-            const fob = focusOrder[b.focus as keyof typeof focusOrder] ?? 3;
+            // Sort: gold_standards first, then bronze_standards, then
+            // emerging, then competitive, then proving_ground; within each
+            // focus, by city/platform name.
+            const focusOrder = { gold_standards: 0, bronze_standards: 1, emerging: 2, competitive: 3, proving_ground: 4 };
+            const fo = focusOrder[a.focus as keyof typeof focusOrder] ?? 4;
+            const fob = focusOrder[b.focus as keyof typeof focusOrder] ?? 4;
             if (fo !== fob) return fo - fob;
             const aLoc = a.city ?? a.platform ?? '';
             const bLoc = b.city ?? b.platform ?? '';

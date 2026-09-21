@@ -52,10 +52,23 @@ const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
 
 const GOLD_STANDARD_PLATFORMS = ['all', 'google', 'yelp', 'facebook', 'bbb', 'apple_maps', 'bing'];
 
+// Bronze standards are city-dimensioned like emerging/competitive, with one
+// twist: stage-1 establishment is a single NATIONWIDE profile per category
+// (city/state null) while the stage-2 city scan is a discovery-kind run that
+// produces the city bronze profile as a draft (BRONZE_STANDARD_SPEC §6). The
+// section renders a leading "Nationwide" column (establishment chip only —
+// there is no national discovery) followed by one column per city carrying
+// the city profile on top and the city scan below. The national profile is
+// the proxy establishment that unlocks every city scan —
+// resolveBronzeStandard cascades city → state → nationwide.
+const BRONZE_NATIONAL = '__national__';
+const BRONZE_DIMENSION_LABELS: Record<string, string> = { [BRONZE_NATIONAL]: 'Nationwide' };
+
 // ─── Slot state model ────────────────────────────────────────────────────
-// Every position (gold: platform, emerging/competitive: city) renders two
-// stacked chips — establishment on top, discovery on the bottom. Combined
-// the flow has seven states, each with its own color and click action:
+// Every position (gold: platform, emerging/competitive/bronze: city)
+// renders two stacked chips — establishment on top, discovery on the
+// bottom. Combined the flow has seven states, each with its own color and
+// click action:
 //
 //   1. establishment pending    gray dashed  → create campaign
 //   2. establishment in-flight  blue         → open campaign
@@ -66,10 +79,12 @@ const GOLD_STANDARD_PLATFORMS = ['all', 'google', 'yelp', 'facebook', 'bbb', 'ap
 //   7. discovery executed       teal         → open audit
 //
 // The discovery chip stays locked (pale gray, lock icon) until the
-// establishment chip is active — except gold standards, where the
-// "All Platforms" establishment profile also unlocks per-platform
-// discovery (proxy establishment: resolveGoldStandard falls back from a
-// platform-specific profile to the cross-platform one).
+// establishment chip is active — except the standards focuses, where a
+// proxy establishment unlocks it: gold's "All Platforms" profile unlocks
+// per-platform discovery (resolveGoldStandard falls back to the
+// cross-platform profile), and bronze's "Nationwide" profile unlocks
+// per-city scans (resolveBronzeStandard cascades city → state →
+// nationwide).
 
 const CAMPAIGN_URL = (id: string) => `/settings/admin/marketing-ops/campaigns/${id}`;
 const CAMPAIGN_AUDITS_URL = (id: string) => `/settings/admin/marketing-ops/campaigns/${id}?tab=audits`;
@@ -195,8 +210,9 @@ export default function CoverageClient() {
           <Text size="sm" c="dimmed">
             The coverage map shows which intelligence profiles exist (active or draft) for each category.
             Every position carries two stacked chips — establishment on top, discovery on the bottom.
-            Fill them in order: gold standards first (nationwide), then emerging/competitive establishment
-            per city, then discovery. Discovery stays locked until its establishment is active.
+            Fill them in order: gold standards first (nationwide, per platform), then the bronze national
+            profile and per-city bronze scans, then emerging/competitive establishment per city, then
+            discovery. Discovery stays locked until its establishment is active.
           </Text>
         </Box>
         <Group gap="xs">
@@ -222,11 +238,13 @@ export default function CoverageClient() {
             <Text size="xs" c="dimmed" mt={4}>
               1. Gold Standard Establishment (All Platforms, nationwide) → activate<br />
               2. Gold Standard Discovery (per platform — the All Platforms profile unlocks it)<br />
-              3. Emerging Establishment (city + category) → activate<br />
-              4. Emerging Discovery (city + category) → prospect queue<br />
-              5. Competitive Establishment (city + category) → activate<br />
-              6. Competitive Discovery (city + category) → prospect queue<br />
-              7. Proving Ground (city + category) → operator workspace aggregating the discovery runs<br />
+              3. Bronze National Establishment (nationwide) → activate<br />
+              4. Bronze City Scan (city + category — the national profile unlocks it) → activate the draft city profile<br />
+              5. Emerging Establishment (city + category) → activate<br />
+              6. Emerging Discovery (city + category) → prospect queue (framed by the city bronze profile)<br />
+              7. Competitive Establishment (city + category) → activate<br />
+              8. Competitive Discovery (city + category) → prospect queue<br />
+              9. Proving Ground (city + category) → operator workspace aggregating the discovery runs<br />
               <Text size="xs" c="dimmed" fs="italic" mt={4}>
                 Thin market? Skip competitive (steps 5-6). Keep gold standard — it's reusable across cities.
                 Promote a discovery run into a proving ground once prospects exist for the city.
@@ -276,6 +294,7 @@ export default function CoverageClient() {
       {/* ─── Coverage matrix ─── */}
       {filteredCategories.map((cat) => {
         const goldSlots = cat.slots.filter((s) => s.focus === 'gold_standards');
+        const bronzeSlots = cat.slots.filter((s) => s.focus === 'bronze_standards');
         const emergingSlots = cat.slots.filter((s) => s.focus === 'emerging');
         const competitiveSlots = cat.slots.filter((s) => s.focus === 'competitive');
         const provingGroundSlots = cat.slots.filter((s) => s.focus === 'proving_ground');
@@ -286,10 +305,12 @@ export default function CoverageClient() {
         const discoveryInflightCount = cat.slots.filter(s => s.discovery_status === 'inflight').length;
         const executedCount = cat.slots.filter(s => s.discovery_status === 'executed').length;
 
-        // Cities that have emerging, competitive, or proving-ground profiles for this category.
+        // Cities that have emerging, competitive, bronze, or proving-ground
+        // profiles for this category.
         const categoryCities = new Set([
           ...emergingSlots.map((s) => s.city).filter(Boolean) as string[],
           ...competitiveSlots.map((s) => s.city).filter(Boolean) as string[],
+          ...bronzeSlots.map((s) => s.city).filter(Boolean) as string[],
           ...provingGroundSlots.map((s) => s.city).filter(Boolean) as string[],
         ]);
 
@@ -345,6 +366,23 @@ export default function CoverageClient() {
               dimensionKey="platform"
               dimensionValues={GOLD_STANDARD_PLATFORMS}
               dimensionLabels={PLATFORM_LABELS}
+            />
+
+            {/* Bronze Standards — the leading Nationwide column carries the
+                stage-1 national profile (establishment only); each city
+                column tracks the stage-2 scan below and the city bronze
+                profile it produces on top. */}
+            <CoverageSection
+              title="Bronze Standards (nationwide establishment + per-city scans)"
+              focus="bronze_standards"
+              slots={bronzeSlots}
+              category={cat}
+              cityFilter={cityFilter}
+              slotStatus={slotStatus}
+              createLink={createCampaignLink}
+              dimensionKey="city"
+              dimensionValues={[BRONZE_NATIONAL, ...(cityFilter ? [cityFilter] : allCities)]}
+              dimensionLabels={BRONZE_DIMENSION_LABELS}
             />
 
             {/* Emerging section — per city */}
@@ -451,7 +489,8 @@ function StateLegend() {
           <Text size="xs" c="dimmed" mt={2}>
             Each position carries two stacked chips — establishment (top) and discovery (bottom).
             Discovery stays locked until establishment is active. Gold standards: the All Platforms
-            establishment also unlocks per-platform discovery.
+            establishment also unlocks per-platform discovery. Bronze standards: the Nationwide
+            profile unlocks every per-city scan.
           </Text>
           <Group gap="xs" mt="sm" align="center">
             {items.map((it) => (
@@ -489,8 +528,8 @@ function StateLegend() {
 }
 
 // ─── Coverage Section ───────────────────────────────────────────────────
-// Renders a sub-section for one focus (gold_standards / emerging /
-// competitive / proving_ground). Non-PG focuses render a stacked
+// Renders a sub-section for one focus (gold_standards / bronze_standards /
+// emerging / competitive / proving_ground). Non-PG focuses render a stacked
 // establishment + discovery chip pair per dimension value (platform or
 // city); proving ground renders a single workspace chip.
 
@@ -526,15 +565,20 @@ function CoverageSection({
 }: CoverageSectionProps) {
   const hasAny = slots.length > 0;
   const isPg = focus === 'proving_ground';
+  const isBronze = focus === 'bronze_standards';
 
-  // Gold standards only: the All Platforms establishment profile is a proxy
-  // that unlocks per-platform discovery (the backend resolver falls back
-  // from a platform-specific profile to the cross-platform one, so a
-  // platform-specific establishment is optional before platform discovery).
-  const allPlatformSlot = focus === 'gold_standards'
-    ? slotStatus(category, 'gold_standards', undefined, 'all')
-    : null;
-  const allPlatformEstablishmentActive = allPlatformSlot?.status === 'active';
+  // Proxy establishment: gold standards' All Platforms profile unlocks
+  // per-platform discovery (the backend resolver falls back from a
+  // platform-specific profile to the cross-platform one), and bronze's
+  // Nationwide profile (city/state/platform all null) unlocks every
+  // per-city scan (resolveBronzeStandard cascades city → state →
+  // nationwide). A platform-scoped national bronze profile does NOT count —
+  // it only backs city scans scoped to that same platform.
+  const proxyEstablishmentActive = focus === 'gold_standards'
+    ? slotStatus(category, 'gold_standards', undefined, 'all')?.status === 'active'
+    : isBronze
+    ? slotStatus(category, 'bronze_standards', null, 'all')?.status === 'active'
+    : false;
 
   return (
     <Box mb="sm">
@@ -565,7 +609,10 @@ function CoverageSection({
         {dimensionValues.map((dimVal) => {
           const isPlatform = dimensionKey === 'platform';
           const platform = isPlatform ? dimVal : undefined;
-          const city = !isPlatform ? dimVal : undefined;
+          // Bronze only: the Nationwide sentinel maps to the city=null
+          // (national) position rather than to a city named after it.
+          const isNationalColumn = isBronze && dimVal === BRONZE_NATIONAL;
+          const city = !isPlatform ? (isNationalColumn ? null : dimVal) : undefined;
           const slot = slotStatus(category, focus, city, platform);
           const label = dimensionLabels?.[dimVal] ?? dimVal;
 
@@ -590,7 +637,8 @@ function CoverageSection({
               category={category}
               city={city}
               platform={platform}
-              allPlatformEstablishmentActive={allPlatformEstablishmentActive}
+              isNational={isNationalColumn}
+              proxyEstablishmentActive={proxyEstablishmentActive}
               createLink={createLink}
             />
           );
@@ -618,9 +666,10 @@ interface SlotPairProps {
   slot: CoverageSlot | null;
   focus: IntelligenceFocus;
   category: CoverageCategory;
-  city?: string;
+  city?: string | null;
   platform?: string;
-  allPlatformEstablishmentActive: boolean;
+  isNational?: boolean;
+  proxyEstablishmentActive: boolean;
   createLink: (params: {
     focus: IntelligenceFocus;
     kind: 'establishment' | 'discovery';
@@ -633,14 +682,16 @@ interface SlotPairProps {
 
 function SlotPair({
   label, slot, focus, category, city, platform,
-  allPlatformEstablishmentActive, createLink,
+  isNational, proxyEstablishmentActive, createLink,
 }: SlotPairProps) {
   // Discovery is unlocked once this position's establishment is active —
-  // or, for gold standards, once the All Platforms establishment is active
-  // (proxy establishment: platform-specific establishment is optional).
+  // or, for the standards focuses, once the proxy establishment is active
+  // (gold: the All Platforms profile; bronze: the Nationwide profile).
   const isGold = focus === 'gold_standards';
+  const isBronze = focus === 'bronze_standards';
   const establishmentActive = slot?.status === 'active' ||
-    (isGold && !!platform && platform !== 'all' && allPlatformEstablishmentActive);
+    (isGold && !!platform && platform !== 'all' && proxyEstablishmentActive) ||
+    (isBronze && !isNational && proxyEstablishmentActive);
 
   return (
     <Stack gap={3}>
@@ -651,19 +702,35 @@ function SlotPair({
         category={category}
         city={city}
         platform={platform}
+        proxyEstablishmentActive={proxyEstablishmentActive}
         createLink={createLink}
       />
-      <DiscoveryChip
-        slot={slot}
-        focus={focus}
-        category={category}
-        city={city}
-        platform={platform}
-        establishmentActive={establishmentActive}
-        isGold={isGold}
-        allPlatformEstablishmentActive={allPlatformEstablishmentActive}
-        createLink={createLink}
-      />
+      {isNational ? (
+        // Bronze has no national discovery — stage-2 scans are city-scoped.
+        <Tooltip label="Bronze discovery runs per city — each city column carries its own scan chip">
+          <Group gap={4} style={{
+            padding: '4px 10px',
+            borderRadius: 6,
+            background: 'var(--mantine-color-gray-0)',
+            border: '1px solid var(--mantine-color-gray-3)',
+            opacity: 0.65,
+          }}>
+            <Text size="xs" c="dimmed" fs="italic">per-city scans</Text>
+          </Group>
+        </Tooltip>
+      ) : (
+        <DiscoveryChip
+          slot={slot}
+          focus={focus}
+          category={category}
+          city={city}
+          platform={platform}
+          establishmentActive={establishmentActive}
+          isGold={isGold}
+          isBronze={isBronze}
+          createLink={createLink}
+        />
+      )}
     </Stack>
   );
 }
@@ -677,8 +744,9 @@ interface EstablishmentChipProps {
   slot: CoverageSlot | null;
   focus: IntelligenceFocus;
   category: CoverageCategory;
-  city?: string;
+  city?: string | null;
   platform?: string;
+  proxyEstablishmentActive: boolean;
   createLink: (params: {
     focus: IntelligenceFocus;
     kind: 'establishment' | 'discovery';
@@ -690,16 +758,59 @@ interface EstablishmentChipProps {
 }
 
 function EstablishmentChip({
-  label, slot, focus, category, city, platform, createLink,
+  label, slot, focus, category, city, platform, proxyEstablishmentActive, createLink,
 }: EstablishmentChipProps) {
   // State 1 — pending: no campaign, no profile. Click creates the
   // establishment campaign for this position.
   if (!slot || slot.status === 'pending') {
+    // Bronze city positions have no establishment campaign — the city
+    // bronze profile is produced by the stage-2 discovery scan. Locked
+    // until the Nationwide profile is active; then the chip opens the
+    // city-scan create form (the same target as the discovery chip below).
+    if (focus === 'bronze_standards' && city != null) {
+      if (!proxyEstablishmentActive) {
+        return (
+          <Tooltip label="City bronze profile — activate the Nationwide bronze profile first">
+            <Group gap={4} style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              background: 'var(--mantine-color-gray-0)',
+              border: '1px solid var(--mantine-color-gray-3)',
+              opacity: 0.65,
+              cursor: 'default',
+            }}>
+              <IconLock size={14} color="var(--mantine-color-gray-5)" />
+              <Text size="xs" c="dimmed">{label}</Text>
+            </Group>
+          </Tooltip>
+        );
+      }
+      return (
+        <Link href={createLink({
+          focus, kind: 'discovery',
+          category: category.category_name,
+          city, state: slot?.state ?? undefined, platform,
+        })}>
+          <Tooltip label="No city bronze profile yet — produced by the city scan. Click to create the scan campaign">
+            <Group gap={4} style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              background: 'var(--mantine-color-gray-1)',
+              border: '1px dashed var(--mantine-color-gray-4)',
+              cursor: 'pointer',
+            }}>
+              <IconPlus size={14} color="var(--mantine-color-gray-5)" />
+              <Text size="xs" c="dimmed">{label}</Text>
+            </Group>
+          </Tooltip>
+        </Link>
+      );
+    }
     return (
       <Link href={createLink({
         focus, kind: 'establishment',
         category: category.category_name,
-        city, state: slot?.state ?? undefined, platform,
+        city: city ?? undefined, state: slot?.state ?? undefined, platform,
       })}>
         <Tooltip label={`1 · Establishment pending — click to create the campaign`}>
           <Group gap={4} style={{
@@ -789,11 +900,11 @@ interface DiscoveryChipProps {
   slot: CoverageSlot | null;
   focus: IntelligenceFocus;
   category: CoverageCategory;
-  city?: string;
+  city?: string | null;
   platform?: string;
   establishmentActive: boolean;
   isGold: boolean;
-  allPlatformEstablishmentActive: boolean;
+  isBronze: boolean;
   createLink: (params: {
     focus: IntelligenceFocus;
     kind: 'establishment' | 'discovery';
@@ -806,13 +917,16 @@ interface DiscoveryChipProps {
 
 function DiscoveryChip({
   slot, focus, category, city, platform,
-  establishmentActive, isGold, allPlatformEstablishmentActive, createLink,
+  establishmentActive, isGold, isBronze, createLink,
 }: DiscoveryChipProps) {
   // Locked — establishment not active for this position. For gold standards
   // the All Platforms establishment is a proxy, so a specific platform also
-  // locks when neither its own nor the All Platforms establishment is active.
+  // locks when neither its own nor the All Platforms establishment is
+  // active; bronze's proxy is the Nationwide profile.
   if (!establishmentActive) {
-    const lockHint = isGold && !!platform && platform !== 'all'
+    const lockHint = isBronze
+      ? 'Scan locked — activate the Nationwide bronze profile first'
+      : isGold && !!platform && platform !== 'all'
       ? 'Discovery locked — activate this platform\'s establishment or the All Platforms establishment first'
       : 'Discovery locked — activate the establishment profile first (state 4)';
     return (
@@ -839,7 +953,7 @@ function DiscoveryChip({
       <Link href={createLink({
         focus, kind: 'discovery',
         category: category.category_name,
-        city, state: slot?.state ?? undefined, platform,
+        city: city ?? undefined, state: slot?.state ?? undefined, platform,
       })}>
         <Tooltip label="5 · Discovery pending — click to create the campaign">
           <Group gap={4} style={{
@@ -878,10 +992,14 @@ function DiscoveryChip({
   }
 
   // State 7 — executed: discovery has a completed execution and/or an
-  // imported audit. Click opens the campaign's Audits tab.
+  // imported audit. Click opens the campaign's Audits tab — except bronze,
+  // whose scans produce a draft city profile (no audit row), so it opens
+  // the profiles workspace where that draft awaits activation.
   return (
-    <Link href={CAMPAIGN_AUDITS_URL(slot.discovery_campaign_id!)}>
-      <Tooltip label="7 · Discovery executed — click to open the audit">
+    <Link href={isBronze ? PROFILES_URL : CAMPAIGN_AUDITS_URL(slot.discovery_campaign_id!)}>
+      <Tooltip label={isBronze
+        ? '7 · City scan executed — draft profile imported; click to review & activate it'
+        : '7 · Discovery executed — click to open the audit'}>
         <Group gap={4} style={{
           padding: '4px 10px',
           borderRadius: 6,
@@ -906,7 +1024,7 @@ interface PgChipProps {
   label: string;
   slot: CoverageSlot | null;
   category: CoverageCategory;
-  city?: string;
+  city?: string | null;
 }
 
 function PgChip({ label, slot, category, city }: PgChipProps) {

@@ -43,6 +43,8 @@ import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, ProfileStatus, IntelligenceFocus, Campaign, CampaignScope } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import GoldStandardProfileView, { isGoldStandardProfile, goldStandardSummary } from '@/components/marketing-ops/GoldStandardProfileView';
+import BronzeStandardProfileView from '@/components/marketing-ops/BronzeStandardProfileView';
+import { isBronzeStandardProfile, bronzeStandardSummary } from '@/lib/bronze-standard-profile';
 import CategoryProfileView from '@/components/marketing-ops/CategoryProfileView';
 
 const STATUS_COLORS: Record<ProfileStatus, string> = {
@@ -428,6 +430,7 @@ export default function IntelligenceProfilesClient() {
     const prohibited = config.prohibited_inferences as string[] | undefined;
     const key = `${profile.id}:${profile.version}`;
     const gsSummary = goldStandardSummary(profile);
+    const bsSummary = bronzeStandardSummary(profile);
 
     return (
       <Paper key={key} shadow="xs" radius="md" withBorder p="md" mb="sm">
@@ -476,6 +479,17 @@ export default function IntelligenceProfilesClient() {
                 {' '}{gsSummary.gateCount} quality gate{gsSummary.gateCount !== 1 ? 's' : ''}
                 {gsSummary.signalWeightCount > 0 && (
                   <> ·{' '}{gsSummary.signalWeightCount} signal weight{gsSummary.signalWeightCount !== 1 ? 's' : ''}</>
+                )}
+              </Text>
+            )}
+            {bsSummary && (
+              <Text size="xs" c="dimmed">
+                {bsSummary.reasonCount} catalog reason{bsSummary.reasonCount !== 1 ? 's' : ''} ·
+                {' '}{bsSummary.filledCount} filled ·
+                {' '}{bsSummary.slotCount} exemplar slot{bsSummary.slotCount !== 1 ? 's' : ''} ·
+                {' '}{bsSummary.executedVectorCount}/{bsSummary.vectorCount} vector{bsSummary.vectorCount !== 1 ? 's' : ''} executed
+                {bsSummary.catalogRevision != null && (
+                  <> ·{' '}catalog r{bsSummary.catalogRevision}</>
                 )}
               </Text>
             )}
@@ -989,6 +1003,8 @@ export default function IntelligenceProfilesClient() {
               </>
             ) : isGoldStandardProfile(viewProfile) ? (
               <GoldStandardProfileView profile={viewProfile} />
+            ) : isBronzeStandardProfile(viewProfile) ? (
+              <BronzeStandardProfileView profile={viewProfile} />
             ) : (
               <CategoryProfileView profile={viewProfile} />
             )}

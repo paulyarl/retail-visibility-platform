@@ -321,6 +321,132 @@ describe('IntelligenceProfileService.getCoverage — 7-state slot model', () => 
     expect(googleSlot.discovery_campaign_id).toBe('camp-gold-disc');
   });
 
+  // ─── Bronze standards ────────────────────────────────────────────────
+  // Bronze mirrors gold's two-dimension slot model but is geo-split:
+  // stage-1 establishment is nationwide (city/state null) while the stage-2
+  // city scan is a discovery-kind campaign that produces a CITY bronze
+  // profile (BRONZE_STANDARD_SPEC §6). Platform is an optional scope.
+
+  it('bronze — national establishment campaign surfaces as in-flight at the nationwide position', async () => {
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-bronze-est',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'establishment',
+      city: null,
+      state: null,
+    }));
+    const slot = findSlot(await service.getCoverage(), 'bronze_standards', null, null);
+    expect(slot).toBeDefined();
+    expect(slot.status).toBe('inflight');
+    expect(slot.profile_id).toBe('camp-bronze-est');
+    expect(slot.discovery_status).toBe('pending');
+  });
+
+  it('bronze — national and city profiles coexist as separate positions', async () => {
+    activeProfiles.push(makeProfile({
+      id: 'prof-bronze-nat',
+      intelligence_focus: 'bronze_standards',
+      reference_city: null,
+      reference_state: null,
+      reference_platform: null,
+    }));
+    activeProfiles.push(makeProfile({
+      id: 'prof-bronze-city',
+      intelligence_focus: 'bronze_standards',
+      reference_city: 'austin',
+      reference_state: 'TX',
+      reference_platform: null,
+    }));
+    const result = await service.getCoverage();
+    const nat = findSlot(result, 'bronze_standards', null, null);
+    const city = findSlot(result, 'bronze_standards', 'austin', null);
+    expect(nat.status).toBe('active');
+    expect(nat.profile_id).toBe('prof-bronze-nat');
+    expect(city.status).toBe('active');
+    expect(city.profile_id).toBe('prof-bronze-city');
+  });
+
+  it('bronze — city scan attaches discovery state to the existing city profile slot', async () => {
+    activeProfiles.push(makeProfile({
+      id: 'prof-bronze-city',
+      intelligence_focus: 'bronze_standards',
+      reference_city: 'austin',
+      reference_state: 'TX',
+    }));
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-bronze-disc',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'discovery',
+    }));
+    const slots = findSlots(await service.getCoverage(), 'bronze_standards', 'austin', null);
+    expect(slots).toHaveLength(1);
+    expect(slots[0].status).toBe('active');
+    expect(slots[0].discovery_status).toBe('inflight');
+    expect(slots[0].discovery_campaign_id).toBe('camp-bronze-disc');
+  });
+
+  it('bronze — city scan executed via completed execution (imports produce profiles, not audits)', async () => {
+    activeProfiles.push(makeProfile({
+      id: 'prof-bronze-nat',
+      intelligence_focus: 'bronze_standards',
+      reference_city: null,
+      reference_state: null,
+      reference_platform: null,
+    }));
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-bronze-disc',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'discovery',
+    }));
+    executedCampaignIds.add('camp-bronze-disc');
+    const result = await service.getCoverage();
+    // The scan claims the city position — the nationwide slot keeps a
+    // dormant discovery dimension (same shape as gold's all-platforms slot).
+    const nat = findSlot(result, 'bronze_standards', null, null);
+    expect(nat.status).toBe('active');
+    expect(nat.discovery_status).toBe('pending');
+    const city = findSlot(result, 'bronze_standards', 'austin', null);
+    expect(city.status).toBe('pending');
+    expect(city.discovery_status).toBe('executed');
+    expect(city.discovery_campaign_id).toBe('camp-bronze-disc');
+  });
+
+  it('bronze — platform-scoped city scan does not claim the cross-platform position', async () => {
+    activeProfiles.push(makeProfile({
+      id: 'prof-bronze-city',
+      intelligence_focus: 'bronze_standards',
+      reference_city: 'austin',
+      reference_state: 'TX',
+      reference_platform: null,
+    }));
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-bronze-goog',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'discovery',
+      intelligence_platform: 'google',
+    }));
+    const result = await service.getCoverage();
+    const crossSlot = findSlot(result, 'bronze_standards', 'austin', null);
+    expect(crossSlot.status).toBe('active');
+    expect(crossSlot.discovery_status).toBe('pending');
+    const googSlot = findSlot(result, 'bronze_standards', 'austin', 'google');
+    expect(googSlot.status).toBe('pending');
+    expect(googSlot.discovery_status).toBe('inflight');
+    expect(googSlot.discovery_campaign_id).toBe('camp-bronze-goog');
+  });
+
+  it('bronze — terminal campaigns are ignored', async () => {
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-bronze-dead',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'establishment',
+      city: null,
+      state: null,
+      stage: 'closed',
+    }));
+    expect(findSlot(await service.getCoverage(), 'bronze_standards', null, null)).toBeUndefined();
+  });
+
   // ─── Proving grounds ──────────────────────────────────────────────────
 
   it('proving-ground slots render as active workspaces with a dormant discovery dimension', async () => {

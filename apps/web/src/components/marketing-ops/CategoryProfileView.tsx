@@ -141,7 +141,8 @@ interface Props {
  *
  * Used by:
  *   - IntelligenceEstablishmentPanel (campaign Overview tab, active profile)
- *   - IntelligenceProfilesClient (View modal, non-gold-standard profiles)
+ *   - IntelligenceProfilesClient (View modal — profiles that are neither
+ *     gold-standard nor bronze-standard shaped)
  */
 export default function CategoryProfileView({ profile }: Props) {
   const config = (profile.configuration_json ?? {}) as CategoryProfileConfig;
