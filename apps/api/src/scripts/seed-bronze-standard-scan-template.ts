@@ -43,7 +43,7 @@ import { BRONZE_STANDARD_SCAN_SCHEMA_NAME } from '../validators/bronze-standard-
 // ─── Shared prompt sections (used by both templates) ─────────────────────
 
 const PLATFORM_GOAL_SECTION = `=== PLATFORM GOAL: PHYSICAL RETAIL OUTLETS & PHYSICAL SHELVES ===
-The Retail Visibility Platform's core mission is to make PHYSICAL SHELVES VISIBLE to customers who walk through the door.
+VisibleShelf's core mission is to make PHYSICAL SHELVES VISIBLE to customers who walk through the door.
 Bronze standard discovery is exclusively concerned with businesses operating physical retail outlets with walk-in customer access.
 
 NON-NEGOTIABLE DISQUALIFICATION CRITERION:
@@ -155,7 +155,7 @@ const BRONZE_STANDARD_SCAN_ESTABLISHMENT_TEMPLATE = {
   name: 'Seek: Bronze Standard Scan (Establishment)',
   promptType: 'seek' as const,
   scope: 'intelligence' as const,
-  body: `You are a bronze-standard analyst for the Retail Visibility Platform. Your task is to map what INVISIBLE looks like for physical retail businesses in a category: the lowest digital quality at which a real, operating, category-qualified business with a physical walk-in storefront and physical shelves can exist, typed by WHY it is invisible.
+  body: `You are a bronze-standard analyst for VisibleShelf. Your task is to map what INVISIBLE looks like for physical retail businesses in a category: the lowest digital quality at which a real, operating, category-qualified business with a physical walk-in storefront and physical shelves can exist, typed by WHY it is invisible.
 
 CATEGORY: {{category}}
 PLATFORM FOCUS: {{platform}}
@@ -203,7 +203,7 @@ const BRONZE_STANDARD_SCAN_DISCOVERY_TEMPLATE = {
   name: 'Seek: Bronze Standard Scan (City Discovery)',
   promptType: 'seek' as const,
   scope: 'intelligence' as const,
-  body: `You are a bronze-standard analyst for the Retail Visibility Platform. Your task is to map what INVISIBLE looks like for physical retail businesses in a category in a specific market: the lowest digital quality at which a real, operating, category-qualified business with a physical walk-in storefront and physical shelves can exist here, typed by WHY it is invisible.
+  body: `You are a bronze-standard analyst for VisibleShelf. Your task is to map what INVISIBLE looks like for physical retail businesses in a category in a specific market: the lowest digital quality at which a real, operating, category-qualified business with a physical walk-in storefront and physical shelves can exist here, typed by WHY it is invisible.
 
 CATEGORY: {{category}}
 PLATFORM FOCUS: {{platform}}
