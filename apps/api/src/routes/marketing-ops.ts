@@ -1137,6 +1137,9 @@ router.get('/', async (req: any, res: Response) => {
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 50,
       intelligenceCampaignKind: req.query.intelligence_campaign_kind,
+      intelligenceFocus: req.query.intelligence_focus,
+      intelligencePlatform: req.query.intelligence_platform,
+      state: req.query.state,
       // Proving-ground drill-down: business campaigns in this PG's tree
       // (queue-graduated + direct parent-linked).
       provingGroundId: req.query.proving_ground_id as string | undefined,

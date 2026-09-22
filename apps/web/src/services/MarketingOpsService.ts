@@ -2183,6 +2183,9 @@ class MarketingOpsService extends AdminApiSingleton {
     page?: number;
     limit?: number;
     intelligenceCampaignKind?: 'discovery' | 'establishment';
+    intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
+    intelligencePlatform?: string;
+    state?: string;
     // Proving-ground drill-down: business campaigns in this PG's tree.
     provingGroundId?: string;
   }): Promise<{ items: Campaign[]; total: number }> {
@@ -2200,6 +2203,9 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.page) params.set('page', String(filters.page));
     if (filters?.limit) params.set('limit', String(filters.limit));
     if (filters?.intelligenceCampaignKind) params.set('intelligence_campaign_kind', filters.intelligenceCampaignKind);
+    if (filters?.intelligenceFocus) params.set('intelligence_focus', filters.intelligenceFocus);
+    if (filters?.intelligencePlatform) params.set('intelligence_platform', filters.intelligencePlatform);
+    if (filters?.state) params.set('state', filters.state);
     if (filters?.provingGroundId) params.set('proving_ground_id', filters.provingGroundId);
     const query = params.toString();
     const url = `${BASE_URL}${query ? `?${query}` : ''}`;

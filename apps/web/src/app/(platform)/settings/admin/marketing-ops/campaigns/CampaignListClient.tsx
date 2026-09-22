@@ -25,6 +25,12 @@ const RECOVERY_CLOSED_STAGES: string[] = ['dead', 'resolved_and_closed'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city', 'intelligence'];
+const CAMPAIGN_CATEGORY_OPTIONS = [
+  'review_management', 'recovery_management', 'profile_repair',
+  'triage_management', 'proving_ground', 'directory_enrichment',
+];
+const INTELLIGENCE_FOCUS_OPTIONS = ['emerging', 'competitive', 'gold_standards', 'bronze_standards'];
+const INTELLIGENCE_KIND_OPTIONS = ['establishment', 'discovery'];
 
 type FollowUpFilter = '' | 'overdue' | 'due_today' | 'this_week';
 
@@ -74,6 +80,11 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
   const [cityFilter, setCityFilter] = useState('');
   const [retainerFilter, setRetainerFilter] = useState<'Fast' | 'Medium' | 'Slow' | ''>('');
   const [attributeFilter, setAttributeFilter] = useState('');
+  const [campaignCategoryFilter, setCampaignCategoryFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [focusFilter, setFocusFilter] = useState('');
+  const [kindFilter, setKindFilter] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('');
   const [showClosed, setShowClosed] = useState(false);
   // Three-way view toggle: Active (excludes closed stages), Archived (only
@@ -103,6 +114,11 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
         city: cityFilter || undefined,
         retainer: retainerFilter || undefined,
         attributes: attributeFilter ? [attributeFilter] : undefined,
+        campaignCategory: (campaignCategoryFilter || undefined) as any,
+        state: stateFilter || undefined,
+        intelligenceFocus: (focusFilter || undefined) as any,
+        intelligenceCampaignKind: (kindFilter || undefined) as any,
+        intelligencePlatform: platformFilter || undefined,
         provingGroundId: provingGroundId || undefined,
         limit: 200,
       });
@@ -112,7 +128,7 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, scopeFilter, toneFilter, categoryFilter, cityFilter, retainerFilter, attributeFilter, provingGroundId]);
+  }, [search, stageFilter, scopeFilter, toneFilter, categoryFilter, cityFilter, retainerFilter, attributeFilter, campaignCategoryFilter, stateFilter, focusFilter, kindFilter, platformFilter, provingGroundId]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -142,6 +158,23 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
       );
       return hasNational ? [cities, ['__all__']].flat() : cities;
     },
+    [campaigns],
+  );
+  const stateOptions = useMemo(
+    // Same national semantics as city — national intelligence campaigns store
+    // state as '__all__' or null; expose a labelled "National" option for both.
+    () => {
+      const states = distinctValues(campaigns, (c) => c.state)
+        .filter((v) => v.trim().toLowerCase() !== '__all__');
+      const hasNational = campaigns.some(
+        (c) => c.scope === 'intelligence' && (!c.state?.trim() || c.state.trim().toLowerCase() === '__all__'),
+      );
+      return hasNational ? [...states, '__all__'] : states;
+    },
+    [campaigns],
+  );
+  const platformOptions = useMemo(
+    () => distinctValues(campaigns, (c) => c.intelligence_platform),
     [campaigns],
   );
 
@@ -238,21 +271,35 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
           </select>
           <select
             value={scopeFilter}
-            onChange={(e) => setScopeFilter(e.target.value as CampaignScope | '')}
+            onChange={(e) => {
+              const s = e.target.value as CampaignScope | '';
+              setScopeFilter(s);
+              // Scope-conditional filters must not leak across scopes — a
+              // hidden-but-set filter would silently narrow the results.
+              if (s !== 'business') {
+                setToneFilter('');
+                setRetainerFilter('');
+                setAttributeFilter('');
+              }
+              if (s !== 'intelligence') {
+                setFocusFilter('');
+                setKindFilter('');
+                setPlatformFilter('');
+              }
+            }}
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Scopes</option>
             {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <SuggestiveSelect
-            value={toneFilter}
-            onChange={setToneFilter}
-            options={toneOptions}
-            emptyLabel="All Tones"
-            newLabel="+ Tone..."
-            newInputPlaceholder="Filter by tone"
+          <select
+            value={campaignCategoryFilter}
+            onChange={(e) => setCampaignCategoryFilter(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          >
+            <option value="">All Campaign Types</option>
+            {CAMPAIGN_CATEGORY_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
           <SuggestiveSelect
             value={categoryFilter}
             onChange={setCategoryFilter}
@@ -272,22 +319,74 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
             newInputPlaceholder="Filter by city"
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <select
-            value={retainerFilter}
-            onChange={(e) => setRetainerFilter(e.target.value as 'Fast' | 'Medium' | 'Slow' | '')}
+          <SuggestiveSelect
+            value={stateFilter}
+            onChange={setStateFilter}
+            options={stateOptions}
+            optionLabels={{ __all__: 'National (all markets)' }}
+            emptyLabel="All States"
+            newLabel="+ State..."
+            newInputPlaceholder="Filter by state"
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Retainers</option>
-            {RETAINER_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select
-            value={attributeFilter}
-            onChange={(e) => setAttributeFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Attributes</option>
-            {ATTRIBUTE_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
+          />
+          {scopeFilter === 'intelligence' && (
+            <>
+              <select
+                value={focusFilter}
+                onChange={(e) => setFocusFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Focuses</option>
+                {INTELLIGENCE_FOCUS_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+              <select
+                value={kindFilter}
+                onChange={(e) => setKindFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Kinds</option>
+                {INTELLIGENCE_KIND_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+              <SuggestiveSelect
+                value={platformFilter}
+                onChange={setPlatformFilter}
+                options={platformOptions}
+                emptyLabel="All Platforms"
+                newLabel="+ Platform..."
+                newInputPlaceholder="Filter by platform"
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </>
+          )}
+          {scopeFilter === 'business' && (
+            <>
+              <SuggestiveSelect
+                value={toneFilter}
+                onChange={setToneFilter}
+                options={toneOptions}
+                emptyLabel="All Tones"
+                newLabel="+ Tone..."
+                newInputPlaceholder="Filter by tone"
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <select
+                value={retainerFilter}
+                onChange={(e) => setRetainerFilter(e.target.value as 'Fast' | 'Medium' | 'Slow' | '')}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Retainers</option>
+                {RETAINER_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <select
+                value={attributeFilter}
+                onChange={(e) => setAttributeFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Attributes</option>
+                {ATTRIBUTE_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </>
+          )}
           <div className="flex items-center rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
             <button
               onClick={() => setView('table')}

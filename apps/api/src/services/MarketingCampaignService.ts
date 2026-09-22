@@ -510,6 +510,11 @@ export interface CampaignListFilters {
   provingGroundId?: string;
   // Migration 201 — filter intelligence-scope campaigns by kind
   intelligenceCampaignKind?: 'discovery' | 'establishment';
+  // Intelligence-lane dimensions: focus + platform focus (gold standards),
+  // and the campaign's state column (sentinel-aware like city).
+  intelligenceFocus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
+  intelligencePlatform?: string;
+  state?: string;
 }
 
 export interface MarkCampaignPaidInput {
@@ -2297,6 +2302,20 @@ export class MarketingCampaignService extends BaseService {
     if (filters.parentCampaignId) where.parent_campaign_id = filters.parentCampaignId;
     if (filters.businessProspectId) where.business_prospect_id = filters.businessProspectId;
     if (filters.intelligenceCampaignKind) where.intelligence_campaign_kind = filters.intelligenceCampaignKind;
+    if (filters.intelligenceFocus) where.intelligence_focus = filters.intelligenceFocus;
+    if (filters.intelligencePlatform) where.intelligence_platform = filters.intelligencePlatform;
+    if (filters.state) {
+      // Same sentinel semantics as city: '__all__' = national scope — match
+      // sentinel-stored AND geo-blank national campaigns (state is nullable,
+      // so geo-blank stores NULL, not '').
+      if (isNationalSentinel(filters.state)) {
+        (where.AND ??= []).push({
+          OR: [{ state: { equals: '__all__', mode: 'insensitive' } }, { state: null }],
+        });
+      } else {
+        where.state = filters.state;
+      }
+    }
     if (filters.provingGroundId) {
       const pgIds = await this.resolveProvingGroundCampaignIds(filters.provingGroundId);
       // Explicit empty set — `id: { in: [] }` is a valid never-match in
