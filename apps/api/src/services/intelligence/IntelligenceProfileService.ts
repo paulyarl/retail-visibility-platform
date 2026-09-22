@@ -124,6 +124,28 @@ const MAX_SLOTS_PER_REASON = 2;
 /** Provenance values that survive a re-scan (§7.3 merge rule). */
 const BRONZE_EXTERNAL_PROVENANCE = new Set(['operator_self_discovery', 'business_audit']);
 
+/**
+ * §7.3/§7.4 — a bronze fill written OUTSIDE the scan's own import path.
+ * `emerging_scan`/`competitive_scan` provenance marks consumer write-back
+ * (confirmatory — drops on re-scan unless re-found); the other two are
+ * ground truth that survives re-scans via mergeBronzeCoverage.
+ */
+export interface BronzeExternalFillSlot {
+  business_name: string;
+  address?: string | null;
+  observed_city?: string | null;
+  observed_state?: string | null;
+  observed_platform?: string | null;
+  category_fit_evidence?: string;
+  operational_evidence?: string;
+  operational_status?: string | null;
+  discovered_by: 'operator_self_discovery' | 'business_audit' | 'emerging_scan' | 'competitive_scan';
+  discovered_via?: string | null;
+  evidence_urls?: string[];
+  digital_quality?: 'low' | 'very_low';
+  platform_presence?: Record<string, string>;
+}
+
 export interface IntelligenceProfile {
   id: string;
   category_key: string;
@@ -3274,42 +3296,51 @@ export class IntelligenceProfileService extends BaseService {
 
   /**
    * §7.3 — record an out-of-loop bronze fill (business audit / operator
-   * self-discovery). Writes a NEW DRAFT VERSION carrying the prior version's
-   * reason_coverage forward with the slot appended under reasonKey — never
-   * mutates the active profile. Dedupes on business_name + address within
-   * the reason. Returns the created draft, or null when no ACTIVE profile
-   * exists at profileId (a bronze exemplar without a bronze profile is
-   * noted by the caller, not written — a single fill must not fabricate
-   * coverage the scan never ran).
+   * self-discovery). Delegates to recordBronzeExternalFills — one slot,
+   * one draft version.
    */
   async recordBronzeExternalFill(
     profileId: string,
     reasonKey: string,
-    slot: {
-      business_name: string;
-      address?: string | null;
-      observed_platform?: string | null;
-      category_fit_evidence?: string;
-      operational_evidence?: string;
-      operational_status?: string | null;
-      discovered_by: 'operator_self_discovery' | 'business_audit';
-      discovered_via?: string | null;
-      evidence_urls?: string[];
-      digital_quality?: 'low' | 'very_low';
-      platform_presence?: Record<string, string>;
-    },
+    slot: BronzeExternalFillSlot,
+    ctx?: RequestCtx,
+  ): Promise<IntelligenceProfile | null> {
+    return this.recordBronzeExternalFills(profileId, [{ reason_key: reasonKey, slot }], ctx);
+  }
+
+  /**
+   * §7.3/§7.4 — record out-of-loop bronze fills as a NEW DRAFT VERSION
+   * carrying the prior version's reason_coverage forward — never mutates
+   * the active profile. One draft carries the whole batch: a discovery
+   * scan attributing five candidates produces one version, not five.
+   * Dedupes on business_name + address within each reason. Returns the
+   * created draft, or null when no ACTIVE profile exists at profileId (a
+   * bronze exemplar without a bronze profile is noted by the caller, not
+   * written — a single fill must not fabricate coverage the scan never ran).
+   *
+   * Provenance contract: `emerging_scan`/`competitive_scan` slots are
+   * CONFIRMATORY (§7.2) — they prove a reason's vector/signal surfaced a
+   * business the establishment scan missed, and drop on re-scan unless
+   * re-found. `operator_self_discovery`/`business_audit` are ground truth
+   * and survive re-scans via mergeBronzeCoverage.
+   */
+  async recordBronzeExternalFills(
+    profileId: string,
+    fills: Array<{ reason_key: string; slot: BronzeExternalFillSlot }>,
     ctx?: RequestCtx,
   ): Promise<IntelligenceProfile | null> {
     try {
+      if (fills.length === 0) return null;
+
       // Load the active version for this profile id.
       const active = await this.prisma.mkt_intelligence_profiles.findFirst({
         where: { id: profileId, status: 'active' },
         orderBy: { version: 'desc' },
       });
       if (!active || active.intelligence_focus !== 'bronze_standards') {
-        logger.info('recordBronzeExternalFill: no active bronze profile — fill not recorded', ctx, {
+        logger.info('recordBronzeExternalFills: no active bronze profile — fills not recorded', ctx, {
           profileId,
-          reasonKey,
+          fillCount: fills.length,
         });
         return null;
       }
@@ -3321,22 +3352,24 @@ export class IntelligenceProfileService extends BaseService {
 
       const dedupeKey = (s: any) =>
         `${(s.business_name || '').trim().toLowerCase()}|${(s.address || '').trim().toLowerCase()}`;
-      const newKey = dedupeKey(slot);
 
-      let entry = priorCoverage.find((e: any) => e.reason_key === reasonKey);
-      if (!entry) {
-        entry = { reason_key: reasonKey, status: 'filled', slots: [], empty_slot_note: null };
-        priorCoverage.push(entry);
+      for (const { reason_key, slot } of fills) {
+        const newKey = dedupeKey(slot);
+        let entry = priorCoverage.find((e: any) => e.reason_key === reason_key);
+        if (!entry) {
+          entry = { reason_key, status: 'filled', slots: [], empty_slot_note: null };
+          priorCoverage.push(entry);
+        }
+        const existingIdx = (entry.slots as any[]).findIndex((s: any) => dedupeKey(s) === newKey);
+        if (existingIdx >= 0) {
+          // Re-audit of the same business — update the slot in place.
+          entry.slots[existingIdx] = { ...entry.slots[existingIdx], ...slot };
+        } else {
+          entry.slots.push(slot);
+        }
+        entry.status = 'filled';
+        entry.empty_slot_note = null;
       }
-      const existingIdx = (entry.slots as any[]).findIndex((s: any) => dedupeKey(s) === newKey);
-      if (existingIdx >= 0) {
-        // Re-audit of the same business — update the slot in place.
-        entry.slots[existingIdx] = { ...entry.slots[existingIdx], ...slot };
-      } else {
-        entry.slots.push(slot);
-      }
-      entry.status = 'filled';
-      entry.empty_slot_note = null;
 
       const newConfig = { ...priorConfig, reason_coverage: priorCoverage };
       const maxVersion = await this.prisma.mkt_intelligence_profiles.findFirst({
@@ -3358,19 +3391,19 @@ export class IntelligenceProfileService extends BaseService {
           status: 'draft',
         },
       });
-      logger.info('Bronze external fill recorded as draft version', ctx, {
+      logger.info('Bronze external fills recorded as draft version', ctx, {
         profileId,
-        reasonKey,
-        businessName: slot.business_name,
-        discoveredBy: slot.discovered_by,
+        fillCount: fills.length,
+        reasonKeys: [...new Set(fills.map((f) => f.reason_key))],
+        discoveredBy: [...new Set(fills.map((f) => f.slot.discovered_by))],
         newVersion: draft.version,
       });
       return draft as IntelligenceProfile;
     } catch (error) {
-      logger.error('IntelligenceProfileService.recordBronzeExternalFill failed', ctx, {
+      logger.error('IntelligenceProfileService.recordBronzeExternalFills failed', ctx, {
         error: (error as Error).message,
         profileId,
-        reasonKey,
+        fillCount: fills.length,
       });
       throw this.handleError(error, ctx);
     }

@@ -263,6 +263,83 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
     });
   });
 
+  describe('recordBronzeExternalFills (§7.4 consumer write-back)', () => {
+    it('carries a multi-reason batch into ONE new draft version', async () => {
+      const active = PROFILE({
+        version: 2,
+        configuration_json: {
+          reason_coverage: [
+            { reason_key: 'r1', status: 'empty_unproven', slots: [], empty_slot_note: 'executed, returned 0' },
+            { reason_key: 'r2', status: 'filled', slots: [{ business_name: 'Prior Co', address: '1 A St', discovered_by: 'bronze_establishment_scan' }] },
+          ],
+        } as any,
+      });
+      mockPrisma.mkt_intelligence_profiles.findFirst
+        .mockResolvedValueOnce(active)
+        .mockResolvedValueOnce({ version: 2 });
+      mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ id: 'mip-bronze-1', version: 3 });
+
+      const draft = await service.recordBronzeExternalFills('mip-bronze-1', [
+        { reason_key: 'r1', slot: { business_name: 'KCK Grocery', address: '900 Central', observed_city: 'Kansas City', observed_state: 'KS', discovered_by: 'emerging_scan', discovered_via: 'community vector' } },
+        { reason_key: 'r2', slot: { business_name: 'Second Co', address: '2 B St', discovered_by: 'emerging_scan' } },
+        { reason_key: 'r3', slot: { business_name: 'Third Co', discovered_by: 'emerging_scan' } },
+      ]);
+
+      expect(draft).not.toBeNull();
+      expect(mockPrisma.mkt_intelligence_profiles.create).toHaveBeenCalledTimes(1);
+      const config = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data.configuration_json;
+      const r1 = config.reason_coverage.find((e: any) => e.reason_key === 'r1');
+      expect(r1.status).toBe('filled');
+      expect(r1.empty_slot_note).toBeNull();
+      expect(r1.slots[0]).toMatchObject({
+        business_name: 'KCK Grocery',
+        discovered_by: 'emerging_scan',
+        observed_city: 'Kansas City',
+        observed_state: 'KS',
+      });
+      const r2 = config.reason_coverage.find((e: any) => e.reason_key === 'r2');
+      expect(r2.slots.map((s: any) => s.business_name)).toEqual(['Prior Co', 'Second Co']);
+      // A reason absent from prior coverage gets a new filled entry.
+      const r3 = config.reason_coverage.find((e: any) => e.reason_key === 'r3');
+      expect(r3.status).toBe('filled');
+      expect(r3.slots).toHaveLength(1);
+    });
+
+    it('dedupes the same business written under one reason within the batch', async () => {
+      const active = PROFILE({ configuration_json: { reason_coverage: [] } as any });
+      mockPrisma.mkt_intelligence_profiles.findFirst
+        .mockResolvedValueOnce(active)
+        .mockResolvedValueOnce({ version: 1 });
+      mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ id: 'mip-bronze-1', version: 2 });
+
+      await service.recordBronzeExternalFills('mip-bronze-1', [
+        { reason_key: 'r1', slot: { business_name: 'Dup Co', address: '5 Main', discovered_by: 'emerging_scan' } },
+        { reason_key: 'r1', slot: { business_name: 'dup co', address: '5 Main', discovered_by: 'emerging_scan', discovered_via: 'second hit' } },
+      ]);
+
+      const config = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data.configuration_json;
+      const entry = config.reason_coverage.find((e: any) => e.reason_key === 'r1');
+      expect(entry.slots).toHaveLength(1);
+      // Re-hit updates in place — the second fill's fields merge over the first.
+      expect(entry.slots[0].discovered_via).toBe('second hit');
+    });
+
+    it('returns null on an empty fill set without touching the DB', async () => {
+      const result = await service.recordBronzeExternalFills('mip-bronze-1', []);
+      expect(result).toBeNull();
+      expect(mockPrisma.mkt_intelligence_profiles.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns null when no ACTIVE bronze profile exists (fills noted, not written)', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(null);
+      const result = await service.recordBronzeExternalFills('mip-bronze-1', [
+        { reason_key: 'r1', slot: { business_name: 'B', discovered_by: 'emerging_scan' } },
+      ]);
+      expect(result).toBeNull();
+      expect(mockPrisma.mkt_intelligence_profiles.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('serializeBronzeStandard', () => {
     const coverageProfile = PROFILE({
       version: 3,

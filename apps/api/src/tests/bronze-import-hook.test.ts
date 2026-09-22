@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockTx, mockPrisma, mockProfileService, mockCampaignService, mockCatalogService } = vi.hoisted(() => {
   const mockTx = {
     mkt_prompt_executions_list: { create: vi.fn(async ({ data }: any) => ({ ...data })) },
-    mkt_audits_list: { create: vi.fn() },
+    mkt_audits_list: { create: vi.fn(async ({ data }: any) => ({ ...data, id: 'ma-1' })) },
   };
   const mockPrisma = {
     $transaction: vi.fn(async (fn: any) => fn(mockTx)),
@@ -29,6 +29,9 @@ const { mockTx, mockPrisma, mockProfileService, mockCampaignService, mockCatalog
       intelligence_focus: input.intelligenceFocus,
     })),
     mergeBronzeCoverage: vi.fn((_prior: any, incoming: any) => incoming ?? []),
+    resolveBronzeStandard: vi.fn(async () => null),
+    recordBronzeExternalFills: vi.fn(async () => ({ id: 'mip-bronze-1', version: 4 })),
+    resolveSignalWeightMapForCampaign: vi.fn(async () => undefined),
   };
   const mockCampaignService = { getCampaign: vi.fn() };
   const mockCatalogService = {
@@ -301,5 +304,351 @@ describe('importExternalResult — bronze_standard_scan hook', () => {
     expect(mockCatalogService.applicableReasons).not.toHaveBeenCalled();
     expect(config.catalog_revision).toBe(1);
     expect(config.catalog_snapshot).toBeUndefined();
+  });
+});
+
+// ─── Consumer write-back (spec §7.2/§7.3/§7.4) ──────────────────────────
+// The bronze establishment scan may miss a business its consumers reach:
+// an intelligence_discovery candidate carrying causal bronze_attribution
+// becomes a CONFIRMATORY (emerging_scan/competitive_scan) slot on the
+// resolved active bronze profile — one draft per import, operator
+// activation is the review gate. A business-scope audit of an attributed
+// prospect is ground truth — business_audit slots survive re-scans.
+
+const DISCOVERY_TEMPLATE = {
+  id: 'mpt-seed-intelligence-discovery-001',
+  name: 'Seek: Intelligence Discovery',
+  version: 1,
+  body: 'Discover {{category}} in {{city}}',
+  prompt_type: 'seek',
+  scope: 'intelligence',
+  output_schema: { name: 'intelligence_discovery' },
+};
+
+const BA_TEMPLATE = {
+  id: 'mpt-6oeuiizo',
+  name: 'Business Digital Audit',
+  version: 12,
+  body: 'Audit {{business_name}}',
+  prompt_type: 'seek',
+  scope: 'business',
+  output_schema: { name: 'business_analysis' },
+};
+
+const DISCOVERY_CAMPAIGN = {
+  id: 'camp-discovery-1',
+  scope: 'intelligence',
+  category: 'African Grocery Store',
+  intelligence_focus: 'emerging',
+  intelligence_campaign_kind: 'discovery',
+  intelligence_platform: null,
+  city: 'Kansas City',
+  state: 'MO',
+};
+
+const CANDIDATE = (over: Record<string, any> = {}) => ({
+  business_name: 'KCK Grocery',
+  category: 'African Grocery Store',
+  city: 'Kansas City',
+  state: 'KS',
+  address: '900 Central Ave',
+  location_status: 'inside_city',
+  ownership_type: 'independent',
+  category_fit: 'verified',
+  identity_confidence: 'high',
+  discovery_signals: ['INT_COMMUNITY_SIGNAL'],
+  discovery_provenance: [{ source: 'community forum', role: 'discovery', url: 'https://forum.example/t' }],
+  business_seek_recommended: true,
+  business_seek_priority: 'high',
+  ...over,
+});
+
+const DISCOVERY_PAYLOAD = (candidates: any[], focus = 'emerging') => JSON.stringify({
+  intelligence_mode: 'profile',
+  category: 'African Grocery Store',
+  city: 'Kansas City',
+  state: 'MO',
+  focus,
+  discovered_businesses: candidates,
+  qualifying_businesses: candidates,
+  candidate_count: candidates.length,
+  qualifying_count: candidates.length,
+  hold_count: 0,
+});
+
+const AUDIT_CAMPAIGN = {
+  id: 'camp-audit-1',
+  scope: 'business',
+  business_name: 'Arsema Food Mart',
+  category: 'African Grocery Store',
+  city: 'Kansas City',
+  state: 'MO',
+  intelligence_platform: null,
+  address_line1: '100 Main St',
+  address_city: 'Kansas City',
+  address_state: 'MO',
+  discovery_context: null,
+};
+
+const AUDIT_PAYLOAD = (over: Record<string, any> = {}) => JSON.stringify({
+  audit_metadata: {
+    audit_date: '2026-09-21',
+    requested_business: { business_name: 'Arsema Food Mart', city: 'Kansas City', state: 'MO', category: 'African Grocery Store' },
+    identity_status: 'confirmed',
+    identity_confidence: 'high',
+  },
+  summary: 'Storefront is real; digital presence is thin.',
+  platforms: {
+    google: {
+      profile_status: 'unclaimed',
+      rating: 4.6,
+      total_reviews: 41,
+      reviews_with_observable_response: 0,
+      observable_unanswered_reviews: 0,
+      observable_unanswered_negative_reviews: 0,
+      observable_unanswered_positive_reviews: 0,
+      observable_response_rate_percent: null,
+    },
+  },
+  website: { status: 'none_found' },
+  nap_consistency: { overall_status: 'consistent' },
+  digital_opportunity_score: { score: 62 },
+  high_attention: true,
+  data_quality: { confidence: 'medium' },
+  ...over,
+});
+
+describe('importExternalResult — bronze consumer write-back', () => {
+  let service: MarketingPromptService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = MarketingPromptService.getInstance();
+    mockProfileService.resolveBronzeStandard.mockResolvedValue({ id: 'mip-bronze-1', version: 2 });
+  });
+
+  it('writes attributed candidates to the resolved bronze profile as emerging_scan fills', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(DISCOVERY_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+    const attributed = CANDIDATE({
+      bronze_attribution: [{ reason_key: 'community_only_presence', basis: 'community forum mention surfaced the business' }],
+    });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      rawOutput: DISCOVERY_PAYLOAD([attributed]),
+    });
+
+    expect(mockProfileService.resolveBronzeStandard).toHaveBeenCalledWith(
+      'African Grocery Store', null, 'Kansas City', 'MO', undefined,
+    );
+    expect(mockProfileService.recordBronzeExternalFills).toHaveBeenCalledWith(
+      'mip-bronze-1',
+      [expect.objectContaining({
+        reason_key: 'community_only_presence',
+        slot: expect.objectContaining({
+          business_name: 'KCK Grocery',
+          observed_city: 'Kansas City',
+          observed_state: 'KS',
+          discovered_by: 'emerging_scan',
+          discovered_via: 'community forum mention surfaced the business',
+        }),
+      })],
+      undefined,
+    );
+  });
+
+  it('does NOT write fills for candidates without causal attribution', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(DISCOVERY_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      rawOutput: DISCOVERY_PAYLOAD([CANDIDATE()]),
+    });
+
+    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
+  });
+
+  it('skips outside_market and benchmark_only candidates even when attributed', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(DISCOVERY_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+    const att = [{ reason_key: 'r1', basis: 'vector hit' }];
+    const outside = CANDIDATE({ location_status: 'outside_market', bronze_attribution: att });
+    const benchmark = CANDIDATE({ business_name: 'Bench Co', address: '1 Bench', benchmark_only: true, bronze_attribution: att });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      // outside_market can only appear in discovered_businesses (refinement
+      // rejects it in qualifying) — pass a qualifying set containing just
+      // the benchmark candidate.
+      rawOutput: JSON.stringify({
+        intelligence_mode: 'profile',
+        category: 'African Grocery Store',
+        city: 'Kansas City',
+        state: 'MO',
+        focus: 'emerging',
+        discovered_businesses: [outside, benchmark],
+        qualifying_businesses: [benchmark],
+        candidate_count: 2,
+        qualifying_count: 1,
+        hold_count: 0,
+      }),
+    });
+
+    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
+  });
+
+  it('emits competitive_scan provenance under focus=competitive', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue({ ...DISCOVERY_CAMPAIGN, intelligence_focus: 'competitive' });
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+    const attributed = CANDIDATE({
+      bronze_attribution: [{ reason_key: 'absent_from_platform', basis: 'platform sweep surfaced it' }],
+    });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      rawOutput: DISCOVERY_PAYLOAD([attributed], 'competitive'),
+    });
+
+    expect(mockProfileService.recordBronzeExternalFills).toHaveBeenCalledWith(
+      'mip-bronze-1',
+      [expect.objectContaining({
+        slot: expect.objectContaining({ discovered_by: 'competitive_scan' }),
+      })],
+      undefined,
+    );
+  });
+
+  it('dedupes a business present in both discovered and qualifying sets', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(DISCOVERY_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+    const attributed = CANDIDATE({
+      bronze_attribution: [{ reason_key: 'community_only_presence', basis: 'vector' }],
+    });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      rawOutput: DISCOVERY_PAYLOAD([attributed]),
+    });
+
+    const fills = mockProfileService.recordBronzeExternalFills.mock.calls[0][1];
+    expect(fills).toHaveLength(1);
+  });
+
+  it('notes fills without writing when no active bronze profile resolves', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(DISCOVERY_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+    mockProfileService.resolveBronzeStandard.mockResolvedValue(null);
+    const attributed = CANDIDATE({
+      bronze_attribution: [{ reason_key: 'community_only_presence', basis: 'vector' }],
+    });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      rawOutput: DISCOVERY_PAYLOAD([attributed]),
+    });
+
+    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
+  });
+
+  it('writes a business_audit fill when an attributed prospect audit fails non_negotiable gates', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(BA_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(AUDIT_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      ...AUDIT_CAMPAIGN,
+      discovery_context: {
+        bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs vector surfaced it' }],
+      },
+    });
+
+    await service.importExternalResult({
+      campaignId: AUDIT_CAMPAIGN.id,
+      templateId: BA_TEMPLATE.id,
+      rawOutput: AUDIT_PAYLOAD({
+        quality_gate_results: {
+          results: [
+            { gate: 'gbp_claimed', passed: false, severity: 'non_negotiable' },
+            { gate: 'photo_count', passed: true, severity: 'recommended' },
+          ],
+        },
+      }),
+    });
+
+    expect(mockProfileService.recordBronzeExternalFills).toHaveBeenCalledWith(
+      'mip-bronze-1',
+      [expect.objectContaining({
+        reason_key: 'trade_manifest_only',
+        slot: expect.objectContaining({
+          business_name: 'Arsema Food Mart',
+          discovered_by: 'business_audit',
+          discovered_via: 'customs vector surfaced it',
+          digital_quality: 'low',
+        }),
+      })],
+      undefined,
+    );
+  });
+
+  it('does NOT write an audit fill when the attributed business passes its gates', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(BA_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(AUDIT_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      ...AUDIT_CAMPAIGN,
+      discovery_context: {
+        bronze_attribution: [{ reason_key: 'trade_manifest_only', basis: 'customs vector' }],
+      },
+    });
+
+    await service.importExternalResult({
+      campaignId: AUDIT_CAMPAIGN.id,
+      templateId: BA_TEMPLATE.id,
+      rawOutput: AUDIT_PAYLOAD({
+        quality_gate_results: { results: [{ gate: 'gbp_claimed', passed: true, severity: 'non_negotiable' }] },
+      }),
+    });
+
+    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
+  });
+
+  it('does NOT write an audit fill when the campaign carries no bronze attribution', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(BA_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(AUDIT_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({ ...AUDIT_CAMPAIGN });
+
+    await service.importExternalResult({
+      campaignId: AUDIT_CAMPAIGN.id,
+      templateId: BA_TEMPLATE.id,
+      rawOutput: AUDIT_PAYLOAD({
+        quality_gate_results: { results: [{ gate: 'gbp_claimed', passed: false, severity: 'non_negotiable' }] },
+      }),
+    });
+
+    expect(mockProfileService.resolveBronzeStandard).not.toHaveBeenCalled();
+    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
   });
 });

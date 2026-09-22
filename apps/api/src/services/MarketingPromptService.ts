@@ -893,6 +893,22 @@ export class MarketingPromptService extends BaseService {
             });
           }
         })();
+
+        // Bronze Standard System — audit-lane write-back (spec §7.3). A
+        // business-scope audit on a bronze-ATTRIBUTED prospect (campaign
+        // discovery_context.bronze_attribution) is the ground-truth
+        // verification a discovery fill lacks: when the audit fails a
+        // non_negotiable quality gate, the business is a verified bronze
+        // exemplar and each attributed reason gets a business_audit slot
+        // (survives re-scans via the §7.3 merge). Best-effort.
+        try {
+          await this.recordBronzeAuditFill(input.campaignId, parsedJson, ctx);
+        } catch (fillErr) {
+          logger.error('Bronze audit fill write-back failed (best-effort)', ctx, {
+            error: (fillErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
       }
 
       // Category-identification audit → best-effort NAP enrichment of the
@@ -1160,6 +1176,27 @@ export class MarketingPromptService extends BaseService {
         } catch (profileErr) {
           logger.error('Bronze standard profile draft persistence failed (best-effort)', ctx, {
             error: (profileErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
+      }
+
+      // Bronze Standard System — consumer write-back (spec §7.2/§7.4).
+      // The bronze establishment scan may miss a business its consumers
+      // reach: when an emerging/competitive discovery candidate carries
+      // causal bronze_attribution (the reason's vector or signal vocabulary
+      // produced the find — never mere resemblance), each attributed
+      // reason gets a CONFIRMATORY slot on the market's active bronze
+      // profile as one new DRAFT version. Operator activation remains the
+      // review gate; scan-provenance slots drop on re-scan unless re-found
+      // (§7.3 merge), which is the self-confirmation guard. Best-effort —
+      // a fill failure never fails the import.
+      if (schemaName === INTELLIGENCE_DISCOVERY_SCHEMA_NAME) {
+        try {
+          await this.recordBronzeDiscoveryFills(input.campaignId, parsedJson, ctx);
+        } catch (fillErr) {
+          logger.error('Bronze consumer fill write-back failed (best-effort)', ctx, {
+            error: (fillErr as Error).message,
             campaignId: input.campaignId,
           });
         }
@@ -1448,6 +1485,173 @@ export class MarketingPromptService extends BaseService {
         campaignId,
       });
     }
+  }
+
+  /**
+   * Bronze consumer write-back — discovery lane (spec §7.2/§7.4). An
+   * intelligence_discovery import's candidates carrying bronze_attribution
+   * are confirmatory fills for the market's bronze profile: attribution is
+   * only emitted when a catalog reason's expected vector or signal
+   * vocabulary produced the find, so each attributed reason gains a slot
+   * stamped emerging_scan/competitive_scan. Only in-market, non-benchmark
+   * candidates write; the fills land as ONE new draft version on the
+   * resolved active profile (city → state → nationwide cascade). No active
+   * profile → noted, not written.
+   */
+  private async recordBronzeDiscoveryFills(campaignId: string, parsedJson: any, ctx?: RequestCtx): Promise<void> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { category: true, intelligence_platform: true, city: true, state: true },
+    });
+    if (!campaign?.category) return;
+
+    const provenance = parsedJson.focus === 'competitive' ? 'competitive_scan' as const : 'emerging_scan' as const;
+    const seen = new Set<string>();
+    const fills: Array<{ reason_key: string; slot: any }> = [];
+    const candidates = [
+      ...(Array.isArray(parsedJson.qualifying_businesses) ? parsedJson.qualifying_businesses : []),
+      ...(Array.isArray(parsedJson.discovered_businesses) ? parsedJson.discovered_businesses : []),
+    ];
+    for (const c of candidates) {
+      if (!Array.isArray(c?.bronze_attribution) || c.bronze_attribution.length === 0) continue;
+      // Out-of-market and benchmark-only candidates are context, not fills —
+      // the fill boundary is the campaign's market.
+      if (c.location_status === 'outside_market' || c.benchmark_only === true) continue;
+      const businessKey = `${(c.business_name || '').trim().toLowerCase()}|${(c.address || '').trim().toLowerCase()}`;
+      if (seen.has(businessKey)) continue;
+      seen.add(businessKey);
+      const evidenceUrls = [...new Set<string>([
+        c.website,
+        c.gbp_url,
+        ...(Array.isArray(c.discovery_provenance) ? c.discovery_provenance.map((p: any) => p?.url) : []),
+      ].filter((u): u is string => !!u))].slice(0, 5);
+      for (const att of c.bronze_attribution) {
+        if (!att?.reason_key) continue;
+        fills.push({
+          reason_key: att.reason_key,
+          slot: {
+            business_name: c.business_name,
+            address: c.address ?? null,
+            observed_city: c.city ?? null,
+            observed_state: c.state ?? null,
+            discovered_by: provenance,
+            discovered_via: att.basis ?? null,
+            category_fit_evidence: `discovery category_fit=${c.category_fit}, identity_confidence=${c.identity_confidence}`,
+            operational_evidence: Array.isArray(c.discovery_signals) && c.discovery_signals.length
+              ? c.discovery_signals.join('; ')
+              : undefined,
+            evidence_urls: evidenceUrls.length ? evidenceUrls : undefined,
+          },
+        });
+      }
+    }
+    if (fills.length === 0) return;
+
+    const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+    const profileService = IntelligenceProfileService.getInstance();
+    const profile = await profileService.resolveBronzeStandard(
+      campaign.category, campaign.intelligence_platform, campaign.city, campaign.state, ctx,
+    );
+    if (!profile) {
+      logger.info('Bronze consumer fills noted, not written — no active bronze profile at campaign scope', ctx, {
+        campaignId,
+        category: campaign.category,
+        fillCount: fills.length,
+      });
+      return;
+    }
+    const draft = await profileService.recordBronzeExternalFills(profile.id, fills, ctx);
+    logger.info('Bronze consumer fills recorded as draft', ctx, {
+      campaignId,
+      profileId: profile.id,
+      fillCount: fills.length,
+      draftVersion: draft?.version ?? null,
+    });
+  }
+
+  /**
+   * Bronze consumer write-back — audit lane (spec §7.3). A business-scope
+   * audit on a prospect that arrived with campaign
+   * discovery_context.bronze_attribution is the ground-truth verification
+   * a discovery fill lacks: the business is real, audited, and (when at
+   * least one non_negotiable quality gate or non_negotiable gap failed)
+   * confirmed low digital quality — a verified bronze exemplar. Each
+   * attributed reason gains a business_audit slot that survives re-scans.
+   * No active profile → noted, not written.
+   */
+  private async recordBronzeAuditFill(campaignId: string, parsedJson: any, ctx?: RequestCtx): Promise<void> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: {
+        business_name: true, category: true, city: true, state: true,
+        intelligence_platform: true, discovery_context: true,
+        address_line1: true, address_city: true, address_state: true,
+      },
+    });
+    const attribution = (campaign?.discovery_context as any)?.bronze_attribution;
+    if (!Array.isArray(attribution) || attribution.length === 0) return;
+
+    // §7.3 qualification: the audit must confirm the business is a bronze
+    // exemplar — at least one failed non_negotiable quality gate, or a
+    // non_negotiable gap when the audit ran without gate results. An
+    // attributed prospect that passes its gates is not invisible.
+    const gateResults = Array.isArray(parsedJson?.quality_gate_results?.results)
+      ? parsedJson.quality_gate_results.results : [];
+    let failedGates = gateResults
+      .filter((g: any) => g?.severity === 'non_negotiable' && g?.passed === false)
+      .map((g: any) => g.gate).filter(Boolean);
+    if (gateResults.length === 0 && failedGates.length === 0) {
+      const gaps = Array.isArray(parsedJson?.gap_analysis?.gaps) ? parsedJson.gap_analysis.gaps : [];
+      failedGates = gaps
+        .filter((g: any) => g?.severity === 'non_negotiable')
+        .map((g: any) => g?.field ?? g?.gate).filter(Boolean);
+    }
+    if (failedGates.length === 0) return;
+
+    const businessName = campaign?.business_name || parsedJson?.business_name;
+    if (!businessName) return;
+
+    const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+    const profileService = IntelligenceProfileService.getInstance();
+    const profile = await profileService.resolveBronzeStandard(
+      campaign?.category || parsedJson?.category,
+      campaign?.intelligence_platform ?? null,
+      campaign?.city ?? null,
+      campaign?.state ?? null,
+      ctx,
+    );
+    if (!profile) {
+      logger.info('Bronze audit fill noted, not written — no active bronze profile at campaign scope', ctx, {
+        campaignId,
+        reasonKeys: attribution.map((a: any) => a?.reason_key).filter(Boolean),
+      });
+      return;
+    }
+
+    const address = [campaign?.address_line1, campaign?.address_city, campaign?.address_state]
+      .filter(Boolean).join(', ') || null;
+    const fills = attribution
+      .filter((a: any) => a?.reason_key)
+      .map((a: any) => ({
+        reason_key: a.reason_key as string,
+        slot: {
+          business_name: businessName,
+          address,
+          observed_city: campaign?.address_city || campaign?.city || null,
+          observed_state: campaign?.address_state || campaign?.state || null,
+          discovered_by: 'business_audit' as const,
+          discovered_via: a.basis ?? null,
+          operational_evidence: `business audit — failed non_negotiable gates: ${failedGates.join('; ')}`,
+          digital_quality: 'low' as const,
+        },
+      }));
+    const draft = await profileService.recordBronzeExternalFills(profile.id, fills, ctx);
+    logger.info('Bronze audit fill recorded as draft', ctx, {
+      campaignId,
+      profileId: profile.id,
+      fillCount: fills.length,
+      draftVersion: draft?.version ?? null,
+    });
   }
 
   // ====================

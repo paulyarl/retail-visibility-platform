@@ -999,22 +999,33 @@ verified business failing many `non_negotiable` gates **is** a bronze exemplar,
 and it arrived via the queue → audit path rather than via any scan. This is
 the highest-trust fill source and should be preferred over scan-derived fills.
 
-**Write path.** An out-of-loop fill is applied by
-`IntelligenceProfileService.recordBronzeExternalFill(profileId, reasonKey,
-slot)` — a new method that:
+**Write path.** Out-of-loop fills are applied by
+`IntelligenceProfileService.recordBronzeExternalFills(profileId,
+fills)` (single-fill calls delegate via `recordBronzeExternalFill`) —
+a method that:
 
-1. Loads the **active** city bronze profile for the (category, city, state)
-   scope. If none exists, the fill is recorded nowhere — a bronze exemplar
-   without a bronze profile is noted on the audit, not written. (Creating a
-   profile from a single audit fill would fabricate coverage the scan never
-   ran.)
-2. Writes a **new draft version** that carries the prior version's
-   `reason_coverage` forward and appends the slot under the matching
-   `reason_key` (`discovered_by: 'business_audit'`). The draft follows the
-   normal operator activation path (`activateDraft`) — an external fill never
-   silently mutates the active profile.
-3. Dedupes on `business_name` + address within the reason — a re-audit of the
-   same business updates the slot in place rather than appending.
+1. Loads the **active** bronze profile resolved at the campaign's
+   (category, platform, city, state) scope via `resolveBronzeStandard`'s
+   city → state → nationwide cascade. If none exists, the fill is recorded
+   nowhere — a bronze exemplar without a bronze profile is noted, not
+   written. (Creating a profile from a fill would fabricate coverage the
+   scan never ran.)
+2. Writes **one new draft version** that carries the prior version's
+   `reason_coverage` forward and appends every slot under its matching
+   `reason_key`. A batch of fills never produces a batch of versions. The
+   draft follows the normal operator activation path (`activateDraft`) —
+   an external fill never silently mutates the active profile.
+3. Dedupes on `business_name` + address within the reason — a re-audit of
+   the same business updates the slot in place rather than appending.
+
+**Audit-lane automation (implemented).** When a `business_analysis` audit
+imports on a campaign whose `discovery_context.bronze_attribution` is
+non-empty AND the audit confirms low digital quality (at least one failed
+`non_negotiable` quality gate, or a `non_negotiable` gap when gate results
+are absent), the import hook writes each attributed reason a
+`discovered_by: 'business_audit'` slot — ground truth that survives
+re-scans. An attributed prospect that passes its gates is not a bronze
+exemplar and writes nothing.
 
 **Merge semantics on re-scan.** Provenance is what survives a re-scan. When a
 stage-2 import produces a new draft, the post-import hook carries forward
@@ -1073,6 +1084,19 @@ attributes the find in its output JSON.
 This gives the catalog a falsifiable yield signal: reasons that repeatedly
 appear in attribution are load-bearing; reasons that never do are candidates
 for revision or deprecation (§3.5.6).
+
+**Discovery-lane write-back (implemented).** Attribution is also the gate
+for consumer fills. When an `intelligence_discovery` import carries
+candidates with `bronze_attribution`, the post-import hook writes each
+attributed reason a slot stamped `discovered_by: 'emerging_scan'` (or
+`'competitive_scan'` under competitive focus) on the market's resolved
+active profile — one draft per import, `observed_city`/`observed_state`
+carrying the candidate's real location under catchment scans. The
+§7.2 guards hold: attribution is causal (never resemblance),
+`outside_market` and `benchmark_only` candidates are excluded, scan
+provenance renders "(confirmatory)" rather than ground truth, and the
+fills drop on re-scan unless re-found — so the consumer cannot teach
+itself coverage it merely predicted.
 
 ---
 
@@ -1202,8 +1226,8 @@ in either run shape (open question 2, §11).
 | Item | Change |
 |---|---|
 | `BronzeReasonCatalogService` (new) | Catalog CRUD with write-time scope normalization (§3.5.1), revision counter management (§3.5.2), the staleness query (§3.5.3), deprecate/supersede (§3.5.6), and `audit()` calls with `actorType: 'user'` on every write (§3.5.5) |
-| `IntelligenceProfileService` | `resolveBronzeStandard(category, city, state, ctx)` — cascade: (city, state) → (null, null) national, `intelligence_focus='bronze_standards'`; `serializeBronzeStandard(profile, role)` with roles `'establishment_reference'` (stage 2: full catalog snapshot + national proof) and `'discovery'` (stage 3: §7.1 framing); `recordBronzeExternalFill(...)` (§7.3); `importAsDraft` needs no signature change — the hook passes `intelligenceFocus: 'bronze_standards'` |
-| `MarketingPromptService` | New post-import hook for `schemaName === 'bronze_standard_scan'`: persist via `importAsDraft` with `intelligence_focus='bronze_standards'`, `reference_city/state` from the campaign, `reference_platform=null`. **Keyed on schema name, not campaign kind** — stage-2 runs are discovery-kind but still produce a profile (§6.1). Discovery-kind bronze imports do **not** create an audit row. Also applies the §7.3 merge (carry forward `operator_self_discovery`/`business_audit` slots from the prior active version). Drafts are inert until `activateDraft` — activation is operator-controlled, same as gold |
+| `IntelligenceProfileService` | `resolveBronzeStandard(category, city, state, ctx)` — cascade: (city, state) → (null, null) national, `intelligence_focus='bronze_standards'`; `serializeBronzeStandard(profile, role)` with roles `'establishment_reference'` (stage 2: full catalog snapshot + national proof) and `'discovery'` (stage 3: §7.1 framing); `recordBronzeExternalFill(s)(...)` (§7.3 — batch variant carries a multi-reason fill set into one draft); `importAsDraft` needs no signature change — the hook passes `intelligenceFocus: 'bronze_standards'` |
+| `MarketingPromptService` | New post-import hook for `schemaName === 'bronze_standard_scan'`: persist via `importAsDraft` with `intelligence_focus='bronze_standards'`, `reference_city/state` from the campaign, `reference_platform=null`. **Keyed on schema name, not campaign kind** — stage-2 runs are discovery-kind but still produce a profile (§6.1). Discovery-kind bronze imports do **not** create an audit row. Also applies the §7.3 merge (carry forward `operator_self_discovery`/`business_audit` slots from the prior active version). Plus two consumer write-back hooks: `intelligence_discovery` imports write attributed candidates as confirmatory `emerging_scan`/`competitive_scan` fills (§7.4), and `business_analysis` imports on bronze-attributed campaigns write `business_audit` fills when a `non_negotiable` gate fails (§7.3). Drafts are inert until `activateDraft` — activation is operator-controlled, same as gold |
 | `MarketingExecutionService` | inject the **national** bronze block (catalog snapshot + proof state) on the `bronze_standards` **discovery** path — the stage-2 prompt consumes it (§6.1); inject the **city** bronze block on the `emerging` **discovery** path (stage 3) |
 
 **Admin routes** (`/api/admin/marketing-ops`, following the
