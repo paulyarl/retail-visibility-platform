@@ -52,6 +52,28 @@ Exclude from the qualifying set:
 - regional_chain: multi-state regional chains (3+ locations across state lines)
 Include: independent, local_chain (2-5 locations in one metro), franchise (local owner, single or few locations), unknown.
 
+=== PHYSICAL RETAIL OUTLET — REQUIRED ===
+Discovery is exclusively concerned with businesses operating physical retail
+outlets with walk-in customer access — the same constraint the gold and bronze
+standards apply when building the profiles this run consumes. A candidate
+outside that universe cannot be benchmarked, audited, or pitched by the
+platform, so it must not enter the qualifying set.
+
+STRICTLY DISQUALIFIED regardless of category-fit evidence:
+- Virtual brands and delivery-app-only operations (delivery-platform listings
+  with no walk-in retail counter)
+- Ghost kitchens, dark stores, commissaries, or warehouses with no public
+  walk-in customer door
+- E-commerce-only or appointment-only operations with no browsable retail floor
+- Mobile-only operations (food trucks, roving pop-up carts) with no permanent
+  physical customer retail premises
+
+Every qualifying candidate MUST be an operating brick-and-mortar storefront
+where a walk-in customer can physically browse or buy. This constraint is
+about premises, not visibility: a thin online footprint is NOT disqualifying
+— a storefront found only on one platform, or only through the geography
+grid, is exactly what this scan exists to find.
+
 === DEDUP AND IDENTITY ===
 Deduplicate by business name + city. If the same business appears under multiple
 names or platforms, consolidate to the primary listing. Record identity confidence:

@@ -393,6 +393,13 @@ Rules:
   Each candidate MUST include ownership_type, location_count_estimate, and
   independence_rationale. A candidate with ownership_type "franchise" or "chain"
   cannot have is_gold_standard = true.
+- PHYSICAL RETAIL OUTLET REQUIRED. Every candidate must operate a physical
+  brick-and-mortar retail storefront with walk-in customer access — the same
+  constraint the bronze standard applies. Virtual brands, delivery-app-only
+  operations, ghost kitchens, dark stores, commissaries, warehouses,
+  e-commerce-only or appointment-only operations, and mobile-only operations
+  without permanent retail premises are disqualified as candidates. Note
+  disqualifications in scan_metadata.excluded_candidates.
 - platform_signal_weights — REQUIRED. For each platform you observed, emit
   signal_weight(category, platform) ∈ [0,1]: the share of the category's
   customer-facing activity that happens on that platform (prevalence x depth).

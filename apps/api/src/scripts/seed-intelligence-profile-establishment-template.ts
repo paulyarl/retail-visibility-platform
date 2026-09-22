@@ -80,6 +80,17 @@ The profile will be used to:
 1. Guide Intelligence-scope discovery audits (finding qualifying businesses)
 2. Amplify Business-scope audit prompts with category-specific evidence rules
 
+=== CUSTOMER UNIVERSE — PHYSICAL RETAIL ===
+This profile describes discovery of businesses that operate PHYSICAL RETAIL
+OUTLETS with walk-in customer access — the same constraint the gold and bronze
+standards apply. The platform's customer is a storefront operator: virtual
+brands, delivery-app-only operations, ghost kitchens, dark stores,
+commissaries, e-commerce-only operations, and mobile-only operations without
+permanent retail premises are OUTSIDE the customer universe. Build the
+profile's terminology, sources, discovery patterns, and evidence rules for
+storefront businesses only — "qualified" everywhere in this profile means
+category-fit AND physical retail storefront.
+
 === PLATFORM SCOPING ===
 {{platform}} is the platform this profile is scoped to. If the platform is "all"
 or empty, produce a cross-platform profile — the discovery patterns and
@@ -221,7 +232,7 @@ Record the result in discovery_patterns under the key "coverage_self_test", stat
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-2026-09-18-signal-weights -->`,
+<!-- seed-version: intel-profile-establishment-2026-09-18-signal-weights+physical-retail -->`,
   variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,
@@ -264,6 +275,17 @@ The profile will be used to:
 1. Guide Intelligence-scope discovery audits (finding qualifying businesses) in ANY market
 2. Amplify Business-scope audit prompts with category-specific evidence rules
 3. Serve as the city-agnostic vocabulary floor: markets without a city-scoped establishment fall back to this profile's terminology, synonyms, subcategories, taxonomy queries, evidence rules, and label sets
+
+=== CUSTOMER UNIVERSE — PHYSICAL RETAIL ===
+This profile describes discovery of businesses that operate PHYSICAL RETAIL
+OUTLETS with walk-in customer access — the same constraint the gold and bronze
+standards apply. The platform's customer is a storefront operator: virtual
+brands, delivery-app-only operations, ghost kitchens, dark stores,
+commissaries, e-commerce-only operations, and mobile-only operations without
+permanent retail premises are OUTSIDE the customer universe. Build the
+profile's terminology, sources, discovery patterns, and evidence rules for
+storefront businesses only — "qualified" everywhere in this profile means
+category-fit AND physical retail storefront.
 
 === PLATFORM SCOPING ===
 {{platform}} is the platform this profile is scoped to. If the platform is "all"
@@ -408,7 +430,7 @@ Record the result in discovery_patterns under the key "coverage_self_test", stat
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-national-2026-09-22 -->`,
+<!-- seed-version: intel-profile-establishment-national-2026-09-22+physical-retail -->`,
   variables: ['category', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,

@@ -54,11 +54,29 @@ For each candidate, you MUST record:
 
 If a well-known business in this category is a franchise or chain, do NOT include it as a candidate. Instead, note the exclusion in scan_metadata.excluded_candidates with the business name and exclusion reason. This prevents future scans from re-surfacing the same chain.`;
 
+// PHYSICAL RETAIL OUTLET — the platform's customer is a brick-and-mortar
+// retail business, so the benchmark must be drawn only from businesses that
+// operate physical walk-in storefronts. Same constraint as the bronze
+// standard's PHYSICAL_RETAIL_CONSTRAINT — the two standards share one
+// definition of the customer. Without it, a strong online-only or
+// delivery-only operation could set the gold bar for a product that serves
+// storefront operators.
+const PHYSICAL_RETAIL_SECTION = `=== PHYSICAL RETAIL OUTLET — REQUIRED ===
+Gold-standard scans are exclusively concerned with businesses operating physical retail outlets with walk-in customer access — the same constraint the bronze standard applies. The gold benchmark defines "excellent" for the platform's actual customer: a storefront operator.
+
+A business with strong category signals, branding, or reviews that lacks a physical retail storefront where customers walk through the door is STRICTLY DISQUALIFIED as a candidate, no matter how polished its platform presence:
+- Virtual brands and delivery-app-only operations (e.g. DoorDash, Uber Eats, Grubhub storefronts with no walk-in retail counter) are DISQUALIFIED.
+- Ghost kitchens, dark stores, commissaries, or warehouses with no public walk-in customer door are DISQUALIFIED.
+- E-commerce-only or appointment-only operations with no browsable retail floor are DISQUALIFIED.
+- Mobile-only operations (food trucks, roving pop-up carts) with no permanent physical customer retail premises are DISQUALIFIED.
+
+Every candidate MUST be an operating brick-and-mortar storefront where a walk-in customer can physically browse or buy. When evidence of a storefront is ambiguous, prefer candidates whose storefront is verifiable (shelf/interior photos, posted hours, street-visible retail premises) and note the ambiguity in quality_rationale — do not slot an unverifiable operation as a benchmark.`;
+
 const CANDIDATE_EVALUATION_SECTION = `Evaluate each candidate per platform:
 - profile_url: the LIVE destination URL on the platform (e.g. "https://www.google.com/maps/place/...")
 - quality_score: 0-10 based on profile completeness, branding, accuracy, engagement
 - quality_rationale: why this score
-- is_gold_standard: true for the TOP candidates per platform (up to 4), relative to the candidate pool. The best available candidate on a platform qualifies even if they don't pass every quality gate — the quality_score and quality_gates_passed/failed capture the absolute quality signal so operators can see how strong the benchmark actually is. Only independent/small_group businesses can qualify.
+- is_gold_standard: true for the TOP candidates per platform (up to 4), relative to the candidate pool. The best available candidate on a platform qualifies even if they don't pass every quality gate — the quality_score and quality_gates_passed/failed capture the absolute quality signal so operators can see how strong the benchmark actually is. Only independent/small_group businesses operating physical retail storefronts can qualify.
 - branding_artifacts: what the candidate has (logo, cover photo, photo count, photo types)
 - platform_config: categories, attributes, description quality
 - quality_gates_passed/failed: which gates this candidate passed/failed (informational — does NOT filter is_gold_standard)
@@ -141,11 +159,14 @@ ${ALL_PLATFORM_COVERAGE_SECTION}
 
 ${ELIGIBILITY_SECTION}
 
+${PHYSICAL_RETAIL_SECTION}
+
 === CANDIDATE SELECTION ===
 Find the BEST AVAILABLE independent businesses for this category. Not every candidate will be perfect — in many niches, no independent operator has a flawless cross-platform presence. Your job is to identify the strongest candidates in the pool and slot them as the benchmark, even if they have gaps.
 
 Prioritize (in rough order):
 - Independent, owner-operated businesses (see ELIGIBILITY section — no franchises, chains, or corporate subsidiaries)
+- Operating a physical retail outlet with walk-in customer access (see PHYSICAL RETAIL OUTLET — non-storefront businesses are disqualified)
 - Correct primary category and clear category-specific positioning
 - Functional website and published hours
 - Recognizable branding (logo, photos)
@@ -217,11 +238,14 @@ ${ALL_PLATFORM_COVERAGE_SECTION}
 
 ${ELIGIBILITY_SECTION}
 
+${PHYSICAL_RETAIL_SECTION}
+
 === CANDIDATE SELECTION ===
 Find ADDITIONAL independent businesses that were NOT already evaluated in the establishment scan. As with establishment, do NOT require candidates to have a flawless profile before flagging them is_gold_standard. Flag the TOP candidates per platform (up to 4) relative to the pool — a candidate that is stronger than the existing benchmark on a platform qualifies even if they don't pass every quality gate.
 
 Prioritize (in rough order):
 - Independent, owner-operated businesses (see ELIGIBILITY section)
+- Operating a physical retail outlet with walk-in customer access (see PHYSICAL RETAIL OUTLET — non-storefront businesses are disqualified)
 - Were NOT already evaluated in the establishment scan (find new candidates, not duplicates)
 - Correct primary category and clear category-specific positioning
 - Functional website and published hours
