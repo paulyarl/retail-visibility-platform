@@ -87,8 +87,14 @@ export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery
  *   - 'discovery' → stage-3 emerging discovery scan: the city bronze profile
  *     injected as CALIBRATION framing (§7.1) — exemplars + empty-slot report +
  *     vector execution log. Framing, not a candidate filter.
+ *   - 'national_proof' → cascading-profile supplement: when a market-scoped
+ *     (city/state) profile resolves, the nationwide profile is injected
+ *     ALONGSIDE it as a compact proof record — which reasons have ever
+ *     produced a qualifying exemplar at national scope. Grounds the
+ *     empty_proven_elsewhere classification and exemplar evidence depth that
+ *     a thin market profile cannot supply. Never injected alone.
  */
-export type BronzeStandardRole = 'establishment_reference' | 'discovery';
+export type BronzeStandardRole = 'establishment_reference' | 'discovery' | 'national_proof';
 
 /**
  * Maximum number of pattern exemplars emitted PER PLATFORM when injecting a
@@ -3029,6 +3035,48 @@ export class IntelligenceProfileService extends BaseService {
       : 'nationwide';
     const platformLabel = profile.reference_platform ?? 'cross-platform (all platforms)';
 
+    if (role === 'national_proof') {
+      // Cascading-profile supplement — a COMPACT proof record emitted
+      // alongside a market-scoped profile (never standalone). One exemplar
+      // name per proven reason is enough signal; the full slot detail stays
+      // in the primary profile's block. No drift check here — the primary
+      // block already carries catalog-drift context.
+      lines.push('');
+      lines.push('=== BRONZE STANDARD — NATIONAL PROOF REFERENCE ===');
+      lines.push(`Category: ${profile.category_name}`);
+      lines.push(`Profile: ${profile.id} v${profile.version}`);
+      lines.push(`Profile scope: ${scopeLabel}`);
+      lines.push(`Platform scope: ${platformLabel}`);
+      if (catalogRevision !== null) lines.push(`Catalog revision: ${catalogRevision}`);
+      lines.push('');
+      lines.push(
+        'DIRECTIVE: This is the NATIONAL proof record for this category — which catalog reasons have ever produced a qualifying exemplar at national scope. It is NOT the hunt list (the market-scoped profile and catalog above are) and NOT coverage to repeat. Use it to read proof state: a reason proven here but empty in your market is empty_proven_elsewhere; a reason never proven at any evaluable scope is empty_unproven — but it is still hunted. The exemplars show what qualifying evidence looks like — match their evidence depth, not their geography.',
+      );
+      lines.push('');
+
+      const provenEntries = coverage.filter((e: any) => e.status === 'filled' && Array.isArray(e.slots) && e.slots.length > 0);
+      const unprovenKeys = coverage.filter((e: any) => e.status !== 'filled').map((e: any) => e.reason_key);
+      if (provenEntries.length > 0) {
+        lines.push('--- Proven at national scope ---');
+        for (const entry of provenEntries) {
+          const s = entry.slots[0];
+          const locale = s.observed_city || s.observed_state
+            ? ` [${[s.observed_city, s.observed_state].filter(Boolean).join(', ')}]`
+            : '';
+          lines.push(`  [${entry.reason_key}] ${s.business_name}${locale}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}${s.digital_quality ? ` — digital quality: ${s.digital_quality}` : ''}${s.discovered_via ? ` — vector: ${s.discovered_via}` : ''}`);
+        }
+        lines.push('');
+      }
+      if (unprovenKeys.length > 0) {
+        lines.push('--- Not yet proven at national scope ---');
+        lines.push(`  ${unprovenKeys.join(', ')}`);
+        lines.push('');
+      }
+      lines.push('=== END BRONZE NATIONAL PROOF ===');
+      lines.push('');
+      return lines.join('\n');
+    }
+
     if (role === 'establishment_reference') {
       lines.push('');
       lines.push('=== BRONZE STANDARD — REFERENCE PROFILE ===');
@@ -3115,7 +3163,10 @@ export class IntelligenceProfileService extends BaseService {
       for (const entry of filledEntries) {
         const slots = (entry.slots as any[]).slice(0, MAX_SLOTS_PER_REASON);
         for (const s of slots) {
-          lines.push(`  [${entry.reason_key}] ${s.business_name}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}${scopeSuffix(entry.reason_key)}`);
+          const slotLocale = s.observed_city || s.observed_state
+            ? ` [${[s.observed_city, s.observed_state].filter(Boolean).join(', ')}]`
+            : '';
+          lines.push(`  [${entry.reason_key}] ${s.business_name}${slotLocale}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}${scopeSuffix(entry.reason_key)}`);
           if (s.digital_quality) lines.push(`    Digital quality: ${s.digital_quality}`);
           if (s.category_fit_evidence) lines.push(`    Category fit: ${s.category_fit_evidence}`);
           if (s.operational_evidence) lines.push(`    Operational: ${s.operational_evidence}`);

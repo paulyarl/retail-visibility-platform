@@ -20,7 +20,7 @@ import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEG
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
-import { IntelligenceProfileService, type PromptResolution, type ResolvedSignalWeight } from './intelligence/IntelligenceProfileService';
+import { IntelligenceProfileService, type IntelligenceProfile, type PromptResolution, type ResolvedSignalWeight } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
@@ -1062,7 +1062,22 @@ export class MarketingExecutionService extends BaseService {
             category,
           });
         }
-        const estRegionDirective = this.renderBronzeRegionDirective(campaignCity, campaignState, null);
+        // Catchment footprint — the same retail-catchment geography grid the
+        // stage-3 discovery scan sweeps. The campaign's city/state stays the
+        // anchor (profile resolution key, catalog predicate key); the grid
+        // widens the fill boundary to the catchment so a metro split by a
+        // state line (e.g. Kansas City, MO/KS) scans as one market.
+        const estCachedGrid = !campaignCity || !campaignState
+          || isNationalSentinel(campaignCity) || isNationalSentinel(campaignState)
+          ? null
+          : await GeographyGridService.getInstance().getGrid(
+              campaignCity,
+              campaignState,
+              parseZipCodes((input.campaign as any).intelligence_zip_codes),
+              ctx,
+            );
+        const estGeoGridDirective = buildGeographyGridDirective(input.campaign, estCachedGrid);
+        const estRegionDirective = this.renderBronzeRegionDirective(campaignCity, campaignState, null, { catchment: !!estGeoGridDirective });
         logger.info('Bronze standard establishment scan catalog injected', ctx, {
           campaignId: input.campaign.id,
           category,
@@ -1074,7 +1089,8 @@ export class MarketingExecutionService extends BaseService {
         });
         return {
           renderedPrompt: this.appendPromptSuffix(
-            baseRendered + (catalogBlock ? '\n' + catalogBlock : ''),
+            baseRendered + (catalogBlock ? '\n' + catalogBlock : '')
+              + (estGeoGridDirective ? '\n' + estGeoGridDirective : ''),
             promptSuffix,
           ) + '\n' + estRegionDirective,
           resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
@@ -1083,6 +1099,24 @@ export class MarketingExecutionService extends BaseService {
 
       // Stage 2 — city discovery scan consumes the resolved bronze profile
       // as its hunt list.
+      //
+      // Catchment footprint — the same retail-catchment geography grid the
+      // stage-3 discovery scan sweeps. The campaign's city/state stays the
+      // anchor (profile resolution key, catalog predicate key); the grid
+      // widens the fill boundary to the catchment so a metro split by a
+      // state line (e.g. Kansas City, MO/KS) scans as one market.
+      const bronzeIsNational = isNationalSentinel(campaignCity) || isNationalSentinel(campaignState);
+      const bronzeCachedGrid = (bronzeIsNational || !campaignCity || !campaignState)
+        ? null
+        : await GeographyGridService.getInstance().getGrid(
+            campaignCity,
+            campaignState,
+            parseZipCodes((input.campaign as any).intelligence_zip_codes),
+            ctx,
+          );
+      const bronzeGeoGridDirective = buildGeographyGridDirective(input.campaign, bronzeCachedGrid);
+      const hasCatchment = !!bronzeGeoGridDirective;
+
       const bronzeStandard = await profileService.resolveBronzeStandard(
         category, campaignPlatform, campaignCity, campaignState, ctx,
       );
@@ -1097,16 +1131,24 @@ export class MarketingExecutionService extends BaseService {
           category,
           campaignKind,
         });
-        const degradedDirective = this.renderBronzeRegionDirective(campaignCity, campaignState, null);
+        const degradedDirective = this.renderBronzeRegionDirective(campaignCity, campaignState, null, { catchment: hasCatchment });
         return {
           renderedPrompt: this.appendPromptSuffix(
-            baseRendered + warning,
+            baseRendered + warning
+              + (bronzeGeoGridDirective ? '\n' + bronzeGeoGridDirective : ''),
             promptSuffix,
           ) + '\n' + degradedDirective,
           resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
         };
       }
-      const referenceBlock = await profileService.serializeBronzeStandard(bronzeStandard, 'establishment_reference', ctx);
+      // Cascading profile — when the resolved profile is market-scoped, pair
+      // it with the national profile's compact proof record so the scan can
+      // classify empty_proven_elsewhere correctly and see exemplar evidence
+      // depth even when the market profile is thin.
+      const [referenceBlock, nationalProofBlock] = await Promise.all([
+        profileService.serializeBronzeStandard(bronzeStandard, 'establishment_reference', ctx),
+        this.resolveBronzeNationalProofBlock(profileService, category, campaignPlatform, bronzeStandard, ctx),
+      ]);
       // §6.3 — location-scoped catalog rows are injected alongside the
       // profile: a city-scoped reason authored after the national profile
       // is still coverage the city scan must produce.
@@ -1124,6 +1166,7 @@ export class MarketingExecutionService extends BaseService {
         campaignCity,
         campaignState,
         { reference_city: bronzeStandard.reference_city, reference_state: bronzeStandard.reference_state },
+        { catchment: hasCatchment },
       );
       logger.info('Bronze standard discovery profile injected', ctx, {
         campaignId: input.campaign.id,
@@ -1137,7 +1180,9 @@ export class MarketingExecutionService extends BaseService {
         renderedPrompt: this.appendPromptSuffix(
           baseRendered
             + (referenceBlock ? '\n' + referenceBlock : '')
-            + (cityCatalogBlock ? '\n' + cityCatalogBlock : ''),
+            + (nationalProofBlock ? '\n' + nationalProofBlock : '')
+            + (cityCatalogBlock ? '\n' + cityCatalogBlock : '')
+            + (bronzeGeoGridDirective ? '\n' + bronzeGeoGridDirective : ''),
           promptSuffix,
         ) + '\n' + regionDirective,
         resolution: {
@@ -1289,9 +1334,17 @@ export class MarketingExecutionService extends BaseService {
           category, campaignPlatform, profileCity, profileState, ctx,
         );
         if (bronzeStandard) {
-          const bronzeBlock = await profileService.serializeBronzeStandard(bronzeStandard, 'discovery', ctx);
-          if (bronzeBlock) {
-            rendered = rendered + '\n' + bronzeBlock;
+          // Cascading profile (§7.1 supplement): a market-scoped calibration
+          // profile is paired with the national proof record so the analyst
+          // sees which blind spots are proven real and what qualifying
+          // evidence looks like — even when this market's profile is thin.
+          const [bronzeBlock, nationalProofBlock] = await Promise.all([
+            profileService.serializeBronzeStandard(bronzeStandard, 'discovery', ctx),
+            this.resolveBronzeNationalProofBlock(profileService, category, campaignPlatform, bronzeStandard, ctx),
+          ]);
+          const combinedBronze = (bronzeBlock || '') + (nationalProofBlock ? '\n' + nationalProofBlock : '');
+          if (combinedBronze) {
+            rendered = rendered + '\n' + combinedBronze;
             bronzeStandardProfileId = bronzeStandard.id;
             bronzeStandardProfileVersion = bronzeStandard.version;
             logger.info('Bronze standard calibration injected into emerging scan', ctx, {
@@ -1420,6 +1473,20 @@ export class MarketingExecutionService extends BaseService {
       let bronzeFoldDirective = '';
       let bronzeFoldProfileId: string | null = null;
       let bronzeFoldProfileVersion: number | null = null;
+
+      // ─── Geography grid injection (establishment) ────────────────────────
+      // The establishment prompt AUTHORS the profile, so the authoritative grid
+      // is injected here for the AI to copy verbatim into the profile's
+      // "geography_grid" field. Precedence: campaign ZIPs > city-level cache >
+      // AI-derivation (the scale path for markets with no ZIPs at deploy time).
+      // Computed before the fold block so the folded bronze payload can be
+      // told its coverage boundary is the same catchment.
+      const estCachedGrid = isNationalSentinel(input.campaign.city)
+        ? null // national — no catchment; skip the '__all__|__ALL__|' key lookup
+        : await GeographyGridService.getInstance()
+          .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
+      const estGeoGridDirective = buildGeographyGridDirective(input.campaign, estCachedGrid);
+
       // National ('__all__') establishment has no market — the folded city
       // bronze scan is city-scoped by construction, so skip the lookup rather
       // than resolving a bronze standard against a literal '__all__' market.
@@ -1430,8 +1497,12 @@ export class MarketingExecutionService extends BaseService {
         );
         if (bronzeStandard) {
           const catalogService = BronzeReasonCatalogService.getInstance();
-          const [referenceBlock, cityRows, catalogRevision] = await Promise.all([
+          const [referenceBlock, nationalProofBlock, cityRows, catalogRevision] = await Promise.all([
             profileService.serializeBronzeStandard(bronzeStandard, 'establishment_reference', ctx),
+            // Cascading profile — the national proof record accompanies a
+            // market-scoped profile so payload 2 can classify
+            // empty_proven_elsewhere and see exemplar evidence depth.
+            this.resolveBronzeNationalProofBlock(profileService, category, campaignPlatform, bronzeStandard, ctx),
             catalogService.applicableReasons({
               categoryKey: category,
               city: estCampaignCity,
@@ -1448,9 +1519,10 @@ export class MarketingExecutionService extends BaseService {
             + 'The sections below are the stage-2 hunt list: cover every applicable reason at THIS market '
             + 'and emit the second payload described in the DUAL-PAYLOAD OUTPUT directive at the end of this prompt.'
             + (referenceBlock ? '\n' + referenceBlock : '')
+            + (nationalProofBlock ? '\n' + nationalProofBlock : '')
             + (cityCatalogBlock ? '\n' + cityCatalogBlock : '')
             + (bronzeOutputFormat ? '\n' + bronzeOutputFormat : '');
-          bronzeFoldDirective = this.renderBronzeFoldDirective(estCampaignCity, estCampaignState, campaignPlatform);
+          bronzeFoldDirective = this.renderBronzeFoldDirective(estCampaignCity, estCampaignState, campaignPlatform, { catchment: !!estGeoGridDirective });
           bronzeFoldProfileId = bronzeStandard.id;
           bronzeFoldProfileVersion = bronzeStandard.version;
           logger.info('Bronze standard city scan folded into emerging establishment prompt', ctx, {
@@ -1465,17 +1537,6 @@ export class MarketingExecutionService extends BaseService {
           });
         }
       }
-
-      // ─── Geography grid injection (establishment) ────────────────────────
-      // The establishment prompt AUTHORS the profile, so the authoritative grid
-      // is injected here for the AI to copy verbatim into the profile's
-      // "geography_grid" field. Precedence: campaign ZIPs > city-level cache >
-      // AI-derivation (the scale path for markets with no ZIPs at deploy time).
-      const estCachedGrid = isNationalSentinel(input.campaign.city)
-        ? null // national — no catchment; skip the '__all__|__ALL__|' key lookup
-        : await GeographyGridService.getInstance()
-          .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
-      const estGeoGridDirective = buildGeographyGridDirective(input.campaign, estCachedGrid);
 
       logger.info('Intelligence Profile Establishment prompt resolved with focus', ctx, {
         campaignId: input.campaign.id,
@@ -3053,6 +3114,7 @@ ${scopeNote}
     city: string | null,
     state: string | null,
     profile: { reference_city: string | null; reference_state: string | null } | null,
+    opts?: { catchment?: boolean },
   ): string {
     // '__all__' national sentinel → null (same as the gold directive).
     if (isNationalSentinel(city)) city = null;
@@ -3084,19 +3146,48 @@ geographic diversity across the fills.
       ? `\nNOTE: The bronze-standard profile above was resolved from the NATIONAL\nprofile (no ${city ? 'city' : 'state'}-scoped bronze profile exists yet for this\ncategory). It is your hunt list — re-cover every applicable reason at THIS\nmarket. A reason proven nationally but empty here is reported\nempty_proven_elsewhere; a reason with no exemplar at any scope is\nempty_unproven — but you still hunt it.`
       : '';
 
+    // When a GEOGRAPHY GRID section accompanies the prompt, the coverage
+    // boundary is the retail catchment (anchor city + contiguous commercial
+    // municipalities) rather than the administrative city line — the same
+    // market definition the stage-3 discovery scan sweeps. This is what lets
+    // a state-line-split metro (Kansas City, MO/KS) fill slots on both sides.
+    // The profile stays anchored to city+state; catchment-wide fills record
+    // their real municipality on the slot.
+    const boundaryLines = opts?.catchment
+      ? [
+          `- "This market" is the ${scopeLabel} RETAIL CATCHMENT defined in the`,
+          `  GEOGRAPHY GRID section — the anchor city plus its contiguous commercial`,
+          `  municipalities, which may cross a state line.`,
+          `- Hunt each applicable reason across the WHOLE catchment. A find inside`,
+          `  the catchment fills a slot regardless of which municipality or state`,
+          `  it sits in — record the business's real location on the slot via`,
+          `  observed_city / observed_state. The profile stays anchored to ${scopeLabel}.`,
+          `- A bronze slot is a floor, not a ranking — one qualifying exemplar per`,
+          `  reason is enough; two is the cap.`,
+          `- If the market is thin for a reason, record it as empty with the correct`,
+          `  status and the vector execution outcome — do NOT pad the slot with a`,
+          `  business that fails the three-part gate (category-qualified,`,
+          `  operationally verified, low digital quality the reason explains).`,
+          `- Only finds OUTSIDE the catchment are out-of-market — note them in`,
+          `  empty_slot_note as "seen outside market" context.`,
+        ]
+      : [
+          `- Hunt each applicable reason PRIMARILY within ${scopeLabel}. A bronze slot is`,
+          `  a floor, not a ranking — one qualifying exemplar per reason is enough;`,
+          `  two is the cap.`,
+          `- If the market is thin for a reason, record it as empty with the correct`,
+          `  status and the vector execution outcome — do NOT pad the slot with a`,
+          `  business that fails the three-part gate (category-qualified,`,
+          `  operationally verified, low digital quality the reason explains).`,
+          `- ${scopeLabel} is the coverage boundary; out-of-market finds are not fills.`,
+          `  They may be noted in empty_slot_note as "seen outside market" context.`,
+        ];
+
     return `=== SEARCH SCOPE — REGION-NARROWED ===
 This bronze-standard ${isEstablishment ? 'establishment' : 'discovery'} scan is REGION-NARROWED to ${scopeLabel}.
 
 SEARCH BOUNDARY:
-- Hunt each applicable reason PRIMARILY within ${scopeLabel}. A bronze slot is
-  a floor, not a ranking — one qualifying exemplar per reason is enough;
-  two is the cap.
-- If the market is thin for a reason, record it as empty with the correct
-  status and the vector execution outcome — do NOT pad the slot with a
-  business that fails the three-part gate (category-qualified, operationally
-  verified, low digital quality the reason explains).
-- ${scopeLabel} is the coverage boundary; out-of-market finds are not fills.
-  They may be noted in empty_slot_note as "seen outside market" context.
+${boundaryLines.join('\n')}
 ${scopeNote}
 === END SEARCH SCOPE ===`;
   }
@@ -3109,10 +3200,55 @@ ${scopeNote}
    * the folded run — two labeled payloads, imported separately through their
    * own schema-named post-import hooks.
    */
+  /**
+   * Cascading-profile supplement — the compact national proof record injected
+   * alongside a market-scoped bronze profile (serializeBronzeStandard
+   * 'national_proof' role). A city/state-scoped resolution shadows the
+   * national profile in the resolver, but the scan still needs national proof
+   * state to classify empty slots (empty_proven_elsewhere vs empty_unproven)
+   * and to see exemplar evidence depth. Returns '' when the resolved profile
+   * IS the national row or no distinct national profile exists.
+   */
+  private async resolveBronzeNationalProofBlock(
+    profileService: IntelligenceProfileService,
+    category: string,
+    platform: string | null,
+    resolvedProfile: IntelligenceProfile,
+    ctx?: RequestCtx,
+  ): Promise<string> {
+    // A profile with no geographic scope IS the nationwide row — already
+    // injected by the caller; nothing to supplement.
+    if (!resolvedProfile.reference_city && !resolvedProfile.reference_state) return '';
+    try {
+      const national = await profileService.resolveBronzeStandard(category, platform, null, null, ctx);
+      if (!national || national.id === resolvedProfile.id) return '';
+      const block = await profileService.serializeBronzeStandard(national, 'national_proof', ctx);
+      if (block) {
+        logger.info('Bronze national proof supplement injected', ctx, {
+          category,
+          platform,
+          nationalProfileId: national.id,
+          nationalProfileVersion: national.version,
+          resolvedProfileId: resolvedProfile.id,
+        });
+      }
+      return block || '';
+    } catch (err) {
+      // Best-effort — the primary profile is already injected; never fail a
+      // render on the proof supplement.
+      logger.warn('Bronze national proof supplement failed — continuing without it', ctx, {
+        error: (err as Error).message,
+        category,
+      });
+      return '';
+    }
+  }
+
   private renderBronzeFoldDirective(
     city: string,
     state: string,
     platform: string | null,
+    opts?: { catchment?: boolean },
   ): string {
     const platformValue = platform && platform !== 'all' ? platform : 'null';
     return `
@@ -3131,7 +3267,13 @@ PAYLOAD 2 — bronze_standard_scan
   reference_platform = ${platformValue === 'null' ? 'null' : `"${platformValue}"`}, and catalog_revision echoes the injected
   catalog block. Produce exactly one reason_coverage entry per applicable
   reason for THIS market — including location-scoped reasons — and list
-  non-applicable keys in not_applicable_reasons.`;
+  non-applicable keys in not_applicable_reasons.${opts?.catchment ? `
+
+  COVERAGE BOUNDARY: the city scan's market is the retail catchment in the
+  GEOGRAPHY GRID section — a find inside the catchment fills a slot
+  regardless of which municipality or state it sits in (the catchment may
+  cross a state line). Record each slot's real location via observed_city /
+  observed_state; the profile stays anchored to ${city}, ${state}.` : ''}`;
   }
 
   /**

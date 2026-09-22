@@ -90,6 +90,14 @@ const bronzeSlotSchema = z.object({
   business_name: z.string().min(1),
   /** Street address / locality for dedupe within the reason (§7.3). */
   address: z.string().nullable().optional(),
+  /**
+   * The business's REAL municipality/state when the scan footprint spans a
+   * catchment wider than the anchor city (a retail catchment may cross a
+   * state line — e.g. a Kansas City, MO-anchored metro covering the Kansas
+   * side). Set whenever the fill sits outside the anchor city.
+   */
+  observed_city: z.string().nullable().optional(),
+  observed_state: z.string().nullable().optional(),
   /** §3.6.5 — which platform the reason was observed on (platform-anchored reasons only). */
   observed_platform: observedPlatformEnum.nullable().optional(),
   /** Assortment evidence, NOT the platform's category label (§5.2 gate 1). */
@@ -252,6 +260,8 @@ Return a single JSON object with this structure (the Bronze Standard Scan result
         {
           "business_name": "<string>",
           "address": "<string|null>",
+          "observed_city": "<string|null — the business's real municipality when the coverage footprint spans multiple cities>",
+          "observed_state": "<string|null — 2-letter code>",
           "observed_platform": "<null|google|yelp|facebook|bbb|apple_maps|bing>",
           "category_fit_evidence": "<string — observable assortment evidence, NOT a category label>",
           "operational_evidence": "<string — why the business is verified operating>",
@@ -331,6 +341,10 @@ Rules:
 - observed_platform is set only for platform-anchored reasons
   (absent_from_platform, unclaimed_profile, and the field-gap family): it names
   the platform the reason was observed on. null for non-platform reasons.
+- observed_city / observed_state record the business's REAL location when the
+  coverage footprint spans multiple municipalities — a retail catchment may
+  cross a state line (e.g. a Kansas City, MO-anchored metro covering the
+  Kansas side). Set them whenever a fill sits outside the anchor city.
 - empty_slot_note is required for every non-filled entry and records the
   EXECUTION outcome — "executed, returned 0" is materially different from
   "not executed". Mirror it in vector_execution_log: an unexecuted vector is

@@ -430,6 +430,57 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       // …but the rule still reaches the analyst, since it governs the empty status.
       expect(block).toContain('proof is scope-relative');
     });
+
+    // ── national_proof — the cascading-profile supplement ────────────────
+    // When a market-scoped profile resolves, the national row is injected
+    // alongside it as a compact proof record: which reasons are proven, one
+    // exemplar name each, and the unproven key list. It exists to ground
+    // empty_proven_elsewhere and exemplar evidence depth — so it must NOT
+    // re-emit the full slot detail, vector log, or drift expansion.
+    it('national_proof emits a compact proven/unproven record, one exemplar per reason', async () => {
+      const nationalProfile = PROFILE({
+        version: 4,
+        configuration_json: coverageProfile.configuration_json,
+      });
+      const block = await service.serializeBronzeStandard(nationalProfile, 'national_proof');
+
+      expect(block).toContain('=== BRONZE STANDARD — NATIONAL PROOF REFERENCE ===');
+      expect(block).toContain('Profile scope: nationwide');
+      expect(block).toContain('empty_proven_elsewhere');
+      expect(block).toContain('--- Proven at national scope ---');
+      expect(block).toContain('[absent_from_platform] Mama Nkechi');
+      // Compact: first exemplar only — the other two slots stay out.
+      expect(block).not.toContain('Second Fill');
+      expect(block).not.toContain('Third Fill');
+      expect(block).toContain('--- Not yet proven at national scope ---');
+      expect(block).toContain('community_only_presence');
+      // No hunt-list framing, no vector log, no drift expansion.
+      expect(block).not.toContain('Vector Execution Log');
+      expect(block).not.toContain('BRONZE CATALOG DRIFT');
+      expect(block).toContain('=== END BRONZE NATIONAL PROOF ===');
+    });
+
+    it('national_proof returns empty string for a profile without configuration_json', async () => {
+      const block = await service.serializeBronzeStandard(PROFILE({ configuration_json: null as any }), 'national_proof');
+      expect(block).toBe('');
+    });
+
+    it('annotates filled slots with observed_city/observed_state when the catchment crosses city lines', async () => {
+      const metroProfile = PROFILE({
+        configuration_json: {
+          catalog_revision: 1,
+          reason_coverage: [
+            {
+              reason_key: 'community_only_presence',
+              status: 'filled',
+              slots: [{ business_name: 'KCK Grocery', observed_city: 'Kansas City', observed_state: 'KS', discovered_by: 'bronze_establishment_scan' }],
+            },
+          ],
+        } as any,
+      });
+      const block = await service.serializeBronzeStandard(metroProfile, 'discovery');
+      expect(block).toContain('KCK Grocery [Kansas City, KS]');
+    });
   });
 
   // §10.2 regression — the whole reason bronze uses its own intelligence_focus

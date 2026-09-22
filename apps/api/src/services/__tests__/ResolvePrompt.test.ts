@@ -909,6 +909,30 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(mockProfileService.serializeBronzeStandard).toHaveBeenCalledWith(bronzeProfile, 'discovery', undefined);
     });
 
+    it('pairs a market-scoped calibration profile with the NATIONAL PROOF supplement', async () => {
+      const cityProfile = { id: 'bz-kc-001', version: 2, reference_city: 'Kansas City', reference_state: 'MO' };
+      const nationalProfile = { id: 'bz-nat-001', version: 4, reference_city: null, reference_state: null };
+      mockProfileService.resolveBronzeStandard
+        .mockResolvedValueOnce(cityProfile)
+        .mockResolvedValueOnce(nationalProfile);
+      mockProfileService.serializeBronzeStandard.mockImplementation((_p: any, role: string) =>
+        role === 'national_proof'
+          ? '=== BRONZE STANDARD — NATIONAL PROOF REFERENCE ===\nnational proof'
+          : '=== BRONZE STANDARD — MARKET CALIBRATION ===\nexemplars + empty slots + vector log',
+      );
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: makeIntelCampaign('emerging', null),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE STANDARD — MARKET CALIBRATION');
+      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL PROOF REFERENCE');
+      // Calibration still stamps the market-scoped profile.
+      expect(resolution.bronze_standard_profile_id).toBe('bz-kc-001');
+    });
+
     it('appends the absent-calibration note on emerging discovery when no bronze profile resolves', async () => {
       mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(null);
 
@@ -1143,6 +1167,33 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(resolution.bronze_standard_profile_id).toBeNull();
     });
 
+    it('folded scan pairs a market-scoped profile with NATIONAL PROOF + the catchment boundary', async () => {
+      const cityProfile = { id: 'bz-kc-city', version: 1, reference_city: 'Kansas City', reference_state: 'MO' };
+      const nationalProfile = { id: 'bz-nat', version: 5, reference_city: null, reference_state: null };
+      mockProfileService.resolveBronzeStandard
+        .mockResolvedValueOnce(cityProfile)
+        .mockResolvedValueOnce(nationalProfile);
+      mockProfileService.serializeBronzeStandard.mockImplementation((_p: any, role: string) =>
+        role === 'national_proof'
+          ? '=== BRONZE STANDARD — NATIONAL PROOF REFERENCE ==='
+          : '=== BRONZE STANDARD — REFERENCE PROFILE ===\nhunt list',
+      );
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(1);
+      mockCatalogService.serializeCatalogBlock.mockReturnValueOnce('=== BRONZE REASON CATALOG ===');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign({ city: 'Kansas City', state: 'MO' }),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL PROOF REFERENCE');
+      expect(renderedPrompt).toContain('COVERAGE BOUNDARY');
+      expect(renderedPrompt).toContain('observed_city / observed_state');
+      expect(renderedPrompt).toContain('=== GEOGRAPHY GRID — AUTHORITATIVE SWEEP UNITS ===');
+    });
+
     it('appends the campaign-derived GEOGRAPHY GRID directive for the profile substrate', async () => {
       mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(null);
 
@@ -1323,6 +1374,87 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).toContain('BRONZE STANDARD — REFERENCE PROFILE');
       expect(mockComposerService.composeIntelligencePrompt).not.toHaveBeenCalled();
       expect(resolution.bronze_standard_profile_id).toBe('bz-1');
+    });
+
+    // Cascading profile: a market-scoped resolution shadows the national row,
+    // so the national profile is resolved separately and injected as the
+    // compact NATIONAL PROOF supplement — the scan needs it to classify
+    // empty_proven_elsewhere vs empty_unproven.
+    it('stage-2 pairs a market-scoped profile with the NATIONAL PROOF supplement', async () => {
+      const cityProfile = { id: 'bz-kc-city', version: 1, reference_city: 'Kansas City', reference_state: 'MO' };
+      const nationalProfile = { id: 'bz-nat', version: 4, reference_city: null, reference_state: null };
+      mockProfileService.resolveBronzeStandard
+        .mockResolvedValueOnce(cityProfile)      // market resolution
+        .mockResolvedValueOnce(nationalProfile); // national supplement
+      mockProfileService.serializeBronzeStandard.mockImplementation((_p: any, role: string) =>
+        role === 'national_proof'
+          ? '=== BRONZE STANDARD — NATIONAL PROOF REFERENCE ===\nnational proof'
+          : '=== BRONZE STANDARD — REFERENCE PROFILE ===\ncity hunt list',
+      );
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(1);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeBronzeTemplate('discovery'),
+        campaign: makeBronzeCampaign({ city: 'Kansas City', state: 'MO' }),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('BRONZE STANDARD — REFERENCE PROFILE');
+      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL PROOF REFERENCE');
+      // The supplement resolves the nationwide slot (null, null market).
+      expect(mockProfileService.resolveBronzeStandard).toHaveBeenNthCalledWith(
+        2, 'African Grocery Store', null, null, null, undefined,
+      );
+      expect(mockProfileService.serializeBronzeStandard).toHaveBeenCalledWith(nationalProfile, 'national_proof', undefined);
+      // The stamped profile is the market-scoped one — it is the hunt list.
+      expect(resolution.bronze_standard_profile_id).toBe('bz-kc-city');
+    });
+
+    it('stage-2 does NOT double-inject when the resolved profile IS nationwide', async () => {
+      const nationalProfile = { id: 'bz-nat', version: 1, reference_city: null, reference_state: null };
+      mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(nationalProfile);
+      mockProfileService.serializeBronzeStandard.mockReturnValueOnce('=== BRONZE STANDARD — REFERENCE PROFILE ===');
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(1);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeBronzeTemplate('discovery'),
+        campaign: makeBronzeCampaign({ city: 'Kansas City', state: 'MO' }),
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolveBronzeStandard).toHaveBeenCalledTimes(1);
+      expect(mockProfileService.serializeBronzeStandard).not.toHaveBeenCalledWith(
+        expect.anything(), 'national_proof', expect.anything(),
+      );
+      expect(renderedPrompt).not.toContain('NATIONAL PROOF REFERENCE');
+    });
+
+    // Catchment footprint: the fill boundary is the retail catchment (the
+    // GEOGRAPHY GRID sweep units), not the administrative city line — so a
+    // state-line-split metro scans as one market while the profile stays
+    // anchored to the campaign's city/state.
+    it('stage-2 sweeps the retail catchment and asks slots to record their real municipality', async () => {
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(1);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeBronzeTemplate('discovery'),
+        campaign: makeBronzeCampaign({
+          city: 'Kansas City', state: 'MO',
+          intelligence_zip_codes: '64118,64124',
+        }),
+        variables: undefined,
+      });
+
+      // Degraded path (no profile) still carries the footprint.
+      expect(renderedPrompt).toContain('=== GEOGRAPHY GRID — AUTHORITATIVE SWEEP UNITS ===');
+      expect(renderedPrompt).toContain('64118, 64124');
+      expect(renderedPrompt).toContain('RETAIL CATCHMENT');
+      expect(renderedPrompt).toContain('cross a state line');
+      expect(renderedPrompt).toContain('observed_city / observed_state');
+      expect(renderedPrompt).toContain('SEARCH SCOPE — REGION-NARROWED');
     });
 
     // '__all__' is what the form's National checkbox actually writes — the

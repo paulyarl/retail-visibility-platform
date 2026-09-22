@@ -47,6 +47,13 @@ A bronze profile's `catalog_snapshot` is documented as a verbatim embedding of t
 
 Live profiles scanned before this fix keep the all-`universal` snapshot; the next establishment scan re-imports a correct one (no backfill script).
 
+### Bronze scans — catchment footprint + cascading national proof (added 2026-09-22)
+
+Two behaviors widen what a city bronze scan covers and what context it sees:
+
+- **Catchment footprint.** Bronze scans (stage-1 market-scoped establishment, stage-2 standalone city scan, and the folded city scan inside emerging establishment) inject the same `GEOGRAPHY GRID` retail-catchment block stage-3 discovery uses — campaign `intelligence_zip_codes` / `intelligence_search_radius_miles` > `mkt_geography_grids` cache > AI derivation. `renderBronzeRegionDirective`'s coverage boundary is the **catchment**, not the administrative city line, so a state-line-split metro (Kansas City, MO/KS) fills slots on both sides. The profile still anchors to campaign `city`/`state` (resolution + catalog-predicate key); fills record their real municipality via `observed_city`/`observed_state` on the slot schema. Location-scoped catalog rows remain anchor-bound — the `applicableReasons` predicate was not widened to catchment municipalities.
+- **Cascading national proof.** When `resolveBronzeStandard` returns a market-scoped profile (city/state set), `resolveBronzeNationalProofBlock` also resolves the nationwide row and injects `serializeBronzeStandard(profile, 'national_proof')` — a compact proven/unproven record (one exemplar name per reason, no vector log, no drift expansion). It grounds `empty_proven_elsewhere` classification and exemplar evidence depth that a thin city profile can't supply. Skipped when the resolved profile IS national or no distinct national row exists. Applies at all three bronze injection sites: stage-2 standalone, stage-3 emerging calibration, and the folded city scan.
+
 ## Seed Scripts — Re-run Discipline
 
 Seed scripts in `apps/api/src/scripts/seed-*.ts` are idempotent (update-in-place) but are **not** run automatically. After editing any seed file, you MUST re-run it against both `local` and `prd` Doppler configs, or the DB row will be stale and the rendered prompt will silently use the old body.
