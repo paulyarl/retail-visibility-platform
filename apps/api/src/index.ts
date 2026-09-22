@@ -428,6 +428,17 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start seed outreach no-response job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start seed report backfill job (daily) — generates a first report
+      // version for live seeds that have no published report, so the public
+      // preview endpoint and report QR kit work without a manual refresh
+      try {
+        const { startSeedReportBackfillJob } = await import('./jobs/seed-report-backfill');
+        startSeedReportBackfillJob();
+        logger.info('Seed report backfill job started');
+      } catch (err) {
+        logger.error('Failed to start seed report backfill job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start review response scheduler (every 6h) — checks gates, auto-advances
       // stages, closes stale threads, promotes closed pipelines to monitoring
       try {

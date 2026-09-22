@@ -241,6 +241,12 @@ class UnifiedConfig {
     return v === 'true' || v === '1';
   }
 
+  // ─── Seed Report Backfill ─────────────────────────────────────────────
+  get disableSeedReportBackfillJob(): boolean {
+    const v = (this.env.DISABLE_SEED_REPORT_BACKFILL_JOB || '').toLowerCase();
+    return v === 'true' || v === '1';
+  }
+
   // ─── Recovery Management (Recovery Engine Sprint 1) ────────────────────
   // Flat getters matching the marketingOps* pattern. The dispute intake
   // portal is token-gated (no account auth); these config keys drive token
