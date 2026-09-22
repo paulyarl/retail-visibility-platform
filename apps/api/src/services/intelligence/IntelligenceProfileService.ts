@@ -3439,7 +3439,7 @@ export class IntelligenceProfileService extends BaseService {
     cities: string[];
   }> {
     try {
-      const [activeProfiles, draftProfiles, intelligenceCampaigns, provingGrounds, pgChildren] = await Promise.all([
+      const [activeProfiles, draftProfiles, intelligenceCampaigns, provingGrounds, pgChildren, enrichmentCampaigns, enrichmentRows] = await Promise.all([
         this.prisma.mkt_intelligence_profiles.findMany({
           where: { status: 'active' },
           select: {
@@ -3486,6 +3486,27 @@ export class IntelligenceProfileService extends BaseService {
         this.prisma.mkt_campaigns_list.findMany({
           where: { scope: 'intelligence', parent_campaign_id: { not: null } },
           select: { parent_campaign_id: true, category: true },
+        }),
+        // Directory-enrichment campaigns (campaign_category='directory_enrichment')
+        // — scope='category' produces a category packet, scope='city' produces
+        // the location narrative. Non-terminal ones surface as 'inflight'.
+        this.prisma.mkt_campaigns_list.findMany({
+          where: { campaign_category: 'directory_enrichment' },
+          select: {
+            id: true, category: true, city: true, state: true, stage: true,
+            scope: true,
+          },
+          orderBy: { created_at: 'desc' },
+        }),
+        // Enrichment rows — ONE table carries both lanes: category packets at
+        // (category_key, city, state) and the location narrative at the
+        // ('__location__', city, state) sentinel row. National rows carry the
+        // ('__all__', '__all__') market sentinel.
+        this.prisma.directory_category_enrichment.findMany({
+          select: {
+            category_key: true, category_name: true, city: true, state: true,
+            source_campaign_id: true,
+          },
         }),
       ]);
 
@@ -3701,12 +3722,111 @@ export class IntelligenceProfileService extends BaseService {
         }
       }
 
-      // Collect distinct cities from intelligence campaigns (for the city
-      // dimension). The national sentinel is not a market — '__all__' must
-      // not appear as a city column; national coverage renders as the
-      // leading Nationwide position instead.
+      // ─── Directory-enrichment slots (focus='enrichment') ────────────────
+      // The enrichment pair per position: slot.status carries the CATEGORY
+      // lane (scope='category' campaign → (category_key, city, state) row)
+      // and slot.discovery_status carries the LOCATION lane (scope='city'
+      // campaign → the ('__location__', city, state) row). Enrichment has no
+      // draft state — a row exists or it doesn't — so 'active' (top chip)
+      // and 'executed' (bottom chip) mark a produced packet. '__all__'
+      // markets normalize to null city, landing in the Nationwide column.
+      const ENRICH_LOCATION_SENTINEL = '__location__';
+      const ensureEnrichSlot = (entry: { category_name: string; slots: any[] }, cityNorm: string, stateNorm: string) => {
+        let s = entry.slots.find((x) => x.focus === 'enrichment' && (x.city ?? '') === cityNorm);
+        if (!s) {
+          s = {
+            focus: 'enrichment',
+            city: cityNorm || null,
+            state: stateNorm || null,
+            platform: null,
+            status: 'pending',
+            profile_id: '',
+            version: 0,
+            discovery_status: 'pending',
+            discovery_campaign_id: null,
+          };
+          entry.slots.push(s);
+        }
+        return s;
+      };
+      const enrichEntryFor = (categoryKey: string, categoryName: string) => {
+        const nameKey = categoryName.trim().toLowerCase();
+        return byCategory.get(categoryKey)
+          ?? entriesByName.get(nameKey)
+          ?? (() => {
+            const entry = ensureCategory(categoryKey, categoryName || categoryKey);
+            entriesByName.set(nameKey, entry);
+            return entry;
+          })();
+      };
+
+      // Pass 1 — category lane: produced rows first ('active' wins over
+      // 'inflight' so a re-enrich campaign never hides an existing packet),
+      // then in-flight campaigns fill pending positions. This pass may create
+      // category entries — it must complete before the location-lane fan-out.
+      for (const row of enrichmentRows) {
+        if (row.category_key === ENRICH_LOCATION_SENTINEL) continue;
+        const cityNorm = isNationalSentinel(row.city) ? '' : (row.city ?? '').trim();
+        const stateNorm = isNationalSentinel(row.state) ? '' : (row.state ?? '').trim();
+        const entry = enrichEntryFor(row.category_key, row.category_name ?? row.category_key);
+        const slot = ensureEnrichSlot(entry, cityNorm, stateNorm);
+        slot.status = 'active';
+        if (row.source_campaign_id) slot.profile_id = row.source_campaign_id;
+      }
+      for (const c of enrichmentCampaigns) {
+        if (c.scope !== 'category' || inactiveStages.has(c.stage)) continue;
+        const catName = (c.category ?? '').trim();
+        if (!catName || catName === ENRICH_LOCATION_SENTINEL) continue;
+        const cityNorm = isNationalSentinel(c.city) ? '' : (c.city ?? '').trim();
+        const stateNorm = isNationalSentinel(c.state) ? '' : (c.state ?? '').trim();
+        const entry = enrichEntryFor(
+          catName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''),
+          catName,
+        );
+        const slot = ensureEnrichSlot(entry, cityNorm, stateNorm);
+        if (slot.status === 'pending') {
+          slot.status = 'inflight';
+          slot.profile_id = c.id;
+        }
+      }
+
+      // Pass 2 — location lane: the ('__location__', city, state) narrative
+      // is market-level (not category-keyed) — it fills the bottom chip of
+      // every category's slot at this market.
+      for (const row of enrichmentRows) {
+        if (row.category_key !== ENRICH_LOCATION_SENTINEL) continue;
+        const cityNorm = isNationalSentinel(row.city) ? '' : (row.city ?? '').trim();
+        const stateNorm = isNationalSentinel(row.state) ? '' : (row.state ?? '').trim();
+        for (const entry of byCategory.values()) {
+          const slot = ensureEnrichSlot(entry, cityNorm, stateNorm);
+          slot.discovery_status = 'executed';
+          if (row.source_campaign_id) slot.discovery_campaign_id = row.source_campaign_id;
+        }
+      }
+      for (const c of enrichmentCampaigns) {
+        if (c.scope !== 'city' || inactiveStages.has(c.stage)) continue;
+        const cityNorm = isNationalSentinel(c.city) ? '' : (c.city ?? '').trim();
+        const stateNorm = isNationalSentinel(c.state) ? '' : (c.state ?? '').trim();
+        for (const entry of byCategory.values()) {
+          const slot = ensureEnrichSlot(entry, cityNorm, stateNorm);
+          if (slot.discovery_status === 'pending') {
+            slot.discovery_status = 'inflight';
+            slot.discovery_campaign_id = c.id;
+          }
+        }
+      }
+
+      // Collect distinct cities (for the city dimension) from intelligence
+      // campaigns AND enrichment geographies — a market touched only by
+      // enrichment work still earns a column. The national sentinel is not a
+      // market — '__all__' must not appear as a city column; national
+      // coverage renders as the leading Nationwide position instead.
       const cities = [...new Set(
-        intelligenceCampaigns.map((c) => c.city).filter((c) => c && !isNationalSentinel(c)),
+        [
+          ...intelligenceCampaigns.map((c) => c.city),
+          ...enrichmentCampaigns.map((c) => c.city),
+          ...enrichmentRows.map((r) => r.city),
+        ].filter((c) => c && !isNationalSentinel(c)),
       )].sort();
 
       const categories = Array.from(byCategory.entries())
@@ -3717,7 +3837,7 @@ export class IntelligenceProfileService extends BaseService {
             // Sort: gold_standards first, then bronze_standards, then
             // emerging, then competitive, then proving_ground; within each
             // focus, by city/platform name.
-            const focusOrder = { gold_standards: 0, bronze_standards: 1, emerging: 2, competitive: 3, proving_ground: 4 };
+            const focusOrder = { gold_standards: 0, bronze_standards: 1, emerging: 2, competitive: 3, proving_ground: 4, enrichment: 5 };
             const fo = focusOrder[a.focus as keyof typeof focusOrder] ?? 4;
             const fob = focusOrder[b.focus as keyof typeof focusOrder] ?? 4;
             if (fo !== fob) return fo - fob;

@@ -6549,7 +6549,9 @@ export interface IntelligenceProfileWithVersions extends IntelligenceProfile {
 }
 
 export interface CoverageSlot {
-  focus: IntelligenceFocus;
+  // 'enrichment' is coverage-only (directory_enrichment campaigns + rows) —
+  // it is not a selectable intelligence_focus on the campaign form.
+  focus: IntelligenceFocus | 'enrichment';
   city: string | null;
   state: string | null;
   platform: string | null;

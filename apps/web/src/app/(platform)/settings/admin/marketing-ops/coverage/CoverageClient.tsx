@@ -8,7 +8,7 @@ import {
 } from '@mantine/core';
 import {
   IconRefresh, IconAlertCircle, IconCircleCheck,
-  IconCircleDot, IconPlus, IconInfoCircle,
+  IconCircleDot, IconPlus, IconInfoCircle, IconClock,
   IconListCheck, IconPlayerPlay, IconLock,
 } from '@tabler/icons-react';
 import Link from 'next/link';
@@ -27,20 +27,28 @@ const PLATFORM_LABELS: Record<string, string> = {
   bing: 'Bing',
 };
 
-const FOCUS_LABELS: Record<IntelligenceFocus, string> = {
+// 'enrichment' is a coverage-only focus: directory_enrichment campaigns are
+// category/city scope, not intelligence scope, so they never carry an
+// intelligence_focus. The pair it renders is (category packet / location
+// narrative) rather than (establishment / discovery).
+type CoverageFocus = IntelligenceFocus | 'enrichment';
+
+const FOCUS_LABELS: Record<CoverageFocus, string> = {
   emerging: 'Emerging',
   competitive: 'Competitive',
   gold_standards: 'Gold Standards',
   bronze_standards: 'Bronze Standards',
   proving_ground: 'Proving Ground',
+  enrichment: 'Enrichment',
 };
 
-const FOCUS_COLORS: Record<IntelligenceFocus, string> = {
+const FOCUS_COLORS: Record<CoverageFocus, string> = {
   emerging: 'blue',
   competitive: 'violet',
   gold_standards: 'gold',
   bronze_standards: 'orange',
   proving_ground: 'teal',
+  enrichment: 'cyan',
 };
 
 // The canonical platforms the operator should cover per category.
@@ -141,10 +149,31 @@ export default function CoverageClient() {
     return `/settings/admin/marketing-ops/campaigns/new?${sp.toString()}`;
   };
 
+  // Enrichment create links — directory_enrichment campaigns are
+  // category/city scope (NOT intelligence scope), so they get their own
+  // builder: lane 'category' → scope=category + the category prefill; lane
+  // 'location' → scope=city (the form stamps the '__location__' category
+  // sentinel itself). National columns pass '__all__' for city/state — the
+  // form's National checkbox reads the sentinel back as checked.
+  const createEnrichmentLink = (params: {
+    lane: 'category' | 'location';
+    category?: string;
+    city?: string;
+    state?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    sp.set('scope', params.lane === 'category' ? 'category' : 'city');
+    sp.set('campaignCategory', 'directory_enrichment');
+    if (params.lane === 'category' && params.category) sp.set('category', params.category);
+    if (params.city) sp.set('city', params.city);
+    if (params.state) sp.set('state', params.state);
+    return `/settings/admin/marketing-ops/campaigns/new?${sp.toString()}`;
+  };
+
   // Find the slot for a given (category, focus, city, platform).
   const slotStatus = (
     cat: CoverageCategory,
-    focus: IntelligenceFocus,
+    focus: CoverageFocus,
     city?: string | null,
     platform?: string | null,
   ): CoverageSlot | null => {
@@ -319,6 +348,7 @@ export default function CoverageClient() {
         const emergingSlots = cat.slots.filter((s) => s.focus === 'emerging');
         const competitiveSlots = cat.slots.filter((s) => s.focus === 'competitive');
         const provingGroundSlots = cat.slots.filter((s) => s.focus === 'proving_ground');
+        const enrichmentSlots = cat.slots.filter((s) => s.focus === 'enrichment');
 
         const activeCount = cat.slots.filter(s => s.status === 'active').length;
         const draftCount = cat.slots.filter(s => s.status === 'draft').length;
@@ -326,13 +356,14 @@ export default function CoverageClient() {
         const discoveryInflightCount = cat.slots.filter(s => s.discovery_status === 'inflight').length;
         const executedCount = cat.slots.filter(s => s.discovery_status === 'executed').length;
 
-        // Cities that have emerging, competitive, bronze, or proving-ground
-        // profiles for this category.
+        // Cities that have emerging, competitive, bronze, proving-ground, or
+        // enrichment work for this category.
         const categoryCities = new Set([
           ...emergingSlots.map((s) => s.city).filter(Boolean) as string[],
           ...competitiveSlots.map((s) => s.city).filter(Boolean) as string[],
           ...bronzeSlots.map((s) => s.city).filter(Boolean) as string[],
           ...provingGroundSlots.map((s) => s.city).filter(Boolean) as string[],
+          ...enrichmentSlots.map((s) => s.city).filter(Boolean) as string[],
         ]);
 
         // If a city filter is active, only show this category if it has
@@ -384,6 +415,7 @@ export default function CoverageClient() {
               cityFilter={cityFilter}
               slotStatus={slotStatus}
               createLink={createCampaignLink}
+              createEnrichmentLink={createEnrichmentLink}
               dimensionKey="platform"
               dimensionValues={GOLD_STANDARD_PLATFORMS}
               dimensionLabels={PLATFORM_LABELS}
@@ -401,6 +433,7 @@ export default function CoverageClient() {
               cityFilter={cityFilter}
               slotStatus={slotStatus}
               createLink={createCampaignLink}
+              createEnrichmentLink={createEnrichmentLink}
               dimensionKey="city"
               dimensionValues={[NATIONAL_DIM, ...(cityFilter ? [cityFilter] : allCities)]}
               dimensionLabels={NATIONAL_DIMENSION_LABELS}
@@ -415,6 +448,7 @@ export default function CoverageClient() {
               cityFilter={cityFilter}
               slotStatus={slotStatus}
               createLink={createCampaignLink}
+              createEnrichmentLink={createEnrichmentLink}
               dimensionKey="city"
               dimensionValues={[NATIONAL_DIM, ...(cityFilter ? [cityFilter] : allCities)]}
               dimensionLabels={NATIONAL_DIMENSION_LABELS}
@@ -430,6 +464,7 @@ export default function CoverageClient() {
               cityFilter={cityFilter}
               slotStatus={slotStatus}
               createLink={createCampaignLink}
+              createEnrichmentLink={createEnrichmentLink}
               dimensionKey="city"
               dimensionValues={[NATIONAL_DIM, ...(cityFilter ? [cityFilter] : allCities)]}
               dimensionLabels={NATIONAL_DIMENSION_LABELS}
@@ -445,9 +480,30 @@ export default function CoverageClient() {
               cityFilter={cityFilter}
               slotStatus={slotStatus}
               createLink={createCampaignLink}
+              createEnrichmentLink={createEnrichmentLink}
               dimensionKey="city"
               dimensionValues={cityFilter ? [cityFilter] : allCities}
               dimensionLabels={undefined}
+              showAllCitiesHint={!cityFilter}
+            />
+
+            {/* Enrichment section — the directory_enrichment pair per
+                position: TOP chip is the category packet (scope='category'),
+                BOTTOM chip is the market-level location narrative
+                (scope='city' → the '__location__' sentinel row). Nationwide
+                is the leading column. */}
+            <CoverageSection
+              title="Enrichment (category packet + location narrative)"
+              focus="enrichment"
+              slots={enrichmentSlots}
+              category={cat}
+              cityFilter={cityFilter}
+              slotStatus={slotStatus}
+              createLink={createCampaignLink}
+              createEnrichmentLink={createEnrichmentLink}
+              dimensionKey="city"
+              dimensionValues={[NATIONAL_DIM, ...(cityFilter ? [cityFilter] : allCities)]}
+              dimensionLabels={NATIONAL_DIMENSION_LABELS}
               showAllCitiesHint={!cityFilter}
             />
           </Paper>
@@ -513,6 +569,8 @@ function StateLegend() {
             establishment also unlocks per-platform discovery. Bronze standards: the Nationwide
             profile unlocks every per-city scan. Emerging/competitive: the Nationwide column is the
             national floor — an active national establishment unlocks discovery in every city.
+            Enrichment positions carry a category packet (top) and the market-level location
+            narrative (bottom, ·loc) — both unlocked, no establishment gate.
           </Text>
           <Group gap="xs" mt="sm" align="center">
             {items.map((it) => (
@@ -557,13 +615,13 @@ function StateLegend() {
 
 interface CoverageSectionProps {
   title: string;
-  focus: IntelligenceFocus;
+  focus: CoverageFocus;
   slots: CoverageSlot[];
   category: CoverageCategory;
   cityFilter: string;
   slotStatus: (
     cat: CoverageCategory,
-    focus: IntelligenceFocus,
+    focus: CoverageFocus,
     city?: string | null,
     platform?: string | null,
   ) => CoverageSlot | null;
@@ -575,6 +633,12 @@ interface CoverageSectionProps {
     state?: string;
     platform?: string;
   }) => string;
+  createEnrichmentLink: (params: {
+    lane: 'category' | 'location';
+    category?: string;
+    city?: string;
+    state?: string;
+  }) => string;
   dimensionKey: 'platform' | 'city';
   dimensionValues: string[];
   dimensionLabels?: Record<string, string>;
@@ -583,10 +647,12 @@ interface CoverageSectionProps {
 
 function CoverageSection({
   title, focus, slots, category, cityFilter, slotStatus,
-  createLink, dimensionKey, dimensionValues, dimensionLabels, showAllCitiesHint,
+  createLink, createEnrichmentLink, dimensionKey, dimensionValues,
+  dimensionLabels, showAllCitiesHint,
 }: CoverageSectionProps) {
   const hasAny = slots.length > 0;
   const isPg = focus === 'proving_ground';
+  const isEnrichment = focus === 'enrichment';
   const isBronze = focus === 'bronze_standards';
   const isCityDim = dimensionKey === 'city';
 
@@ -656,6 +722,20 @@ function CoverageSection({
                 slot={slot}
                 category={category}
                 city={city}
+              />
+            );
+          }
+
+          if (isEnrichment) {
+            return (
+              <EnrichmentPair
+                key={`enrichment-${dimVal}`}
+                label={label}
+                category={category.category_name}
+                city={city}
+                isNational={isNationalColumn}
+                slot={slot ?? undefined}
+                createEnrichmentLink={createEnrichmentLink}
               />
             );
           }
@@ -1128,5 +1208,100 @@ function PgChip({ label, slot, category, city }: PgChipProps) {
         </Group>
       </Tooltip>
     </Link>
+  );
+}
+
+// ─── Enrichment Pair (stacked chips) ────────────────────────────────────
+// One (category, market) position rendered as two stacked chips:
+//   TOP    — category packet lane (slot.status): a scope='category'
+//            directory_enrichment campaign → the (category_key, city, state)
+//            row in directory_category_enrichment.
+//   BOTTOM — location narrative lane (slot.discovery_status): a scope='city'
+//            campaign → the ('__location__', city, state) sentinel row. The
+//            narrative is market-level (not category-keyed) — the same row
+//            fills the bottom chip of every category at this market.
+// National positions pass '__all__' into the create link — the campaign
+// form's National checkbox reads the sentinel back as checked.
+
+function EnrichmentPair({
+  label,
+  category,
+  city,
+  isNational,
+  slot,
+  createEnrichmentLink,
+}: {
+  label: string;
+  category: string;
+  city: string | null | undefined;
+  isNational: boolean;
+  slot: CoverageSlot | undefined;
+  createEnrichmentLink: (p: { lane: 'category' | 'location'; category?: string; city?: string; state?: string }) => string;
+}) {
+  const linkCity = isNational ? '__all__' : (city ?? undefined);
+  const linkState = isNational ? '__all__' : (slot?.state ?? undefined);
+  const catState = slot?.status ?? 'pending';
+  const locState = slot?.discovery_status ?? 'pending';
+
+  const renderChip = (opts: {
+    kind: 'category' | 'location';
+    state: string;
+    tooltip: string;
+    createHref: string;
+    campaignId?: string | null;
+  }) => {
+    const filled = opts.state === 'active' || opts.state === 'executed';
+    const inflight = opts.state === 'inflight';
+    const Icon = filled ? IconCircleCheck : inflight ? IconClock : IconPlus;
+    const color = filled ? (opts.kind === 'category' ? 'green' : 'teal') : inflight ? 'blue' : 'gray';
+    const href = opts.state === 'pending'
+      ? opts.createHref
+      : opts.campaignId ? CAMPAIGN_URL(opts.campaignId) : null;
+    const body = (
+      <Group gap={4} style={{
+        padding: '4px 10px',
+        borderRadius: 6,
+        background: filled
+          ? `var(--mantine-color-${color}-light)`
+          : inflight ? 'var(--mantine-color-blue-light)' : 'var(--mantine-color-gray-1)',
+        border: `1px ${opts.state === 'pending' ? 'dashed' : 'solid'} var(--mantine-color-${color}-${opts.state === 'pending' ? 4 : 3})`,
+        cursor: href ? 'pointer' : 'default',
+      }}>
+        <Icon size={14} color={`var(--mantine-color-${color}-${opts.state === 'pending' ? 5 : 6})`} />
+        <Text size="xs" fw={500} c={opts.state === 'pending' ? 'dimmed' : undefined}>
+          {opts.kind === 'category' ? label : `${label} · loc`}
+        </Text>
+      </Group>
+    );
+    return (
+      <Tooltip key={opts.kind} label={opts.tooltip} withArrow>
+        {href ? <Link href={href}>{body}</Link> : body}
+      </Tooltip>
+    );
+  };
+
+  return (
+    <Stack gap={4}>
+      {renderChip({
+        kind: 'category',
+        state: catState,
+        tooltip:
+          catState === 'active' ? 'Category packet enriched — click to open the source campaign'
+            : catState === 'inflight' ? 'Category enrichment campaign in flight — click to open'
+            : `Create a category enrichment campaign for ${category} at ${label}`,
+        createHref: createEnrichmentLink({ lane: 'category', category, city: linkCity, state: linkState }),
+        campaignId: slot?.profile_id || null,
+      })}
+      {renderChip({
+        kind: 'location',
+        state: locState,
+        tooltip:
+          locState === 'executed' ? 'Location narrative enriched — click to open the source campaign'
+            : locState === 'inflight' ? 'Location enrichment campaign in flight — click to open'
+            : `Create a location enrichment campaign for ${label}`,
+        createHref: createEnrichmentLink({ lane: 'location', city: linkCity, state: linkState }),
+        campaignId: slot?.discovery_campaign_id ?? null,
+      })}
+    </Stack>
   );
 }
