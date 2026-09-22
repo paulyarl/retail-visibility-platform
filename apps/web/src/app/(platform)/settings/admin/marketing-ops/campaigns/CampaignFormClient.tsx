@@ -443,7 +443,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // focus shouldn't suppress the blank-geo inference on another.
   useEffect(() => {
     setNationalDeclined(false);
-  }, [form.intelligence_focus, form.intelligence_campaign_kind, form.scope]);
+  }, [form.intelligence_focus, form.intelligence_campaign_kind, form.scope, form.campaign_category]);
 
   useEffect(() => {
     if (form.scope !== 'intelligence') return;
@@ -502,8 +502,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     }
     const city = form.city.trim();
     const state = form.state.trim();
-    if (city && city.toLowerCase() !== '__all__') parts.push(city);
-    if (state) parts.push(state);
+    if (city.toLowerCase() === '__all__') parts.push('National');
+    else if (city) parts.push(city);
+    if (state && state.toLowerCase() !== '__all__') parts.push(state);
     if (enrichmentTitleSuffix.trim()) parts.push(enrichmentTitleSuffix.trim());
     const derived = parts.join(' - ');
     setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
@@ -801,18 +802,26 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // null-slot. For geo-optional focuses (gold, bronze establishment) a blank
   // city IS national, so the box also renders checked while geo is empty —
   // national is a declared intent on every focus, not an implicit default.
-  const showNationalScope = form.scope === 'intelligence'
-    && !(form.intelligence_focus === 'bronze_standards' && form.intelligence_campaign_kind === 'discovery');
+  const isEnrichment = form.campaign_category === 'directory_enrichment';
+  const showNationalScope = (form.scope === 'intelligence'
+    && !(form.intelligence_focus === 'bronze_standards' && form.intelligence_campaign_kind === 'discovery'))
+    || isEnrichment;
   const nationalScopeChecked = showNationalScope && !nationalDeclined && (
     form.city.trim().toLowerCase() === '__all__'
-    || (form.intelligence_focus !== '' && !geoRequired && !form.city.trim())
+    // Blank-city national inference is intelligence-only — for enrichment a
+    // blank city is just an unfilled field, never an implicit national.
+    || (form.scope === 'intelligence' && form.intelligence_focus !== '' && !geoRequired && !form.city.trim())
   );
   const standardsFocus = form.intelligence_focus === 'gold_standards' || form.intelligence_focus === 'bronze_standards';
-  const nationalScopeLabel = standardsFocus
-    ? 'National (all markets) — the standards default; uncheck to pin a market'
-    : form.intelligence_campaign_kind === 'establishment'
-      ? 'National (all markets) — establish the city-agnostic vocabulary floor'
-      : 'National (all markets) — sweep all US markets against the national profile';
+  const nationalScopeLabel = isEnrichment
+    ? form.scope === 'category'
+      ? 'National (all markets) — enrich the national category page'
+      : 'National (all markets) — the national location narrative (platform-wide coverage packet)'
+    : standardsFocus
+      ? 'National (all markets) — the standards default; uncheck to pin a market'
+      : form.intelligence_campaign_kind === 'establishment'
+        ? 'National (all markets) — establish the city-agnostic vocabulary floor'
+        : 'National (all markets) — sweep all US markets against the national profile';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
@@ -1159,7 +1168,15 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                   </span>
                 </label>
                 <p className="text-xs text-gray-400 mt-1">
-                  {standardsFocus
+                  {isEnrichment
+                    ? (form.scope === 'category'
+                      ? <>Checked writes the <span className="font-mono">__all__</span> market sentinel — the run
+                        produces the national category packet (<span className="font-mono">__all__</span>/
+                        <span className="font-mono">__all__</span>), the page every market page falls back to.
+                        Uncheck and pick a city + state for a market-scoped category enrichment instead.</>
+                      : <>Checked writes <span className="font-mono">__all__</span> for city + state — the run
+                        produces the national location narrative composing platform-wide coverage.</>)
+                    : standardsFocus
                     ? <>Standards profiles are nationwide by default — one profile resolves as the fallback for
                       every market. Uncheck and fill City + State to produce a market-scoped profile instead
                       (it resolves first for that market; nationwide remains the fallback).</>
@@ -1187,10 +1204,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Showing cities observed in {form.state} — use <span className="font-medium">+ New city</span> for a new market.</p>
               )}
               {form.campaign_category === 'directory_enrichment' && form.scope === 'category' && (
-                <p className="text-xs text-gray-400 mt-1">Enter <span className="font-mono">__all__</span> (via + New city) for the national category page.</p>
+                <p className="text-xs text-gray-400 mt-1">Check <strong>Market Scope → National</strong> above for the national category page (writes the <span className="font-mono">__all__</span> market sentinel).</p>
               )}
               {form.campaign_category === 'directory_enrichment' && form.scope === 'city' && (
-                <p className="text-xs text-gray-400 mt-1">Enter <span className="font-mono">__all__</span> for city + state (via + New on each) for the national location narrative — composes the platform-wide coverage packet.</p>
+                <p className="text-xs text-gray-400 mt-1">Check <strong>Market Scope → National</strong> above for the national location narrative — composes the platform-wide coverage packet (writes <span className="font-mono">__all__</span> for city + state).</p>
               )}
               {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
                 <p className="text-xs text-gray-400 mt-1">Leave blank for the nationwide bar; fill city + state for a market-scoped gold standard.</p>
