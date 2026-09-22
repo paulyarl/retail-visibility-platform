@@ -81,9 +81,9 @@ export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery
 
 /**
  * Role for bronze-standard injection into prompts (BRONZE_STANDARD_SPEC §10.3).
- *   - 'establishment_reference' → stage-2 city bronze scan: the national
- *     bronze profile injected as the hunt list (full catalog snapshot +
- *     national proof state) the city scan must cover.
+ *   - 'establishment_reference' → stage-2 city bronze scan: the resolved
+ *     bronze profile (city → national cascade) injected as the hunt list
+ *     (full catalog snapshot + proof state) the city scan must cover.
  *   - 'discovery' → stage-3 emerging discovery scan: the city bronze profile
  *     injected as CALIBRATION framing (§7.1) — exemplars + empty-slot report +
  *     vector execution log. Framing, not a candidate filter.
@@ -2994,9 +2994,9 @@ export class IntelligenceProfileService extends BaseService {
   /**
    * Serialize a bronze-standard profile for prompt injection.
    *
-   *   establishment_reference (stage-2 city scan): the national profile as
-   *   the hunt list — full reason set (catalog snapshot when present,
-   *   reason_coverage otherwise) + national proof state.
+   *   establishment_reference (stage-2 city scan): the resolved profile
+   *   (city → national cascade) as the hunt list — full reason set (catalog
+   *   snapshot when present, reason_coverage otherwise) + proof state.
    *
    *   discovery (stage-3 emerging scan): the city profile as CALIBRATION
    *   framing (§7.1) — filled slots as exemplars, the empty-slot report, and
@@ -3031,7 +3031,7 @@ export class IntelligenceProfileService extends BaseService {
 
     if (role === 'establishment_reference') {
       lines.push('');
-      lines.push('=== BRONZE STANDARD — NATIONAL REFERENCE ===');
+      lines.push('=== BRONZE STANDARD — REFERENCE PROFILE ===');
       lines.push(`Category: ${profile.category_name}`);
       lines.push(`Profile: ${profile.id} v${profile.version}`);
       lines.push(`Profile scope: ${scopeLabel}`);
@@ -3039,7 +3039,7 @@ export class IntelligenceProfileService extends BaseService {
       if (catalogRevision !== null) lines.push(`Catalog revision: ${catalogRevision}`);
       lines.push('');
       lines.push(
-        'DIRECTIVE: This is the national bronze standard for this category — the established map of what INVISIBLE looks like, typed by discovery-blind-spot reason. Your city scan MUST produce exactly one reason_coverage entry for each applicable reason below. Each reason is a discovery vector: execute its expected_vectors against the reference market, evaluate candidates against the three-part gate (category-qualified by assortment evidence, operationally verified — unable_to_verify never qualifies, low digital quality the reason explains), and record filled slots or the correct empty status with the execution outcome. Reasons marked proven at national scope but empty here are reported empty_proven_elsewhere; reasons with no exemplar at any evaluable scope are empty_unproven — but you still hunt them (the hunt is how they become proven).',
+        'DIRECTIVE: This is the established bronze-standard reference profile for this category — the map of what INVISIBLE looks like, typed by discovery-blind-spot reason. Your city scan MUST produce exactly one reason_coverage entry for each applicable reason below. Each reason is a discovery vector: execute its expected_vectors against the reference market, evaluate candidates against the three-part gate (category-qualified by assortment evidence, operationally verified — unable_to_verify never qualifies, low digital quality the reason explains), and record filled slots or the correct empty status with the execution outcome. Reasons proven in the reference profile but empty here are reported empty_proven_elsewhere; reasons with no exemplar at any evaluable scope are empty_unproven — but you still hunt them (the hunt is how they become proven).',
       );
       lines.push('');
       lines.push(BRONZE_SCOPE_SEMANTICS);
@@ -3066,7 +3066,7 @@ export class IntelligenceProfileService extends BaseService {
         }
         lines.push('');
       } else if (coverage.length > 0) {
-        lines.push('--- Reasons Covered Nationally ---');
+        lines.push('--- Reasons Covered in Reference ---');
         for (const e of coverage) {
           lines.push(`  [${e.reason_key}] status: ${e.status}`);
         }

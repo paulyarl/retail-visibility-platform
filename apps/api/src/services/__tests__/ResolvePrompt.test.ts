@@ -1093,7 +1093,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       const bronzeProfile = { id: 'bz-african-001', version: 1, reference_city: null, reference_state: null };
       mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(bronzeProfile);
       mockProfileService.serializeBronzeStandard.mockReturnValueOnce(
-        '=== BRONZE STANDARD — NATIONAL REFERENCE ===\nhunt list',
+        '=== BRONZE STANDARD — REFERENCE PROFILE ===\nhunt list',
       );
       mockCatalogService.applicableReasons.mockResolvedValueOnce([{ reason_key: 'trade_manifest_only' }]);
       mockCatalogService.currentRevision.mockResolvedValueOnce(7);
@@ -1106,7 +1106,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       });
 
       expect(renderedPrompt).toContain('BRONZE STANDARD — CITY SCAN (FOLDED)');
-      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL REFERENCE');
+      expect(renderedPrompt).toContain('BRONZE STANDARD — REFERENCE PROFILE');
       expect(renderedPrompt).toContain('BRONZE REASON CATALOG');
       expect(renderedPrompt).toContain('DUAL-PAYLOAD OUTPUT — FOLDED CITY BRONZE SCAN');
       expect(renderedPrompt).toContain('PAYLOAD 2 — bronze_standard_scan');
@@ -1305,11 +1305,11 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(mockComposerService.composeIntelligencePrompt).not.toHaveBeenCalled();
     });
 
-    it('stage-2 city discovery injects the national reference block and never composes', async () => {
+    it('stage-2 city discovery injects the reference profile block and never composes', async () => {
       const bronzeProfile = { id: 'bz-1', version: 1, reference_city: null, reference_state: null };
       mockProfileService.resolveBronzeStandard.mockResolvedValueOnce(bronzeProfile);
       mockProfileService.serializeBronzeStandard.mockReturnValueOnce(
-        '=== BRONZE STANDARD — NATIONAL REFERENCE ===\nhunt list',
+        '=== BRONZE STANDARD — REFERENCE PROFILE ===\nhunt list',
       );
       mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
       mockCatalogService.currentRevision.mockResolvedValueOnce(1);
@@ -1320,9 +1320,56 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
         variables: undefined,
       });
 
-      expect(renderedPrompt).toContain('BRONZE STANDARD — NATIONAL REFERENCE');
+      expect(renderedPrompt).toContain('BRONZE STANDARD — REFERENCE PROFILE');
       expect(mockComposerService.composeIntelligencePrompt).not.toHaveBeenCalled();
       expect(resolution.bronze_standard_profile_id).toBe('bz-1');
+    });
+
+    // '__all__' is what the form's National checkbox actually writes — the
+    // region directive must read it as nationwide, never as a literal region.
+    it('national (__all__) bronze establishment emits NATIONWIDE scope, never the sentinel', async () => {
+      mockCatalogService.applicableReasons.mockResolvedValueOnce([]);
+      mockCatalogService.currentRevision.mockResolvedValueOnce(1);
+      mockCatalogService.serializeCatalogBlock.mockReturnValueOnce('');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeBronzeTemplate('establishment'),
+        campaign: makeBronzeCampaign({
+          city: '__all__', state: '__all__', intelligence_campaign_kind: 'establishment',
+        }),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('SEARCH SCOPE — NATIONWIDE');
+      expect(renderedPrompt).not.toContain('REGION-NARROWED');
+      expect(renderedPrompt).not.toContain('__all__');
+    });
+
+    it('national (__all__) gold establishment emits NATIONWIDE scope, never the sentinel', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: {
+          body: 'Gold scan for {{category}} on {{platform}}',
+          prompt_type: 'seek',
+          scope: 'intelligence',
+          output_schema: { name: 'gold_standard_scan' },
+          outputSchema: { name: 'gold_standard_scan' },
+        },
+        campaign: {
+          id: 'camp-gold-nat-1',
+          scope: 'intelligence',
+          category: 'African Grocery Store',
+          city: '__all__',
+          state: '__all__',
+          intelligence_focus: 'gold_standards',
+          intelligence_platform: 'google',
+          intelligence_campaign_kind: 'establishment',
+        },
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('SEARCH SCOPE — NATIONWIDE');
+      expect(renderedPrompt).not.toContain('REGION-NARROWED');
+      expect(renderedPrompt).not.toContain('__all__');
     });
   });
 

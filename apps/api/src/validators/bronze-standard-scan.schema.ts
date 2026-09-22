@@ -1,8 +1,9 @@
 /**
  * Bronze Standard Scan Output Schema (Bronze Standard System)
  *
- * Validates the output of bronze-standard national (stage 1) and city
- * (stage 2) scans. Spec: docs/LocalBiz/BRONZE_STANDARD_SPEC.md §4.
+ * Validates the output of bronze-standard establishment (stage 1 —
+ * nationwide or market-scoped) and city discovery (stage 2) scans.
+ * Spec: docs/LocalBiz/BRONZE_STANDARD_SPEC.md §4.
  *
  * The bronze profile maps what INVISIBLE looks like for a category: its
  * slots are typed by WHY a business is invisible (a discovery blind spot =
@@ -13,8 +14,9 @@
  * Two campaign kinds produce this schema — the post-import hook in
  * importExternalResult() persists a DRAFT profile for BOTH (keyed on the
  * schema name, not campaign kind, spec §6.1):
- *   - establishment (stage 1, national): embeds a revision-stamped snapshot
- *     of the scope-applicable reason catalog + national proof slots.
+ *   - establishment (stage 1 — nationwide or market-scoped): embeds a
+ *     revision-stamped snapshot of the scope-applicable reason catalog +
+ *     proof slots.
  *   - discovery (stage 2, city): fills city reason slots, reporting the
  *     three-state coverage vocabulary and the vector execution log.
  *   Discovery-kind bronze imports do NOT create an audit row
@@ -146,7 +148,7 @@ const suggestedReasonSchema = z.object({
   exemplar_lead: suggestedReasonExemplarLeadSchema.optional(),
 }).passthrough();
 
-// ─── Catalog snapshot row (stage-1 national profile embeds these) ───────
+// ─── Catalog snapshot row (establishment profiles embed these) ──────────
 
 const catalogSnapshotRowSchema = z.object({
   reason_key: z.string().min(1),
@@ -167,7 +169,7 @@ const catalogSnapshotRowSchema = z.object({
 export const bronzeStandardScanSchema = z.object({
   category_key: z.string().min(1),
   category_name: z.string().min(1),
-  /** City variant sets these; the national (stage-1) variant leaves them null. */
+  /** Set when the scan is market-scoped; null for nationwide runs. */
   reference_city: z.string().nullable().optional(),
   reference_state: z.string().nullable().optional(),
   /** null = cross-platform (default); a platform-scoped profile filters the reason set (§3.6.5). */
@@ -221,7 +223,7 @@ Return a single JSON object with this structure (the Bronze Standard Scan result
 {
   "category_key": "<normalized category key, lowercase, spaces collapsed>",
   "category_name": "<display name>",
-  "reference_city": "<string|null — set for city scans, null for national>",
+  "reference_city": "<string|null — set when the SEARCH SCOPE is region-narrowed, null for nationwide>",
   "reference_state": "<string|null — 2-letter code>",
   "reference_platform": "<null|google|yelp|facebook|bbb|apple_maps|bing>",
   "catalog_revision": <integer — echo the catalog revision from the injected catalog block>,
@@ -334,7 +336,7 @@ Rules:
   "not executed". Mirror it in vector_execution_log: an unexecuted vector is
   an admitted blind spot, never a silent gap.
 - catalog_revision echoes the revision stamped on the injected catalog block.
-  For stage-1 (national) scans, catalog_snapshot embeds the scope-applicable
+  For establishment scans, catalog_snapshot embeds the scope-applicable
   catalog rows verbatim so the profile stays interpretable after the catalog
   moves on.
 - Cap slots at 2 per reason — two exemplars calibrate; more is token cost

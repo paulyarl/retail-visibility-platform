@@ -324,7 +324,7 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
 
     it('emits the establishment_reference hunt list', async () => {
       const block = await service.serializeBronzeStandard(coverageProfile, 'establishment_reference');
-      expect(block).toContain('=== BRONZE STANDARD — NATIONAL REFERENCE ===');
+      expect(block).toContain('=== BRONZE STANDARD — REFERENCE PROFILE ===');
       expect(block).toContain('reason_coverage entry');
       expect(block).toContain('Mama Nkechi');
     });

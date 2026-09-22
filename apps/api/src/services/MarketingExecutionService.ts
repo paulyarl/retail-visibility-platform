@@ -1089,7 +1089,7 @@ export class MarketingExecutionService extends BaseService {
       if (!bronzeStandard) {
         const warning = '\n\n=== DEGRADED MODE — NO ACTIVE BRONZE STANDARD PROFILE ===\n'
           + `No active bronze-standard profile exists for category "${category}". `
-          + 'Run a Bronze Standard national Establishment campaign first to create the profile. '
+          + 'Run a Bronze Standard Establishment campaign first to create the profile. '
           + 'This city scan will run in degraded mode — hunt for hard-to-find businesses '
           + 'using your own blind-spot judgment and report each reason you covered.\n';
         logger.warn('Bronze standard city scan resolved without active profile (degraded)', ctx, {
@@ -2979,6 +2979,11 @@ competitive also-rans with identifiable gaps.`;
     state: string | null,
     profile: { reference_city: string | null; reference_state: string | null } | null,
   ): string {
+    // '__all__' is the national-market sentinel the campaign form writes for
+    // geo-optional focuses — normalize to null so it never renders as a
+    // literal region label.
+    if (isNationalSentinel(city)) city = null;
+    if (isNationalSentinel(state)) state = null;
     const isEstablishment = profile === null;
     const scanTypeLabel = isEstablishment ? 'establishment scan' : 'discovery scan';
     const searchVerb = isEstablishment ? 'candidate businesses' : 'ADDITIONAL candidate businesses';
@@ -3049,6 +3054,9 @@ ${scopeNote}
     state: string | null,
     profile: { reference_city: string | null; reference_state: string | null } | null,
   ): string {
+    // '__all__' national sentinel → null (same as the gold directive).
+    if (isNationalSentinel(city)) city = null;
+    if (isNationalSentinel(state)) state = null;
     const isEstablishment = profile === null;
 
     if (!city && !state) {

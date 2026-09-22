@@ -3,14 +3,17 @@
  *
  * Seeds TWO prompt templates for bronze-standard scans:
  *
- * 1. ESTABLISHMENT / NATIONAL (mpt-seed-bronze-standard-scan-001):
+ * 1. ESTABLISHMENT (mpt-seed-bronze-standard-scan-001):
  *    intelligence_campaign_kind = 'establishment'. Stage 1 of the bronze
- *    pipeline — the analyst covers every applicable catalog reason at
- *    national scope and embeds a revision-stamped catalog snapshot in the
- *    output. The reason catalog is injected at render time by
- *    MarketingExecutionService via BronzeReasonCatalogService
- *    .serializeCatalogBlock(). The validated JSON is persisted as a DRAFT
- *    bronze-standard profile by IntelligenceProfileService.importAsDraft().
+ *    pipeline — the analyst covers every applicable catalog reason and
+ *    embeds a revision-stamped catalog snapshot in the output. The body is
+ *    geographically neutral (same pattern as gold): the campaign's city /
+ *    state — blank = nationwide, set = market-scoped profile — is carried by
+ *    the SEARCH SCOPE directive appended at render time. The reason catalog
+ *    is injected at render time by MarketingExecutionService via
+ *    BronzeReasonCatalogService.serializeCatalogBlock(). The validated JSON
+ *    is persisted as a DRAFT bronze-standard profile by
+ *    IntelligenceProfileService.importAsDraft().
  *
  * 2. DISCOVERY / CITY (mpt-seed-bronze-standard-scan-discovery-001):
  *    intelligence_campaign_kind = 'discovery'. Stage 2 — the analyst covers
@@ -145,11 +148,11 @@ discovered_by value exactly as supplied.`;
 const OUTPUT_FORMAT_SECTION = `=== OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The expected JSON structure and rules are specified in the EXPECTED OUTPUT FORMAT section below.`;
 
-// ─── 1. ESTABLISHMENT template (national — stage 1) ──────────────────────
+// ─── 1. ESTABLISHMENT template (stage 1 — national or market-scoped) ─────
 
 const BRONZE_STANDARD_SCAN_ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-bronze-standard-scan-001',
-  name: 'Seek: Bronze Standard Scan (National Establishment)',
+  name: 'Seek: Bronze Standard Scan (Establishment)',
   promptType: 'seek' as const,
   scope: 'intelligence' as const,
   body: `You are a bronze-standard analyst for the Retail Visibility Platform. Your task is to map what INVISIBLE looks like for physical retail businesses in a category: the lowest digital quality at which a real, operating, category-qualified business with a physical walk-in storefront and physical shelves can exist, typed by WHY it is invisible.
@@ -162,7 +165,7 @@ The gold standard maps what "excellent" looks like. The bronze standard maps the
 
 Each reason in the catalog below is a discovery blind spot (miscategorization, missing category tokens, weak mainstream indexing, community-only presence, and so on) AND a discovery vector: the reason's expected_vectors name the sources that reveal businesses mainstream discovery misses.
 
-This is the NATIONAL establishment scan (stage 1): you are deriving the national bronze profile. Cover EVERY applicable reason in the injected catalog — the catalog is your hunt list, and your output embeds a revision-stamped snapshot of it so the profile stays interpretable after the catalog moves on. The geographic search scope is specified in the SEARCH SCOPE section at the end of this prompt.
+This is the establishment scan (stage 1): you are deriving the bronze-standard profile for this scan's search scope. Cover EVERY applicable reason in the injected catalog — the catalog is your hunt list, and your output embeds a revision-stamped snapshot of it so the profile stays interpretable after the catalog moves on. The geographic search scope — nationwide or a single market — is specified in the SEARCH SCOPE section at the end of this prompt.
 
 ${PLATFORM_GOAL_SECTION}
 
@@ -186,7 +189,7 @@ ${OUTPUT_FORMAT_SECTION}`,
   variables: ['category', 'platform'],
   outputSchema: {
     name: BRONZE_STANDARD_SCAN_SCHEMA_NAME,
-    description: 'Bronze Standard Scan (National Establishment) — covers every applicable catalog reason at national scope, embeds the revision-stamped catalog snapshot, and produces the national bronze-standard profile.',
+    description: 'Bronze Standard Scan (Establishment) — covers every applicable catalog reason at the scan\'s search scope (nationwide or a single market), embeds the revision-stamped catalog snapshot, and produces the bronze-standard profile.',
   },
   isDefault: false,
   intelligenceFocus: 'bronze_standards' as const,
@@ -206,7 +209,7 @@ CATEGORY: {{category}}
 PLATFORM FOCUS: {{platform}}
 
 === WHAT THIS SCAN IS ===
-This is the CITY discovery scan (stage 2). The BRONZE STANDARD NATIONAL REFERENCE and BRONZE REASON CATALOG sections below (injected by the platform) are your hunt list — the established reason map this market must cover. Produce exactly one reason_coverage entry per applicable reason.
+This is the CITY discovery scan (stage 2). The BRONZE STANDARD REFERENCE PROFILE and BRONZE REASON CATALOG sections below (injected by the platform) are your hunt list — the established reason map this market must cover. Produce exactly one reason_coverage entry per applicable reason.
 
 Your output becomes the market's bronze profile: the calibration artifact the emerging discovery scan consumes to know what a hard-to-find business looks like here and which vectors reach it. The geographic search scope is specified in the SEARCH SCOPE section at the end of this prompt.
 
@@ -216,9 +219,9 @@ ${THREE_PART_GATE_SECTION}
 
 ${COVERAGE_VOCABULARY_SECTION}
 
-=== NATIONAL PROOF STATES ===
-The national reference tells you which reasons are already proven somewhere:
-- A reason proven nationally but empty in this market is reported
+=== REFERENCE PROOF STATES ===
+The injected reference profile tells you which reasons are already proven somewhere:
+- A reason proven in the reference but empty in this market is reported
   empty_proven_elsewhere — the reason is real; this market just did not
   yield an exemplar this pass.
 - A reason with no exemplar at ANY evaluable scope is empty_unproven — but
@@ -239,7 +242,7 @@ ${OUTPUT_FORMAT_SECTION}`,
   variables: ['category', 'platform'],
   outputSchema: {
     name: BRONZE_STANDARD_SCAN_SCHEMA_NAME,
-    description: 'Bronze Standard Scan (City Discovery) — covers every applicable reason at the market scope using the national bronze profile as the hunt list; produces the city bronze-standard profile consumed by emerging discovery.',
+    description: 'Bronze Standard Scan (City Discovery) — covers every applicable reason at the market scope using the resolved bronze profile (city → national cascade) as the hunt list; produces the city bronze-standard profile consumed by emerging discovery.',
   },
   isDefault: false,
   intelligenceFocus: 'bronze_standards' as const,
