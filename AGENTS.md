@@ -1328,3 +1328,16 @@ Key rules (regression history — do not reintroduce):
 - Frontend: the discovery chip stays **locked** (lock icon, not clickable) until the establishment chip is active — except gold standards, where the **All Platforms** establishment also unlocks per-platform discovery (proxy establishment — mirrors `resolveGoldStandard`'s platform fallback chain). "All Platforms" is always the first chip in the gold row.
 
 Tests: `apps/api/src/services/__tests__/IntelligenceProfileService.coverage.test.ts` (15 tests — all 7 states, gold platform slots, newest-wins, pending-slot upgrade, terminal exclusion, PG slot shape).
+
+## National Location Row — Sync Contract (shipped 2026-09-22)
+
+The `('__location__','__all__','__all__')` row in `directory_category_enrichment` is **derived state** over every covered market: `getNationalCoverage()` measures `directory_listings_list`, `getNationalCategoryEnrichments()` reads all `(category,'__all__','__all__')` packets. It refreshes on two triggers:
+
+- **National category apply** — `CategoryMarketEnrichmentService.applyEnrichmentPacket`'s `else` (national) branch calls `enrichLocation('__all__','__all__')`, mirroring the city cascade. `enrichMarket` bails on the sentinel (`invalid_market`) — national category rows are campaign-lane only.
+- **Every PG shelf sweep** — `ProvingGroundShelfSweepService` calls it unconditionally after the per-city location pass (`triggerSource='pg_sweep'`); reported as `nationalLocation` on `ShelfSweepReport`, NOT inside `locationMarkets` (that array is per-city first-fill only). This covers listing-driven coverage drift that category deploys don't.
+
+**Preserve contract (differs from city rows):** `enrichNational` keeps the campaign row's head copy when `composer_version=2` (meta_title / description / keywords / secondary_categories / schema_type_hint) and only refreshes `context.national_coverage`. City `enrichLocation` overwrites head fields deterministically on every sync — do NOT copy that behavior into the national path; the composer cannot write national coverage narrative, so the campaign packet is the only good source of head copy.
+
+**What sync does NOT refresh:** the AI narrative fields (`body_copy`, `shopper_guide`, `faq`, `area_breakdown`, `context.market_gaps` / `metro_dynamics` / `top_categories`) go stale as coverage shape changes — they only update on a `__location__`/`__all__` campaign re-run. Open follow-up: staleness signal comparing stamped `context.national_coverage` vs live `getNationalCoverage()` on the Coverage surface. Also open (sprint plan Phase C.3): the `profile_activated` hook still requires non-null `reference_city`, so national profile activation produces no national packet.
+
+Tests: `directoryEnrichment.apply.category.test.ts` (national resync call), `directoryEnrichment.apply.location.test.ts` (campaign-copy preservation + baseline write), `ProvingGroundShelfSweep.test.ts` (national refresh + error isolation).

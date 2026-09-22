@@ -315,7 +315,9 @@ export class SeedReportEvidenceService extends BaseService {
       observations.filter((o) => keys.includes(o.field)).map((o) => o.observation_id!);
 
     const identityCandidate = {
-      business_name: provValue('business_name') ?? seedState.name_variants[0] ?? null,
+      // 'name' is the canonical provenance key written by the seed write
+      // paths; 'business_name' is accepted for operator-authored rows.
+      business_name: provValue('business_name') ?? provValue('name') ?? seedState.name_variants[0] ?? null,
       address: provValue('address'),
       phone: provValue('phone'),
       website: provValue('website'),
@@ -323,7 +325,7 @@ export class SeedReportEvidenceService extends BaseService {
       state: seedState.state,
       identity_confidence: (seedState.identity_confidence as 'high' | 'medium' | 'low') ?? 'low',
       basis: ['resolved seed record', 'directory_field_provenance'],
-      source_observation_ids: provObsIds(['business_name', 'address', 'phone', 'website', 'city', 'state']),
+      source_observation_ids: provObsIds(['business_name', 'name', 'address', 'phone', 'website', 'city', 'state']),
     };
 
     const geographicAssessment = seedState.city

@@ -715,33 +715,54 @@ export class SeedIntelligenceReportService extends BaseService {
       provenanceByField.set(p.field_key, p);
     }
 
+    // Provenance field-key aliases — the seed write paths (createFromCampaign,
+    // manual form) record the name under 'name' while the report DTO uses
+    // 'business_name' (§9.1). Match both so a provenance row under either key
+    // resolves.
+    const FIELD_KEY_ALIASES: Record<string, string[]> = {
+      business_name: ['name'],
+    };
+
     const buildFact = (
       fieldKey: string,
       value: unknown,
       fallbackConfidence: EvidenceConfidence = 'medium',
     ): ReportFact => {
-      const prov = provenanceByField.get(fieldKey);
+      const keys = [fieldKey, ...(FIELD_KEY_ALIASES[fieldKey] ?? [])];
+      const prov = keys.map((k) => provenanceByField.get(k)).find((p) => p != null);
       const evidenceState: EvidenceState = prov?.evidence_state as EvidenceState
         ?? (prov?.override_by ? 'owner_confirmed' : 'observed');
       const confidence: EvidenceConfidence = (prov?.confidence as EvidenceConfidence) ?? fallbackConfidence;
       const sourceObsIds = evidence.observations
-        .filter((o) => o.field === fieldKey)
+        .filter((o) => keys.includes(o.field))
         .map((o) => o.observation_id!)
         .filter(Boolean);
 
+      const resolvedValue = prov?.value ?? value;
+      // §17.1: a fact with no source observations must carry an explicit
+      // derived-value explanation — otherwise lint blocks publication.
+      const displayNote = prov?.notes
+        ?? (sourceObsIds.length === 0
+          ? prov
+            ? `Sourced from ${prov.source_name ?? 'directory provenance'}`
+            : resolvedValue != null
+              ? 'Resolved from the seed record'
+              : 'Not observed — no sourced value on record'
+          : null);
+
       return {
         field: fieldKey,
-        value: prov?.value ?? value,
+        value: resolvedValue,
         state: evidenceState,
         confidence,
         source_observation_ids: sourceObsIds,
         owner_verified_at: prov?.override_at ?? null,
-        display_note: prov?.notes ?? null,
+        display_note: displayNote,
       };
     };
 
     return {
-      business_name: buildFact('business_name', null, 'medium'),
+      business_name: buildFact('business_name', seedState.name_variants[0] ?? null, 'medium'),
       address: buildFact('address', null, 'medium'),
       phone: buildFact('phone', null, 'medium'),
       website: buildFact('website', null, 'low'),
