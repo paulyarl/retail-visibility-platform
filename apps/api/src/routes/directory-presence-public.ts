@@ -1559,7 +1559,7 @@ const claimListingUpdateSchema = z.object({
 });
 
 /** PUT /api/public/directory/claim/:token/listing — owner pre-approval edits (token auth) */
-router.put('/claim/:token/listing', async (req: Request, res: Response) => {
+router.put('/claim/:token/listing', optionalAuth, optionalCustomerAuth, async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     const summary = await DirectoryClaimService.getTokenSummary(token);
@@ -1613,6 +1613,10 @@ router.put('/claim/:token/listing', async (req: Request, res: Response) => {
 
     await DirectoryPresenceSeedService.updateFields(summary.seedId, fields, [], {
       actorType: 'customer',
+      // Best-effort actor capture — the token is the capability, so edits
+      // work unauthenticated, but a signed-in claimant's id is stamped into
+      // the audit trail + provenance override fields when present.
+      actorId: (req as any).customer?.id || (req as any).user?.id || undefined,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
     });

@@ -37,6 +37,7 @@ import {
   IconShieldCheck,
   IconSparkles,
   IconTag,
+  IconPencil,
 } from '@tabler/icons-react';
 import { getCategoryUrl } from '@/utils/slug';
 import directoryClaimPublicService, {
@@ -89,6 +90,10 @@ export default function DirectoryClaimClient() {
   // Claim-time owner verification (migration 274) — the consent gate. Null
   // until the owner checks the confirmation box; required to submit.
   const [verification, setVerification] = useState<OwnerClaimVerification | null>(null);
+
+  // Optional pre-claim listing corrections (address/phone/hours/etc.) — the
+  // same optional-submission pattern as the post-submit review screen.
+  const [showListingEditor, setShowListingEditor] = useState(false);
 
   // Claimant verification fields (for operator-approval claims)
   const [claimantFirstName, setClaimantFirstName] = useState('');
@@ -817,6 +822,56 @@ export default function DirectoryClaimClient() {
               onChange={setVerification}
             />
           )}
+
+          {/* Optional pre-claim corrections — the same optional-submission
+              pattern as the post-submit review screen (PUT /claim/:token/listing
+              is token-gated, so edits apply before or after submit).
+              includeCategories=false: the verification panel above owns the
+              category consent contract, and its payload is minted at claim
+              submit — a second category editor here would be overwritten. */}
+          {summary && (
+            <Stack gap="xs">
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => setShowListingEditor((v) => !v)}
+                leftSection={<IconPencil size={14} />}
+              >
+                {showListingEditor
+                  ? 'Hide listing corrections'
+                  : 'Something wrong? Correct your listing details (optional)'}
+              </Button>
+              {showListingEditor && (
+                <DirectoryClaimListingEditor
+                  token={token}
+                  summary={summary}
+                  onSaved={loadSummary}
+                  includeCategories={false}
+                />
+              )}
+            </Stack>
+          )}
+
+          <Alert color="gray" variant="light" icon={<IconShieldCheck size={16} />}>
+            <Text size="sm" fw={500} mb={4}>
+              What happens after you claim
+            </Text>
+            <List size="sm" c="dimmed" spacing={4}>
+              <List.Item>
+                We may email you a 6-digit code to confirm it&apos;s you, or our team may
+                review the claim — reviews usually take 1–2 business days.
+              </List.Item>
+              <List.Item>
+                If your claim goes to review, the confirmation screen lets you upload proof
+                of ownership — a business license, utility bill, or storefront photo — and
+                keep correcting your listing details while you wait.
+              </List.Item>
+              <List.Item>
+                Once approved, the listing is yours — manage hours, photos, and categories
+                from your dashboard.
+              </List.Item>
+            </List>
+          </Alert>
 
           <Divider />
 

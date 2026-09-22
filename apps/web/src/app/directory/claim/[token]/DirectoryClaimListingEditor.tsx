@@ -101,10 +101,15 @@ export default function DirectoryClaimListingEditor({
   token,
   summary,
   onSaved,
+  includeCategories = true,
 }: {
   token: string;
   summary: DirectoryClaimSummary;
   onSaved: () => void;
+  /** False on the pre-claim screen — ClaimVerificationPanel owns the
+   *  category consent contract there, so the editor must not offer a second
+   *  category editor whose save would be overwritten at claim submit. */
+  includeCategories?: boolean;
 }) {
   const [editAddress, setEditAddress] = useState('');
   const [editCity, setEditCity] = useState('');
@@ -121,6 +126,10 @@ export default function DirectoryClaimListingEditor({
   const [editSecondaryCategories, setEditSecondaryCategories] = useState<string[]>([]);
   const [editHours, setEditHours] = useState<Record<string, DayHours>>({ ...EMPTY_HOURS });
   const [editTimezone, setEditTimezone] = useState('America/New_York');
+  // Only send businessHours when the owner actually touched them — the empty
+  // form state is "every day closed", which would wrongly overwrite a listing
+  // that has no sourced hours yet.
+  const [hoursTouched, setHoursTouched] = useState(false);
   const [editSlug, setEditSlug] = useState('');
   const [slugPatterns, setSlugPatterns] = useState<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }[]>([]);
   const [loadingSlugs, setLoadingSlugs] = useState(false);
@@ -197,12 +206,7 @@ export default function DirectoryClaimListingEditor({
     setError(null);
     setSuccess(null);
 
-    const hoursObj: Record<string, DayHours> = {};
-    for (const day of DAYS) {
-      hoursObj[day] = editHours[day];
-    }
-
-    const payload = {
+    const payload: Record<string, any> = {
       address: editAddress.trim() || undefined,
       city: editCity.trim() || undefined,
       state: editState.trim() || undefined,
@@ -212,13 +216,23 @@ export default function DirectoryClaimListingEditor({
       website: editWebsite.trim() || null,
       latitude: editLatitude.trim() && !Number.isNaN(Number(editLatitude)) ? Number(editLatitude) : null,
       longitude: editLongitude.trim() && !Number.isNaN(Number(editLongitude)) ? Number(editLongitude) : null,
-      primaryCategory: editPrimaryCategory.trim() || null,
-      secondaryCategories: editSecondaryCategories,
-      businessHours: { ...hoursObj, timezone: editTimezone },
       notes: editNotes.trim() || null,
       socialLinks: editSocialLinks.filter((s) => s.platform.trim() && s.url.trim()),
       slug: editSlug.trim() || undefined,
     };
+
+    if (includeCategories) {
+      payload.primaryCategory = editPrimaryCategory.trim() || null;
+      payload.secondaryCategories = editSecondaryCategories;
+    }
+
+    if (hoursTouched) {
+      const hoursObj: Record<string, DayHours> = {};
+      for (const day of DAYS) {
+        hoursObj[day] = editHours[day];
+      }
+      payload.businessHours = { ...hoursObj, timezone: editTimezone };
+    }
 
     const result = await directoryClaimPublicService.updateListing(token, payload);
     setSaving(false);
@@ -263,15 +277,17 @@ export default function DirectoryClaimListingEditor({
             label="Business name"
             value={summary.businessName}
             disabled
-            description="Contact support to change the business name."
+            description="To correct the business name, note it in the corrections field below — our team reviews name changes."
           />
-          <DirectoryCategorySelectorAdapter
-            primary={editPrimaryCategory}
-            secondary={editSecondaryCategories}
-            onPrimaryChange={setEditPrimaryCategory}
-            onSecondaryChange={setEditSecondaryCategories}
-            disabled={false}
-          />
+          {includeCategories && (
+            <DirectoryCategorySelectorAdapter
+              primary={editPrimaryCategory}
+              secondary={editSecondaryCategories}
+              onPrimaryChange={setEditPrimaryCategory}
+              onSecondaryChange={setEditSecondaryCategories}
+              disabled={false}
+            />
+          )}
         </Stack>
 
         <Divider />
@@ -471,7 +487,7 @@ export default function DirectoryClaimListingEditor({
             label="Timezone"
             data={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz }))}
             value={editTimezone}
-            onChange={(v) => setEditTimezone(v || 'America/New_York')}
+            onChange={(v) => { setHoursTouched(true); setEditTimezone(v || 'America/New_York'); }}
             searchable
           />
           <div className="space-y-2">
@@ -487,12 +503,13 @@ export default function DirectoryClaimListingEditor({
                       <input
                         type="checkbox"
                         checked={!h.closed}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setHoursTouched(true);
                           setEditHours((prev) => ({
                             ...prev,
                             [day]: { ...prev[day], closed: !e.target.checked },
-                          }))
-                        }
+                          }));
+                        }}
                       />
                       <span className="capitalize">{day}</span>
                     </label>
@@ -504,12 +521,13 @@ export default function DirectoryClaimListingEditor({
                           type="time"
                           className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                           value={h.open}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            setHoursTouched(true);
                             setEditHours((prev) => ({
                               ...prev,
                               [day]: { ...prev[day], open: e.target.value },
-                            }))
-                          }
+                            }));
+                          }}
                         />
                       </div>
                       <div className="md:col-span-1 text-center text-xs text-gray-400">to</div>
@@ -518,12 +536,13 @@ export default function DirectoryClaimListingEditor({
                           type="time"
                           className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                           value={h.close}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            setHoursTouched(true);
                             setEditHours((prev) => ({
                               ...prev,
                               [day]: { ...prev[day], close: e.target.value },
-                            }))
-                          }
+                            }));
+                          }}
                         />
                       </div>
                     </>
