@@ -52,8 +52,13 @@ export default function ProvingGroundsClient() {
   const groups = useMemo<ProvingGroundGroup[]>(() => {
     const byMarket = new Map<string, Campaign[]>();
     for (const c of filtered) {
-      const city = c.city?.trim() || 'No market';
-      const state = c.state?.trim() || '';
+      const rawCity = c.city?.trim() || '';
+      // PGs are city-scoped workspaces, but guard the grouping anyway —
+      // '__all__' is the national sentinel, not a market name.
+      const city = !rawCity ? 'No market'
+        : rawCity.toLowerCase() === '__all__' ? 'National (all markets)'
+        : rawCity;
+      const state = rawCity.toLowerCase() === '__all__' ? '' : (c.state?.trim() || '');
       const key = state ? `${city}, ${state}` : city;
       if (!byMarket.has(key)) byMarket.set(key, []);
       byMarket.get(key)!.push(c);

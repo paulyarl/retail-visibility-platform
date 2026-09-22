@@ -254,6 +254,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       .then(([{ items }, presetTones]) => {
         const recordTones = distinctValues(items, (c) => c.tone);
         const mergedTones = [...new Set([...presetTones, ...recordTones])].sort((a, b) => a.localeCompare(b));
+        // '__all__' is the national sentinel, not a market — keep it out of
+        // the observed city/state vocabulary and pairing maps so it never
+        // surfaces as a suggested city on scopes where national is invalid.
+        // (The National checkbox writes it directly; SuggestiveSelect still
+        // renders it when it IS the current value.)
+        const isNational = (v?: string | null) => v?.trim().toLowerCase() === '__all__';
+        const marketValues = (pick: (c: any) => string | null | undefined) =>
+          distinctValues(items, pick).filter((v) => !isNational(v));
         // Observed city↔state pairings (case-insensitive keys, trimmed) so
         // the two dropdowns can narrow each other and flag unseen pairs.
         const cityStates: Record<string, Set<string>> = {};
@@ -262,6 +270,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           const city = c.city?.trim();
           const state = c.state?.trim();
           if (!city || !state) continue;
+          if (isNational(city) || isNational(state)) continue;
           const ck = city.toLowerCase();
           const sk = state.toLowerCase();
           (cityStates[ck] ??= new Set()).add(state);
@@ -269,8 +278,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         }
         setVocab({
           categories: distinctValues(items, (c) => c.category),
-          cities: distinctValues(items, (c) => c.city),
-          states: distinctValues(items, (c) => c.state),
+          cities: marketValues((c) => c.city),
+          states: marketValues((c) => c.state),
           neighborhoods: distinctValues(items, (c) => c.neighborhood),
           contactMethods: distinctValues(items, (c) => c.contact_method),
           estimatedTiers: distinctValues(items, (c) => c.estimated_tier),

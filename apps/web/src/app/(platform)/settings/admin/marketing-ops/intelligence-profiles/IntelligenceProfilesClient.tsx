@@ -251,7 +251,12 @@ export default function IntelligenceProfilesClient() {
     return nonBusinessCampaigns.filter((c) => {
       if (nbScopeFilter && c.scope !== nbScopeFilter) return false;
       if (nbCategoryFilter && c.category !== nbCategoryFilter) return false;
-      if (nbCityFilter && c.city !== nbCityFilter) return false;
+      // The '__all__' filter value means "national scope" — match both
+      // national spellings: sentinel-stored campaigns and geo-blank ones
+      // (gold standards / bronze establishment carry city: null).
+      if (nbCityFilter === '__all__') {
+        if (c.city?.trim() && c.city.trim().toLowerCase() !== '__all__') return false;
+      } else if (nbCityFilter && c.city !== nbCityFilter) return false;
       if (nbFocusFilter && c.intelligence_focus !== nbFocusFilter) return false;
       if (nbKindFilter && c.intelligence_campaign_kind !== nbKindFilter) return false;
       if (nbSearch) {
@@ -268,10 +273,22 @@ export default function IntelligenceProfilesClient() {
     () => [...new Set(nonBusinessCampaigns.map((c) => c.category).filter(Boolean))].sort(),
     [nonBusinessCampaigns],
   );
-  const nbCityOptions = useMemo(
-    () => [...new Set(nonBusinessCampaigns.map((c) => c.city).filter(Boolean))].sort(),
-    [nonBusinessCampaigns],
-  );
+  // '__all__' is the national sentinel (scope marker, not a city) — excluded
+  // from the derived city list, then re-added as a labelled "National" option
+  // when a national campaign exists. Geo-blank campaigns (gold standards /
+  // bronze establishment carry city: null) are national too, so the option
+  // must appear even when no literal '__all__' value exists.
+  const nbCityOptions = useMemo(() => {
+    const cities = [...new Set(
+      nonBusinessCampaigns
+        .map((c) => c.city)
+        .filter((v) => v && v.trim().toLowerCase() !== '__all__'),
+    )].sort() as string[];
+    const hasNational = nonBusinessCampaigns.some(
+      (c) => !c.city?.trim() || c.city.trim().toLowerCase() === '__all__',
+    );
+    return hasNational ? [...cities, '__all__'] : cities;
+  }, [nonBusinessCampaigns]);
   const nbFocusOptions = useMemo(
     () => [...new Set(nonBusinessCampaigns.map((c) => c.intelligence_focus).filter(Boolean) as string[])].sort(),
     [nonBusinessCampaigns],
@@ -707,7 +724,10 @@ export default function IntelligenceProfilesClient() {
                   placeholder="All cities"
                   value={nbCityFilter || ''}
                   onChange={(v) => setNbCityFilter(v || '')}
-                  data={nbCityOptions.map((c) => ({ value: c, label: c }))}
+                  data={nbCityOptions.map((c) => ({
+                    value: c,
+                    label: c.trim().toLowerCase() === '__all__' ? 'National (all markets)' : c,
+                  }))}
                   clearable
                   searchable
                   size="xs"
@@ -772,7 +792,7 @@ export default function IntelligenceProfilesClient() {
                               <Badge size="xs" variant="light" color="gray">{c.scope}</Badge>
                             </Table.Td>
                             <Table.Td>{c.category || '—'}</Table.Td>
-                            <Table.Td>{c.city || '—'}{c.neighborhood ? ` (${c.neighborhood})` : ''}</Table.Td>
+                            <Table.Td>{c.city?.trim().toLowerCase() === '__all__' ? 'National (all markets)' : c.city || '—'}{c.neighborhood ? ` (${c.neighborhood})` : ''}</Table.Td>
                             <Table.Td>
                               <Badge size="xs" variant="light" color="blue">
                                 {STAGE_LABELS[c.stage] ?? c.stage}

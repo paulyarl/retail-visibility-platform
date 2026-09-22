@@ -2255,7 +2255,19 @@ export class MarketingCampaignService extends BaseService {
     if (filters.scope) where.scope = filters.scope;
     if (filters.campaignCategory) where.campaign_category = filters.campaignCategory;
     if (filters.category) where.category = filters.category;
-    if (filters.city) where.city = filters.city;
+    if (filters.city) {
+      // '__all__' = the national scope marker — match sentinel-stored
+      // campaigns AND geo-blank national campaigns (gold standards / bronze
+      // establishment carry city: null). Distinct from no city filter, which
+      // means "all markets". AND-wrapped so it composes with the search OR.
+      if (isNationalSentinel(filters.city)) {
+        (where.AND ??= []).push({
+          OR: [{ city: { equals: '__all__', mode: 'insensitive' } }, { city: null }],
+        });
+      } else {
+        where.city = filters.city;
+      }
+    }
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     if (filters.tone) where.tone = filters.tone;
     if (filters.retainer) where.retainer = filters.retainer;

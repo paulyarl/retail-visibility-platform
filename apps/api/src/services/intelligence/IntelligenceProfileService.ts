@@ -32,6 +32,7 @@ import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateIntelligenceProfileId } from '../../lib/id-generator';
 import { BRONZE_SCOPE_SEMANTICS, formatBronzeReasonScope } from './bronze-scope';
+import { isNationalSentinel } from './geography-grid';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -3567,7 +3568,12 @@ export class IntelligenceProfileService extends BaseService {
         if (focus !== 'emerging' && focus !== 'competitive' && focus !== 'gold_standards' && focus !== 'bronze_standards') continue;
         const catName = (c.category ?? '').trim();
         if (!catName) continue;
-        const cityNorm = (c.city ?? '').trim();
+        // National ('__all__') campaigns occupy the null-city position — the
+        // same slot the national profile (reference_city NULL) lands in. Left
+        // literal, a national campaign would never match its own profile and
+        // would render a ghost '__all__' column in the city dimension.
+        const cityNorm = isNationalSentinel(c.city) ? '' : (c.city ?? '').trim();
+        const stateNorm = isNationalSentinel(c.state) ? '' : (c.state ?? '').trim();
         // Gold standards are platform-dimensioned (nationwide); emerging and
         // competitive are city-dimensioned, so their slots ignore platform.
         // Bronze matches on BOTH axes: the stage-1 establishment is
@@ -3612,7 +3618,7 @@ export class IntelligenceProfileService extends BaseService {
             entry.slots.push({
               focus,
               city: cityNorm || null,
-              state: (c.state ?? '').trim() || null,
+              state: stateNorm || null,
               platform: platNorm,
               status: 'inflight',
               profile_id: c.id,
@@ -3642,7 +3648,7 @@ export class IntelligenceProfileService extends BaseService {
           entry.slots.push({
             focus,
             city: cityNorm || null,
-            state: (c.state ?? '').trim() || null,
+            state: stateNorm || null,
             platform: platNorm,
             status: 'pending',
             profile_id: '',
@@ -3695,8 +3701,13 @@ export class IntelligenceProfileService extends BaseService {
         }
       }
 
-      // Collect distinct cities from intelligence campaigns (for the city dimension).
-      const cities = [...new Set(intelligenceCampaigns.map((c) => c.city).filter(Boolean))].sort();
+      // Collect distinct cities from intelligence campaigns (for the city
+      // dimension). The national sentinel is not a market — '__all__' must
+      // not appear as a city column; national coverage renders as the
+      // leading Nationwide position instead.
+      const cities = [...new Set(
+        intelligenceCampaigns.map((c) => c.city).filter((c) => c && !isNationalSentinel(c)),
+      )].sort();
 
       const categories = Array.from(byCategory.entries())
         .map(([category_key, { category_name, slots }]) => ({

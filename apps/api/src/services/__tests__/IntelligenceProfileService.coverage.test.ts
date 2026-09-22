@@ -447,6 +447,94 @@ describe('IntelligenceProfileService.getCoverage — 7-state slot model', () => 
     expect(findSlot(await service.getCoverage(), 'bronze_standards', null, null)).toBeUndefined();
   });
 
+  // ─── National ('__all__') lane ────────────────────────────────────────
+  // A national emerging/competitive campaign carries city='__all__' — a scope
+  // marker, not a market. It must map onto the null-city slot position (the
+  // national profile's home) and never produce a literal '__all__' city
+  // column or a duplicate slot that never meets its own profile.
+
+  it('national establishment campaign maps to the null-city position', async () => {
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-nat-est',
+      intelligence_campaign_kind: 'establishment',
+      city: '__all__',
+      state: '__all__',
+    }));
+    const result = await service.getCoverage();
+    const slot = findSlot(result, 'emerging', null, null);
+    expect(slot).toBeDefined();
+    expect(slot.status).toBe('inflight');
+    expect(slot.profile_id).toBe('camp-nat-est');
+    expect(slot.state).toBeNull();
+    // No literal '__all__' slot position.
+    expect(findSlot(result, 'emerging', '__all__' as any)).toBeUndefined();
+    // And the sentinel never enters the city dimension.
+    expect(result.cities).not.toContain('__all__');
+  });
+
+  it('national campaign merges into the existing national profile slot (no ghost duplicate)', async () => {
+    activeProfiles.push(makeProfile({
+      id: 'prof-nat',
+      reference_city: null,
+      reference_state: null,
+    }));
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-nat-est',
+      intelligence_campaign_kind: 'establishment',
+      city: '__all__',
+      state: '__all__',
+    }));
+    const result = await service.getCoverage();
+    const slots = result.categories.flatMap((c: any) => c.slots)
+      .filter((s: any) => s.focus === 'emerging');
+    expect(slots).toHaveLength(1);
+    expect(slots[0].status).toBe('active');
+    expect(slots[0].profile_id).toBe('prof-nat');
+  });
+
+  it('national discovery campaign attaches to the national slot\'s discovery dimension', async () => {
+    activeProfiles.push(makeProfile({
+      id: 'prof-nat',
+      reference_city: null,
+      reference_state: null,
+    }));
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-nat-disc',
+      intelligence_campaign_kind: 'discovery',
+      city: '__all__',
+      state: '__all__',
+    }));
+    auditedCampaignIds.add('camp-nat-disc');
+    const slot = findSlot(await service.getCoverage(), 'emerging', null, null);
+    expect(slot.status).toBe('active');
+    expect(slot.discovery_status).toBe('executed');
+    expect(slot.discovery_campaign_id).toBe('camp-nat-disc');
+  });
+
+  it('a national campaign does not create a fake city for the dimension list', async () => {
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-city', city: 'austin', state: 'TX',
+    }));
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-nat', city: '__all__', state: '__all__',
+      intelligence_campaign_kind: 'establishment',
+    }));
+    const result = await service.getCoverage();
+    expect(result.cities).toEqual(['austin']);
+  });
+
+  it('case variants of the sentinel (e.g. __All__) normalize to the national slot too', async () => {
+    intelligenceCampaigns.push(makeCampaign({
+      id: 'camp-nat-est',
+      intelligence_campaign_kind: 'establishment',
+      city: '__All__',
+      state: '__ALL__',
+    }));
+    const result = await service.getCoverage();
+    expect(findSlot(result, 'emerging', null, null)?.profile_id).toBe('camp-nat-est');
+    expect(result.cities).not.toContain('__All__');
+  });
+
   // ─── Proving grounds ──────────────────────────────────────────────────
 
   it('proving-ground slots render as active workspaces with a dormant discovery dimension', async () => {

@@ -129,7 +129,19 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
     [campaigns],
   );
   const cityOptions = useMemo(
-    () => distinctValues(campaigns, (c) => c.city),
+    // '__all__' is the national sentinel (scope marker, not a market) — keep
+    // it out of the derived city list, then re-add it as a labelled "National"
+    // option when a national campaign exists (sentinel-stored or geo-blank:
+    // gold standards / bronze establishment carry city: null). Empty filter
+    // means "all cities"; the sentinel option means "national scope only".
+    () => {
+      const cities = distinctValues(campaigns, (c) => c.city)
+        .filter((v) => v.trim().toLowerCase() !== '__all__');
+      const hasNational = campaigns.some(
+        (c) => !c.city?.trim() || c.city.trim().toLowerCase() === '__all__',
+      );
+      return hasNational ? [cities, ['__all__']].flat() : cities;
+    },
     [campaigns],
   );
 
@@ -254,6 +266,7 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
             value={cityFilter}
             onChange={setCityFilter}
             options={cityOptions}
+            optionLabels={{ __all__: 'National (all markets)' }}
             emptyLabel="All Cities"
             newLabel="+ City..."
             newInputPlaceholder="Filter by city"
@@ -417,7 +430,7 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.category}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.tone ?? '—'}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.city}{c.neighborhood ? ` (${c.neighborhood})` : ''}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.city?.trim() ? (c.city.trim().toLowerCase() === '__all__' ? 'National' : c.city) : (c.scope === 'intelligence' ? 'National' : '—')}{c.neighborhood ? ` (${c.neighborhood})` : ''}</td>
                         <td className="px-4 py-3"><StageBadge stage={c.stage} /></td>
                         <td className="px-4 py-3">
                           {(() => {

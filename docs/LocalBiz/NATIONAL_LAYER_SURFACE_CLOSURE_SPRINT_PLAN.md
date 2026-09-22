@@ -1,6 +1,6 @@
 # National Layer & Surface Closure — Sprint Plan
 
-> Status: **sprint complete — Phase A landed; Phase B landed (national establishment); Phase C landed (national category grounding + NATIONAL SURFACE FRAMING); Phase D landed (national location enrichment, coverage grid, phantom-write guard); Phase E landed (/place/city packet render + metadata + nav; slug ambiguity resolved via modal-state); Phase F landed (national roster endpoint + /place national panel + category excerpts on /place and /directory/categories); Phase G landed (national discovery end-to-end + market-scoped gold/bronze + national enrichment form affordance). /directory home parity deferred — see Phase F.**
+> Status: **sprint complete — Phase A landed; Phase B landed (national establishment); Phase C landed (national category grounding + NATIONAL SURFACE FRAMING); Phase D landed (national location enrichment, coverage grid, phantom-write guard); Phase E landed (/place/city packet render + metadata + nav; slug ambiguity resolved via modal-state); Phase F landed (national roster endpoint + /place national panel + category excerpts on /place and /directory/categories); Phase G landed (national discovery end-to-end + market-scoped gold/bronze + national enrichment form affordance); Phase H landed (ghost-gap sweep — national-as-superset on all city-aware admin surfaces). /directory home parity deferred — see Phase F.**
 > Context doc pairs with: `DIRECTORY_ENRICHMENT_CAMPAIGNS_SPRINT_PLAN.md`,
 > `CATEGORY_MARKET_ENRICHMENT_SPEC.md`, `BRONZE_STANDARD_SPRINT_PLAN.md`
 
@@ -197,6 +197,46 @@ market-context load, city unchanged); `__location__` national load in
 `MarketContextLoader.test.ts`; pairing guard + national/market acceptance in
 `bronze-campaign-refines.test.ts`; national framing in new
 `DiscoveryMarketContextFormatter.test.ts`.
+
+### Phase H — Ghost-gap sweep: national-as-superset on city-aware surfaces — IMPLEMENTED 2026-10-01
+
+Because the resolvers treat national as a superset of every market (city →
+state → nationwide cascade), any surface that enumerates markets literally
+must know the national layer or it reports gaps that don't exist:
+
+- **Coverage map** (the epicenter). API `getCoverage`: national campaigns map
+  onto the null-city slot position (previously a `__all__` campaign would
+  create an orphan inflight slot that never merged with its own profile),
+  and `__all__` is excluded from the `cities` dimension (was a fake column).
+  UI `CoverageClient`: emerging + competitive sections gain the leading
+  Nationwide column (same pattern bronze already used); a city's discovery
+  chip unlocks when the national establishment is active — the honest gap is
+  the city *establishment* chip (local delta still missing), not the lock.
+  Gold proxy tightened: the All Platforms proxy + platform-column unlock now
+  require a null-city slot, because a market-scoped gold profile does not
+  back a nationwide platform scan (`resolveGoldStandard` layer 3 is
+  null-city only); platform-dimensioned slot matching prefers the nationwide
+  slot when both exist. Nationwide-column create links carry `__all__` for
+  emerging/competitive but stay geo-empty for bronze (bronze national is
+  geo-free — a literal sentinel would import `reference_city='__All__'`, an
+  orphan slot).
+- **Dropdowns** — `vocab.cities`/`states` + the city↔state pairing maps in
+  `CampaignFormClient` exclude `__all__` (SuggestiveSelect still renders it
+  when it IS the current value); `IntelligenceProfilesClient` city filter
+  labels it "National (all markets)"; `CampaignListClient` city column shows
+  "National" and the filter excludes the sentinel.
+- **City-aware lists** — `ProspectQueueClient` city filter excludes `__all__`
+  defensively (national-discovery prospects carry real cities by contract);
+  `ProvingGroundsClient` groups a stray sentinel under "National (all
+  markets)" instead of a fake market.
+- **Structurally immune (verified, no change):** `/settings/admin/directory/
+  funnel` (cohorts are per-city seed rows; city is a free-text filter),
+  `/settings/admin/growth-engine` (per-city breakdown groups
+  `directory_presence_seeds.city` — real listings only).
+
+Tests: 5 national-lane cases in `IntelligenceProfileService.coverage.test.ts`
+(sentinel→null position, profile merge, discovery attach, cities exclusion,
+case variants).
 
 ## Out of scope (recorded, not forgotten)
 

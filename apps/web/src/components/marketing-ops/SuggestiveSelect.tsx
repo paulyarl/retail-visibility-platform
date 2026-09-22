@@ -8,6 +8,9 @@ interface SuggestiveSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: string[];
+  // Optional display labels keyed by option value — for sentinel values that
+  // must not render raw (e.g. the national '__all__' scope marker).
+  optionLabels?: Record<string, string>;
   emptyLabel?: string;
   newLabel?: string;
   newInputPlaceholder?: string;
@@ -24,6 +27,7 @@ export default function SuggestiveSelect({
   value,
   onChange,
   options,
+  optionLabels,
   emptyLabel = '-- Select --',
   newLabel = '+ New...',
   newInputPlaceholder = 'Enter new value',
@@ -58,7 +62,7 @@ export default function SuggestiveSelect({
       >
         <option value="">{emptyLabel}</option>
         {allOptions.map((o) => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o} value={o}>{optionLabels?.[o] ?? o}</option>
         ))}
         <option value={NEW_VALUE}>{newLabel}</option>
       </select>

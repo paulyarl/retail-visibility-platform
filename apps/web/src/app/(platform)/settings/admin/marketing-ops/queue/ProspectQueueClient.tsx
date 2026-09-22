@@ -598,7 +598,9 @@ export default function ProspectQueueClient() {
     [entries],
   );
   const cityOptions = useMemo(
-    () => Array.from(new Set(entries.map((e) => e.city).filter(Boolean))) as string[],
+    // National-discovery prospects carry their own real city; '__all__' is a
+    // scope sentinel, not a market — exclude it if it ever lands on an entry.
+    () => Array.from(new Set(entries.map((e) => e.city).filter((c) => c && c.trim().toLowerCase() !== '__all__'))) as string[],
     [entries],
   );
 
