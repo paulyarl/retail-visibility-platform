@@ -97,6 +97,42 @@ const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   fragment: 'Fragment',
 };
 
+// ─── Intelligence-lane schema compat ─────────────────────────────────────
+// A template is compatible with an intelligence campaign only when its
+// output_schema belongs to the campaign's focus+kind lane. This keeps the
+// shared e/c `intelligence_profile` establishment templates (focus NULL —
+// they wildcard-match via include_null_focus_kind) out of gold/bronze
+// lists, where running them would import a category profile into the
+// standards lane. Schema-less templates (operator-authored) stay — they
+// carry no import contract to violate.
+const INTELLIGENCE_SCHEMA_BY_LANE: Record<string, string[]> = {
+  'gold_standards:establishment': ['gold_standard_scan'],
+  'gold_standards:discovery': ['gold_standard_scan'],
+  'bronze_standards:establishment': ['bronze_standard_scan'],
+  'bronze_standards:discovery': ['bronze_standard_scan'],
+  'emerging:establishment': ['intelligence_profile'],
+  'emerging:discovery': ['intelligence_discovery'],
+  'competitive:establishment': ['intelligence_profile'],
+  'competitive:discovery': ['intelligence_discovery'],
+};
+
+// Group labels for the intelligence lane — all intelligence templates are
+// category-null (the category is a {{variable}}), so the generic
+// category-grouping collapses them under "Uncategorized". Schema is the
+// meaningful axis there.
+const INTELLIGENCE_SCHEMA_GROUP_LABELS: Record<string, string> = {
+  gold_standard_scan: 'Gold Standard Scan',
+  bronze_standard_scan: 'Bronze Standard Scan',
+  intelligence_profile: 'Category Intelligence Profile',
+  intelligence_discovery: 'Intelligence Discovery',
+};
+
+// resolvePrompt auto-swaps this variant in when the campaign is '__all__'
+// (NATIONAL_ESTABLISHMENT_TEMPLATE_ID in MarketingExecutionService). It must
+// never appear as a list choice — opening it on a city campaign renders the
+// national body with a market's variables.
+const NATIONAL_ESTABLISHMENT_TEMPLATE_ID = 'mpt-seed-intel-profile-establishment-national-001';
+
 // ─── Triage → Prompt recommendation mapping ──────────────────────────────
 //
 // When triage is decided (accepted or overridden), the detected signals +
@@ -2266,6 +2302,19 @@ export default function CampaignDetailClient({
                       return !vars.includes('category');
                     });
                   }
+                  // Intelligence lane: schema compat + hide the auto-swapped
+                  // national establishment variant (see module constants).
+                  if (campaign.scope === 'intelligence') {
+                    const laneKey = `${campaign.intelligence_focus ?? ''}:${campaign.intelligence_campaign_kind ?? ''}`;
+                    const allowedSchemas = INTELLIGENCE_SCHEMA_BY_LANE[laneKey];
+                    if (allowedSchemas) {
+                      stageRelevant = stageRelevant.filter((t) => {
+                        const schema = t.output_schema?.name;
+                        return !schema || allowedSchemas.includes(schema);
+                      });
+                    }
+                    stageRelevant = stageRelevant.filter((t) => t.id !== NATIONAL_ESTABLISHMENT_TEMPLATE_ID);
+                  }
                   if (stageRelevant.length === 0) {
                     return (
                       <div className="flex flex-col items-center justify-center py-10 text-center">
@@ -2300,10 +2349,15 @@ export default function CampaignDetailClient({
                   //     rather than reading every card body.
                   const UNCATEGORIZED = 'Uncategorized';
                   const NO_SCHEMA = 'No schema';
+                  const isIntelligenceScope = campaign.scope === 'intelligence';
                   const grouped = (() => {
                     const map = new Map<string, typeof unrecommended>();
                     for (const t of unrecommended) {
-                      const key = t.category?.trim() || UNCATEGORIZED;
+                      // Intelligence templates are all category-null — group
+                      // by output schema instead so groups carry meaning.
+                      const key = isIntelligenceScope
+                        ? (INTELLIGENCE_SCHEMA_GROUP_LABELS[t.output_schema?.name ?? ''] ?? t.output_schema?.name ?? UNCATEGORIZED)
+                        : (t.category?.trim() || UNCATEGORIZED);
                       const arr = map.get(key) ?? [];
                       arr.push(t);
                       map.set(key, arr);
