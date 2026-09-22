@@ -463,3 +463,93 @@ describe('PG domain model (Migration 283 — describe + auto-expand)', () => {
     });
   });
 });
+
+describe('proving grounds — national sentinel handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(service, 'createCampaign').mockResolvedValue({
+      id: PG_ID,
+      campaign_category: 'proving_ground',
+      category: 'fleet services',
+      city: null,
+      state: null,
+      secondary_categories: [],
+      member_geos: null,
+    } as any);
+    vi.spyOn(service, 'attachChildCampaign').mockResolvedValue({ attached: true } as any);
+    mockCampaignsList.findFirst.mockResolvedValue(null);
+    mockCampaignsList.findMany.mockResolvedValue([]);
+    mockProspectQueue.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('promotes a national discovery source to a category-scope umbrella PG', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(
+      discoverySource({ city: '__all__', state: '__all__' }),
+    );
+
+    const result = await service.promoteToProvingGround(SOURCE_ID);
+
+    expect(service.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: 'category',
+        campaignCategory: 'proving_ground',
+        category: 'fleet services',
+        city: undefined,
+        state: undefined,
+      }),
+      undefined,
+    );
+    expect(result.attached).toEqual([SOURCE_ID]);
+  });
+
+  it('lets an explicit input.city deploy a national run into a specific market', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(
+      discoverySource({ city: '__all__', state: '__all__' }),
+    );
+
+    await service.promoteToProvingGround(SOURCE_ID, { city: 'Austin', state: 'TX' });
+
+    expect(service.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'city', city: 'Austin', state: 'TX' }),
+      undefined,
+    );
+  });
+
+  it('never records the sentinel in member_geos during domain expansion', async () => {
+    vi.spyOn(service, 'createCampaign').mockResolvedValue({
+      id: PG_ID,
+      campaign_category: 'proving_ground',
+      category: 'fleet services',
+      city: 'Austin',
+      state: 'TX',
+      secondary_categories: [],
+      member_geos: null,
+    } as any);
+    mockCampaignsList.findUnique.mockResolvedValue(discoverySource());
+    // Merged run is national — its sentinel geo must not land in member_geos.
+    mockCampaignsList.findMany.mockResolvedValue([
+      { category: 'fleet services', city: 'Austin', state: 'TX' },
+      { category: 'fleet services', city: '__all__', state: '__all__' },
+      { category: 'fleet services', city: 'Dallas', state: 'TX' },
+    ]);
+
+    const result = await service.promoteToProvingGround(SOURCE_ID, {
+      mergeCampaignIds: ['mkt-intel-nat', 'mkt-intel-2'],
+    });
+
+    expect(result.domainExpanded.geos).toEqual([{ city: 'Dallas', state: 'TX' }]);
+  });
+
+  it('queue grouping with sentinel entry cities collapses to a category umbrella', async () => {
+    mockProspectQueue.findMany.mockResolvedValue([
+      { id: 'pque-1', category: 'fleet services', city: '__all__', state: '__all__' },
+    ]);
+
+    await service.groupQueueEntriesIntoProvingGround({ queueEntryIds: ['pque-1'] });
+
+    expect(service.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'category', city: undefined, state: undefined }),
+      undefined,
+    );
+  });
+});

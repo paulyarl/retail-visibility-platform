@@ -229,6 +229,13 @@ must know the national layer or it reports gaps that don't exist:
   defensively (national-discovery prospects carry real cities by contract);
   `ProvingGroundsClient` groups a stray sentinel under "National (all
   markets)" instead of a fake market.
+- **Proving grounds** — a PG is a market deployment workspace, so the
+  sentinel can never anchor one: `promoteToProvingGround` maps a `__all__`
+  source to the geography-free category-scope umbrella (an explicit
+  `input.city` still forces a specific market); `expandProvingGroundDomain`
+  excludes the sentinel from member_geos and treats a sentinel anchor as
+  unconstrained; `groupQueueEntriesIntoProvingGround` collapses a
+  sentinel-derived modal city to blank → category umbrella.
 - **Structurally immune (verified, no change):** `/settings/admin/directory/
   funnel` (cohorts are per-city seed rows; city is a free-text filter),
   `/settings/admin/growth-engine` (per-city breakdown groups

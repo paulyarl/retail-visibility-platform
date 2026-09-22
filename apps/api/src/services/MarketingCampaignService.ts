@@ -1100,13 +1100,26 @@ export class MarketingCampaignService extends BaseService {
         throw new ValidationError('source_not_discovery_prospect_run');
       }
 
-      const pgScope = input.scope ?? 'city';
+      let pgScope = input.scope ?? 'city';
       if (pgScope !== 'city' && pgScope !== 'category') {
         throw new ValidationError('scope must be city or category');
       }
       const category = (input.category ?? source.category ?? '').trim();
-      const city = (input.city ?? source.city ?? '').trim();
-      const state = (input.state ?? source.state ?? '').trim();
+      let city = (input.city ?? source.city ?? '').trim();
+      let state = (input.state ?? source.state ?? '').trim();
+      // National discovery sources carry the '__all__' sentinel — a scope
+      // marker, not a market. A proving ground is a market deployment
+      // workspace, so the sentinel never becomes a city-scope PG anchor: it
+      // maps to the geography-free category-scope umbrella instead (category
+      // PGs legitimately span cities, §6.5). An explicit real input.city
+      // still lets the operator deploy a national run into a chosen market.
+      if (isNationalSentinel(city)) {
+        pgScope = 'category';
+        city = '';
+        state = '';
+      }
+      // A sentinel state with a real city is malformed input — never stored.
+      if (isNationalSentinel(state)) state = '';
       // Scope-conditional requirements (PG scope flex, culture-fit §6.5):
       // category is the market identity — required for both scopes. city is
       // only required for a city-scope PG; a category-scope PG legitimately
@@ -1244,7 +1257,10 @@ export class MarketingCampaignService extends BaseService {
     }
 
     const newGeos: Array<{ city: string; state: string | null }> = [];
-    if (norm(pg.city)) {
+    // A '__all__' anchor is the national scope marker, not a market — treat
+    // it like a geography-free PG (unconstrained geo domain) so the sentinel
+    // never lands in member_geos.
+    if (norm(pg.city) && !isNationalSentinel(pg.city)) {
       const geoKey = (city?: string | null, state?: string | null) =>
         `${norm(city)}|${norm(state)}`;
       const declared = new Set<string>([
@@ -1259,7 +1275,7 @@ export class MarketingCampaignService extends BaseService {
         const city = (m.city ?? '').trim();
         const state = (m.state ?? '').trim();
         const key = geoKey(city, state);
-        if (norm(city) && !declared.has(key) && !seenGeos.has(key)) {
+        if (norm(city) && !isNationalSentinel(city) && !declared.has(key) && !seenGeos.has(key)) {
           seenGeos.add(key);
           newGeos.push({ city, state: state || null });
         }
@@ -1344,8 +1360,14 @@ export class MarketingCampaignService extends BaseService {
           return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
         };
         const category = (input.category ?? '').trim() || modal(entries.map((e) => e.category));
-        const city = (input.city ?? '').trim() || modal(entries.map((e) => e.city));
-        const state = (input.state ?? '').trim() || modal(entries.map((e) => e.state));
+        // Queue entries carry real cities by contract (national discovery
+        // writes per-candidate city/state), but guard anyway — '__all__' is
+        // a scope marker, never a PG anchor. A sentinel-derived or
+        // sentinel-passed city collapses to blank → category-scope umbrella.
+        const cityRaw = (input.city ?? '').trim() || modal(entries.map((e) => e.city));
+        const city = isNationalSentinel(cityRaw) ? '' : cityRaw;
+        const stateRaw = (input.state ?? '').trim() || modal(entries.map((e) => e.state));
+        const state = city ? stateRaw : (isNationalSentinel(stateRaw) ? '' : stateRaw);
         const pgScope = input.scope ?? (city ? 'city' : 'category');
         if (pgScope !== 'city' && pgScope !== 'category') {
           throw new ValidationError('scope must be city or category');
