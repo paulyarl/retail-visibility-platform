@@ -78,6 +78,21 @@ export interface CategoryIntelligence {
   adjacent_categories?: string[];
 }
 
+export interface NationalCoverageStat {
+  state?: string;
+  city?: string;
+  cityCount?: number;
+  listingCount?: number;
+}
+
+export interface NationalCoverage {
+  totalStates?: number;
+  totalCities?: number;
+  totalListings?: number;
+  states?: NationalCoverageStat[];
+  topCities?: NationalCoverageStat[];
+}
+
 export interface LocationIntelligence {
   market_summary?: string;
   top_categories?: string[];
@@ -89,6 +104,9 @@ export interface LocationIntelligence {
   market_gaps?: MarketGap[];
   metro_context?: string;
   metro_dynamics?: MetroDynamic[];
+  // Stamped by applyEnrichmentPacket on the national ('__all__') location row —
+  // measured coverage aggregates that ground national narratives.
+  national_coverage?: NationalCoverage;
 }
 
 export interface MarketContext {
@@ -127,9 +145,11 @@ export class MarketContextLoader extends BaseService {
    * Returns empty objects when enrichment hasn't run — callers should
    * check for the presence of specific fields before using them.
    *
-   * National campaigns (city = '__all__') have no city profile — only the
-   * national category enrichment row (written literally as (category,
-   * '__all__', '__all__') by CategoryMarketEnrichmentService) is loaded.
+   * National campaigns (city = '__all__') have no city profile — the national
+   * category enrichment row AND the national location row (category_key
+   * '__location__', carrying context.national_coverage + market_gaps +
+   * metro_dynamics) are loaded. Both are written literally as
+   * (key, '__all__', '__all__') by the enrichment services.
    */
   async loadMarketContext(
     category: string,
@@ -151,12 +171,18 @@ export class MarketContextLoader extends BaseService {
         const rows = await this.prisma.$queryRaw<Array<{ category_key: string; context: any }>>`
           SELECT category_key, context FROM directory_category_enrichment
           WHERE LOWER(city) = '__all__'
-            AND category_key = ${category}
+            AND category_key IN (${category}, '__location__')
         `;
         const categoryCtx = Array.isArray(rows)
           ? rows.find((r) => r.category_key === category)?.context
           : undefined;
-        const data: MarketContext = { category: categoryCtx ?? {}, location: {} };
+        // The '__location__' national row carries the measured coverage grid
+        // (context.national_coverage) + national market_gaps/metro_dynamics —
+        // it plays the "where" role a city profile plays for market scans.
+        const locationCtx = Array.isArray(rows)
+          ? rows.find((r) => r.category_key === '__location__')?.context
+          : undefined;
+        const data: MarketContext = { category: categoryCtx ?? {}, location: locationCtx ?? {} };
         this.cache.set(cacheKey, { data, expiresAt: Date.now() + MarketContextLoader.CACHE_TTL_MS });
         return data;
       }
@@ -266,7 +292,10 @@ export class MarketContextLoader extends BaseService {
       ctx.city_profile ||
       (ctx.market_gaps && ctx.market_gaps.length > 0) ||
       (ctx.metro_dynamics && ctx.metro_dynamics.length > 0) ||
-      (ctx.notable_areas && ctx.notable_areas.length > 0),
+      (ctx.notable_areas && ctx.notable_areas.length > 0) ||
+      // The national ('__all__') location row may carry coverage aggregates
+      // alone — measured counts are intelligence even without narrative fields.
+      (ctx.national_coverage && (ctx.national_coverage.totalListings ?? 0) > 0),
     );
   }
 }

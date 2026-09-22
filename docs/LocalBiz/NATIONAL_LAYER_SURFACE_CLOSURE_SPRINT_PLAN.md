@@ -1,6 +1,6 @@
 # National Layer & Surface Closure — Sprint Plan
 
-> Status: **sprint complete — Phase A landed; Phase B landed (national establishment); Phase C landed (national category grounding + NATIONAL SURFACE FRAMING); Phase D landed (national location enrichment, coverage grid, phantom-write guard); Phase E landed (/place/city packet render + metadata + nav; slug ambiguity resolved via modal-state); Phase F landed (national roster endpoint + /place national panel + category excerpts on /place and /directory/categories). /directory home parity deferred — see Phase F.**
+> Status: **sprint complete — Phase A landed; Phase B landed (national establishment); Phase C landed (national category grounding + NATIONAL SURFACE FRAMING); Phase D landed (national location enrichment, coverage grid, phantom-write guard); Phase E landed (/place/city packet render + metadata + nav; slug ambiguity resolved via modal-state); Phase F landed (national roster endpoint + /place national panel + category excerpts on /place and /directory/categories); Phase G landed (national discovery end-to-end + market-scoped gold/bronze + national enrichment form affordance). /directory home parity deferred — see Phase F.**
 > Context doc pairs with: `DIRECTORY_ENRICHMENT_CAMPAIGNS_SPRINT_PLAN.md`,
 > `CATEGORY_MARKET_ENRICHMENT_SPEC.md`, `BRONZE_STANDARD_SPRINT_PLAN.md`
 
@@ -152,10 +152,55 @@ Tests: `ResolvePrompt.test.ts` (+9), `directoryEnrichment.apply.category.test.ts
 4. `/directory` home: **deferred** — decision recorded above.
 5. Depends on Phase C (category packets) and Phase D (location packet) for content; render plumbing degrades graceful-absent.
 
+### Phase G — National discovery + market-scoped standards (post-sprint extension) — IMPLEMENTED 2026-10-01
+
+The two-tier campaign matrix (NATIONAL + MARKET × all lanes) exposed three
+gaps the original phases didn't cover:
+
+- **National discovery** — `__all__` emerging/competitive discovery campaigns
+  now work end-to-end:
+  - `MarketingCampaignService.createCampaign` maps the sentinel to `null`
+    city/state at the profile-prerequisite check → resolves the national slot
+    directly; error copy says "nationwide".
+  - `MarketingExecutionService.resolvePrompt` passes `city: null` to the
+    composer (national profile slot, no retargeting directive), substitutes
+    `{{city}}`→'all US markets' / `{{state}}`→'nationwide' in the composed
+    body, resolves gold + bronze at nationwide scope (`null` slots), skips the
+    geography-grid lookup, and appends `=== NATIONAL DISCOVERY SCOPE ===` —
+    sweep nationally, every candidate carries its own city+state, no
+    ZIP/radius applies.
+  - `MarketContextLoader` loads the national `__location__` row for `__all__`
+    campaigns (was the deferred out-of-scope item — now landed);
+    `hasLocationIntelligence` counts `national_coverage` alone as intelligence.
+  - `formatDiscoveryMarketContext` renders NATIONAL phrasing + a measured
+    `NATIONAL COVERAGE` block (listings/markets/states + top states/cities),
+    omits city-only blocks (city_profile, notable_areas), and never leaks the
+    sentinel.
+  - `GET /intelligence-profiles/resolve/:category` maps `__all__`→null on all
+    four focus paths — the form's profile-prerequisite check resolves the
+    national slot.
+  - Form: the "National (all markets)" checkbox extends to discovery kind
+    (distinct copy per kind); ZIP/radius fields hide when `__all__`.
+- **National location enrichment affordance** — the `__all__` hint now renders
+  for `scope=city` enrichment campaigns (was category-only).
+- **Market-scoped gold + bronze establishment** — the nationwide-only gates
+  are removed (validator + form geo-clearing). The import seams already
+  stamped campaign city/state → `reference_city`/`reference_state`, so a
+  filled market produces a market-scoped profile that resolves city-first and
+  still cascades to nationwide. A pairing guard on `campaignCreateSchema`
+  rejects half-scoped input (city without state or vice versa) — a half-slot
+  resolves ambiguously.
+
+Tests: national discovery describe in `ResolvePrompt.test.ts` (composer null
+city, readable labels + directive, nationwide gold/bronze, grid skip,
+market-context load, city unchanged); `__location__` national load in
+`MarketContextLoader.test.ts`; pairing guard + national/market acceptance in
+`bronze-campaign-refines.test.ts`; national framing in new
+`DiscoveryMarketContextFormatter.test.ts`.
+
 ## Out of scope (recorded, not forgotten)
 
 - Bronze `scope_level: 'category_family'` matching — observed label overlap via `category_taxonomy_queries` is a future category-association mechanism; user deferred ("no action for now").
-- `MarketContextLoader` reading the national `__location__` row for `__all__` consumers — decide with Phase D.
 - City establishment consuming a national profile for city-agnostic fields — deeper change; national-as-floor already comes free via resolver fallback.
 
 ## Test plan

@@ -1165,18 +1165,36 @@ export class MarketingExecutionService extends BaseService {
       // back to cross-platform. Without this, platform-specific establishment
       // profiles would never resolve and discovery would always use the
       // cross-platform profile.
-      const city = input.campaign.city || null;
+      // National ('__all__') discovery maps the sentinel to the national
+      // profile slot — reference_city NULL — so the composer resolves the
+      // city-agnostic profile directly and renderProfileBlock emits no city
+      // retargeting/application directive against a phantom '__All__' target.
+      const isNationalDiscovery = isNationalSentinel(input.campaign.city);
+      const city = isNationalDiscovery ? null : (input.campaign.city || null);
       const campaignPlatform = (input.campaign as any).intelligence_platform || null;
       const composed = await composer.composeIntelligencePrompt({ category, focus, city, platform: campaignPlatform }, ctx);
+
+      // National discovery renders '{{city}}'/'{{state}}' as readable market
+      // labels — the literal sentinels must never reach the model.
+      const discoveryVariables = isNationalDiscovery
+        ? { ...(input.variables ?? {}), city: 'all US markets', state: 'nationwide' }
+        : input.variables;
 
       // Apply variable substitution on the composed body (zip_codes, radius, etc.)
       // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
       // since renderTemplate() only supports simple {{variable}} replacement.
-      const cleanedBody = this.stripHandlebarsConditionals(composed.body, input.variables);
+      const cleanedBody = this.stripHandlebarsConditionals(composed.body, discoveryVariables);
       // Same interactive-verification prefix as baseRendered — the composed
       // path is the only branch that bypasses baseRendered, so it gets its
       // own copy of the (possibly empty) preamble.
-      let rendered = interactivePreamble + this.renderTemplate(cleanedBody, input.variables, input.campaign);
+      let rendered = interactivePreamble + this.renderTemplate(cleanedBody, discoveryVariables, input.campaign);
+
+      // National discovery framing — the composed fragments are city-scoped
+      // copy; this directive reframes the sweep as nationwide and pins the
+      // per-candidate market-attribution contract.
+      if (isNationalDiscovery) {
+        rendered = rendered + '\n' + this.formatNationalDiscoveryDirective(focus);
+      }
 
       // ─── Platform discovery focus injection ────────────────────────
       // When the campaign has a specific platform set (e.g. 'google'), the
@@ -1218,7 +1236,11 @@ export class MarketingExecutionService extends BaseService {
       // establishment scan first.
       const campaignCity = (input.campaign as any).city || null;
       const campaignState = (input.campaign as any).state || null;
-      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, campaignCity, campaignState, ctx);
+      // National discovery resolves the nationwide benchmark directly — the
+      // literal sentinels would cascade there anyway via misses.
+      const profileCity = isNationalDiscovery ? null : campaignCity;
+      const profileState = isNationalDiscovery ? null : campaignState;
+      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, profileCity, profileState, ctx);
       let goldStandardProfileId: string | null = null;
       let goldStandardProfileVersion: number | null = null;
       if (goldStandard) {
@@ -1264,7 +1286,7 @@ export class MarketingExecutionService extends BaseService {
       let bronzeStandardProfileVersion: number | null = null;
       if (focus === 'emerging') {
         const bronzeStandard = await profileService.resolveBronzeStandard(
-          category, campaignPlatform, campaignCity, campaignState, ctx,
+          category, campaignPlatform, profileCity, profileState, ctx,
         );
         if (bronzeStandard) {
           const bronzeBlock = await profileService.serializeBronzeStandard(bronzeStandard, 'discovery', ctx);
@@ -1284,7 +1306,7 @@ export class MarketingExecutionService extends BaseService {
           // not a scan blocker (unlike gold, bronze coverage is additive).
           rendered = rendered + '\n\n=== NO BRONZE STANDARD PROFILE — BLIND-SPOT CALIBRATION ABSENT ===\n'
             + `No active bronze-standard profile exists for category "${category}"`
-            + (campaignCity && campaignState ? ` in ${campaignCity}, ${campaignState}` : '')
+            + (campaignCity && campaignState && !isNationalDiscovery ? ` in ${campaignCity}, ${campaignState}` : ' nationwide')
             + '. This emerging scan runs without blind-spot calibration — hard-to-find '
             + 'businesses that evade mainstream discovery may be missed. '
             + 'To enable calibration, run the Bronze Standard national + city scans first.';
@@ -1302,8 +1324,9 @@ export class MarketingExecutionService extends BaseService {
       // market_gaps (WHERE demand is unmet), prospect_signals (WHAT to
       // look for), category_signals (HOW to evaluate), market_density
       // (expectation setting), and metro_dynamics (nearby context).
-      // National campaigns (city = '__all__') load category intelligence
-      // only — no city profile exists at national scope.
+      // National campaigns (city = '__all__') load the national category
+      // intelligence + the national location row's coverage context — no
+      // city profile exists at national scope.
       if (campaignCity && campaignState && category) {
         const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
           category, campaignCity, campaignState, ctx,
@@ -1327,8 +1350,13 @@ export class MarketingExecutionService extends BaseService {
       // the fix for the "name does not self-identify with the category" blind
       // spot: a business invisible to every category-token query is still reached
       // by sweeping the grid exhaustively.
-      const cachedGrid = await GeographyGridService.getInstance()
-        .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
+      // National ('__all__') campaigns have no single catchment — skip the
+      // grid lookup entirely (the directive would emit '' anyway; the lookup
+      // is a dead read against a '__all__|__ALL__|' key that never exists).
+      const cachedGrid = isNationalDiscovery
+        ? null
+        : await GeographyGridService.getInstance()
+            .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
       const geoGridDirective = buildGeographyGridDirective(input.campaign, cachedGrid);
       if (geoGridDirective) {
         rendered = rendered + '\n' + geoGridDirective;
@@ -3359,6 +3387,32 @@ PAYLOAD 2 — bronze_standard_scan
       'DIRECTIVE: This is the platform\'s measured coverage — database truth, not an estimate. Ground body_copy, metro_context, area_breakdown, market_gaps, and market descriptions in these aggregates and do not contradict them. area_breakdown is a browse-by-state/market structure (covered states or metros with their category character — NOT neighborhoods). market_gaps means uncovered or thin regions, not unmet categories in one city. Never state counts beyond these figures and do not invent city-level claims. Do NOT mention this block, "coverage grid", or "enrichment" in the visible output.',
     );
     return lines.join('\n');
+  }
+
+  /**
+   * National discovery framing — appended to the composed discovery prompt for
+   * '__all__' campaigns. The composed fragments are city-scoped copy, so this
+   * directive reframes the sweep as nationwide and pins the per-candidate
+   * market-attribution contract (every business must carry its own city/state
+   * — the campaign's '__all__' is a scope marker, not a market).
+   */
+  private formatNationalDiscoveryDirective(focus: IntelligenceFocus): string {
+    const focusLine = focus === 'emerging'
+      ? 'For EMERGING national discovery, prioritize markets where national intelligence indicates thin coverage or unmet demand — emerging businesses surface first where the category is under-served. Attribute every reason/blind-spot observation to the candidate\'s own market context.'
+      : 'For COMPETITIVE national discovery, prioritize markets where national coverage indicates the category is established — strong candidates concentrate where the category has density. Attribute every weakness observation to the candidate\'s own market context.';
+    return [
+      '=== NATIONAL DISCOVERY SCOPE ===',
+      'This is a NATIONAL discovery scan — the target market is all US markets,',
+      'not a single city. Apply these rules:',
+      '- Sweep nationally. Do not confine candidates to one metro or invent a',
+      '  single target city; distribute effort across diverse markets.',
+      '- Every candidate MUST carry its own city + state — classify each',
+      '  business by ITS market, never by the campaign scope.',
+      '- No ZIP-code list or search radius applies.',
+      focusLine,
+      '- Where national coverage or national market intelligence is provided,',
+      '  use it to prioritize which markets to sweep first.',
+    ].join('\n');
   }
 
   renderTemplate(body: string, variables: Record<string, any> | undefined, campaign: any): string {

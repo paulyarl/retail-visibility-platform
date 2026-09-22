@@ -1868,4 +1868,131 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).not.toContain('NATIONAL SURFACE FRAMING');
     });
   });
+
+  // ─── National discovery ('__all__' sentinel) ────────────────────────────
+  // A '__all__' emerging/competitive discovery campaign sweeps all US markets
+  // against the NATIONAL profile slot (reference_city NULL). The sentinel is
+  // mapped to null at the resolver seams; the rendered prompt reads 'all US
+  // markets'/'nationwide', carries a NATIONAL DISCOVERY SCOPE directive, and
+  // skips the city geography grid.
+  describe('intelligence-scope composer path — national discovery (__all__)', () => {
+    const makeIntelTemplate = (body = 'Discover {{category}} in {{city}}, {{state}}') => ({
+      body,
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_discovery' },
+      outputSchema: { name: 'intelligence_discovery' },
+    });
+
+    const nationalCampaign = (focus = 'emerging', platform: string | null = null) => ({
+      id: 'camp-intel-nat',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: '__all__',
+      state: '__all__',
+      intelligence_focus: focus,
+      intelligence_platform: platform,
+      intelligence_campaign_kind: 'discovery',
+    });
+
+    it('resolves the national profile slot — composer called with null city', async () => {
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: nationalCampaign('emerging'),
+        variables: undefined,
+      });
+
+      expect(mockComposerService.composeIntelligencePrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'African Grocery Store', focus: 'emerging', city: null }),
+        undefined,
+      );
+    });
+
+    it('renders readable market labels + the NATIONAL DISCOVERY SCOPE directive', async () => {
+      mockComposerService.composeIntelligencePrompt.mockResolvedValueOnce({
+        body: 'TARGET MARKET: {{city}}, {{state}}',
+        resolution: { profile_id: 'nat-1', profile_version: 1, intelligence_mode: 'profile' as const },
+        focus: 'competitive',
+      });
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: nationalCampaign('competitive'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('TARGET MARKET: all US markets, nationwide');
+      expect(renderedPrompt).toContain('=== NATIONAL DISCOVERY SCOPE ===');
+      expect(renderedPrompt).toContain('its own city + state');
+      // No literal sentinel reaches the model.
+      expect(renderedPrompt).not.toContain('__all__');
+      expect(renderedPrompt).not.toContain('__ALL__');
+    });
+
+    it('resolves the gold benchmark and bronze calibration at nationwide scope', async () => {
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: nationalCampaign('emerging'),
+        variables: undefined,
+      });
+
+      // null city/state → the resolvers' nationwide layer directly.
+      expect(mockProfileService.resolveGoldStandard).toHaveBeenCalledWith(
+        'African Grocery Store', null, null, null, undefined,
+      );
+      expect(mockProfileService.resolveBronzeStandard).toHaveBeenCalledWith(
+        'African Grocery Store', null, null, null, undefined,
+      );
+    });
+
+    it('skips the city geography-grid lookup entirely', async () => {
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: nationalCampaign('emerging'),
+        variables: undefined,
+      });
+
+      expect(mockGeographyGridService.getGrid).not.toHaveBeenCalled();
+    });
+
+    it('still loads national market context for the sentinel city', async () => {
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: nationalCampaign('emerging'),
+        variables: undefined,
+      });
+
+      expect(mockMarketContextLoader.loadMarketContext).toHaveBeenCalledWith(
+        'African Grocery Store', '__all__', '__all__', undefined,
+      );
+    });
+
+    it('city-scoped discovery is unchanged — composer keeps the real city', async () => {
+      await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: {
+          ...nationalCampaign('competitive'),
+          city: 'Kansas City',
+          state: 'MO',
+        },
+        variables: undefined,
+      });
+
+      expect(mockComposerService.composeIntelligencePrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ city: 'Kansas City' }),
+        undefined,
+      );
+      expect(mockGeographyGridService.getGrid).toHaveBeenCalled();
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeIntelTemplate(),
+        campaign: {
+          ...nationalCampaign('competitive'),
+          city: 'Kansas City',
+          state: 'MO',
+        },
+        variables: undefined,
+      });
+      expect(renderedPrompt).not.toContain('NATIONAL DISCOVERY SCOPE');
+    });
+  });
 });

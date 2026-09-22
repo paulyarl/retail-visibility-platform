@@ -25,6 +25,7 @@ import { getBillingNotificationService } from './subscription/BillingNotificatio
 import { MarketingScorecardService } from './MarketingScorecardService';
 import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 import { normalizeReferenceState } from './intelligence/IntelligenceProfileService.js';
+import { isNationalSentinel } from './intelligence/geography-grid.js';
 import type { DiscoveryContext } from '../validators/intelligence-discovery.schema';
 import type { IdentityFieldKey } from './directory/identityScoring';
 
@@ -788,19 +789,28 @@ export class MarketingCampaignService extends BaseService {
       if (input.scope === 'intelligence' && input.intelligenceCampaignKind === 'discovery') {
         const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
         const profileService = IntelligenceProfileService.getInstance();
+        // National ('__all__') discovery resolves the national profile slot —
+        // reference_city NULL. The literal sentinel would cascade to the same
+        // slot via misses, but mapping it here keeps resolution explicit and
+        // avoids the "city contamination" warn-log.
+        const isNational = isNationalSentinel(input.city);
+        const resolveCity = isNational ? null : (input.city || null);
+        const resolveState = isNational ? null : (input.state || null);
         const hasProfile = input.intelligenceFocus === 'gold_standards'
-          ? await profileService.resolveGoldStandard(input.category || '', input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
+          ? await profileService.resolveGoldStandard(input.category || '', input.intelligencePlatform || null, resolveCity, resolveState, ctx)
           : input.intelligenceFocus === 'bronze_standards'
           // Bronze cascades city → state → nationwide: a city (stage-2) scan
           // is backed by the national bronze profile even before a city
           // profile exists (BRONZE_STANDARD_SPEC §6.1).
-          ? await profileService.resolveBronzeStandard(input.category || '', input.intelligencePlatform || null, input.city || null, input.state || null, ctx)
-          : await profileService.resolve(input.category || '', input.intelligenceFocus as any, input.city || null, input.intelligencePlatform || null, ctx);
+          ? await profileService.resolveBronzeStandard(input.category || '', input.intelligencePlatform || null, resolveCity, resolveState, ctx)
+          : await profileService.resolve(input.category || '', input.intelligenceFocus as any, resolveCity, input.intelligencePlatform || null, ctx);
         if (!hasProfile) {
           const focusLabel = input.intelligenceFocus === 'gold_standards'
             ? `gold standard${input.intelligencePlatform ? ` (${input.intelligencePlatform})` : ''}`
             : `${input.intelligenceFocus}`;
-          const geoLabel = input.city ? ` in ${input.city}${input.state ? ', ' + input.state : ''}` : '';
+          const geoLabel = isNational
+            ? ' nationwide'
+            : input.city ? ` in ${input.city}${input.state ? ', ' + input.state : ''}` : '';
           throw new ValidationError(
             `No active ${focusLabel} profile exists for "${input.category}"${geoLabel}. ` +
             `Run and activate an establishment campaign first — discovery requires an active profile to know what to search for. ` +

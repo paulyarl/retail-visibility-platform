@@ -287,28 +287,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       .catch(() => {});
   }, []);
 
-  // ─── Gold-standards nationwide-only guard ─────────────────────────────
-  // Gold-standard establishment/discovery campaigns are nationwide only —
-  // city/state/ZIP/radius scoping is redundant with the emerging & competitive
-  // scans that already run at those local scopes. When the operator selects
-  // focus=gold_standards in create mode, clear any geo-scoping fields they
-  // may have filled for a prior emerging/competitive selection so the
-  // submitted campaign is nationwide. Edit mode preserves existing values
-  // (the fields are hidden but not wiped) for backward compatibility with
-  // any legacy scoped gold-standard campaigns.
-  useEffect(() => {
-    if (mode !== 'create') return;
-    if (form.scope !== 'intelligence') return;
-    if (form.intelligence_focus !== 'gold_standards') return;
-    if (!form.city && !form.state && !form.intelligence_zip_codes && form.intelligence_search_radius_miles === '') return;
-    setForm((prev) => ({
-      ...prev,
-      city: '',
-      state: '',
-      intelligence_zip_codes: '',
-      intelligence_search_radius_miles: '',
-    }));
-  }, [mode, form.scope, form.intelligence_focus]);
+  // ─── Gold-standards geo scoping ────────────────────────────────────────
+  // Gold-standard campaigns accept an OPTIONAL market: blank city/state
+  // produces the nationwide bar (the default), a filled city+state produces
+  // a market-scoped gold profile (the import seam stamps reference_city/
+  // reference_state — resolveGoldStandard cascades city → state →
+  // nationwide). No forced clearing — the operator chooses the tier.
 
   // ─── Discovery prerequisite check ─────────────────────────────────────
   // When the operator has selected scope=intelligence + focus + category
@@ -1046,8 +1030,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 </select>
                 <p className="text-xs text-gray-400 mt-1">
                   The platform this gold-standard scan focuses on. &quot;All Platforms&quot; evaluates candidates across every major platform.
-                  Gold-standard campaigns are <strong>nationwide only</strong> — the platform replaces city/state as the focus dimension.
-                  Local establishment &amp; discovery work happens via the Emerging and Competitive campaign archetypes.
+                  Leave City + State blank for the <strong>nationwide</strong> bar (the default), or set them for a
+                  <strong> market-scoped</strong> gold standard — the profile resolves city → state → nationwide.
                 </p>
               </FormField>
             )}
@@ -1068,7 +1052,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                   <p className="text-xs text-gray-400 mt-1">
                     Anchor platform-bound reasons to a specific platform (absent-from-X, unclaimed-profile).
                     &quot;All Platforms&quot; (default) qualifies platform-anchored reasons across every major platform.
-                    Bronze establishment is nationwide; bronze discovery scans a specific market — set City + State below.
+                    Bronze establishment defaults to nationwide (blank City + State); set them for a market-scoped bronze profile. Bronze discovery scans a specific market — set City + State below.
                   </p>
                 ) : (
                   <p className="text-xs text-gray-400 mt-1">
@@ -1106,13 +1090,16 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
               )}
             </FormField>
-            {/* Market Scope — national establishment (emerging/competitive).
-                Checking this writes the '__all__' sentinel into city + state;
-                the import seam maps it to the national profile slot
-                (reference_city NULL) and the prompt renders the national
-                establishment template. Unchecking restores city/state entry. */}
+            {/* Market Scope — national lane (emerging/competitive, both kinds).
+                Checking this writes the '__all__' sentinel into city + state.
+                Establishment: the import seam maps it to the national profile
+                slot (reference_city NULL) and the prompt renders the national
+                establishment template. Discovery: the campaign sweeps all US
+                markets against the national profile — no ZIP/radius scoping,
+                each candidate carries its own market. Unchecking restores
+                city/state entry. */}
             {form.scope === 'intelligence'
-              && form.intelligence_campaign_kind === 'establishment'
+              && (form.intelligence_campaign_kind === 'establishment' || form.intelligence_campaign_kind === 'discovery')
               && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
               <FormField label="Market Scope" className="sm:col-span-2">
                 <label className="flex items-center gap-2">
@@ -1123,18 +1110,25 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                       ? { ...prev, city: '__all__', state: '__all__' }
                       : { ...prev, city: '', state: '' })}
                   />
-                  <span className="text-sm">National (all markets) — establish the city-agnostic vocabulary floor</span>
+                  <span className="text-sm">
+                    {form.intelligence_campaign_kind === 'establishment'
+                      ? 'National (all markets) — establish the city-agnostic vocabulary floor'
+                      : 'National (all markets) — sweep all US markets against the national profile'}
+                  </span>
                 </label>
                 <p className="text-xs text-gray-400 mt-1">
-                  A national establishment produces the city-agnostic profile every market falls back to when no
-                  local establishment exists (synonyms, subcategories, taxonomy, evidence rules, national signal
-                  weights). Run a city establishment per market for the local delta — corridors, ZIP catchments,
-                  supplier lists, local signal weights.
+                  {form.intelligence_campaign_kind === 'establishment'
+                    ? <>A national establishment produces the city-agnostic profile every market falls back to when no
+                      local establishment exists (synonyms, subcategories, taxonomy, evidence rules, national signal
+                      weights). Run a city establishment per market for the local delta — corridors, ZIP catchments,
+                      supplier lists, local signal weights.</>
+                    : <>A national discovery sweeps all US markets using the national profile — each candidate is
+                      classified by its own city + state. Run a market-scoped discovery when you want to concentrate
+                      on a single city.</>}
                 </p>
               </FormField>
             )}
             {/* City | State — family pair */}
-            {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="City" required={geoRequired}>
               <SuggestiveSelect required={geoRequired} value={form.city} onChange={handleCityChange}
                 options={cityOptions} emptyLabel="-- Select city --" newLabel="+ New city..."
@@ -1145,9 +1139,13 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               {form.campaign_category === 'directory_enrichment' && form.scope === 'category' && (
                 <p className="text-xs text-gray-400 mt-1">Enter <span className="font-mono">__all__</span> (via + New city) for the national category page.</p>
               )}
+              {form.campaign_category === 'directory_enrichment' && form.scope === 'city' && (
+                <p className="text-xs text-gray-400 mt-1">Enter <span className="font-mono">__all__</span> for city + state (via + New on each) for the national location narrative — composes the platform-wide coverage packet.</p>
+              )}
+              {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
+                <p className="text-xs text-gray-400 mt-1">Leave blank for the nationwide bar; fill city + state for a market-scoped gold standard.</p>
+              )}
             </FormField>
-            )}
-            {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="State" required={geoRequired}>
               <SuggestiveSelect required={geoRequired} value={form.state} onChange={(v) => handleChange('state', v)}
                 options={stateOptions} emptyLabel="-- Select state --" newLabel="+ New state..."
@@ -1162,9 +1160,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
               )}
             </FormField>
-            )}
-            {/* ZIP Codes | Search Radius — intelligence emerging/competitive */}
-            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+            {/* ZIP Codes | Search Radius — intelligence emerging/competitive.
+                Hidden for national ('__all__') campaigns — a nationwide sweep
+                has no ZIP or radius constraint. */}
+            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && form.city.trim().toLowerCase() !== '__all__' && (
               <FormField label="ZIP Codes (optional)">
                 <input type="text" value={form.intelligence_zip_codes}
                   onChange={(e) => handleChange('intelligence_zip_codes', e.target.value)}
@@ -1173,7 +1172,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Restrict discovery to specific ZIP codes. Leave empty to use city-wide search.</p>
               </FormField>
             )}
-            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+            {form.scope === 'intelligence' && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && form.city.trim().toLowerCase() !== '__all__' && (
               <FormField label="Search Radius (miles, optional)">
                 <input type="number" min="0" step="1" value={form.intelligence_search_radius_miles}
                   onChange={(e) => handleChange('intelligence_search_radius_miles', e.target.value === '' ? '' : Number(e.target.value))}

@@ -119,3 +119,96 @@ describe('campaignCreateSchema — bronze_standards refine semantics', () => {
     expect(paths).toContain('state');
   });
 });
+
+describe('campaignCreateSchema — national + market-scope semantics', () => {
+  it('accepts a national (__all__) discovery campaign — sentinel satisfies geo presence', () => {
+    const result = campaignCreateSchema.safeParse({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: '__all__',
+      state: '__all__',
+      intelligence_focus: 'emerging',
+      intelligence_campaign_kind: 'discovery',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a national (__all__) competitive discovery campaign', () => {
+    const result = campaignCreateSchema.safeParse({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: '__all__',
+      state: '__all__',
+      intelligence_focus: 'competitive',
+      intelligence_campaign_kind: 'discovery',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a market-scoped gold standard campaign (city + state + platform)', () => {
+    const result = campaignCreateSchema.safeParse({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Kansas City',
+      state: 'MO',
+      intelligence_focus: 'gold_standards',
+      intelligence_platform: 'google',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a nationwide gold standard (no geo, platform still required)', () => {
+    const result = campaignCreateSchema.safeParse({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      intelligence_focus: 'gold_standards',
+      intelligence_platform: 'google',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a half-scoped gold standard (city without state)', () => {
+    const paths = issuePaths({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Kansas City',
+      intelligence_focus: 'gold_standards',
+      intelligence_platform: 'google',
+    });
+    expect(paths).toContain('state');
+  });
+
+  it('rejects a half-scoped gold standard (state without city)', () => {
+    const paths = issuePaths({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      state: 'MO',
+      intelligence_focus: 'gold_standards',
+      intelligence_platform: 'google',
+    });
+    expect(paths).toContain('state');
+  });
+
+  it('rejects a half-scoped bronze establishment (city without state)', () => {
+    const paths = issuePaths({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'establishment',
+    });
+    expect(paths).toContain('state');
+  });
+
+  it('accepts a market-scoped bronze establishment (city + state)', () => {
+    const result = campaignCreateSchema.safeParse({
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'establishment',
+    });
+    expect(result.success).toBe(true);
+  });
+});

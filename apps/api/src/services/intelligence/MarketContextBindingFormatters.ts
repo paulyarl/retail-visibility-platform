@@ -416,18 +416,29 @@ export function formatDiscoveryMarketContext(
   const hasCat = loader.hasCategoryIntelligence(catCtx);
   const hasLoc = loader.hasLocationIntelligence(locCtx);
   if (!hasCat && !hasLoc) return '';
+  const isNational = (city ?? '').trim().toLowerCase() === '__all__';
 
   const lines: string[] = [
     '=== MARKET CONTEXT (from prior enrichment runs) ===',
     '',
-    'This discovery benefits from market intelligence produced by prior PG enrichment runs:',
-    '- Location enrichment (Stage 1): established the city\'s market character,',
-    '  identified demand gaps, and mapped metro dynamics',
-    '- Category enrichment (Stage 2): established the category\'s business model,',
+    isNational
+      ? 'This national discovery benefits from market intelligence produced by prior national enrichment runs:'
+      : 'This discovery benefits from market intelligence produced by prior PG enrichment runs:',
+    isNational
+      ? '- National location enrichment: measured platform coverage across states'
+      : '- Location enrichment (Stage 1): established the city\'s market character,',
+    isNational
+      ? '  and markets, plus national demand gaps and state-level dynamics'
+      : '  identified demand gaps, and mapped metro dynamics',
+    isNational
+      ? '- National category enrichment: established the category\'s business model,'
+      : '- Category enrichment (Stage 2): established the category\'s business model,',
     '  identified what strong looks like, and produced prospecting signals',
     '',
     'Use this intelligence to target your discovery. The intelligence tells you',
-    'WHAT to look for (category profile), WHERE to look (city profile + market gaps),',
+    isNational
+      ? 'WHAT to look for (category profile), WHERE to look (national coverage + market gaps),'
+      : 'WHAT to look for (category profile), WHERE to look (city profile + market gaps),',
     'and HOW to evaluate what you find (category signals).',
   ];
 
@@ -468,34 +479,59 @@ export function formatDiscoveryMarketContext(
     lines.push('category knowledge for prospect discovery.');
   }
 
-  // Location intelligence
+  // Location intelligence — for national ('__all__') scans this is the
+  // national location row: measured coverage + national gaps/dynamics instead
+  // of a single city's profile.
   const locLines: string[] = [];
+  const nationalCoverage = locCtx.national_coverage;
+  if (isNational && nationalCoverage && (nationalCoverage.totalListings ?? 0) > 0) {
+    locLines.push('', 'NATIONAL COVERAGE (measured platform coverage):');
+    locLines.push(`  ${nationalCoverage.totalListings} listings across ${nationalCoverage.totalCities ?? 0} markets in ${nationalCoverage.totalStates ?? 0} states`);
+    if (Array.isArray(nationalCoverage.states) && nationalCoverage.states.length > 0) {
+      locLines.push(`  States: ${nationalCoverage.states.slice(0, 15).map((s) => `${s.state} (${s.listingCount} listings / ${s.cityCount} markets)`).join('; ')}`);
+    }
+    if (Array.isArray(nationalCoverage.topCities) && nationalCoverage.topCities.length > 0) {
+      locLines.push(`  Largest markets: ${nationalCoverage.topCities.slice(0, 10).map((c) => `${c.city}, ${c.state}`).join('; ')}`);
+    }
+  }
   if (locCtx.market_summary) {
-    locLines.push('', 'CITY MARKET SUMMARY:');
+    locLines.push('', isNational ? 'NATIONAL MARKET SUMMARY:' : 'CITY MARKET SUMMARY:');
     locLines.push(`  ${locCtx.market_summary}`);
   }
-  locLines.push(...formatCityProfileBlock(locCtx));
-  if (locCtx.notable_areas && locCtx.notable_areas.length > 0) {
-    locLines.push('', 'NOTABLE AREAS:');
-    locLines.push(`  ${locCtx.notable_areas.join(', ')}`);
+  if (!isNational) {
+    locLines.push(...formatCityProfileBlock(locCtx));
+    if (locCtx.notable_areas && locCtx.notable_areas.length > 0) {
+      locLines.push('', 'NOTABLE AREAS:');
+      locLines.push(`  ${locCtx.notable_areas.join(', ')}`);
+    }
   }
   locLines.push(...formatMarketGapsBlock(locCtx));
   locLines.push(...formatMetroDynamicsBlock(locCtx));
 
   if (locLines.length > 0) {
-    lines.push('', '--- LOCATION INTELLIGENCE ---');
+    lines.push('', isNational ? '--- NATIONAL LOCATION INTELLIGENCE ---' : '--- LOCATION INTELLIGENCE ---');
     lines.push(...locLines);
-    lines.push('', 'Use the city profile to understand the market. Let the city\'s character');
-    lines.push('guide WHERE you search.');
-    lines.push('Use market gaps to target your discovery — if the category you\'re');
-    lines.push('discovering has a gap in a specific area, prioritize that area.');
-    lines.push('Businesses in gap areas are high-value prospects — they fill unmet demand.');
-    lines.push('Use metro dynamics for expansion context — if nearby cities have');
-    lines.push('complementary characteristics, businesses there may be expansion prospects.');
+    if (isNational) {
+      lines.push('', 'Use national coverage to prioritize WHERE you sweep first — markets');
+      lines.push('with thin or absent coverage are the frontier; dense markets are where');
+      lines.push('established candidates concentrate.');
+      lines.push('Use national market gaps to target regions where the category is');
+      lines.push('under-served — businesses filling those gaps are high-value prospects.');
+    } else {
+      lines.push('', 'Use the city profile to understand the market. Let the city\'s character');
+      lines.push('guide WHERE you search.');
+      lines.push('Use market gaps to target your discovery — if the category you\'re');
+      lines.push('discovering has a gap in a specific area, prioritize that area.');
+      lines.push('Businesses in gap areas are high-value prospects — they fill unmet demand.');
+      lines.push('Use metro dynamics for expansion context — if nearby cities have');
+      lines.push('complementary characteristics, businesses there may be expansion prospects.');
+    }
   } else {
-    lines.push('', '--- LOCATION INTELLIGENCE: not available ---');
-    lines.push('Location enrichment has not run for this market yet. Proceed with general');
-    lines.push('knowledge of the city for prospect discovery.');
+    lines.push('', isNational ? '--- NATIONAL LOCATION INTELLIGENCE: not available ---' : '--- LOCATION INTELLIGENCE: not available ---');
+    lines.push(isNational
+      ? 'National location enrichment has not run yet. Distribute the sweep across diverse markets using general knowledge.'
+      : 'Location enrichment has not run for this market yet. Proceed with general');
+    if (!isNational) lines.push('knowledge of the city for prospect discovery.');
   }
 
   // Focus-specific framing

@@ -60,6 +60,11 @@ doppler run --config local -- pnpm seed:intelligence-discovery-signals
 doppler run --config local -- pnpm seed:intelligence-profile-establishment-template
 doppler run --config local -- pnpm seed:intelligence-profile-auto-repair
 
+# Directory enrichment templates — category/location/category-set packet bodies,
+# including the national ('__all__') variants consumed by national enrichment +
+# discovery framing.
+doppler run --config local -- pnpm seed:directory-enrichment-templates
+
 # Profile repair + marketing ops + gold standard (use npx tsx directly)
 doppler run --config local -- npx tsx src/scripts/seed-profile-repair-signals.ts
 doppler run --config local -- npx tsx src/scripts/seed-profile-repair-issue-briefings.ts

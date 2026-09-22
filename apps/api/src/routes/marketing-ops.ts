@@ -361,18 +361,22 @@ export const campaignCreateSchema = campaignBaseSchema
     message: 'intelligence_platform is required for gold_standards campaigns',
     path: ['intelligence_platform'],
   })
-  // Gold-standard campaigns are nationwide-only — city/state scoping is
-  // redundant with the emerging & competitive scans that already run at
-  // those local scopes. Reject city/state on create so the nationwide
-  // constraint is enforced at the API too, not just the operator UI.
-  // (Update schema is intentionally left unguarded so legacy scoped
-  // gold-standard campaigns can still be edited without a 400.)
-  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || !data.city || data.city.trim().length === 0, {
-    message: 'city is not allowed for gold_standards campaigns (nationwide only)',
-    path: ['city'],
-  })
-  .refine((data) => data.scope !== 'intelligence' || data.intelligence_focus !== 'gold_standards' || !data.state || data.state.trim().length === 0, {
-    message: 'state is not allowed for gold_standards campaigns (nationwide only)',
+  // Gold standards + bronze establishment accept an OPTIONAL market: blank
+  // city/state = nationwide profile, filled = market-scoped profile (the
+  // import seams stamp reference_city/reference_state). Half-scoped input
+  // (city without state, or vice versa) is rejected — it would write a
+  // profile slot the resolver never reads meaningfully.
+  .refine((data) => {
+    if (data.scope !== 'intelligence') return true;
+    const optionalGeo =
+      data.intelligence_focus === 'gold_standards'
+      || (data.intelligence_focus === 'bronze_standards' && (data.intelligence_campaign_kind ?? 'discovery') === 'establishment');
+    if (!optionalGeo) return true;
+    const hasCity = !!(data.city && data.city.trim().length > 0);
+    const hasState = !!(data.state && data.state.trim().length > 0);
+    return hasCity === hasState;
+  }, {
+    message: 'city and state must be set together (or both blank for nationwide)',
     path: ['state'],
   });
 
@@ -7796,9 +7800,14 @@ router.get('/intelligence-profiles/coverage', async (req, res) => {
 router.get('/intelligence-profiles/resolve/:category', async (req, res) => {
   try {
     const focus = req.query.focus as 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards' | undefined;
-    const city = typeof req.query.city === 'string' ? req.query.city : undefined;
-    const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+    const rawCity = typeof req.query.city === 'string' ? req.query.city : undefined;
+    const rawState = typeof req.query.state === 'string' ? req.query.state : undefined;
     const platform = typeof req.query.platform === 'string' ? req.query.platform : undefined;
+    // National sentinel → the national profile slot (reference_city NULL).
+    const city = rawCity?.trim().toLowerCase() === '__all__' ? undefined : rawCity;
+    const state = rawCity?.trim().toLowerCase() === '__all__'
+      ? undefined
+      : rawState;
     let profile: IntelligenceProfile | null;
     if (focus === 'gold_standards') {
       profile = await IntelligenceProfileService.getInstance().resolveGoldStandard(

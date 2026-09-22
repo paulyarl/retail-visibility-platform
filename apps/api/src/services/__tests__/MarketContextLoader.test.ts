@@ -104,6 +104,22 @@ describe('MarketContextLoader.loadMarketContext', () => {
     expect(mockQueryRaw).toHaveBeenCalledTimes(1);
   });
 
+  it('loads the __location__ national row alongside the category row for __all__ campaigns', async () => {
+    // National discovery reads the (category,'__all__','__all__') packet AND the
+    // national location coverage packet — the national_coverage block it renders
+    // is what grounds 'all US markets' in measured counts.
+    mockQueryRaw.mockResolvedValue([
+      { category_key: 'african_grocery', context: CATEGORY_CTX },
+      { category_key: '__location__', context: LOCATION_CTX },
+    ]);
+
+    const result = await loader.loadMarketContext('african_grocery', '__all__', '__all__');
+
+    expect(result.category).toEqual(CATEGORY_CTX);
+    expect(result.location).toEqual(LOCATION_CTX);
+    expect(loader.hasLocationIntelligence(result.location)).toBe(true);
+  });
+
   it('short-circuits without a DB call when inputs are missing', async () => {
     for (const [cat, city, st] of [
       [null, 'Indianapolis', 'IN'],
