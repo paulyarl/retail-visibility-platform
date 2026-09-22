@@ -51,6 +51,13 @@ import type { RequestCtx } from '../context';
  * up freshly written category rows; enrichMarket already resyncs the
  * location row per enriched market, so the location pass only fills cities
  * no category pass produced.
+ *
+ * National row: the ('__location__','__all__','__all__') row is derived
+ * state over every covered market — listings publish/unpublish and national
+ * category packets land between sweeps, so its coverage fact layer goes
+ * stale silently. Unlike the city pass (first-fill only), the national
+ * refresh runs on EVERY sweep: enrichNational is a cheap aggregate
+ * recompute that preserves campaign-applied copy.
  */
 
 const LOCATION_SENTINEL_KEY = '__location__';
@@ -87,6 +94,9 @@ export interface ShelfSweepReport {
   };
   categoryMarkets: CategoryMarketOutcome[];
   locationMarkets: LocationMarketOutcome[];
+  /** Refresh outcome for the ('__location__','__all__','__all__') row —
+   *  separate from locationMarkets (which is the per-city first-fill pass). */
+  nationalLocation: LocationMarketOutcome | null;
   needsAi: SweepMarket[];
   sweepCampaign: {
     id: string;
@@ -345,6 +355,33 @@ class ProvingGroundShelfSweepService extends BaseService {
       }
     }
 
+    // ── 4b. National location row — refresh every sweep ──────────────────
+    // Derived state over all covered markets: the sentinel routes to
+    // enrichNational, which recomputes the coverage fact layer and merges it
+    // into context without reverting campaign-applied copy. Runs even when
+    // the row already exists — this is a refresh, not a first-fill.
+    let nationalLocation: ShelfSweepReport['nationalLocation'] = null;
+    try {
+      const national = await LocationMarketEnrichmentService.enrichLocation(
+        '__all__', '__all__',
+        { triggerSource: 'pg_sweep', enrichedBy: opts.enrichedBy ?? null },
+        ctx,
+      );
+      nationalLocation = {
+        city: '__all__',
+        state: '__all__',
+        status: national ? 'enriched' : 'skipped',
+        detail: national ? 'coverage refresh' : 'no row written',
+      };
+    } catch (err) {
+      nationalLocation = {
+        city: '__all__',
+        state: '__all__',
+        status: 'error',
+        detail: (err as Error).message,
+      };
+    }
+
     // ── 5. Residual set → one directory_enrichment child campaign ────────
     // The anchor signature is needsAi[0]'s market — those markets have no
     // covering active campaign by construction, so the structural-duplicate
@@ -422,6 +459,7 @@ class ProvingGroundShelfSweepService extends BaseService {
       covered: outcomes.filter((o) => o.status === 'covered').length,
       needsAi: needsAi.length,
       locationsEnriched: locationOutcomes.filter((o) => o.status === 'enriched').length,
+      nationalLocationStatus: nationalLocation?.status ?? null,
       sweepCampaignId: sweepCampaign?.id ?? null,
     });
 
@@ -433,6 +471,7 @@ class ProvingGroundShelfSweepService extends BaseService {
       },
       categoryMarkets: outcomes,
       locationMarkets: locationOutcomes,
+      nationalLocation,
       needsAi,
       sweepCampaign,
     };

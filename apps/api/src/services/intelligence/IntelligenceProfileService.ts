@@ -3505,7 +3505,7 @@ export class IntelligenceProfileService extends BaseService {
         this.prisma.directory_category_enrichment.findMany({
           select: {
             category_key: true, category_name: true, city: true, state: true,
-            source_campaign_id: true,
+            source_campaign_id: true, trigger_source: true, enriched_at: true,
           },
         }),
       ]);
@@ -3771,6 +3771,8 @@ export class IntelligenceProfileService extends BaseService {
         const entry = enrichEntryFor(row.category_key, row.category_name ?? row.category_key);
         const slot = ensureEnrichSlot(entry, cityNorm, stateNorm);
         slot.status = 'active';
+        slot.enrichment_at = row.enriched_at?.toISOString?.() ?? null;
+        slot.enrichment_trigger = row.trigger_source ?? null;
         if (row.source_campaign_id) slot.profile_id = row.source_campaign_id;
       }
       for (const c of enrichmentCampaigns) {
@@ -3800,6 +3802,8 @@ export class IntelligenceProfileService extends BaseService {
         for (const entry of byCategory.values()) {
           const slot = ensureEnrichSlot(entry, cityNorm, stateNorm);
           slot.discovery_status = 'executed';
+          slot.discovery_at = row.enriched_at?.toISOString?.() ?? null;
+          slot.discovery_trigger = row.trigger_source ?? null;
           if (row.source_campaign_id) slot.discovery_campaign_id = row.source_campaign_id;
         }
       }

@@ -245,6 +245,63 @@ describe('applyEnrichmentPacket — national (__all__) location row', () => {
   });
 });
 
+describe('enrichLocation — national (__all__) deterministic sync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sqlCalls.length = 0;
+  });
+
+  it('preserves campaign-applied head copy and refreshes national_coverage', async () => {
+    // findRow falls through to categoryRows in the dispatcher — the v2 row
+    // doubles as the "existing" national location row.
+    mockQueries([], [{
+      ...appliedRow,
+      category_name: 'United States',
+      city: '__all__',
+      state: '__all__',
+      meta_title: 'Campaign Title',
+      description: 'Campaign description.',
+      keywords: ['campaign kw'],
+      secondary_categories: ['campaign secondary'],
+      schema_type_hint: 'CollectionPage',
+      composer_version: 2,
+      context: { market_summary: 'prior context' },
+    }]);
+
+    await service.enrichLocation('__all__', '__all__', { triggerSource: 'pg_sweep' });
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    // Campaign head copy survives the sync — the composer never reverts it.
+    expect(upsert!.values).toContain('Campaign Title');
+    expect(upsert!.values).toContain('Campaign description.');
+    expect(JSON.stringify(upsert!.values)).toContain('campaign kw');
+    expect(upsert!.values).toContain('CollectionPage');
+    expect(upsert!.values).toContain(2); // composer_version stays campaign
+    // Prior AI context survives; the coverage grid is restamped.
+    const ctxVal = upsert!.values.find(
+      (v) => v && typeof v === 'object' && 'national_coverage' in v,
+    );
+    expect(ctxVal).toBeDefined();
+    expect((ctxVal as any).market_summary).toBe('prior context');
+    expect(upsert!.values).toContain('pg_sweep');
+  });
+
+  it('writes the deterministic baseline packet when no campaign row exists', async () => {
+    mockQueries();
+    await service.enrichLocation('__all__', '__all__', { triggerSource: 'pg_sweep' });
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    expect(upsert!.values).toContain('__location__');
+    // The sentinels are inlined literally in the SQL, not bound params.
+    expect(upsert!.text).toContain("'__all__', '__all__'");
+    expect(upsert!.values).toContain('United States');
+    expect(upsert!.values).toContain(1); // COMPOSER_VERSION — deterministic baseline
+    expect(upsert!.values).not.toContain('Campaign Title');
+  });
+});
+
 describe('getLocation — national (__all__) phantom-write guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();

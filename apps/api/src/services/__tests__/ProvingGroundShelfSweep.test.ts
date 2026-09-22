@@ -249,6 +249,31 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
     );
   });
 
+  it('refreshes the national location row on every sweep', async () => {
+    const report = await sweepService.sweep('pg-1');
+
+    // The national refresh is separate from the per-city first-fill pass —
+    // it runs unconditionally, even when no city row was written.
+    expect(report.nationalLocation).toEqual(
+      expect.objectContaining({ city: '__all__', state: '__all__', status: 'enriched' }),
+    );
+    expect(mockEnrichLocation).toHaveBeenCalledWith(
+      '__all__', '__all__',
+      expect.objectContaining({ triggerSource: 'pg_sweep' }),
+      undefined,
+    );
+  });
+
+  it('reports a national refresh error without failing the sweep', async () => {
+    mockEnrichLocation.mockImplementation((city: string) =>
+      city === '__all__' ? Promise.reject(new Error('boom')) : Promise.resolve({ id: 'dce-loc' }),
+    );
+
+    const report = await sweepService.sweep('pg-1');
+    expect(report.nationalLocation?.status).toBe('error');
+    expect(report.nationalLocation?.detail).toBe('boom');
+  });
+
   it('merges residual markets into the existing set campaign on signature conflict', async () => {
     const conflict = new ConflictError('duplicate');
     (conflict as any).existingCampaignId = 'ec-set';

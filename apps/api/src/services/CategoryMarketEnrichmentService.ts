@@ -6,6 +6,7 @@ import {
   normalizeReferenceCity,
   normalizeReferenceState,
 } from './intelligence/IntelligenceProfileService';
+import { isNationalSentinel } from './intelligence/geography-grid';
 import {
   buildCategorySeoPacket,
   buildSeedSeoPacket,
@@ -95,6 +96,19 @@ class CategoryMarketEnrichmentService extends BaseService {
     ctx?: RequestCtx,
   ): Promise<EnrichMarketResult> {
     const categoryKey = normalizeCategoryKey(category);
+    // National ('__all__') category rows come from the campaign lane
+    // (applyEnrichmentPacket) — the deterministic path is city-scoped
+    // (profile resolution + listing fan-out). Bail before the normalizers
+    // title-case the sentinel into a phantom '__All__' row.
+    if (isNationalSentinel(city)) {
+      return {
+        marketKey: { categoryKey, city, state },
+        categoryEnrichmentId: null,
+        listingsEnriched: 0,
+        listingsSkipped: 0,
+        skipReasons: { invalid_market: 1 },
+      };
+    }
     const normalizedCity = normalizeReferenceCity(city);
     const normalizedState = normalizeReferenceState(state);
 
@@ -418,6 +432,20 @@ class CategoryMarketEnrichmentService extends BaseService {
           error: (locationErr as Error).message,
           city: normalizedCity,
           state: normalizedState,
+        });
+      }
+    } else {
+      // Same contract one level up: a national category packet is an input
+      // to the ('__location__','__all__','__all__') row's aggregates, so
+      // applying one re-syncs the national location row. The sentinel routes
+      // enrichLocation → enrichNational — a cheap coverage/aggregate refresh
+      // that preserves campaign-applied copy.
+      try {
+        const { default: locationService } = await import('./LocationMarketEnrichmentService');
+        await locationService.enrichLocation('__all__', '__all__', { triggerSource, enrichedBy }, ctx);
+      } catch (locationErr) {
+        logger.warn('[CategoryMarketEnrichmentService] national location enrichment failed', ctx, {
+          error: (locationErr as Error).message,
         });
       }
     }

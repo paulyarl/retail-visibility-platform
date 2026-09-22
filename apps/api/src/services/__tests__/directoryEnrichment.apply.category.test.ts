@@ -9,7 +9,8 @@
  *   produce '__ALL__').
  * - trigger_source='campaign_run' + source_campaign_id/source_execution_id
  *   lineage are written.
- * - National packets skip listing fan-out and the location recompute.
+ * - National packets skip listing fan-out but resync the NATIONAL location
+ *   row (the ('__location__','__all__','__all__') aggregates they feed).
  * - City-scope packets write the normalized market row and fan out.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -124,10 +125,16 @@ describe('applyEnrichmentPacket — national (__all__) packet', () => {
     expect(upsert!.values).toContain('mpexec-1');
     expect(upsert!.values).toContain(2); // CAMPAIGN_COMPOSER_VERSION
 
-    // National packets have no city to match listings on — no fan-out, and
-    // no location recompute.
+    // National packets have no city to match listings on — no fan-out — but
+    // the national location row IS resynced (its aggregates feed on national
+    // category packets), the same contract as the city cascade one level up.
     expect(mockListingsFindMany).not.toHaveBeenCalled();
-    expect(mockEnrichLocation).not.toHaveBeenCalled();
+    expect(mockEnrichLocation).toHaveBeenCalledWith(
+      '__all__',
+      '__all__',
+      expect.objectContaining({ triggerSource: 'campaign_run' }),
+      undefined,
+    );
     expect(result.listingsEnriched).toBe(0);
   });
 

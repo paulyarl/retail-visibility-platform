@@ -5667,6 +5667,8 @@ class MarketingOpsService extends AdminApiSingleton {
     domain: { categories: string[]; geos: { city: string; state: string | null }[] };
     categoryMarkets: Array<{ category: string; categoryKey: string; city: string; state: string; status: string; detail?: string; listingsEnriched?: number }>;
     locationMarkets: Array<{ city: string; state: string; status: string; detail?: string }>;
+    /** Refresh outcome for the national ('__all__') location row — runs every sweep. */
+    nationalLocation?: { city: string; state: string; status: string; detail?: string } | null;
     needsAi: Array<{ category: string; categoryKey: string; city: string; state: string }>;
     sweepCampaign: { id: string; created: boolean; marketCount: number; mergedMarkets?: number } | null;
   }> {
@@ -6571,6 +6573,16 @@ export interface CoverageSlot {
   //              imported audit (gold_standard_scan / intelligence_discovery).
   discovery_status: 'pending' | 'inflight' | 'executed';
   discovery_campaign_id: string | null;
+  // Enrichment provenance (focus='enrichment' only) — when/how the
+  // directory_category_enrichment row was written, so a filled chip can be
+  // verified against the rendered packet instead of trusted on row
+  // existence. trigger_source ∈ campaign_run | manual | on_demand |
+  // profile_activated | pg_sweep; rows written outside a campaign run carry
+  // a null profile_id/discovery_campaign_id.
+  enrichment_at?: string | null;
+  enrichment_trigger?: string | null;
+  discovery_at?: string | null;
+  discovery_trigger?: string | null;
 }
 
 export interface CoverageCategory {

@@ -531,10 +531,26 @@ class LocationMarketEnrichmentService extends BaseService {
     const existing = await this.findRow('__all__', '__all__');
     const context = { ...((existing?.context as any) ?? {}), national_coverage: coverage };
 
+    // A campaign-applied row (composer_version=2) keeps its AI head copy —
+    // this sync refreshes the fact layer (national_coverage + aggregate
+    // inputs), it does not revert the packet to composer prose. Deliberately
+    // different from the city path: the composer cannot write national
+    // coverage narrative, so the campaign packet is the only good source.
+    // Baseline rows (v1 / missing) take the full deterministic packet.
+    const campaignRow = existing?.composer_version === CAMPAIGN_COMPOSER_VERSION;
+    const metaTitle = campaignRow ? existing.meta_title : packet.metaTitle;
+    const description = campaignRow ? existing.description : packet.description;
+    const keywords = campaignRow
+      ? (existing.keywords ?? [])
+      : (packet.keywords.length > 0 ? packet.keywords : []);
+    const secondary = campaignRow
+      ? (existing.secondary_categories ?? [])
+      : (packet.secondaryCategories.length > 0 ? packet.secondaryCategories : []);
+    const schemaTypeHint = campaignRow ? existing.schema_type_hint : packet.schemaTypeHint;
+    const composerVersion = campaignRow ? CAMPAIGN_COMPOSER_VERSION : packet.composerVersion;
+
     const id = generateCategoryMarketEnrichmentId();
     const enrichedAt = new Date();
-    const keywords = packet.keywords.length > 0 ? packet.keywords : [];
-    const secondary = packet.secondaryCategories.length > 0 ? packet.secondaryCategories : [];
 
     const upsert = Prisma.sql`
       INSERT INTO directory_category_enrichment (
@@ -546,12 +562,12 @@ class LocationMarketEnrichmentService extends BaseService {
       )
       VALUES (
         ${id}, ${LOCATION_SENTINEL_KEY}, ${locationName}, '__all__', '__all__',
-        ${packet.metaTitle}, ${packet.description},
+        ${metaTitle}, ${description},
         ${textArraySql(keywords)},
         ${textArraySql(secondary)},
-        ${packet.schemaTypeHint},
+        ${schemaTypeHint},
         ${context as any},
-        ${null}, ${null}, ${packet.composerVersion},
+        ${null}, ${null}, ${composerVersion},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource}, now(), now()
       )
       ON CONFLICT (category_key, city, state) DO UPDATE SET

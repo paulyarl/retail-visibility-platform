@@ -732,6 +732,7 @@ function CoverageSection({
                 key={`enrichment-${dimVal}`}
                 label={label}
                 category={category.category_name}
+                categoryKey={category.category_key}
                 city={city}
                 isNational={isNationalColumn}
                 slot={slot ?? undefined}
@@ -1222,10 +1223,15 @@ function PgChip({ label, slot, category, city }: PgChipProps) {
 //            fills the bottom chip of every category at this market.
 // National positions pass '__all__' into the create link — the campaign
 // form's National checkbox reads the sentinel back as checked.
+// Filled chips link to the RENDERED public page — row existence alone is a
+// weak signal (non-campaign triggers like enrichNational write rows with no
+// source_campaign_id), so the chip must let the operator inspect the actual
+// packet. Provenance (enriched_at + trigger_source) rides in the tooltip.
 
 function EnrichmentPair({
   label,
   category,
+  categoryKey,
   city,
   isNational,
   slot,
@@ -1233,6 +1239,7 @@ function EnrichmentPair({
 }: {
   label: string;
   category: string;
+  categoryKey: string;
   city: string | null | undefined;
   isNational: boolean;
   slot: CoverageSlot | undefined;
@@ -1243,20 +1250,49 @@ function EnrichmentPair({
   const catState = slot?.status ?? 'pending';
   const locState = slot?.discovery_status ?? 'pending';
 
+  // Rendered-packet URLs — the surfaces that actually consume the
+  // directory_category_enrichment rows:
+  //   category national → /place/category/<slug>   (reads the '__all__' row)
+  //   category market   → /place/category/<slug>?city=…&state=…
+  //   location national → /place                    (PlaceNationalPanel)
+  //   location market   → /directory/location/<city-slug>-<state>
+  const categorySlug = categoryKey.replace(/\s+/g, '-');
+  const categoryViewUrl = isNational
+    ? `/place/category/${categorySlug}`
+    : `/place/category/${categorySlug}?${new URLSearchParams({
+        ...(slot?.city ? { city: slot.city } : {}),
+        ...(slot?.state ? { state: slot.state } : {}),
+      }).toString()}`;
+  const citySlug = (slot?.city ?? '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-');
+  const locationViewUrl = isNational
+    ? '/place'
+    : `/directory/location/${citySlug}-${(slot?.state ?? '').toLowerCase()}`;
+
+  const provenance = (at?: string | null, trigger?: string | null, campaignId?: string | null) =>
+    `enriched ${at ? new Date(at).toLocaleDateString() : '(date unknown)'}` +
+    ` · via ${trigger ?? 'unknown trigger'}` +
+    (campaignId ? '' : ' · no source campaign recorded');
+
   const renderChip = (opts: {
     kind: 'category' | 'location';
     state: string;
     tooltip: string;
     createHref: string;
+    viewHref: string;
     campaignId?: string | null;
   }) => {
     const filled = opts.state === 'active' || opts.state === 'executed';
     const inflight = opts.state === 'inflight';
     const Icon = filled ? IconCircleCheck : inflight ? IconClock : IconPlus;
     const color = filled ? (opts.kind === 'category' ? 'green' : 'teal') : inflight ? 'blue' : 'gray';
+    // pending → create form; inflight → the running campaign; filled → the
+    // rendered packet (verification), never a dead chip.
     const href = opts.state === 'pending'
       ? opts.createHref
-      : opts.campaignId ? CAMPAIGN_URL(opts.campaignId) : null;
+      : inflight && opts.campaignId ? CAMPAIGN_URL(opts.campaignId)
+      : filled ? opts.viewHref
+      : null;
     const body = (
       <Group gap={4} style={{
         padding: '4px 10px',
@@ -1286,20 +1322,24 @@ function EnrichmentPair({
         kind: 'category',
         state: catState,
         tooltip:
-          catState === 'active' ? 'Category packet enriched — click to open the source campaign'
+          catState === 'active'
+            ? `Category packet — ${provenance(slot?.enrichment_at, slot?.enrichment_trigger, slot?.profile_id)} — click to view the rendered packet`
             : catState === 'inflight' ? 'Category enrichment campaign in flight — click to open'
             : `Create a category enrichment campaign for ${category} at ${label}`,
         createHref: createEnrichmentLink({ lane: 'category', category, city: linkCity, state: linkState }),
+        viewHref: categoryViewUrl,
         campaignId: slot?.profile_id || null,
       })}
       {renderChip({
         kind: 'location',
         state: locState,
         tooltip:
-          locState === 'executed' ? 'Location narrative enriched — click to open the source campaign'
+          locState === 'executed'
+            ? `Location narrative — ${provenance(slot?.discovery_at, slot?.discovery_trigger, slot?.discovery_campaign_id)} — click to view the rendered packet`
             : locState === 'inflight' ? 'Location enrichment campaign in flight — click to open'
             : `Create a location enrichment campaign for ${label}`,
         createHref: createEnrichmentLink({ lane: 'location', city: linkCity, state: linkState }),
+        viewHref: locationViewUrl,
         campaignId: slot?.discovery_campaign_id ?? null,
       })}
     </Stack>
