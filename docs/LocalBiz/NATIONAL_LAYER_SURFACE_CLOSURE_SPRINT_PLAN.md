@@ -241,9 +241,18 @@ must know the national layer or it reports gaps that don't exist:
   `/settings/admin/growth-engine` (per-city breakdown groups
   `directory_presence_seeds.city` — real listings only).
 
+Deployment doctrine (operator guidance, encoded in the coverage map's
+recommended-order guide): **every category deployment goes national first —
+establishment ×4 + enrichment ×2 + optional discovery sweep — then iterates
+cities.** Each city adds only its local delta; the national floor is the
+fallback the resolvers already cascade to. A national discovery run promotes
+to a category-scope umbrella PG; per-city deployment PGs come from queue
+grouping on real entry cities.
+
 Tests: 5 national-lane cases in `IntelligenceProfileService.coverage.test.ts`
 (sentinel→null position, profile merge, discovery attach, cities exclusion,
-case variants).
+case variants); 4 national-sentinel PG cases in
+`MarketingCampaignService.pgScopeFlex.test.ts`.
 
 ## Out of scope (recorded, not forgotten)
 

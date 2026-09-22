@@ -224,9 +224,9 @@ export default function CoverageClient() {
           <Text size="sm" c="dimmed">
             The coverage map shows which intelligence profiles exist (active or draft) for each category.
             Every position carries two stacked chips — establishment on top, discovery on the bottom.
-            Fill them in order: gold standards first (nationwide, per platform), then the bronze national
-            profile and per-city bronze scans, then emerging/competitive establishment per city, then
-            discovery. Discovery stays locked until its establishment is active.
+            Deploy per category: build the national floor first (one pass covers every market), then
+            iterate cities — each city adds only its local delta. Discovery stays locked until its
+            establishment is active.
           </Text>
         </Box>
         <Group gap="xs">
@@ -248,23 +248,27 @@ export default function CoverageClient() {
             <IconInfoCircle size={14} />
           </ThemeIcon>
           <Box>
-            <Text size="sm" fw={600}>Recommended order for a new niche + city</Text>
+            <Text size="sm" fw={600}>Recommended order for a category deployment — national first, then iterate cities</Text>
             <Text size="xs" c="dimmed" mt={4}>
+              <Text size="xs" fw={600} c="dimmed" component="div">National floor (one pass covers every market):</Text>
               1. Gold Standard Establishment (All Platforms, nationwide) → activate<br />
               2. Gold Standard Discovery (per platform — the All Platforms profile unlocks it)<br />
               3. Bronze National Establishment (nationwide) → activate<br />
-              4. Bronze City Scan (city + category — the national profile unlocks it) → activate the draft city profile<br />
-              5. Emerging Establishment (city + category) → activate<br />
-              6. Emerging Discovery (city + category) → prospect queue (framed by the city bronze profile)<br />
-              7. Competitive Establishment (city + category) → activate<br />
-              8. Competitive Discovery (city + category) → prospect queue<br />
-              9. Proving Ground (city + category) → operator workspace aggregating the discovery runs<br />
+              4. Emerging + Competitive Establishment (Nationwide) → activate — the vocabulary floor that
+              unlocks discovery in every city at once<br />
+              5. National Enrichment (location + category) → public national narratives on /place and /directory<br />
+              6. National Discovery (optional sweep — emerging reasons / competitive weaknesses) →
+              city-attributed prospects in the queue<br />
+              <Text size="xs" fw={600} c="dimmed" component="div" mt={6}>Then iterate cities — each market adds only its local delta:</Text>
+              7. City Establishment (city + category — optional where the national floor suffices) → activate<br />
+              8. Bronze City Scan (city + category) → activate the draft city profile<br />
+              9. City Discovery (emerging + competitive) → prospect queue<br />
+              10. Proving Ground (city + category) → operator workspace aggregating the discovery runs<br />
+              11. Business Audit → per prospect<br />
               <Text size="xs" c="dimmed" fs="italic" mt={4}>
-                Thin market? Skip competitive (steps 5-6). Keep gold standard — it's reusable across cities.
-                Promote a discovery run into a proving ground once prospects exist for the city.<br />
-                National lane: a Nationwide emerging/competitive establishment is the vocabulary floor —
-                it unlocks discovery in every city at once (the local establishment then adds only the
-                market delta).
+                Thin market? Skip competitive — keep gold standard, it&apos;s reusable across cities.
+                A national discovery run promotes to a category-scope umbrella PG; per-city deployment
+                PGs come from grouping that run&apos;s queue entries by market.
               </Text>
             </Text>
           </Box>
