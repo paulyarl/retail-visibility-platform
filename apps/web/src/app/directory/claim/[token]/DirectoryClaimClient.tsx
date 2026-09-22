@@ -870,6 +870,14 @@ export default function DirectoryClaimClient() {
                 Once approved, the listing is yours — manage hours, photos, and categories
                 from your dashboard.
               </List.Item>
+              <List.Item>
+                Your listing is free forever and includes 5 free product slots to showcase
+                your top sellers to nearby shoppers — that&apos;s our{' '}
+                <Link href="/place/about" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  promise
+                </Link>
+                .
+              </List.Item>
             </List>
           </Alert>
 

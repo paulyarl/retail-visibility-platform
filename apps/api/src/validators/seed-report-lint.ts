@@ -342,6 +342,21 @@ export function lintNarrativeText(text: string, path?: string): LintFinding[] {
 // ─── §10.1.1: Peer-effect copy gating ───────────────────────────────────
 
 /**
+ * Phrases that make a market-context string "peer-effect copy" — they only
+ * belong on the report when a real, reproducible peer metric accompanies
+ * them (§10.1.1). Exported so the report builder can pre-vet enrichment
+ * text bound for `category_profile_context` and drop it instead of letting
+ * the lint rule block publication.
+ */
+export const PEER_EFFECT_PHRASES: readonly string[] = [
+  'comparable businesses',
+  'competitors',
+  'other businesses in your category',
+  'businesses in your area',
+  'peers',
+];
+
+/**
  * Validate that peer-effect copy is only present when a real peer metric
  * is available. The report builder must set `peer_metric` in the market
  * classification when peer-effect language is used.
@@ -352,13 +367,7 @@ export const peerEffectGatingRule: LintRule = {
   severity: 'error',
   check: (report) => {
     const findings: LintFinding[] = [];
-    const peerPhrases = [
-      'comparable businesses',
-      'competitors',
-      'other businesses in your category',
-      'businesses in your area',
-      'peers',
-    ];
+    const peerPhrases = [...PEER_EFFECT_PHRASES];
 
     // Check the market classification context for peer language without a metric
     const context = report.market_classification.category_profile_context;

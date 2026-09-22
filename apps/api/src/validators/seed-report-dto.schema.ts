@@ -121,6 +121,11 @@ export const sourceSummarySectionSchema = z.object({
     z.object({
       source_type: z.string(),
       source_name: z.string(),
+      // Business-facing label mapped from the internal source_name —
+      // "Business presence review", not "business_analysis_audit".
+      // Optional: report versions built before the mapping lack it;
+      // renderers fall back to source_name.
+      label: z.string().optional(),
       role: z.string(),
       observation_count: z.number(),
     }).passthrough(),
@@ -129,6 +134,19 @@ export const sourceSummarySectionSchema = z.object({
   name_variants_count: z.number(),
   address_variants_count: z.number(),
   unresolved_count: z.number(),
+  // Discovery attribution (BRONZE_STANDARD_SPEC §7.4) — the catalog
+  // reason(s) causally responsible for surfacing this business in
+  // emerging-lane discovery, carried forward from the linked campaign's
+  // discovery_context. Empty when mainstream discovery found it.
+  discovery_attribution: z.array(
+    z.object({
+      reason_key: z.string(),
+      basis: z.string().nullable(),
+      // Business-facing label from mkt_bronze_reason_catalog — preferred
+      // display text. reason_key stays as provenance only.
+      label: z.string().nullable().optional(),
+    }).passthrough(),
+  ).default([]),
 }).passthrough();
 
 export type SourceSummarySection = z.infer<typeof sourceSummarySectionSchema>;
@@ -171,6 +189,18 @@ export const marketClassificationSectionSchema = z.object({
   ownership_type: z.string().nullable(),
   category_profile_context: z.string().nullable(),
   operational_signals: z.array(z.string()).default([]),
+  // Shelf portfolio from the category-identification audit — additional
+  // categories the business could be listed under. These are analyst
+  // candidates, not verified placements; the resolved primary category is
+  // excluded at build time.
+  recommended_categories: z.array(
+    z.object({
+      category: z.string(),
+      confidence: z.enum(['high', 'medium', 'low']),
+      subcategory: z.string().nullable(),
+      basis: z.string().nullable(),
+    }).passthrough(),
+  ).default([]),
 }).passthrough();
 
 export type MarketClassificationSection = z.infer<typeof marketClassificationSectionSchema>;
@@ -260,6 +290,29 @@ export const verificationActivitySectionSchema = z.object({
 
 export type VerificationActivitySection = z.infer<typeof verificationActivitySectionSchema>;
 
+// ─── Narrative section ──────────────────────────────────────────────────
+//
+// Public-facing narrative assembled from Tier-C-safe audit output
+// (public_narrative on business_analysis / category_identification audits)
+// and the location enrichment market_summary. Descriptive only — the
+// builder vets every field through lintNarrativeText before inclusion and
+// drops text that would read as a negative finding or alarmist copy
+// (§4.3, §4.7). Null when no safe narrative exists.
+
+export const reportNarrativeSectionSchema = z.object({
+  public_narrative: z.string().nullable(),
+  market_summary: z.string().nullable(),
+  // Shopper-facing metro framing from the location enrichment row
+  // (context.metro_context) — vetted through lintNarrativeText like the
+  // other narrative fields.
+  metro_context: z.string().nullable(),
+  // Named neighborhoods/areas from the location enrichment row — the
+  // places shoppers in this market actually search by.
+  notable_areas: z.array(z.string()).default([]),
+}).passthrough();
+
+export type ReportNarrativeSection = z.infer<typeof reportNarrativeSectionSchema>;
+
 // ─── Claim summary section (§9.5) ───────────────────────────────────────
 
 export const claimSummarySectionSchema = z.object({
@@ -332,6 +385,7 @@ export const seedIntelligenceReportSchema = z.object({
   owner_verification_count: z.number(),
 
   business_identity: businessIdentitySectionSchema,
+  narrative: reportNarrativeSectionSchema.nullable().optional(),
   source_summary: sourceSummarySectionSchema,
   identity_reconciliation: identityReconciliationSectionSchema,
   market_classification: marketClassificationSectionSchema,

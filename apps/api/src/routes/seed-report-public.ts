@@ -158,12 +158,17 @@ router.get('/marketing/seed/:seedId/report/preview', async (req: Request, res: R
         state: report.business_identity.state,
         website: report.business_identity.website,
       },
+      // Tier-C-safe narrative assembled from audit + enrichment fragments
+      // (vetting happens at build time; absent on reports generated before
+      // the narrative section existed).
+      narrative: report.narrative ?? null,
       source_summary: {
         sources_checked_count: report.source_summary.sources_checked_count,
         sources_with_evidence_count: report.source_summary.sources_with_evidence_count,
         source_types: report.source_summary.source_types,
         name_variants_count: report.source_summary.name_variants_count,
         address_variants_count: report.source_summary.address_variants_count,
+        discovery_attribution: report.source_summary.discovery_attribution ?? [],
       },
       identity_reconciliation: {
         canonical_candidate: report.identity_reconciliation.canonical_candidate,
@@ -174,6 +179,17 @@ router.get('/marketing/seed/:seedId/report/preview', async (req: Request, res: R
         subcategory: report.market_classification.subcategory,
         category_fit: report.market_classification.category_fit,
         location_status: report.market_classification.location_status,
+        category_profile_context: report.market_classification.category_profile_context ?? null,
+        operational_signals: report.market_classification.operational_signals ?? [],
+        recommended_categories: report.market_classification.recommended_categories ?? [],
+      },
+      platform_presence: {
+        platforms: (report.platform_presence?.platforms ?? []).map((p) => ({
+          platform: p.platform,
+          presence: p.presence,
+          claimed_status: p.claimed_status,
+          source_url: p.source_url,
+        })),
       },
       intelligence_signals: {
         signals: report.intelligence_signals.signals.map((s) => ({

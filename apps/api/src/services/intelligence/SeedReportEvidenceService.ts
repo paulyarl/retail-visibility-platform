@@ -35,9 +35,11 @@ import {
   type ReportEvidenceOutput,
   type ReportObservation,
   type ReportSignal,
+  type PlatformObservation,
   type EvidenceState,
   type EvidenceConfidence,
 } from '../../validators/seed-report-evidence.schema';
+import { MarketContextLoader } from './MarketContextLoader';
 import {
   getSignalRegistryCache,
   setSignalRegistryCache,
@@ -63,6 +65,11 @@ export interface NormalizedEvidence {
   quarantined_signals: QuarantinedSignal[];
   /** Provenance row IDs from directory_field_provenance used as evidence sources. */
   provenance_refs: string[];
+  /**
+   * Audit/enrichment fragments for report sections (substrate path only —
+   * undefined on the prompt path, where the builder resolves it lazily).
+   */
+  report_context?: SeedReportContext | null;
   /** Whether the evidence passed validation. */
   valid: boolean;
   /** Validation errors if invalid. */
@@ -147,6 +154,73 @@ export interface SeedTouchRow {
   notes: string | null;
   operator_id: string | null;
   occurred_at: string;
+}
+
+/**
+ * Audit/enrichment fragments assembled for the report's narrative,
+ * market-classification, and source-summary sections. Resolved from the
+ * seed's linked campaign (directory_seed_campaign_links → mkt_campaigns_list
+ * → mkt_audits_list, mirroring MarketIntelService's §8.4 chain) plus the
+ * category/location enrichment rows via MarketContextLoader.
+ *
+ * These are report-content inputs, not evidence — they carry no
+ * observation IDs and do not feed identity reconciliation.
+ */
+export interface SeedReportContext {
+  /** Linked campaign (primary link role preferred). Null when unlinked. */
+  campaign_id: string | null;
+  /** mkt_audits_list IDs consumed — fingerprint + provenance trail. */
+  audit_ids: string[];
+  /** Latest business_analysis audit row ID, when present. */
+  business_analysis_audit_id: string | null;
+  /** Latest category_identification audit row ID, when present. */
+  category_identification_audit_id: string | null;
+  /**
+   * Tier-C-safe audit narrative (business_analysis first, then
+   * category_identification). Still raw text here — the report builder
+   * vets it through lintNarrativeText before it reaches the DTO.
+   */
+  public_narrative: string | null;
+  /**
+   * Shelf portfolio from the category-identification audit's
+   * candidate_categories — analyst candidates, not verified placements.
+   */
+  candidate_categories: Array<{
+    category: string;
+    confidence: 'high' | 'medium' | 'low';
+    subcategory: string | null;
+    basis: string | null;
+  }>;
+  /**
+   * Platform presence derived from the audits (business_analysis platforms
+   * first, category_identification digital_footprint filling gaps). Only
+   * confirmed-presence entries — 'unable_to_verify' is never emitted as
+   * an absence finding (§4.3).
+   */
+  platform_observations: PlatformObservation[];
+  /**
+   * Bronze-lane discovery attribution (BRONZE_STANDARD_SPEC §7.4) from the
+   * campaign's discovery_context, falling back to the originating
+   * mkt_prospect_queue business_snapshot.
+   */
+  discovery_attribution: Array<{
+    reason_key: string;
+    basis: string | null;
+    /**
+     * Business-facing reason label resolved from mkt_bronze_reason_catalog —
+     * what renders on the report. Null when the key isn't in the catalog;
+     * renderers fall back to basis, then a humanized reason_key.
+     */
+    label: string | null;
+  }>;
+  /** Category/location enrichment rows via MarketContextLoader. */
+  market_context: {
+    category_summary: string | null;
+    category_signals: string[];
+    market_summary: string | null;
+    metro_context: string | null;
+    notable_areas: string[];
+  };
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -400,6 +474,16 @@ export class SeedReportEvidenceService extends BaseService {
     const { validated: divergenceValidated, quarantined: divergenceQuarantined } =
       await this.validateSignals(divergenceSignals, ctx);
 
+    // Audit/enrichment fragments (public narrative, candidate categories,
+    // platform presence, discovery attribution, market context). Best-effort
+    // — a missing campaign link or enrichment row yields an empty context,
+    // not a failure.
+    const reportContext = await this.getSeedReportContext(
+      seedId,
+      { category: seedState.category, city: seedState.city, state: seedState.state },
+      ctx,
+    );
+
     const evidence: ReportEvidenceOutput = {
       observations,
       identity_candidates: [identityCandidate],
@@ -414,7 +498,7 @@ export class SeedReportEvidenceService extends BaseService {
         registry_signal_id: v.registry_signal_id,
       })),
       unresolved_questions: [],
-      platform_observations: [],
+      platform_observations: reportContext.platform_observations,
     };
 
     return {
@@ -425,9 +509,218 @@ export class SeedReportEvidenceService extends BaseService {
       validated_signals: divergenceValidated,
       quarantined_signals: divergenceQuarantined,
       provenance_refs: provenanceRefs,
+      report_context: reportContext,
       valid: true,
       errors: [],
     };
+  }
+
+  // ─── Audit/enrichment context (report sections, not evidence) ──────────
+
+  /**
+   * Resolve the audit + enrichment fragments the report sections render.
+   *
+   * Chain (mirrors MarketIntelService §8.4):
+   *   seed → directory_seed_campaign_links (primary role first)
+   *        → mkt_campaigns_list.discovery_context (bronze_attribution)
+   *        → mkt_audits_list (latest business_analysis + category_identification)
+   *   + directory_category_enrichment via MarketContextLoader
+   *
+   * Never throws — every leg degrades independently so report generation
+   * survives a missing link, an un-run enrichment, or a bad audit row.
+   */
+  async getSeedReportContext(
+    seedId: string,
+    dims: { category: string | null; city: string | null; state: string | null },
+    ctx?: RequestCtx,
+  ): Promise<SeedReportContext> {
+    const context: SeedReportContext = {
+      campaign_id: null,
+      audit_ids: [],
+      business_analysis_audit_id: null,
+      category_identification_audit_id: null,
+      public_narrative: null,
+      candidate_categories: [],
+      platform_observations: [],
+      discovery_attribution: [],
+      market_context: {
+        category_summary: null,
+        category_signals: [],
+        market_summary: null,
+        metro_context: null,
+        notable_areas: [],
+      },
+    };
+
+    try {
+      // 1. seed → campaign link (prefer the primary link role)
+      const linkRows = await this.prisma.$queryRaw<any[]>`
+        SELECT campaign_id
+        FROM directory_seed_campaign_links
+        WHERE seed_id = ${seedId}
+        ORDER BY link_role ASC
+        LIMIT 1
+      `;
+      const campaignId = linkRows?.[0]?.campaign_id ?? null;
+      context.campaign_id = campaignId;
+
+      // 2. campaign → discovery_context + audits (parallel)
+      let discoveryContext: Record<string, unknown> | null = null;
+      let baData: Record<string, unknown> | null = null;
+      let catData: Record<string, unknown> | null = null;
+
+      if (campaignId) {
+        const [campaignRows, auditRows] = await Promise.all([
+          this.prisma.$queryRaw<any[]>`
+            SELECT discovery_context
+            FROM mkt_campaigns_list
+            WHERE id = ${campaignId}
+            LIMIT 1
+          `,
+          this.prisma.$queryRaw<any[]>`
+            SELECT id, platform, audit_data
+            FROM mkt_audits_list
+            WHERE campaign_id = ${campaignId}
+              AND platform IN ('business_analysis', 'category_identification')
+            ORDER BY created_at DESC
+          `,
+        ]);
+
+        discoveryContext =
+          campaignRows?.[0]?.discovery_context &&
+          typeof campaignRows[0].discovery_context === 'object'
+            ? campaignRows[0].discovery_context
+            : null;
+
+        for (const row of auditRows ?? []) {
+          const data =
+            row.audit_data && typeof row.audit_data === 'object' ? row.audit_data : null;
+          if (!data) continue;
+          if (row.platform === 'business_analysis' && !context.business_analysis_audit_id) {
+            context.business_analysis_audit_id = row.id;
+            baData = data;
+          } else if (row.platform === 'category_identification' && !context.category_identification_audit_id) {
+            context.category_identification_audit_id = row.id;
+            catData = data;
+          }
+        }
+      }
+
+      context.audit_ids = [
+        context.business_analysis_audit_id,
+        context.category_identification_audit_id,
+      ].filter((id): id is string => Boolean(id));
+
+      // 3. Public narrative — Tier-C-safe by contract. Prefer the deeper
+      //    business_analysis narrative; fall back to category_identification.
+      context.public_narrative =
+        readTrimmedString(baData?.public_narrative) ??
+        readTrimmedString(catData?.public_narrative);
+
+      // 4. Candidate categories — the shelf portfolio (primary excluded by
+      //    the report builder, which knows the resolved category).
+      const candidates = catData?.candidate_categories;
+      if (Array.isArray(candidates)) {
+        context.candidate_categories = candidates
+          .map((c: any) => ({
+            category: typeof c?.category === 'string' ? c.category.trim() : '',
+            confidence: (['high', 'medium', 'low'].includes(c?.confidence)
+              ? c.confidence
+              : 'low') as 'high' | 'medium' | 'low',
+            subcategory: readTrimmedString(c?.subcategory),
+            basis: readTrimmedString(c?.reasoning),
+          }))
+          .filter((c) => c.category.length > 0)
+          .slice(0, 10);
+      }
+
+      // 5. Platform presence — business_analysis platforms first (richer
+      //    claim status), category_identification digital_footprint fills
+      //    platforms the audit didn't cover.
+      context.platform_observations = buildPlatformObservations(baData, catData);
+
+      // 6. Discovery attribution — campaign discovery_context first; the
+      //    originating prospect-queue snapshot is the fallback (seeds created
+      //    before the context carry-forward existed).
+      context.discovery_attribution = readBronzeAttribution(
+        discoveryContext?.bronze_attribution,
+      );
+      if (context.discovery_attribution.length === 0) {
+        const queueRows = await this.prisma.$queryRaw<any[]>`
+          SELECT business_snapshot
+          FROM mkt_prospect_queue
+          WHERE seed_id = ${seedId}
+            AND business_snapshot IS NOT NULL
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        const snapshot = queueRows?.[0]?.business_snapshot;
+        if (snapshot && typeof snapshot === 'object') {
+          context.discovery_attribution = readBronzeAttribution(
+            (snapshot as Record<string, unknown>).bronze_attribution,
+          );
+        }
+      }
+
+      // Resolve catalog labels so the report renders business-facing reason
+      // text ("Trade / import-only visibility") instead of internal keys.
+      if (context.discovery_attribution.length > 0) {
+        const keys = [...new Set(context.discovery_attribution.map((a) => a.reason_key))];
+        const catalogRows = await this.prisma.$queryRaw<Array<{ reason_key: string; label: string }>>`
+          SELECT reason_key, label
+          FROM mkt_bronze_reason_catalog
+          WHERE reason_key = ANY(${keys})
+        `;
+        const labelByKey = new Map((catalogRows ?? []).map((r) => [r.reason_key, r.label]));
+        for (const attr of context.discovery_attribution) {
+          attr.label = labelByKey.get(attr.reason_key) ?? null;
+        }
+      }
+    } catch (err: any) {
+      // Enrichment is best-effort — a broken link must not fail the report.
+      logger.warn('SeedReportEvidenceService: report context resolution failed (non-fatal)', ctx, {
+        error: err?.message,
+        seedId,
+      });
+    }
+
+    // 7. Category/location enrichment — independent of the audit chain;
+    //    MarketContextLoader degrades to empty objects itself.
+    try {
+      const marketCtx = await MarketContextLoader.getInstance().loadMarketContext(
+        dims.category ?? '',
+        dims.city,
+        dims.state,
+        ctx,
+      );
+      context.market_context = {
+        category_summary: readTrimmedString(marketCtx.category?.category_summary),
+        category_signals: Array.isArray(marketCtx.category?.category_signals)
+          ? marketCtx.category.category_signals
+              .map((s) => (typeof s === 'string' ? s.trim() : ''))
+              .filter((s) => s.length > 0)
+              .slice(0, 8)
+          : [],
+        market_summary: readTrimmedString(marketCtx.location?.market_summary),
+        // metro_context is shopper-facing enrichment copy by contract
+        // (enrichment directive lists context.metro_context among the
+        // shopper-facing fields) — safe for the free report.
+        metro_context: readTrimmedString(marketCtx.location?.metro_context),
+        notable_areas: Array.isArray(marketCtx.location?.notable_areas)
+          ? marketCtx.location.notable_areas
+              .map((s) => (typeof s === 'string' ? s.trim() : ''))
+              .filter((s) => s.length > 0)
+              .slice(0, 8)
+          : [],
+      };
+    } catch (err: any) {
+      logger.warn('SeedReportEvidenceService: market context load failed (non-fatal)', ctx, {
+        error: err?.message,
+        seedId,
+      });
+    }
+
+    return context;
   }
 
   // ─── Signal validation against mkt_signal_registry (§6.7) ──────────────
@@ -841,6 +1134,105 @@ function emptyEvidence(): ReportEvidenceOutput {
     unresolved_questions: [],
     platform_observations: [],
   };
+}
+
+function readTrimmedString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+/** business_analysis profile_status values that mean a profile exists. */
+const BA_CLAIMED_STATUSES = new Set(['claimed', 'likely_claimed']);
+const BA_UNCLAIMED_STATUSES = new Set(['unclaimed', 'likely_unclaimed']);
+
+function readBronzeAttribution(
+  raw: unknown,
+): Array<{ reason_key: string; basis: string | null; label: string | null }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((a: any) => ({
+      reason_key: typeof a?.reason_key === 'string' ? a.reason_key.trim() : '',
+      basis: readTrimmedString(a?.basis),
+      label: null,
+    }))
+    .filter((a) => a.reason_key.length > 0);
+}
+
+/**
+ * Map audit platform data to report PlatformObservations.
+ *
+ * business_analysis `platforms.{key}.profile_status` values other than
+ * 'unable_to_verify' mean a profile was found → presence 'observed'.
+ * 'unable_to_verify' is skipped entirely — it means the analyst could not
+ * render the platform, which is neither presence nor absence (§4.3 and the
+ * render-control spec both treat unverifiability as inert).
+ *
+ * category_identification `digital_footprint.platforms_found` entries are
+ * found platforms by definition → 'observed'. They fill platforms the
+ * business audit did not cover; business_analysis wins on overlap.
+ */
+function buildPlatformObservations(
+  baData: Record<string, unknown> | null,
+  catData: Record<string, unknown> | null,
+): PlatformObservation[] {
+  const out: PlatformObservation[] = [];
+  const covered = new Set<string>();
+
+  const platformsObj = baData?.platforms;
+  if (platformsObj && typeof platformsObj === 'object') {
+    for (const [key, raw] of Object.entries(platformsObj)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const p = raw as Record<string, unknown>;
+      const status = typeof p.profile_status === 'string' ? p.profile_status : null;
+      if (!status || status === 'unable_to_verify') continue;
+      covered.add(key.toLowerCase());
+      out.push({
+        platform: key,
+        presence: 'observed',
+        business_name: readTrimmedString(p.displayed_name),
+        address: readTrimmedString(p.displayed_address),
+        phone: readTrimmedString(p.displayed_phone),
+        primary_category: readTrimmedString(p.primary_category),
+        hours_present: null,
+        website_present: readTrimmedString(p.displayed_website) ? true : null,
+        claimed_status: BA_CLAIMED_STATUSES.has(status)
+          ? 'claimed'
+          : BA_UNCLAIMED_STATUSES.has(status)
+            ? 'unclaimed'
+            : 'not_verified',
+        attributes: [],
+        source_url: readTrimmedString(p.profile_url),
+        observed_at: null,
+      });
+    }
+  }
+
+  const footprint = catData?.digital_footprint;
+  const found =
+    footprint && typeof footprint === 'object' && Array.isArray((footprint as any).platforms_found)
+      ? ((footprint as any).platforms_found as any[])
+      : [];
+  for (const f of found) {
+    const platform = readTrimmedString(f?.platform);
+    if (!platform || covered.has(platform.toLowerCase())) continue;
+    covered.add(platform.toLowerCase());
+    out.push({
+      platform,
+      presence: 'observed',
+      business_name: null,
+      address: null,
+      phone: null,
+      primary_category: null,
+      hours_present: null,
+      website_present: typeof f?.has_website === 'boolean' ? f.has_website : null,
+      claimed_status:
+        f?.claimed === true ? 'claimed' : f?.claimed === false ? 'unclaimed' : 'not_verified',
+      attributes: [],
+      source_url: readTrimmedString(f?.url),
+      observed_at: null,
+    });
+  }
+
+  return out;
 }
 
 export default SeedReportEvidenceService.getInstance();

@@ -45,12 +45,19 @@ interface ReportPreviewData {
     state: { value: string; state: string };
     website: { value: string | null; state: string };
   };
+  narrative?: {
+    public_narrative: string | null;
+    market_summary: string | null;
+    metro_context?: string | null;
+    notable_areas?: string[];
+  } | null;
   source_summary: {
     sources_checked_count: number;
     sources_with_evidence_count: number;
-    source_types: Array<{ source_type: string; source_name: string; role: string; observation_count: number }>;
+    source_types: Array<{ source_type: string; source_name: string; label?: string; role: string; observation_count: number }>;
     name_variants_count: number;
     address_variants_count: number;
+    discovery_attribution?: Array<{ reason_key: string; basis: string | null; label?: string | null }>;
   };
   identity_reconciliation: {
     canonical_candidate: {
@@ -68,6 +75,22 @@ interface ReportPreviewData {
     subcategory: string | null;
     category_fit: string;
     location_status: string;
+    category_profile_context?: string | null;
+    operational_signals?: string[];
+    recommended_categories?: Array<{
+      category: string;
+      confidence: string;
+      subcategory: string | null;
+      basis: string | null;
+    }>;
+  };
+  platform_presence?: {
+    platforms: Array<{
+      platform: string;
+      presence: string;
+      claimed_status: string | null;
+      source_url: string | null;
+    }>;
   };
   intelligence_signals: {
     signals: Array<{ code: string; label: string; basis: string }>;
@@ -213,6 +236,11 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
         </div>
       </Group>
 
+      {/* Tier-C-safe audit narrative (when present) */}
+      {report.narrative?.public_narrative && (
+        <Text size="sm" mb="md">{report.narrative.public_narrative}</Text>
+      )}
+
       {/* Identity confidence + location */}
       <Group gap="xs" mb="md">
         {confidenceBadge(report.identity_reconciliation.identity_confidence)}
@@ -231,7 +259,7 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
           <div className="mt-2 flex flex-wrap gap-1">
             {report.source_summary.source_types.map((s, i) => (
               <Badge key={i} variant="light" size="sm" color="gray">
-                {s.source_name} ({s.observation_count})
+                {s.label ?? s.source_name} ({s.observation_count})
               </Badge>
             ))}
           </div>
@@ -243,7 +271,34 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
             {report.source_summary.address_variants_count > 1 && `${report.source_summary.address_variants_count} address variants`}
           </Text>
         )}
+        {/* Bronze-lane discovery attribution — why this business surfaced */}
+        {(report.source_summary.discovery_attribution ?? []).map((attr, i) => (
+          <Text key={i} size="xs" c="dimmed" mt="xs">
+            {attr.label ?? attr.basis ?? attr.reason_key.replace(/[_-]+/g, ' ')}
+            {attr.label && attr.basis ? ` — ${attr.basis}` : ''}
+          </Text>
+        ))}
       </div>
+
+      {/* Platform presence — where the audit found profiles */}
+      {(report.platform_presence?.platforms ?? []).length > 0 && (
+        <div className="mb-4">
+          <Text size="sm" fw={500} mb="xs">Where customers may find you</Text>
+          <div className="flex flex-wrap gap-1">
+            {(report.platform_presence?.platforms ?? []).map((p, i) => (
+              <Badge
+                key={i}
+                variant="light"
+                size="sm"
+                color={p.presence === 'observed' ? 'blue' : 'gray'}
+              >
+                <span className="capitalize">{p.platform}</span>
+                {p.claimed_status === 'unclaimed' ? ' (unclaimed)' : ''}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Intelligence signals */}
       {report.intelligence_signals.signals.length > 0 && (
@@ -265,7 +320,7 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
         </div>
       )}
 
-      {/* Category */}
+      {/* Category + shelf portfolio */}
       {report.market_classification.category && (
         <div className="mb-4">
           <Text size="sm" fw={500} mb="xs">Category</Text>
@@ -278,6 +333,14 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
               {report.market_classification.subcategory && ` → ${report.market_classification.subcategory}`}
             </Text>
           </Group>
+          {(report.market_classification.recommended_categories ?? []).length > 0 && (
+            <Text size="xs" c="dimmed" mt="xs">
+              Also fits:{' '}
+              {(report.market_classification.recommended_categories ?? [])
+                .map((c) => c.category)
+                .join(', ')}
+            </Text>
+          )}
         </div>
       )}
 

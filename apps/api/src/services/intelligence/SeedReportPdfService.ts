@@ -236,6 +236,43 @@ export async function generateSeedReportPdf(
   yPos += introLines.length * 4 + 4;
 
   // ════════════════════════════════════════════════════════════════════════
+  // NARRATIVE — Tier-C-safe audit narrative + market summary (§4.7)
+  // ════════════════════════════════════════════════════════════════════════
+
+  const narrative = report.narrative;
+  if (
+    narrative &&
+    (narrative.public_narrative ||
+      narrative.market_summary ||
+      narrative.metro_context ||
+      (narrative.notable_areas?.length ?? 0) > 0)
+  ) {
+    ensureSpace(20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(branding.primaryColor);
+    doc.text('About this business', margin, yPos);
+    yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    if (narrative.public_narrative) {
+      bodyText(narrative.public_narrative);
+      yPos += 2;
+    }
+    if (narrative.market_summary) {
+      bodyText(narrative.market_summary);
+      yPos += 2;
+    }
+    if (narrative.metro_context) {
+      bodyText(narrative.metro_context);
+      yPos += 2;
+    }
+    if (narrative.notable_areas && narrative.notable_areas.length > 0) {
+      bodyText(`Notable areas in this market: ${narrative.notable_areas.join(', ')}`);
+      yPos += 2;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // 1. BUSINESS IDENTITY
   // ════════════════════════════════════════════════════════════════════════
 
@@ -268,7 +305,7 @@ export async function generateSeedReportPdf(
     if (ss.source_types.length > 0) {
       yPos += 2;
       for (const src of ss.source_types) {
-        bullet(`${src.source_name ?? src.source_type}: ${src.observation_count} observation${src.observation_count !== 1 ? 's' : ''}`);
+        bullet(`${src.label ?? src.source_name ?? src.source_type}: ${src.observation_count} observation${src.observation_count !== 1 ? 's' : ''}`);
       }
     }
     if (ss.name_variants_count > 1 || ss.address_variants_count > 1) {
@@ -280,6 +317,18 @@ export async function generateSeedReportPdf(
     }
     if (ss.unresolved_count > 0) {
       bodyText(`${ss.unresolved_count} field${ss.unresolved_count !== 1 ? 's' : ''} unresolved.`);
+    }
+    // Discovery attribution (§7.4) — why this business surfaced in
+    // emerging-lane research. The catalog label is the business-facing
+    // reason text; basis adds the causal detail. reason_key stays in the
+    // DTO as provenance and never renders raw (last resort is humanized).
+    if (ss.discovery_attribution && ss.discovery_attribution.length > 0) {
+      yPos += 2;
+      bodyText('Why this business appeared in our research:');
+      for (const attr of ss.discovery_attribution) {
+        const head = attr.label ?? attr.basis ?? humanizeKey(attr.reason_key);
+        bullet(attr.label && attr.basis ? `${head} — ${attr.basis}` : head);
+      }
     }
     // Report limitation language (spec §15.3)
     yPos += 2;
@@ -358,6 +407,13 @@ export async function generateSeedReportPdf(
       bodyText('Operational signals:');
       for (const s of mc.operational_signals) {
         bullet(s);
+      }
+    }
+    if (mc.recommended_categories && mc.recommended_categories.length > 0) {
+      yPos += 2;
+      bodyText('Other shelves this business could appear on:');
+      for (const c of mc.recommended_categories) {
+        bullet(`${c.category}${c.confidence ? ` (${c.confidence} confidence)` : ''}`);
       }
     }
   } else {
@@ -572,6 +628,13 @@ export async function generateSeedReportPdf(
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────
+
+/** Last-resort display for an internal snake_case key (e.g. a bronze
+    reason_key with no catalog label and no basis). */
+function humanizeKey(key: string): string {
+  const h = key.replace(/[_-]+/g, ' ').trim();
+  return h ? h.charAt(0).toUpperCase() + h.slice(1) : key;
+}
 
 async function loadReportVersion(
   seedId: string,

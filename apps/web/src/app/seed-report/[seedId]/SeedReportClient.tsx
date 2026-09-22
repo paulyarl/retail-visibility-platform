@@ -27,6 +27,8 @@ import {
   IconAlertCircle,
   IconCheck,
   IconQrcode,
+  IconWorld,
+  IconTag,
 } from '@tabler/icons-react';
 import { Badge, Button, Card, Group, Text, ThemeIcon, Alert, Loader, Center } from '@mantine/core';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
@@ -52,12 +54,19 @@ interface ReportPreviewData {
     state: { value: string; state: string };
     website: { value: string | null; state: string };
   };
+  narrative: {
+    public_narrative: string | null;
+    market_summary: string | null;
+    metro_context?: string | null;
+    notable_areas?: string[];
+  } | null;
   source_summary: {
     sources_checked_count: number;
     sources_with_evidence_count: number;
-    source_types: Array<{ source_type: string; source_name: string; role: string; observation_count: number }>;
+    source_types: Array<{ source_type: string; source_name: string; label?: string; role: string; observation_count: number }>;
     name_variants_count: number;
     address_variants_count: number;
+    discovery_attribution?: Array<{ reason_key: string; basis: string | null; label?: string | null }>;
   };
   identity_reconciliation: {
     canonical_candidate: {
@@ -75,6 +84,22 @@ interface ReportPreviewData {
     subcategory: string | null;
     category_fit: string;
     location_status: string;
+    category_profile_context?: string | null;
+    operational_signals?: string[];
+    recommended_categories?: Array<{
+      category: string;
+      confidence: string;
+      subcategory: string | null;
+      basis: string | null;
+    }>;
+  };
+  platform_presence?: {
+    platforms: Array<{
+      platform: string;
+      presence: string;
+      claimed_status: string | null;
+      source_url: string | null;
+    }>;
   };
   intelligence_signals: {
     signals: Array<{ code: string; label: string; basis: string }>;
@@ -88,6 +113,13 @@ interface ReportPreviewData {
     cta_eligible: boolean;
     cta_disabled_reason: string | null;
   };
+}
+
+/** Last-resort display for an internal snake_case key (e.g. a bronze
+    reason_key with no catalog label and no basis). */
+function humanizeKey(key: string): string {
+  const h = key.replace(/[_-]+/g, ' ').trim();
+  return h ? h.charAt(0).toUpperCase() + h.slice(1) : key;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -282,6 +314,42 @@ export default function SeedReportClient() {
           </Text>
         </Card>
 
+        {/* About this business — Tier-C-safe audit narrative + market summary */}
+        {(report.narrative?.public_narrative ||
+          report.narrative?.market_summary ||
+          report.narrative?.metro_context) && (
+          <Card withBorder radius="md" p="lg">
+            <Group gap="sm" mb="md">
+              <ThemeIcon color="blue" size="lg" variant="light">
+                <IconBuilding size={18} />
+              </ThemeIcon>
+              <Text fw={600} size="lg">About this business</Text>
+            </Group>
+            {report.narrative?.public_narrative && (
+              <Text size="sm">{report.narrative.public_narrative}</Text>
+            )}
+            {report.narrative?.market_summary && (
+              <Text size="sm" c="dimmed" mt={report.narrative?.public_narrative ? 'sm' : 0}>
+                {report.narrative.market_summary}
+              </Text>
+            )}
+            {report.narrative?.metro_context && (
+              <Text size="sm" c="dimmed" mt="sm">
+                {report.narrative.metro_context}
+              </Text>
+            )}
+            {(report.narrative?.notable_areas ?? []).length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1">
+                {(report.narrative?.notable_areas ?? []).map((area, i) => (
+                  <Badge key={i} variant="light" size="sm" color="gray">
+                    {area}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Business identity */}
         <Card withBorder radius="md" p="lg">
           <Group gap="sm" mb="md">
@@ -337,7 +405,7 @@ export default function SeedReportClient() {
             <div className="flex flex-wrap gap-2">
               {report.source_summary.source_types.map((s, i) => (
                 <Badge key={i} variant="light" size="sm" color="gray">
-                  {s.source_name} ({s.observation_count})
+                  {s.label ?? s.source_name} ({s.observation_count})
                 </Badge>
               ))}
             </div>
@@ -349,6 +417,21 @@ export default function SeedReportClient() {
               {report.source_summary.address_variants_count > 1 && `${report.source_summary.address_variants_count} address variants found`}
             </Text>
           )}
+          {/* Discovery attribution — why this business surfaced in our
+              research (bronze-lane causal basis, §7.4) */}
+          {(report.source_summary.discovery_attribution ?? []).length > 0 && (
+            <div className="mt-3 rounded-md bg-blue-50 border border-blue-100 p-3">
+              <Text size="xs" fw={600} className="text-blue-800" mb={4}>
+                Why this business appeared in our research
+              </Text>
+              {(report.source_summary.discovery_attribution ?? []).map((attr, i) => (
+                <Text key={i} size="xs" className="text-blue-700">
+                  {attr.label ?? attr.basis ?? humanizeKey(attr.reason_key)}
+                  {attr.label && attr.basis ? ` — ${attr.basis}` : ''}
+                </Text>
+              ))}
+            </div>
+          )}
           {/* Report limitation language (spec §15.3) */}
           <Text size="xs" c="dimmed" mt="md">
             This report reflects information available in the sources checked on
@@ -358,19 +441,87 @@ export default function SeedReportClient() {
           </Text>
         </Card>
 
-        {/* Category */}
+        {/* Category + market context */}
         {report.market_classification.category && (
           <Card withBorder radius="md" p="lg">
             <Group gap="sm" mb="md">
               <ThemeIcon color="gray" size="lg" variant="light">
-                <IconBuilding size={18} />
+                <IconTag size={18} />
               </ThemeIcon>
-              <Text fw={600} size="lg">Category</Text>
+              <Text fw={600} size="lg">Category & market</Text>
             </Group>
-            <Text size="sm">
+            <Text size="sm" fw={500}>
               {report.market_classification.category}
               {report.market_classification.subcategory && ` → ${report.market_classification.subcategory}`}
             </Text>
+            {report.market_classification.category_profile_context && (
+              <Text size="sm" c="dimmed" mt="sm">
+                {report.market_classification.category_profile_context}
+              </Text>
+            )}
+            {(report.market_classification.operational_signals ?? []).length > 0 && (
+              <div className="mt-3">
+                <Text size="xs" fw={600} c="dimmed" mb={4}>
+                  What customers typically look for in this category
+                </Text>
+                <ul className="space-y-1">
+                  {(report.market_classification.operational_signals ?? []).map((signal, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                      <IconCheck size={12} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                      {signal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(report.market_classification.recommended_categories ?? []).length > 0 && (
+              <div className="mt-3">
+                <Text size="xs" fw={600} c="dimmed" mb={4}>
+                  Other shelves this business could appear on
+                </Text>
+                <div className="flex flex-wrap gap-2">
+                  {(report.market_classification.recommended_categories ?? []).map((c, i) => (
+                    <Badge key={i} variant="light" size="sm" color="blue">
+                      {c.category}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Platform presence — where customers may encounter the business */}
+        {(report.platform_presence?.platforms ?? []).length > 0 && (
+          <Card withBorder radius="md" p="lg">
+            <Group gap="sm" mb="md">
+              <ThemeIcon color="blue" size="lg" variant="light">
+                <IconWorld size={18} />
+              </ThemeIcon>
+              <Text fw={600} size="lg">Where customers may find you</Text>
+            </Group>
+            <div className="space-y-2">
+              {(report.platform_presence?.platforms ?? []).map((p, i) => (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <Text size="sm" className="capitalize">{p.platform}</Text>
+                  <Group gap="xs">
+                    {p.claimed_status === 'claimed' && (
+                      <Badge variant="light" size="xs" color="green">claimed</Badge>
+                    )}
+                    {p.claimed_status === 'unclaimed' && (
+                      <Badge variant="light" size="xs" color="orange">unclaimed</Badge>
+                    )}
+                    <Text size="xs" c="dimmed">
+                      {p.presence === 'observed'
+                        ? 'Found'
+                        : p.presence === 'not_found_during_discovery'
+                          ? 'Not found during discovery'
+                          : 'Not checked'}
+                    </Text>
+                  </Group>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
 

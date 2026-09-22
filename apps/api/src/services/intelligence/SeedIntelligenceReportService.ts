@@ -34,6 +34,7 @@ import type {
   ProvenanceRow,
   NapVerificationRow,
   SeedTouchRow,
+  SeedReportContext,
 } from './SeedReportEvidenceService';
 import {
   type SeedIntelligenceReport,
@@ -50,6 +51,7 @@ import {
   type VerificationActivitySection,
   type ClaimSummarySection,
   type NextActionSection,
+  type ReportNarrativeSection,
   type ReportGenerationMetadata,
   evaluateClaimHookEligibility,
   computeDeltaSummary,
@@ -58,12 +60,15 @@ import {
   type ReportEvidenceOutput,
   type ReportObservation,
   type ReportSignal,
+  type PlatformObservation,
   type IdentityCandidate,
   type EvidenceState,
   type EvidenceConfidence,
 } from '../../validators/seed-report-evidence.schema';
 import {
   lintReport,
+  lintNarrativeText,
+  PEER_EFFECT_PHRASES,
   type LintResult,
   type LintFinding,
 } from '../../validators/seed-report-lint';
@@ -153,16 +158,29 @@ export class SeedIntelligenceReportService extends BaseService {
       throw new Error(`Seed not found: ${seedId}`);
     }
 
+    // Audit/enrichment fragments for the narrative, market-classification,
+    // and source-summary sections. The substrate path carries the context
+    // on NormalizedEvidence; the prompt path resolves it lazily here so
+    // both paths produce the same enriched report.
+    const reportContext = normalizedEvidence.report_context !== undefined
+      ? normalizedEvidence.report_context
+      : await this.evidenceService.getSeedReportContext(
+          seedId,
+          { category: seedState.category, city: seedState.city, state: seedState.state },
+          ctx,
+        );
+
     // 5. Assemble report sections
     const evidence = normalizedEvidence.evidence;
     const reportId = generateSeedIntelligenceReportId();
     const generatedAt = new Date().toISOString();
 
     const businessIdentity = this.assembleBusinessIdentity(seedState, provenanceRows, evidence);
-    const sourceSummary = this.assembleSourceSummary(evidence, provenanceRows);
+    const narrative = this.assembleNarrative(reportContext, ctx);
+    const sourceSummary = this.assembleSourceSummary(evidence, provenanceRows, reportContext);
     const identityReconciliation = this.assembleIdentityReconciliation(seedState, evidence);
-    const marketClassification = this.assembleMarketClassification(seedState, evidence);
-    const platformPresence = this.assemblePlatformPresence(evidence);
+    const marketClassification = this.assembleMarketClassification(seedState, evidence, reportContext, ctx);
+    const platformPresence = this.assemblePlatformPresence(evidence, reportContext);
     const categoryFit = this.assembleCategoryFit(seedState, evidence);
     const intelligenceSignals = this.assembleIntelligenceSignals(normalizedEvidence);
     const verificationActivity = this.assembleVerificationActivity(outreachTouches, napVerifications);
@@ -211,6 +229,7 @@ export class SeedIntelligenceReportService extends BaseService {
       unresolved_count: evidence.unresolved_questions.length,
       owner_verification_count: napVerifications.filter((v) => v.owner_corrected).length,
       business_identity: businessIdentity,
+      narrative,
       source_summary: sourceSummary,
       identity_reconciliation: identityReconciliation,
       market_classification: marketClassification,
@@ -342,9 +361,12 @@ export class SeedIntelligenceReportService extends BaseService {
         },
         evidence: normalizedEvidence.evidence,
         provenance_refs: normalizedEvidence.provenance_refs,
+        // Audit/enrichment fragments feed report-visible sections — a new
+        // audit or enrichment run must produce a new version (§22.3).
+        report_context: normalizedEvidence.report_context ?? null,
         nap_verification_ids: napVerifications.map((v) => v.id),
         outreach_touch_ids: outreachTouches.map((t) => t.id),
-        substrate_template: 'substrate-1',
+        substrate_template: 'substrate-2',
       }))
       .digest('hex');
 
@@ -774,14 +796,98 @@ export class SeedIntelligenceReportService extends BaseService {
   }
 
   /**
+   * Vet narrative text bound for the public report (§4.3, §4.7). Drops the
+   * text entirely when it contains a banned negative-finding or alarmist
+   * phrase — a lint error on the assembled DTO would block publication, so
+   * unsafe copy is omitted rather than carried through. `peerGuard` also
+   * drops text containing peer-effect language (§10.1.1 requires a measured
+   * metric for that copy; the enrichment inputs carry none).
+   */
+  private vetReportText(
+    text: string | null | undefined,
+    path: string,
+    opts: { peerGuard?: boolean } = {},
+    ctx?: RequestCtx,
+  ): string | null {
+    if (!text || typeof text !== 'string') return null;
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+
+    const findings = lintNarrativeText(trimmed, path);
+    const errors = findings.filter((f) => f.severity === 'error');
+    if (errors.length > 0) {
+      logger.warn('SeedIntelligenceReportService: narrative text dropped by lint', ctx, {
+        path,
+        findings: errors.map((f) => f.message),
+      });
+      return null;
+    }
+
+    if (opts.peerGuard) {
+      const lower = trimmed.toLowerCase();
+      if (PEER_EFFECT_PHRASES.some((p) => lower.includes(p))) {
+        logger.warn('SeedIntelligenceReportService: narrative text dropped — peer language without metric', ctx, {
+          path,
+        });
+        return null;
+      }
+    }
+
+    return trimmed;
+  }
+
+  /**
+   * Assemble the narrative section — the Tier-C-safe audit narrative plus
+   * the location enrichment market summary. Null when neither survives
+   * vetting (the renderer keeps its existing intro copy in that case).
+   */
+  private assembleNarrative(
+    reportContext: SeedReportContext | null,
+    ctx?: RequestCtx,
+  ): ReportNarrativeSection | null {
+    if (!reportContext) return null;
+    const publicNarrative = this.vetReportText(
+      reportContext.public_narrative,
+      'narrative.public_narrative',
+      {},
+      ctx,
+    );
+    const marketSummary = this.vetReportText(
+      reportContext.market_context.market_summary,
+      'narrative.market_summary',
+      {},
+      ctx,
+    );
+    const metroContext = this.vetReportText(
+      reportContext.market_context.metro_context,
+      'narrative.metro_context',
+      {},
+      ctx,
+    );
+    const notableAreas = reportContext.market_context.notable_areas;
+    if (!publicNarrative && !marketSummary && !metroContext && notableAreas.length === 0) {
+      return null;
+    }
+    return {
+      public_narrative: publicNarrative,
+      market_summary: marketSummary,
+      metro_context: metroContext,
+      notable_areas: notableAreas,
+    };
+  }
+
+  /**
    * Assemble the source summary section (§9.3).
-   * Counts sources from observations and provenance rows.
+   * Counts sources from observations and provenance rows, and carries the
+   * bronze-lane discovery attribution when the seed was surfaced through
+   * an emerging-discovery reason (§7.4 causal provenance).
    */
   private assembleSourceSummary(
     evidence: ReportEvidenceOutput,
     provenanceRows: ProvenanceRow[],
+    reportContext?: SeedReportContext | null,
   ): SourceSummarySection {
-    const sourceTypesMap = new Map<string, { source_type: string; source_name: string; role: string; observation_count: number }>();
+    const sourceTypesMap = new Map<string, { source_type: string; source_name: string; label: string; role: string; observation_count: number }>();
     for (const obs of evidence.observations) {
       const key = `${obs.source_type}:${obs.source_name}`;
       const existing = sourceTypesMap.get(key);
@@ -791,6 +897,7 @@ export class SeedIntelligenceReportService extends BaseService {
         sourceTypesMap.set(key, {
           source_type: obs.source_type,
           source_name: obs.source_name,
+          label: sourceDisplayLabel(obs.source_name),
           role: 'discovery',
           observation_count: 1,
         });
@@ -821,6 +928,7 @@ export class SeedIntelligenceReportService extends BaseService {
       name_variants_count: nameSet.size,
       address_variants_count: addressSet.size,
       unresolved_count: evidence.unresolved_questions.length,
+      discovery_attribution: reportContext?.discovery_attribution ?? [],
     };
   }
 
@@ -888,27 +996,73 @@ export class SeedIntelligenceReportService extends BaseService {
   private assembleMarketClassification(
     seedState: ResolvedSeedState,
     evidence: ReportEvidenceOutput,
+    reportContext?: SeedReportContext | null,
+    ctx?: RequestCtx,
   ): MarketClassificationSection {
     const geoAssessment = evidence.geographic_assessment;
     const catAssessment = evidence.category_assessment;
+    const resolvedCategory = catAssessment?.category ?? seedState.category;
+    const marketCtx = reportContext?.market_context;
+
+    // Category-profile context (§10.5) — the enrichment row's
+    // category_summary. Peer-guarded: §10.1.1 requires a measured metric
+    // for peer-effect copy and enrichment text carries none.
+    const categoryProfileContext = this.vetReportText(
+      marketCtx?.category_summary,
+      'market_classification.category_profile_context',
+      { peerGuard: true },
+      ctx,
+    );
+
+    // Operational signals — the category's enrichment signal list
+    // (descriptive, category-level; never business-specific findings).
+    const operationalSignals = (marketCtx?.category_signals ?? [])
+      .map((s) => this.vetReportText(s, 'market_classification.operational_signals', {}, ctx))
+      .filter((s): s is string => Boolean(s))
+      .slice(0, 6);
+
+    // Shelf portfolio — candidate categories from the identification audit,
+    // minus the resolved primary category (analyst candidates, not verified
+    // placements).
+    const recommendedCategories = (reportContext?.candidate_categories ?? [])
+      .filter(
+        (c) =>
+          !resolvedCategory ||
+          c.category.toLowerCase() !== resolvedCategory.toLowerCase(),
+      )
+      .slice(0, 9);
 
     return {
-      category: catAssessment?.category ?? seedState.category,
+      category: resolvedCategory,
       subcategory: catAssessment?.subcategory ?? null,
       category_fit: (catAssessment?.category_fit ?? seedState.category_fit) as 'verified' | 'probable' | 'insufficient',
       location_status: geoAssessment?.location_status ?? 'outside_market',
       ownership_type: null,
-      category_profile_context: null,
-      operational_signals: [],
+      category_profile_context: categoryProfileContext,
+      operational_signals: operationalSignals,
+      recommended_categories: recommendedCategories,
     };
   }
 
   /**
    * Assemble the platform presence section (§10.6).
+   * Prompt/normalized observations win on overlap; audit-derived
+   * observations (business_analysis platforms + category_identification
+   * digital_footprint) fill platforms the evidence set doesn't cover.
    */
-  private assemblePlatformPresence(evidence: ReportEvidenceOutput): PlatformPresenceSection {
+  private assemblePlatformPresence(
+    evidence: ReportEvidenceOutput,
+    reportContext?: SeedReportContext | null,
+  ): PlatformPresenceSection {
+    const merged: PlatformObservation[] = [...evidence.platform_observations];
+    for (const obs of reportContext?.platform_observations ?? []) {
+      const key = obs.platform.toLowerCase();
+      if (!merged.some((e) => e.platform.toLowerCase() === key)) {
+        merged.push(obs);
+      }
+    }
     return {
-      platforms: evidence.platform_observations.map((p) => ({
+      platforms: merged.map((p) => ({
         platform: p.platform,
         presence: p.presence,
         business_name: p.business_name,
@@ -1140,6 +1294,35 @@ export class SeedIntelligenceReportService extends BaseService {
     // Default: provisional
     return 'provisional';
   }
+}
+
+/**
+ * Map internal evidence source names to business-facing labels for the
+ * report's "How we found you" section. Internal keys (business_analysis_audit,
+ * seed_seo_composer, …) are operator vocabulary — the public surface shows a
+ * plain-language description of the research step instead.
+ */
+const SOURCE_DISPLAY_LABELS: Record<string, string> = {
+  business_analysis_audit: 'Business presence review',
+  category_identification_audit: 'Category research',
+  seed_seo_composer: 'Listing summary',
+  intelligence_profile: 'Market research',
+  linked_campaign: 'Directory research',
+  prospect_queue: 'Public records research',
+  directory: 'Public directory records',
+  snap_retailer_list: 'SNAP retailer records',
+};
+
+function sourceDisplayLabel(sourceName: string): string {
+  const key = sourceName.trim().toLowerCase();
+  const head = key.split(':')[0]; // e.g. "intelligence-profile:<id>@v3"
+  const mapped = SOURCE_DISPLAY_LABELS[head];
+  if (mapped) return mapped;
+  // Unknown source — humanize snake/kebab keys rather than render raw.
+  const humanized = head.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return humanized.length > 0
+    ? humanized.charAt(0).toUpperCase() + humanized.slice(1)
+    : sourceName;
 }
 
 export default SeedIntelligenceReportService.getInstance();

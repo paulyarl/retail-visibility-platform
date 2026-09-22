@@ -36,7 +36,7 @@ import {
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V11';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V12';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -56,7 +56,7 @@ Produce the SEO + content packet that will power the public category page for th
 If CITY is "__all__", this is a NATIONAL category page — write city-agnostic copy (no city name in the title, description, or body copy; describe the category and what shoppers should look for). Otherwise, write market-scoped copy for {{city}}, {{state}}.
 
 === TONE ===
-Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about categories and places from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, category_overview, shopper_guide, faq.
+Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about categories and places from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, category_overview, shopper_guide, faq, context.category_summary, context.category_signals.
 
 === WHAT GOOD LOOKS LIKE ===
 - meta_title: <= 70 chars. Pattern: "{Category} in {City}, {ST} — VisibleShelf Places" for market pages; "{Category} — VisibleShelf Places" for national. Front-load the category noun.
@@ -75,12 +75,12 @@ Uniform platform voice — the same register used on every public surface (busin
 === REUSABLE CONTEXT (multiple consumers) ===
 Produce a context object consumed by business audit campaigns (the seed) for category-specific market awareness. All context fields → seed only. This context does NOT bleed onto the location surface.
 
-- context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context. For national ('__all__') campaigns, describe the category's national landscape.
+- context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context. Written in the platform voice — this text may appear verbatim on public seed reports shown to business owners. For national ('__all__') campaigns, describe the category's national landscape.
 - context.keywords: category-level search terms for downstream use — exclude "near me" variants and page-level phrasing from the SEO keywords.
 - context.secondary_categories: the same set as the SEO packet's secondary_categories, for downstream use.
 - context.category_notes: optional free-text notes useful for downstream work (e.g. "strong in immigrant communities on the north side", "limited to a handful of independent stores").
 - context.category_profile: STRUCTURAL category characteristics (NO business names, NO city names). Qualitative + quantitative dimensions of the category as a business type. Fields: { business_model (qualitative: e.g. "typically independent, family-owned, single-location"), typical_products (qualitative: what they sell), customer_base (qualitative: who they serve), online_presence_pattern (qualitative: e.g. "varies widely — many rely on Google/Yelp only"), competitive_landscape (qualitative: e.g. "sparse in most US cities, concentrated in metro areas with large diaspora"), typical_scale (qualitative: e.g. "single-location, small team") }. Use qualitative descriptors, NOT specific revenue figures or employee counts.
-- context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns, not platform-by-platform checklists (e.g. "published hours with daily coverage", "clear category positioning", "community presence"). Lighter than a gold standard; helps the seed audit know what to look for.
+- context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns, not platform-by-platform checklists (e.g. "published hours with daily coverage", "clear category positioning", "community presence"). Lighter than a gold standard; helps the seed audit know what to look for. Phrase each signal in plain, shopper-safe language — they may appear on public seed reports as what customers look for in this category.
 - context.market_density: qualitative density assessment for this category in this city (e.g. "sparse — few dedicated stores", "moderate — several established businesses", "dense — competitive market"). For national campaigns, describe the category's typical density across US cities. Use qualitative descriptors, NOT specific counts.
 - context.prospect_signals: 3-5 signals to look for when prospecting businesses in this category (e.g. "businesses with 'international grocery' in their Google category", "businesses near existing international markets", "businesses with incomplete online presence — high opportunity"). Helps prospecting queue prioritization.
 
@@ -116,7 +116,7 @@ STATE: {{state}}
 Produce the SEO + content packet that will power the public location page for {{city}}, {{state}} — a page that aggregates all published business listings in this city across categories.
 
 === TONE ===
-Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about places and businesses from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, shopper_guide, faq, area_breakdown, context.metro_context.
+Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about places and businesses from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, shopper_guide, faq, area_breakdown, context.metro_context, context.market_summary.
 
 === WHAT GOOD LOOKS LIKE ===
 - meta_title: <= 70 chars. Pattern: "Local Businesses in {City}, {ST} — VisibleShelf Directory". Front-load the place.
@@ -135,9 +135,10 @@ Produce a context object with multiple consumers:
 - Business audit campaigns (the seed) consume ALL context fields for market awareness.
 - Category enrichment campaigns consume context.city_profile ONLY (structural city characteristics, no place names) to ground category copy in the city's market without bleeding place-specific sentiment.
 - The location page renders context.metro_context as a shopper-facing "Metro Area" section.
+- context.market_summary and context.metro_context may appear verbatim on public seed reports shown to business owners.
 Place-specific fields (market_summary, notable_areas, market_gaps, metro_dynamics) do NOT bleed onto the category surface — only city_profile is shared.
 
-- context.market_summary: 1-2 paragraphs describing this city's business landscape — major industries, well-known commercial districts, categories the city is known for, community and cultural context that shapes the local market.
+- context.market_summary: 1-2 paragraphs describing this city's business landscape — major industries, well-known commercial districts, categories the city is known for, community and cultural context that shapes the local market. Warm and factual, per the TONE section.
 - context.top_categories: 3-8 representative categories (same set as the SEO packet's top_categories).
 - context.secondary_categories: supporting categories for downstream use.
 - context.keywords: city-level search terms for downstream use.
@@ -193,7 +194,7 @@ If the list above says there is no sweep set, produce a single packet for the an
 For each market, produce the SEO + content packet that will power the public category page for that category in that market. Each market is independent — copy must be specific to that category in that city, never templated boilerplate repeated across entries.
 
 === TONE ===
-Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about categories and places from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, category_overview, shopper_guide, faq.
+Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about categories and places from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, category_overview, shopper_guide, faq, context.category_summary, context.category_signals.
 
 === WHAT GOOD LOOKS LIKE (per market entry) ===
 - category_name / city / state: echo the market exactly as listed under MARKETS TO ENRICH — these route the packet to that market's public page.
@@ -213,12 +214,12 @@ Uniform platform voice — the same register used on every public surface (busin
 === REUSABLE CONTEXT (per market entry, multiple consumers) ===
 Each market entry's context object is consumed by business audit campaigns (the seed) for category-specific market awareness. All context fields → seed only.
 
-- context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context.
+- context.category_summary: 1-2 paragraphs describing what this category looks like in this market — market size, competitive density, notable patterns, community context. Written in the platform voice — this text may appear verbatim on public seed reports shown to business owners.
 - context.keywords: category-level search terms for downstream use — exclude "near me" variants and page-level phrasing from the SEO keywords.
 - context.secondary_categories: the same set as the packet's secondary_categories, for downstream use.
 - context.category_notes: optional free-text notes useful for downstream work.
 - context.category_profile: STRUCTURAL category characteristics (NO business names, NO city names). Fields: { business_model, typical_products, customer_base, online_presence_pattern, competitive_landscape, typical_scale } — all qualitative descriptors, NOT specific revenue figures or employee counts.
-- context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns (e.g. "published hours with daily coverage", "community presence").
+- context.category_signals: 3-6 signals that indicate a strong business in this category — category-scope patterns (e.g. "published hours with daily coverage", "community presence"). Phrase each signal in plain, shopper-safe language — they may appear on public seed reports as what customers look for in this category.
 - context.market_density: qualitative density assessment for this category in this city (e.g. "sparse — few dedicated stores", "dense — competitive market"). Qualitative only.
 - context.prospect_signals: 3-5 signals to look for when prospecting businesses in this category (e.g. "businesses with incomplete online presence — high opportunity").
 
@@ -257,7 +258,7 @@ You are a local-SEO copywriter producing a directory enrichment packet for the N
 Produce the SEO + content packet that powers the public national location page — the directory's geographic coverage surface. This page represents ALL covered markets, not one city: it introduces the directory's coverage, lets shoppers browse by state and market, and sets national expectations.
 
 === TONE ===
-Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about places and businesses from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, shopper_guide, faq, area_breakdown, context.metro_context.
+Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about places and businesses from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, shopper_guide, faq, area_breakdown, context.metro_context, context.market_summary.
 
 === WHAT GOOD LOOKS LIKE ===
 - meta_title: <= 70 chars. Pattern: "Local Businesses Across the US — VisibleShelf Directory". No city or state name.
@@ -276,7 +277,7 @@ Produce a context object with multiple consumers:
 - Business audit campaigns (the seed) consume ALL context fields for national market awareness.
 - National category enrichment campaigns consume context.city_profile ONLY — for a national packet it is the platform's national coverage profile (structural, no place-specific sentiment).
 
-- context.market_summary: 1-2 paragraphs describing the platform's national coverage — which regions are covered, where coverage is dense, the overall shape of the listing base.
+- context.market_summary: 1-2 paragraphs describing the platform's national coverage — which regions are covered, where coverage is dense, the overall shape of the listing base. Warm and factual, per the TONE section.
 - context.top_categories: 3-8 representative categories nationally (same set as the SEO packet's top_categories).
 - context.secondary_categories: supporting categories for downstream use.
 - context.keywords: national-level search terms for downstream use.
