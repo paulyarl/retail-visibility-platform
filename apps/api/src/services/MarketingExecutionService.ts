@@ -25,7 +25,7 @@ import { PromptComposerService, type IntelligenceFocus } from './intelligence/Pr
 import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
-import { buildGeographyGridDirective, buildGeographyGrid, parseZipCodes } from './intelligence/geography-grid';
+import { buildGeographyGridDirective, buildGeographyGrid, parseZipCodes, isNationalSentinel, type GeographyGrid } from './intelligence/geography-grid';
 import { GeographyGridService } from './intelligence/GeographyGridService';
 import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
 import { CategoryVocabularyService } from './CategoryVocabularyService';
@@ -57,6 +57,16 @@ const INT_SIGNAL_LABELS: Record<string, string> = {
 
 // Re-export for backward compatibility (tests + existing imports).
 export { ScopeMismatchError, assertScopeCompatible };
+
+/**
+ * National establishment template (sprint: national layer). A '__all__'
+ * establishment campaign renders this city-agnostic §10 body instead of the
+ * city-scoped establishment template — no geography grid, national signal
+ * weights, no "what you observed in {{city}}" phrasing. Seeded by
+ * seed-intelligence-profile-establishment-template.ts.
+ */
+export const NATIONAL_ESTABLISHMENT_TEMPLATE_ID = 'mpt-seed-intel-profile-establishment-national-001';
+export const NATIONAL_LOCATION_ENRICHMENT_TEMPLATE_ID = 'mpt-location-enrichment-national';
 
 export interface BatchExecutionInput {
   campaignIds: string[];
@@ -707,7 +717,46 @@ export class MarketingExecutionService extends BaseService {
         hasOperatorObservations: Boolean(String(effectiveVariables.operator_observations ?? '').trim()),
       });
     }
-    const baseRendered = interactivePreamble + this.renderTemplate(input.template.body, effectiveVariables, input.campaign);
+    // National establishment (sprint: national layer) — a '__all__'
+    // establishment campaign renders the national template variant: a
+    // city-agnostic §10 body (no geography grid, national-scope signal
+    // weights, no "what you observed in {{city}}" phrasing). Sentinel-keyed
+    // so the operator can't render the city-scoped body with a literal
+    // '__all__' market. Falls back to the selected template body when the
+    // national seed hasn't run (degraded — CITY renders as '__all__').
+    let templateBody = input.template.body;
+    // National ('__all__') template variants — city-scoped seed bodies would
+    // render the sentinel verbatim into CITY/MARKET lines and ask for
+    // city-level copy. Sentinel-keyed so the operator can't render a
+    // city-scoped body against a national campaign. Falls back to the
+    // selected template body when the national seed hasn't run.
+    const nationalTemplateId =
+      outputSchemaName === 'intelligence_profile'
+        ? NATIONAL_ESTABLISHMENT_TEMPLATE_ID
+        : outputSchemaName === LOCATION_ENRICHMENT_SCHEMA_NAME
+          ? NATIONAL_LOCATION_ENRICHMENT_TEMPLATE_ID
+          : null;
+    if (nationalTemplateId && isNationalSentinel(input.campaign.city)) {
+      try {
+        const nationalTemplate = await MarketingPromptService.getInstance()
+          .getTemplate(nationalTemplateId, ctx);
+        if (nationalTemplate?.body) {
+          templateBody = nationalTemplate.body;
+        } else {
+          logger.warn('National template variant not seeded — rendering selected template body', ctx, {
+            campaignId: input.campaign.id,
+            templateId: input.template.id,
+            nationalTemplateId,
+          });
+        }
+      } catch (tplErr) {
+        logger.warn('National template variant lookup failed — rendering selected template body', ctx, {
+          campaignId: input.campaign.id,
+          error: (tplErr as Error).message,
+        });
+      }
+    }
+    const baseRendered = interactivePreamble + this.renderTemplate(templateBody, effectiveVariables, input.campaign);
 
     // 2. Check amplification gates
     const isSeek = promptType === 'seek';
@@ -1343,7 +1392,10 @@ export class MarketingExecutionService extends BaseService {
       let bronzeFoldDirective = '';
       let bronzeFoldProfileId: string | null = null;
       let bronzeFoldProfileVersion: number | null = null;
-      if (focus === 'emerging' && estCampaignCity && estCampaignState && category) {
+      // National ('__all__') establishment has no market — the folded city
+      // bronze scan is city-scoped by construction, so skip the lookup rather
+      // than resolving a bronze standard against a literal '__all__' market.
+      if (focus === 'emerging' && estCampaignCity && estCampaignState && !isNationalSentinel(estCampaignCity) && category) {
         const profileService = IntelligenceProfileService.getInstance();
         const bronzeStandard = await profileService.resolveBronzeStandard(
           category, campaignPlatform, estCampaignCity, estCampaignState, ctx,
@@ -1391,8 +1443,10 @@ export class MarketingExecutionService extends BaseService {
       // is injected here for the AI to copy verbatim into the profile's
       // "geography_grid" field. Precedence: campaign ZIPs > city-level cache >
       // AI-derivation (the scale path for markets with no ZIPs at deploy time).
-      const estCachedGrid = await GeographyGridService.getInstance()
-        .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
+      const estCachedGrid = isNationalSentinel(input.campaign.city)
+        ? null // national — no catchment; skip the '__all__|__ALL__|' key lookup
+        : await GeographyGridService.getInstance()
+          .getGrid(input.campaign.city, input.campaign.state, parseZipCodes(input.campaign.intelligence_zip_codes), ctx);
       const estGeoGridDirective = buildGeographyGridDirective(input.campaign, estCachedGrid);
 
       logger.info('Intelligence Profile Establishment prompt resolved with focus', ctx, {
@@ -1486,27 +1540,187 @@ export class MarketingExecutionService extends BaseService {
         }
       }
 
+      // National ('__all__') location enrichment — the public national
+      // coverage page. Its fact layer is measured coverage, not a city
+      // geography grid: inject the deterministic NATIONAL COVERAGE GRID
+      // (distinct markets, per-state rollups, category leaders) plus the
+      // national public-surface framing. The framing renders even when
+      // coverage computation fails — it is what keeps the packet national.
+      if (category === '__location__' && isNationalSentinel(campaignCity)) {
+        const locBlocks: string[] = [];
+        try {
+          const { default: LocationMarketEnrichmentService } = await import('./LocationMarketEnrichmentService.js');
+          const coverage = await LocationMarketEnrichmentService.getNationalCoverage(ctx);
+          const coverageBlock = coverage ? this.formatNationalCoverageBlock(coverage) : '';
+          if (coverageBlock) {
+            locBlocks.push(coverageBlock);
+            logger.info('National coverage grid injected into location enrichment prompt', ctx, {
+              campaignId: input.campaign.id,
+              totalStates: coverage.totalStates,
+              totalCities: coverage.totalCities,
+              totalListings: coverage.totalListings,
+            });
+          }
+        } catch (err) {
+          logger.warn('National coverage injection failed — continuing without it', ctx, {
+            campaignId: input.campaign.id,
+            error: (err as Error).message,
+          });
+        }
+
+        locBlocks.push(this.formatNationalSurfaceBlock('location'));
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + locBlocks.join('\n\n'), promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+
+      // Location enrichment (city scope) gets the established market
+      // geography grid — the category-independent retail catchment (ZIPs,
+      // corridors, adjacent municipalities) cached from prior establishment
+      // runs in this market. Without it the packet re-derives geography the
+      // establishment layer already produced. National ('__all__') uses its
+      // own branch above — a sentinel city would look up a fake grid row.
+      if (category === '__location__' && campaignCity && campaignState &&
+          !isNationalSentinel(campaignCity)) {
+        try {
+          const grid = await GeographyGridService.getInstance().getGrid(
+            campaignCity,
+            campaignState,
+            parseZipCodes((input.campaign as any).intelligence_zip_codes),
+            ctx,
+          );
+          const gridBlock = grid ? this.formatMarketGeographyBlock(campaignCity, campaignState, grid) : '';
+          if (gridBlock) {
+            logger.info('Market geography grid injected into location enrichment prompt', ctx, {
+              campaignId: input.campaign.id,
+              city: campaignCity,
+              state: campaignState,
+            });
+            return {
+              renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + gridBlock, promptSuffix),
+              resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+            };
+          }
+        } catch (err) {
+          logger.warn('Market geography grid injection failed — continuing without it', ctx, {
+            campaignId: input.campaign.id,
+            city: campaignCity,
+            error: (err as Error).message,
+          });
+        }
+      }
+
+      // National ('__all__') category enrichment — the public national
+      // category page. Grounds in the national category intelligence profile
+      // (the reference_city NULL slot) and the national location row's
+      // structural city_profile when one exists, plus an explicit national
+      // framing directive. The framing renders even when nothing resolved —
+      // it is what keeps the packet market-agnostic.
+      if (category !== '__location__' && hasCategory && campaignCity && isNationalSentinel(campaignCity)) {
+        const enrichmentBlocks: string[] = [];
+        try {
+          const intelProfileService = IntelligenceProfileService.getInstance();
+          const intelProfile =
+            (await intelProfileService.resolve(category, 'competitive', null, null, ctx)) ??
+            (await intelProfileService.resolve(category, 'emerging', null, null, ctx));
+          const intelBlock = intelProfile ? this.formatCategoryIntelligenceBlock(intelProfile, 'national') : '';
+          if (intelBlock) {
+            enrichmentBlocks.push(intelBlock);
+            logger.info('National category intelligence injected into category enrichment prompt', ctx, {
+              campaignId: input.campaign.id,
+              category,
+              profileId: intelProfile!.id,
+              intelligenceFocus: (intelProfile as any).intelligence_focus,
+            });
+          }
+        } catch (err) {
+          logger.warn('National category intelligence injection failed — continuing without it', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            error: (err as Error).message,
+          });
+        }
+
+        // The national location row's structural city_profile (the
+        // ('__location__','__all__','__all__') packet) grounds the category
+        // copy in the platform's national coverage character once a national
+        // location enrichment exists.
+        const nationalProfile = await this.fetchCityProfile('__all__', '__all__', ctx, input.campaign.id);
+        if (nationalProfile) {
+          enrichmentBlocks.push(this.formatCityProfileBlock('All US markets', 'US', nationalProfile));
+        }
+
+        enrichmentBlocks.push(this.formatNationalSurfaceBlock('category'));
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + enrichmentBlocks.join('\n\n'), promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+
       // Category enrichment with a real city gets the structural city profile.
-      // Location enrichment and national ('__all__') category enrichment skip.
+      // Location enrichment and national ('__all__') category enrichment use
+      // their own branches above.
       if (category !== '__location__' && campaignCity && campaignState &&
-          campaignCity.trim().toLowerCase() !== '__all__') {
+          !isNationalSentinel(campaignCity)) {
+        const enrichmentBlocks: string[] = [];
+
+        // Established category intelligence injection — the category-scope
+        // enrichment packet re-derives vocabulary the establishment profile
+        // already produced (synonyms, subcategories, corridors, swallowing
+        // labels, evidence rules, signal weights, prohibited inferences).
+        // Injecting the resolved profile makes the establishment run the
+        // fact source; the analyst composes shopper copy against it.
+        // Resolution order mirrors the deterministic lane's
+        // resolveProfileForMarket: competitive first, then emerging.
+        // Category-set sweeps are skipped — their markets are the residual
+        // no-profile set by construction.
+        if (hasCategory && outputSchemaName !== CATEGORY_SET_ENRICHMENT_SCHEMA_NAME) {
+          try {
+            const intelProfileService = IntelligenceProfileService.getInstance();
+            const intelProfile =
+              (await intelProfileService.resolve(category, 'competitive', campaignCity, null, ctx)) ??
+              (await intelProfileService.resolve(category, 'emerging', campaignCity, null, ctx));
+            const intelBlock = intelProfile ? this.formatCategoryIntelligenceBlock(intelProfile) : '';
+            if (intelBlock) {
+              enrichmentBlocks.push(intelBlock);
+              logger.info('Category intelligence injected into category enrichment prompt', ctx, {
+                campaignId: input.campaign.id,
+                category,
+                city: campaignCity,
+                profileId: intelProfile!.id,
+                intelligenceFocus: (intelProfile as any).intelligence_focus,
+              });
+            }
+          } catch (err) {
+            logger.warn('Category intelligence injection failed — continuing without it', ctx, {
+              campaignId: input.campaign.id,
+              category,
+              city: campaignCity,
+              error: (err as Error).message,
+            });
+          }
+        }
+
         const profile = await this.fetchCityProfile(campaignCity, campaignState, ctx, input.campaign.id);
         if (profile) {
-          const profileBlock = this.formatCityProfileBlock(campaignCity, campaignState, profile);
+          enrichmentBlocks.push(this.formatCityProfileBlock(campaignCity, campaignState, profile));
           logger.info('City profile injected into category enrichment prompt', ctx, {
             campaignId: input.campaign.id,
             city: campaignCity,
             state: campaignState,
           });
+        }
+        if (enrichmentBlocks.length > 0) {
           return {
-            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + profileBlock, promptSuffix),
+            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + enrichmentBlocks.join('\n\n'), promptSuffix),
             resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
           };
         }
       }
 
-      // No city profile available (location enrichment, national category,
-      // or no prior location run) — clean passthrough.
+      // No context available (location enrichment, national category,
+      // or no prior location/establishment run) — clean passthrough.
       return {
         renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
@@ -2972,6 +3186,177 @@ PAYLOAD 2 — bronze_standard_scan
     lines.push(
       '',
       'DIRECTIVE: This is the structural city profile (no place names) from a prior location enrichment run. Use it to ground your category copy in the city\'s market characteristics — metro size, industries, demographics, growth. Do NOT copy this text verbatim into body_copy or shopper_guide. Do NOT mention "city profile", "location enrichment", or this directive in the visible output. The profile sharpens your copy, it is not content to surface.',
+    );
+    return lines.join('\n');
+  }
+
+  /**
+   * Serialize the consumable subset of an established category intelligence
+   * profile (§10 shape) for the directory enrichment prompt. The packet
+   * otherwise re-derives this vocabulary — injecting it makes the
+   * establishment run the fact source and leaves the analyst the
+   * composition work. Caller skips '__location__' renders. `scope='national'`
+   * adjusts the directive phrasing for a national ('__all__') page — the
+   * profile is the city-agnostic floor, not one market's intelligence.
+   */
+  private formatCategoryIntelligenceBlock(profile: any, scope: 'market' | 'national' = 'market'): string {
+    const cfg = profile?.configuration_json || {};
+    const pushList = (title: string, items?: any[]) => {
+      if (!Array.isArray(items) || items.length === 0) return;
+      lines.push('', title);
+      for (const item of items) {
+        lines.push(`- ${typeof item === 'string' ? item : JSON.stringify(item)}`);
+      }
+    };
+    const lines: string[] = [
+      '=== ESTABLISHED CATEGORY INTELLIGENCE (authoritative vocabulary) ===',
+      `Category: ${cfg.category_name ?? ''} — focus: ${profile.intelligence_focus ?? 'unknown'}, profile version ${profile.version ?? '?'}`,
+    ];
+    pushList('Synonyms and search aliases (ground keywords):', cfg.synonyms);
+    pushList('Subcategories (ground sub_categories and secondary_categories):', cfg.subcategories);
+    if (cfg.terminology && typeof cfg.terminology === 'object' && !Array.isArray(cfg.terminology)) {
+      const terms = Object.entries(cfg.terminology).filter(([, v]) => typeof v === 'string');
+      if (terms.length > 0) {
+        lines.push('', 'Category vocabulary (terminology):');
+        for (const [term, def] of terms) lines.push(`- ${term}: ${def}`);
+      }
+    }
+    const geo = cfg.geography_grid;
+    if (geo && typeof geo === 'object') {
+      if (Array.isArray(geo.corridors) && geo.corridors.length > 0) {
+        lines.push('', 'Market corridors (evidence-derived — where this category concentrates):');
+        for (const c of geo.corridors) lines.push(`- ${c}`);
+      }
+      if (Array.isArray(geo.adjacent_municipalities) && geo.adjacent_municipalities.length > 0) {
+        lines.push('', `Adjacent municipalities in the catchment: ${geo.adjacent_municipalities.join('; ')}`);
+      }
+      if (geo.derivation_basis) {
+        lines.push('', `Corridor/grid derivation basis: ${geo.derivation_basis}`);
+      }
+    }
+    const swallowingLabels = new Set<string>();
+    for (const entry of Array.isArray(cfg.generic_label_set) ? cfg.generic_label_set : []) {
+      for (const label of Array.isArray(entry?.labels) ? entry.labels : []) {
+        if (typeof label === 'string' && label.trim()) swallowingLabels.add(label.trim());
+      }
+    }
+    if (swallowingLabels.size > 0) {
+      lines.push('', `Generic directory labels that swallow this category (mislabel/misfile evidence): ${[...swallowingLabels].join(', ')}`);
+    }
+    if (cfg.category_evidence_rules && typeof cfg.category_evidence_rules === 'object' && !Array.isArray(cfg.category_evidence_rules)) {
+      const rules = Object.values(cfg.category_evidence_rules).filter((v): v is string => typeof v === 'string');
+      pushList('Category evidence rules (what qualifies a member — ground category_signals):', rules);
+    }
+    const weights = (Array.isArray(cfg.platform_signal_weights) ? cfg.platform_signal_weights : [])
+      .filter((p: any) => p && typeof p.weight === 'number')
+      .sort((a: any, b: any) => b.weight - a.weight);
+    if (weights.length > 0) {
+      lines.push('', 'Observed platform signal weights (where this category\'s activity actually is):');
+      for (const p of weights) {
+        lines.push(`- ${p.platform}: ${p.weight}${p.basis ? ` — ${p.basis}` : ''}`);
+      }
+    }
+    pushList('Prohibited inferences (never assert these):', cfg.prohibited_inferences);
+    lines.push(
+      '',
+      scope === 'national'
+        ? 'DIRECTIVE: This is the established NATIONAL category intelligence — the authoritative city-agnostic vocabulary produced by a prior national establishment run. Ground keywords, sub_categories, secondary_categories, context.keywords, context.category_signals, context.prospect_signals, and market descriptions in this vocabulary rather than inventing new terms, and do not contradict it. It sharpens your copy — do NOT copy it verbatim into shopper-facing fields and do NOT mention this block, "intelligence profile", or "establishment" in the visible output.'
+        : 'DIRECTIVE: This is the established category intelligence for this market — the authoritative vocabulary produced by a prior establishment run. Ground keywords, sub_categories, secondary_categories, context.keywords, context.category_signals, context.prospect_signals, context.market_density, and market descriptions in this context rather than inventing new terms, and do not contradict it. It sharpens your copy — do NOT copy it verbatim into shopper-facing fields and do NOT mention this block, "intelligence profile", or "establishment" in the visible output.',
+    );
+    return lines.join('\n');
+  }
+
+  /**
+   * Render the national-surface framing directive (sprint: national layer).
+   * Injected for '__all__' enrichment campaigns — the packet composes the
+   * national public page, not one city's, so shopper-facing copy must be
+   * market-agnostic. Always emitted for national renders — it is what keeps
+   * the packet national even when no profile or context resolved.
+   */
+  private formatNationalSurfaceBlock(surface: 'category' | 'location'): string {
+    const represents = surface === 'category'
+      ? 'the category across every covered market'
+      : 'the platform\'s listing coverage across every market';
+    const framing = surface === 'category'
+      ? 'how the category presents nationally — the vocabulary and subcategory landscape, what shoppers can expect to find in covered markets'
+      : 'the national coverage story — states, metros, and markets covered, how coverage distributes, where it is thin';
+    return [
+      '=== NATIONAL SURFACE FRAMING ===',
+      `This packet composes the NATIONAL ${surface} page — it represents ${represents}, not one city.`,
+      '',
+      'DIRECTIVE:',
+      '- Every shopper-facing field is market-agnostic: meta_title, description, keywords, body_copy, and the guide/faq fields carry NO single-city claims, corridor names, ZIPs, or "in <city>" phrasing.',
+      `- Frame nationally: ${framing}. City-level depth belongs to city pages, not here.`,
+      '- context fields describe the national landscape (keywords, signals, coverage or density as national expectation-setting), not one market\'s profile.',
+      '- Do NOT mention this block, "national framing", or "enrichment" in the visible output.',
+    ].join('\n');
+  }
+
+  /**
+   * Serialize the cached city-level geography grid (mkt_geography_grids) for
+   * the location enrichment prompt. The grid is the established,
+   * category-independent retail catchment — injecting it grounds
+   * notable_areas / area_breakdown / metro_context / metro_dynamics in the
+   * same geography every category establishment in this market used.
+   */
+  private formatMarketGeographyBlock(city: string, state: string, grid: GeographyGrid): string {
+    const lines: string[] = [
+      '=== MARKET GEOGRAPHY GRID (established catchment) ===',
+      `Market: ${city}, ${state}`,
+    ];
+    if (grid.zips.length > 0) {
+      lines.push(`Retail catchment ZIPs (evidence-derived): ${grid.zips.join(', ')}`);
+    }
+    if (grid.corridors.length > 0) {
+      lines.push('', 'Commercial corridors:');
+      for (const c of grid.corridors) lines.push(`- ${c}`);
+    }
+    if (grid.adjacent_municipalities.length > 0) {
+      lines.push('', `Adjacent municipalities in the catchment: ${grid.adjacent_municipalities.join('; ')}`);
+    }
+    if (typeof grid.radius_miles === 'number') {
+      lines.push(`Search radius: ${grid.radius_miles} miles`);
+    }
+    lines.push(
+      '',
+      'DIRECTIVE: This is the established market geography — the evidence-derived retail catchment (principal city plus contiguous commercial municipalities) produced by prior category establishment runs in this market. Ground notable_areas, area_breakdown, metro_context, metro_dynamics, and market descriptions in this geography rather than inventing a different catchment, and do not contradict it. It sharpens your copy — do NOT copy it verbatim into shopper-facing fields and do NOT mention this block, "geography grid", or "establishment" in the visible output.',
+    );
+    return lines.join('\n');
+  }
+
+  /**
+   * Serialize the measured national coverage grid (distinct markets,
+   * per-state rollups, category leaders from directory_listings_list) for
+   * the national ('__all__') location enrichment prompt. This is DB truth —
+   * the national packet's geography analogue of MARKET GEOGRAPHY GRID: it
+   * grounds area_breakdown (browse-by-state), metro_context, and market_gaps
+   * in measured coverage so the AI composes prose over aggregates it cannot
+   * contradict.
+   */
+  private formatNationalCoverageBlock(coverage: {
+    totalStates: number;
+    totalCities: number;
+    totalListings: number;
+    states: { state: string; cityCount: number; listingCount: number }[];
+    topCities: { city: string; state: string; listingCount: number }[];
+  }): string {
+    if (!coverage || coverage.totalListings === 0) return '';
+    const lines: string[] = [
+      '=== NATIONAL COVERAGE GRID (measured platform coverage) ===',
+      `Coverage: ${coverage.totalListings} published listings across ${coverage.totalCities} markets in ${coverage.totalStates} states`,
+    ];
+    if (coverage.states.length > 0) {
+      lines.push('', 'Covered states (listings / markets):');
+      for (const s of coverage.states) {
+        lines.push(`- ${s.state}: ${s.listingCount} listings across ${s.cityCount} markets`);
+      }
+    }
+    if (coverage.topCities.length > 0) {
+      lines.push('', `Largest covered markets: ${coverage.topCities.slice(0, 15).map((c) => `${c.city}, ${c.state} (${c.listingCount})`).join('; ')}`);
+    }
+    lines.push(
+      '',
+      'DIRECTIVE: This is the platform\'s measured coverage — database truth, not an estimate. Ground body_copy, metro_context, area_breakdown, market_gaps, and market descriptions in these aggregates and do not contradict them. area_breakdown is a browse-by-state/market structure (covered states or metros with their category character — NOT neighborhoods). market_gaps means uncovered or thin regions, not unmet categories in one city. Never state counts beyond these figures and do not invent city-level claims. Do NOT mention this block, "coverage grid", or "enrichment" in the visible output.',
     );
     return lines.join('\n');
   }

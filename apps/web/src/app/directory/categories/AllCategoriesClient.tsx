@@ -6,6 +6,7 @@ import { Package, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import type { NationalCategoryRosterEntry } from '@/services/PlacesBrowsePublicService';
 import { clientLogger } from '@/lib/client-logger';
 
 interface Category {
@@ -23,7 +24,11 @@ interface Category {
 
 
 
-export default function AllCategoriesClient() {
+export default function AllCategoriesClient({
+  roster,
+}: {
+  roster?: NationalCategoryRosterEntry[] | null;
+}) {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +74,21 @@ export default function AllCategoriesClient() {
     .filter((cat) =>
       cat.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+  // National category packets keyed by slug + name — cards surface the
+  // national framing excerpt when a packet exists for the category.
+  const rosterByCategory = new Map<string, NationalCategoryRosterEntry>();
+  for (const entry of roster ?? []) {
+    if (entry.market.categoryKey) {
+      rosterByCategory.set(entry.market.categoryKey.toLowerCase(), entry);
+    }
+    if (entry.market.categoryName) {
+      rosterByCategory.set(entry.market.categoryName.toLowerCase(), entry);
+    }
+  }
+  const rosterFor = (cat: Category) =>
+    rosterByCategory.get(cat.slug.toLowerCase()) ??
+    rosterByCategory.get(cat.name.toLowerCase());
 
   if (loading) {
     return (
@@ -177,6 +197,17 @@ export default function AllCategoriesClient() {
                     <h3 className="font-medium text-neutral-900 dark:text-white text-sm truncate">
                       {category.name}
                     </h3>
+                    {(() => {
+                      const entry = rosterFor(category);
+                      const excerpt =
+                        entry?.context?.category_overview ||
+                        entry?.effective?.description;
+                      return excerpt ? (
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-2">
+                          {excerpt}
+                        </p>
+                      ) : null;
+                    })()}
                     <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
                       {/* Show primary/secondary breakdown if available */}
                       {category.primaryStoreCount !== undefined && category.secondaryStoreCount !== undefined ? (

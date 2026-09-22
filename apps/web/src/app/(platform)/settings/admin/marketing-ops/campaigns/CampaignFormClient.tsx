@@ -1106,6 +1106,33 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Optional for business-scope campaigns. Leave blank if the category is unknown — run the &ldquo;Business Category Identification&rdquo; seek prompt to identify it.</p>
               )}
             </FormField>
+            {/* Market Scope — national establishment (emerging/competitive).
+                Checking this writes the '__all__' sentinel into city + state;
+                the import seam maps it to the national profile slot
+                (reference_city NULL) and the prompt renders the national
+                establishment template. Unchecking restores city/state entry. */}
+            {form.scope === 'intelligence'
+              && form.intelligence_campaign_kind === 'establishment'
+              && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+              <FormField label="Market Scope" className="sm:col-span-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.city.trim().toLowerCase() === '__all__'}
+                    onChange={(e) => setForm((prev) => e.target.checked
+                      ? { ...prev, city: '__all__', state: '__all__' }
+                      : { ...prev, city: '', state: '' })}
+                  />
+                  <span className="text-sm">National (all markets) — establish the city-agnostic vocabulary floor</span>
+                </label>
+                <p className="text-xs text-gray-400 mt-1">
+                  A national establishment produces the city-agnostic profile every market falls back to when no
+                  local establishment exists (synonyms, subcategories, taxonomy, evidence rules, national signal
+                  weights). Run a city establishment per market for the local delta — corridors, ZIP catchments,
+                  supplier lists, local signal weights.
+                </p>
+              </FormField>
+            )}
             {/* City | State — family pair */}
             {!(form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards') && (
             <FormField label="City" required={geoRequired}>

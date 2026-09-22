@@ -1135,6 +1135,57 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
     );
     const total = parseInt(countResult.rows[0].total) || 0;
 
+    // Resolve the market's dominant seed state — city-only slugs can't
+    // disambiguate same-name cities across states, so the modal state wins
+    // deterministically — then the location enrichment packet (same row the
+    // /directory/location page renders) for SEO metadata + on-page copy.
+    const stateResult = await pool.query(
+      `SELECT dps.state AS state, COUNT(*) AS cnt
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'
+         AND LOWER(dps.city) = LOWER($1)
+       GROUP BY dps.state
+       ORDER BY cnt DESC
+       LIMIT 1`,
+      [cityName],
+    );
+    const cityState: string | null = stateResult.rows[0]?.state ?? null;
+
+    let enrichment: any = null;
+    if (cityState) {
+      try {
+        const market = await LocationMarketEnrichmentService.getLocation(cityName, cityState);
+        if (market) {
+          enrichment = {
+            market: { city: market.city, state: market.state, locationName: market.locationName },
+            effective: {
+              metaTitle: market.effective.metaTitle,
+              description: market.effective.description,
+              keywords: market.effective.keywords,
+              schemaTypeHint: market.effective.schemaTypeHint,
+              secondaryCategories: market.effective.secondaryCategories,
+            },
+            overridden: {
+              description: market.override.description !== null,
+              metaTitle: market.override.metaTitle !== null,
+              keywords: market.override.keywords !== null,
+            },
+            enrichedAt: market.enrichedAt?.toISOString?.() ?? null,
+            bodyCopy: market.bodyCopy,
+            topCategories: market.topCategories,
+            shopperGuide: market.shopperGuide,
+            faq: market.faq,
+            areaBreakdown: market.areaBreakdown,
+            context: market.context,
+          };
+        }
+      } catch {
+        // Enrichment is additive — never fail the shelf for it.
+      }
+    }
+
     const result = await pool.query(
       `SELECT
          dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
@@ -1202,6 +1253,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
     res.json({
       success: true,
       city: cityName,
+      state: cityState,
       citySlug: decodedSlug,
       categories: Object.values(categoryMap),
       places,
@@ -1209,6 +1261,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       page,
       perPage,
       totalPages: Math.ceil(total / perPage),
+      enrichment,
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/places/city/:citySlug] Error:', undefined, {
@@ -1738,6 +1791,37 @@ router.get('/category-enrichment', async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('[GET /api/public/directory/category-enrichment] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/category-enrichment-roster — all national ('__all__') category packets in one call */
+router.get('/category-enrichment-roster', async (req: Request, res: Response) => {
+  try {
+    const markets = await CategoryMarketEnrichmentService.getInstance().getNationalRoster();
+    res.json({
+      success: true,
+      markets: markets.map((m) => ({
+        market: {
+          categoryName: m.categoryName,
+          categoryKey: m.categoryKey,
+        },
+        effective: {
+          metaTitle: m.effective.metaTitle,
+          description: m.effective.description,
+          keywords: m.effective.keywords,
+          schemaTypeHint: m.effective.schemaTypeHint,
+          secondaryCategories: m.effective.secondaryCategories,
+        },
+        bodyCopy: m.bodyCopy,
+        context: m.context,
+        enrichedAt: m.enrichedAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/category-enrichment-roster] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

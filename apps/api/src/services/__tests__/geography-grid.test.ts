@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseZipCodes,
   normalizeCityKey,
+  isNationalSentinel,
   buildGeographyGrid,
   buildGeographyGridDirective,
 } from '../intelligence/geography-grid';
@@ -176,5 +177,31 @@ describe('buildGeographyGridDirective', () => {
     const directive = buildGeographyGridDirective({ city: 'Kansas City', state: 'MO' });
     expect(directive).toContain('ONE sweep unit');
     expect(directive).toContain('RECORD THE DERIVATION BASIS');
+  });
+
+  it('returns empty string for the national __all__ sentinel (no single catchment)', () => {
+    // A national establishment has no retail catchment — emitting the
+    // directive would read "Market: __all__" and ask for a nationwide ZIP
+    // derivation that no sweep can execute.
+    expect(buildGeographyGridDirective({ city: '__all__', state: '__all__' })).toBe('');
+    expect(buildGeographyGridDirective({ city: '__all__', state: 'IN' })).toBe('');
+    expect(buildGeographyGridDirective({ city: 'Kansas City', state: '__all__' })).toBe('');
+    // Case-insensitive — the sentinel is matched after trimming/lowercasing.
+    expect(buildGeographyGridDirective({ city: ' __ALL__ ', state: ' mo ' })).toBe('');
+  });
+});
+
+describe('isNationalSentinel', () => {
+  it('matches __all__ case-insensitively and trims', () => {
+    expect(isNationalSentinel('__all__')).toBe(true);
+    expect(isNationalSentinel(' __ALL__ ')).toBe(true);
+  });
+
+  it('rejects real places and empties', () => {
+    expect(isNationalSentinel('Indianapolis')).toBe(false);
+    expect(isNationalSentinel('all')).toBe(false);
+    expect(isNationalSentinel(null)).toBe(false);
+    expect(isNationalSentinel(undefined)).toBe(false);
+    expect(isNationalSentinel('')).toBe(false);
   });
 });

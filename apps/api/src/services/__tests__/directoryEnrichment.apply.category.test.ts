@@ -14,11 +14,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockQueryRaw, mockListingsFindMany, mockAudit, mockEnrichLocation } = vi.hoisted(() => ({
+const { mockQueryRaw, mockListingsFindMany, mockAudit, mockEnrichLocation, mockProfileResolve } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
   mockListingsFindMany: vi.fn(),
   mockAudit: vi.fn(),
   mockEnrichLocation: vi.fn(),
+  mockProfileResolve: vi.fn(async () => null),
 }));
 
 const sqlCalls: { text: string; values: any[] }[] = [];
@@ -50,7 +51,7 @@ vi.mock('../../lib/id-generator', () => ({
 // '__all__' would come back '__ALL__', which is exactly why the apply path
 // must bypass it for sentinels.
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
-  IntelligenceProfileService: { getInstance: () => ({ resolveGoldStandard: vi.fn() }) },
+  IntelligenceProfileService: { getInstance: () => ({ resolveGoldStandard: vi.fn(), resolve: mockProfileResolve }) },
   normalizeCategoryKey: (s?: string | null) => (s ?? '').toLowerCase().trim().replace(/\s+/g, ' '),
   normalizeReferenceCity: (s?: string | null) => {
     const t = (s ?? '').trim();
@@ -89,8 +90,13 @@ describe('applyEnrichmentPacket — national (__all__) packet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sqlCalls.length = 0;
-    mockQueryRaw.mockImplementation((sql: any) => {
-      sqlCalls.push({ text: (sql.strings ?? []).join(' '), values: sql.values ?? [] });
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const [first, ...rest] = args;
+      if (Array.isArray(first)) {
+        sqlCalls.push({ text: first.join(' '), values: rest });
+      } else {
+        sqlCalls.push({ text: (first.strings ?? []).join(' '), values: first.values ?? [] });
+      }
       return Promise.resolve([]);
     });
     mockEnrichLocation.mockResolvedValue(null);
@@ -123,6 +129,35 @@ describe('applyEnrichmentPacket — national (__all__) packet', () => {
     expect(mockListingsFindMany).not.toHaveBeenCalled();
     expect(mockEnrichLocation).not.toHaveBeenCalled();
     expect(result.listingsEnriched).toBe(0);
+  });
+
+  it('resolves the national profile slot (null city) and stamps intelligence_profile_id', async () => {
+    mockProfileResolve.mockResolvedValueOnce({
+      id: 'mip-national-1',
+      category_name: 'Halal Grocery',
+      configuration_json: { synonyms: ['halal market'], subcategories: ['halal butcher'] },
+    });
+
+    await service.applyEnrichmentPacket({
+      campaign: { id: 'mcamp-enr-6', category: 'Halal Grocery', city: '__all__', state: '__all__' },
+      packet: validPacket as any,
+      executionId: 'mpexec-6',
+      enrichedBy: 'user-1',
+    });
+
+    // The national slot is probed with a null city — competitive first —
+    // never the literal '__all__' sentinel.
+    const cityArgs = mockProfileResolve.mock.calls.map((c) => c[2]);
+    expect(cityArgs.length).toBeGreaterThan(0);
+    expect(cityArgs[0]).toBeNull();
+    expect(cityArgs).not.toContain('__all__');
+    expect(mockProfileResolve.mock.calls[0][1]).toBe('competitive');
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    expect(upsert!.values).toContain('mip-national-1');
+    // Still no listing fan-out for a national packet.
+    expect(mockListingsFindMany).not.toHaveBeenCalled();
   });
 });
 
@@ -166,6 +201,46 @@ describe('applyEnrichmentPacket — city-scope packet', () => {
     );
   });
 
+  it('stamps intelligence_profile_id when an established profile exists for the market', async () => {
+    mockProfileResolve.mockResolvedValueOnce({
+      id: 'mip-african-1',
+      category_name: 'Halal Grocery',
+      configuration_json: {
+        synonyms: ['halal market', 'zabiha market'],
+        subcategories: ['halal butcher'],
+      },
+    });
+
+    await service.applyEnrichmentPacket({
+      campaign: { id: 'mcamp-enr-4', category: 'Halal Grocery', city: 'Columbus', state: 'OH' },
+      packet: validPacket as any,
+      executionId: 'mpexec-4',
+      enrichedBy: 'user-1',
+    });
+
+    // Competitive tried first, then emerging — same order as enrichMarket.
+    const focusCalls = mockProfileResolve.mock.calls.map((c) => c[1]);
+    expect(focusCalls[0]).toBe('competitive');
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    expect(upsert!.values).toContain('mip-african-1');
+    expect(upsert!.text).toContain('intelligence_profile_id = EXCLUDED.intelligence_profile_id');
+  });
+
+  it('writes null intelligence_profile_id when no profile exists', async () => {
+    await service.applyEnrichmentPacket({
+      campaign: { id: 'mcamp-enr-5', category: 'Halal Grocery', city: 'Columbus', state: 'OH' },
+      packet: validPacket as any,
+      executionId: 'mpexec-5',
+      enrichedBy: 'user-1',
+    });
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    expect(upsert!.values).not.toContain('mip-african-1');
+  });
+
   it('returns a no-op result for an empty campaign city', async () => {
     const result = await service.applyEnrichmentPacket({
       campaign: { id: 'mcamp-enr-3', category: 'Halal Grocery', city: '', state: '' },
@@ -175,5 +250,76 @@ describe('applyEnrichmentPacket — city-scope packet', () => {
     expect(result.categoryEnrichmentId).toBeNull();
     expect(result.skipReasons).toEqual({ invalid_market: 1 });
     expect(findUpsert()).toBeUndefined();
+  });
+});
+
+describe('getNationalRoster — home-page national category packets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sqlCalls.length = 0;
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const [first, ...rest] = args;
+      let text = '';
+      let values: any[] = [];
+      if (Array.isArray(first)) {
+        text = first.join(' ');
+        values = rest;
+      } else {
+        text = (first.strings ?? []).join(' ');
+        values = first.values ?? [];
+      }
+      sqlCalls.push({ text, values });
+      if (text.includes('FROM directory_category_enrichment')) {
+        return Promise.resolve([
+          {
+            id: 'dce-nat-1',
+            category_key: 'halal grocery',
+            category_name: 'Halal Grocery',
+            city: '__all__',
+            state: '__all__',
+            meta_title: 'Halal Grocery Stores Nationwide',
+            description: 'National halal grocery coverage.',
+            keywords: ['halal grocery'],
+            secondary_categories: [],
+            schema_type_hint: 'CollectionPage',
+            intelligence_profile_id: null,
+            gold_standard_profile_id: null,
+            enriched_at: new Date('2026-01-01T00:00:00Z'),
+            trigger_source: 'campaign_run',
+            composer_version: 2,
+            body_copy: 'National body copy.',
+            context: { category_overview: 'National overview text.' },
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+  });
+
+  it('selects the literal __all__ rows and maps them to MarketState', async () => {
+    const roster = await service.getNationalRoster();
+
+    const select = sqlCalls.find((c) =>
+      c.text.includes('FROM directory_category_enrichment'),
+    );
+    expect(select).toBeDefined();
+    // The national sentinels are inlined literally — never normalized params.
+    expect(select!.text).toContain("city = '__all__'");
+    expect(select!.text).toContain("state = '__all__'");
+    // Location rows never leak into the category roster.
+    expect(select!.text).toContain("category_key != '__location__'");
+
+    expect(roster).toHaveLength(1);
+    expect(roster[0].city).toBe('__all__');
+    expect(roster[0].state).toBe('__all__');
+    expect(roster[0].effective.description).toBe('National halal grocery coverage.');
+    expect(roster[0].bodyCopy).toBe('National body copy.');
+    expect(roster[0].context.category_overview).toBe('National overview text.');
+  });
+
+  it('returns an empty roster when no national packets exist', async () => {
+    mockQueryRaw.mockImplementation(() => Promise.resolve([]));
+    const roster = await service.getNationalRoster();
+    expect(roster).toEqual([]);
   });
 });

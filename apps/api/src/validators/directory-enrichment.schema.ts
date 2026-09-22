@@ -255,7 +255,7 @@ Return your response as JSON matching this exact schema:
 {
   "category_key": "<normalized category key, lowercase, spaces replaced with underscores, e.g. 'african_grocery'>",
   "category_name": "<display name>",
-  "meta_title": "<SEO title, <= 70 chars — category + city + state for market pages; category only for national ('__all__')>",
+  "meta_title": "<SEO title, <= 70 chars — category + city + state for market pages; category only for national pages>",
   "description": "<meta description, <= 300 chars, browse-oriented local-SEO copy>",
   "keywords": ["<keyword>", ...],
   "secondary_categories": ["<closely related category a shopper might also browse>", ...],

@@ -75,16 +75,37 @@ const appliedRow = {
   override_at: null,
 };
 
-/** Dispatch $queryRaw: aggregates/categories → [], upsert → [appliedRow]. */
-function mockQueries(listingAggregates: any[] = [], categoryRows: any[] = []) {
-  mockQueryRaw.mockImplementation((sql: any) => {
-    const text = (sql.strings ?? []).join(' ');
-    sqlCalls.push({ text, values: sql.values ?? [] });
+/**
+ * Dispatch $queryRaw: upsert → [appliedRow]; listing aggregates →
+ * listingAggregates; national coverage rollups → coverageRows; everything
+ * else (category enrichments, findRow) → categoryRows.
+ *
+ * $queryRaw is called in two forms: tagged-template (`$queryRaw`...`` →
+ * (strings, ...values)) and Prisma.sql objects (`.strings`/`.values`) — the
+ * dispatcher must normalize both or tagged queries record empty text.
+ */
+function mockQueries(
+  listingAggregates: any[] = [],
+  categoryRows: any[] = [],
+  coverageRows: { states?: any[]; cities?: any[] } = {},
+) {
+  mockQueryRaw.mockImplementation((...args: any[]) => {
+    const sql = args[0];
+    const tagged = Array.isArray(sql);
+    const text = tagged ? sql.join(' ') : (sql?.strings ?? []).join(' ');
+    const values = tagged ? args.slice(1) : (sql?.values ?? []);
+    sqlCalls.push({ text, values });
     if (text.includes('INSERT INTO directory_category_enrichment')) {
       return Promise.resolve([appliedRow]);
     }
     if (text.includes('GROUP BY primary_category')) {
       return Promise.resolve(listingAggregates);
+    }
+    if (text.includes('COUNT(DISTINCT city)')) {
+      return Promise.resolve(coverageRows.states ?? []);
+    }
+    if (text.includes('GROUP BY city, state')) {
+      return Promise.resolve(coverageRows.cities ?? []);
     }
     return Promise.resolve(categoryRows);
   });
@@ -156,6 +177,115 @@ describe('applyEnrichmentPacket — location row', () => {
     });
 
     expect(result).toBeNull();
+    expect(findUpsert()).toBeUndefined();
+  });
+});
+
+describe('applyEnrichmentPacket — national (__all__) location row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sqlCalls.length = 0;
+    mockQueries();
+  });
+
+  it('writes the literal sentinel row, not the normalized __All__ phantom', async () => {
+    await service.applyEnrichmentPacket({
+      campaign: { id: 'mcamp-loc-nat', city: '__all__', state: '__all__' },
+      packet: {
+        meta_title: 'Local Businesses Across the US — VisibleShelf Directory',
+        description: 'Browse local businesses across covered markets.',
+        keywords: ['local businesses'],
+        context: { market_summary: 'Coverage spans two states.' },
+      } as any,
+      executionId: 'mpexec-nat',
+      enrichedBy: 'user-1',
+    });
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    expect(upsert!.values).toContain('__location__');
+    // Literal sentinels on the row — never the normalized forms.
+    expect(upsert!.values).toContain('__all__');
+    expect(upsert!.values).not.toContain('__All__');
+    expect(upsert!.values).not.toContain('__ALL__');
+    expect(upsert!.values).toContain('United States');
+    expect(upsert!.values).toContain('campaign_run');
+    expect(upsert!.values).toContain('mcamp-loc-nat');
+
+    // The measured coverage grid is stamped into context alongside the AI
+    // packet's context — the deterministic fact layer rides the row.
+    const ctxVal = upsert!.values.find(
+      (v) => v && typeof v === 'object' && 'national_coverage' in v,
+    );
+    expect(ctxVal).toBeDefined();
+    expect((ctxVal as any).market_summary).toBe('Coverage spans two states.');
+
+    // The literal sentinel never reaches the row in normalized form — not
+    // even inside the nested Prisma.sql text[] fragments.
+    expect(JSON.stringify(upsert!.values)).not.toContain('__ALL__');
+    expect(JSON.stringify(upsert!.values)).not.toContain('__All__');
+  });
+
+  it('national category aggregates + listing aggregates feed the fallback packet', async () => {
+    mockQueries(
+      [{ primary_category: 'restaurants', cnt: 40n }], // national listing aggregates
+      [{ category_key: 'restaurants', category_name: 'Restaurants', city: '__all__', state: '__all__', meta_title: '', description: '', keywords: ['restaurants near me'], secondary_categories: ['diners'] }],
+    );
+
+    await service.applyEnrichmentPacket({
+      campaign: { id: 'mcamp-loc-nat2', city: '__all__', state: '__all__' },
+      packet: { meta_title: 'x', description: 'x' } as any,
+    });
+
+    const upsert = findUpsert();
+    expect(upsert).toBeDefined();
+    // Aggregate-derived keyword/category material reached the row (the
+    // text[] fragments serialize their values inside nested Prisma.sql).
+    expect(JSON.stringify(upsert!.values)).toContain('restaurants');
+  });
+});
+
+describe('getLocation — national (__all__) phantom-write guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sqlCalls.length = 0;
+    mockQueries();
+  });
+
+  it('returns null on miss and never on-demand-writes a national row', async () => {
+    const result = await service.getLocation('__all__', '__all__');
+
+    expect(result).toBeNull();
+    // A literal lookup ran, and no INSERT was issued — the phantom-write
+    // path (normalize '__all__' → miss → enrichLocation) is closed.
+    const select = sqlCalls.find((c) => c.text.includes('SELECT * FROM directory_category_enrichment'));
+    expect(select).toBeDefined();
+    expect(select!.values).toContain('__all__');
+    expect(findUpsert()).toBeUndefined();
+  });
+
+  it('returns the literal national row when it exists', async () => {
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const sql = args[0];
+      const tagged = Array.isArray(sql);
+      const text = tagged ? sql.join(' ') : (sql?.strings ?? []).join(' ');
+      sqlCalls.push({ text, values: tagged ? args.slice(1) : (sql?.values ?? []) });
+      if (text.includes('SELECT * FROM directory_category_enrichment')) {
+        return Promise.resolve([{
+          ...appliedRow,
+          category_name: 'United States',
+          city: '__all__',
+          state: '__all__',
+        }]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const result = await service.getLocation('__all__', '__all__');
+
+    expect(result).not.toBeNull();
+    expect(result!.city).toBe('__all__');
+    expect(result!.locationName).toBe('United States');
     expect(findUpsert()).toBeUndefined();
   });
 });

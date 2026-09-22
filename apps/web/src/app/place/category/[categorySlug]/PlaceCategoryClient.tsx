@@ -225,6 +225,20 @@ export default function PlaceCategoryClient({
               })}
             </div>
           )}
+
+          {/* City-shelf hop — with a city filter active, link to the
+              cross-category seed shelf for that market (/place/city). */}
+          {city && (
+            <div className="mt-3">
+              <Link
+                href={`/place/city/${city.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Browse all places in {city}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

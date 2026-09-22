@@ -17,6 +17,7 @@
  */
 
 import { MarketingPromptService } from '../services/MarketingPromptService';
+import { NATIONAL_ESTABLISHMENT_TEMPLATE_ID } from '../services/MarketingExecutionService';
 import { logger } from '../logger';
 import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-profile.schema';
 
@@ -50,8 +51,15 @@ import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-pro
  * confidence + observations, the market-layer counterpart of the national
  * gold-standard estimate. A confident local weight outranks the national one
  * at resolution time.
+ *
+ * 2026-09-22-national-variant: seeds a second template —
+ * mpt-seed-intel-profile-establishment-national-001 — the city-agnostic §10
+ * body rendered for '__all__' (national) establishment campaigns
+ * (MarketingExecutionService.resolvePrompt substitutes it on the sentinel).
+ * Same output schema; no geography_grid; national-scope platform signal
+ * weights.
  */
-const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-18-signal-weights';
+const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-22-national-variant';
 
 const ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-intel-profile-establishment-001',
@@ -223,6 +231,193 @@ Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. 
   intelligenceCampaignKind: 'establishment' as const,
 };
 
+/**
+ * National variant — rendered for '__all__' (national) establishment
+ * campaigns. MarketingExecutionService.resolvePrompt substitutes this body
+ * on the '__all__' city sentinel (NATIONAL_ESTABLISHMENT_TEMPLATE_ID), so the
+ * operator never renders the city-scoped body with a literal '__all__'
+ * market. Same 'intelligence_profile' output schema; the differences:
+ *   - no city/state bindings ({{category}} + {{platform}} only)
+ *   - NATIONAL SCOPING replaces CITY SCOPING — vocabulary/taxonomy/sources
+ *     that hold across US markets; local source CLASSES named by pattern,
+ *     never a specific city's instance
+ *   - geography_grid omitted — a national profile has no single catchment
+ *     (city-scoped establishments author + cache it per market)
+ *   - platform_signal_weights estimated at national scope (the city-agnostic
+ *     floor a confident local estimate outranks)
+ */
+const NATIONAL_ESTABLISHMENT_TEMPLATE = {
+  id: NATIONAL_ESTABLISHMENT_TEMPLATE_ID,
+  name: 'Seek: Intelligence Profile Establishment (National)',
+  promptType: 'seek' as const,
+  scope: 'intelligence' as const,
+  body: `You are a category intelligence analyst. Your task is to establish a NATIONAL Category Intelligence Profile for the following category.
+
+CATEGORY: {{category}}
+MARKET SCOPE: National — all US markets
+PLATFORM: {{platform}}
+
+=== OBJECTIVE ===
+Produce a comprehensive Category Intelligence Profile that describes how to discover businesses in this category and what evidence ecosystems matter when auditing a business in this category — at NATIONAL scope.
+
+The profile will be used to:
+1. Guide Intelligence-scope discovery audits (finding qualifying businesses) in ANY market
+2. Amplify Business-scope audit prompts with category-specific evidence rules
+3. Serve as the city-agnostic vocabulary floor: markets without a city-scoped establishment fall back to this profile's terminology, synonyms, subcategories, taxonomy queries, evidence rules, and label sets
+
+=== PLATFORM SCOPING ===
+{{platform}} is the platform this profile is scoped to. If the platform is "all"
+or empty, produce a cross-platform profile — the discovery patterns and
+specialized sources should work across all major platforms (Google, Yelp,
+Facebook, Apple Maps, Bing). If a specific platform is named, bias the
+discovery patterns toward that platform:
+
+- DISCOVERY PATTERNS: include platform-specific search strategies that surface
+  businesses on {{platform}} that mainstream search misses. For example, on
+  Google: search GBP category taxonomies for miscategorized businesses (e.g.,
+  "International Grocery" instead of "African Goods Store"), search Google
+  Maps for unmarked storefronts along commercial corridors, search for
+  platform-specific longtail queries (e.g., "fufu powder site:google.com/maps"
+  or "egusi near me" on {{platform}}). Name the concrete platform-specific
+  search strategies, not generic "search the platform" instructions.
+- SPECIALIZED SOURCES: when a platform is specified, include platform-specific
+  sources (e.g., GBP category taxonomy, {{platform}} review ecosystems,
+  platform-specific directory features) alongside the category's vertical and
+  community sources. The platform sources help the discovery analyst find
+  businesses that are present but miscategorized, or absent entirely, on the
+  target platform.
+- CATEGORY EVIDENCE RULES: include platform-specific evidence rules that
+  distinguish "not found on {{platform}} during discovery" from "does not exist
+  on {{platform}}" — a business may be active on other platforms but absent
+  from {{platform}}, and that absence is a discovery signal, not a negative
+  quality signal.
+
+Do NOT produce a platform-agnostic profile when a specific platform is named:
+the operator will run a separate establishment campaign for each platform they
+want a profile for, because a profile established for one platform's discovery
+is not safe to apply to a different platform's discovery campaign (the category
+taxonomy, search mechanics, and directory features will not match).
+
+=== NATIONAL SCOPING ===
+This profile is NATIONALLY scoped — it is not tied to any single city or metro.
+Produce the layer of category intelligence that holds across US markets:
+
+- Terminology, synonyms (English terms AND endonyms/diaspora-language tokens),
+  subcategories, and taxonomy queries are national facts — they do not vary
+  by city.
+- Specialized sources should be sources that exist nationally or pattern to
+  every market (national datasets, federal registries, national certification
+  bodies, platform taxonomies, national associations, hosted storefront
+  platforms). Where a source CLASS is local (state business registries, county
+  health departments, municipal licensing, local diaspora organizations), name
+  the class and the jurisdiction level at which the discovery sweep resolves
+  the local instance per market — do not name a specific city's instance.
+- Discovery patterns and community/referral sources describe the NATIONAL
+  pattern (e.g. "each market's diaspora association directory", "the state's
+  business-entity registry") — operators run city-scoped establishments for
+  the concrete local instances (specific suppliers, corridors, community
+  organizations).
+- Do NOT name city-specific suppliers, corridors, neighborhoods, or
+  organizations as if they were national facts. A national profile that
+  hardcodes one city's market details misleads every market that falls back
+  to it.
+
+=== PROFILE SECTIONS ===
+
+1. TERMINOLOGY — Define the key terms used in this category. What do practitioners call their work? What terms would a customer use? What industry-specific vocabulary matters?
+
+2. SYNONYMS — List alternative names for this category (what people search for when looking for this type of business). Include BOTH classes:
+   (a) ENGLISH CATEGORY TERMS — the label shoppers and mainstream directories use.
+   (b) ENDONYMS AND DIASPORA-LANGUAGE TOKENS — the words the community itself uses for the category and for itself. These are the highest-yield discovery tokens and are usually absent from English-language directory taxonomies. Examples across categories: "habesha" (Ethiopian/Eritrean), "supermarché" (Francophone West African), "tienda" and "bodega" (Latin American), "desi" and "kirana" (South Asian), "halal market" and "souk" (Middle Eastern), "toko" (Indonesian).
+   Label each synonym as an English term or an endonym. A synonym list containing only English category words is incomplete and will miss businesses whose names are transliterations or personal names.
+
+3. SUBCATEGORIES — Identify the major subcategories within this category. Not all businesses in the category do the same thing — what are the specializations?
+
+4. SPECIALIZED SOURCES — This is the most important section. Identify the category-specific sources that are useful for discovering and verifying businesses in this category. For each source:
+   - Name: the source name
+   - Type: service_history | certification | professional_network | mainstream_directory | vertical_directory | social_platform | other
+   - URL: the source's canonical web address (homepage, directory index, organization page, or store locator). Vertical directories, community organizations, professional networks, and official brand/chain websites should ALWAYS carry a URL — it is the operator's entry point to the source. Omit the URL only for sources that have no single canonical web address (e.g. "storefront photo evidence", "SNAP listings" as a class).
+   - Priority: 1 (highest) to 5 (lowest)
+   - Capabilities: what this source CAN tell you (list at least one)
+   - Limitations: what this source CANNOT tell you or what it does NOT measure (list at least one)
+
+   CRITICAL: Limitations are as important as capabilities. A source's limitations define what inferences must NOT be made from its data. For example, "CARFAX service history is NOT a review system" is a limitation that prevents conflating service records with customer reviews.
+
+   Also look for DATASETS INDEXED TO THE BUSINESS ADDRESS. These are often the highest-signal sources for categories with import supply chains, regulated goods, or licensed premises, and they surface businesses that appear in no commercial directory at all. Dataset classes to consider:
+   - Import / customs bill-of-lading records (importer of record, supplier country, and the exact product line imported)
+   - Business-entity registries (legal name, formation date, principal office address) — name the jurisdiction level (federal, state, county, municipal) the discovery sweep resolves per market
+   - Health department food-establishment licensing and inspection records — typically county or municipal; name the class and how the sweep finds the local instance
+   - Benefit-program retailer authorization lists (e.g. SNAP/EBT authorized retailers) — federal dataset, swept once nationally
+   - Licensed-goods permit registries (liquor, tobacco, pharmacy, halal or kosher certification) — name the jurisdiction level per registry
+   Name the concrete dataset that exists for this category nationally (and the local-instance class where applicable), with its URL, capabilities, AND limitations. A registration is not evidence of trading; an authorization is not a quality signal; a permit is not a review.
+
+   Also treat HOSTED STOREFRONT PLATFORMS as a source class in their own right — not merely as a search trick. Small independent retailers in this category disproportionately adopt low-cost storefront hosts (Square Online, Wix, Shopify, GoDaddy, Weebly, WordPress.com) because they bundle point-of-sale with a simple online catalog, and the resulting subdomains stay publicly indexed even when the business's platform category is generic or wrong. Give this class its own source entry, naming the concrete hosts that matter nationally, and carry these limitations with it:
+   - Presence proves the operator adopted a storefront tool, NOT that the business is trading, licensed, or accepting orders. Hosted pages frequently display "not currently accepting online orders", and a storefront can outlive a closed business or precede an opening.
+   - The sweep surfaces only operators who adopted that host, so it carries selection bias toward slightly more digitized businesses. Absence from the sweep means nothing.
+   - Hosted pages are typically client-side rendered, so a search-index hit proves the URL exists, not that it renders for an ordinary visitor.
+
+4b. DISCOVERY SUBSTRATE (REQUIRED — CATEGORY-INDEPENDENT) — This section must NOT depend on the category's name, vocabulary, or tokens. It is the enumeration floor that surfaces businesses whose names do NOT self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). At NATIONAL scope, produce two structured fields:
+   - generic_label_set — the platform labels that SWALLOW this category: the generic buckets a mislabeled business sits under. One entry per platform: { "platform", "labels": [...] }. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). Do NOT list the correct category label — that is the label the business is MISSING.
+   - label_independent_sweeps — the address-indexed datasets to sweep WITHOUT a category name token. One entry per dataset: { "dataset", "url", "sweep_key": "geography", "filter": "none", "post_filter": "assortment" }. The sweep_key MUST be "geography": these datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. At national scope, name the dataset and the jurisdiction level at which it is enumerated (federal dataset → once nationally; state registry → per-state enumeration; county licensing → per-county). Never keyed by the category name.
+
+   DO NOT emit a geography_grid field. A national profile has no single retail
+   catchment — the catchment (ZIPs, corridors, adjacent municipalities) is
+   authored by city-scoped establishment runs and cached per market. Leave
+   geography_grid out of the output entirely.
+
+   A profile whose only discovery paths are keyed on the category's own tokens is incomplete. The substrate is what makes discovery category-independent.
+
+   HARD RULE — LABEL-INDEPENDENT SWEEPS MUST BE GEOGRAPHY-KEYED. When you name an address-indexed dataset (state registry, benefit-program authorization, licensing, permit registries), specify that it is swept by GEOGRAPHY (ZIP/address) and filtered to category fit afterward. Do NOT implement it as a name-token query. Token-keying a label-independent dataset makes it label-dependent and defeats its purpose: a business whose legal name carries no category token will be invisible to it.
+
+4c. PLATFORM SIGNAL WEIGHTS (REQUIRED) — Estimate signal_weight(category, platform) at NATIONAL scope: how much each platform's signals (category traffic, reviews, ratings, profiles) should move a score for this category across US markets, as a number in [0,1]. This is the NATIONAL estimate — derive it from what is observable nationally: prevalence x depth, i.e. what share of the category's customer-facing activity across the country actually happens on that platform.
+
+   Emit "platform_signal_weights" with one entry per platform: { "platform", "weight", "basis", "confidence", "observations" }. weight is 0-1 and honest — a platform this category barely uses nationally scores low; do NOT inflate. basis records the observed evidence behind the number at national scale (e.g. "nationally, category businesses overwhelmingly maintain Google profiles with review activity; Yelp presence is sparse outside coastal metros"). confidence (0-1) is how reliable the national estimate is given regional heterogeneity — a category concentrated in a few metros has a less nationally-uniform platform mix. A confident CITY-scoped estimate outranks this national weight at scoring time — the confidence you record is the floor it provides.
+
+5. DISCOVERY PATTERNS — How should an analyst search for businesses in this category? What vertical directories, professional networks, or niche platforms should be searched? What search strategies surface businesses that are invisible to mainstream search? Provide at least one concrete pattern for EACH of these query shapes, with real, market-agnostic examples for this category:
+   (a) CATEGORY-TAXONOMY queries — the platform's own category labels, including the wrong or generic labels a mis-categorized business would sit under.
+   (b) NAME-TOKEN queries — business names built from endonyms, transliterations, personal names, or place names. These carry no English category word and are invisible to category-name searches.
+   (c) PRODUCT long-tail queries — the specific goods a customer would type.
+   (d) SITE-SCOPED sweeps — restrict a search engine to a hosting platform or directory domain to enumerate an entire population at once (e.g. site:square.site, site:myshopify.com, site:wixsite.com, site:godaddysites.com, site:weebly.com, site:wordpress.com). These are cheap and high-yield, and they surface businesses whose platform category is generic or wrong. Treat the host list as illustrative and verify a host is still live before sweeping — hosted-site platforms are discontinued and rebranded regularly, so a dead host wastes the whole pattern.
+   (e) GEOGRAPHIC cluster queries — derive corridors from the addresses of already-found businesses in the market being swept rather than assuming them.
+   (f) COMMUNITY / REFERRAL queries — the national pattern for where the community recommends businesses to each other (diaspora association directories, community forums, national referral networks); the sweep resolves the local instance per market.
+
+6. CATEGORY EVIDENCE RULES — What evidence indicates that a business is active, qualified, and a good prospect? What evidence is meaningful for this category specifically (as opposed to generic digital-presence signals)?
+
+7. PROHIBITED INFERENCES — List at least one inference that must NOT be made for this category. These are inferences that seem reasonable but are actually incorrect or misleading. For example:
+   - "Absence from [source] does NOT mean the business is inactive"
+   - "[Source] record count ≠ total customers served"
+   - "No website does NOT mean no customers"
+   - "Low [platform] review count does NOT mean few customers"
+
+8. CATEGORY SIGNALS — List the INT_* signal codes that are most relevant to this category. Use the canonical INT_ family:
+   INT_LOW_VISIBILITY, INT_WEAK_MAINSTREAM_INDEXING, INT_SINGLE_SOURCE, INT_HIDDEN_TRUST, INT_RECENT_BUSINESS_EVIDENCE, INT_POSSIBLE_CATEGORY_MISALIGNMENT, INT_VERTICAL_SOURCE_DISCOVERY, INT_MULTISOURCE_IDENTITY, INT_ACTIVE_OPERATIONAL_EVIDENCE, INT_CATEGORY_SPECIALIZATION, INT_UNDEREXPOSED_CREDENTIAL
+
+=== EVIDENCE SAFETY ===
+Do NOT convert unavailable information into a negative signal. "Website not found during discovery" is not the same as "no website exists." Record what you found and what you could not verify as separate observations. The prohibited_inferences section is where you document inferences that must not be made from absence of evidence.
+
+=== COVERAGE SELF-TEST (REQUIRED) ===
+Before finalizing, audit your own pattern set for blind spots. For each class below, confirm that at least one of your discovery patterns would surface it. If a class is uncovered, add or fix a pattern until it is covered.
+  (1) A business whose platform category is generic or wrong (e.g. "Convenience store", "Grocery store", "Restaurant") while its actual specialization appears only in its description, photos, or import records.
+  (2) A business whose name contains no English category word — an endonym, transliteration, personal name, or place name.
+  (3) A business with no website and no claimed profile on any platform.
+  (4) A business whose storefront sits outside the corridors a city-scoped establishment would name.
+  (5) A business that is well known in its community but has no customer reviews.
+  (6) A business whose name contains NO category token and NO endonym — a generic-looking name that does not self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). Confirm a pattern surfaces it WITHOUT relying on the name.
+  (7) A business reachable ONLY by sweeping a ZIP × generic-label matrix or an address-indexed dataset by geography — i.e. it is invisible to every name, endonym, and product query.
+Record the result in discovery_patterns under the key "coverage_self_test", stating for each class which pattern covers it — or that it is uncovered. A pattern set that can only find businesses that already look like the category is not finished.
+
+=== OUTPUT REQUIREMENT ===
+Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
+<!-- seed-version: intel-profile-establishment-national-2026-09-22 -->`,
+  variables: ['category', 'platform'],
+  outputSchema: {
+    name: INTELLIGENCE_PROFILE_SCHEMA_NAME,
+    description: 'Category Intelligence Profile (NATIONAL) — §10 structure at national scope: terminology, synonyms, subcategories, nationally-available specialized sources, the category-independent discovery substrate (generic_label_set / label_independent_sweeps — NO geography_grid), national platform signal weights, discovery patterns, evidence rules, prohibited inferences, and category signals.',
+  },
+  isDefault: false,
+  intelligenceCampaignKind: 'establishment' as const,
+};
+
 async function main() {
   const service = MarketingPromptService.getInstance();
 
@@ -249,6 +444,33 @@ async function main() {
       intelligenceCampaignKind: ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
     });
     logger.info(`Created establishment template: ${ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: ESTABLISHMENT_TEMPLATE.id, seedVersion: SEED_VERSION_MARKER });
+  }
+
+  // National variant — same upsert pattern; rendered for '__all__'
+  // establishment campaigns via resolvePrompt's sentinel-keyed substitution.
+  const existingNational = await service.getTemplate(NATIONAL_ESTABLISHMENT_TEMPLATE.id);
+  if (existingNational) {
+    await service.updateTemplate(NATIONAL_ESTABLISHMENT_TEMPLATE.id, {
+      name: NATIONAL_ESTABLISHMENT_TEMPLATE.name,
+      body: NATIONAL_ESTABLISHMENT_TEMPLATE.body,
+      variables: NATIONAL_ESTABLISHMENT_TEMPLATE.variables,
+      outputSchema: NATIONAL_ESTABLISHMENT_TEMPLATE.outputSchema,
+      intelligenceCampaignKind: NATIONAL_ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
+    });
+    logger.info(`Updated national establishment template: ${NATIONAL_ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: NATIONAL_ESTABLISHMENT_TEMPLATE.id, seedVersion: SEED_VERSION_MARKER });
+  } else {
+    await service.createTemplate({
+      id: NATIONAL_ESTABLISHMENT_TEMPLATE.id,
+      name: NATIONAL_ESTABLISHMENT_TEMPLATE.name,
+      promptType: NATIONAL_ESTABLISHMENT_TEMPLATE.promptType,
+      scope: NATIONAL_ESTABLISHMENT_TEMPLATE.scope,
+      body: NATIONAL_ESTABLISHMENT_TEMPLATE.body,
+      variables: NATIONAL_ESTABLISHMENT_TEMPLATE.variables,
+      outputSchema: NATIONAL_ESTABLISHMENT_TEMPLATE.outputSchema,
+      isDefault: NATIONAL_ESTABLISHMENT_TEMPLATE.isDefault,
+      intelligenceCampaignKind: NATIONAL_ESTABLISHMENT_TEMPLATE.intelligenceCampaignKind,
+    });
+    logger.info(`Created national establishment template: ${NATIONAL_ESTABLISHMENT_TEMPLATE.id}`, undefined, { id: NATIONAL_ESTABLISHMENT_TEMPLATE.id, seedVersion: SEED_VERSION_MARKER });
   }
 }
 

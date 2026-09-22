@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveCategoryIntelligence: vi.fn(async (_category: string, _city?: string | null, _platform?: string | null) => null),
@@ -61,7 +61,11 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     getGrid: vi.fn(async () => null),
     upsertGrid: vi.fn(async () => undefined),
   };
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService };
+  const mockLocationEnrichmentService = {
+    getNationalCoverage: vi.fn(async () => null),
+    applyEnrichmentPacket: vi.fn(async () => null),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -112,6 +116,13 @@ vi.mock('../intelligence/GeographyGridService', () => ({
   GeographyGridService: {
     getInstance: () => mockGeographyGridService,
   },
+}));
+
+// Intercepts the lazy `import('./LocationMarketEnrichmentService.js')` inside
+// resolvePrompt's national location branch — the specifier resolves to the
+// same module.
+vi.mock('../LocationMarketEnrichmentService', () => ({
+  default: mockLocationEnrichmentService,
 }));
 
 vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
@@ -1174,6 +1185,82 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
   });
 
+  // ── National establishment (__all__ sentinel) — sprint: national layer ──
+  // A '__all__' establishment campaign renders the national template variant
+  // (NATIONAL_ESTABLISHMENT_TEMPLATE_ID) instead of the city-scoped body, and
+  // carries no geography grid / bronze fold — both are city-scoped by
+  // construction.
+  describe('national establishment (__all__ sentinel)', () => {
+    const makeEstabTemplate = () => ({
+      body: 'Establish the intelligence profile for {{category}}',
+      prompt_type: 'seek',
+      scope: 'intelligence',
+      output_schema: { name: 'intelligence_profile' },
+      outputSchema: { name: 'intelligence_profile' },
+    });
+
+    const makeEstabCampaign = (overrides: Record<string, any> = {}) => ({
+      id: 'camp-estab-nat-1',
+      scope: 'intelligence',
+      category: 'African Grocery Store',
+      city: '__all__',
+      state: '__all__',
+      intelligence_focus: 'emerging',
+      intelligence_platform: null,
+      intelligence_campaign_kind: 'establishment',
+      ...overrides,
+    });
+
+    it('renders the seeded national template body for a __all__ campaign', async () => {
+      mockPromptService.getTemplate.mockResolvedValueOnce({
+        body: 'NATIONAL BODY for {{category}} on {{platform}}',
+        prompt_type: 'seek',
+      });
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign(),
+        variables: undefined,
+      });
+
+      expect(mockPromptService.getTemplate).toHaveBeenCalledWith(
+        'mpt-seed-intel-profile-establishment-national-001', undefined,
+      );
+      expect(renderedPrompt).toContain('NATIONAL BODY for African Grocery Store');
+      // The city-scoped body was NOT rendered.
+      expect(renderedPrompt).not.toContain('Establish the intelligence profile for');
+      // National campaigns carry no catchment — no grid directive, no fold.
+      expect(renderedPrompt).not.toContain('GEOGRAPHY GRID');
+      expect(renderedPrompt).not.toContain('CITY SCAN (FOLDED)');
+      expect(mockGeographyGridService.getGrid).not.toHaveBeenCalled();
+      expect(mockProfileService.resolveBronzeStandard).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the selected template body when the national seed is absent', async () => {
+      mockPromptService.getTemplate.mockResolvedValueOnce(null);
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: { ...makeEstabTemplate(), body: 'CITY BODY for {{category}} in {{city}}' },
+        campaign: makeEstabCampaign(),
+        variables: undefined,
+      });
+
+      // Degraded but non-fatal — the operator-selected body renders with the
+      // literal sentinel until the seed runs.
+      expect(renderedPrompt).toContain('CITY BODY for African Grocery Store in __all__');
+    });
+
+    it('does not fetch the national template for a city-scoped establishment', async () => {
+      await service.resolvePrompt({
+        template: makeEstabTemplate(),
+        campaign: makeEstabCampaign({ city: 'Indianapolis', state: 'IN' }),
+        variables: undefined,
+      });
+
+      expect(mockPromptService.getTemplate).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Bronze-standard scans never enter the composer (sprint plan 6.2/10) ──
   // composeIntelligencePrompt's focus ternary loads the COMPETITIVE fragment
   // for any non-emerging focus — a bronze campaign reaching the composer would
@@ -1404,6 +1491,381 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       } finally {
         (service as any).prisma = realPrisma;
       }
+    });
+  });
+
+  // ─── Category intelligence injection (campaign lane) ──────────────────
+  // The establishment profile's vocabulary (synonyms, subcategories,
+  // corridors, swallowing labels, evidence rules, signal weights,
+  // prohibited inferences) is the fact source the enrichment packet
+  // otherwise re-derives. resolvePrompt injects it for city-scoped
+  // category enrichment, competitive → emerging, same order as the
+  // deterministic lane's resolveProfileForMarket.
+  describe('enrichment prompt — category intelligence injection', () => {
+    const makeCategoryTemplate = () => ({
+      body: 'CATEGORY: {{category}}\nCITY: {{city}} STATE: {{state}}',
+      prompt_type: 'enrichment',
+      scope: 'category',
+      output_schema: { name: 'category_enrichment' },
+    });
+    const makeCategoryCampaign = (category: string, city: string, state: string) => ({
+      id: 'camp-enr-ci-1',
+      scope: 'category',
+      category,
+      city,
+      state,
+      parent_campaign_id: null,
+    });
+    const INTEL_PROFILE = (focus: string) => ({
+      id: `ip-${focus}-1`,
+      version: 3,
+      intelligence_focus: focus,
+      configuration_json: {
+        category_name: 'African Grocery Store',
+        synonyms: ['african market', 'african food market', 'habesha store'],
+        subcategories: ['West African grocery', 'Ethiopian and Eritrean grocery'],
+        terminology: { merkato: 'Amharic for market' },
+        geography_grid: {
+          corridors: ['Lafayette Rd / International Marketplace'],
+          adjacent_municipalities: ['Speedway', 'Lawrence'],
+          derivation_basis: 'platform evidence sweep',
+        },
+        generic_label_set: [{ source: 'google', labels: ['Convenience store', 'Grocery store'] }],
+        category_evidence_rules: { snap_registry: 'SNAP-authorized retailers qualify' },
+        platform_signal_weights: [{ platform: 'google', weight: 0.6, basis: 'most listings' }],
+        prohibited_inferences: ['never claim delivery service'],
+      },
+    });
+
+    it('injects ESTABLISHED CATEGORY INTELLIGENCE when a competitive profile exists', async () => {
+      mockProfileService.resolve.mockResolvedValueOnce(INTEL_PROFILE('competitive'));
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign('African Grocery Store', 'Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== ESTABLISHED CATEGORY INTELLIGENCE (authoritative vocabulary) ===');
+      expect(renderedPrompt).toContain('african market');
+      expect(renderedPrompt).toContain('West African grocery');
+      expect(renderedPrompt).toContain('Lafayette Rd / International Marketplace');
+      expect(renderedPrompt).toContain('Convenience store, Grocery store');
+      expect(renderedPrompt).toContain('never claim delivery service');
+      // Provenance stays 'none' at render — lineage is stamped at apply.
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('falls back to the emerging profile when competitive misses', async () => {
+      mockProfileService.resolve
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(INTEL_PROFILE('emerging'));
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign('African Grocery Store', 'Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== ESTABLISHED CATEGORY INTELLIGENCE');
+      expect(renderedPrompt).toContain('focus: emerging');
+      const calls = mockProfileService.resolve.mock.calls;
+      expect(calls[0][1]).toBe('competitive');
+      expect(calls[1][1]).toBe('emerging');
+    });
+
+    it('no profile → no block, base render passthrough', async () => {
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign('African Grocery Store', 'Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('ESTABLISHED CATEGORY INTELLIGENCE');
+      expect(renderedPrompt).toContain('CATEGORY: African Grocery Store');
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('national (__all__) category enrichment resolves the national slot + emits framing', async () => {
+      mockProfileService.resolve.mockResolvedValueOnce(INTEL_PROFILE('competitive'));
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign('African Grocery Store', '__all__', '__all__'),
+        variables: undefined,
+      });
+
+      // Resolves the national slot — reference_city NULL — never the literal
+      // '__all__' city. Competitive first, emerging fallback preserved.
+      expect(mockProfileService.resolve).toHaveBeenCalledWith(
+        'African Grocery Store', 'competitive', null, null, undefined,
+      );
+      expect(renderedPrompt).toContain('=== ESTABLISHED CATEGORY INTELLIGENCE (authoritative vocabulary) ===');
+      expect(renderedPrompt).toContain('NATIONAL category intelligence');
+      // The national public-surface framing directive is present and tells
+      // the model the packet is a national page, not a city page.
+      expect(renderedPrompt).toContain('=== NATIONAL SURFACE FRAMING ===');
+      expect(renderedPrompt).toContain('NATIONAL category page');
+      expect(renderedPrompt).toContain('market-agnostic');
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('national (__all__) emits the framing directive even when no profile resolves', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign('African Grocery Store', '__all__', '__all__'),
+        variables: undefined,
+      });
+
+      // Both slots probed (competitive → emerging), nothing found — the
+      // packet still carries the national framing so copy stays
+      // market-agnostic.
+      expect(mockProfileService.resolve).toHaveBeenCalledTimes(2);
+      expect(renderedPrompt).not.toContain('ESTABLISHED CATEGORY INTELLIGENCE');
+      expect(renderedPrompt).toContain('=== NATIONAL SURFACE FRAMING ===');
+      // The framing block itself carries no sentinel vocabulary — the
+      // campaign's literal '__all__' appears only via {{city}} substitution.
+      const framing = renderedPrompt.slice(renderedPrompt.indexOf('=== NATIONAL SURFACE FRAMING ==='));
+      expect(framing).not.toContain('__all__');
+      expect(framing).not.toContain('national sentinel');
+    });
+
+    it('location enrichment skips category resolution entirely', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: {
+          body: 'CITY: {{city}} STATE: {{state}}',
+          prompt_type: 'enrichment',
+          scope: 'city',
+          output_schema: { name: 'location_enrichment' },
+        },
+        campaign: {
+          id: 'camp-enr-loc-2',
+          scope: 'city',
+          category: '__location__',
+          city: 'Indianapolis',
+          state: 'IN',
+          parent_campaign_id: null,
+        },
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolve).not.toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('ESTABLISHED CATEGORY INTELLIGENCE');
+    });
+
+    it('category-set sweep skips category resolution (residual no-profile markets)', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: {
+          body: 'CATEGORY: {{category}}\nMARKETS:\n{{markets}}',
+          prompt_type: 'enrichment',
+          scope: 'category',
+          output_schema: { name: 'category_set_enrichment' },
+        },
+        campaign: {
+          id: 'camp-set-2',
+          scope: 'category',
+          category: 'Halal Market',
+          city: 'Fort Wayne',
+          state: 'IN',
+          discovery_context: null,
+        },
+        variables: undefined,
+      });
+
+      expect(mockProfileService.resolve).not.toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('ESTABLISHED CATEGORY INTELLIGENCE');
+    });
+  });
+
+  // ─── Location enrichment — market geography grid injection ─────────────
+  // The city-level grid cache (mkt_geography_grids) is the established,
+  // category-independent retail catchment — populated by establishment
+  // imports and shared across categories. Location enrichment injects it so
+  // the packet grounds notable_areas / metro fields in established
+  // geography instead of re-deriving a different catchment.
+  describe('enrichment prompt — location geography grid injection', () => {
+    const makeLocationTemplate = () => ({
+      body: 'CITY: {{city}} STATE: {{state}}',
+      prompt_type: 'enrichment',
+      scope: 'city',
+      output_schema: { name: 'location_enrichment' },
+    });
+    const makeLocationCampaign = (city: string, state: string) => ({
+      id: 'camp-enr-geo-1',
+      scope: 'city',
+      category: '__location__',
+      city,
+      state,
+      parent_campaign_id: null,
+    });
+    const CACHED_GRID = {
+      city: 'Indianapolis',
+      state: 'IN',
+      zips: ['46201', '46208', '46254'],
+      corridors: ['Lafayette Rd / International Marketplace', 'W 38th St'],
+      adjacent_municipalities: ['Speedway', 'Lawrence', 'Beech Grove'],
+      radius_miles: 20,
+    };
+
+    it('injects MARKET GEOGRAPHY GRID when a cached grid exists', async () => {
+      mockGeographyGridService.getGrid.mockResolvedValueOnce(CACHED_GRID);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeLocationTemplate(),
+        campaign: makeLocationCampaign('Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== MARKET GEOGRAPHY GRID (established catchment) ===');
+      expect(renderedPrompt).toContain('46201, 46208, 46254');
+      expect(renderedPrompt).toContain('Lafayette Rd / International Marketplace');
+      expect(renderedPrompt).toContain('Speedway; Lawrence; Beech Grove');
+      expect(renderedPrompt).toContain('Search radius: 20 miles');
+      // Category resolution must NOT fire for a location render.
+      expect(mockProfileService.resolve).not.toHaveBeenCalled();
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('no cached grid → no block, base render passthrough', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeLocationTemplate(),
+        campaign: makeLocationCampaign('Indianapolis', 'IN'),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('MARKET GEOGRAPHY GRID');
+      expect(renderedPrompt).toContain('CITY: Indianapolis');
+    });
+
+    it('category enrichment does NOT consult the grid cache', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: {
+          body: 'CATEGORY: {{category}}\nCITY: {{city}} STATE: {{state}}',
+          prompt_type: 'enrichment',
+          scope: 'category',
+          output_schema: { name: 'category_enrichment' },
+        },
+        campaign: {
+          id: 'camp-enr-cat-geo',
+          scope: 'category',
+          category: 'African Grocery Store',
+          city: 'Indianapolis',
+          state: 'IN',
+          parent_campaign_id: null,
+        },
+        variables: undefined,
+      });
+
+      expect(mockGeographyGridService.getGrid).not.toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('MARKET GEOGRAPHY GRID');
+    });
+  });
+
+  // ─── National location enrichment ('__all__' sentinel) ─────────────────
+  // The national location page's fact layer is measured coverage, not a
+  // city geography grid: resolvePrompt renders the national template
+  // variant (no city placeholders), injects the deterministic NATIONAL
+  // COVERAGE GRID, and appends the national public-surface framing.
+  describe('enrichment prompt — national location (__all__ sentinel)', () => {
+    const makeLocationTemplate = (body: string) => ({
+      body,
+      prompt_type: 'enrichment',
+      scope: 'city',
+      output_schema: { name: 'location_enrichment' },
+    });
+    const makeNationalCampaign = () => ({
+      id: 'camp-enr-natloc-1',
+      scope: 'city',
+      category: '__location__',
+      city: '__all__',
+      state: '__all__',
+      parent_campaign_id: null,
+    });
+    const COVERAGE = {
+      totalStates: 2,
+      totalCities: 12,
+      totalListings: 240,
+      states: [
+        { state: 'IN', cityCount: 8, listingCount: 120 },
+        { state: 'OH', cityCount: 4, listingCount: 120 },
+      ],
+      topCities: [{ city: 'Indianapolis', state: 'IN', listingCount: 45 }],
+    };
+
+    it('renders the national template + coverage grid + national framing', async () => {
+      mockPromptService.getTemplate.mockResolvedValueOnce({
+        body: 'NATIONAL LOCATION BODY — coverage page, no city placeholders',
+        prompt_type: 'enrichment',
+      });
+      mockLocationEnrichmentService.getNationalCoverage.mockResolvedValueOnce(COVERAGE);
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeLocationTemplate('CITY BODY for {{city}}, {{state}}'),
+        campaign: makeNationalCampaign(),
+        variables: undefined,
+      });
+
+      // National template variant substituted for the city-scoped body.
+      expect(mockPromptService.getTemplate).toHaveBeenCalledWith(
+        'mpt-location-enrichment-national', undefined,
+      );
+      expect(renderedPrompt).toContain('NATIONAL LOCATION BODY');
+      expect(renderedPrompt).not.toContain('CITY BODY for __all__');
+
+      // Measured coverage injected as the grounding fact layer.
+      expect(renderedPrompt).toContain('=== NATIONAL COVERAGE GRID (measured platform coverage) ===');
+      expect(renderedPrompt).toContain('240 published listings across 12 markets in 2 states');
+      expect(renderedPrompt).toContain('IN: 120 listings across 8 markets');
+      expect(renderedPrompt).toContain('Indianapolis, IN (45)');
+
+      // National public-surface framing — market-agnostic directive.
+      expect(renderedPrompt).toContain('=== NATIONAL SURFACE FRAMING ===');
+      expect(renderedPrompt).toContain('NATIONAL location page');
+
+      // No city-scope machinery: no geography grid, no category profile.
+      expect(mockGeographyGridService.getGrid).not.toHaveBeenCalled();
+      expect(mockProfileService.resolve).not.toHaveBeenCalled();
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('emits the framing directive even when coverage computation returns nothing', async () => {
+      mockPromptService.getTemplate.mockResolvedValueOnce(null);
+      mockLocationEnrichmentService.getNationalCoverage.mockResolvedValueOnce({
+        totalStates: 0, totalCities: 0, totalListings: 0, states: [], topCities: [],
+      });
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeLocationTemplate('CITY BODY for {{city}}, {{state}}'),
+        campaign: makeNationalCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).not.toContain('NATIONAL COVERAGE GRID');
+      expect(renderedPrompt).toContain('=== NATIONAL SURFACE FRAMING ===');
+      // The framing block carries no sentinel vocabulary.
+      const framing = renderedPrompt.slice(renderedPrompt.indexOf('=== NATIONAL SURFACE FRAMING ==='));
+      expect(framing).not.toContain('__all__');
+    });
+
+    it('city-scoped location enrichment still takes the geography grid path', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeLocationTemplate('CITY BODY for {{city}}, {{state}}'),
+        campaign: {
+          id: 'camp-enr-loc-city',
+          scope: 'city',
+          category: '__location__',
+          city: 'Indianapolis',
+          state: 'IN',
+          parent_campaign_id: null,
+        },
+        variables: undefined,
+      });
+
+      // City path untouched: grid consulted, national template not fetched,
+      // no national framing.
+      expect(mockGeographyGridService.getGrid).toHaveBeenCalled();
+      expect(mockPromptService.getTemplate).not.toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('NATIONAL SURFACE FRAMING');
     });
   });
 });

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Info, MapPin, ShieldCheck, ShoppingBag, Tag } from 'lucide-react';
-import { getCategoryUrl, getCityUrl } from '@/utils/slug';
+import { getCategoryUrl, getCityUrl, slugify } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
@@ -402,15 +402,15 @@ export default function PlaceEntryEditorialLayout({
           <div className="bg-white border-t">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
               <h2 className="text-2xl font-bold text-neutral-900 mb-3">
-                Browse more stores in the directory
+                Browse more places
               </h2>
               <p className="text-neutral-600 mb-8">
-                Discover more local businesses by category or location.
+                More local businesses listed from public information — by category or city.
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 {listing.primaryCategory && (
                   <Link
-                    href={getCategoryUrl({ name: listing.primaryCategory })}
+                    href={getCategoryUrl({ name: listing.primaryCategory }, '/place/category')}
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-sm font-medium text-blue-700 transition-colors"
                   >
                     <Tag className="w-4 h-4" />
@@ -420,11 +420,11 @@ export default function PlaceEntryEditorialLayout({
                 )}
                 {listing.city && listing.state && (
                   <Link
-                    href={getCityUrl(listing.city, listing.state)}
+                    href={`/place/city/${slugify(listing.city)}`}
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-50 hover:bg-green-100 border border-green-200 rounded-full text-sm font-medium text-green-700 transition-colors"
                   >
                     <MapPin className="w-4 h-4" />
-                    {listing.city}, {listing.state}
+                    Places in {listing.city}
                     <span aria-hidden="true">→</span>
                   </Link>
                 )}

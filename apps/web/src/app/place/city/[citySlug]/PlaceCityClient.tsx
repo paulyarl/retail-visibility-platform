@@ -8,6 +8,7 @@ import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurface
 import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 import type { CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
+import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
 
 interface PlaceResult {
   id: string;
@@ -25,12 +26,14 @@ interface PlaceResult {
 
 interface CityResponse {
   city: string;
+  state: string | null;
   citySlug: string;
   categories: Array<{ category: string; slug: string; iconEmoji: string | null; places: PlaceResult[] }>;
   total: number;
   page: number;
   perPage: number;
   totalPages: number;
+  enrichment?: LocationEnrichmentResponse | null;
 }
 
 class PlacesCityService extends PublicApiSingleton {
@@ -67,9 +70,10 @@ const cityService = PlacesCityService.getInstance();
 interface PlaceCityClientProps {
   citySlug: string;
   marketIntelTeaser?: CityMarketIntelTeaser | null;
+  enrichment?: LocationEnrichmentResponse | null;
 }
 
-export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTeaser }: PlaceCityClientProps) {
+export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTeaser, enrichment: enrichmentProp }: PlaceCityClientProps) {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -117,6 +121,10 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
     );
   }
 
+  // The packet embeds in the city response — the prop is the server-fetched
+  // copy (page.tsx) for the same row, so either source renders identically.
+  const enrichment = data.enrichment ?? enrichmentProp ?? null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Seed city shelf browse event (Layer 2 surface: 'place') — mirrors
@@ -124,7 +132,7 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
       <LocationBrowseTracker
         location={citySlug}
         city={data.city}
-        state={data.categories.flatMap((c) => c.places)[0]?.state || ''}
+        state={data.state || enrichment?.market?.state || data.categories.flatMap((c) => c.places)[0]?.state || ''}
         locationName={data.city}
         surface="place"
         filterSignature={sort}
@@ -134,9 +142,29 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
           ← All places
         </Link>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Places in {data.city}
+          Places in {data.city}{data.state ? `, ${data.state}` : ''}
         </h1>
-        <p className="text-gray-600 mb-6">{data.total} business{data.total !== 1 ? 'es' : ''}</p>
+        <p className="text-gray-600 mb-2">{data.total} business{data.total !== 1 ? 'es' : ''}</p>
+        {/* Location enrichment packet — seed-shelf intro copy from the same
+            ('__location__', city, state) row /directory/location renders. */}
+        {(enrichment?.effective?.description) && (
+          <p className="text-gray-700 max-w-3xl mb-4">{enrichment.effective.description}</p>
+        )}
+        {(enrichment?.topCategories?.length ?? 0) > 0 && (
+          <div className="mb-6">
+            <p className="text-sm text-gray-500 mb-1">Top categories in {data.city}</p>
+            <div className="flex flex-wrap gap-2 max-w-3xl">
+              {enrichment!.topCategories.slice(0, 8).map((category) => (
+                <span
+                  key={category}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+                >
+                  {category}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sort */}
         <div className="flex items-center gap-3 mb-6">

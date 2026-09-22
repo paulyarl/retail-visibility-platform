@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import AllCategoriesClient from './AllCategoriesClient';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
@@ -23,7 +24,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AllCategoriesPage() {
+export default async function AllCategoriesPage() {
+  const roster = await placesBrowsePublicService.getNationalCategoryRoster();
   return (
     <Suspense
       fallback={
@@ -37,7 +39,7 @@ export default function AllCategoriesPage() {
         </div>
       }
     >
-      <AllCategoriesClient />
+      <AllCategoriesClient roster={roster} />
 
             {/* Platform Branding Footer */}
             <PoweredByFooter />

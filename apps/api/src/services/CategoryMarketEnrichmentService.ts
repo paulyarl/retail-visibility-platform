@@ -233,14 +233,18 @@ class CategoryMarketEnrichmentService extends BaseService {
    *
    * Entry point for the directory_enrichment campaign lane (both internal-run
    * and external-import executions). Differences from enrichMarket:
-   *   - No intelligence profile required — the packet IS the content source.
+   *   - The packet is the content source, but an established intelligence
+   *     profile is still consumed when one exists for the market — it stamps
+   *     intelligence_profile_id lineage and supplies the listing fan-out
+   *     vocabulary (field-level merge over packet-synthesized fields).
    *   - Sentinel handling: campaign city '__all__' writes the national
    *     (category, '__all__', '__all__') row literally; normalizers are
    *     bypassed for sentinels (normalizeReferenceState('__all__') would
    *     return '__ALL__' via its unknown-format passthrough).
    *   - Writes trigger_source='campaign_run' + source_campaign_id /
    *     source_execution_id lineage + body_copy.
-   *   - Fans out to published listings in the market using a synthesized
+   *   - Fans out to published listings in the market using the resolved
+   *     intelligence profile's SEO fields when present, else a synthesized
    *     IntelligenceProfileSeoFields built from the AI packet (no profile row).
    *     National packets skip fan-out — there is no city to match on.
    */
@@ -285,6 +289,16 @@ class CategoryMarketEnrichmentService extends BaseService {
     const enrichedBy = input.enrichedBy ?? null;
     const triggerSource = 'campaign_run';
 
+    // Establishment-profile consumption: resolve the market's intelligence
+    // profile (competitive → emerging, same order as enrichMarket) so the
+    // campaign lane stamps lineage and fans out with the establishment
+    // vocabulary instead of running profile-blind. National packets resolve
+    // the national slot (reference_city NULL) directly — '__all__' is the
+    // enrichment-layer marker for the same fact-layer floor city markets
+    // fall back to.
+    const intelProfile = await this.resolveProfileForMarket(categoryKey, isNational ? null : normalizedCity, ctx);
+    const intelProfileSeo = this.toIntelligenceProfileSeoFields(intelProfile);
+
     const keywords = (packet.keywords ?? []).map((k) => k.trim()).filter(Boolean);
     const secondary = (packet.secondary_categories ?? []).map((s) => s.trim()).filter(Boolean);
     const bodyCopy = packet.body_copy?.trim() || null;
@@ -321,7 +335,7 @@ class CategoryMarketEnrichmentService extends BaseService {
         ${faq as any},
         ${null as any},
         ${context as any},
-        ${null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
+        ${intelProfile?.id ?? null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource},
         ${campaign.id}, ${input.executionId ?? null}, now(), now()
       )
@@ -337,6 +351,7 @@ class CategoryMarketEnrichmentService extends BaseService {
         faq = EXCLUDED.faq,
         area_breakdown = EXCLUDED.area_breakdown,
         context = EXCLUDED.context,
+        intelligence_profile_id = EXCLUDED.intelligence_profile_id,
         composer_version = EXCLUDED.composer_version,
         enriched_at = EXCLUDED.enriched_at,
         enriched_by = EXCLUDED.enriched_by,
@@ -367,19 +382,28 @@ class CategoryMarketEnrichmentService extends BaseService {
 
     let listingResult = { enriched: 0, skipped: 0, skipReasons: {} as Record<string, number> };
     if (!isNational) {
-      // Synthesize profile-shaped SEO fields from the AI packet so the
-      // existing per-listing composer + guards apply unchanged. profileId is
-      // null — no intelligence profile backs a campaign run.
-      const pseudoProfileSeo: IntelligenceProfileSeoFields = {
-        profileId: null,
-        synonyms: keywords,
-        subcategories: secondary,
-        schemaOrgType: packet.schema_type_hint ?? null,
-      };
+      // Fan-out vocabulary: the resolved intelligence profile wins
+      // field-by-field (establishment is the fact source); packet-synthesized
+      // values fill what the profile doesn't carry so the no-profile path is
+      // unchanged. profileId is null only when no profile backs the run.
+      const fanoutProfileSeo: IntelligenceProfileSeoFields = intelProfileSeo
+        ? {
+            profileId: intelProfile!.id,
+            synonyms: intelProfileSeo.synonyms ?? keywords,
+            subcategories: intelProfileSeo.subcategories ?? secondary,
+            prohibitedKeywords: intelProfileSeo.prohibitedKeywords,
+            schemaOrgType: intelProfileSeo.schemaOrgType ?? packet.schema_type_hint ?? null,
+          }
+        : {
+            profileId: null,
+            synonyms: keywords,
+            subcategories: secondary,
+            schemaOrgType: packet.schema_type_hint ?? null,
+          };
       listingResult = await this.enrichMarketListings(
         { categoryKey, city: normalizedCity, state: normalizedState },
         categoryName,
-        pseudoProfileSeo,
+        fanoutProfileSeo,
         null,
         { triggerSource, enrichedBy },
         ctx,
@@ -467,6 +491,24 @@ class CategoryMarketEnrichmentService extends BaseService {
     `;
     if (!rows || !Array.isArray(rows) || rows.length === 0) return null;
     return await this.rowToMarketState(rows[0]);
+  }
+
+  /**
+   * Every national ('__all__') category packet in one call — the home-page
+   * roster. Per-category `getMarket` calls don't scale to a grid of N cards,
+   * so the surfaces that render national category narratives fetch the whole
+   * national set once.
+   */
+  async getNationalRoster(ctx?: RequestCtx): Promise<MarketState[]> {
+    const rows = await this.prisma.$queryRaw`
+      SELECT * FROM directory_category_enrichment
+      WHERE category_key != '__location__'
+        AND city = '__all__'
+        AND state = '__all__'
+      ORDER BY category_name ASC
+    `;
+    if (!rows || !Array.isArray(rows) || rows.length === 0) return [];
+    return Promise.all(rows.map((r: any) => this.rowToMarketState(r)));
   }
 
   async overrideMarket(

@@ -4,6 +4,7 @@ import {
   normalizeReferenceCity,
   normalizeReferenceState,
 } from './intelligence/IntelligenceProfileService';
+import { isNationalSentinel } from './intelligence/geography-grid';
 import {
   buildLocationSeoPacket,
   type LocationSeoPacket,
@@ -63,6 +64,19 @@ export interface EnrichLocationResult {
   categoryCount: number;
 }
 
+/**
+ * Measured national coverage — the deterministic fact layer injected into
+ * national ('__all__') location enrichment prompts and stamped into
+ * context.national_coverage on the national row.
+ */
+export interface NationalCoverage {
+  totalStates: number;
+  totalCities: number;
+  totalListings: number;
+  states: { state: string; cityCount: number; listingCount: number }[];
+  topCities: { city: string; state: string; listingCount: number }[];
+}
+
 interface CategoryRow {
   category_key: string;
   category_name: string;
@@ -98,6 +112,16 @@ class LocationMarketEnrichmentService extends BaseService {
     state: string | null | undefined,
     ctx?: RequestCtx,
   ): Promise<LocationState | null> {
+    // National sentinel — the ('__location__','__all__','__all__') row.
+    // Literal lookup: normalizers would produce '__All__'/'__ALL__' and miss
+    // the row, and a miss must NOT fall into enrichLocation — an on-demand
+    // national write would persist a phantom '__All__' row with empty
+    // aggregates. National rows are produced by campaign runs or an explicit
+    // enrichNational call only.
+    if (isNationalSentinel(city)) {
+      const row = await this.findRow('__all__', '__all__');
+      return row ? this.rowToLocationState(row) : null;
+    }
     const normalizedCity = normalizeReferenceCity(city);
     const normalizedState = state ? normalizeReferenceState(state) : null;
     if (!normalizedCity || !normalizedState) return null;
@@ -116,6 +140,12 @@ class LocationMarketEnrichmentService extends BaseService {
     opts: { triggerSource?: 'manual' | 'profile_activated' | 'on_demand' | 'campaign_run' | 'pg_sweep'; enrichedBy?: string | null } = {},
     ctx?: RequestCtx,
   ): Promise<LocationState | null> {
+    // National sentinel — deterministic national coverage compose. Without
+    // this guard, normalizeReferenceCity('__all__') would write a phantom
+    // '__All__' row with empty aggregates.
+    if (isNationalSentinel(city)) {
+      return this.enrichNational(opts, ctx);
+    }
     const normalizedCity = normalizeReferenceCity(city);
     const normalizedState = state ? normalizeReferenceState(state) : null;
     if (!normalizedCity || !normalizedState) {
@@ -265,20 +295,34 @@ class LocationMarketEnrichmentService extends BaseService {
     ctx?: RequestCtx,
   ): Promise<LocationState | null> {
     const { campaign, packet } = input;
-    const normalizedCity = normalizeReferenceCity(campaign.city);
-    const normalizedState = campaign.state ? normalizeReferenceState(campaign.state) : null;
+    // National ('__all__') packets write the literal sentinel row —
+    // normalizers would produce '__All__'/'__ALL__'.
+    const isNational = isNationalSentinel(campaign.city);
+    const normalizedCity = isNational ? '__all__' : normalizeReferenceCity(campaign.city);
+    const normalizedState = isNational
+      ? '__all__'
+      : (campaign.state ? normalizeReferenceState(campaign.state) : null);
     if (!normalizedCity || !normalizedState) {
       return null;
     }
 
-    const locationName = `${normalizedCity}, ${normalizedState}`;
+    const locationName = isNational ? 'United States' : `${normalizedCity}, ${normalizedState}`;
     const enrichedBy = input.enrichedBy ?? null;
 
-    // Deterministic aggregate fallback packet — same inputs as enrichLocation.
-    const [categoryRows, listingRows] = await Promise.all([
-      this.getCategoryEnrichments(normalizedCity, normalizedState),
-      this.getListingAggregates(normalizedCity, normalizedState),
-    ]);
+    // Deterministic aggregate fallback packet — same inputs as enrichLocation
+    // for city packets; national packets aggregate across all covered markets
+    // and stamp the measured coverage grid into context.national_coverage.
+    const [categoryRows, listingRows, nationalCoverage] = isNational
+      ? await Promise.all([
+          this.getNationalCategoryEnrichments(),
+          this.getNationalListingAggregates(),
+          this.getNationalCoverage(),
+        ])
+      : await Promise.all([
+          this.getCategoryEnrichments(normalizedCity, normalizedState),
+          this.getListingAggregates(normalizedCity, normalizedState),
+          Promise.resolve(null),
+        ]);
 
     const categoryMap = new Map<string, CategoryRow>();
     for (const row of categoryRows) {
@@ -311,8 +355,10 @@ class LocationMarketEnrichmentService extends BaseService {
     }
 
     const aggregatePacket = buildLocationSeoPacket({
-      city: normalizedCity,
-      state: normalizedState,
+      // Composer keyword seeds get display strings — the literal '__all__'
+      // sentinel must never land in the row's keywords.
+      city: isNational ? 'United States' : normalizedCity,
+      state: isNational ? 'US' : normalizedState,
       locationName,
       businessCount,
       categoryEnrichments,
@@ -337,7 +383,11 @@ class LocationMarketEnrichmentService extends BaseService {
     const shopperGuide = packet.shopper_guide?.trim() || null;
     const faq = packet.faq ?? null;
     const areaBreakdown = packet.area_breakdown ?? null;
-    const context = packet.context ?? null;
+    // National packets carry the measured coverage grid alongside the AI
+    // context — the deterministic fact layer the copy must not contradict.
+    const context = isNational
+      ? { ...(packet.context ?? {}), national_coverage: nationalCoverage }
+      : (packet.context ?? null);
 
     const id = generateCategoryMarketEnrichmentId();
     const enrichedAt = new Date();
@@ -415,6 +465,220 @@ class LocationMarketEnrichmentService extends BaseService {
     });
 
     return row ? this.rowToLocationState(row) : null;
+  }
+
+  /**
+   * Deterministic national location enrich — the
+   * ('__location__','__all__','__all__') row. Composes the same SEO packet
+   * shape as a city enrich but aggregates across ALL covered markets
+   * (national listing aggregates + national category enrichment rows) and
+   * stamps the measured coverage grid into context.national_coverage —
+   * merged over any existing AI context so the deterministic fact layer
+   * refreshes without clobbering campaign-applied fields.
+   */
+  private async enrichNational(
+    opts: { triggerSource?: 'manual' | 'profile_activated' | 'on_demand' | 'campaign_run' | 'pg_sweep'; enrichedBy?: string | null } = {},
+    ctx?: RequestCtx,
+  ): Promise<LocationState | null> {
+    const locationName = 'United States';
+    const triggerSource = opts.triggerSource ?? 'manual';
+    const enrichedBy = opts.enrichedBy ?? null;
+
+    const [categoryRows, listingRows, coverage] = await Promise.all([
+      this.getNationalCategoryEnrichments(),
+      this.getNationalListingAggregates(),
+      this.getNationalCoverage(),
+    ]);
+
+    const categoryMap = new Map<string, CategoryRow>();
+    for (const row of categoryRows) {
+      categoryMap.set(row.category_name.toLowerCase().trim(), row);
+    }
+
+    let businessCount = 0;
+    const categoriesFromListings: string[] = [];
+    const categoryEnrichments: LocationEnrichmentInput[] = [];
+    for (const row of (listingRows as ListingAggregateRow[])) {
+      const catName = row.primary_category?.trim();
+      if (!catName) continue;
+      categoriesFromListings.push(catName);
+      businessCount += Number(row.cnt);
+      const matched = categoryMap.get(catName.toLowerCase());
+      categoryEnrichments.push({
+        categoryName: catName,
+        keywords: matched?.keywords ?? [],
+        synonyms: matched?.secondary_categories ?? [],
+      });
+    }
+    for (const row of categoryRows) {
+      if (!categoriesFromListings.some((c) => c.toLowerCase().trim() === row.category_name.toLowerCase().trim())) {
+        categoryEnrichments.push({
+          categoryName: row.category_name,
+          keywords: row.keywords,
+          synonyms: row.secondary_categories,
+        });
+      }
+    }
+
+    const packet = buildLocationSeoPacket({
+      city: 'United States',
+      state: 'US',
+      locationName,
+      businessCount,
+      categoryEnrichments,
+    });
+
+    const existing = await this.findRow('__all__', '__all__');
+    const context = { ...((existing?.context as any) ?? {}), national_coverage: coverage };
+
+    const id = generateCategoryMarketEnrichmentId();
+    const enrichedAt = new Date();
+    const keywords = packet.keywords.length > 0 ? packet.keywords : [];
+    const secondary = packet.secondaryCategories.length > 0 ? packet.secondaryCategories : [];
+
+    const upsert = Prisma.sql`
+      INSERT INTO directory_category_enrichment (
+        id, category_key, category_name, city, state,
+        meta_title, description, keywords, secondary_categories, schema_type_hint,
+        context,
+        intelligence_profile_id, gold_standard_profile_id, composer_version,
+        enriched_at, enriched_by, trigger_source, created_at, updated_at
+      )
+      VALUES (
+        ${id}, ${LOCATION_SENTINEL_KEY}, ${locationName}, '__all__', '__all__',
+        ${packet.metaTitle}, ${packet.description},
+        ${textArraySql(keywords)},
+        ${textArraySql(secondary)},
+        ${packet.schemaTypeHint},
+        ${context as any},
+        ${null}, ${null}, ${packet.composerVersion},
+        ${enrichedAt}, ${enrichedBy}, ${triggerSource}, now(), now()
+      )
+      ON CONFLICT (category_key, city, state) DO UPDATE SET
+        category_name = EXCLUDED.category_name,
+        meta_title = EXCLUDED.meta_title,
+        description = EXCLUDED.description,
+        keywords = EXCLUDED.keywords,
+        secondary_categories = EXCLUDED.secondary_categories,
+        schema_type_hint = EXCLUDED.schema_type_hint,
+        context = EXCLUDED.context,
+        composer_version = EXCLUDED.composer_version,
+        enriched_at = EXCLUDED.enriched_at,
+        enriched_by = EXCLUDED.enriched_by,
+        trigger_source = EXCLUDED.trigger_source,
+        updated_at = now()
+      RETURNING *
+    `;
+
+    const resultRows = await this.prisma.$queryRaw<CategoryRow[]>(upsert);
+    const row = Array.isArray(resultRows) && resultRows.length > 0 ? resultRows[0] : null;
+
+    audit({
+      actor: enrichedBy,
+      actorType: enrichedBy ? 'user' : 'system',
+      action: 'directory_location_enrichment.sync',
+      payload: {
+        city: '__all__',
+        state: '__all__',
+        locationName,
+        businessCount,
+        categoryCount: categoryEnrichments.length,
+        coveredStates: coverage.totalStates,
+        coveredCities: coverage.totalCities,
+        locationEnrichmentId: id,
+        triggerSource,
+      },
+    });
+
+    logger.info('LocationMarketEnrichmentService.enrichNational', ctx, {
+      businessCount,
+      categoryCount: categoryEnrichments.length,
+      coveredStates: coverage.totalStates,
+      coveredCities: coverage.totalCities,
+      locationEnrichmentId: id,
+    });
+
+    return row ? this.rowToLocationState(row) : null;
+  }
+
+  /**
+   * Measured national coverage — the deterministic fact layer for the
+   * national location packet. Distinct (city, state) markets, per-state
+   * rollups, and category leaders across every published listing. This is
+   * DB truth, not derived copy — injected into the national location prompt
+   * and stamped into context.national_coverage at apply.
+   */
+  async getNationalCoverage(ctx?: RequestCtx): Promise<NationalCoverage> {
+    try {
+      const [stateRows, cityRows] = await Promise.all([
+        this.prisma.$queryRaw<{ state: string; city_count: bigint; listing_count: bigint }[]>`
+          SELECT state, COUNT(DISTINCT city) AS city_count, COUNT(*) AS listing_count
+          FROM directory_listings_list
+          WHERE is_published = true
+            AND (business_hours IS NULL OR business_hours::text != 'null')
+            AND state IS NOT NULL AND city IS NOT NULL
+          GROUP BY state
+          ORDER BY listing_count DESC
+        `,
+        this.prisma.$queryRaw<{ city: string; state: string; listing_count: bigint }[]>`
+          SELECT city, state, COUNT(*) AS listing_count
+          FROM directory_listings_list
+          WHERE is_published = true
+            AND (business_hours IS NULL OR business_hours::text != 'null')
+            AND city IS NOT NULL AND state IS NOT NULL
+          GROUP BY city, state
+          ORDER BY listing_count DESC
+          LIMIT 50
+        `,
+      ]);
+      const states = (Array.isArray(stateRows) ? stateRows : []).map((r) => ({
+        state: r.state,
+        cityCount: Number(r.city_count),
+        listingCount: Number(r.listing_count),
+      }));
+      const cities = (Array.isArray(cityRows) ? cityRows : []).map((r) => ({
+        city: r.city,
+        state: r.state,
+        listingCount: Number(r.listing_count),
+      }));
+      return {
+        totalStates: states.length,
+        totalCities: cities.length === 50 ? states.reduce((a, s) => a + s.cityCount, 0) : cities.length,
+        totalListings: states.reduce((a, s) => a + s.listingCount, 0),
+        states,
+        topCities: cities.slice(0, 20),
+      };
+    } catch (err) {
+      logger.warn('Failed to compute national coverage', ctx, { error: (err as Error).message });
+      return { totalStates: 0, totalCities: 0, totalListings: 0, states: [], topCities: [] };
+    }
+  }
+
+  /** National listing aggregates — category counts across ALL markets. */
+  private async getNationalListingAggregates(): Promise<ListingAggregateRow[]> {
+    const rows = await this.prisma.$queryRaw<ListingAggregateRow[]>`
+      SELECT primary_category, COUNT(*) as cnt
+      FROM directory_listings_list
+      WHERE is_published = true
+        AND (business_hours IS NULL OR business_hours::text != 'null')
+        AND primary_category IS NOT NULL
+      GROUP BY primary_category
+      ORDER BY cnt DESC
+    `;
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  /** National category enrichment rows — the (category,'__all__','__all__') packets. */
+  private async getNationalCategoryEnrichments(): Promise<CategoryRow[]> {
+    const rows = await this.prisma.$queryRaw<CategoryRow[]>`
+      SELECT category_key, category_name, city, state, meta_title, description, keywords, secondary_categories
+      FROM directory_category_enrichment
+      WHERE category_key != ${LOCATION_SENTINEL_KEY}
+        AND city = '__all__'
+        AND state = '__all__'
+      ORDER BY enriched_at DESC
+    `;
+    return Array.isArray(rows) ? rows : [];
   }
 
   private async findRow(city: string, state: string): Promise<any | null> {

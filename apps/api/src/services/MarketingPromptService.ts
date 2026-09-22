@@ -18,6 +18,7 @@ import { applyRenderControlCoverageGate, BUSINESS_ANALYSIS_SCHEMA_NAME } from '.
 import { normalizeIntelligenceDiscoveryPayload, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
+import { isNationalSentinel } from './intelligence/geography-grid';
 import MarketingCampaignService from './MarketingCampaignService';
 import { unifiedConfig } from '../config/unifiedConfig';
 
@@ -924,98 +925,7 @@ export class MarketingPromptService extends BaseService {
       // must explicitly activate it before it affects any prompts.
       // Catches + logs errors so a persistence failure never fails the import.
       if (schemaName === 'intelligence_profile' && resolved.auditPlatform === null) {
-        try {
-          const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
-          // Migration 202 — Profile Type Alignment: read the establishment
-          // campaign's intelligence_focus so the imported draft is born with
-          // the correct type lineage. This is the key ghost-bug fix: the
-          // operator's campaign focus choice flows end-to-end into the profile.
-          // Migration 205 — Profile City Scoping: also read the establishment
-          // campaign's city so the draft is scoped to the correct reference
-          // market. Without this, a Zionsville establishment campaign would
-          // produce a profile that later resolves for an Indianapolis
-          // discovery campaign (cross-city contamination).
-          // Platform scoping: also read the campaign's intelligence_platform
-          // so the draft is scoped to the correct platform. Without this, a
-          // Google-specific establishment campaign would produce a profile
-          // that resolves for a Yelp discovery campaign (cross-platform
-          // contamination). Mirrors the gold standard import path which
-          // already reads intelligence_platform.
-          const campaign = await this.prisma.mkt_campaigns_list.findUnique({
-            where: { id: input.campaignId },
-            select: { intelligence_focus: true, city: true, state: true, intelligence_platform: true, intelligence_zip_codes: true },
-          });
-          const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards';
-          const referenceCity = campaign?.city || null;
-          const referencePlatform = campaign?.intelligence_platform || null;
-          const profile = await IntelligenceProfileService.getInstance().importAsDraft({
-            categoryKey: parsedJson.category_key,
-            categoryName: parsedJson.category_name,
-            configurationJson: parsedJson,
-            intelligenceFocus: focus,
-            referenceCity,
-            referencePlatform,
-          }, ctx);
-          logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
-            profileId: profile.id,
-            version: profile.version,
-            categoryKey: profile.category_key,
-            intelligenceFocus: focus,
-            referenceCity,
-            referencePlatform,
-            campaignId: input.campaignId,
-          });
-
-          // Geography grid cache (migration 295): the profile's geography_grid is
-          // CATEGORY-INDEPENDENT — it describes the market's retail catchment, not
-          // the category. Cache it once per (city, state) so every other category
-          // in the market reuses the same sweep units instead of re-deriving them.
-          // Best-effort: a cache failure never fails the import.
-          try {
-            const { GeographyGridService } = await import('./intelligence/GeographyGridService.js');
-            const { parseZipCodes } = await import('./intelligence/geography-grid.js');
-            const grid = (parsedJson as any)?.geography_grid ?? null;
-            const campaignZips = parseZipCodes((campaign as any)?.intelligence_zip_codes);
-            const state = (campaign as any)?.state ?? (grid as any)?.state ?? null;
-            await GeographyGridService.getInstance().upsertGrid({
-              city: referenceCity,
-              state,
-              zips: campaignZips,
-              grid: grid ?? (campaignZips.length > 0 ? { zips: campaignZips } : null),
-              derivation: grid ? 'profile_import' : campaignZips.length > 0 ? 'campaign_zip_codes' : 'ai_derived',
-              sourceProfileId: profile.id,
-            }, ctx);
-          } catch (gridErr) {
-            logger.warn('Geography grid cache upsert failed (best-effort)', ctx, {
-              error: (gridErr as Error).message,
-              campaignId: input.campaignId,
-            });
-          }
-        } catch (profileErr) {
-          logger.error('Intelligence profile draft persistence failed (best-effort, GAP-P8)', ctx, {
-            error: (profileErr as Error).message,
-            campaignId: input.campaignId,
-          });
-        }
-
-        // Migration 201: mark the campaign that received the profile import
-        // as an 'establishment' campaign so it is excluded from discovery-
-        // workspace campaign pickers. Best-effort — a failure here does not
-        // fail the import (the profile is already persisted as a draft).
-        try {
-          await this.prisma.mkt_campaigns_list.update({
-            where: { id: input.campaignId },
-            data: { intelligence_campaign_kind: 'establishment' },
-          });
-          logger.info('Campaign marked as establishment (intelligence_profile import)', ctx, {
-            campaignId: input.campaignId,
-          });
-        } catch (markErr) {
-          logger.error('Failed to mark campaign as establishment (best-effort)', ctx, {
-            error: (markErr as Error).message,
-            campaignId: input.campaignId,
-          });
-        }
+        await this.persistIntelligenceProfileDraft(input.campaignId, parsedJson, ctx);
       }
 
       // Gold Standard System — Sprint 0: post-import hook for
@@ -1409,6 +1319,125 @@ export class MarketingPromptService extends BaseService {
         logger.error('Failed to import external result', ctx, { error: (error as Error).message });
       }
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * GAP-P8: best-effort post-import hook for the intelligence_profile schema.
+   * When an operator imports an externally-generated profile via
+   * /executions/external, the validated JSON is persisted as a DRAFT profile
+   * by IntelligenceProfileService.importAsDraft(). The draft is inert — the
+   * resolver only returns active profiles, so the operator must explicitly
+   * activate it before it affects any prompts. Also caches the profile's
+   * geography_grid into mkt_geography_grids and marks the campaign as
+   * 'establishment'. National ('__all__') establishment campaigns persist to
+   * the national slot (reference_city = NULL) and skip the grid cache — the
+   * sentinel is a campaign-layer marker, never a literal profile slot. Never
+   * throws — every failure is caught + logged so it cannot fail the import.
+   */
+  private async persistIntelligenceProfileDraft(campaignId: string, parsedJson: any, ctx?: RequestCtx): Promise<void> {
+    try {
+      const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
+      // Migration 202 — Profile Type Alignment: read the establishment
+      // campaign's intelligence_focus so the imported draft is born with
+      // the correct type lineage. This is the key ghost-bug fix: the
+      // operator's campaign focus choice flows end-to-end into the profile.
+      // Migration 205 — Profile City Scoping: also read the establishment
+      // campaign's city so the draft is scoped to the correct reference
+      // market. Without this, a Zionsville establishment campaign would
+      // produce a profile that later resolves for an Indianapolis
+      // discovery campaign (cross-city contamination).
+      // Platform scoping: also read the campaign's intelligence_platform
+      // so the draft is scoped to the correct platform. Without this, a
+      // Google-specific establishment campaign would produce a profile
+      // that resolves for a Yelp discovery campaign (cross-platform
+      // contamination). Mirrors the gold standard import path which
+      // already reads intelligence_platform.
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { intelligence_focus: true, city: true, state: true, intelligence_platform: true, intelligence_zip_codes: true },
+      });
+      const focus = (campaign?.intelligence_focus || 'emerging') as 'emerging' | 'competitive' | 'gold_standards';
+      // National establishment sentinel: '__all__' is the campaign-layer
+      // marker (non-empty so the schema's required-city refines pass). The
+      // profile's national slot is reference_city = NULL — the resolver's
+      // city-agnostic fallback reads NULL, never a literal '__All__' row
+      // (normalizeReferenceCity would title-case the sentinel into an
+      // orphan slot no lookup touches).
+      const isNational = isNationalSentinel(campaign?.city);
+      const referenceCity = isNational ? null : (campaign?.city || null);
+      const referencePlatform = campaign?.intelligence_platform || null;
+      const profile = await IntelligenceProfileService.getInstance().importAsDraft({
+        categoryKey: parsedJson.category_key,
+        categoryName: parsedJson.category_name,
+        configurationJson: parsedJson,
+        intelligenceFocus: focus,
+        referenceCity,
+        referencePlatform,
+      }, ctx);
+      logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
+        profileId: profile.id,
+        version: profile.version,
+        categoryKey: profile.category_key,
+        intelligenceFocus: focus,
+        referenceCity,
+        referencePlatform,
+        campaignId,
+      });
+
+      // Geography grid cache (migration 295): the profile's geography_grid is
+      // CATEGORY-INDEPENDENT — it describes the market's retail catchment, not
+      // the category. Cache it once per (city, state) so every other category
+      // in the market reuses the same sweep units instead of re-deriving them.
+      // Best-effort: a cache failure never fails the import. National profiles
+      // carry no single catchment — skipped entirely so the sentinel never
+      // lands as a '__all__|__ALL__|' cache row.
+      if (!isNational) {
+        try {
+          const { GeographyGridService } = await import('./intelligence/GeographyGridService.js');
+          const { parseZipCodes } = await import('./intelligence/geography-grid.js');
+          const grid = (parsedJson as any)?.geography_grid ?? null;
+          const campaignZips = parseZipCodes((campaign as any)?.intelligence_zip_codes);
+          const state = (campaign as any)?.state ?? (grid as any)?.state ?? null;
+          await GeographyGridService.getInstance().upsertGrid({
+            city: referenceCity,
+            state,
+            zips: campaignZips,
+            grid: grid ?? (campaignZips.length > 0 ? { zips: campaignZips } : null),
+            derivation: grid ? 'profile_import' : campaignZips.length > 0 ? 'campaign_zip_codes' : 'ai_derived',
+            sourceProfileId: profile.id,
+          }, ctx);
+        } catch (gridErr) {
+          logger.warn('Geography grid cache upsert failed (best-effort)', ctx, {
+            error: (gridErr as Error).message,
+            campaignId,
+          });
+        }
+      }
+    } catch (profileErr) {
+      logger.error('Intelligence profile draft persistence failed (best-effort, GAP-P8)', ctx, {
+        error: (profileErr as Error).message,
+        campaignId,
+      });
+    }
+
+    // Migration 201: mark the campaign that received the profile import
+    // as an 'establishment' campaign so it is excluded from discovery-
+    // workspace campaign pickers. Best-effort — a failure here does not
+    // fail the import (the profile is already persisted as a draft).
+    try {
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { intelligence_campaign_kind: 'establishment' },
+      });
+      logger.info('Campaign marked as establishment (intelligence_profile import)', ctx, {
+        campaignId,
+      });
+    } catch (markErr) {
+      logger.error('Failed to mark campaign as establishment (best-effort)', ctx, {
+        error: (markErr as Error).message,
+        campaignId,
+      });
     }
   }
 

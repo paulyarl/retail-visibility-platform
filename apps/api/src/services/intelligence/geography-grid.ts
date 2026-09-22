@@ -67,6 +67,18 @@ export function normalizeCityKey(
   return `${c}|${s}|${z}`;
 }
 
+/**
+ * National-market sentinel: '__all__' marks a national campaign or row
+ * (all markets). It is NOT a real city/state — normalizers must never treat
+ * it as one (normalizeReferenceCity would title-case it to '__All__', an
+ * orphan slot no resolver reads). Callers translate the sentinel to the
+ * national slot at their own seams: NULL reference_city on intelligence
+ * profiles, literal '__all__' on directory_category_enrichment rows.
+ */
+export function isNationalSentinel(v: string | null | undefined): boolean {
+  return (v ?? '').toString().trim().toLowerCase() === '__all__';
+}
+
 export interface GeographyGrid {
   city: string | null;
   state: string | null;
@@ -113,6 +125,11 @@ export function buildGeographyGridDirective(
   const campaignCity = (campaign?.city ?? '').toString().trim() || null;
   const campaignState = (campaign?.state ?? '').toString().trim() || null;
   if (!campaignCity && !campaignState) return '';
+  // National ('__all__') campaigns have no single retail catchment — the
+  // catchment is authored by city-scoped establishments. Emit nothing rather
+  // than a directive that would read "Market: __all__" and ask for a
+  // nationwide ZIP/corridor derivation.
+  if (isNationalSentinel(campaignCity) || isNationalSentinel(campaignState)) return '';
 
   const campaignZips = parseZipCodes(campaign?.intelligence_zip_codes);
   const cachedZips = asStringArray(cached?.zips);

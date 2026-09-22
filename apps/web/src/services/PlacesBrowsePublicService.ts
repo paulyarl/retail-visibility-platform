@@ -146,6 +146,20 @@ export interface CategoryVocabEntry {
   onDirectory: boolean;
 }
 
+export interface NationalCategoryRosterEntry {
+  market: { categoryName: string; categoryKey: string };
+  effective: {
+    metaTitle: string | null;
+    description: string | null;
+    keywords: string[] | null;
+    schemaTypeHint: string | null;
+    secondaryCategories: string[] | null;
+  };
+  bodyCopy: string | null;
+  context: { category_overview?: string; [key: string]: any } | null;
+  enrichedAt: string;
+}
+
 class PlacesBrowsePublicService extends PublicApiSingleton {
   private static instance: PlacesBrowsePublicService;
 
@@ -256,6 +270,39 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
     }
   }
 
+  /**
+   * GET /api/public/directory/places/city/:slug (light summary) — the seed
+   * shelf's resolved market: dominant state + embedded location enrichment
+   * packet. Server-side callers (generateMetadata, page.tsx) use this to
+   * render packet-driven SEO without a second endpoint call.
+   */
+  async getCityShelfSummary(citySlug: string): Promise<{
+    city: string;
+    state: string | null;
+    total: number;
+    enrichment: LocationEnrichmentResponse | null;
+  } | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/places/city/${encodeURIComponent(citySlug)}?perPage=1`,
+        { method: 'GET' },
+        `places-city-summary-${citySlug}`,
+        5 * 60 * 1000,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      if (!data || !data.city) return null;
+      return {
+        city: data.city,
+        state: data.state ?? null,
+        total: data.total ?? 0,
+        enrichment: data.enrichment ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /** GET /api/public/directory/location-enrichment — effective location SEO for city pages */
   async getLocationEnrichment(
     city: string,
@@ -286,6 +333,28 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         areaBreakdown: data.areaBreakdown ?? null,
         context: data.context ?? null,
       };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * GET /api/public/directory/category-enrichment-roster — every national
+   * ('__all__') category packet in one call. Powers the category-aware
+   * narrative layer on the /place and /directory homes.
+   */
+  async getNationalCategoryRoster(): Promise<NationalCategoryRosterEntry[] | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/public/directory/category-enrichment-roster',
+        { method: 'GET' },
+        'category-enrichment-roster',
+        5 * 60 * 1000,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      if (!data || !Array.isArray(data.markets)) return null;
+      return data.markets as NationalCategoryRosterEntry[];
     } catch {
       return null;
     }

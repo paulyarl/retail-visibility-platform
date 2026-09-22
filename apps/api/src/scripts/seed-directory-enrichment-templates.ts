@@ -240,7 +240,71 @@ Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
   isDefault: false,
 };
 
-const TEMPLATES = [CATEGORY_TEMPLATE, LOCATION_TEMPLATE, CATEGORY_SET_TEMPLATE];
+// National Location Enrichment — the '__all__' variant. Selected
+// sentinel-keyed at render time (NATIONAL_LOCATION_ENRICHMENT_TEMPLATE_ID)
+// for location campaigns whose city is '__all__'. The body is city-agnostic
+// by construction: it declares no {{city}}/{{state}} placeholders, so the
+// campaign's sentinel values can never leak into the rendered prompt.
+const NATIONAL_LOCATION_TEMPLATE = {
+  id: 'mpt-location-enrichment-national',
+  name: 'Enrichment: National Location SEO',
+  promptType: 'enrichment' as const,
+  scope: 'city' as const,
+  body: `<!-- ${SEED_VERSION_MARKER} -->
+You are a local-SEO copywriter producing a directory enrichment packet for the NATIONAL coverage page on VisibleShelf, a public directory of local businesses — the page that aggregates every market the directory covers.
+
+=== OBJECTIVE ===
+Produce the SEO + content packet that powers the public national location page — the directory's geographic coverage surface. This page represents ALL covered markets, not one city: it introduces the directory's coverage, lets shoppers browse by state and market, and sets national expectations.
+
+=== TONE ===
+Uniform platform voice — the same register used on every public surface (business listings, category pages, location pages): warm and professional, like a knowledgeable local speaking to a neighbor. Welcoming and plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no sales calls to action. The platform writes about places and businesses from public information — never as or for a business. Applies to every shopper-facing field: description, body_copy, shopper_guide, faq, area_breakdown, context.metro_context.
+
+=== WHAT GOOD LOOKS LIKE ===
+- meta_title: <= 70 chars. Pattern: "Local Businesses Across the US — VisibleShelf Directory". No city or state name.
+- description: <= 300 chars meta description. What the page offers: a browsable index of local businesses across covered states and markets, listed from public information.
+- keywords: 8-15 search terms — "local businesses", "businesses near me", "local directory", covered-state and market phrasing, category terms that lead nationally. No keyword stuffing.
+- secondary_categories: 3-6 category names strong across the directory's national business mix (generic, e.g. "restaurants", "grocery stores").
+- top_categories: 3-8 category names most representative of the platform's national listing landscape.
+- schema_type_hint: usually "CollectionPage".
+- body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the national page — how coverage is organized (states and markets), how listings are sourced, what shoppers can browse. Warm and factual, per the TONE section. NO single-city claims.
+- shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — how to browse by state or market, how coverage differs region to region, what to expect when drilling into a market page. Distinct from body_copy (which is intro copy); this is "how to browse nationally" guidance.
+- faq: 3-6 question/answer pairs shoppers might have about browsing the directory nationally (e.g. "How many states does VisibleShelf cover?"). Each answer 1-3 sentences, warm and factual. Used for an FAQ section + FAQ schema.
+- area_breakdown: a browse-by-state/market structure — 3-8 covered states or metros, each with a short description and the categories strong there. NOT neighborhoods — this level is states and metros.
+
+=== REUSABLE CONTEXT (multiple consumers) ===
+Produce a context object with multiple consumers:
+- Business audit campaigns (the seed) consume ALL context fields for national market awareness.
+- National category enrichment campaigns consume context.city_profile ONLY — for a national packet it is the platform's national coverage profile (structural, no place-specific sentiment).
+
+- context.market_summary: 1-2 paragraphs describing the platform's national coverage — which regions are covered, where coverage is dense, the overall shape of the listing base.
+- context.top_categories: 3-8 representative categories nationally (same set as the SEO packet's top_categories).
+- context.secondary_categories: supporting categories for downstream use.
+- context.keywords: national-level search terms for downstream use.
+- context.notable_areas: covered metros and markets (simplified list — the structured area_breakdown is the page-rendered version).
+- context.market_notes: optional free-text notes useful for downstream work (e.g. "coverage concentrated in Midwest metros", "thin coverage in Mountain West").
+- context.city_profile: STRUCTURAL national coverage characteristics (NO place names). Shared with national category enrichment. Fields: { metro_description (qualitative, e.g. "multi-state coverage concentrated in Midwest metros"), major_industries (string[] — dominant business types across coverage), growth_trajectory (qualitative, e.g. "expanding into adjacent metros"), demographic_character (qualitative), market_character (1-2 sentences: overall national market character) }. Use qualitative descriptors, NOT specific population counts.
+- context.market_gaps: 2-5 uncovered or thin regions — where coverage is sparse relative to population. Each entry: { category: "<region or market>", signal, area }. The signal explains why it reads as a gap (e.g. "populous state with few covered markets"). Use the injected coverage data — do not fabricate counts.
+- context.metro_context: 1-2 paragraphs (shopper-facing) describing how the directory organizes geographically — coverage by state, how markets relate within a state, where shoppers browse next. Warm and factual, per the TONE section.
+- context.metro_dynamics: 2-6 covered states or regions with their character. Each entry: { city: "<state or metro name>", state, relationship, character, business_scene, notes }. relationship = coverage role (e.g. "largest covered market", "recently added state"). Use qualitative descriptors, NOT specific income figures or population counts.
+
+=== RULES ===
+- Write for shoppers, not operators. No internal jargon, no "campaign", no "enrichment", no "coverage grid".
+- Every field is market-agnostic: NO single-city claims, corridor names, ZIPs, or "in <city>" phrasing anywhere in shopper-facing copy.
+- Do NOT invent business counts, ratings, or specific business names — cite only coverage aggregates provided in the prompt, and describe them qualitatively ("coverage across N states" is fine; inventing per-market figures is not).
+- Do NOT include claims about business quality ("best", "top-rated") — the directory lists from public information.
+- If coverage data is provided in the prompt, ground every geographic claim in it. If it is absent, write coverage-agnostic national copy and omit specific state claims rather than guessing.
+
+=== OUTPUT REQUIREMENT ===
+Respond with a SINGLE JSON object only. No markdown fences, no commentary.`,
+  variables: [] as string[],
+  outputSchema: {
+    name: LOCATION_ENRICHMENT_SCHEMA_NAME,
+    description: 'National location enrichment packet — coverage narrative for the national (all-markets) location page.',
+  },
+  isDefault: false,
+};
+
+const TEMPLATES = [CATEGORY_TEMPLATE, LOCATION_TEMPLATE, CATEGORY_SET_TEMPLATE, NATIONAL_LOCATION_TEMPLATE];
 
 async function main() {
   const service = MarketingPromptService.getInstance();
