@@ -1248,7 +1248,7 @@ Include:
 
 End with the claim value proposition:
 
-> Claiming is free. It lets you confirm ownership, correct inaccurate information, add missing details, connect your preferred profiles, and establish the verified starting record for future intelligence.
+> Claiming is free. It lets you confirm this business is yours, fix anything wrong or out of date, add the details shoppers look for, connect the profiles you already use, showcase 5 top sellers in free product slots, and set the verified record future intelligence builds on.
 
 Primary CTA:
 
@@ -1754,7 +1754,7 @@ The seed claim should unlock the appropriate owner access already described in `
 
 ### 15.2 Claim explanation
 
-> Claiming is free. It lets you confirm ownership, correct inaccurate information, add missing details, connect your preferred profiles, and establish the verified starting record for future intelligence.
+> Claiming is free. It lets you confirm this business is yours, fix anything wrong or out of date, add the details shoppers look for, connect the profiles you already use, showcase 5 top sellers in free product slots, and set the verified record future intelligence builds on.
 
 ### 15.3 Report limitation language
 

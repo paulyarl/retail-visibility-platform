@@ -286,8 +286,8 @@ export default function PlaceCategoryClient({
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 These places are listed from public information (address, phone, and
                 publicly available data). They are not claimed profiles. If you own one
-                of these businesses, claim your listing to verify information, add
-                photos, and get a dashboard to manage your online presence.
+                of these businesses, claim it free to fix your details, add photos, and
+                showcase 5 top sellers from your own dashboard.
               </p>
             </div>
           </div>

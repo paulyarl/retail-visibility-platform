@@ -105,7 +105,7 @@ export default function PlaceCard({
               <ShieldCheck className="w-5 h-5" /> Claim this listing
             </Link>
             <p className="mt-3 text-xs text-gray-500 text-center">
-              Claiming is free and lets you update hours, add a photo, and verify your details.
+              Free forever — fix your details, add a photo, and showcase 5 top sellers.
             </p>
           </div>
         </div>

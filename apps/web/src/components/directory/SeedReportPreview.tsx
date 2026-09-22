@@ -351,7 +351,7 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
             <div>
               <Text size="sm" fw={500}>Claim this business seed</Text>
               <Text size="xs" c="dimmed">
-                Verify your details and connect your preferred profiles
+                Claim it free — fix what&apos;s here and showcase your top sellers
               </Text>
             </div>
             <Link

@@ -41,7 +41,8 @@ export default function UnclaimedDirectoryBanner({
     >
       <Text size="sm" c="blue.9" className="mb-2">
         <strong>{businessName}</strong> is listed from public information. This is not a claimed profile.
-        Claim to verify your details and appear on every matching category shelf.
+        Claim it free — verify your details, appear on every matching category shelf,
+        and showcase 5 top sellers.
       </Text>
 
       {hasToken ? (

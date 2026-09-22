@@ -569,8 +569,8 @@ export default function SeedReportClient() {
           ) : (
             <>
               <Text size="sm" c="dimmed" mb="md">
-                Verify your details, correct any errors, and connect your preferred profiles.
-                Claiming is free.
+                This seed is yours — claim it free. Fix what&apos;s wrong, add what&apos;s
+                missing, and put your top sellers in front of nearby shoppers.
               </Text>
               <ul className="mb-4 space-y-1">
                 {report.claim_summary.claim_benefits.map((benefit, i) => (

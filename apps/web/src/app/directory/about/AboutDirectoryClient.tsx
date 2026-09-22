@@ -132,7 +132,8 @@ export default function AboutDirectoryClient() {
                     You claim your listing
                   </h3>
                   <p className="text-neutral-600 dark:text-neutral-400">
-                    Claiming is free and takes about two minutes. Fix your name, address, and phone so they're right everywhere.
+                    Claiming is free and takes about two minutes. Fix your name, address, and phone —
+                    then showcase 5 top sellers in free product slots.
                   </p>
                 </div>
               </div>

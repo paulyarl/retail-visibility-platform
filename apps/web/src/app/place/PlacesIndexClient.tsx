@@ -113,8 +113,8 @@ export default function PlacesIndexClient({
           </h1>
           <p className="text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl">
             Local businesses listed from public information. Browse by category to find
-            places near you. Is this your business? Claim your listing to verify and
-            update details.
+            places near you. Is this your business? Claim it free — fix your details
+            and showcase 5 top sellers.
           </p>
 
           {/* Search bar */}
@@ -215,9 +215,8 @@ export default function PlacesIndexClient({
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 Places listed here are sourced from public information (address, phone,
                 and publicly available data). They are not claimed profiles. If you own
-                one of these businesses, you can claim your listing to verify
-                information, add photos, and get a dashboard to manage your online
-                presence.
+                one of these businesses, claim it free to fix your details, add photos,
+                and showcase 5 top sellers from your own dashboard.
               </p>
             </div>
           </div>

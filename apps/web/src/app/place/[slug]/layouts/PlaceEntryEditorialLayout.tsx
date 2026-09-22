@@ -243,8 +243,8 @@ export default function PlaceEntryEditorialLayout({
                   </p>
                 )}
                 <p className="text-neutral-500 leading-relaxed mt-3">
-                  Claiming is free and lets the business owner verify details, update hours, add a photo,
-                  and connect with customers on VisibleShelf.
+                  It&apos;s free to claim — the owner can fix details, update hours, add a photo,
+                  and showcase up to 5 products for nearby shoppers.
                 </p>
               </div>
               <div className="flex flex-col items-center lg:items-end gap-3">

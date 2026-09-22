@@ -871,8 +871,8 @@ export default function DirectoryClaimClient() {
                 from your dashboard.
               </List.Item>
               <List.Item>
-                Your listing is free forever and includes 5 free product slots to showcase
-                your top sellers to nearby shoppers — that&apos;s our{' '}
+                Your listing is free forever — 5 free product slots to put your top
+                sellers in front of nearby shoppers. That&apos;s our{' '}
                 <Link href="/place/about" style={{ color: 'inherit', textDecoration: 'underline' }}>
                   promise
                 </Link>

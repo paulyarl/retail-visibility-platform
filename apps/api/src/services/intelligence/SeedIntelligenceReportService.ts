@@ -1188,11 +1188,12 @@ export class SeedIntelligenceReportService extends BaseService {
       claim_status: claimStatus,
       claim_url: null, // Set by the claim-handoff layer (Phase 5)
       claim_benefits: [
-        'Confirm ownership',
-        'Correct inaccurate information',
-        'Add missing details',
-        'Connect your preferred profiles',
-        'Establish the verified starting record for future intelligence',
+        'Confirm this business is yours',
+        'Fix anything wrong or out of date',
+        'Add the details shoppers look for',
+        'Connect the profiles you already use',
+        'Showcase 5 top sellers in free product slots',
+        'Set the verified record future intelligence builds on',
       ],
       owner_confirmation_count: ownerConfirmationCount,
       owner_correction_count: ownerCorrectionCount,
