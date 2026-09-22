@@ -32,6 +32,17 @@ const CAMPAIGN_CATEGORY_OPTIONS = [
 const INTELLIGENCE_FOCUS_OPTIONS = ['emerging', 'competitive', 'gold_standards', 'bronze_standards'];
 const INTELLIGENCE_KIND_OPTIONS = ['establishment', 'discovery'];
 
+// '__all__' is the national scope marker — never display text. 'All
+// Platforms' in a stored title is the implicit default — strip the segment.
+const displayCampaignTitle = (v?: string | null) =>
+  (v ?? '')
+    .replace(/__all__/gi, 'National')
+    .replace(/\s*-\s*All Platforms\b/gi, '')
+    .replace(/\s*-\s*$/, '')
+    .trim();
+const displayCityPart = (v?: string | null, nationalBlank = false) =>
+  !v?.trim() ? (nationalBlank ? 'National' : '') : v.trim().toLowerCase() === '__all__' ? 'National' : v;
+
 type FollowUpFilter = '' | 'overdue' | 'due_today' | 'this_week';
 
 function followUpBadge(c: Campaign): { label: string; cls: string } | null {
@@ -513,7 +524,7 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
                         <td className="px-4 py-3">
                           <Link href={`/settings/admin/marketing-ops/campaigns/${c.id}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
                             {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 text-orange-500" />}
-                            {c.title || c.business_name || c.category || c.city || '—'}
+                            {displayCampaignTitle(c.title || c.business_name || c.category || c.city) || '—'}
                           </Link>
                           {c.archetype && (
                             <ArchetypeBadge archetype={c.archetype} className="ml-1.5 align-middle" />
@@ -523,7 +534,7 @@ export default function CampaignListClient({ initialProvingGroundId, initialStag
                           )}
                           {c.title && (c.business_name || c.category || c.city) && (
                             <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {c.business_name || `${c.category} · ${c.city}`}
+                              {c.business_name || [c.category, displayCityPart(c.city, c.scope === 'intelligence')].filter(Boolean).join(' · ')}
                             </span>
                           )}
                         </td>

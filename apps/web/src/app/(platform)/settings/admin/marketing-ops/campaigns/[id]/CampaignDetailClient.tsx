@@ -133,6 +133,29 @@ const INTELLIGENCE_SCHEMA_GROUP_LABELS: Record<string, string> = {
 // national body with a market's variables.
 const NATIONAL_ESTABLISHMENT_TEMPLATE_ID = 'mpt-seed-intel-profile-establishment-national-001';
 
+// '__all__' is the national scope marker — never display text. And 'all' as
+// a platform title segment is the implicit default, so stored titles get a
+// display-time strip ("- All Platforms" adds no information).
+const isNationalGeoPart = (v?: string | null) => !v?.trim() || v.trim().toLowerCase() === '__all__';
+const displayCampaignTitle = (v?: string | null) =>
+  (v ?? '')
+    .replace(/__all__/gi, 'National')
+    .replace(/\s*-\s*All Platforms\b/gi, '')
+    .replace(/\s*-\s*$/,'')
+    .trim();
+// Blank geo reads as "National" only on intelligence scope — a business
+// campaign missing city/state is just missing data, not a national run.
+const displayGeoPair = (city?: string | null, state?: string | null, nationalBlank = false) => {
+  if (isNationalGeoPart(city) && isNationalGeoPart(state)) {
+    const explicit = (v?: string | null) => (v ?? '').trim().toLowerCase() === '__all__';
+    return explicit(city) || explicit(state) || nationalBlank ? 'National' : '';
+  }
+  return [city, state]
+    .map((s) => s?.trim() ?? '')
+    .filter((s) => s && s.toLowerCase() !== '__all__')
+    .join(', ');
+};
+
 // ─── Triage → Prompt recommendation mapping ──────────────────────────────
 //
 // When triage is decided (accepted or overridden), the detected signals +
@@ -854,7 +877,8 @@ export default function CampaignDetailClient({
     const street = [campaign.address_line1, campaign.address_line2].filter(Boolean).join(', ');
     const locality = [
       [campaign.address_city || campaign.city, campaign.address_state || campaign.state]
-        .filter(Boolean)
+        .map((s) => s?.trim() ?? '')
+        .filter((s) => s && s.toLowerCase() !== '__all__')
         .join(', '),
       campaign.address_zip,
     ]
@@ -1072,7 +1096,7 @@ export default function CampaignDetailClient({
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.title || campaign.business_name || campaign.category || campaign.city}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{displayCampaignTitle(campaign.title || campaign.business_name || campaign.category || campaign.city)}</h1>
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
                     {campaign.scope}
                   </span>
@@ -1108,7 +1132,7 @@ export default function CampaignDetailClient({
                 </div>
                 {campaign.title && (campaign.business_name || campaign.category || campaign.city) && (
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-0.5">
-                    {campaign.business_name || campaign.category || campaign.city}
+                    {displayCampaignTitle(campaign.business_name || campaign.category || campaign.city)}
                   </p>
                 )}
                 <div className="flex items-center gap-2">
@@ -1116,7 +1140,7 @@ export default function CampaignDetailClient({
                     {/* Canonical NAP display — structured business address fields
                         first, market scope as the fallback (non-business scopes
                         carry no address_* columns). */}
-                    {campaign.scope} · {campaign.category} · {campaign.address_city || campaign.city}{(campaign.address_state || campaign.state) ? `, ${campaign.address_state || campaign.state}` : ''}{campaign.address_zip ? ` ${campaign.address_zip}` : ''}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
+                    {campaign.scope} · {campaign.category} · {displayGeoPair(campaign.address_city || campaign.city, campaign.address_state || campaign.state, campaign.scope === 'intelligence')}{campaign.address_zip ? ` ${campaign.address_zip}` : ''}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
                     {campaign.display_id && ` · ${campaign.display_id}`}
                   </p>
                   {napSearchString && (

@@ -452,19 +452,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     const kindLabel = cap(form.intelligence_campaign_kind);
     const focusLabel = cap(form.intelligence_focus);
     const headParts = [form.category, kindLabel, focusLabel].map((s) => (s ?? '').trim()).filter(Boolean);
-    // Gold-standard campaigns are nationwide — the platform replaces city
-    // as the focus dimension. Append the platform to the title. (Legacy
-    // edit-mode campaigns that already have city/state will still include
-    // them via the locParts block below — preserved for backward compat.)
-    // Emerging/competitive campaigns are city-scoped, but when a specific
-    // platform is selected, append it to the title so the operator can
-    // distinguish a platform-targeted discovery scan from a broad one.
-    if (form.intelligence_focus === 'gold_standards' && form.intelligence_platform) {
-      const platformLabel = form.intelligence_platform === 'all'
-        ? 'All Platforms'
-        : cap(form.intelligence_platform);
-      headParts.push(platformLabel);
-    } else if ((form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive' || form.intelligence_focus === 'bronze_standards') && form.intelligence_platform) {
+    // A specific platform earns a title segment so the operator can
+    // distinguish a platform-targeted scan from a broad one. 'all' is the
+    // implicit default — it adds no information, so it's hidden from the
+    // title. (Legacy edit-mode campaigns that already have city/state will
+    // still include them via the locParts block below.)
+    if (form.intelligence_platform && form.intelligence_platform.toLowerCase() !== 'all') {
       headParts.push(cap(form.intelligence_platform));
     }
     // '__all__' is the national scope marker — never title text; render a
