@@ -972,9 +972,13 @@ export class MarketingPromptService extends BaseService {
             // first for regional discovery campaigns (Layer 1/2) instead of
             // falling back to the nationwide profile (Layer 3). A nationwide
             // establishment campaign (no city/state) produces a nationwide
-            // profile as before.
-            const referenceCity = campaign?.city || null;
-            const referenceState = campaign?.state || null;
+            // profile as before. A literal '__all__' (the national checkbox
+            // marker) maps to the same NULL slot — normalizeReferenceCity
+            // would otherwise title-case it into an orphan '__All__' row no
+            // resolver reads.
+            const isNational = isNationalSentinel(campaign?.city);
+            const referenceCity = isNational ? null : (campaign?.city || null);
+            const referenceState = isNational ? null : (campaign?.state || null);
             // Platform scoping (Migration 236): if the scan's platform_focus
             // is a specific platform (not 'all'), persist it as
             // reference_platform so a platform-specific profile coexists
@@ -1043,8 +1047,13 @@ export class MarketingPromptService extends BaseService {
               state: true,
             },
           });
-          const referenceCity = campaign?.city || null;
-          const referenceState = campaign?.state || null;
+          // '__all__' (the national checkbox marker) maps to the national
+          // NULL slot — same convention as the e/c + gold seams. Without the
+          // map, the sentinel would poison the profile slot ('__All__' after
+          // title-casing) AND the catalog scope query below.
+          const isNational = isNationalSentinel(campaign?.city);
+          const referenceCity = isNational ? null : (campaign?.city || null);
+          const referenceState = isNational ? null : (campaign?.state || null);
           // Platform scoping mirrors gold's platform_focus handling
           // (spec §10.3): a specific reference_platform produces a
           // platform-scoped profile; null stays cross-platform.

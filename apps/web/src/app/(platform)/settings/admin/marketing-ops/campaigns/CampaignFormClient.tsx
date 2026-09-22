@@ -240,6 +240,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // Kind, Focus, City, State (see deriveIntelligenceTitle effect below). The
   // first keystroke in the Title field flips this to true and stops auto-fill.
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(false);
+  // Explicit un-check of the National box on geo-optional focuses (gold /
+  // bronze establishment) — without it a blank city would re-infer checked
+  // and the box could never be unchecked. Resets when the lane changes.
+  const [nationalDeclined, setNationalDeclined] = useState(false);
   // Directory-enrichment-only: optional freeform tail appended to the
   // auto-generated title ("Enrichment - Indianapolis - IN" + suffix "test"
   // → "Enrichment - Indianapolis - IN - test"). Not persisted separately —
@@ -435,6 +439,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   // city/state as the focus dimension:
   // "African Grocery Store - Establishment - Gold Standards - Google".
   // Stops auto-filling once the operator manually edits the Title field.
+  // Lane changes re-infer the National checkbox — a declined national on one
+  // focus shouldn't suppress the blank-geo inference on another.
+  useEffect(() => {
+    setNationalDeclined(false);
+  }, [form.intelligence_focus, form.intelligence_campaign_kind, form.scope]);
+
   useEffect(() => {
     if (form.scope !== 'intelligence') return;
     if (titleManuallyEdited) return;
@@ -457,9 +467,15 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     } else if ((form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive' || form.intelligence_focus === 'bronze_standards') && form.intelligence_platform) {
       headParts.push(cap(form.intelligence_platform));
     }
-    const locParts = [form.city, form.state].map((s) => (s ?? '').trim()).filter(Boolean);
+    // '__all__' is the national scope marker — never title text; render a
+    // readable scope label instead of the sentinel.
+    const cityIsNational = (form.city ?? '').trim().toLowerCase() === '__all__';
+    const locParts = [form.city, form.state]
+      .map((s) => (s ?? '').trim())
+      .filter((s) => s && s.toLowerCase() !== '__all__');
     const parts = [...headParts];
-    if (locParts.length > 0) parts.push(locParts.join(', '));
+    if (cityIsNational) parts.push('National');
+    else if (locParts.length > 0) parts.push(locParts.join(', '));
     const derived = parts.join(' - ');
     setForm((prev) => (prev.title === derived ? prev : { ...prev, title: derived }));
   }, [form.scope, form.category, form.intelligence_campaign_kind, form.intelligence_focus, form.intelligence_platform, form.city, form.state, titleManuallyEdited]);
@@ -785,6 +801,26 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     || (form.intelligence_focus === 'bronze_standards' && form.intelligence_campaign_kind === 'discovery')
   )) || form.campaign_category === 'proving_ground';
 
+  // Unified national-scope control — one checkbox across every intelligence
+  // focus/kind EXCEPT bronze discovery (the stage-2 scan is city-mandatory
+  // by design — its national counterpart is bronze establishment). Checked
+  // writes the '__all__' sentinel uniformly; the API maps it to the national
+  // null-slot. For geo-optional focuses (gold, bronze establishment) a blank
+  // city IS national, so the box also renders checked while geo is empty —
+  // national is a declared intent on every focus, not an implicit default.
+  const showNationalScope = form.scope === 'intelligence'
+    && !(form.intelligence_focus === 'bronze_standards' && form.intelligence_campaign_kind === 'discovery');
+  const nationalScopeChecked = showNationalScope && !nationalDeclined && (
+    form.city.trim().toLowerCase() === '__all__'
+    || (form.intelligence_focus !== '' && !geoRequired && !form.city.trim())
+  );
+  const standardsFocus = form.intelligence_focus === 'gold_standards' || form.intelligence_focus === 'bronze_standards';
+  const nationalScopeLabel = standardsFocus
+    ? 'National (all markets) — the standards default; uncheck to pin a market'
+    : form.intelligence_campaign_kind === 'establishment'
+      ? 'National (all markets) — establish the city-agnostic vocabulary floor'
+      : 'National (all markets) — sweep all US markets against the national profile';
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1107,37 +1143,49 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 markets against the national profile — no ZIP/radius scoping,
                 each candidate carries its own market. Unchecking restores
                 city/state entry. */}
-            {form.scope === 'intelligence'
-              && (form.intelligence_campaign_kind === 'establishment' || form.intelligence_campaign_kind === 'discovery')
-              && (form.intelligence_focus === 'emerging' || form.intelligence_focus === 'competitive') && (
+            {/* Market Scope — one National checkbox across all intelligence
+                focuses (bronze discovery excluded: stage-2 is city-mandatory).
+                For gold/bronze establishment the box renders checked while geo
+                is blank — blank already means national there, so the checkbox
+                is a declaration, not a different state. */}
+            {showNationalScope && (
               <FormField label="Market Scope" className="sm:col-span-2">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={form.city.trim().toLowerCase() === '__all__'}
-                    onChange={(e) => setForm((prev) => e.target.checked
-                      ? { ...prev, city: '__all__', state: '__all__' }
-                      : { ...prev, city: '', state: '' })}
+                    checked={nationalScopeChecked}
+                    onChange={(e) => {
+                      setNationalDeclined(!e.target.checked);
+                      setForm((prev) => e.target.checked
+                        ? { ...prev, city: '__all__', state: '__all__' }
+                        : { ...prev, city: '', state: '' });
+                    }}
                   />
                   <span className="text-sm">
-                    {form.intelligence_campaign_kind === 'establishment'
-                      ? 'National (all markets) — establish the city-agnostic vocabulary floor'
-                      : 'National (all markets) — sweep all US markets against the national profile'}
+                    {nationalScopeLabel}
                   </span>
                 </label>
                 <p className="text-xs text-gray-400 mt-1">
-                  {form.intelligence_campaign_kind === 'establishment'
-                    ? <>A national establishment produces the city-agnostic profile every market falls back to when no
-                      local establishment exists (synonyms, subcategories, taxonomy, evidence rules, national signal
-                      weights). Run a city establishment per market for the local delta — corridors, ZIP catchments,
-                      supplier lists, local signal weights.</>
-                    : <>A national discovery sweeps all US markets using the national profile — each candidate is
-                      classified by its own city + state. Run a market-scoped discovery when you want to concentrate
-                      on a single city.</>}
+                  {standardsFocus
+                    ? <>Standards profiles are nationwide by default — one profile resolves as the fallback for
+                      every market. Uncheck and fill City + State to produce a market-scoped profile instead
+                      (it resolves first for that market; nationwide remains the fallback).</>
+                    : form.intelligence_campaign_kind === 'establishment'
+                      ? <>A national establishment produces the city-agnostic profile every market falls back to when no
+                        local establishment exists (synonyms, subcategories, taxonomy, evidence rules, national signal
+                        weights). Run a city establishment per market for the local delta — corridors, ZIP catchments,
+                        supplier lists, local signal weights.</>
+                      : <>A national discovery sweeps all US markets using the national profile — each candidate is
+                        classified by its own city + state. Run a market-scoped discovery when you want to concentrate
+                        on a single city.</>}
                 </p>
               </FormField>
             )}
-            {/* City | State — family pair */}
+            {/* City | State — family pair. Hidden while the National scope
+                checkbox is checked (intelligence only): the pair is the
+                market selector, and national means no market — showing it
+                would surface the raw '__all__' sentinel as a field value. */}
+            {!nationalScopeChecked && (
             <FormField label="City" required={geoRequired}>
               <SuggestiveSelect required={geoRequired} value={form.city} onChange={handleCityChange}
                 options={cityOptions} emptyLabel="-- Select city --" newLabel="+ New city..."
@@ -1155,6 +1203,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">Leave blank for the nationwide bar; fill city + state for a market-scoped gold standard.</p>
               )}
             </FormField>
+            )}
+            {!nationalScopeChecked && (
             <FormField label="State" required={geoRequired}>
               <SuggestiveSelect required={geoRequired} value={form.state} onChange={(v) => handleChange('state', v)}
                 options={stateOptions} emptyLabel="-- Select state --" newLabel="+ New state..."
@@ -1169,6 +1219,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
               )}
             </FormField>
+            )}
             {/* ZIP Codes | Search Radius — intelligence emerging/competitive.
                 Hidden for national ('__all__') campaigns — a nationwide sweep
                 has no ZIP or radius constraint. */}
@@ -1223,6 +1274,13 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             </FormField>
           </FormSection>
 
+          {/* Classification / Contact & GBP Audit / Pricing & Stage are
+              business-engagement fields — retainer, contact channels, GBP
+              audit, pricing, stage. Meaningless on aggregate lanes
+              (category/city/intelligence/PG), so they only render for
+              business-scope campaigns. */}
+          {form.scope === 'business' && (
+          <>
           <FormSection title="Classification">
             <FormField label="Retainer">
               <select value={form.retainer} onChange={(e) => handleChange('retainer', e.target.value as 'Fast' | 'Medium' | 'Slow' | '')}
@@ -1645,6 +1703,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
               </>
             )}
           </FormSection>
+          </>
+          )}
 
           {/* Notes */}
           <FormSection title="Notes">

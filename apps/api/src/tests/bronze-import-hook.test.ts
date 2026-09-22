@@ -132,6 +132,37 @@ describe('importExternalResult — bronze_standard_scan hook', () => {
     expect(result.audit).toBeNull();
   });
 
+  it('maps the __all__ campaign marker to the national NULL slot (no __All__ orphan)', async () => {
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValueOnce({
+      intelligence_focus: 'bronze_standards',
+      intelligence_campaign_kind: 'establishment',
+      city: '__all__',
+      state: '__all__',
+    });
+
+    await service.importExternalResult({
+      campaignId: 'camp-bronze-1',
+      templateId: TEMPLATE.id,
+      rawOutput: PAYLOAD,
+    });
+
+    expect(mockProfileService.importAsDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intelligenceFocus: 'bronze_standards',
+        referenceCity: null,
+        referenceState: null,
+      }),
+      undefined,
+    );
+    // The sentinel must not leak into the prior-active lookup either —
+    // normalizeReferenceCity('__all__') would title-case an orphan slot.
+    expect(mockPrisma.mkt_intelligence_profiles.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ reference_city: null, reference_state: null }),
+      }),
+    );
+  });
+
   it('persists a bronze draft for a discovery import too (hook keyed on schema name, not kind)', async () => {
     await service.importExternalResult({
       campaignId: 'camp-bronze-1',
