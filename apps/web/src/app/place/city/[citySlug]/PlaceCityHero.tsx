@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MapPin, ArrowLeft } from 'lucide-react';
 import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
+import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
 
 /**
  * Server-rendered seed city shelf hero — breadcrumb, title, listing count, the
@@ -26,15 +27,19 @@ export default function PlaceCityHero({
   enrichment: LocationEnrichmentResponse | null;
 }) {
   const locationName = state ? `${city}, ${state}` : city;
-  const overview = enrichment?.bodyCopy || enrichment?.effective?.description || null;
+  // Legacy packets carry a baked listing count that goes stale (see the helper)
+  // — the live count renders below the title instead.
+  const overview = stripStaleBusinessCount(
+    enrichment?.bodyCopy || enrichment?.effective?.description || null,
+  );
   const topCategories = enrichment?.topCategories ?? [];
 
   const jsonLd = enrichment
     ? {
         '@context': 'https://schema.org',
         '@type': 'CollectionPage',
-        name: enrichment.effective.metaTitle || `Places in ${locationName}`,
-        description: enrichment.effective.description,
+        name: stripStaleBusinessCount(enrichment.effective.metaTitle) || `Places in ${locationName}`,
+        description: stripStaleBusinessCount(enrichment.effective.description) ?? undefined,
         url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://visibleshelf.com'}/place/city/${citySlug}`,
       }
     : null;

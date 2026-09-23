@@ -77,6 +77,25 @@ describe('PlaceCityHero', () => {
     expect(unknown).not.toContain('listed from public information');
   });
 
+  it('never renders a stale baked business count from legacy packet copy', () => {
+    const html = renderToStaticMarkup(
+      createElement(PlaceCityHero, {
+        ...baseProps,
+        enrichment: {
+          ...enrichment,
+          bodyCopy: null,
+          effective: {
+            ...enrichment.effective,
+            description:
+              'Discover 0 local businesses in Kansas City, MO, listed on VisibleShelf from public information.',
+          },
+        },
+      }),
+    );
+    expect(html).toContain('Discover local businesses in Kansas City, MO');
+    expect(html).not.toContain('0 local businesses');
+  });
+
   it('renders without a packet (graceful-absent)', () => {
     const html = renderToStaticMarkup(
       createElement(PlaceCityHero, { ...baseProps, enrichment: null }),

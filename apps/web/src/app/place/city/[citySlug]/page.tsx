@@ -8,6 +8,7 @@ import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
 
 /** Slug-derived display name — the DB spelling wins whenever it's available. */
 function cityNameFromSlug(citySlug: string): string {
@@ -25,8 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ citySlug:
   const summary = await placesBrowsePublicService.getCityShelfSummary(citySlug);
   const effective = summary?.enrichment?.effective;
 
-  const title = effective?.metaTitle || `Places in ${cityName} — Directory`;
-  const description = effective?.description
+  // Legacy packets bake a listing count that goes stale ("0 Businesses in …")
+  // — normalize so the SERP never carries a count that can't reflect actual.
+  const title = stripStaleBusinessCount(effective?.metaTitle) || `Places in ${cityName} — Directory`;
+  const description = stripStaleBusinessCount(effective?.description)
     || `Browse all businesses in ${cityName}. Find grocery stores, restaurants, and more.`;
 
   return {

@@ -23,6 +23,7 @@ import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 import { resolveShelfForLabel, shelfHrefFor } from '@/lib/place-shelves';
@@ -287,6 +288,18 @@ export default function PlaceCategoryClient({
                 shelfRef={`place/category/${categorySlug}`}
               />
             ))}
+          </div>
+        )}
+
+        {/* Square banner slot (300x250) — in-feed placement at the end of the
+            listing grid, before the listings disclosure. */}
+        {places.length > 0 && (
+          <div className="mt-10 flex justify-center">
+            <MarketIntelBanner
+              variant="square"
+              surfaceType="category"
+              teaser={marketIntelTeaser}
+            />
           </div>
         )}
 

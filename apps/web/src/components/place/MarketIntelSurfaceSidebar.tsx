@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { MarketIntelCard } from './MarketIntelCard';
+import { MarketIntelBanner } from './MarketIntelBanner';
 import marketIntelSurfaceService, {
   type CategoryMarketIntelTeaser,
   type CityMarketIntelTeaser,
@@ -76,9 +77,10 @@ export function MarketIntelSurfaceSidebar({
         {open ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
       </button>
 
-      {/* Sidebar panel */}
+      {/* Sidebar panel. w-[21rem]: the 300px banner slot plus panel padding —
+          w-80 (320px) is 8px too narrow for a 300x600 creative. */}
       {open && (
-        <aside className="fixed right-0 top-0 h-full w-80 max-w-[85vw] bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl z-30 overflow-y-auto">
+        <aside className="fixed right-0 top-0 h-full w-[21rem] max-w-[85vw] bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl z-30 overflow-y-auto">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -94,6 +96,14 @@ export function MarketIntelSurfaceSidebar({
             </div>
 
             <div className="space-y-3">
+              {/* Tall banner slot (300x600) — reserved ad inventory at the top
+                  of the panel, filled with the surface's report offer. */}
+              <MarketIntelBanner
+                variant="tall"
+                surfaceType={isCategory ? 'category' : 'city'}
+                teaser={teaser}
+                className="mb-1"
+              />
               {isCategory ? (
                 <CategoryCards teaser={teaser as CategoryMarketIntelTeaser} />
               ) : (

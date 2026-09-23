@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Fragment, useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -15,6 +15,7 @@ import {
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { buildShelfSections } from './place-city-shelves';
 import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 import type { CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
@@ -148,6 +149,10 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
   // listings only.
   const enrichment = data.enrichment ?? enrichmentProp ?? null;
   const locationName = data.state ? `${data.city}, ${data.state}` : data.city;
+  // Shelf chip counts come from THIS page's row set, so they only equal the true
+  // shelf size when the whole city fits on one page. Paginated → the per-shelf
+  // number would undercount, so it isn't shown (the live city total is above).
+  const shelfCountsAreComplete = data.totalPages <= 1;
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -214,7 +219,9 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
                     >
                       {c.iconEmoji && <span>{c.iconEmoji}</span>}
                       <span>{c.category}</span>
-                      <span className="text-neutral-400">({c.places.length})</span>
+                      {shelfCountsAreComplete && (
+                        <span className="text-neutral-400">({c.places.length})</span>
+                      )}
                     </Link>
                   ))}
                 </div>
@@ -223,8 +230,9 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
 
             {/* Listings grouped by shelf, each business carded once. */}
             <div className="space-y-10">
-              {shelfSections.map((cat) => (
-                <section key={cat.slug} id={`shelf-${cat.slug}`}>
+              {shelfSections.map((cat, idx) => (
+                <Fragment key={cat.slug}>
+                <section id={`shelf-${cat.slug}`}>
                   <div className="flex items-baseline justify-between gap-3 mb-3">
                     <h2 className="text-xl font-semibold text-neutral-900">
                       {cat.iconEmoji && <span className="mr-2">{cat.iconEmoji}</span>}
@@ -269,6 +277,18 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
                     </ul>
                   )}
                 </section>
+                {/* Square banner slot (300x250) — in-feed placement after the
+                    first shelf, the highest-viewability spot in the flow. */}
+                {idx === 0 && (
+                  <div className="flex justify-center">
+                    <MarketIntelBanner
+                      variant="square"
+                      surfaceType="city"
+                      teaser={marketIntelTeaser}
+                    />
+                  </div>
+                )}
+                </Fragment>
               ))}
             </div>
 
