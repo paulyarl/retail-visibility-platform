@@ -552,7 +552,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       }
 
       const searchParams = new URLSearchParams();
-      searchParams.append('category', encodeURIComponent(category));
+      searchParams.append('category', category);
       if (page) searchParams.append('page', page.toString());
       if (limit) searchParams.append('limit', limit.toString());
 
@@ -586,8 +586,8 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       }
 
       const searchParams = new URLSearchParams();
-      searchParams.append('city', encodeURIComponent(city));
-      searchParams.append('state', encodeURIComponent(state));
+      searchParams.append('city', city);
+      searchParams.append('state', state);
       if (page) searchParams.append('page', page.toString());
       if (limit) searchParams.append('limit', limit.toString());
 
