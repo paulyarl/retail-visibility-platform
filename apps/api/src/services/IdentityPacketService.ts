@@ -81,6 +81,15 @@ export interface IdentityPacket {
    * display summary, not the day-map.
    */
   businessHours: Record<string, any> | null;
+  /**
+   * Campaign-record contact + profile lists, carried for the Verify record
+   * modal prefill (same role as businessHours). The modal re-submits these
+   * verbatim on save and the campaign write REPLACES the columns — a modal
+   * that never rendered them would silently drop every stored row.
+   */
+  email: string | null;
+  socialProfiles: Array<{ platform: string; url: string }>;
+  directoryProfiles: Array<Record<string, any>>;
   identityStatus: IdentityStatus;
   operationalStatus: OperationalStatus;
   callConfirmed: boolean | null;
@@ -118,6 +127,9 @@ export interface AssembleInput {
     phone?: string | null;
     website_url?: string | null;
     business_hours?: Record<string, any> | null;
+    email?: string | null;
+    social_profiles?: Array<{ platform: string; url: string }> | null;
+    directory_profiles?: Array<Record<string, any>> | null;
   } | null;
   /** Latest non-stub business_analysis audit_data, or null. */
   audit: any | null;
@@ -491,6 +503,9 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     addressState,
     addressZip,
     businessHours: campaign?.business_hours ?? null,
+    email: campaign?.email ?? null,
+    socialProfiles: Array.isArray(campaign?.social_profiles) ? campaign.social_profiles : [],
+    directoryProfiles: Array.isArray(campaign?.directory_profiles) ? campaign.directory_profiles : [],
     identityStatus,
     operationalStatus,
     callConfirmed: input.callConfirmed ?? null,
@@ -528,6 +543,9 @@ class IdentityPacketService {
         phone: true,
         website_url: true,
         business_hours: true,
+        email: true,
+        social_profiles: true,
+        directory_profiles: true,
       },
     });
 

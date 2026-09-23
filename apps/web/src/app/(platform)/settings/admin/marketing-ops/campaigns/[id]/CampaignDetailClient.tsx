@@ -2567,7 +2567,11 @@ export default function CampaignDetailClient({
 
             {activeTab === 'identity' && campaign && (
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
-                <IdentityPacketCard campaignId={campaign.id} onSeedCreated={fetchCampaign} />
+                <IdentityPacketCard
+                  campaignId={campaign.id}
+                  onSeedCreated={fetchCampaign}
+                  onVerified={fetchCampaign}
+                />
               </div>
             )}
 

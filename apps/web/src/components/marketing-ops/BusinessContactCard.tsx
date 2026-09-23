@@ -207,13 +207,18 @@ export default function BusinessContactCard({ campaign, onEnriched }: BusinessCo
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {directoryProfiles.map((dp, idx) => {
-              const platformLabel = DIRECTORY_PLATFORM_LABELS[dp.platform] || dp.platform || 'Unknown';
+              // Stored platform is free-text ("MapQuest", "Yellow Pages") —
+              // normalize to the label-map key shape before lookup.
+              const platformKey = (dp.platform ?? '').toLowerCase().replace(/[\s-]+/g, '_');
+              const platformLabel = DIRECTORY_PLATFORM_LABELS[platformKey] || dp.platform || 'Unknown';
               const claimIcon = dp.claim_status === 'claimed'
                 ? <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                 : dp.claim_status === 'unclaimed'
                   ? <XCircle className="h-3.5 w-3.5 text-red-500" />
                   : <HelpCircle className="h-3.5 w-3.5 text-gray-400" />;
-              const claimLabel = dp.claim_status === 'claimed' ? 'Claimed' : dp.claim_status === 'unclaimed' ? 'Unclaimed' : 'Unknown';
+              // Spell out "Claim status unknown" — a bare "Unknown" under the
+              // platform name reads as if the platform itself is unidentified.
+              const claimLabel = dp.claim_status === 'claimed' ? 'Claimed' : dp.claim_status === 'unclaimed' ? 'Unclaimed' : 'Claim status unknown';
               const ratingText = dp.star_rating != null
                 ? `${dp.star_rating.toFixed(1)}★`
                 : null;

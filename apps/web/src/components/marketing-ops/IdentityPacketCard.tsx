@@ -205,12 +205,65 @@ function SourceChips({
   );
 }
 
+/**
+ * Synthesize a VerificationEntryLike from an IdentityPacket for ResolveVerificationModal.
+ *
+ * Reuses the queue modal's field panels for the campaign verification flow.
+ * Note: directory_profiles, social_profiles, email, and owner contact are
+ * explicitly mapped into business_snapshot because the modal initializes from
+ * the snapshot and wholesale-overwrites those columns on save.
+ */
+export function buildVerificationEntryFromPacket(
+  campaignId: string,
+  packet: IdentityPacket,
+): VerificationEntryLike {
+  const canonicalValue = (key: string) => packet.fields.find((f) => f.field === key)?.value ?? '';
+  return {
+    id: campaignId,
+    business_name: packet.businessName,
+    category: canonicalValue('primary_category'),
+    // City/state/zip aren't scored packet fields — the packet resolves them
+    // separately via the shared lib/canonical-nap contract.
+    city: packet.addressCity,
+    state: packet.addressState,
+    business_snapshot: {
+      // Campaign-record contact + profiles ride the snapshot so the modal's
+      // enrichment panel re-prefills on re-open — and so the next save
+      // round-trips them (the campaign write replaces the columns wholesale;
+      // rows the modal never rendered would be silently dropped).
+      email: packet.email ?? '',
+      social_profiles: packet.socialProfiles ?? [],
+      directory_profiles: packet.directoryProfiles ?? [],
+      verified_nap: {
+        name: canonicalValue('name'),
+        address: canonicalValue('address'),
+        city: packet.addressCity,
+        state: packet.addressState,
+        zip: packet.addressZip,
+        // Captured hours ride the snapshot so the modal's hours editor
+        // re-prefills on re-open (same shape the queue path stores).
+        hours: packet.businessHours ?? undefined,
+        phone: canonicalValue('phone'),
+        website: canonicalValue('website'),
+        category: canonicalValue('primary_category'),
+        owner_name: packet.ownerContact?.name ?? '',
+        owner_phone: packet.ownerContact?.phone ?? '',
+        owner_email: packet.ownerContact?.email ?? '',
+      },
+    },
+  };
+}
+
 export default function IdentityPacketCard({
   campaignId,
   onSeedCreated,
+  onVerified,
 }: {
   campaignId: string;
   onSeedCreated?: () => void;
+  /** Called after a Verify record save — the campaign record changed
+   *  (canonical NAP + profiles), so the host should refresh it. */
+  onVerified?: () => void;
 }) {
   const [packet, setPacket] = useState<IdentityPacket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -337,38 +390,10 @@ export default function IdentityPacketCard({
   const seed = packet.seed;
   const visibleFields = score.fields.filter((f) => f.value != null || f.sources.length > 0);
 
-  // The record-verification modal is campaign-scoped here: it prefills from the
-  // packet's canonical values and writes the campaign record. Reuses the queue
-  // modal's field panels rather than a parallel component.
-  const canonicalValue = (key: string) => packet.fields.find((f) => f.field === key)?.value ?? '';
   // Fields in conflict — a verification that CHANGES one of these clears a
   // conflict, so the modal requires a reason.
   const conflictFields = score.fields.filter((f) => f.conflictWeight > 0).map((f) => f.field);
-  const verificationEntry: VerificationEntryLike = {
-    id: campaignId,
-    business_name: packet.businessName,
-    category: canonicalValue('primary_category'),
-    // City/state/zip aren't scored packet fields — the packet resolves them
-    // separately via the shared lib/canonical-nap contract.
-    city: packet.addressCity,
-    state: packet.addressState,
-    business_snapshot: {
-      verified_nap: {
-        name: canonicalValue('name'),
-        address: canonicalValue('address'),
-        city: packet.addressCity,
-        state: packet.addressState,
-        zip: packet.addressZip,
-        // Captured hours ride the snapshot so the modal's hours editor
-        // re-prefills on re-open (same shape the queue path stores).
-        hours: packet.businessHours ?? undefined,
-        phone: canonicalValue('phone'),
-        website: canonicalValue('website'),
-        category: canonicalValue('primary_category'),
-        owner_name: packet.ownerContact?.name ?? '',
-      },
-    },
-  };
+  const verificationEntry = buildVerificationEntryFromPacket(campaignId, packet);
 
   return (
     <div className="space-y-4">
@@ -881,7 +906,13 @@ export default function IdentityPacketCard({
           entry={verificationEntry}
           conflictFields={conflictFields}
           onClose={() => setShowVerify(false)}
-          onResolved={load}
+          onResolved={async () => {
+            await load();
+            // The campaign record changed too — let the host refresh it so
+            // the overview reflects the verified NAP/profiles without a
+            // browser reload.
+            onVerified?.();
+          }}
         />
       )}
     </div>

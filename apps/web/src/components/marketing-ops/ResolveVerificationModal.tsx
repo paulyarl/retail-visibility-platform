@@ -67,9 +67,17 @@ interface ResolveVerificationModalProps {
    * clearing a conflict, so it must be attributable beyond `updated_at`).
    */
   conflictFields?: string[];
+  /** Optional initial active tab ('nap' by default). Useful for testing or deep linking. */
+  initialTab?: VerificationTab;
+  /**
+   * Optional initial call outcome ('operational' by default). A non-operational
+   * outcome renders the NAP gate notice and the blocked next-action state —
+   * exposed so tests can reach those panels without interaction.
+   */
+  initialOutcome?: VerificationOutcome;
 }
 
-type VerificationTab = 'nap' | 'enrichment' | 'notes';
+export type VerificationTab = 'nap' | 'enrichment' | 'notes';
 
 /** Shown in the NAP + enrichment panels for outcomes that capture no identity. */
 const NAP_GATE_NOTICE =
@@ -80,7 +88,7 @@ const NAP_GATE_NOTICE =
  * object ({ status, url }). Coerce to the string the input needs — binding an
  * object to a text input renders "[object Object]".
  */
-function snapshotWebsite(value: unknown): string {
+export function snapshotWebsite(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && typeof (value as any).url === 'string') {
     return (value as any).url;
@@ -88,7 +96,15 @@ function snapshotWebsite(value: unknown): string {
   return '';
 }
 
-export default function ResolveVerificationModal({ entry, onClose, onResolved, mode = 'queue', conflictFields = [] }: ResolveVerificationModalProps) {
+export default function ResolveVerificationModal({
+  entry,
+  onClose,
+  onResolved,
+  mode = 'queue',
+  conflictFields = [],
+  initialTab = 'nap',
+  initialOutcome = 'operational',
+}: ResolveVerificationModalProps) {
   const isCampaign = mode === 'campaign';
   const snap = entry.business_snapshot ?? {};
   const nap = snap.verified_nap ?? snap.nap ?? {};
@@ -111,7 +127,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
     : rawAddressInit;
 
   const [form, setForm] = useState(() => ({
-    outcome: 'operational' as VerificationOutcome,
+    outcome: initialOutcome,
     verifiedName: nap.name ?? entry.business_name ?? '',
     verifiedPhone: nap.phone ?? snap.phone ?? '',
     verifiedAddress: streetInit,
@@ -146,7 +162,7 @@ export default function ResolveVerificationModal({ entry, onClose, onResolved, m
         }))
       : [],
   );
-  const [tab, setTab] = useState<VerificationTab>('nap');
+  const [tab, setTab] = useState<VerificationTab>(initialTab);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Campaign mode — required only when the edit clears a conflict (below).

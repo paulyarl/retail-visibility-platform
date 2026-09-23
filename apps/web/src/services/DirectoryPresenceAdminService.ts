@@ -142,6 +142,19 @@ export interface IdentityPacket {
   /** Raw business_hours day-map from the campaign record (Verify modal
    *  prefill); the scored `hours` field carries a display summary. */
   businessHours: Record<string, any> | null;
+  /** Campaign-record contact + profile lists (Verify modal prefill — the
+   *  modal re-submits them verbatim and the campaign write replaces the
+   *  columns, so they must round-trip). */
+  email: string | null;
+  socialProfiles: Array<{ platform: string; url: string }>;
+  directoryProfiles: Array<{
+    platform: string;
+    url: string;
+    claim_status?: 'claimed' | 'unclaimed' | 'unknown';
+    star_rating?: number | null;
+    review_count?: number | null;
+    category?: string;
+  }>;
   identityStatus: 'confirmed' | 'ambiguous' | 'mismatched';
   operationalStatus: 'active' | 'likely_active' | 'inactive' | 'unable_to_verify';
   callConfirmed: boolean | null;
