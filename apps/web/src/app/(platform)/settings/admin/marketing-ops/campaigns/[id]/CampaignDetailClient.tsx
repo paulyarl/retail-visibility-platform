@@ -2083,7 +2083,7 @@ export default function CampaignDetailClient({
                       ) : audit.platform === 'city_analysis' && audit.audit_data ? (
                         <CityAnalysisAuditCard key={audit.id} audit={audit} />
                       ) : audit.platform === 'intelligence_discovery' && audit.audit_data ? (
-                        <IntelligenceDiscoveryAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                        <IntelligenceDiscoveryAuditCard key={audit.id} audit={audit} campaignId={campaignId} siblingAudits={campaign.audits ?? []} />
                       ) : audit.platform === 'category_identification' && audit.audit_data ? (
                         <CategoryIdentificationAuditCard
                           key={audit.id}

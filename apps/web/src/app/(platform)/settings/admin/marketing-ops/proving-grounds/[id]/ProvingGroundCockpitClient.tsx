@@ -1993,6 +1993,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                     queueEntries={queueEntries}
                     onLogGap={(biz) => handleProspectGap(biz.business_name, biz.city, biz.state)}
                     onQueued={load}
+                    siblingAudits={discoveryAudits.filter((d) => d.childId === childId).map((d) => d.audit)}
                   />
                 </div>
               ))}

@@ -80,6 +80,72 @@ export interface DiscoveredBusiness {
   [key: string]: any;
 }
 
+// ─── Scan contract types (Discovery Scan Contract Spec §3) ───────────────
+//
+// Persisted in audit_data.scan_contract by the import gate; violations stamp
+// to audit_data.scan_contract_violations. Legacy audits (pre-contract) carry
+// neither and render as coverage-unverified.
+
+interface SweepLedgerRow {
+  unit_id: string;
+  unit_type?: 'zip_label_matrix' | 'corridor' | 'dataset_geography';
+  unit?: string;
+  platforms_swept?: string[];
+  labels_swept?: string[];
+  status?: 'executed_with_findings' | 'executed_empty' | 'not_executed' | 'blocked';
+  findings_count?: number | null;
+  candidate_keys?: string[];
+  executed_at?: string;
+  blocked_reason?: string | null;
+  [key: string]: any;
+}
+
+interface CoverageAttestation {
+  units_total?: number;
+  units_executed?: number;
+  units_executed_empty?: number;
+  units_not_executed?: number;
+  units_blocked?: number;
+  vectors_total?: number;
+  vectors_executed?: number;
+  vectors_not_executed?: number;
+  coverage_ratio?: number;
+  completeness_claim?: 'verified_full' | 'verified_partial' | 'unverified';
+  uncovered_municipalities?: string[];
+  unexecuted_vector_list?: Array<{ vector: string; reason?: string }>;
+  attestation_basis?: string;
+  [key: string]: any;
+}
+
+interface MunicipalityCoverageRow {
+  municipality: string;
+  shared_zip?: string;
+  status?: 'covered' | 'platform_only' | 'uncovered';
+  [key: string]: any;
+}
+
+interface ScanContract {
+  contract_version?: string;
+  sweep_ledger?: SweepLedgerRow[];
+  coverage_attestation?: CoverageAttestation;
+  municipality_coverage?: MunicipalityCoverageRow[];
+  reconciliation?: {
+    operator_supplied_members?: string[];
+    matched_to_candidates?: string[];
+    added_this_pass?: string[];
+    unmatched?: string[];
+    excluded_with_reason?: Array<{ member: string; reason?: string }>;
+    [key: string]: any;
+  } | null;
+  [key: string]: any;
+}
+
+interface ContractViolation {
+  invariant: string;
+  path?: string;
+  message: string;
+}
+
 interface IntelligenceDiscoveryData {
   intelligence_mode: 'profile' | 'generic_fallback';
   category: string;
@@ -96,6 +162,8 @@ interface IntelligenceDiscoveryData {
   ownership_exclusion_notes?: string;
   profile_id?: string | null;
   profile_version?: number | null;
+  scan_contract?: ScanContract | null;
+  scan_contract_violations?: ContractViolation[];
 }
 
 function isIntelligenceDiscoveryAudit(audit: Audit): boolean {
@@ -129,12 +197,38 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: 'text-red-600 dark:text-red-400',
 };
 
+const CLAIM_STYLES: Record<string, string> = {
+  verified_full: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+  verified_partial: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  unverified: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+};
+
+const CLAIM_LABELS: Record<string, string> = {
+  verified_full: 'verified full',
+  verified_partial: 'verified partial',
+  unverified: 'unverified',
+};
+
+const LEDGER_STATUS_STYLES: Record<string, string> = {
+  executed_with_findings: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+  executed_empty: 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+  not_executed: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+  blocked: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+};
+
+const MUNICIPALITY_STATUS_STYLES: Record<string, string> = {
+  covered: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+  platform_only: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  uncovered: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+};
+
 export default function IntelligenceDiscoveryAuditCard({
   audit,
   campaignId,
   onLogGap,
   onQueued,
   queueEntries,
+  siblingAudits,
 }: {
   audit: Audit;
   campaignId: string;
@@ -151,6 +245,11 @@ export default function IntelligenceDiscoveryAuditCard({
    *  — plus a campaign link when the row already graduated — instead of
    *  the Queue/Verify/Campaign actions. */
   queueEntries?: ProspectQueueEntry[];
+  /** Other audits on the same campaign — used for focus-pair parity
+   *  (spec §7.1: a market is green-lit only when BOTH focus ledgers pass).
+   *  The card picks the intelligence_discovery audit with the opposite
+   *  focus and renders its attestation beside this one's. */
+  siblingAudits?: Audit[];
 }) {
   const data = parseDiscovery(audit);
   const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
@@ -344,6 +443,11 @@ export default function IntelligenceDiscoveryAuditCard({
         <Metric label="On hold" value={String(data.hold_count)} />
         <Metric label="Mode" value={data.intelligence_mode === 'profile' ? 'Profile' : 'Generic'} />
       </div>
+
+      {/* Coverage attestation (Discovery Scan Contract §3) — derived
+          coverage, not the model's claim. Legacy audits carry no
+          scan_contract and render as unverified. */}
+      <ScanContractSection data={data} audit={audit} siblingAudits={siblingAudits} />
 
       {/* Category definition (collapsible) */}
       {data.category_definition && (
@@ -710,6 +814,212 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 p-2">
       <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       <p className="text-sm font-semibold text-gray-900 dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+function ClaimBadge({ claim }: { claim?: string | null }) {
+  const c = claim ?? 'unverified';
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${CLAIM_STYLES[c] ?? CLAIM_STYLES.unverified}`}>
+      {CLAIM_LABELS[c] ?? c}
+    </span>
+  );
+}
+
+/**
+ * Coverage attestation block (Discovery Scan Contract §3/§7.1). Renders the
+ * derived claim, unit counts, unexecuted vectors, municipality coverage,
+ * reconciliation, contract violations, the sweep ledger, and — when a
+ * sibling audit with the opposite focus exists — the parity comparison.
+ * All content is conditional: a pre-contract audit degrades to a single
+ * "unverified" line.
+ */
+function ScanContractSection({
+  data,
+  audit,
+  siblingAudits,
+}: {
+  data: IntelligenceDiscoveryData;
+  audit: Audit;
+  siblingAudits?: Audit[];
+}) {
+  const contract = data.scan_contract;
+  const att = contract?.coverage_attestation;
+  const ledger = contract?.sweep_ledger ?? [];
+  const municipalities = contract?.municipality_coverage ?? [];
+  const reconciliation = contract?.reconciliation;
+  const violations = data.scan_contract_violations ?? [];
+  const claim = att?.completeness_claim ?? 'unverified';
+
+  // Focus-pair parity: the sibling intelligence_discovery audit on this
+  // campaign carrying the opposite focus, if one was passed in.
+  const sibling = (siblingAudits ?? []).find(
+    (a) => a.id !== audit.id
+      && a.platform === 'intelligence_discovery'
+      && a.audit_data
+      && (a.audit_data as IntelligenceDiscoveryData).focus
+      && (a.audit_data as IntelligenceDiscoveryData).focus !== data.focus,
+  );
+  const siblingData = sibling?.audit_data as IntelligenceDiscoveryData | undefined;
+  const siblingAtt = siblingData?.scan_contract?.coverage_attestation;
+  const siblingClaim = siblingAtt?.completeness_claim ?? 'unverified';
+
+  if (!contract) {
+    return (
+      <div className="mb-4 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/40 p-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Coverage</span>
+          <ClaimBadge claim="unverified" />
+        </div>
+        <p className="mt-1 text-[10px] text-gray-400">
+          Pre-contract audit — no sweep ledger was recorded, so market coverage is unverified.
+        </p>
+      </div>
+    );
+  }
+
+  const counts = [
+    att?.units_executed != null && att?.units_total != null
+      ? `${att.units_executed}/${att.units_total} units executed`
+      : att?.units_executed != null ? `${att.units_executed} units executed` : null,
+    att?.units_executed_empty != null ? `${att.units_executed_empty} empty` : null,
+    att?.units_not_executed != null && att.units_not_executed > 0
+      ? `${att.units_not_executed} not executed` : null,
+    att?.units_blocked != null && att.units_blocked > 0
+      ? `${att.units_blocked} blocked` : null,
+  ].filter(Boolean) as string[];
+
+  const unmatched = reconciliation?.unmatched ?? [];
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/50 dark:bg-neutral-800/40 p-3 space-y-2">
+      {/* Claim + counts */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Coverage</span>
+        <ClaimBadge claim={claim} />
+        {counts.map((c, i) => (
+          <span key={i} className="text-[10px] text-gray-500 dark:text-gray-400">{c}</span>
+        ))}
+      </div>
+
+      {/* Focus parity — spec §7.1: the market is not green-lit until both
+          focus ledgers pass. */}
+      {sibling && siblingData && (
+        <div className="flex items-center gap-2 flex-wrap text-[10px] text-gray-500 dark:text-gray-400">
+          <span className="font-medium text-gray-600 dark:text-gray-300">Focus parity:</span>
+          <span>{data.focus}</span>
+          <ClaimBadge claim={claim} />
+          <span>·</span>
+          <span>{siblingData.focus}</span>
+          <ClaimBadge claim={siblingClaim} />
+          {siblingAtt?.units_executed != null && siblingAtt?.units_total != null && (
+            <span>({siblingAtt.units_executed}/{siblingAtt.units_total} units)</span>
+          )}
+          {claim !== siblingClaim && (
+            <span className="text-amber-600 dark:text-amber-400">
+              — ledgers disagree; market not green-lit
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Contract violations (report-mode, stamped by the import gate) */}
+      {violations.length > 0 && (
+        <div className="rounded border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 p-2">
+          <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 mb-1">
+            {violations.length} contract violation{violations.length !== 1 ? 's' : ''}
+          </p>
+          <ul className="space-y-0.5">
+            {violations.map((v, i) => (
+              <li key={i} className="text-[10px] text-amber-800 dark:text-amber-300">
+                <span className="font-mono font-semibold">{v.invariant}</span> — {v.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Unexecuted vectors — gaps are named, not silent (INV-6) */}
+      {(att?.unexecuted_vector_list ?? []).length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-600 dark:text-gray-300 mb-0.5">Unexecuted vectors</p>
+          <ul className="space-y-0.5">
+            {att!.unexecuted_vector_list!.map((v, i) => (
+              <li key={i} className="text-[10px] text-gray-500 dark:text-gray-400">
+                {v.vector}{v.reason ? <span className="text-gray-400"> — {v.reason}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Municipality coverage */}
+      {municipalities.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300">Municipalities:</span>
+          {municipalities.map((m, i) => (
+            <span
+              key={i}
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${MUNICIPALITY_STATUS_STYLES[m.status ?? ''] ?? 'bg-gray-50 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700'}`}
+              title={m.shared_zip ? `shares ZIP ${m.shared_zip}` : undefined}
+            >
+              {m.municipality}{m.status ? `: ${m.status.replace('_', ' ')}` : ''}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Reconciliation — operator-supplied ground truth (INV-7) */}
+      {reconciliation && (reconciliation.operator_supplied_members?.length ?? 0) > 0 && (
+        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+          <span className="font-semibold text-gray-600 dark:text-gray-300">Reconciliation:</span>
+          {' '}{(reconciliation.matched_to_candidates?.length ?? 0)}/{(reconciliation.operator_supplied_members?.length ?? 0)} operator-supplied members matched
+          {unmatched.length > 0 && (
+            <span className="text-red-600 dark:text-red-400">
+              {' '}— unmatched: {unmatched.join(', ')} (scan missed a real business)
+            </span>
+          )}
+          {(reconciliation.excluded_with_reason?.length ?? 0) > 0 && (
+            <span>
+              {' '}· excluded: {reconciliation.excluded_with_reason!.map((e) => e.member).join(', ')}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Sweep ledger (collapsible) */}
+      {ledger.length > 0 && (
+        <details className="rounded border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-2">
+          <summary className="text-[10px] font-semibold text-gray-600 dark:text-gray-300 cursor-pointer">
+            Sweep ledger ({ledger.length} unit{ledger.length !== 1 ? 's' : ''})
+          </summary>
+          <ul className="mt-1.5 space-y-1">
+            {ledger.map((row, i) => (
+              <li key={i} className="flex items-center gap-2 flex-wrap text-[10px] text-gray-500 dark:text-gray-400">
+                <span className="font-mono text-gray-600 dark:text-gray-300">{row.unit_id}</span>
+                {row.status && (
+                  <span className={`px-1.5 py-0.5 rounded border ${LEDGER_STATUS_STYLES[row.status] ?? 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                    {row.status.replace(/_/g, ' ')}
+                  </span>
+                )}
+                {typeof row.findings_count === 'number' && <span>{row.findings_count} findings</span>}
+                {row.platforms_swept && row.platforms_swept.length > 0 && (
+                  <span title={row.platforms_swept.join(', ')}>{row.platforms_swept.length} platform{row.platforms_swept.length !== 1 ? 's' : ''}</span>
+                )}
+                {row.labels_swept && row.labels_swept.length > 0 && (
+                  <span title={row.labels_swept.join(', ')}>{row.labels_swept.length} label{row.labels_swept.length !== 1 ? 's' : ''}</span>
+                )}
+                {row.blocked_reason && (
+                  <span className="text-amber-600 dark:text-amber-400" title={row.blocked_reason}>
+                    blocked: {row.blocked_reason}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
