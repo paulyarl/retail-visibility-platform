@@ -26,6 +26,11 @@ const CAMPAIGN_COMPOSER_VERSION = 2;
 const textArraySql = (arr: string[]) =>
   arr.length ? Prisma.sql`ARRAY[${Prisma.join(arr)}]::text[]` : Prisma.sql`ARRAY[]::text[]`;
 
+// Raw $queryRaw params serialize JS arrays as Postgres arrays (jsonb[]), not
+// jsonb — stringify JSON-typed values and cast so they land as a single jsonb.
+const jsonbSql = (v: unknown) =>
+  v == null ? Prisma.sql`NULL` : Prisma.sql`${JSON.stringify(v)}::jsonb`;
+
 export interface LocationState {
   id: string;
   categoryKey: string;
@@ -410,9 +415,9 @@ class LocationMarketEnrichmentService extends BaseService {
         ${merged.schemaTypeHint},
         ${merged.bodyCopy},
         ${shopperGuide},
-        ${faq as any},
-        ${areaBreakdown as any},
-        ${context as any},
+        ${jsonbSql(faq)},
+        ${jsonbSql(areaBreakdown)},
+        ${jsonbSql(context)},
         ${null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource},
         ${campaign.id}, ${input.executionId ?? null}, now(), now()
@@ -566,7 +571,7 @@ class LocationMarketEnrichmentService extends BaseService {
         ${textArraySql(keywords)},
         ${textArraySql(secondary)},
         ${schemaTypeHint},
-        ${context as any},
+        ${jsonbSql(context)},
         ${null}, ${null}, ${composerVersion},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource}, now(), now()
       )

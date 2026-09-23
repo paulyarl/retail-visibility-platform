@@ -37,6 +37,11 @@ const CAMPAIGN_COMPOSER_VERSION = 2;
 const textArraySql = (arr: string[]) =>
   arr.length ? Prisma.sql`ARRAY[${Prisma.join(arr)}]::text[]` : Prisma.sql`ARRAY[]::text[]`;
 
+// Raw $queryRaw params serialize JS arrays as Postgres arrays (jsonb[]), not
+// jsonb — stringify JSON-typed values and cast so they land as a single jsonb.
+const jsonbSql = (v: unknown) =>
+  v == null ? Prisma.sql`NULL` : Prisma.sql`${JSON.stringify(v)}::jsonb`;
+
 export interface MarketState {
   id: string;
   categoryKey: string;
@@ -346,9 +351,9 @@ class CategoryMarketEnrichmentService extends BaseService {
         ${packet.schema_type_hint ?? null},
         ${bodyCopy},
         ${shopperGuide},
-        ${faq as any},
+        ${jsonbSql(faq)},
         ${null as any},
-        ${context as any},
+        ${jsonbSql(context)},
         ${intelProfile?.id ?? null}, ${null}, ${CAMPAIGN_COMPOSER_VERSION},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource},
         ${campaign.id}, ${input.executionId ?? null}, now(), now()
