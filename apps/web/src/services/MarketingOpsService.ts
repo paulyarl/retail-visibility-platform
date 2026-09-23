@@ -5662,10 +5662,11 @@ class MarketingOpsService extends AdminApiSingleton {
     return campaign;
   }
 
-  /** POST /:id/enrich-sweep — PG shelf coverage sweep. Fills every uncovered
-   *  (category × market) in the PG's declared + discovered domain via the
-   *  deterministic path, then spawns one directory_enrichment child for the
-   *  residual no-profile set (category_set_enrichment schema). */
+  /** POST /:id/enrich-sweep — PG shelf coverage sweep. First-fills every
+   *  uncovered (category × market) in the PG's declared + discovered domain
+   *  via the deterministic path, then spawns one directory_enrichment child
+   *  carrying every market that lacks a campaign-applied (composer_version=2)
+   *  row — needsAi is the set payload (category_set_enrichment schema). */
   async enrichShelfSweep(provingGroundId: string, opts?: { createCampaign?: boolean }): Promise<{
     provingGroundId: string;
     domain: { categories: string[]; geos: { city: string; state: string | null }[] };

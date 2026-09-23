@@ -35,16 +35,27 @@ import type { RequestCtx } from '../context';
  *   location markets = distinct geos across the same inputs.
  *
  * Classification per category market:
- *   covered          — a directory_category_enrichment row already exists
- *                      (first-fill only: the sweep NEVER overwrites rows)
+ *   covered          — a directory_category_enrichment row exists AND was
+ *                      applied by a campaign run (composer_version >= 2):
+ *                      the market already carries the AI packet
+ *   baseline         — a row exists but is deterministic-only
+ *                      (composer_version < 2). The row is left untouched
+ *                      (the sweep NEVER overwrites rows itself) and the
+ *                      market is queued into the sweep campaign so the SET
+ *                      prompt upgrades it to the AI packet
  *   campaign_exists  — an active directory_enrichment campaign (single-market
  *                      signature or a prior set's shelf_sweep payload) covers it
- *   enriched         — enrichMarket() wrote it deterministically (profile
- *                      exists — the free path)
+ *   enriched         — enrichMarket() wrote a deterministic baseline
+ *                      (profile exists — the free path); also queued into the
+ *                      set campaign for the AI upgrade
  *   needs_ai         — no row, no campaign, no profile → routed into one
  *                      spawned directory_enrichment child campaign carrying
- *                      the residual set in discovery_context.shelf_sweep
+ *                      the set in discovery_context.shelf_sweep
  *   skipped / error  — invalid market or enrich failure (partial success)
+ *
+ * The spawned SET campaign carries every market not already AI-enriched or
+ * covered by a live campaign — baseline + enriched + needs_ai — so one
+ * category_set_enrichment execution enriches the PG's whole category set.
  *
  * Location markets: covered → else enrichLocation() deterministic baseline
  * (no profile needed). Category pass runs first so location aggregates pick
@@ -66,6 +77,12 @@ const LOCATION_SENTINEL_KEY = '__location__';
 // mirrors the structural-duplicate guardrail's inactive set (AGENTS.md).
 const INACTIVE_STAGES = new Set(['lost', 'dead', 'closed', 'resolved_and_closed']);
 
+// composer_version=2 marks rows written by a directory_enrichment campaign
+// run (applyEnrichmentPacket's CAMPAIGN_COMPOSER_VERSION in
+// CategoryMarketEnrichmentService). Rows below it are deterministic
+// baselines — real coverage, but still queued into the SET campaign.
+const AI_COMPOSER_VERSION = 2;
+
 export interface SweepMarket {
   category: string;
   categoryKey: string;
@@ -74,7 +91,7 @@ export interface SweepMarket {
 }
 
 export interface CategoryMarketOutcome extends SweepMarket {
-  status: 'covered' | 'campaign_exists' | 'enriched' | 'needs_ai' | 'skipped' | 'error';
+  status: 'covered' | 'baseline' | 'campaign_exists' | 'enriched' | 'needs_ai' | 'skipped' | 'error';
   detail?: string;
   listingsEnriched?: number;
 }
@@ -274,10 +291,13 @@ class ProvingGroundShelfSweepService extends BaseService {
           ...locationGeos.map((g) => ({ category_key: LOCATION_SENTINEL_KEY, city: g.city, state: g.state })),
         ],
       },
-      select: { category_key: true, city: true, state: true },
+      select: { category_key: true, city: true, state: true, composer_version: true },
     });
-    const covered = new Set(
-      existingRows.map((r) => marketKey(r.category_key, r.city, r.state)),
+    // marketKey → composer_version. Rows at AI_COMPOSER_VERSION were applied
+    // by a campaign run and count as fully covered; anything lower is a
+    // deterministic baseline that still goes into the set campaign.
+    const covered = new Map(
+      existingRows.map((r) => [marketKey(r.category_key, r.city, r.state), r.composer_version ?? 1]),
     );
 
     // Active enrichment campaigns — single-market signatures plus any
@@ -303,12 +323,20 @@ class ProvingGroundShelfSweepService extends BaseService {
     const needsAi: SweepMarket[] = [];
     for (const m of categoryMarkets) {
       const key = marketKey(m.categoryKey, m.city, m.state);
-      if (covered.has(key)) {
+      const existingVersion = covered.get(key);
+      if (existingVersion !== undefined && existingVersion >= AI_COMPOSER_VERSION) {
         outcomes.push({ ...m, status: 'covered' });
         continue;
       }
       if (campaignCovered.has(key)) {
         outcomes.push({ ...m, status: 'campaign_exists' });
+        continue;
+      }
+      if (existingVersion !== undefined) {
+        // Deterministic baseline row — leave it in place and queue the
+        // market for the SET campaign's AI packet.
+        outcomes.push({ ...m, status: 'baseline' });
+        needsAi.push(m);
         continue;
       }
       try {
@@ -324,7 +352,8 @@ class ProvingGroundShelfSweepService extends BaseService {
           outcomes.push({ ...m, status: 'skipped', detail: 'invalid_market' });
         } else {
           outcomes.push({ ...m, status: 'enriched', listingsEnriched: result.listingsEnriched });
-          covered.add(key);
+          covered.set(key, 1);
+          needsAi.push(m);
         }
       } catch (err) {
         outcomes.push({ ...m, status: 'error', detail: (err as Error).message });
@@ -466,7 +495,10 @@ class ProvingGroundShelfSweepService extends BaseService {
     return {
       provingGroundId,
       domain: {
-        categories: Array.from(domainCategories.values()),
+        // Declared ∪ discovered — derive from the market set so prospect
+        // secondary categories (which never feed domainCategories) still
+        // show up in the report.
+        categories: Array.from(new Set(categoryMarkets.map((m) => m.category))),
         geos: Array.from(domainGeos.values()),
       },
       categoryMarkets: outcomes,

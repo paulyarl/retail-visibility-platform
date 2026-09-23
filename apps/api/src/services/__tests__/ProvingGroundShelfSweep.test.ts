@@ -172,19 +172,36 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
     ]));
   });
 
-  it('skips markets that already have an enrichment row (never overwrites)', async () => {
+  it('skips markets with a campaign-applied row (composer_version=2, never overwrites)', async () => {
     mockEnrichmentFindMany.mockResolvedValue([
-      { category_key: 'halal market', city: 'Fort Wayne', state: 'IN' },
+      { category_key: 'halal market', city: 'Fort Wayne', state: 'IN', composer_version: 2 },
     ]);
 
     const report = await sweepService.sweep('pg-1');
     const covered = report.categoryMarkets.filter((m) => m.status === 'covered');
     expect(covered).toHaveLength(1);
     expect(covered[0].category).toBe('Halal Market');
-    // enrichMarket is NOT called for covered markets — the sweep is
-    // first-fill only and never overwrites existing rows or overrides.
+    // AI-covered markets are neither re-enriched nor queued into the set campaign.
     const calledFor = mockEnrichMarket.mock.calls.map((c) => `${c[0]}|${c[1]}`);
     expect(calledFor).not.toContain('Halal Market|Fort Wayne');
+    expect(report.needsAi.map((m) => `${m.category}|${m.city}`)).not.toContain('Halal Market|Fort Wayne');
+  });
+
+  it('queues deterministic baseline rows (composer_version<2) into the set campaign without overwriting', async () => {
+    mockEnrichmentFindMany.mockResolvedValue([
+      { category_key: 'halal market', city: 'Fort Wayne', state: 'IN', composer_version: 1 },
+    ]);
+
+    const report = await sweepService.sweep('pg-1');
+    const baseline = report.categoryMarkets.filter((m) => m.status === 'baseline');
+    expect(baseline).toHaveLength(1);
+    expect(baseline[0].category).toBe('Halal Market');
+    // The sweep never overwrites the baseline row itself — enrichMarket is
+    // NOT called — but the market rides into the SET campaign payload.
+    const calledFor = mockEnrichMarket.mock.calls.map((c) => `${c[0]}|${c[1]}`);
+    expect(calledFor).not.toContain('Halal Market|Fort Wayne');
+    expect(report.needsAi.map((m) => `${m.category}|${m.city}`)).toContain('Halal Market|Fort Wayne');
+    expect(report.sweepCampaign).toEqual({ id: 'set-campaign-1', created: true, marketCount: 4 });
   });
 
   it('marks markets covered by an active enrichment campaign', async () => {
@@ -221,7 +238,9 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
     const report = await sweepService.sweep('pg-1');
     const enriched = report.categoryMarkets.filter((m) => m.status === 'enriched');
     expect(enriched).toHaveLength(2); // Halal Market in both geos
-    expect(report.needsAi.map((m) => m.category)).not.toContain('Halal Market');
+    // Deterministic baselines still ride into the set campaign — the SET
+    // prompt upgrades them to campaign-applied (composer_version=2) rows.
+    expect(report.needsAi.map((m) => m.category)).toContain('Halal Market');
     expect(mockEnrichMarket).toHaveBeenCalledWith(
       'Halal Market', 'Fort Wayne', 'IN',
       expect.objectContaining({ triggerSource: 'pg_sweep' }),
@@ -230,13 +249,13 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
   });
 
   it('enriches uncovered location rows deterministically after the category pass', async () => {
-    // All category markets covered → enrichMarket never runs → the
+    // All category markets AI-covered → enrichMarket never runs → the
     // __location__ rows are still missing → location pass fills them.
     mockEnrichmentFindMany.mockResolvedValue([
-      { category_key: 'halal market', city: 'Fort Wayne', state: 'IN' },
-      { category_key: 'halal market', city: 'Auburn', state: 'IN' },
-      { category_key: 'butcher shop', city: 'Fort Wayne', state: 'IN' },
-      { category_key: 'butcher shop', city: 'Auburn', state: 'IN' },
+      { category_key: 'halal market', city: 'Fort Wayne', state: 'IN', composer_version: 2 },
+      { category_key: 'halal market', city: 'Auburn', state: 'IN', composer_version: 2 },
+      { category_key: 'butcher shop', city: 'Fort Wayne', state: 'IN', composer_version: 2 },
+      { category_key: 'butcher shop', city: 'Auburn', state: 'IN', composer_version: 2 },
     ]);
 
     const report = await sweepService.sweep('pg-1');

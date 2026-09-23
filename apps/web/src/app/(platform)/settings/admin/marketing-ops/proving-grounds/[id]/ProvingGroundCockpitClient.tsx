@@ -548,12 +548,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       const locEnriched = report.locationMarkets.filter((m) => m.status === 'enriched').length;
       const parts = [
         `${report.categoryMarkets.length} category markets`,
-        `${count('covered')} already covered`,
+        `${count('covered')} already AI-enriched`,
+        `${count('baseline')} baseline rows`,
         `${count('enriched')} enriched now`,
         `${count('campaign_exists')} already have a campaign`,
-        `${report.needsAi.length} need AI`,
+        `${report.needsAi.length} queued into set campaign`,
       ];
       if (locEnriched) parts.push(`${locEnriched} location${locEnriched === 1 ? '' : 's'} enriched`);
+      if (count('error') || count('skipped')) parts.push(`${count('error') + count('skipped')} failed/skipped`);
+      if (report.nationalLocation?.status === 'error') parts.push('national refresh failed');
       setSweepResult({
         summary: parts.join(' · '),
         campaignId: report.sweepCampaign?.id,
