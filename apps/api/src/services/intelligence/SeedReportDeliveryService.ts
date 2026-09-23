@@ -558,7 +558,7 @@ export class SeedReportDeliveryService extends BaseService {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(40, 40, 40);
-    const body = `We researched the public signals associated with ${kit.businessName} and assembled them into a free business seed. Scan the code below to view your report and claim your listing.`;
+    const body = `We researched the public signals associated with ${kit.businessName} and assembled them into a free business listing. Scan the code below to view your report and claim your listing.`;
     const bodyLines = doc.splitTextToSize(body, pageWidth - 2 * margin);
     doc.text(bodyLines, pageWidth / 2, yPos, { align: 'center' });
     yPos += bodyLines.length * 0.16 + 0.3;

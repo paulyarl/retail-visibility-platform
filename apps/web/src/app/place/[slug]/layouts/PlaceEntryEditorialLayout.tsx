@@ -19,6 +19,7 @@ import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
+import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
@@ -289,7 +290,7 @@ export default function PlaceEntryEditorialLayout({
                   </p>
                 )}
                 <p className="text-neutral-500 leading-relaxed mt-3">
-                  It&apos;s free to claim — the owner can fix details, update hours, add a photo,
+                  Free to claim — verify your details, update hours, add a photo,
                   and showcase up to 5 products for nearby shoppers.
                 </p>
               </div>
@@ -375,6 +376,20 @@ export default function PlaceEntryEditorialLayout({
             </div>
           </div>
         </div>
+
+        {/* Market Intel — the "How We Found" card shows above the collapsed
+            panel as its teaser, so the 5-products offer, the report card,
+            and the intel panel form a mini funnel. Seed pages only. */}
+        {listing.listingOrigin === 'directory_seed' && (
+          <div className="max-w-6xl mx-auto px-6 mb-6">
+            <MarketIntelSidebar
+              slug={slug}
+              initialTeaser={marketIntelTeaser}
+              activeClaimToken={claimToken}
+              seedId={listing.seedId}
+            />
+          </div>
+        )}
 
         {/* Claim inquiry form — shown when no claim token has been minted.
             Uses the same anonymous PublicInquiryForm pattern as storefront contact,

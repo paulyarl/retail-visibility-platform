@@ -306,7 +306,7 @@ export default function SeedReportClient() {
           </Text>
           <Text size="sm" c="dimmed" mt="sm">
             We researched the public signals associated with your business and
-            assembled them into a free business seed. This report shows what we
+            assembled them into a free business listing. This report shows what we
             found, where it came from, what appears consistent, and what still
             needs confirmation. The goal is to make the available intelligence
             visible, start a useful conversation, and give you the opportunity to
@@ -397,7 +397,7 @@ export default function SeedReportClient() {
             <Text fw={600} size="lg">How we found this business</Text>
           </Group>
           <Text size="sm" c="dimmed" mb="md">
-            We researched public sources to assemble this business seed.
+            We researched public sources to assemble this listing.
             {report.source_summary.sources_checked_count} source{report.source_summary.sources_checked_count !== 1 ? 's' : ''} checked,
             {' '}{report.source_summary.sources_with_evidence_count} with evidence.
           </Text>
@@ -557,7 +557,7 @@ export default function SeedReportClient() {
               <IconShieldCheck size={18} />
             </ThemeIcon>
             <Text fw={600} size="lg">
-              {isClaimed ? 'This business is claimed' : 'Claim this business seed'}
+              {isClaimed ? 'This business is claimed' : 'Claim this listing'}
             </Text>
           </Group>
 
@@ -569,7 +569,7 @@ export default function SeedReportClient() {
           ) : (
             <>
               <Text size="sm" c="dimmed" mb="md">
-                This seed is yours — claim it free. Fix what&apos;s wrong, add what&apos;s
+                This listing is yours — claim it free. Fix what&apos;s wrong, add what&apos;s
                 missing, and put your top sellers in front of nearby shoppers.
               </Text>
               <ul className="mb-4 space-y-1">

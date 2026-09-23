@@ -226,7 +226,7 @@ export async function generateSeedReportPdf(
     'Customers encounter businesses across search, maps, directories, social platforms, ' +
     'local sources, and category-specific marketplaces — and those sources may not all ' +
     'represent the business the same way. We researched the public signals associated ' +
-    'with this business and assembled them into a free business seed. This report shows ' +
+    'with this business and assembled them into a free business listing. This report shows ' +
     'what we found, where it came from, what appears consistent, and what still needs ' +
     'confirmation. The goal is to make the available intelligence visible, start a ' +
     'useful conversation, and give the business the opportunity to verify and claim ' +

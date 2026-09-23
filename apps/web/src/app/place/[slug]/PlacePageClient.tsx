@@ -8,7 +8,6 @@ import PlaceEntryEditorialLayout from './layouts/PlaceEntryEditorialLayout';
 import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
 import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
 import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
-import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface PlacePageClientProps {
@@ -78,27 +77,13 @@ export default function PlacePageClient({
         publicNarrative={marketIntelTeaser?.publicNarrative ?? null}
         marketIntelTeaser={marketIntelTeaser}
       />
-      {/* Market Intel sidebar — seed pages only (§2.1). The page already
-          redirects non-seeds server-side; this gate is defensive. The square
-          sponsored slot renders inside the layout under Contact. */}
-      {listing.listingOrigin === 'directory_seed' && (
-        <div className="max-w-5xl mx-auto px-4 pt-6">
-          <MarketIntelSidebar
-            slug={slug}
-            initialTeaser={marketIntelTeaser}
-            activeClaimToken={listing.activeClaimToken}
-            seedId={listing.seedId}
-          />
-        </div>
-      )}
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <GbpReviewsSection slug={slug} />
         <GbpPostsSection slug={slug} />
         <GbpPhotoGallerySection slug={slug} />
       </div>
       {/* Platform footer — rendered by the page (not the layout) so it is
-          always the last element, after the Market Intel sidebar that
-          mounts below the editorial layout. */}
+          always the last element, after the GBP sections below. */}
       <PoweredByFooter
         note={`${listing.businessName} is listed from public information. This is not a claimed profile and may be incomplete.`}
       />

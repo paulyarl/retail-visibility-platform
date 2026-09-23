@@ -49,16 +49,17 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
   const [open, setOpen] = useState(false);
   const [hasSeedReport, setHasSeedReport] = useState(false);
 
-  // Seed-report existence check — deferred until the panel opens. The
-  // "How We Found" card only renders when a published report exists.
+  // Seed-report existence check on mount — the "How We Found" card sits
+  // outside the collapsible as its always-visible teaser, so it can't
+  // wait for the panel to open.
   useEffect(() => {
-    if (!open || !seedId || hasSeedReport) return;
+    if (!seedId || hasSeedReport) return;
     let cancelled = false;
     seedReportPreviewService.getReportPreview(seedId).then((data) => {
       if (!cancelled && data) setHasSeedReport(true);
     });
     return () => { cancelled = true; };
-  }, [open, seedId, hasSeedReport]);
+  }, [seedId, hasSeedReport]);
 
   // Refresh teaser client-side (ttl: 0 — no cache).
   useEffect(() => {
@@ -114,7 +115,7 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
   const claimHref = activeClaimToken
     ? `/place/claim/${activeClaimToken}`
     : '#claim-inquiry';
-  const claimCtaLabel = activeClaimToken ? 'Verify Ownership →' : 'Claim This Business →';
+  const claimCtaLabel = 'Claim this listing →';
 
   // Determine the content tier to render.
   // - full: paid/owner → full content + download button
@@ -125,6 +126,24 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
 
   return (
     <aside className="w-full">
+      {/* How We Found This Business — the seed-report provenance card sits
+          OUTSIDE the collapsible as the always-visible teaser for the intel
+          below; the report page carries the claim CTA itself. Renders
+          independently of audit availability — the report predates the
+          intel audit. */}
+      {hasSeedReport && seedId && (
+        <div className="mb-2">
+          <MarketIntelCard
+            icon="🔍"
+            title="How We Found This Business"
+            teaser="Where this listing came from — the sources checked, identity confidence, and signals behind it."
+            available={true}
+            ctaLabel="Read the free report →"
+            ctaHref={`/seed-report/${seedId}`}
+          />
+        </div>
+      )}
+
       {/* Toggle tab — discoverable, not demanding (§1.3). */}
       <button
         type="button"
@@ -159,21 +178,6 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
               seedId={seedId}
             />
           </div>
-
-          {/* How We Found This Business — the seed-report provenance preview.
-              It leads into the report/claim CTAs in this panel; the report
-              page carries the claim CTA itself. Renders independently of
-              audit availability — the report predates the intel audit. */}
-          {hasSeedReport && seedId && (
-            <MarketIntelCard
-              icon="🔍"
-              title="How We Found This Business"
-              teaser="Where this listing came from — the sources checked, identity confidence, and signals behind it."
-              available={true}
-              ctaLabel="See the full report →"
-              ctaHref={`/seed-report/${seedId}`}
-            />
-          )}
 
           {!teaser || !teaser.hasAudit ? (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm text-gray-500 dark:text-gray-400">

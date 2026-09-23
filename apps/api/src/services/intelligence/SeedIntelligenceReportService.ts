@@ -1228,7 +1228,7 @@ export class SeedIntelligenceReportService extends BaseService {
     }
 
     return {
-      primary_cta: 'Claim this free business seed',
+      primary_cta: 'Claim this free listing',
       cta_eligible: true, // Will be overridden by eligibility check if needed
       cta_disabled_reason: null,
       suggested_actions: suggestedActions,
