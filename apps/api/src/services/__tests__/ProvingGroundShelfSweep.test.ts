@@ -143,6 +143,45 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
     );
   });
 
+  it('discovers queue rows linked through tree source campaigns (migration 262 linkage)', async () => {
+    // Intelligence-lane queue entries carry source_campaign_id → a PG child
+    // and proving_ground_id=null — filtering on proving_ground_id alone
+    // misses them entirely (the cockpit ORs both linkages).
+    routeCampaignFindMany([], [], [
+      { id: 'child-intel', stage: 'seek', discovery_context: null },
+    ]);
+    mockQueueFindMany.mockResolvedValue([
+      {
+        category: 'Halal Market',
+        city: 'Olathe',
+        state: 'KS',
+        seed_id: null,
+        processed_campaign_id: null,
+        source_campaign_id: 'child-intel',
+        business_snapshot: null,
+      },
+    ]);
+
+    const report = await sweepService.sweep('pg-1');
+
+    // Pin the OR'd linkage on the query itself — the findMany mock doesn't
+    // filter, so only the where clause proves both linkages are queried.
+    expect(mockQueueFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { proving_ground_id: 'pg-1' },
+            { source_campaign_id: { in: ['pg-1', 'child-intel'] } },
+          ]),
+        }),
+      }),
+    );
+
+    const keys = report.categoryMarkets.map((m) => `${m.category}|${m.city}|${m.state}`);
+    expect(keys).toContain('Halal Market|Olathe|KS');
+    expect(report.domain.geos).toContainEqual({ city: 'Olathe', state: 'KS' });
+  });
+
   it('discovers per-prospect secondaries from campaigns, listings, and snapshots', async () => {
     mockQueueFindMany.mockResolvedValue([
       {

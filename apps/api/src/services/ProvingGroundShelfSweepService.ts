@@ -212,8 +212,24 @@ class ProvingGroundShelfSweepService extends BaseService {
     }
 
     // Discovered: per-prospect categories × prospect geo.
+    // Queue linkage mirrors the cockpit list / stage-distribution union
+    // (migrations 262 + 282): direct proving_ground_id membership OR'd with
+    // source_campaign_id pointing at the PG or one of its direct children —
+    // intelligence-lane entries are never stamped proving_ground_id, so
+    // filtering on that column alone misses the whole tree's queue.
+    const treeChildren = await this.prisma.mkt_campaigns_list.findMany({
+      where: { parent_campaign_id: provingGroundId },
+      select: { id: true },
+    });
+    const treeIds = [provingGroundId, ...treeChildren.map((c) => c.id)];
+
     const queueRows = await this.prisma.mkt_prospect_queue.findMany({
-      where: { proving_ground_id: provingGroundId },
+      where: {
+        OR: [
+          { proving_ground_id: provingGroundId },
+          { source_campaign_id: { in: treeIds } },
+        ],
+      },
       select: {
         category: true, city: true, state: true,
         seed_id: true, processed_campaign_id: true, source_campaign_id: true,

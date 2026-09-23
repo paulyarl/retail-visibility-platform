@@ -136,12 +136,12 @@ export default function OutreachProblemsSection({ problems, title, onUseAsOpener
             className="rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800/60 p-3 space-y-2"
           >
             {/* Headline + usage chip */}
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-medium text-gray-900 dark:text-gray-100 leading-snug">
+            <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+              <p className="flex-1 basis-48 min-w-0 text-xs font-medium text-gray-900 dark:text-gray-100 leading-snug">
                 {entry.problem}
               </p>
               {entry.outreach_use && (
-                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                <span className="max-w-full inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 leading-snug">
                   {entry.outreach_use}
                 </span>
               )}
