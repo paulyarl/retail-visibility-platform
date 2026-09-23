@@ -10,6 +10,7 @@ import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
 import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
 import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
 import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface PlacePageClientProps {
   slug: string;
@@ -106,6 +107,12 @@ export default function PlacePageClient({
         <GbpPostsSection slug={slug} />
         <GbpPhotoGallerySection slug={slug} />
       </div>
+      {/* Platform footer — rendered by the page (not the layout) so it is
+          always the last element, after the sponsored banner and Market
+          Intel sidebar that mount below the editorial layout. */}
+      <PoweredByFooter
+        note={`${listing.businessName} is listed from public information. This is not a claimed profile and may be incomplete.`}
+      />
     </>
   );
 }

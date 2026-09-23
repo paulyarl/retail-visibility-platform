@@ -407,7 +407,9 @@ function FunnelSummaryCard({ report, title }: { report: CohortFunnelReport; titl
       </div>
 
       {/* Report-delivery QR scans (spec §5.7) — the report hook's scan signal.
-          Same cross-channel counting as the invite split above. */}
+          Same cross-channel counting as the invite split above. The Banner cell
+          is NOT a delivery channel: it's the self-serve banner-served QR, kept
+          out of reportScans so the delivery rate above stays delivery-only. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
         <StatCell
           label="Report Scan Rate"
@@ -428,6 +430,11 @@ function FunnelSummaryCard({ report, title }: { report: CohortFunnelReport; titl
           label="Report · Email"
           value={m.reportScansEmail}
           sub={m.reportScanRateEmail !== null ? `${(m.reportScanRateEmail * 100).toFixed(1)}% of invited` : '—'}
+        />
+        <StatCell
+          label="Report · Banner"
+          value={m.reportScansBanner}
+          sub={m.reportScanRateBanner !== null ? `${(m.reportScanRateBanner * 100).toFixed(1)}% of invited` : '—'}
         />
       </div>
     </div>

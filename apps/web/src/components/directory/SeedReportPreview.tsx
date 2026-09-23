@@ -5,9 +5,9 @@
  * listing surface (/place/[slug]).
  *
  * Shows the "how we found you" story: sources checked, identity confidence,
- * intelligence signals, and the claim CTA. This is the provenance narrative
- * that leads into the claim action — it explains why the listing exists and
- * what the owner can verify.
+ * and intelligence signals. This is the provenance narrative — it explains
+ * why the listing exists — and hands off to the full report page, which
+ * carries the claim CTA itself.
  *
  * Data comes from GET /api/public/marketing/seed/:seedId/report/preview
  * (only lint-passed published reports are served).
@@ -16,13 +16,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  IconShieldCheck,
   IconSearch,
-  IconMapPin,
   IconBuilding,
   IconAlertCircle,
-  IconCheck,
-  IconClock,
+  IconArrowRight,
 } from '@tabler/icons-react';
 import { Badge, Card, Group, Text, ThemeIcon } from '@mantine/core';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
@@ -184,10 +181,9 @@ function claimStatusBadge(status: string) {
 
 export interface SeedReportPreviewProps {
   seedId: string;
-  claimToken?: string | null;
 }
 
-export default function SeedReportPreview({ seedId, claimToken }: SeedReportPreviewProps) {
+export default function SeedReportPreview({ seedId }: SeedReportPreviewProps) {
   const [report, setReport] = useState<ReportPreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -220,8 +216,6 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
   if (notFound || !report) {
     return null; // No published report — render nothing (not an error state)
   }
-
-  const claimHref = claimToken ? `/place/claim/${claimToken}` : '#claim-inquiry';
 
   return (
     <Card withBorder radius="md" p="lg">
@@ -344,32 +338,27 @@ export default function SeedReportPreview({ seedId, claimToken }: SeedReportPrev
         </div>
       )}
 
-      {/* Claim CTA */}
-      {report.next_actions.cta_eligible && report.next_actions.primary_cta && (
-        <div className="mt-4 pt-4 border-t border-neutral-200">
-          <Group justify="space-between" align="center">
-            <div>
-              <Text size="sm" fw={500}>Claim this business seed</Text>
-              <Text size="xs" c="dimmed">
-                Claim it free — fix what&apos;s here and showcase your top sellers
-              </Text>
-            </div>
-            <Link
-              href={claimHref}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm whitespace-nowrap"
-            >
-              <IconShieldCheck size={16} /> {report.next_actions.primary_cta}
-            </Link>
-          </Group>
-        </div>
-      )}
-
-      {/* CTA disabled reason */}
-      {!report.next_actions.cta_eligible && report.next_actions.cta_disabled_reason && (
-        <div className="mt-4 pt-4 border-t border-neutral-200">
-          <Text size="xs" c="dimmed">{report.next_actions.cta_disabled_reason}</Text>
-        </div>
-      )}
+      {/* Full report link — the preview's action is about the report, not
+          the claim; the report page carries the claim CTA itself. */}
+      <div className="mt-4 pt-4 border-t border-neutral-200">
+        <Group justify="space-between" align="center">
+          <div>
+            <Text size="sm" fw={500}>See everything we found</Text>
+            <Text size="xs" c="dimmed">
+              The full report lists every source, signal, and what claiming this seed unlocks
+            </Text>
+          </div>
+          <Link
+            href={`/seed-report/${seedId}`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors font-semibold text-sm whitespace-nowrap"
+          >
+            Full report <IconArrowRight size={16} />
+          </Link>
+        </Group>
+        {!report.next_actions.cta_eligible && report.next_actions.cta_disabled_reason && (
+          <Text size="xs" c="dimmed" mt="sm">{report.next_actions.cta_disabled_reason}</Text>
+        )}
+      </div>
     </Card>
   );
 }

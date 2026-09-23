@@ -87,6 +87,11 @@ export interface CohortFunnelMetrics {
   reportScanRateSocial: number | null;
   reportScanRateInPerson: number | null;
   reportScanRateText: number | null;
+  /** Banner-served report QR scans (`report_banner` surface). Deliberately
+   *  OUTSIDE `reportScans` — a banner is self-serve, not an operator delivery,
+   *  so it must not inflate the delivered → scanned rate. */
+  reportScansBanner: number;
+  reportScanRateBanner: number | null;
 }
 
 export interface ConversionScoreBreakdown {
@@ -295,6 +300,7 @@ interface CohortRow {
   report_scans_social: bigint | number;
   report_scans_in_person: bigint | number;
   report_scans_text: bigint | number;
+  report_scans_banner: bigint | number;
 }
 
 function buildFilterClauses(filters: CohortFilters, params: any[]): string {
@@ -579,7 +585,16 @@ const METRIC_SELECT = `
       WHERE qse.tenant_id = dps.tenant_id
         AND qse.surface = 'report_delivery_text'
     )
-  ) AS report_scans_text
+  ) AS report_scans_text,
+  -- Banner-served report QR (its own surface, not a report_delivery_* channel).
+  -- Counted separately so the delivery scan rate above stays delivery-only.
+  COUNT(DISTINCT dps.id) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM qr_scan_events qse
+      WHERE qse.tenant_id = dps.tenant_id
+        AND qse.surface = 'report_banner'
+    )
+  ) AS report_scans_banner
 `;
 
 const FUNNEL_FROM = `
@@ -604,6 +619,7 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
   const reportScansSocial = Number(row.report_scans_social ?? 0);
   const reportScansInPerson = Number(row.report_scans_in_person ?? 0);
   const reportScansText = Number(row.report_scans_text ?? 0);
+  const reportScansBanner = Number(row.report_scans_banner ?? 0);
   const invited = Number(row.invited ?? 0);
   const scanRate = (count: number) =>
     invited > 0 ? Math.round((count / invited) * 10000) / 10000 : null;
@@ -643,6 +659,8 @@ function rowToMetrics(row: CohortRow): CohortFunnelMetrics {
     reportScanRateSocial: scanRate(reportScansSocial),
     reportScanRateInPerson: scanRate(reportScansInPerson),
     reportScanRateText: scanRate(reportScansText),
+    reportScansBanner,
+    reportScanRateBanner: scanRate(reportScansBanner),
   };
 }
 
@@ -703,6 +721,8 @@ function buildReport(
         reportScanRateSocial: null,
         reportScanRateInPerson: null,
         reportScanRateText: null,
+        reportScansBanner: 0,
+        reportScanRateBanner: null,
       };
   const { gates, grade } = gradeGates(metrics);
   const report: CohortFunnelReport = {

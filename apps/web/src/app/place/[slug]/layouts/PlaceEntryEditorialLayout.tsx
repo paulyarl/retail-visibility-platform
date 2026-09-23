@@ -12,7 +12,6 @@ import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursColla
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import LastViewed from '@/components/directory/LastViewed';
-import { PoweredByFooter } from '@/components/PoweredByFooter';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
@@ -206,18 +205,14 @@ export default function PlaceEntryEditorialLayout({
         </section>
 
         <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
-          <UnclaimedDirectoryBanner
-            businessName={listing.businessName}
-            claimToken={claimToken}
-            publicDisclaimer={publicDisclaimer}
-          />
+          <UnclaimedDirectoryBanner businessName={listing.businessName} />
         </section>
 
-        {/* Seed report preview — the "how we found you" narrative that leads
-            into the claim CTA. Only renders when a published report exists. */}
+        {/* Seed report preview — the "how we found you" narrative that links
+            into the full report. Only renders when a published report exists. */}
         {listing.seedId && (
           <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20 mb-4">
-            <SeedReportPreview seedId={listing.seedId} claimToken={claimToken} />
+            <SeedReportPreview seedId={listing.seedId} />
           </div>
         )}
 
@@ -449,9 +444,6 @@ export default function PlaceEntryEditorialLayout({
             source={currentUrl}
           />
         </div>
-        <PoweredByFooter
-          note={`${listing.businessName} is listed from public information. This is not a claimed profile and may be incomplete.`}
-        />
       </div>
     </>
   );

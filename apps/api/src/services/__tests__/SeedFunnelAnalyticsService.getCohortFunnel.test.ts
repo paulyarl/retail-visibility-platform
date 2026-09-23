@@ -69,6 +69,7 @@ const perCampaignRow = {
   report_scans_social: 0n,
   report_scans_in_person: 2n,
   report_scans_text: 1n,
+  report_scans_banner: 3n,
 };
 
 const combinedRow = {
@@ -269,6 +270,12 @@ describe('getCohortFunnel — SQL path', () => {
     expect(cohort.metrics.reportScansText).toBe(1);
     expect(cohort.metrics.reportScansEmail).toBe(1);
     expect(cohort.metrics.reportScanRateInPerson).toBeCloseTo(0.1111, 4);
+
+    // Banner-served report QR carries its own surface (report_banner), so it is
+    // counted separately — 3 banner scans must NOT leak into reportScans above.
+    expect(cohort.metrics.reportScansBanner).toBe(3);
+    expect(cohort.metrics.reportScanRateBanner).toBeCloseTo(0.1667, 4);
+    expect(cohort.metrics.reportScans).toBe(4);
 
     // Combined: 8 scans / 30 invited
     expect(report.combined.metrics.inviteScans).toBe(8);

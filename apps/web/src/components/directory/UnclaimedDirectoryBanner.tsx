@@ -1,13 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { IconShieldCheck } from '@tabler/icons-react';
-import { Alert, Button, Text } from '@mantine/core';
+import { Alert, Text } from '@mantine/core';
 
 /**
- * UnclaimedDirectoryBanner — primary "Claim this listing" CTA for
- * directory presence seeds. Uses the ShieldCheck icon to distinguish
- * the claim action from suggest/add CTAs elsewhere.
+ * UnclaimedDirectoryBanner — provenance disclosure strip for
+ * directory presence seeds. Pure disclosure: it explains that the
+ * listing is unclaimed and what claiming unlocks, but carries no
+ * action — the hero and About-section buttons are the page's claim
+ * CTAs.
  *
  * The shelf line is incentive copy only — it never renders the seed's
  * secondary categories. Per the claim gate (multi-category shelf
@@ -17,20 +18,11 @@ import { Alert, Button, Text } from '@mantine/core';
  */
 export interface UnclaimedDirectoryBannerProps {
   businessName: string;
-  claimToken?: string | null;
-  publicDisclaimer?: string | null;
 }
 
 export default function UnclaimedDirectoryBanner({
   businessName,
-  claimToken,
-  publicDisclaimer,
 }: UnclaimedDirectoryBannerProps) {
-  const hasToken = !!claimToken;
-  const claimHref = hasToken
-    ? `/place/claim/${claimToken}`
-    : '#claim-inquiry';
-
   return (
     <Alert
       color="blue"
@@ -39,27 +31,11 @@ export default function UnclaimedDirectoryBanner({
       radius="md"
       className="mb-4"
     >
-      <Text size="sm" c="blue.9" className="mb-2">
+      <Text size="sm" c="blue.9">
         <strong>{businessName}</strong> is listed from public information. This is not a claimed profile.
         Claim it free — verify your details, appear on every matching category shelf,
         and showcase 5 top sellers.
       </Text>
-
-      {hasToken ? (
-        <Button
-          component={Link}
-          href={claimHref}
-          size="xs"
-          leftSection={<IconShieldCheck size={16} />}
-          variant='gradient' style={{ color: 'white' }}
-        >
-          Claim this listing
-        </Button>
-      ) : (
-        <Text size="sm" c="blue.9">
-          Are you the owner? <Link href="#claim-inquiry" className="underline font-medium">Contact us</Link> to claim this listing.
-        </Text>
-      )}
     </Alert>
   );
 }

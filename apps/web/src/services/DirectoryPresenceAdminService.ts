@@ -590,6 +590,10 @@ export interface CohortFunnelMetrics {
   reportScanRateSocial: number | null;
   reportScanRateInPerson: number | null;
   reportScanRateText: number | null;
+  /** Banner-served report QR scans (`report_banner`) — self-serve, so counted
+   *  outside `reportScans` (the delivery rate stays delivery-only). */
+  reportScansBanner: number;
+  reportScanRateBanner: number | null;
 }
 
 export interface ConversionScoreBreakdown {
