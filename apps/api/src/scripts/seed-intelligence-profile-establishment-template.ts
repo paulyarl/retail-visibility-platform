@@ -63,8 +63,16 @@ import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-pro
  * generic_label_set by role — "labels" stay the hide/enumeration labels and a
  * new "reveal_labels" field carries the correct/gold-standard labels used for
  * qualification. A label may live in both lists.
+ *
+ * 2026-09-22-substrate-consistency (Discovery Scan Contract §6): city-variant
+ * substrate fields for the authoring invariants — geography_grid gains
+ * corridor_zips (corridor → ZIP resolution) and uncovered_municipalities
+ * (honest uncovered flag), label_independent_sweeps gains
+ * covers_municipalities; new HARD RULE attests municipality coverage and
+ * coverage self-test class (8) checks substrate consistency. National variant
+ * unchanged (no geography_grid).
  */
-const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-22-hide-reveal-labels';
+const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-22-substrate-consistency';
 
 const ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-intel-profile-establishment-001',
@@ -190,13 +198,15 @@ an industrial or arterial stretch that no general city guide mentions.
    - Hosted pages are typically client-side rendered, so a search-index hit proves the URL exists, not that it renders for an ordinary visitor.
 
 4b. DISCOVERY SUBSTRATE (REQUIRED — CATEGORY-INDEPENDENT) — This section must NOT depend on the category's name, vocabulary, or tokens. It is the enumeration floor that surfaces businesses whose names do NOT self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). Produce three structured fields:
-   - geography_grid — the sweep units for this market, independent of category: { "city", "state", "zips": [every ZIP the market's commercial addresses fall in], "corridors": [arterial commercial stretches, derived from address evidence where possible], "adjacent_municipalities": [separately-incorporated suburbs / contiguous commercial municipalities in the catchment], "radius_miles" }. SCOPE IS THE RETAIL CATCHMENT, NOT THE ADMINISTRATIVE CITY: the principal city PLUS its contiguous commercial suburbs, including separately-incorporated municipalities that share ZIPs with the principal city (e.g. a suburb like Gladstone, MO sharing 64118 with Kansas City). List EVERY ZIP the catchment's commercial addresses fall in — not only the ZIPs where category businesses were already found, and not only the principal city's administrative ZIPs. Name the shared-ZIP suburbs explicitly in adjacent_municipalities; a ZIP spanning the principal city and a suburb is ONE sweep unit. The grid is the exhaustive enumeration unit: every ZIP must be swept, and a ZIP with zero findings must be reported as an executed-empty result, never silently skipped.
+   - geography_grid — the sweep units for this market, independent of category: { "city", "state", "zips": [every ZIP the market's commercial addresses fall in], "corridors": [arterial commercial stretches, derived from address evidence where possible], "adjacent_municipalities": [separately-incorporated suburbs / contiguous commercial municipalities in the catchment], "corridor_zips": { "<corridor name>": [grid ZIP(s) it spans] }, "uncovered_municipalities": [adjacent municipalities no label-independent dataset reaches — the honest uncovered flag], "radius_miles" }. SCOPE IS THE RETAIL CATCHMENT, NOT THE ADMINISTRATIVE CITY: the principal city PLUS its contiguous commercial suburbs, including separately-incorporated municipalities that share ZIPs with the principal city (e.g. a suburb like Gladstone, MO sharing 64118 with Kansas City). List EVERY ZIP the catchment's commercial addresses fall in — not only the ZIPs where category businesses were already found, and not only the principal city's administrative ZIPs. Name the shared-ZIP suburbs explicitly in adjacent_municipalities; a ZIP spanning the principal city and a suburb is ONE sweep unit. The grid is the exhaustive enumeration unit: every ZIP must be swept, and a ZIP with zero findings must be reported as an executed-empty result, never silently skipped. Every corridor MUST resolve to at least one ZIP sweep unit — name the ZIP(s) it spans in corridor_zips; a corridor with no ZIP resolution is a node the dataset set can drift away from.
    - generic_label_set — the platform labels split by ROLE. One entry per platform: { "platform", "labels": [...], "reveal_labels": [...] }. "labels" are the HIDE labels — the generic buckets a mislabeled business sits under; they drive enumeration. "reveal_labels" are the CORRECT / gold-standard labels for this category on that platform; they drive qualification. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). A label can be BOTH — e.g. the platform's correct category label is also where mislabeled businesses get filed — put it in both lists. Do NOT put the correct label in "labels" alone, and never omit a hide label just because it is also the correct one.
-   - label_independent_sweeps — the address-indexed datasets to sweep WITHOUT a category name token. One entry per dataset: { "dataset", "url", "sweep_key": "geography", "filter": "none", "post_filter": "assortment" }. The sweep_key MUST be "geography": these datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. Never keyed by the category name.
+   - label_independent_sweeps — the address-indexed datasets to sweep WITHOUT a category name token. One entry per dataset: { "dataset", "url", "sweep_key": "geography", "covers_municipalities": [catchment municipalities this dataset reaches, or "*" for whole-catchment coverage], "filter": "none", "post_filter": "assortment" }. The sweep_key MUST be "geography": these datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. Never keyed by the category name.
 
    A profile whose only discovery paths are keyed on the category's own tokens is incomplete. The substrate is what makes discovery category-independent.
 
    HARD RULE — LABEL-INDEPENDENT SWEEPS MUST BE GEOGRAPHY-KEYED. When you name an address-indexed dataset (state registry, benefit-program authorization, licensing, permit registries), specify that it is swept by GEOGRAPHY (ZIP/address) and filtered to category fit afterward. Do NOT implement it as a name-token query. Token-keying a label-independent dataset makes it label-dependent and defeats its purpose: a business whose legal name carries no category token will be invisible to it.
+
+   HARD RULE — MUNICIPALITY COVERAGE IS ATTESTED OR FLAGGED. Every entry in geography_grid.adjacent_municipalities MUST map to at least one label-independent sweep — name it in that sweep's "covers_municipalities" (or "*" for whole-catchment datasets like statewide registries) — or be flagged in geography_grid.uncovered_municipalities. A municipality that no dataset reaches and nothing flags is an invisible coverage hole: silence is the failure this rule exists to catch. If the catchment has no dataset for a municipality (e.g. a suburb whose licensing records are not online), flag it uncovered rather than inventing coverage.
 
 4c. PLATFORM SIGNAL WEIGHTS (REQUIRED) — Estimate signal_weight(category, platform) for this market: how much each platform's signals (category traffic, reviews, ratings, profiles) should move a score for this category, as a number in [0,1]. This is the LOCAL estimate — derive it from what you observed in {{city}}: prevalence x depth, i.e. what share of the category's customer-facing activity in this market actually happens on that platform.
 
@@ -233,11 +243,12 @@ Before finalizing, audit your own pattern set for blind spots. For each class be
   (5) A business that is well known in its community but has no customer reviews.
   (6) A business whose name contains NO category token and NO endonym — a generic-looking name that does not self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). Confirm a pattern surfaces it WITHOUT relying on the name.
   (7) A business reachable ONLY by sweeping a ZIP × generic-label matrix or an address-indexed dataset by geography — i.e. it is invisible to every name, endonym, and product query.
+  (8) A business located in an ADJACENT MUNICIPALITY whose only discoverable trace is a label-independent dataset — confirm every adjacent_municipalities entry is covered by some sweep's covers_municipalities or flagged in uncovered_municipalities, and confirm every corridor resolves to a ZIP via corridor_zips.
 Record the result in discovery_patterns under the key "coverage_self_test", stating for each class which pattern covers it — or that it is uncovered. A pattern set that can only find businesses that already look like the category is not finished.
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-2026-09-22-hide-reveal-labels -->`,
+<!-- seed-version: intel-profile-establishment-2026-09-22-substrate-consistency -->`,
   variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,

@@ -55,8 +55,15 @@ describe('intelligence-profile establishment template — discovery substrate co
   });
 
   it('stamps the current seed version', () => {
-    expect(SEED_SOURCE).toContain("'intel-profile-establishment-2026-09-22-hide-reveal-labels'");
-    expect(SEED_SOURCE).toContain('seed-version: intel-profile-establishment-2026-09-22-hide-reveal-labels');
+    expect(SEED_SOURCE).toContain("'intel-profile-establishment-2026-09-22-substrate-consistency'");
+    expect(SEED_SOURCE).toContain('seed-version: intel-profile-establishment-2026-09-22-substrate-consistency');
+  });
+
+  it('carries the substrate-consistency authoring invariants (spec §6)', () => {
+    expect(SEED_SOURCE).toContain('covers_municipalities');
+    expect(SEED_SOURCE).toContain('corridor_zips');
+    expect(SEED_SOURCE).toContain('uncovered_municipalities');
+    expect(SEED_SOURCE).toContain('MUNICIPALITY COVERAGE IS ATTESTED OR FLAGGED');
   });
 
   it('splits generic_label_set into hide and reveal labels (spec §5.1.3)', () => {

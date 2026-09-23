@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   intelligenceProfileSchema,
   INTELLIGENCE_PROFILE_SCHEMA_NAME,
+  collectProfileSubstrateViolations,
 } from '../../validators/intelligence-profile.schema';
 
 const validProfile = (overrides: Record<string, any> = {}) => ({
@@ -260,5 +261,141 @@ describe('intelligence_profile schema (GAP-P8)', () => {
       geography_grid: { zips: ['64118'] },
     }));
     expect(result.success).toBe(true);
+  });
+
+  it('geography_grid accepts corridor_zips and uncovered_municipalities', () => {
+    const result = intelligenceProfileSchema.safeParse(validProfile({
+      geography_grid: {
+        zips: ['64118', '64119'],
+        corridors: ['N Oak Trafficway'],
+        corridor_zips: { 'N Oak Trafficway': ['64118'] },
+        uncovered_municipalities: ['Gladstone, MO'],
+      },
+    }));
+    expect(result.success).toBe(true);
+  });
+});
+
+// ─── Substrate consistency check (Discovery Scan Contract Spec §6) ───────
+
+describe('collectProfileSubstrateViolations (spec §6 substrate check)', () => {
+  const substrateProfile = (overrides: Record<string, any> = {}) => validProfile({
+    geography_grid: {
+      city: 'Kansas City',
+      state: 'MO',
+      zips: ['64118', '64119'],
+      corridors: ['N Oak Trafficway'],
+      adjacent_municipalities: ['Gladstone, MO'],
+      corridor_zips: { 'N Oak Trafficway': ['64118'] },
+    },
+    label_independent_sweeps: [
+      {
+        dataset: 'Missouri Secretary of State business entity registry',
+        sweep_key: 'geography',
+        covers_municipalities: ['*'],
+      },
+    ],
+    ...overrides,
+  });
+
+  it('clean substrate → no violations', () => {
+    expect(collectProfileSubstrateViolations(substrateProfile())).toEqual([]);
+  });
+
+  it('non-object input → no violations', () => {
+    expect(collectProfileSubstrateViolations(null)).toEqual([]);
+    expect(collectProfileSubstrateViolations('x')).toEqual([]);
+  });
+
+  it('SUB-1 — adjacent municipality maps to no sweep → violation', () => {
+    const profile = substrateProfile({
+      label_independent_sweeps: [
+        { dataset: 'KCMO business licensing', sweep_key: 'geography', covers_municipalities: ['Kansas City, MO'] },
+      ],
+    });
+    const violations = collectProfileSubstrateViolations(profile);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].invariant).toBe('SUB-1');
+    expect(violations[0].message).toContain('Gladstone');
+  });
+
+  it('SUB-1 — sweep with no covers_municipalities does not attest coverage', () => {
+    const profile = substrateProfile({
+      label_independent_sweeps: [
+        { dataset: 'KCMO business licensing', sweep_key: 'geography' },
+      ],
+    });
+    expect(collectProfileSubstrateViolations(profile).map((v) => v.invariant)).toEqual(['SUB-1']);
+  });
+
+  it('SUB-1 — explicit uncovered_municipalities flag satisfies the invariant', () => {
+    const profile = substrateProfile();
+    (profile.geography_grid as any).uncovered_municipalities = ['Gladstone, MO'];
+    profile.label_independent_sweeps = [
+      { dataset: 'KCMO business licensing', sweep_key: 'geography', covers_municipalities: ['Kansas City, MO'] },
+    ];
+    expect(collectProfileSubstrateViolations(profile)).toEqual([]);
+  });
+
+  it('SUB-1 — municipality matching is tolerant (name without state suffix)', () => {
+    const profile = substrateProfile({
+      label_independent_sweeps: [
+        { dataset: 'Gladstone licensing records', sweep_key: 'geography', covers_municipalities: ['Gladstone'] },
+      ],
+    });
+    expect(collectProfileSubstrateViolations(profile)).toEqual([]);
+  });
+
+  it('SUB-1 — vacuous when no adjacent_municipalities declared', () => {
+    const profile = substrateProfile();
+    delete (profile.geography_grid as any).adjacent_municipalities;
+    profile.label_independent_sweeps = [];
+    expect(collectProfileSubstrateViolations(profile)).toEqual([]);
+  });
+
+  it('SUB-2 — corridor resolving to no ZIP → violation', () => {
+    const profile = substrateProfile({
+      geography_grid: {
+        zips: ['64118'],
+        corridors: ['N Oak Trafficway'],
+      },
+    });
+    const violations = collectProfileSubstrateViolations(profile);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].invariant).toBe('SUB-2');
+    expect(violations[0].message).toContain('N Oak Trafficway');
+  });
+
+  it('SUB-2 — corridor string naming a grid ZIP resolves inline', () => {
+    const profile = substrateProfile({
+      geography_grid: {
+        zips: ['64118'],
+        corridors: ['N Oak Trafficway (64118)'],
+      },
+    });
+    expect(collectProfileSubstrateViolations(profile)).toEqual([]);
+  });
+
+  it('SUB-2 — corridor_zips mapping to a grid ZIP resolves', () => {
+    const profile = substrateProfile();
+    expect(collectProfileSubstrateViolations(profile)).toEqual([]);
+  });
+
+  it('SUB-3 — corridor_zips pointing outside geography_grid.zips → violation', () => {
+    const profile = substrateProfile({
+      geography_grid: {
+        zips: ['64118'],
+        corridors: ['N Oak Trafficway'],
+        corridor_zips: { 'N Oak Trafficway': ['64155'] },
+      },
+    });
+    const violations = collectProfileSubstrateViolations(profile);
+    expect(violations.map((v) => v.invariant)).toContain('SUB-3');
+    // also unresolved: the only mapping lands outside the grid
+    expect(violations.map((v) => v.invariant)).toContain('SUB-2');
+  });
+
+  it('legacy profile without substrate fields → no violations', () => {
+    expect(collectProfileSubstrateViolations(validProfile())).toEqual([]);
   });
 });

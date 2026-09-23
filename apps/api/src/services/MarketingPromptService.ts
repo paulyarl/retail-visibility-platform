@@ -16,6 +16,7 @@ import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlag
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { applyRenderControlCoverageGate, BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
 import { normalizeIntelligenceDiscoveryPayload, applyDiscoveryScanContractGate, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
+import { collectProfileSubstrateViolations } from '../validators/intelligence-profile.schema';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import { isNationalSentinel } from './intelligence/geography-grid';
@@ -1455,6 +1456,19 @@ export class MarketingPromptService extends BaseService {
       const isNational = isNationalSentinel(campaign?.city);
       const referenceCity = isNational ? null : (campaign?.city || null);
       const referencePlatform = campaign?.intelligence_platform || null;
+      // Discovery Scan Contract Spec §6 — substrate consistency check,
+      // report-mode (v1.3): stamps violations into the persisted
+      // configuration_json so the substrate's own coverage holes travel with
+      // the draft. National profiles carry no geography_grid — the collector
+      // returns [] and this is a no-op.
+      const substrateViolations = collectProfileSubstrateViolations(parsedJson);
+      if (substrateViolations.length > 0) {
+        parsedJson.substrate_violations = substrateViolations;
+        logger.warn('Intelligence profile substrate violations detected (report-mode)', ctx, {
+          campaignId,
+          violations: substrateViolations,
+        });
+      }
       const profile = await IntelligenceProfileService.getInstance().importAsDraft({
         categoryKey: parsedJson.category_key,
         categoryName: parsedJson.category_name,
