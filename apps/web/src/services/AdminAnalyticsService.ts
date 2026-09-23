@@ -60,6 +60,8 @@ export interface CategoryEmergenceRow {
   kind: 'primary' | 'secondary';
   category: string;
   listingCount: number;
+  /** Distinct businesses on active business-scope campaigns carrying this category in this market (0 = listings only). */
+  businessCount: number;
 }
 
 export interface CategoryEmergenceFilters {

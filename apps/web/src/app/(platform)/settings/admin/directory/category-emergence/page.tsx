@@ -52,7 +52,7 @@ export default function CategoryEmergencePage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <PageHeader
         title="Category Emergence"
-        description="See how many published listings fall into each category, per served location, to spot emerging sub-niches."
+        description="See how many published listings and businesses in the campaign pipeline fall into each category, per served location — listings are shelves already populated, businesses are pipeline demand."
         icon={<BarChart3 className="w-6 h-6 text-blue-600" />}
         backLink={{ href: '/settings/admin/directory', label: 'Back to Directory' }}
         actions={
@@ -138,7 +138,10 @@ export default function CategoryEmergencePage() {
                     Kind
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Count
+                    Listings
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Businesses
                   </th>
                 </tr>
               </thead>
@@ -146,7 +149,7 @@ export default function CategoryEmergencePage() {
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
                       No category emergence data matches the current filters.
@@ -175,8 +178,24 @@ export default function CategoryEmergencePage() {
                           {row.kind}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900 dark:text-white">
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
+                        row.listingCount > 0
+                          ? 'text-gray-900 dark:text-white'
+                          : 'text-gray-400 dark:text-gray-500'
+                      }`}>
                         {row.listingCount}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
+                        row.businessCount > 0
+                          ? 'text-violet-700 dark:text-violet-300'
+                          : 'text-gray-400 dark:text-gray-500'
+                      }`}>
+                        {row.businessCount}
+                        {row.businessCount > 0 && row.listingCount === 0 && (
+                          <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300" title="Businesses in the pipeline carry this category but no published listing sits on it yet">
+                            pipeline only
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))

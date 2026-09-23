@@ -617,8 +617,17 @@ router.patch('/listings/:tenantId/seo', authenticateToken, requireAdmin, async (
  * GET /api/admin/directory/category-emergence
  *
  * Returns primary and secondary category counts grouped by published
- * directory listing city/state. Useful for spotting emerging sub-niches
- * that have enough hosting population to justify a standalone category.
+ * directory listing city/state — plus a parallel count of distinct
+ * BUSINESSES carried by active business-scope campaigns in the same
+ * market (primary = campaign.category, secondary = secondary_categories;
+ * sibling campaigns dedup by business_prospect_id, then business_name).
+ * Campaign-only rows (listingCount = 0) surface shelves the pipeline is
+ * working before any published listing sits on them. Useful for spotting
+ * emerging sub-niches that have enough hosting population to justify a
+ * standalone category.
+ *
+ * Inactive campaign stages are excluded (mirrors the shelf sweep's
+ * INACTIVE_STAGES set).
  */
 router.get('/category-emergence', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -629,13 +638,12 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
       where: { is_published: true },
       select: { tenant_id: true },
     });
-    if (publishedSettings.length === 0) {
-      return res.json({ rows: [] });
-    }
-    const idList = Prisma.join(publishedSettings.map((s) => Prisma.sql`${s.tenant_id}`));
+    const idList = publishedSettings.length > 0
+      ? Prisma.sql`tenant_id IN (${Prisma.join(publishedSettings.map((s) => Prisma.sql`${s.tenant_id}`))})`
+      : Prisma.sql`FALSE`;
 
     let query = Prisma.sql`
-      WITH category_counts AS (
+      WITH listing_counts AS (
         SELECT
           city,
           state,
@@ -643,7 +651,7 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           primary_category AS category,
           count(*)::int AS listing_count
         FROM directory_listings_list
-        WHERE tenant_id IN (${idList})
+        WHERE ${idList}
           AND city IS NOT NULL
           AND state IS NOT NULL
           AND primary_category IS NOT NULL
@@ -659,14 +667,76 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
           count(*)::int AS listing_count
         FROM directory_listings_list l
         CROSS JOIN LATERAL unnest(l.secondary_categories) s(category)
-        WHERE l.tenant_id IN (${idList})
+        WHERE ${idList}
           AND l.city IS NOT NULL
           AND l.state IS NOT NULL
           AND s.category IS NOT NULL
         GROUP BY l.city, l.state, s.category
+      ),
+      campaign_counts AS (
+        SELECT
+          city,
+          state,
+          'primary' AS kind,
+          category,
+          count(DISTINCT business_key)::int AS business_count
+        FROM (
+          SELECT
+            city,
+            state,
+            category,
+            COALESCE(
+              business_prospect_id,
+              NULLIF(btrim(LOWER(business_name)), ''),
+              id
+            ) AS business_key
+          FROM mkt_campaigns_list
+          WHERE scope = 'business'
+            AND city IS NOT NULL
+            AND state IS NOT NULL
+            AND btrim(category) <> ''
+            AND LOWER(COALESCE(stage, '')) NOT IN ('lost', 'dead', 'closed', 'resolved_and_closed')
+        ) primaries
+        GROUP BY city, state, category
+
+        UNION ALL
+
+        SELECT
+          mc.city,
+          mc.state,
+          'secondary' AS kind,
+          s.category,
+          count(DISTINCT COALESCE(
+            mc.business_prospect_id,
+            NULLIF(btrim(LOWER(mc.business_name)), ''),
+            mc.id
+          ))::int AS business_count
+        FROM mkt_campaigns_list mc
+        CROSS JOIN LATERAL unnest(mc.secondary_categories) s(category)
+        WHERE mc.scope = 'business'
+          AND mc.city IS NOT NULL
+          AND mc.state IS NOT NULL
+          AND s.category IS NOT NULL
+          AND btrim(s.category) <> ''
+          AND LOWER(COALESCE(mc.stage, '')) NOT IN ('lost', 'dead', 'closed', 'resolved_and_closed')
+        GROUP BY mc.city, mc.state, s.category
       )
-      SELECT city, state, kind, category, listing_count AS "listingCount"
-      FROM category_counts
+      SELECT *
+      FROM (
+        SELECT
+          COALESCE(l.city, c.city) AS city,
+          COALESCE(l.state, c.state) AS state,
+          COALESCE(l.kind, c.kind) AS kind,
+          COALESCE(l.category, c.category) AS category,
+          COALESCE(l.listing_count, 0) AS "listingCount",
+          COALESCE(c.business_count, 0) AS "businessCount"
+        FROM listing_counts l
+        FULL OUTER JOIN campaign_counts c
+          ON LOWER(l.city) = LOWER(c.city)
+          AND LOWER(l.state) = LOWER(c.state)
+          AND l.kind = c.kind
+          AND LOWER(l.category) = LOWER(c.category)
+      ) merged
       WHERE 1 = 1
     `;
 
@@ -683,15 +753,15 @@ router.get('/category-emergence', authenticateToken, requireAdmin, async (req: R
       query = Prisma.sql`${query} AND kind = ${kind}`;
     }
     if (minCountNum !== undefined && !Number.isNaN(minCountNum)) {
-      query = Prisma.sql`${query} AND listing_count >= ${minCountNum}`;
+      query = Prisma.sql`${query} AND ("listingCount" + "businessCount") >= ${minCountNum}`;
     }
 
     query = Prisma.sql`${query}
-      ORDER BY "listingCount" DESC, state, city, kind, category
+      ORDER BY ("listingCount" + "businessCount") DESC, state, city, kind, category
     `;
 
     const rows = await prisma.$queryRaw<
-      { city: string; state: string; kind: string; category: string; listingCount: number }[]
+      { city: string; state: string; kind: string; category: string; listingCount: number; businessCount: number }[]
     >(query);
 
     return res.json({ rows });
