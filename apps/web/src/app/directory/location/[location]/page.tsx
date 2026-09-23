@@ -254,6 +254,11 @@ export default async function LocationPage({ params, searchParams }: LocationPag
 
         {/* Listings */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {/* Listings + tall-banner rail. The rail holds the 300x600 report
+              slot (sticky on desktop) fed by the city teaser; the collapsible
+              Market Intel panel below then shows cards only. */}
+          <div className="lg:flex lg:gap-8">
+            <div className="min-w-0 flex-1">
           {data.listings.length === 0 ? (
             <div className="text-center py-12">
               <MapPin className="w-16 h-16 text-neutral-400 mx-auto mb-4" />
@@ -279,6 +284,18 @@ export default async function LocationPage({ params, searchParams }: LocationPag
               shelfRef={`directory/location/${location}`}
             />
           )}
+            </div>
+
+            <aside className="mt-8 shrink-0 lg:mt-0 lg:w-[336px]">
+              <div className="lg:sticky lg:top-6">
+                <MarketIntelBanner
+                  variant="tall"
+                  surfaceType="city"
+                  teaser={marketIntelTeaser}
+                />
+              </div>
+            </aside>
+          </div>
 
           {/* Square banner slot (300x250) — in-flow placement below the grid. */}
           {data.listings.length > 0 && (
@@ -449,12 +466,15 @@ export default async function LocationPage({ params, searchParams }: LocationPag
 
         <PoweredByFooter />
 
-        {/* Market Intel sidebar (§12.3) — tall banner slot + city teaser cards.
-            The citySlug here is the "{city}-{state}" slug the teaser route parses. */}
+        {/* Market Intel sidebar (§12.3) — city teaser cards. showBanner=false:
+            the tall slot already lives in the right rail, so the panel carries
+            only the intelligence cards (one tall slot per page). The citySlug
+            is the "{city}-{state}" slug the teaser route parses. */}
         <MarketIntelSurfaceSidebar
           surfaceType="city"
           surfaceKey={location}
           initialTeaser={marketIntelTeaser}
+          showBanner={false}
         />
       </div>
     </>

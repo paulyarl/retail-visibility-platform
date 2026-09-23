@@ -19,6 +19,10 @@ interface MarketIntelSurfaceSidebarProps {
   state?: string | null;
   /** Server-rendered teaser for SEO (optional). */
   initialTeaser?: CategoryMarketIntelTeaser | CityMarketIntelTeaser | null;
+  /** Render the tall banner slot at the top of the panel. Default true.
+   *  Pass false when the surface already shows the tall slot in a right rail,
+   *  so there is exactly one tall slot per surface. */
+  showBanner?: boolean;
 }
 
 /**
@@ -37,6 +41,7 @@ export function MarketIntelSurfaceSidebar({
   city = '__all__',
   state = null,
   initialTeaser = null,
+  showBanner = true,
 }: MarketIntelSurfaceSidebarProps) {
   const [open, setOpen] = useState(false);
   const [teaser, setTeaser] = useState<
@@ -97,13 +102,16 @@ export function MarketIntelSurfaceSidebar({
 
             <div className="space-y-3">
               {/* Tall banner slot (300x600) — reserved ad inventory at the top
-                  of the panel, filled with the surface's report offer. */}
-              <MarketIntelBanner
-                variant="tall"
-                surfaceType={isCategory ? 'category' : 'city'}
-                teaser={teaser}
-                className="mb-1"
-              />
+                  of the panel, filled with the surface's report offer. Skipped
+                  when the surface already shows the slot in a right rail. */}
+              {showBanner && (
+                <MarketIntelBanner
+                  variant="tall"
+                  surfaceType={isCategory ? 'category' : 'city'}
+                  teaser={teaser}
+                  className="mb-1"
+                />
+              )}
               {isCategory ? (
                 <CategoryCards teaser={teaser as CategoryMarketIntelTeaser} />
               ) : (

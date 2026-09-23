@@ -20,6 +20,7 @@ import DirectoryFilterRail from '../DirectoryFilterRail';
 import StoreResults from '../StoreResults';
 import { Pagination } from '@/components/ui';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
 import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
@@ -168,6 +169,13 @@ export default function DirectoryEditorialLayout({ data }: DirectoryLayoutProps)
             shelfRef="directory/home"
           />
 
+          {/* Square banner slot (300x250) — in-feed, after the results grid. */}
+          {totalItems > 0 && (
+            <div className="mt-10 flex justify-center">
+              <MarketIntelBanner variant="square" surfaceType="directory" />
+            </div>
+          )}
+
           {/* Pagination */}
           {!data.loading && totalItems > 0 && totalPages > 1 && (
             <div className="mt-12 flex justify-center">
@@ -193,6 +201,14 @@ export default function DirectoryEditorialLayout({ data }: DirectoryLayoutProps)
             </ProductSingletonProvider>
 
             <LastViewed />
+          </div>
+        )}
+
+        {/* Tall banner slot (300x600) — in-flow, before the CTA band. No
+            teaser on the home surface → house creative fallback. */}
+        {!data.loading && (
+          <div className="mt-12 flex justify-center">
+            <MarketIntelBanner variant="tall" surfaceType="directory" />
           </div>
         )}
 

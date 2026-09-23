@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import CategoryViewClient from './CategoryViewClient';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
+import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,19 @@ export default async function CategoryViewPage({ params, searchParams }: PagePro
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
 
+  // Server-render the market intel teaser for SEO (§12.3/§11.5). This is the
+  // national (city-agnostic) category view, so the teaser is '__all__'-scoped.
+  let marketIntelTeaser = null;
+  try {
+    marketIntelTeaser = await marketIntelSurfaceService.getCategoryTeaser(
+      resolvedParams.categorySlug,
+      '__all__',
+      null,
+    );
+  } catch {
+    // Degrade gracefully — sidebar just won't render.
+  }
+
   return (
     <Suspense
       fallback={
@@ -66,6 +80,7 @@ export default async function CategoryViewPage({ params, searchParams }: PagePro
       <CategoryViewClient
         categorySlug={resolvedParams.categorySlug}
         searchParams={resolvedSearchParams}
+        marketIntelTeaser={marketIntelTeaser}
       />
     </Suspense>
   );

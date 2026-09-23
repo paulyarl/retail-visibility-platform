@@ -84,12 +84,12 @@ transactional/info pages have no listings flow to interrupt.
 
 | Surface | File | Teaser | Tall slot | Square slot |
 |---|---|---|---|---|
-| `/directory/location/[location]` | `location/[location]/page.tsx` | ✅ `getCityTeaser({city}-{state})` | ✅ done (panel) | ✅ done (inline) |
-| `/directory/categories/[categorySlug]` | `categories/[categorySlug]/CategoryViewClient.tsx` | ✅ `getCategoryTeaser(slug, '__all__', null)` | panel | inline |
+| `/directory/location/[location]` | `location/[location]/page.tsx` | ✅ `getCityTeaser({city}-{state})` | rail | inline |
+| `/directory/categories/[categorySlug]` | `categories/[categorySlug]/CategoryViewClient.tsx` | ✅ `getCategoryTeaser(slug, '__all__', null)` | rail | inline |
 | `/directory/categories` | `categories/AllCategoriesClient.tsx` | ❌ none | rail | inline |
 | `/directory/stores/[storeTypeSlug]` | `stores/[storeTypeSlug]/StoreTypeViewClient.tsx` | ❌ none | rail | inline |
 | `/directory/stores` | `stores/AllStoreTypesClient.tsx` | ❌ none | rail | inline |
-| `/directory` (home) | `DirectoryClient.tsx` | ❌ none | rail | inline |
+| `/directory` (home) | `components/directory/redesign/layouts/*` (3 variants) | ❌ none | in-flow | inline |
 | `/directory/category/[category]` | `category/[category]/page.tsx` | — legacy hardcoded stub (`CATEGORY_INFO`) | out of scope | out of scope |
 
 **Two category routes exist.** `/directory/categories/[categorySlug]` is the
@@ -166,6 +166,24 @@ fetch (no doomed request on teaser-less surfaces).
 on every surface, and cleanly separates ad space from the intelligence
 panel. Option B is documented in case consistency with the shipped pages is
 preferred over viewability.
+
+### 4.4 As implemented
+
+Option A, applied uniformly to the directory surfaces:
+
+- Every directory browse surface renders the tall `300x600` banner in a
+  `lg:flex` right rail (`lg:w-[336px]`, `lg:sticky lg:top-6`, stacks below
+  content on mobile). The home page's three redesign layouts (`DirectoryShell`
+  → Discovery/Editorial/Immersive) are single-flow and already dense, so the
+  tall slot renders **in-flow** there rather than in a rail.
+- `MarketIntelSurfaceSidebar` gained a `showBanner` prop (default `true`). On
+  `categories/[categorySlug]` and `location/[location]` it is rendered with
+  `showBanner={false}` so the panel carries only the intelligence cards and
+  there is exactly one tall slot per surface.
+- **Follow-up (not done):** the `/place/*` surfaces still keep the tall slot
+  inside the panel (`showBanner` default). Migrating them to the rail is the
+  same `showBanner={false}` + rail edit; left out of this pass since those
+  pages were already approved with the panel-resident slot.
 
 ---
 

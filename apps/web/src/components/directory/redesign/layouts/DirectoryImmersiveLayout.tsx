@@ -21,6 +21,7 @@ import DirectoryFilterRail from '../DirectoryFilterRail';
 import StoreResults from '../StoreResults';
 import { Pagination } from '@/components/ui';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
 import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
 import PromotedStoresCarousel from '@/components/directory/PromotedStoresCarousel';
@@ -128,6 +129,13 @@ export default function DirectoryImmersiveLayout({ data }: DirectoryLayoutProps)
               appearance="immersive"
               shelfRef="directory/home"
             />
+
+            {/* Square banner slot (300x250) — in-feed, after the results. */}
+            {totalItems > 0 && (
+              <div className="pt-3 flex justify-center">
+                <MarketIntelBanner variant="square" surfaceType="directory" />
+              </div>
+            )}
           </div>
 
           {/* Pagination */}
@@ -171,6 +179,12 @@ export default function DirectoryImmersiveLayout({ data }: DirectoryLayoutProps)
 
         {/* Recently viewed — conversion re-engagement */}
         <LastViewed />
+
+        {/* Tall banner slot (300x600) — in-flow at the foot of the discovery
+            stack. No teaser on the home surface → house creative fallback. */}
+        <div className="flex justify-center">
+          <MarketIntelBanner variant="tall" surfaceType="directory" />
+        </div>
       </div>
 
       {/* Mobile filter drawer */}

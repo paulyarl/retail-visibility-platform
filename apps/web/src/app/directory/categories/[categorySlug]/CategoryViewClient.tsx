@@ -18,6 +18,9 @@ import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
+import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import placesBrowsePublicService, { CategoryEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
 import { clientLogger } from '@/lib/client-logger';
@@ -85,11 +88,15 @@ interface CategoryViewClientProps {
     radius?: string;
     search?: string;
   };
+  /** Server-rendered national category teaser — feeds the report banner +
+      Market Intel panel (§12.3). */
+  marketIntelTeaser?: CategoryMarketIntelTeaser | null;
 }
 
 export default function CategoryViewClient({
   categorySlug,
   searchParams,
+  marketIntelTeaser,
 }: CategoryViewClientProps) {
   const { settings } = usePlatformSettings();
   const [data, setData] = useState<DirectoryResponse | null>(null);
@@ -333,6 +340,11 @@ export default function CategoryViewClient({
           </div>
         </div>
 
+        {/* Listings + tall-banner rail. The rail holds the 300x600 report
+            slot (sticky on desktop) fed by the category teaser; the
+            collapsible Market Intel panel below then shows cards only. */}
+        <div className="lg:flex lg:gap-8">
+          <div className="min-w-0 flex-1">
         {/* Views - REUSE EXACT COMPONENTS */}
         {viewMode === 'grid' && (
           <DirectoryGrid
@@ -363,6 +375,30 @@ export default function CategoryViewClient({
               shelfRef={`directory/category/${categorySlug}`}
             />
           </>
+        )}
+          </div>
+
+          <aside className="mt-8 shrink-0 lg:mt-0 lg:w-[336px]">
+            <div className="lg:sticky lg:top-6">
+              <MarketIntelBanner
+                variant="tall"
+                surfaceType="category"
+                teaser={marketIntelTeaser}
+              />
+            </div>
+          </aside>
+        </div>
+
+        {/* Square banner slot (300x250) — in-feed placement at the end of the
+            listing views, before the enrichment band. */}
+        {totalItems > 0 && (
+          <div className="mt-10 flex justify-center">
+            <MarketIntelBanner
+              variant="square"
+              surfaceType="category"
+              teaser={marketIntelTeaser}
+            />
+          </div>
         )}
       </div>
 
@@ -488,6 +524,18 @@ export default function CategoryViewClient({
 
                   {/* Platform Branding Footer */}
                   <PoweredByFooter />
+
+      {/* Market Intel sidebar (§12.3) — national category teaser cards.
+          showBanner=false: the tall slot already lives in the right rail, so
+          the panel carries only the intelligence cards (one tall slot/page). */}
+      <MarketIntelSurfaceSidebar
+        surfaceType="category"
+        surfaceKey={categorySlug}
+        city="__all__"
+        state={null}
+        initialTeaser={marketIntelTeaser}
+        showBanner={false}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Package, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import type { NationalCategoryRosterEntry } from '@/services/PlacesBrowsePublicService';
 import { clientLogger } from '@/lib/client-logger';
@@ -176,12 +177,14 @@ export default function AllCategoriesClient({
           </div>
         ) : (
           <>
+          <div className="lg:flex lg:gap-8">
+            <div className="min-w-0 flex-1">
             <div className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
               Showing {filteredCategories.length} of {categories.filter(cat => cat.storeCount > 0).length}{' '}
               {categories.filter(cat => cat.storeCount > 0).length === 1 ? 'category' : 'categories'} with stores
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredCategories.map((category) => (
                 <button
                   key={category.id}
@@ -239,6 +242,22 @@ export default function AllCategoriesClient({
                 </button>
               ))}
             </div>
+            </div>
+
+            {/* Tall banner slot (300x600) — right rail beside the category
+                grid; sticky on desktop, stacks below on mobile. No teaser on
+                this aggregate surface → house creative fallback. */}
+            <aside className="mt-8 shrink-0 lg:mt-0 lg:w-[336px]">
+              <div className="lg:sticky lg:top-6">
+                <MarketIntelBanner variant="tall" surfaceType="directory" />
+              </div>
+            </aside>
+          </div>
+
+          {/* Square banner slot (300x250) — in-flow, end of the grid. */}
+          <div className="mt-10 flex justify-center">
+            <MarketIntelBanner variant="square" surfaceType="directory" />
+          </div>
           </>
         )}
       </div> 

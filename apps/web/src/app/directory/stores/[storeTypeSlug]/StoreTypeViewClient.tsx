@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { useDirectoryShelfTracking } from '@/hooks/useDirectoryShelfTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -335,6 +336,11 @@ export default function StoreTypeViewClient({
           </div>
         </div>
 
+        {/* Listings + tall-banner rail. The rail holds the 300x600 report
+            slot (sticky on desktop); no store-type teaser exists, so the
+            creative falls back to house copy. */}
+        <div className="lg:flex lg:gap-8">
+          <div className="min-w-0 flex-1">
         {/* Views - REUSE EXACT COMPONENTS */}
         {viewMode === 'grid' && (
           <DirectoryGrid
@@ -365,6 +371,21 @@ export default function StoreTypeViewClient({
 
         {/* Store Type Recommendations */}
         <StoreTypeRecommendations storeTypeSlug={storeTypeSlug} />
+          </div>
+
+          <aside className="mt-8 shrink-0 lg:mt-0 lg:w-[336px]">
+            <div className="lg:sticky lg:top-6">
+              <MarketIntelBanner variant="tall" surfaceType="directory" />
+            </div>
+          </aside>
+        </div>
+
+        {/* Square banner slot (300x250) — in-flow, end of the listings. */}
+        {totalItems > 0 && (
+          <div className="mt-10 flex justify-center">
+            <MarketIntelBanner variant="square" surfaceType="directory" />
+          </div>
+        )}
       </div>
 
                   {/* Platform Branding Footer */}

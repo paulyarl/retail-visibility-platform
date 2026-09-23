@@ -159,6 +159,26 @@ describe('MarketIntelBanner', () => {
     expect(html).toContain('Coming soon');
   });
 
+  it('renders the aggregate directory promo with no teaser and no QR', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'tall',
+        surfaceType: 'directory',
+        teaser: null,
+      }),
+    );
+
+    // Aggregate surfaces have no per-surface report — generic offer copy,
+    // a "Coming soon" CTA (no fabricated target), and never a QR (not a seed).
+    expect(html).toContain('Free market report');
+    expect(html).toContain('public data says about local businesses');
+    expect(html).toContain('Get the report');
+    expect(html).toContain('Coming soon');
+    expect(html).not.toContain('Unlock');
+    expect(html).not.toContain('Scan to open the report');
+    expect(html).toContain('height:600px');
+  });
+
   it('falls back to the default offer copy with no teaser, keeping the box', () => {
     const html = renderToStaticMarkup(
       createElement(MarketIntelBanner, { variant: 'tall', surfaceType: 'city', teaser: null }),

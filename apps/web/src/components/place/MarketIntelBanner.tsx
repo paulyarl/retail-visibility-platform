@@ -7,7 +7,7 @@ import { generateQrDataUrl } from '@/lib/qr-engine';
 import type { CategoryMarketIntelTeaser, CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
 
-export type MarketIntelSurfaceType = 'city' | 'category' | 'seed';
+export type MarketIntelSurfaceType = 'city' | 'category' | 'seed' | 'directory';
 type BannerTeaser =
   | CategoryMarketIntelTeaser
   | CityMarketIntelTeaser
@@ -32,6 +32,14 @@ const SURFACE_PROMO: Record<
     reportTitle: 'Full Category Report',
     fallbackTeaser: 'Complete market analysis with recommendations',
     alsoInside: ['Category Signals', 'Category Profile', 'Market Density'],
+  },
+  // Aggregate browse surfaces (index / store-type / home) have no per-surface
+  // report — the promo stays generic and the CTA renders "Coming soon".
+  directory: {
+    reportTitle: 'Free market report',
+    fallbackTeaser:
+      'See what public data says about local businesses in this directory.',
+    alsoInside: ['Category Signals', 'Market Gaps', 'Market Density'],
   },
 };
 
@@ -111,7 +119,11 @@ export function MarketIntelBanner({
   const teaserText = (isSeed ? null : report?.teaser?.trim()) || promo.fallbackTeaser;
   const available = isSeed ? !!trackedPath : (report?.available ?? false);
   // The free report isn't an unlock — keep the verb honest per surface.
-  const ctaLabel = isSeed ? 'See the report' : 'Unlock';
+  const ctaLabel = isSeed
+    ? 'See the report'
+    : surfaceType === 'directory'
+      ? 'Get the report'
+      : 'Unlock';
 
   return (
     <BannerSlot variant={variant} className={className}>
