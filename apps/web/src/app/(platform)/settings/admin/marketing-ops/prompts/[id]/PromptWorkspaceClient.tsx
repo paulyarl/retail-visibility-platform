@@ -387,6 +387,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
   const [importProvider, setImportProvider] = useState('');
   const [importRunId, setImportRunId] = useState('');
   const [importNotes, setImportNotes] = useState('');
+  const [importMembers, setImportMembers] = useState('');
 
   // Template body inline-edit state
   const [editingBody, setEditingBody] = useState(false);
@@ -649,11 +650,17 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       if (importRunId.trim()) metadata.run_id = importRunId.trim();
       if (importNotes.trim()) metadata.notes = importNotes.trim();
 
+      // INV-7 reconciliation input — one member per line, matched against the
+      // scan's candidate keys + aliases by the import gate (computed, not
+      // model-authored). Only meaningful for intelligence_discovery imports.
+      const members = importMembers.split('\n').map((m) => m.trim()).filter(Boolean);
+
       const result: ExternalExecutionResult = await marketingOpsService.createExternalExecution({
         campaign_id: selectedCampaignId,
         template_id: templateId,
         raw_output: importJson.trim(),
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        operator_supplied_members: members.length > 0 ? members : undefined,
       });
       setLastExecution(result.execution);
       setResultOpen(true);
@@ -666,6 +673,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       setImportProvider('');
       setImportRunId('');
       setImportNotes('');
+      setImportMembers('');
       // Refresh the establishment workflow panel so the newly-created draft
       // profile appears in the "Activate" reminder immediately.
       setEstabRefreshKey((k) => k + 1);
@@ -1246,6 +1254,26 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                 />
               </div>
             </div>
+            {/* Operator reconciliation — ground-truth members for the
+                discovery contract's INV-7 check. Discovery imports only. */}
+            {template.output_schema?.name === 'intelligence_discovery' && (
+              <div className="mt-3 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50/40 dark:bg-cyan-900/10 p-3">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Operator reconciliation <span className="text-gray-400">(optional)</span>
+                </p>
+                <p className="text-[11px] text-gray-400 mb-2">
+                  Businesses you know exist in this market — one per line. The import gate matches each against the scan's candidates (including aliases); a miss is recorded as an INV-7 violation, not silently dropped.
+                </p>
+                <textarea
+                  value={importMembers}
+                  onChange={(e) => setImportMembers(e.target.value)}
+                  placeholder={'Universal African Market\nTawakal Market'}
+                  rows={3}
+                  disabled={!selectedCampaignId}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+              </div>
+            )}
             <button
               onClick={handleImportExternal}
               disabled={importing || !selectedCampaignId || !importJson.trim()}

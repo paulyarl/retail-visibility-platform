@@ -2037,6 +2037,10 @@ export interface ExternalExecutionCreateInput {
   template_id: string;
   raw_output: string;
   source?: string;
+  /** Discovery Scan Contract §3.4 — operator-supplied ground-truth members
+   *  reconciled against the scan's candidates at import time (INV-7).
+   *  Meaningful only for intelligence_discovery imports. */
+  operator_supplied_members?: string[];
   cost_cents?: number;
   metadata?: {
     model?: string;
