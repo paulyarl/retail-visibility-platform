@@ -212,6 +212,61 @@ export default function PlaceEntryEditorialLayout({
           <UnclaimedDirectoryBanner businessName={listing.businessName} />
         </section>
 
+        {/* Balanced content grid — map on left (wider), NAP data on right.
+            NAP is the shopper's primary task, so it leads the page body;
+            the claim/conversion blocks follow below. */}
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left — Location + Contact stacked */}
+            <div className="lg:col-span-7 space-y-8">
+              {showsMap && listing.address && (
+                <div className="bg-neutral-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
+                  <GoogleMapEmbed address={listing.address} />
+                </div>
+              )}
+
+              {showsContact && (
+                <div className="bg-neutral-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
+                  <ContactInformationCollapsible
+                    tenant={listing}
+                    fullAddress={showsLocation ? fullAddress : ''}
+                    initialExpanded={true}
+                    isRetailStore={true}
+                    onPhoneClick={trackCallClick}
+                  />
+                </div>
+              )}
+
+              {/* Square sponsored slot (300x250) — seed pages only. Fills
+                  the space under Contact when the Hours column runs taller.
+                  The tall slot lives inside the Market Intel panel below,
+                  so the two never collide. */}
+              {listing.listingOrigin === 'directory_seed' && (
+                <div className="flex justify-center">
+                  <MarketIntelBanner
+                    variant="square"
+                    surfaceType="seed"
+                    teaser={marketIntelTeaser}
+                    seedId={listing.seedId}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Right — Hours standalone */}
+            <div className="lg:col-span-5 space-y-8">
+              {showsHours && businessHours && (
+                <div className="bg-neutral-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
+                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Full-width provenance callout — the conversion pitch */}
         <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">
           <section className="bg-white rounded-xl p-6 border border-neutral-200 shadow-sm">
@@ -317,59 +372,6 @@ export default function PlaceEntryEditorialLayout({
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Balanced content grid — map on left (wider), NAP data on right */}
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left — Location + Contact stacked */}
-            <div className="lg:col-span-7 space-y-8">
-              {showsMap && listing.address && (
-                <div className="bg-neutral-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>
-                  <GoogleMapEmbed address={listing.address} />
-                </div>
-              )}
-
-              {showsContact && (
-                <div className="bg-neutral-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Contact</h3>
-                  <ContactInformationCollapsible
-                    tenant={listing}
-                    fullAddress={showsLocation ? fullAddress : ''}
-                    initialExpanded={true}
-                    isRetailStore={true}
-                    onPhoneClick={trackCallClick}
-                  />
-                </div>
-              )}
-
-              {/* Square sponsored slot (300x250) — seed pages only. Fills
-                  the space under Contact when the Hours column runs taller.
-                  The tall slot lives inside the Market Intel panel below,
-                  so the two never collide. */}
-              {listing.listingOrigin === 'directory_seed' && (
-                <div className="flex justify-center">
-                  <MarketIntelBanner
-                    variant="square"
-                    surfaceType="seed"
-                    teaser={marketIntelTeaser}
-                    seedId={listing.seedId}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Right — Hours standalone */}
-            <div className="lg:col-span-5 space-y-8">
-              {showsHours && businessHours && (
-                <div className="bg-neutral-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
-                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
-                </div>
-              )}
             </div>
           </div>
         </div>
