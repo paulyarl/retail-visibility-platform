@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Info, MapPin, ShieldCheck, ShoppingBag, Tag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Info, MapPin, ShieldCheck, Tag } from 'lucide-react';
 import { getCategoryUrl, getCityUrl, slugify } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
@@ -20,6 +20,7 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
+import ShelfSlotsPreview from '@/components/place/ShelfSlotsPreview';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
@@ -344,34 +345,27 @@ export default function PlaceEntryEditorialLayout({
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium mb-4">
                   <Tag className="w-3 h-3" />
-                  Free with your claimed listing
+                  Free With Your Claimed Listing
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
-                  List your first 5 products
+                  Put your 5 most-requested items online.
                 </h3>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                  Claim this listing and add up to 5 signature products to your storefront —
-                  free with your claimed listing. Showcase your best offerings and see
-                  how the platform works before upgrading.
+                  Pick the 5 signature products customers constantly call to ask about — the
+                  specialty items chain supermarkets never stock. When nearby shoppers search
+                  for them, your store appears with actual prices and an{' '}
+                  <strong>&quot;In-Stock at Store&quot;</strong> badge, pointing them straight
+                  to your register.
                 </p>
                 <Link
                   href="/place/about"
                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline mt-3"
                 >
-                  Learn what VisibleShelf offers <ArrowRight className="w-3 h-3" />
+                  See how your shelf gets found <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
               <div className="flex justify-center">
-                <div className="grid grid-cols-3 gap-3">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <div
-                      key={i}
-                      className="w-16 h-16 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-300 dark:text-blue-700"
-                    >
-                      <ShoppingBag className="w-5 h-5" />
-                    </div>
-                  ))}
-                </div>
+                <ShelfSlotsPreview className="w-full max-w-sm" />
               </div>
             </div>
           </div>
