@@ -316,42 +316,42 @@ export default function PlaceCategoryClient({
         (enrichment?.context?.adjacent_categories && enrichment.context.adjacent_categories.length > 0) ||
         (enrichment?.faq && enrichment.faq.length > 0)) && (
         <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800">
-          <div className="container mx-auto px-4 py-12">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
             {/* About this category */}
             {enrichment?.context?.category_overview && (
-              <div className="max-w-3xl mb-8">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
                   About {categoryName}
                 </h2>
-                <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-line">
+                <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
                   {enrichment.context.category_overview}
                 </p>
-              </div>
+              </section>
             )}
 
             {/* Shopper Guide */}
             {enrichment?.shopperGuide && (
-              <div className="max-w-3xl mb-8">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
                   What to Look For
                 </h2>
-                <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-line">
+                <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
                   {enrichment.shopperGuide}
                 </p>
-              </div>
+              </section>
             )}
 
             {/* FAQ */}
             {enrichment?.faq && enrichment.faq.length > 0 && (
-              <div className="max-w-3xl">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">
                   Frequently Asked Questions
                 </h2>
-                <div className="space-y-4">
+                <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
                   {enrichment.faq.map((item, idx) => (
-                    <div key={idx} className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
+                    <div key={idx} className="py-4 last:pb-0">
                       <h3 className="font-semibold text-neutral-900 dark:text-white mb-1">{item.question}</h3>
-                      <p className="text-neutral-700 dark:text-neutral-300 text-sm">{item.answer}</p>
+                      <p className="text-neutral-700 dark:text-neutral-300 text-sm leading-relaxed">{item.answer}</p>
                     </div>
                   ))}
                 </div>
@@ -373,45 +373,45 @@ export default function PlaceCategoryClient({
                     }),
                   }}
                 />
-              </div>
+              </section>
             )}
 
             {/* Sub-categories */}
             {enrichment?.context?.sub_categories && enrichment.context.sub_categories.length > 0 && (
-              <div className="max-w-3xl mt-8">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
                   Browse {categoryName} by Type
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {enrichment.context.sub_categories.map((sub) => (
                     <span
                       key={sub}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
                     >
                       {sub}
                     </span>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Related categories */}
             {enrichment?.context?.adjacent_categories && enrichment.context.adjacent_categories.length > 0 && (
-              <div className="max-w-3xl mt-8">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
                   Related Categories
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {enrichment.context.adjacent_categories.map((adj) => (
                     <span
                       key={adj}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
                     >
                       {adj}
                     </span>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
           </div>
         </div>

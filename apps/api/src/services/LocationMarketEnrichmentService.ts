@@ -203,7 +203,6 @@ class LocationMarketEnrichmentService extends BaseService {
       city: normalizedCity,
       state: normalizedState,
       locationName,
-      businessCount,
       categoryEnrichments,
     });
 
@@ -365,7 +364,6 @@ class LocationMarketEnrichmentService extends BaseService {
       city: isNational ? 'United States' : normalizedCity,
       state: isNational ? 'US' : normalizedState,
       locationName,
-      businessCount,
       categoryEnrichments,
     });
 
@@ -529,7 +527,6 @@ class LocationMarketEnrichmentService extends BaseService {
       city: 'United States',
       state: 'US',
       locationName,
-      businessCount,
       categoryEnrichments,
     });
 

@@ -115,6 +115,26 @@ function findUpsert() {
   return sqlCalls.find((c) => c.text.includes('INSERT INTO directory_category_enrichment'));
 }
 
+/**
+ * The context column is written through the jsonbSql helper
+ * (JSON.stringify + explicit ::jsonb cast), so it reaches the upsert values as
+ * a JSON string rather than a raw object — parse before asserting on shape.
+ */
+function findContextValue(upsert: { values: any[] } | undefined) {
+  for (const v of upsert?.values ?? []) {
+    let parsed: any = v;
+    if (typeof v === 'string' && v.trimStart().startsWith('{')) {
+      try {
+        parsed = JSON.parse(v);
+      } catch {
+        continue;
+      }
+    }
+    if (parsed && typeof parsed === 'object' && 'national_coverage' in parsed) return parsed;
+  }
+  return undefined;
+}
+
 describe('applyEnrichmentPacket — location row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -214,9 +234,7 @@ describe('applyEnrichmentPacket — national (__all__) location row', () => {
 
     // The measured coverage grid is stamped into context alongside the AI
     // packet's context — the deterministic fact layer rides the row.
-    const ctxVal = upsert!.values.find(
-      (v) => v && typeof v === 'object' && 'national_coverage' in v,
-    );
+    const ctxVal = findContextValue(upsert);
     expect(ctxVal).toBeDefined();
     expect((ctxVal as any).market_summary).toBe('Coverage spans two states.');
 
@@ -279,9 +297,7 @@ describe('enrichLocation — national (__all__) deterministic sync', () => {
     expect(upsert!.values).toContain('CollectionPage');
     expect(upsert!.values).toContain(2); // composer_version stays campaign
     // Prior AI context survives; the coverage grid is restamped.
-    const ctxVal = upsert!.values.find(
-      (v) => v && typeof v === 'object' && 'national_coverage' in v,
-    );
+    const ctxVal = findContextValue(upsert);
     expect(ctxVal).toBeDefined();
     expect((ctxVal as any).market_summary).toBe('prior context');
     expect(upsert!.values).toContain('pg_sweep');

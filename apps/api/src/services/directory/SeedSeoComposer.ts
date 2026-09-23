@@ -651,21 +651,21 @@ export interface LocationEnrichmentInput {
   synonyms?: string[];
 }
 
-function composeLocationMetaTitle(
-  locationName: string,
-  businessCount: number,
-): string {
-  const title = `${businessCount} Businesses in ${locationName} — VisibleShelf Directory`;
+// Stored copy deliberately carries NO business count: the packet is written
+// once and outlives the aggregate it was composed from, so a baked count goes
+// stale ("0 Businesses in Kansas City" on a city with listings). The live
+// count renders on the page itself. Mirrors the AI template's title pattern.
+function composeLocationMetaTitle(locationName: string): string {
+  const title = `Local Businesses in ${locationName} — VisibleShelf Directory`;
   return truncateAtWordBoundary(title, META_TITLE_MAX);
 }
 
 function composeLocationDescription(
   locationName: string,
-  businessCount: number,
   topCategories: string[],
   categorySynonyms: string[],
 ): string {
-  const base = `Discover ${businessCount} local businesses in ${locationName}, listed on VisibleShelf from public information.`;
+  const base = `Discover local businesses in ${locationName}, listed on VisibleShelf from public information.`;
   const parts: string[] = [base];
 
   const categories = topCategories.slice(0, 5).filter((c) => c.length <= 40);
@@ -685,10 +685,9 @@ export function buildLocationSeoPacket(input: {
   city: string;
   state: string | null;
   locationName: string;
-  businessCount: number;
   categoryEnrichments: LocationEnrichmentInput[];
 }): LocationSeoPacket {
-  const { city, state, locationName, businessCount, categoryEnrichments } = input;
+  const { city, state, locationName, categoryEnrichments } = input;
   const effectiveState = state ?? '';
 
   const topCategories: string[] = [];
@@ -715,10 +714,9 @@ export function buildLocationSeoPacket(input: {
   const keywords = dedupeLowercase(keywordSource).slice(0, KEYWORDS_MAX);
   const secondaryCategories = dedupeLowercase(topCategories).slice(0, SECONDARY_CATEGORIES_MAX);
 
-  const metaTitle = composeLocationMetaTitle(locationName, businessCount);
+  const metaTitle = composeLocationMetaTitle(locationName);
   const description = composeLocationDescription(
     locationName,
-    businessCount,
     dedupeLowercase(topCategories),
     dedupeLowercase(categorySynonyms),
   );

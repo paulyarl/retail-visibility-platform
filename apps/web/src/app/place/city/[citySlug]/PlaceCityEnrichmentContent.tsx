@@ -29,35 +29,33 @@ export default function PlaceCityEnrichmentContent({
 
   return (
     <div className="bg-gray-100 border-t">
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        <div className="prose max-w-none">
-          {bodyCopy && (
-            <>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                About {locationName}
-              </h2>
-              <p className="text-gray-700 mb-4 whitespace-pre-line">{bodyCopy}</p>
-            </>
-          )}
-        </div>
+      <div className="max-w-6xl mx-auto px-4 py-12 space-y-6">
+        {bodyCopy && (
+          <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              About {locationName}
+            </h2>
+            <p className="text-gray-700 leading-relaxed whitespace-pre-line">{bodyCopy}</p>
+          </section>
+        )}
 
         {shopperGuide && (
-          <div className="mt-8 prose max-w-none">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
               Shopping in {locationName}
             </h2>
-            <p className="text-gray-700 whitespace-pre-line">{shopperGuide}</p>
-          </div>
+            <p className="text-gray-700 leading-relaxed whitespace-pre-line">{shopperGuide}</p>
+          </section>
         )}
 
         {areaBreakdown.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
               Browse by Area
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {areaBreakdown.map((area, idx) => (
-                <div key={idx} className="bg-white rounded-lg p-4 border border-gray-200">
+                <div key={idx} className="rounded-lg p-4 border border-gray-200 bg-gray-50">
                   <h3 className="font-semibold text-gray-900 mb-1">{area.area_name}</h3>
                   <p className="text-sm text-gray-600 mb-2">{area.description}</p>
                   {area.strong_categories && area.strong_categories.length > 0 && (
@@ -65,7 +63,7 @@ export default function PlaceCityEnrichmentContent({
                       {area.strong_categories.map((cat) => (
                         <span
                           key={cat}
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white text-gray-700 border border-gray-200"
                         >
                           {cat}
                         </span>
@@ -75,28 +73,28 @@ export default function PlaceCityEnrichmentContent({
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
         {metroContext && (
-          <div className="mt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
               Metro Area
             </h2>
-            <p className="text-gray-700 whitespace-pre-line">{metroContext}</p>
-          </div>
+            <p className="text-gray-700 leading-relaxed whitespace-pre-line">{metroContext}</p>
+          </section>
         )}
 
         {faq.length > 0 && (
-          <div className="mt-8 prose max-w-none">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">
               Frequently Asked Questions
             </h2>
-            <div className="space-y-4">
+            <div className="divide-y divide-gray-200">
               {faq.map((item, idx) => (
-                <div key={idx} className="bg-white rounded-lg p-4 border border-gray-200">
+                <div key={idx} className="py-4 last:pb-0">
                   <h3 className="font-semibold text-gray-900 mb-1">{item.question}</h3>
-                  <p className="text-gray-700 text-sm">{item.answer}</p>
+                  <p className="text-gray-700 text-sm leading-relaxed">{item.answer}</p>
                 </div>
               ))}
             </div>
@@ -117,7 +115,7 @@ export default function PlaceCityEnrichmentContent({
                 }),
               }}
             />
-          </div>
+          </section>
         )}
       </div>
     </div>
