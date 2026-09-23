@@ -37,6 +37,19 @@ const categoryTeaser = {
   },
 } as any;
 
+const seedTeaser = {
+  businessSlug: 'baraka-market',
+  businessName: 'Baraka Market',
+  hasAudit: true,
+  publicNarrative: 'How we found this business.',
+  cards: {
+    growthOpportunities: { available: true, teaser: '3 actionable gaps identified' },
+    howItStacksUp: { available: true, teaser: 'Meets 4 of 6 category signals' },
+    fullReport: { available: true, teaser: 'The complete audit with recommendations' },
+    claimBusiness: { available: true, teaser: 'Own this business? Claim it.' },
+  },
+} as any;
+
 describe('MarketIntelBanner', () => {
   it('leads with the city report card and names the other cards', () => {
     const html = renderToStaticMarkup(
@@ -82,6 +95,23 @@ describe('MarketIntelBanner', () => {
     expect(html).toContain('Full City Report');
     expect(html).not.toContain('Also inside');
     expect(html).toContain('height:250px');
+  });
+
+  it('leads with the audit report on the seed surface', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'tall',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+      }),
+    );
+
+    expect(html).toContain('Full Audit Report');
+    expect(html).toContain('The complete audit with recommendations');
+    expect(html).toContain('Growth Opportunities');
+    expect(html).toContain('How It Stacks Up');
+    // The claim card is an action, not report contents — it stays out.
+    expect(html).not.toContain('Claim This Business');
   });
 
   it('falls back to the default offer copy with no teaser, keeping the box', () => {

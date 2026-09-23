@@ -10,6 +10,7 @@ import marketIntelCustomerService, {
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { MarketIntelCard } from './MarketIntelCard';
 import { MarketIntelPaywall } from './MarketIntelPaywall';
+import { MarketIntelBanner } from './MarketIntelBanner';
 
 interface MarketIntelSidebarProps {
   slug: string;
@@ -133,6 +134,12 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken }: Ma
       {/* Collapsible panel. */}
       {open && (
         <div id="market-intel-panel" className="mt-2 space-y-3">
+          {/* Tall banner slot (300x600) — reserved seed banner inventory at the
+              top of the panel, filled with this seed's report offer. */}
+          <div className="flex justify-center">
+            <MarketIntelBanner variant="tall" surfaceType="seed" teaser={teaser} />
+          </div>
+
           {!teaser || !teaser.hasAudit ? (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm text-gray-500 dark:text-gray-400">
               We haven't gathered intel on this business yet — check back soon.

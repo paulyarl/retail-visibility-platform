@@ -9,6 +9,7 @@ import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
 import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
 import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
 import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 
 interface PlacePageClientProps {
   slug: string;
@@ -79,13 +80,24 @@ export default function PlacePageClient({
       {/* Market Intel sidebar — seed pages only (§2.1). The page already
           redirects non-seeds server-side; this gate is defensive. */}
       {listing.listingOrigin === 'directory_seed' && (
-        <div className="max-w-5xl mx-auto px-4 pt-4">
-          <MarketIntelSidebar
-            slug={slug}
-            initialTeaser={marketIntelTeaser}
-            activeClaimToken={listing.activeClaimToken}
-          />
-        </div>
+        <>
+          {/* Square banner slot (300x250) — in-flow seed banner. The tall slot
+              lives inside the panel below, so the two never collide. */}
+          <div className="max-w-5xl mx-auto px-4 pt-6 flex justify-center">
+            <MarketIntelBanner
+              variant="square"
+              surfaceType="seed"
+              teaser={marketIntelTeaser}
+            />
+          </div>
+          <div className="max-w-5xl mx-auto px-4 pt-4">
+            <MarketIntelSidebar
+              slug={slug}
+              initialTeaser={marketIntelTeaser}
+              activeClaimToken={listing.activeClaimToken}
+            />
+          </div>
+        </>
       )}
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <GbpReviewsSection slug={slug} />
