@@ -8,6 +8,7 @@ import {
   Phone,
   ArrowLeft,
   ArrowRight,
+  ChevronRight,
   Info,
   ShoppingBasket,
 } from 'lucide-react';
@@ -192,21 +193,32 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
               </select>
             </div>
 
-            {/* Shelf quick-nav chips — each links to its category shelf. */}
+            {/* Shelf quick-nav — collapsed by default. The shelf list grows
+                with the directory's category vocabulary (a city can carry
+                dozens), so it can't be a flat chip row. <details> keeps every
+                shelf link in the DOM while hidden, so crawlers still follow
+                them — a JS-toggled conditional render would drop them. */}
             {data.categories.length > 1 && (
-              <div className="flex flex-wrap gap-2 mb-8">
-                {data.categories.map((c) => (
-                  <Link
-                    key={c.slug}
-                    href={`/place/category/${c.slug}?city=${encodeURIComponent(data.city)}`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-neutral-200 rounded-full text-sm hover:bg-neutral-50"
-                  >
-                    {c.iconEmoji && <span>{c.iconEmoji}</span>}
-                    <span>{c.category}</span>
-                    <span className="text-neutral-400">({c.places.length})</span>
-                  </Link>
-                ))}
-              </div>
+              <details className="mb-8 group">
+                <summary className="cursor-pointer list-none select-none inline-flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900">
+                  <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
+                  Browse by category
+                  <span className="text-neutral-400">({data.categories.length})</span>
+                </summary>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {data.categories.map((c) => (
+                    <Link
+                      key={c.slug}
+                      href={`/place/category/${c.slug}?city=${encodeURIComponent(data.city)}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-neutral-200 rounded-full text-sm hover:bg-neutral-50"
+                    >
+                      {c.iconEmoji && <span>{c.iconEmoji}</span>}
+                      <span>{c.category}</span>
+                      <span className="text-neutral-400">({c.places.length})</span>
+                    </Link>
+                  ))}
+                </div>
+              </details>
             )}
 
             {/* Listings grouped by shelf, each business carded once. */}
