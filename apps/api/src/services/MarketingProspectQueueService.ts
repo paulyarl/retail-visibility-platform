@@ -29,6 +29,11 @@ import { addressParser } from '../lib/address-parser';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
+import {
+  normalizeCategoryKey,
+  normalizeReferenceCity,
+  normalizeReferenceState,
+} from './intelligence/IntelligenceProfileService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -227,6 +232,13 @@ export interface ListQueueFilters {
   include_unassigned?: boolean;
   limit?: number;
   includeCampaigns?: boolean;
+  // When true, each entry gets a shelf_enriched flag — every one of the
+  // prospect's sweep categories (queue + snapshot + processed campaign
+  // secondaries) × its geo carries a campaign-applied
+  // directory_category_enrichment row (composer_version >= 2). Powers the
+  // promote panel's "enriched" badge so selective sweeps can skip covered
+  // prospects. Requires the campaign join (geo + secondaries fallback).
+  includeEnrichment?: boolean;
 }
 
 export interface UpdateQueueInput {
@@ -511,13 +523,16 @@ class MarketingProspectQueueServiceClass extends BaseService {
           { created_at: 'asc' },
         ],
         take: limit,
-        include: filters.includeCampaigns
+        include: filters.includeCampaigns || filters.includeEnrichment
           ? {
               mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list: {
                 select: {
                   id: true,
                   stage: true,
                   category: true,
+                  secondary_categories: true,
+                  city: true,
+                  state: true,
                   repair_track: true,
                   is_hot_prospect: true,
                   stage_entered_at: true,
@@ -584,6 +599,59 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }
       }
 
+      // Shelf enrichment coverage (selective-sweep aid): for each entry, the
+      // prospect's sweep category set × its geo → which of those markets
+      // already carry a campaign-applied enrichment row. Mirrors the sweep's
+      // own discovery inputs (queue category, snapshot cats, processed
+      // campaign cats + secondaries) and its 'covered' bar
+      // (composer_version >= 2). One batched pair lookup for the whole page.
+      const enrichmentByEntry = new Map<string, { covered: number; total: number }>();
+      if (filters.includeEnrichment) {
+        const perEntry: Array<{ id: string; pairs: string[] }> = [];
+        const pairSet = new Set<string>();
+        for (const e of entries as any[]) {
+          const camp = e.mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list;
+          const snap = e.business_snapshot as any;
+          const cats = new Set<string>();
+          const addCat = (c: unknown) => {
+            const k = normalizeCategoryKey(String(c ?? ''));
+            if (k) cats.add(k);
+          };
+          addCat(e.category);
+          addCat(snap?.identified_category);
+          for (const c of snap?.secondary_categories ?? []) addCat(c);
+          addCat(camp?.category);
+          for (const c of camp?.secondary_categories ?? []) addCat(c);
+          const city = normalizeReferenceCity(e.city ?? camp?.city);
+          const state = normalizeReferenceState(e.state ?? camp?.state);
+          if (!city || !state || cats.size === 0) {
+            perEntry.push({ id: e.id, pairs: [] });
+            continue;
+          }
+          const pairs = Array.from(cats).map((k) => `${k}|${city}|${state}`);
+          for (const p of pairs) pairSet.add(p);
+          perEntry.push({ id: e.id, pairs });
+        }
+        const unique = Array.from(pairSet).map((p) => {
+          const [category_key, city, state] = p.split('|');
+          return { category_key, city, state };
+        });
+        const coveredSet = new Set<string>();
+        if (unique.length > 0) {
+          const rows = await this.prisma.directory_category_enrichment.findMany({
+            where: { composer_version: { gte: 2 }, OR: unique },
+            select: { category_key: true, city: true, state: true },
+          });
+          for (const r of rows) coveredSet.add(`${r.category_key}|${r.city}|${r.state}`);
+        }
+        for (const pe of perEntry) {
+          enrichmentByEntry.set(pe.id, {
+            covered: pe.pairs.filter((p) => coveredSet.has(p)).length,
+            total: pe.pairs.length,
+          });
+        }
+      }
+
       // Flatten the campaign join for the board view so the API payload is
       // { ..., campaign_stage, campaign_category, ... } instead of the long
       // Prisma relation name.
@@ -604,6 +672,17 @@ class MarketingProspectQueueServiceClass extends BaseService {
             };
           })
         : entries;
+
+      if (filters.includeEnrichment) {
+        for (const d of decorated as any[]) {
+          const s = enrichmentByEntry.get(d.id);
+          d.shelf_enriched = !!s && s.total > 0 && s.covered === s.total;
+          d.shelf_enriched_covered = s?.covered ?? 0;
+          d.shelf_enriched_total = s?.total ?? 0;
+          // enrichment-only callers still got the raw relation — strip it.
+          delete d.mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list;
+        }
+      }
 
       return { entries: decorated, queuedCount };
     } catch (error) {

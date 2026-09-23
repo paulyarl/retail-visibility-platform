@@ -164,7 +164,7 @@ class ProvingGroundShelfSweepService extends BaseService {
 
   async sweep(
     provingGroundId: string,
-    opts: { createCampaign?: boolean; enrichedBy?: string | null } = {},
+    opts: { createCampaign?: boolean; enrichedBy?: string | null; queueEntryIds?: string[] } = {},
     ctx?: RequestCtx,
   ): Promise<ShelfSweepReport> {
     const pg = await this.prisma.mkt_campaigns_list.findUnique({
@@ -229,6 +229,12 @@ class ProvingGroundShelfSweepService extends BaseService {
           { proving_ground_id: provingGroundId },
           { source_campaign_id: { in: treeIds } },
         ],
+        // Dismissed prospects were operator-rejected — their categories and
+        // geos must not widen the sweep domain.
+        status: { not: 'dismissed' },
+        // Selective sweep: intersect the selection with the tree linkage —
+        // ids outside the tree simply match nothing.
+        ...(opts.queueEntryIds?.length ? { id: { in: opts.queueEntryIds } } : {}),
       },
       select: {
         category: true, city: true, state: true,
@@ -265,6 +271,10 @@ class ProvingGroundShelfSweepService extends BaseService {
       : [];
     const listingById = new Map(listings.map((l) => [l.id, l]));
 
+    // Prospect geo frequency — mixed-market PGs (no declared city/state)
+    // anchor their sweep campaign on the dominant prospect geo.
+    const geoCounts = new Map<string, { city: string; state: string | null; count: number }>();
+
     for (const q of queueRows) {
       const prospectCats = new Set<string>();
       const addProspectCat = (c?: string | null) => { if ((c ?? '').trim()) prospectCats.add((c as string).trim()); };
@@ -292,6 +302,13 @@ class ProvingGroundShelfSweepService extends BaseService {
       const geoCity = q.city ?? campaignById.get(q.processed_campaign_id ?? '')?.city ?? null;
       const geoState = q.state ?? campaignById.get(q.processed_campaign_id ?? '')?.state ?? null;
       addGeo(geoCity, geoState);
+      const normGeoCity = normalizeReferenceCity(geoCity);
+      if (normGeoCity) {
+        const gk = `${normGeoCity.toLowerCase()}|${(normalizeReferenceState(geoState) ?? '').toLowerCase()}`;
+        const entry = geoCounts.get(gk) ?? { city: normGeoCity, state: normalizeReferenceState(geoState), count: 0 };
+        entry.count += 1;
+        geoCounts.set(gk, entry);
+      }
       for (const cat of prospectCats) addMarket(cat, geoCity, geoState);
     }
 
@@ -427,74 +444,124 @@ class ProvingGroundShelfSweepService extends BaseService {
       };
     }
 
-    // ── 5. Residual set → one directory_enrichment child campaign ────────
-    // The anchor signature is needsAi[0]'s market — those markets have no
-    // covering active campaign by construction, so the structural-duplicate
-    // guardrail can only collide with a prior SET campaign anchored on the
-    // same market, which we then merge into.
+    // ── 5. Set payload → one directory_enrichment child campaign ────────
+    // Anchor = the PG's own signature: pg.category × the PG's declared
+    // market; mixed-market PGs (no declared city/state) adopt the dominant
+    // prospect geo. If the anchor market is already claimed by an active
+    // single-market child of this PG, the payload folds INTO that child —
+    // it becomes the set campaign and its own market joins the set for the
+    // AI packet. Conflicts with campaigns outside the PG tree fall through
+    // to the next anchor candidate (payload markets carrying the PG
+    // category, then the home-geo payload market, then the first).
     let sweepCampaign: ShelfSweepReport['sweepCampaign'] = null;
     if (needsAi.length > 0 && opts.createCampaign !== false) {
-      const anchor = needsAi[0];
-      const payload = {
-        shelf_sweep: {
-          proving_ground_id: provingGroundId,
-          swept_at: new Date().toISOString(),
-          markets: needsAi.map((m) => ({ category: m.category, city: m.city, state: m.state })),
-        },
-      };
-      try {
-        const created = await MarketingCampaignService.getInstance().createCampaign({
-          scope: 'category',
-          campaignCategory: 'directory_enrichment',
-          category: anchor.category,
-          city: anchor.city,
-          state: anchor.state,
-          title: `Category Set Enrichment — ${needsAi.length} markets — ${pg.title || pg.category || 'PG'}`,
-          parentCampaignId: provingGroundId,
-          discoveryContext: payload as any,
-        }, ctx);
-        sweepCampaign = { id: created.id, created: true, marketCount: needsAi.length };
-      } catch (err) {
-        if (!(err instanceof ConflictError)) throw err;
-        // A live set campaign under this PG already holds the anchor —
-        // merge the residual markets into its shelf_sweep payload.
-        const children = await this.prisma.mkt_campaigns_list.findMany({
-          where: {
-            parent_campaign_id: provingGroundId,
-            campaign_category: 'directory_enrichment',
-          },
-          select: { id: true, stage: true, discovery_context: true },
-        });
-        const existingSet = children.find(
-          (c) => !INACTIVE_STAGES.has((c.stage ?? '').toLowerCase()) && sweepMarketsOf(c).length > 0,
-        );
-        if (!existingSet) throw err;
-        const existing = sweepMarketsOf(existingSet);
-        const existingKeys = new Set(existing.map((m) => marketKey(m.categoryKey, m.city, m.state)));
-        const fresh = needsAi.filter((m) => !existingKeys.has(marketKey(m.categoryKey, m.city, m.state)));
-        if (fresh.length > 0) {
-          const dc = (existingSet.discovery_context ?? {}) as any;
-          await this.prisma.mkt_campaigns_list.update({
-            where: { id: existingSet.id },
-            data: {
-              discovery_context: {
-                ...dc,
-                shelf_sweep: {
-                  ...(dc.shelf_sweep ?? {}),
-                  proving_ground_id: provingGroundId,
-                  swept_at: new Date().toISOString(),
-                  markets: [
-                    ...existing.map((m) => ({ category: m.category, city: m.city, state: m.state })),
-                    ...fresh.map((m) => ({ category: m.category, city: m.city, state: m.state })),
-                  ],
-                },
-              } as any,
-              updated_at: new Date(),
-            },
-          });
-        }
-        sweepCampaign = { id: existingSet.id, created: false, marketCount: existing.length + fresh.length, mergedMarkets: fresh.length };
+      const pgCategoryKey = normalizeCategoryKey(pg.category ?? '');
+      let anchorGeoCity = normalizeReferenceCity(pg.city);
+      let anchorGeoState = normalizeReferenceState(pg.state);
+      if (!anchorGeoCity || !anchorGeoState) {
+        const top = [...geoCounts.values()].sort((a, b) => b.count - a.count)[0];
+        if (top) { anchorGeoCity = top.city; anchorGeoState = top.state; }
       }
+      const anchorCity = anchorGeoCity;
+      const anchorState = anchorGeoState;
+
+      const keyOf = (m: SweepMarket) => marketKey(m.categoryKey, m.city, m.state);
+      const inAnchorGeo = (m: SweepMarket) =>
+        !!anchorCity && !!anchorState
+        && m.city.toLowerCase() === anchorCity.toLowerCase()
+        && m.state.toLowerCase() === anchorState.toLowerCase();
+
+      const candidates: SweepMarket[] = [];
+      if (pgCategoryKey && anchorCity && anchorState) {
+        candidates.push({ category: (pg.category ?? '').trim(), categoryKey: pgCategoryKey, city: anchorCity, state: anchorState });
+      }
+      candidates.push(...needsAi.filter((m) => m.categoryKey === pgCategoryKey));
+      candidates.push(...needsAi.filter(inAnchorGeo));
+      candidates.push(needsAi[0]);
+      const seenKeys = new Set<string>();
+      const ordered = candidates.filter((c) => {
+        const k = keyOf(c);
+        if (seenKeys.has(k)) return false;
+        seenKeys.add(k);
+        return true;
+      });
+
+      let lastErr: unknown = null;
+      for (const anchor of ordered) {
+        const payload = {
+          shelf_sweep: {
+            proving_ground_id: provingGroundId,
+            swept_at: new Date().toISOString(),
+            markets: needsAi.map((m) => ({ category: m.category, city: m.city, state: m.state })),
+          },
+        };
+        try {
+          const created = await MarketingCampaignService.getInstance().createCampaign({
+            scope: 'category',
+            campaignCategory: 'directory_enrichment',
+            category: anchor.category,
+            city: anchor.city,
+            state: anchor.state,
+            title: `Category Set Enrichment — ${needsAi.length} markets — ${pg.title || pg.category || 'PG'}`,
+            parentCampaignId: provingGroundId,
+            discoveryContext: payload as any,
+          }, ctx);
+          sweepCampaign = { id: created.id, created: true, marketCount: needsAi.length };
+          break;
+        } catch (err) {
+          if (!(err instanceof ConflictError)) throw err;
+          lastErr = err;
+          // Merge targets under this PG: a prior set campaign (shelf_sweep
+          // payload) or the single-market child whose signature IS this
+          // anchor — either absorbs the set.
+          const children = await this.prisma.mkt_campaigns_list.findMany({
+            where: {
+              parent_campaign_id: provingGroundId,
+              campaign_category: 'directory_enrichment',
+            },
+            select: { id: true, stage: true, scope: true, category: true, city: true, state: true, discovery_context: true },
+          });
+          const active = children.filter((c) => !INACTIVE_STAGES.has((c.stage ?? '').toLowerCase()));
+          const anchorChild = active.find((c) => {
+            if ((c.scope ?? '').toLowerCase() !== 'category') return false;
+            const sm = toSweepMarket(c.category ?? '', c.city ?? '', c.state ?? '');
+            return sm ? keyOf(sm) === keyOf(anchor) : false;
+          });
+          const existingSet = active.find((c) => sweepMarketsOf(c).length > 0);
+          const target = anchorChild ?? existingSet;
+          if (!target) continue; // conflict came from outside the tree — try the next anchor
+
+          const base = sweepMarketsOf(target);
+          const additions = [...needsAi];
+          if (target === anchorChild) additions.unshift(anchor); // the child's own market joins the set
+          const existingKeys = new Set(base.map(keyOf));
+          const fresh = additions.filter((m) => !existingKeys.has(keyOf(m)));
+          if (fresh.length > 0) {
+            const dc = (target.discovery_context ?? {}) as any;
+            await this.prisma.mkt_campaigns_list.update({
+              where: { id: target.id },
+              data: {
+                discovery_context: {
+                  ...dc,
+                  shelf_sweep: {
+                    ...(dc.shelf_sweep ?? {}),
+                    proving_ground_id: provingGroundId,
+                    swept_at: new Date().toISOString(),
+                    markets: [
+                      ...base.map((m) => ({ category: m.category, city: m.city, state: m.state })),
+                      ...fresh.map((m) => ({ category: m.category, city: m.city, state: m.state })),
+                    ],
+                  },
+                } as any,
+                updated_at: new Date(),
+              },
+            });
+          }
+          sweepCampaign = { id: target.id, created: false, marketCount: base.length + fresh.length, mergedMarkets: fresh.length };
+          break;
+        }
+      }
+      if (!sweepCampaign && lastErr) throw lastErr;
     }
 
     logger.info('ProvingGroundShelfSweepService.sweep', ctx, {

@@ -294,6 +294,9 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       // the promote panel, not vanish from it.
       status: ['queued', 'in_thread', 'hold', 'verify_then_outreach', 'campaign_created'],
       includeCampaigns: true,
+      // shelf_enriched flags power the promote panel's enriched badge —
+      // selective sweeps can skip prospects whose markets are already covered.
+      includeEnrichment: true,
       limit: 200,
     });
     setQueueEntries(queue.entries);
@@ -537,13 +540,13 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   // own categories (incl. secondaries) × its market. Deterministic enrich
   // runs where a profile exists; the residual goes into one spawned
   // directory_enrichment child carrying the market set.
-  const handleShelfSweep = async () => {
+  const handleShelfSweep = async (queueEntryIds?: string[]) => {
     if (!campaign || campaign.campaign_category !== 'proving_ground') return;
     setSweepBusy(true);
     setSweepError(null);
     setSweepResult(null);
     try {
-      const report = await marketingOpsService.enrichShelfSweep(campaignId);
+      const report = await marketingOpsService.enrichShelfSweep(campaignId, { queueEntryIds });
       const count = (s: string) => report.categoryMarkets.filter((m) => m.status === s).length;
       const locEnriched = report.locationMarkets.filter((m) => m.status === 'enriched').length;
       const parts = [
@@ -1346,15 +1349,28 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 Shelf sweep: enrich every category × market this proving ground covers — including prospect secondary categories and member cities.
               </div>
-              <button
-                onClick={handleShelfSweep}
-                disabled={sweepBusy}
-                title="Enrich every uncovered market in this proving ground's domain (deterministic where possible; spawns one enrichment campaign for the rest)"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {sweepBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
-                Sweep shelf coverage
-              </button>
+              <div className="flex items-center gap-2">
+                {promoteSelected.size > 0 && (
+                  <button
+                    onClick={() => handleShelfSweep([...promoteSelected])}
+                    disabled={sweepBusy}
+                    title="Sweep only the markets the selected prospects cover — their categories × their cities (declared PG markets still sweep too)"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-neutral-800 border border-emerald-300 dark:border-emerald-700 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50"
+                  >
+                    {sweepBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
+                    Sweep {promoteSelected.size} selected
+                  </button>
+                )}
+                <button
+                  onClick={() => handleShelfSweep()}
+                  disabled={sweepBusy}
+                  title="Enrich every uncovered market in this proving ground's domain (deterministic where possible; spawns one enrichment campaign for the rest)"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {sweepBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
+                  Sweep shelf coverage
+                </button>
+              </div>
             </div>
             {sweepResult && (
               <p className="mt-2 text-xs text-green-700 dark:text-green-400">
@@ -1680,6 +1696,22 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                           {e.business_name || e.title || e.id}
                         </span>
                         {e.verification && <VerificationBadge verification={e.verification} />}
+                        {e.shelf_enriched === true && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex-shrink-0"
+                            title="Every category × market for this prospect already carries campaign enrichment — a selective sweep can skip it"
+                          >
+                            enriched
+                          </span>
+                        )}
+                        {e.shelf_enriched === false && (e.shelf_enriched_total ?? 0) > 0 && (e.shelf_enriched_covered ?? 0) > 0 && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800 flex-shrink-0"
+                            title={`${e.shelf_enriched_covered} of ${e.shelf_enriched_total} category markets already enriched — a sweep picks up the rest`}
+                          >
+                            {e.shelf_enriched_covered}/{e.shelf_enriched_total} enriched
+                          </span>
+                        )}
                         {isHold && !promoted && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 flex-shrink-0">
                             <AlertTriangle className="w-2.5 h-2.5" /> hold

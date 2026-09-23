@@ -1360,6 +1360,11 @@ router.get('/:campaignId/stage-distribution', async (req: any, res: Response) =>
 // active enrichment campaign are never touched.
 const enrichSweepSchema = z.object({
   create_campaign: z.boolean().optional(),
+  // Selective sweep (mirrors "promote selected"): limit the prospect-
+  // discovered markets to these queue entries. Still intersected with the
+  // PG tree linkage server-side — the selection can only narrow, never
+  // reach outside the tree.
+  queue_entry_ids: z.array(z.string().min(1)).max(500).optional(),
 });
 
 router.post('/:campaignId/enrich-sweep', async (req: any, res: Response) => {
@@ -1368,7 +1373,11 @@ router.post('/:campaignId/enrich-sweep', async (req: any, res: Response) => {
     const { default: sweepService } = await import('../services/ProvingGroundShelfSweepService');
     const report = await sweepService.sweep(
       req.params.campaignId,
-      { createCampaign: parsed.create_campaign, enrichedBy: (req.user as any)?.id ?? null },
+      {
+        createCampaign: parsed.create_campaign,
+        enrichedBy: (req.user as any)?.id ?? null,
+        queueEntryIds: parsed.queue_entry_ids,
+      },
       getCtx(req),
     );
     res.json({ success: true, data: report });
@@ -5288,7 +5297,11 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       assigned_to: resolvedAssignedTo,
       include_unassigned: isMeFilter,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
-      includeCampaigns: req.query.include === 'campaigns',
+      includeCampaigns: (req.query.include as string | undefined)?.split(',').includes('campaigns') ?? false,
+      // 'enrichment' decorates each entry with shelf_enriched (+ covered/total
+      // counts) — whether its sweep markets already carry campaign-applied
+      // enrichment. Used by the cockpit promote panel's enriched badge.
+      includeEnrichment: (req.query.include as string | undefined)?.split(',').includes('enrichment') ?? false,
     }, getCtx(req));
 
     // Spec §5.8 — surface the mail rung's at-due QR-scan decision (scanned →

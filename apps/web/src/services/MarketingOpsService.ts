@@ -1360,6 +1360,9 @@ export interface ProspectQueueListFilters {
   assigned_to?: string; // 'me' | 'unassigned' | <userId>
   limit?: number;
   includeCampaigns?: boolean;
+  // 'enrichment' decorates each entry with shelf_enriched (+ covered/total
+  // counts) — powers the cockpit promote panel's enriched badge.
+  includeEnrichment?: boolean;
   // Migration 262 — tree filter: queue rows whose source_campaign_id is any
   // of these campaign ids (proving ground + its intelligence children).
   source_campaign_ids?: string[];
@@ -1425,6 +1428,13 @@ export interface ProspectQueueEntry {
   // playbook, so cross-campaign comparisons need the fraction view on the
   // campaign's checklist tab.
   checklist_completed?: number | null;
+  // Shelf enrichment coverage (present when includeEnrichment=true) — every
+  // sweep category × the prospect's geo carries a campaign-applied
+  // (composer_version >= 2) directory enrichment row. covered/total give the
+  // fraction for partial coverage tooltips.
+  shelf_enriched?: boolean | null;
+  shelf_enriched_covered?: number | null;
+  shelf_enriched_total?: number | null;
   // Intelligence scope fields (Sprint 2 — Migration 197)
   category_fit?: string | null;
   identity_confidence?: string | null;
@@ -5367,7 +5377,11 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.source_campaign_ids?.length) params.set('source_campaign_ids', filters.source_campaign_ids.join(','));
     if (filters?.proving_ground_id) params.set('proving_ground_id', filters.proving_ground_id);
     if (filters?.limit) params.set('limit', String(filters.limit));
-    if (filters?.includeCampaigns) params.set('include', 'campaigns');
+    const include = [
+      filters?.includeCampaigns ? 'campaigns' : null,
+      filters?.includeEnrichment ? 'enrichment' : null,
+    ].filter(Boolean).join(',');
+    if (include) params.set('include', include);
     const query = params.toString();
     const url = `${BASE_URL}/prospect-queue${query ? `?${query}` : ''}`;
 
@@ -5667,7 +5681,7 @@ class MarketingOpsService extends AdminApiSingleton {
    *  via the deterministic path, then spawns one directory_enrichment child
    *  carrying every market that lacks a campaign-applied (composer_version=2)
    *  row — needsAi is the set payload (category_set_enrichment schema). */
-  async enrichShelfSweep(provingGroundId: string, opts?: { createCampaign?: boolean }): Promise<{
+  async enrichShelfSweep(provingGroundId: string, opts?: { createCampaign?: boolean; queueEntryIds?: string[] }): Promise<{
     provingGroundId: string;
     domain: { categories: string[]; geos: { city: string; state: string | null }[] };
     categoryMarkets: Array<{ category: string; categoryKey: string; city: string; state: string; status: string; detail?: string; listingsEnriched?: number }>;
@@ -5679,7 +5693,7 @@ class MarketingOpsService extends AdminApiSingleton {
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${provingGroundId}/enrich-sweep`,
-      { method: 'POST', body: JSON.stringify({ create_campaign: opts?.createCampaign ?? true }) },
+      { method: 'POST', body: JSON.stringify({ create_campaign: opts?.createCampaign ?? true, queue_entry_ids: opts?.queueEntryIds }) },
       `mkt-ops-pg-sweep-${provingGroundId}`,
       0,
     );

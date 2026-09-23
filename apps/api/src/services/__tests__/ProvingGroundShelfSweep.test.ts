@@ -364,11 +364,76 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
     );
   });
 
+  it('scopes the queue read to selected prospect ids (selective sweep)', async () => {
+    await sweepService.sweep('pg-1', { queueEntryIds: ['pque-1', 'pque-2'] });
+    expect(mockQueueFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: { in: ['pque-1', 'pque-2'] } }),
+      }),
+    );
+  });
+
   it('respects createCampaign=false (preview mode)', async () => {
     const report = await sweepService.sweep('pg-1', { createCampaign: false });
     expect(report.sweepCampaign).toBeNull();
     expect(report.needsAi.length).toBeGreaterThan(0);
     expect(mockCreateCampaign).not.toHaveBeenCalled();
+  });
+
+  it('anchors on the PG market and folds the set into the single-market child that claims it', async () => {
+    // Halal Market × Fort Wayne is covered by an active single-market child
+    // of this PG — the anchor candidate conflicts, the payload merges into
+    // that child, and the child's own market joins the set.
+    const child = {
+      id: 'ec-single', stage: 'seek', scope: 'category',
+      category: 'Halal Market', city: 'Fort Wayne', state: 'IN',
+      discovery_context: null,
+    };
+    routeCampaignFindMany([], [child], [child]);
+    mockCreateCampaign.mockRejectedValue(new ConflictError('duplicate'));
+
+    const report = await sweepService.sweep('pg-1');
+
+    // The PG's declared market was attempted first as the anchor.
+    expect(mockCreateCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'Halal Market', city: 'Fort Wayne', state: 'IN' }),
+      undefined,
+    );
+    expect(report.categoryMarkets.find((m) => m.city === 'Fort Wayne' && m.category === 'Halal Market')?.status)
+      .toBe('campaign_exists');
+    // 3 payload markets + the child's own anchor market = 4 in the merged set.
+    expect(report.sweepCampaign).toEqual({ id: 'ec-single', created: false, marketCount: 4, mergedMarkets: 4 });
+    expect(mockCampaignUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ec-single' },
+        data: expect.objectContaining({
+          discovery_context: expect.objectContaining({
+            shelf_sweep: expect.objectContaining({
+              markets: expect.arrayContaining([
+                expect.objectContaining({ category: 'Halal Market', city: 'Fort Wayne', state: 'IN' }),
+                expect.objectContaining({ category: 'Butcher Shop', city: 'Auburn', state: 'IN' }),
+              ]),
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('mixed-market PGs anchor on pg.category × the dominant prospect geo', async () => {
+    mockCampaignFindUnique.mockResolvedValue({ ...PG, city: null, state: null, member_geos: null });
+    mockQueueFindMany.mockResolvedValue([
+      { category: 'Halal Market', city: 'Olathe', state: 'KS', seed_id: null, processed_campaign_id: null, source_campaign_id: null, business_snapshot: null },
+      { category: 'Halal Market', city: 'Olathe', state: 'KS', seed_id: null, processed_campaign_id: null, source_campaign_id: null, business_snapshot: null },
+      { category: 'Halal Market', city: 'Kansas City', state: 'MO', seed_id: null, processed_campaign_id: null, source_campaign_id: null, business_snapshot: null },
+    ]);
+
+    const report = await sweepService.sweep('pg-1');
+    expect(mockCreateCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'Halal Market', city: 'Olathe', state: 'KS' }),
+      undefined,
+    );
+    expect(report.sweepCampaign?.created).toBe(true);
   });
 });
 
