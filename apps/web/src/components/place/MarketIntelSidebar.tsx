@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown, Check, X, Lock, Download } from 'lucide-react';
 import marketIntelPublicService, { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
+import seedReportPreviewService from '@/services/SeedReportPreviewService';
 import marketIntelCustomerService, {
   MarketIntelPartialContent,
   MarketIntelFullContent,
@@ -46,6 +47,18 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
   const [unlockRequired, setUnlockRequired] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const [hasSeedReport, setHasSeedReport] = useState(false);
+
+  // Seed-report existence check — deferred until the panel opens. The
+  // "How We Found" card only renders when a published report exists.
+  useEffect(() => {
+    if (!open || !seedId || hasSeedReport) return;
+    let cancelled = false;
+    seedReportPreviewService.getReportPreview(seedId).then((data) => {
+      if (!cancelled && data) setHasSeedReport(true);
+    });
+    return () => { cancelled = true; };
+  }, [open, seedId, hasSeedReport]);
 
   // Refresh teaser client-side (ttl: 0 — no cache).
   useEffect(() => {
@@ -146,6 +159,21 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
               seedId={seedId}
             />
           </div>
+
+          {/* How We Found This Business — the seed-report provenance preview.
+              It leads into the report/claim CTAs in this panel; the report
+              page carries the claim CTA itself. Renders independently of
+              audit availability — the report predates the intel audit. */}
+          {hasSeedReport && seedId && (
+            <MarketIntelCard
+              icon="🔍"
+              title="How We Found This Business"
+              teaser="Where this listing came from — the sources checked, identity confidence, and signals behind it."
+              available={true}
+              ctaLabel="See the full report →"
+              ctaHref={`/seed-report/${seedId}`}
+            />
+          )}
 
           {!teaser || !teaser.hasAudit ? (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm text-gray-500 dark:text-gray-400">

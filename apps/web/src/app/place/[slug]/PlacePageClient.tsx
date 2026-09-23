@@ -9,7 +9,6 @@ import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
 import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
 import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
 import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
-import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface PlacePageClientProps {
@@ -77,30 +76,20 @@ export default function PlacePageClient({
         claimToken={listing.activeClaimToken}
         publicDisclaimer={listing.publicDisclaimer}
         publicNarrative={marketIntelTeaser?.publicNarrative ?? null}
+        marketIntelTeaser={marketIntelTeaser}
       />
       {/* Market Intel sidebar — seed pages only (§2.1). The page already
-          redirects non-seeds server-side; this gate is defensive. */}
+          redirects non-seeds server-side; this gate is defensive. The square
+          sponsored slot renders inside the layout under Contact. */}
       {listing.listingOrigin === 'directory_seed' && (
-        <>
-          {/* Square banner slot (300x250) — in-flow seed banner. The tall slot
-              lives inside the panel below, so the two never collide. */}
-          <div className="max-w-5xl mx-auto px-4 pt-6 flex justify-center">
-            <MarketIntelBanner
-              variant="square"
-              surfaceType="seed"
-              teaser={marketIntelTeaser}
-              seedId={listing.seedId}
-            />
-          </div>
-          <div className="max-w-5xl mx-auto px-4 pt-4">
-            <MarketIntelSidebar
-              slug={slug}
-              initialTeaser={marketIntelTeaser}
-              activeClaimToken={listing.activeClaimToken}
-              seedId={listing.seedId}
-            />
-          </div>
-        </>
+        <div className="max-w-5xl mx-auto px-4 pt-6">
+          <MarketIntelSidebar
+            slug={slug}
+            initialTeaser={marketIntelTeaser}
+            activeClaimToken={listing.activeClaimToken}
+            seedId={listing.seedId}
+          />
+        </div>
       )}
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <GbpReviewsSection slug={slug} />
@@ -108,8 +97,8 @@ export default function PlacePageClient({
         <GbpPhotoGallerySection slug={slug} />
       </div>
       {/* Platform footer — rendered by the page (not the layout) so it is
-          always the last element, after the sponsored banner and Market
-          Intel sidebar that mount below the editorial layout. */}
+          always the last element, after the Market Intel sidebar that
+          mounts below the editorial layout. */}
       <PoweredByFooter
         note={`${listing.businessName} is listed from public information. This is not a claimed profile and may be incomplete.`}
       />

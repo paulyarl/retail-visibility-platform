@@ -15,14 +15,15 @@ import LastViewed from '@/components/directory/LastViewed';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryBanner';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
-import SeedReportPreview from '@/components/directory/SeedReportPreview';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
+import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
+import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
 
 /**
  * PlaceEntryEditorialLayout — editorial-style layout adapted for directory
@@ -64,6 +65,8 @@ export interface PlaceEntryEditorialLayoutProps {
   publicDisclaimer?: string | null;
   /** Tier-C-safe audit narrative — preferred About-section source (§1.1). */
   publicNarrative?: string | null;
+  /** Server-rendered market-intel teaser — feeds the sponsored slot under Contact. */
+  marketIntelTeaser?: MarketIntelTeaserSummary | null;
 }
 
 export default function PlaceEntryEditorialLayout({
@@ -86,6 +89,7 @@ export default function PlaceEntryEditorialLayout({
   claimToken,
   publicDisclaimer,
   publicNarrative,
+  marketIntelTeaser,
 }: PlaceEntryEditorialLayoutProps) {
   useQrScanTracking(tenantId, 'directory');
 
@@ -207,14 +211,6 @@ export default function PlaceEntryEditorialLayout({
         <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
           <UnclaimedDirectoryBanner businessName={listing.businessName} />
         </section>
-
-        {/* Seed report preview — the "how we found you" narrative that links
-            into the full report. Only renders when a published report exists. */}
-        {listing.seedId && (
-          <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20 mb-4">
-            <SeedReportPreview seedId={listing.seedId} />
-          </div>
-        )}
 
         {/* Full-width provenance callout — the conversion pitch */}
         <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">
@@ -346,6 +342,21 @@ export default function PlaceEntryEditorialLayout({
                     initialExpanded={true}
                     isRetailStore={true}
                     onPhoneClick={trackCallClick}
+                  />
+                </div>
+              )}
+
+              {/* Square sponsored slot (300x250) — seed pages only. Fills
+                  the space under Contact when the Hours column runs taller.
+                  The tall slot lives inside the Market Intel panel below,
+                  so the two never collide. */}
+              {listing.listingOrigin === 'directory_seed' && (
+                <div className="flex justify-center">
+                  <MarketIntelBanner
+                    variant="square"
+                    surfaceType="seed"
+                    teaser={marketIntelTeaser}
+                    seedId={listing.seedId}
                   />
                 </div>
               )}
