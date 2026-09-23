@@ -19,7 +19,7 @@ import { generateQrAnalyticsId, generateQrScanEventId } from '../lib/id-generato
 // TYPES
 // ====================
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
@@ -146,6 +146,10 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   report_delivery_social: 'Report Delivery (Social/DM)',
   report_delivery_in_person: 'Report Delivery QR (In Person)',
   report_delivery_text: 'Report Delivery QR (Text)',
+  // Banner-served report QR — self-serve, NOT an operator delivery. Deliberately
+  // outside the report_delivery_* prefix so it can't inflate the
+  // delivered → scanned funnel rate.
+  report_banner: 'Report Banner QR',
   intake_link_sms: 'Intake Link (SMS)',
   intake_link_email: 'Intake Link (Email)',
   intake_link_qr: 'Intake Link (QR)',

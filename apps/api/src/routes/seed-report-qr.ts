@@ -42,14 +42,35 @@ const WEB_URL = (
 
 type ReportDeliveryChannel = 'phone' | 'email' | 'social' | 'in_person' | 'text';
 
-const VALID_CHANNELS = new Set<ReportDeliveryChannel>(['phone', 'email', 'social', 'in_person', 'text']);
+/**
+ * `banner` is a report-QR channel but NOT a delivery channel: the QR is served
+ * on a public directory banner rather than handed to the owner by an operator.
+ * It gets its own surface (`report_banner`, outside the `report_delivery_*`
+ * prefix) so banner scans never inflate the delivered → scanned funnel rate,
+ * and it writes no `report_viewed` delivery touch (see DELIVERY_CHANNELS).
+ */
+type ReportChannel = ReportDeliveryChannel | 'banner';
 
-const SURFACE_MAP: Record<ReportDeliveryChannel, QrSurfaceType> = {
+const VALID_CHANNELS = new Set<ReportChannel>([
+  'phone',
+  'email',
+  'social',
+  'in_person',
+  'text',
+  'banner',
+]);
+
+/** Channels that represent an operator delivery — only these write the
+ *  delivered → viewed touch. */
+const DELIVERY_CHANNELS = new Set<ReportChannel>(['phone', 'email', 'social', 'in_person', 'text']);
+
+const SURFACE_MAP: Record<ReportChannel, QrSurfaceType> = {
   phone: 'report_delivery_phone',
   email: 'report_delivery_email',
   social: 'report_delivery_social',
   in_person: 'report_delivery_in_person',
   text: 'report_delivery_text',
+  banner: 'report_banner',
 };
 
 /**
@@ -93,7 +114,8 @@ async function recordReportScanAndRedirect(
 
   // §5.3.2 lifecycle: write the *view* side of the delivery so the funnel and
   // cadence see delivered → viewed. Best-effort, never blocks the redirect.
-  if (seedId && VALID_CHANNELS.has(channel as ReportDeliveryChannel)) {
+  // Delivery channels only — a banner scan has no delivery to mark as viewed.
+  if (seedId && DELIVERY_CHANNELS.has(channel as ReportChannel)) {
     try {
       const { default: reportDelivery } = await import(
         '../services/intelligence/SeedReportDeliveryService'
@@ -112,12 +134,12 @@ async function recordReportScanAndRedirect(
 // Seed-id fallback variant: /api/public/r/seed/:seedId/:channel
 router.get('/r/seed/:seedId/:channel', async (req: Request, res: Response) => {
   const { seedId, channel } = req.params;
-  if (!VALID_CHANNELS.has(channel as ReportDeliveryChannel)) {
+  if (!VALID_CHANNELS.has(channel as ReportChannel)) {
     return res.status(400).json({ error: 'invalid_channel' });
   }
 
   await recordReportScanAndRedirect(
-    SURFACE_MAP[channel as ReportDeliveryChannel],
+    SURFACE_MAP[channel as ReportChannel],
     seedId,
     channel,
     req,

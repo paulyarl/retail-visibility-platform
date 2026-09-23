@@ -8,7 +8,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 
@@ -104,6 +104,7 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   report_delivery_social: 'Report Delivery (Social/DM)',
   report_delivery_in_person: 'Report Delivery (In Person)',
   report_delivery_text: 'Report Delivery (Text)',
+  report_banner: 'Report Banner',
 };
 
 class QrAnalyticsServiceClass extends TenantApiSingleton {

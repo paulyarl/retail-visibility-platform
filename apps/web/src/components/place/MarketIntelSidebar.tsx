@@ -18,6 +18,8 @@ interface MarketIntelSidebarProps {
   initialTeaser?: MarketIntelTeaserSummary | null;
   /** Active claim token for the Claim card CTA (§3.4). */
   activeClaimToken?: string | null;
+  /** Seed id — target of the banner's tracked report QR/link. */
+  seedId?: string | null;
 }
 
 /**
@@ -36,7 +38,7 @@ interface MarketIntelSidebarProps {
  * Spec: §2.1 (surface model), §3 (cards), §4.2 (partial), §4.3 (full),
  *       §6.2 (paywall), §7.1 (component tree).
  */
-export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken }: MarketIntelSidebarProps) {
+export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seedId }: MarketIntelSidebarProps) {
   const { isAuthenticated } = useCustomerAuth();
   const [teaser, setTeaser] = useState<MarketIntelTeaserSummary | null>(initialTeaser ?? null);
   const [partial, setPartial] = useState<MarketIntelPartialContent | null>(null);
@@ -135,9 +137,14 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken }: Ma
       {open && (
         <div id="market-intel-panel" className="mt-2 space-y-3">
           {/* Tall banner slot (300x600) — reserved seed banner inventory at the
-              top of the panel, filled with this seed's report offer. */}
+              top of the panel, filled with this seed's free-report offer + QR. */}
           <div className="flex justify-center">
-            <MarketIntelBanner variant="tall" surfaceType="seed" teaser={teaser} />
+            <MarketIntelBanner
+              variant="tall"
+              surfaceType="seed"
+              teaser={teaser}
+              seedId={seedId}
+            />
           </div>
 
           {!teaser || !teaser.hasAudit ? (

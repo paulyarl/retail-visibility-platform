@@ -88,6 +88,7 @@ export default function PlacePageClient({
               variant="square"
               surfaceType="seed"
               teaser={marketIntelTeaser}
+              seedId={listing.seedId}
             />
           </div>
           <div className="max-w-5xl mx-auto px-4 pt-4">
@@ -95,6 +96,7 @@ export default function PlacePageClient({
               slug={slug}
               initialTeaser={marketIntelTeaser}
               activeClaimToken={listing.activeClaimToken}
+              seedId={listing.seedId}
             />
           </div>
         </>

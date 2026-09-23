@@ -97,7 +97,53 @@ describe('MarketIntelBanner', () => {
     expect(html).toContain('height:250px');
   });
 
-  it('leads with the audit report on the seed surface', () => {
+  it('promotes the free report on the seed surface, not the paid unlock', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'tall',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+        seedId: 'seed-1',
+      }),
+    );
+
+    expect(html).toContain('Your free business report');
+    expect(html).toContain('documented the work in a free report');
+    // The paid report card's teaser must not be reused as the free offer.
+    expect(html).not.toContain('The complete audit with recommendations');
+    expect(html).not.toContain('Full Audit Report');
+  });
+
+  it('links the seed CTA through its own tracked banner channel', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'square',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+        seedId: 'seed-1',
+      }),
+    );
+
+    // Tracked redirect, never the destination — and its own surface, so banner
+    // scans never land in the report_delivery_* funnel.
+    expect(html).toContain('/api/public/r/seed/seed-1/banner');
+    expect(html).toContain('See the report');
+    expect(html).not.toContain('/seed-report/seed-1"');
+  });
+
+  it('renders no QR in the square variant (tall only)', () => {
+    const square = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'square',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+        seedId: 'seed-1',
+      }),
+    );
+    expect(square).not.toContain('Scan to open the report');
+  });
+
+  it('falls back to an unlinked offer when the seed id is unknown', () => {
     const html = renderToStaticMarkup(
       createElement(MarketIntelBanner, {
         variant: 'tall',
@@ -106,12 +152,11 @@ describe('MarketIntelBanner', () => {
       }),
     );
 
-    expect(html).toContain('Full Audit Report');
-    expect(html).toContain('The complete audit with recommendations');
-    expect(html).toContain('Growth Opportunities');
-    expect(html).toContain('How It Stacks Up');
-    // The claim card is an action, not report contents — it stays out.
-    expect(html).not.toContain('Claim This Business');
+    // No dead link, no fabricated tracked URL — the offer degrades in place.
+    expect(html).not.toContain('/api/public/r/seed/');
+    expect(html).not.toContain('<a');
+    expect(html).toContain('See the report');
+    expect(html).toContain('Coming soon');
   });
 
   it('falls back to the default offer copy with no teaser, keeping the box', () => {
