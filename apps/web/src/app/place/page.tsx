@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import PlacesIndexClient from './PlacesIndexClient';
+import PlacesIndexHero from './PlacesIndexHero';
 import PlaceNationalPanel from './PlaceNationalPanel';
 
 export const dynamic = 'force-dynamic';
@@ -33,13 +34,22 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PlacesIndexPage() {
   // National narratives: the location packet (coverage story) plus the roster
   // of national category packets (per-category framing for the cards below).
-  const [national, roster] = await Promise.all([
+  // The category shelf is read here too — the header carries its counts and the
+  // grid renders from it without waiting on a client fetch.
+  const [national, roster, categories] = await Promise.all([
     placesBrowsePublicService.getLocationEnrichment('__all__', '__all__'),
     placesBrowsePublicService.getNationalCategoryRoster(),
+    placesBrowsePublicService.getCategories(),
   ]);
 
   return (
     <>
+      {/* Header leads the page — the national coverage band below reads as page
+          copy under the title, not as a band above it. */}
+      <PlacesIndexHero
+        totalPlaces={categories?.totalPlaces ?? 0}
+        categoryCount={categories?.categories.length ?? 0}
+      />
       {national && <PlaceNationalPanel enrichment={national} />}
       <Suspense
         fallback={
@@ -51,7 +61,10 @@ export default async function PlacesIndexPage() {
           </div>
         }
       >
-        <PlacesIndexClient roster={roster} />
+        <PlacesIndexClient
+          roster={roster}
+          initialCategories={categories?.categories ?? null}
+        />
       </Suspense>
     </>
   );
