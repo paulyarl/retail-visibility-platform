@@ -34,6 +34,12 @@ import {
   type QualityGateResult,
   type CloseVariant,
 } from './outreach-openers';
+import { ARCHETYPE_LABELS } from './triage/types';
+
+// The full archetype set, derived from ARCHETYPE_LABELS keys so a newly
+// added archetype (e.g. A7 website gap) is honored by the triage-precedence
+// branches below without a second hardcoded list to keep in sync.
+const VALID_ARCHETYPES = new Set<string>(Object.keys(ARCHETYPE_LABELS));
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -126,10 +132,7 @@ export async function resolveCampaignArchetype(
     // Triage not found or not accepted — fall through to selectArchetype
   }
 
-  if (
-    triageArchetype &&
-    ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].includes(triageArchetype)
-  ) {
+  if (triageArchetype && VALID_ARCHETYPES.has(triageArchetype)) {
     return {
       archetype: triageArchetype as ArchetypeSelection['archetype'],
       source: 'triage',
@@ -353,7 +356,7 @@ export class OutreachOpenerService extends BaseService {
       // Triage not found or not accepted — fall through to selectArchetype
     }
 
-    if (triageArchetype && ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].includes(triageArchetype)) {
+    if (triageArchetype && VALID_ARCHETYPES.has(triageArchetype)) {
       // Use the triage-derived archetype. For A2, we still need a theme —
       // re-run selectArchetype to get the theme if the triage archetype is A2.
       // For A5, there is no theme (it's dual-signal, not theme-driven).

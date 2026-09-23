@@ -29,6 +29,7 @@ const {
   mockStageHistory: { create: vi.fn() },
   mockTriageResults: {
     findUnique: vi.fn(),
+    findMany: vi.fn(),
     create: vi.fn(),
   },
   mockGetPlaybookByCode: vi.fn(),
@@ -391,6 +392,33 @@ describe('listSiblings', () => {
     mockCampaignsList.findMany.mockResolvedValue([]);
     const result = await BusinessProspectService.getInstance().listSiblings('bp-empty');
     expect(result).toEqual([]);
+  });
+
+  it('resolves the A7 archetype for a PB-08 (website gap) sibling', async () => {
+    // Regression: the sibling-existence check in IntelligentTriageCard keys
+    // on SiblingSummary.archetype — an A7 sibling whose archetype resolved to
+    // null kept showing "Create Sibling" and hit a 409 on click.
+    const pb08Sibling = {
+      ...sourceCampaign,
+      id: 'mkt-pb08-sibling',
+      is_primary_sibling: false,
+      playbook_code: 'PB-08',
+      created_at: new Date('2025-01-02'),
+    };
+    mockCampaignsList.findMany.mockResolvedValue([sourceCampaign, pb08Sibling]);
+    mockTriageResults.findMany.mockResolvedValue([
+      {
+        campaign_id: 'mkt-pb08-sibling',
+        is_operator_accepted: true,
+        playbook: { archetype: 'A7' },
+        overridden_playbook: null,
+      },
+    ]);
+
+    const result = await BusinessProspectService.getInstance().listSiblings('bp-existing-001');
+
+    const pb08 = result.find((s) => s.id === 'mkt-pb08-sibling');
+    expect(pb08?.archetype).toBe('A7');
   });
 });
 

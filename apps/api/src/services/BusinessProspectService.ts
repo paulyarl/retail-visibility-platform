@@ -21,14 +21,14 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError } from '../middleware/errorHandler';
 import { generateCampaignId, generateBusinessProspectId, generateStageHistoryId, generateCampaignTriageId } from '../lib/id-generator';
-import type { ArchetypeCodeWithA6, PlaybookCode, PlaybookCategory } from './triage/types';
+import { ARCHETYPE_LABELS, type ArchetypeCodeWithA6, type PlaybookCode, type PlaybookCategory } from './triage/types';
 
 // ─── Inputs ──────────────────────────────────────────────────────────────
 
 export interface CreateSiblingInput {
   /** The source campaign — must already have a business_prospect_id. */
   sourceCampaignId: string;
-  /** Archetype for the sibling (A1-A6). Used for display + validation. */
+  /** Archetype for the sibling (A1-A7). Used for display + validation. */
   archetype: ArchetypeCodeWithA6;
   /** For triage-driven siblings: the playbook code (sets category via playbook). */
   playbookCode?: PlaybookCode;
@@ -354,7 +354,7 @@ export class BusinessProspectService extends BaseService {
     // Batch-resolve the declared archetype for each sibling from its
     // operator-accepted triage result's effective playbook. Siblings created
     // via triage have a pre-accepted triage result (see
-    // createSiblingTriageResult), so this resolves the A1–A6 code that
+    // createSiblingTriageResult), so this resolves the A1–A7 code that
     // disambiguates siblings sharing a business name. Manually-created
     // siblings with no triage result resolve to null.
     const archetypeByCampaign = await this.resolveSiblingArchetypes(
@@ -392,7 +392,7 @@ export class BusinessProspectService extends BaseService {
   }
 
   /**
-   * Batch-resolve the declared archetype (A1–A6) for sibling campaigns from
+   * Batch-resolve the declared archetype (A1–A7) for sibling campaigns from
    * their operator-accepted triage result's effective playbook (override if
    * present, otherwise recommendation). Mirrors the triage-precedence branch
    * of OutreachOpenerService.resolveCampaignArchetype without the audit
@@ -412,12 +412,14 @@ export class BusinessProspectService extends BaseService {
           overridden_playbook: { select: { archetype: true } },
         },
       });
-      const validArchetypes: string[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
+      // ARCHETYPE_LABELS keys are the full archetype set — deriving validity
+      // from it keeps A7 (and any future archetype) from being filtered out.
+      const validArchetypes = new Set(Object.keys(ARCHETYPE_LABELS));
       for (const row of triageRows as any[]) {
         if (row.is_operator_accepted !== true) continue;
         const pb = row.overridden_playbook ?? row.playbook;
         const arch = pb?.archetype;
-        if (arch && validArchetypes.includes(arch)) {
+        if (arch && validArchetypes.has(arch)) {
           result.set(row.campaign_id, arch as ArchetypeCodeWithA6);
         }
       }
