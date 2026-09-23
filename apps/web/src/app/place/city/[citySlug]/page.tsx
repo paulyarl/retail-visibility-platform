@@ -4,6 +4,9 @@ import PlaceCityEnrichmentContent from './PlaceCityEnrichmentContent';
 import { Metadata } from 'next';
 import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
+import AddBusinessCta from '@/components/directory/AddBusinessCta';
+import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 export async function generateMetadata({ params }: { params: Promise<{ citySlug: string }> }): Promise<Metadata> {
   const { citySlug } = await params;
@@ -46,6 +49,11 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
     placesBrowsePublicService.getCityShelfSummary(citySlug).catch(() => null),
   ]);
 
+  // DB-spelled city wins over the slug-derived lowercase form so the CTA copy
+  // never renders a lowercase city name.
+  const cityName = summary?.city || decodeURIComponent(citySlug).replace(/-/g, ' ');
+  const state = summary?.state ?? undefined;
+
   return (
     <>
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading...</p></div>}>
@@ -58,6 +66,14 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
       {summary?.enrichment && (
         <PlaceCityEnrichmentContent enrichment={summary.enrichment} city={summary.city} state={summary.state} />
       )}
+
+      {/* Footer CTAs — sit directly above the platform footer. */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <AddBusinessCta city={cityName} state={state} source={`/place/city/${citySlug}`} />
+        <SuggestBusinessCta city={cityName} state={state} source={`/place/city/${citySlug}`} />
+      </div>
+
+      <PoweredByFooter />
     </>
   );
 }

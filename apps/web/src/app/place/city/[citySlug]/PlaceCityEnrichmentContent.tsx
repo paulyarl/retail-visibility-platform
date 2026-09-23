@@ -28,8 +28,8 @@ export default function PlaceCityEnrichmentContent({
   }
 
   return (
-    <div className="bg-gray-100 border-t">
-      <div className="max-w-6xl mx-auto px-4 py-12 space-y-6">
+    <div className="bg-neutral-100 border-t border-neutral-200">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
         {bodyCopy && (
           <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">
