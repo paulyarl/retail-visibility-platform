@@ -807,6 +807,10 @@ const externalExecutionCreateSchema = z.object({
     run_id: z.string().max(200).optional(),
     notes: z.string().max(1000).optional(),
   }).passthrough().optional(),
+  // Discovery Scan Contract (v1.3): operator-supplied category members diffed
+  // against the candidate set by the import gate (INV-7 reconciliation).
+  // intelligence_discovery imports only — ignored by other schemas.
+  operator_supplied_members: z.array(z.string().max(300)).max(200).optional(),
 });
 
 const filterFlagUpdateSchema = z.object({
@@ -3275,6 +3279,7 @@ router.post('/prompts/executions/external', async (req: any, res: Response) => {
       costCents: parsed.cost_cents,
       metadata: parsed.metadata,
       executedBy: req.user?.id,
+      operatorSuppliedMembers: parsed.operator_supplied_members,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });
   } catch (error) {

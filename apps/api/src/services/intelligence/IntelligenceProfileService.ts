@@ -189,7 +189,10 @@ export interface GeographyGridConfig {
 
 export interface GenericLabelSetEntry {
   platform: string;
+  // Hide labels — generic buckets that swallow the category (enumeration).
   labels: string[];
+  // Reveal labels — the correct/gold-standard labels (qualification only).
+  reveal_labels?: string[];
 }
 
 export interface LabelIndependentSweep {
@@ -229,6 +232,9 @@ export interface PromptResolution {
   // appended to the rendered prompt. Additive/optional — existing consumers
   // of resolution ignore unknown keys.
   discovery_leads_injected?: boolean;
+  // True only when a "Verified evidence — operator / owner" block (the
+  // mkt_identity_evidence ledger) was appended to the rendered prompt.
+  verified_evidence_injected?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -2181,9 +2187,17 @@ export class IntelligenceProfileService extends BaseService {
         }
       }
       if (config.generic_label_set && config.generic_label_set.length > 0) {
-        lines.push('  Generic labels that SWALLOW this category (sweep these, not the correct label):');
+        lines.push('  Generic labels that SWALLOW this category (hide labels — sweep these for enumeration):');
         for (const entry of config.generic_label_set) {
           lines.push(`    [${entry.platform}] ${(entry.labels || []).join(', ')}`);
+        }
+        const reveals = config.generic_label_set
+          .filter((e) => Array.isArray(e.reveal_labels) && e.reveal_labels.length > 0);
+        if (reveals.length > 0) {
+          lines.push('  Correct / gold-standard labels (reveal labels — qualification only, not enumeration):');
+          for (const entry of reveals) {
+            lines.push(`    [${entry.platform}] ${entry.reveal_labels!.join(', ')}`);
+          }
         }
       }
       if (config.label_independent_sweeps && config.label_independent_sweeps.length > 0) {

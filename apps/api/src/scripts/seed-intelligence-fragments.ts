@@ -297,11 +297,29 @@ category's own tokens be the only discovery keys.
   result, never a silent skip. Do not stop after the first unit that yields
   results.
 - Run the generic-label x geography matrix: for each platform, sweep the generic
-  labels that SWALLOW this category (not the correct category label) across each
-  sweep unit, then verify assortment from photos, review text, or catalog copy.
+  labels that SWALLOW this category (the HIDE labels — they drive enumeration,
+  not the correct category label) across each sweep unit, then verify assortment
+  from photos, review text, or catalog copy. When the profile also carries
+  reveal_labels (the correct / gold-standard labels), use them for
+  QUALIFICATION only — a hit under a reveal label reads as a benchmark, not a
+  hidden prospect.
+- TOKEN-FREE PLATFORM ENUMERATION (mandatory): per ZIP, enumerate ALL pins under
+  the swallow labels regardless of business name — no category token, no
+  endonym required. This is the platform analogue of the geography-keyed
+  dataset sweep and is the net that catches the generic-looking-name class.
+  Cost: one query per ZIP x label.
+- ATTRIBUTE-FILTER SWEEP: use platform-native ownership/service attribute
+  filters (e.g. "Identifies as Black-owned", "women-owned", service options) as
+  a named sweep keyed on geography. Name-independent and category-independent;
+  high yield for diaspora-owned categories.
 - Run every label_independent_sweep by GEOGRAPHY (ZIP/address) with NO
   category-name filter, then filter to category fit by assortment evidence.
   Never key these datasets on the category name.
+- RECORD THE LEDGER: emit one scan_contract.sweep_ledger row per ZIP
+  (unit_id "zip:<zip>"), one per corridor swept, one per dataset x geography
+  unit — each with the platforms and labels actually issued and its status.
+  Every candidate_key in the ledger must trace to a discovered business, and
+  every discovered business must appear in at least one ledger row.
 - If any sweep unit was skipped or could not be executed, say so explicitly
   rather than omitting it.
 
@@ -404,6 +422,29 @@ discovery path. Competitive focus means mainstream-visible leaders lead, and
 the profile's category-specific evidence rules govern whether a high-visibility
 business actually qualifies as a category benchmark versus a generic
 high-visibility business that does not meet the profile's specialization bar.
+
+=== GEOGRAPHY GRID EXECUTION (MANDATORY) ===
+The competitive scan enumerates the SAME geography grid the emerging scan does —
+coverage is a property of the market, not the focus. The profile's DISCOVERY
+SUBSTRATE and any appended GEOGRAPHY GRID block are the enumeration floor.
+
+- Sweep EVERY sweep unit (ZIP/corridor) INDEPENDENTLY. A unit with zero findings
+  is an executed-empty result to report, never a silent skip. Do not stop after
+  the first unit that yields leaders — the top three surface early; the miss a
+  shallow pass hides is the MID-TIER benchmark the emerging set is measured
+  against.
+- Run the generic-label x geography matrix per platform across each sweep unit.
+  The swallow labels (hide labels) drive enumeration; when the profile carries
+  reveal_labels use them for qualification only.
+- Run every label_independent_sweep by GEOGRAPHY (ZIP/address) with NO
+  category-name filter, then filter to category fit by evidence.
+- RECORD THE LEDGER: emit one scan_contract.sweep_ledger row per ZIP
+  (unit_id "zip:<zip>"), one per corridor, one per dataset x geography unit —
+  with the platforms and labels actually issued and the row's status. Every
+  discovered business must appear in at least one ledger row's candidate_keys.
+- If any sweep unit or mechanism-set vector was skipped or could not be
+  executed, name it — unexecuted vectors belong in
+  coverage_attestation.unexecuted_vector_list with a reason.
 
 Do NOT compute the emerging prospect set in this run — thin-footprint,
 hidden-trust, and single-platform discovery are emerging-focus work. Competitive

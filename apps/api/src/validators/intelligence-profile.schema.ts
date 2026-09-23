@@ -81,8 +81,15 @@ const geographyGridSchema = z.object({
 const genericLabelSetEntrySchema = z.object({
   platform: z.string().min(1),
   // The generic buckets that SWALLOW this category — the labels a mislabeled
-  // business sits under. Category-specific in content, universal in class.
+  // business sits under (HIDE labels: they drive enumeration). Category-
+  // specific in content, universal in class.
   labels: z.array(z.string()).min(1),
+  // The CORRECT / gold-standard labels for this category on this platform
+  // (REVEAL labels: they drive qualification, not enumeration). A label can
+  // be both — "African goods store" hides mislabeled businesses AND is the
+  // correct label — so it lives in both lists and the discovery prompt uses
+  // each list for its own purpose (spec §5.1 item 3).
+  reveal_labels: z.array(z.string()).optional(),
 }).passthrough();
 
 const labelIndependentSweepSchema = z.object({
@@ -205,7 +212,8 @@ Return a single JSON object with this structure (the Category Intelligence Profi
   "generic_label_set": [
     {
       "platform": "<platform>",
-      "labels": ["<generic label that SWALLOWS this category>", ...]
+      "labels": ["<generic label that SWALLOWS this category (hide label)>", ...],
+      "reveal_labels": ["<the CORRECT / gold-standard label for this category on this platform>", ...]
     }
   ],
   "label_independent_sweeps": [
@@ -251,7 +259,7 @@ Rules:
 - label_independent_sweeps entries MUST set "sweep_key": "geography". These datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. Do NOT key them on the category name — token-keying a label-independent dataset makes it label-dependent and hides every business whose legal name carries no category token.
 - geography_grid.zips MUST list every ZIP the market's commercial addresses fall in, not only the ZIPs where category businesses were already found. Every ZIP is swept independently; a ZIP with zero findings is an executed-empty result, not a silent skip.
 - geography_grid scope is the RETAIL CATCHMENT, not the administrative city: the principal city PLUS its contiguous commercial suburbs. geography_grid.adjacent_municipalities MUST list the separately-incorporated municipalities in the catchment — including any that share a ZIP with the principal city (the shared-ZIP suburb class). A ZIP spanning the principal city and a suburb is ONE sweep unit.
-- generic_label_set MUST name the generic/misleading labels that hide this category on each platform, not the correct category label.
+- generic_label_set splits each platform's labels by ROLE: "labels" are the HIDE labels — the generic/misleading buckets that swallow this category and drive enumeration; "reveal_labels" are the CORRECT / gold-standard labels that drive qualification. A label can be both (e.g. a platform's correct category label is also where mislabeled businesses get filed) — put it in both lists. Do NOT put the correct label in "labels" alone, and never omit a hide label just because it happens to be the correct one too.
 - platform_signal_weights is REQUIRED for every new profile. For each platform where this category's customers actually are (reviews, ratings, profiles, category traffic), estimate signal_weight = prevalence x depth — how much of the category's customer-facing activity happens on that platform — as a number in [0,1]. Each entry MUST carry "basis" (the observed evidence behind the number), "confidence" (how reliable the estimate is, in [0,1]), and "observations" (the sample size). A platform with high signal weight outranks a low-signal one in scoring; do not inflate weights for platforms the category barely uses.
 - platform_signal_divergence is OPTIONAL — record it only when both a national and a local estimate were observed for the same platform (local weight - national weight).
 - For each specialized_source that has a canonical web address (a homepage, directory index, organization page, or store locator), include its "url". Vertical directories, community organizations, professional networks, and official brand/chain websites should always carry a url — it is the operator's entry point to the source. Omit "url" only for sources that have no single canonical web address (e.g. "storefront photo evidence", "SNAP listings" as a class).

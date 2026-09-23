@@ -37,6 +37,7 @@ import {
   type IntelligenceFocus,
 } from './IntelligenceProfileService';
 import { composeReportDirectives, REPORT_DIRECTIVES_VERSION } from './report-directives';
+import { DISCOVERY_OPERATING_POSTURE } from '../../validators/intelligence-discovery.schema';
 
 // Re-export IntelligenceFocus for backward compatibility — the type now
 // originates in IntelligenceProfileService to avoid a circular import.
@@ -145,13 +146,17 @@ export class PromptComposerService extends BaseService {
       };
     }
 
-    // 4. Assemble: base + extension + profile block + focus + shared
-    //    report directives (§6.1 report_evidence contract + §6.10 tone
-    //    directive — composed once here, not copied into fragment bodies).
+    // 4. Assemble: base + extension + profile block + operating posture +
+    //    focus + shared report directives (§6.1 report_evidence contract +
+    //    §6.10 tone directive — composed once here, not copied into fragment
+    //    bodies). The posture (Discovery Scan Contract §5.0) lands ahead of
+    //    the focus fragment's mechanism set so the run is framed as
+    //    enumeration work before the patterns are read.
     const body = [
       baseFragment,
       extensionFragment,
       profileSection,
+      DISCOVERY_OPERATING_POSTURE,
       focusFragment,
       composeReportDirectives(),
     ]

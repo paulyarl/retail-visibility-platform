@@ -199,6 +199,12 @@ DIRECTIVE:
   category-name filter, then filter to category fit by assortment evidence.
   Do NOT key these datasets on the category name — token-keying a
   label-independent dataset makes it label-dependent.
+- RECORD THE SWEEP IN THE LEDGER: emit one scan_contract.sweep_ledger row per
+  ZIP above with unit_id "zip:<zip>" (e.g. "zip:64118"), one row per corridor
+  actually swept with unit_id "corridor:<slug>", and one row per dataset x
+  geography unit with unit_id "dataset:<slug>". Each row records the platforms
+  and labels actually issued and its status — executed_with_findings,
+  executed_empty, not_executed, or blocked (blocked requires blocked_reason).
 - RECORD THE DERIVATION BASIS: state how the ZIP set and adjacent municipalities
   were derived (city boundary + adjacent municipalities + arterial corridors), so
   coverage is auditable rather than a bare list.

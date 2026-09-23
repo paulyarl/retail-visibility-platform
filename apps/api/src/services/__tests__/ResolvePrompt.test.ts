@@ -125,6 +125,13 @@ vi.mock('../LocationMarketEnrichmentService', () => ({
   default: mockLocationEnrichmentService,
 }));
 
+// Intercepts the lazy `import('./IdentityEvidenceService.js')` inside
+// renderVerifiedEvidenceBlock — empty ledger by default so the block is
+// absent and renders stay byte-identical.
+vi.mock('../IdentityEvidenceService', () => ({
+  default: { listForCampaign: vi.fn(async () => []) },
+}));
+
 vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
   formatEstablishmentMarketContext: mockFormatEstablishment,
   formatDiscoveryMarketContext: mockFormatDiscovery,

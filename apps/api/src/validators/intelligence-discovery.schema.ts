@@ -154,6 +154,86 @@ const discoveredBusinessSchema = z.object({
   // Optional marker (§3): candidate observed as a reference point, not a
   // prospect. Scan/card-display only — not carried downstream.
   benchmark_only: z.boolean().nullable().optional(),
+
+  // Run-local key aliases (Discovery Scan Contract v1.3) — alternate names for
+  // the same business (the Tawakal / Al-Hallal / Darsalaam one-address case).
+  // Each alias is slugged with the candidate's city and counts as the same
+  // candidate_key for INV-1/INV-7 provenance and reconciliation checks.
+  candidate_key_aliases: z.array(z.string()).nullable().optional(),
+}).passthrough();
+
+// ─── Scan contract (Discovery Scan Contract Spec §3) ─────────────────────
+//
+// The contract is coverage bookkeeping: which sweep units were opened, what
+// each returned, and what the run admits it skipped. Shape only is enforced
+// here — the coverage invariants (INV-1…INV-8) are report-mode and live in
+// collectDiscoveryContractViolations below, invoked at the import seam.
+
+export const DISCOVERY_SCAN_CONTRACT_VERSION = 'discovery-scan-contract-v1';
+
+const sweepLedgerRowSchema = z.object({
+  unit_id: z.string().min(1),
+  unit_type: z.enum(['zip_label_matrix', 'corridor', 'dataset_geography']),
+  unit: z.string().optional(),
+  platforms_swept: z.array(z.string()).optional(),
+  labels_swept: z.array(z.string()).optional(),
+  status: z.enum(['executed_with_findings', 'executed_empty', 'not_executed', 'blocked']),
+  findings_count: z.number().int().nullable().optional(),
+  candidate_keys: z.array(z.string()).optional(),
+  executed_at: z.string().optional(),
+  blocked_reason: z.string().nullable().optional(),
+}).passthrough();
+
+const coverageAttestationSchema = z.object({
+  units_total: z.number().int().optional(),
+  units_executed: z.number().int().optional(),
+  units_executed_empty: z.number().int().optional(),
+  units_not_executed: z.number().int().optional(),
+  units_blocked: z.number().int().optional(),
+  vectors_total: z.number().int().optional(),
+  vectors_executed: z.number().int().optional(),
+  vectors_not_executed: z.number().int().optional(),
+  coverage_ratio: z.number().optional(),
+  completeness_claim: z.enum(['verified_full', 'verified_partial', 'unverified']).optional(),
+  uncovered_municipalities: z.array(z.string()).optional(),
+  unexecuted_vector_list: z.array(
+    z.object({
+      vector: z.string().min(1),
+      reason: z.string().optional(),
+    }).passthrough(),
+  ).optional(),
+  attestation_basis: z.string().optional(),
+}).passthrough();
+
+const municipalityCoverageRowSchema = z.object({
+  municipality: z.string().min(1),
+  shared_zip: z.string().optional(),
+  platform_zip_rows: z.array(z.string()).optional(),
+  label_independent_datasets: z.array(z.string()).optional(),
+  status: z.enum(['covered', 'platform_only', 'uncovered']).optional(),
+}).passthrough();
+
+const reconciliationSchema = z.object({
+  // v1.3: operator-supplied members are an import-time input injected by the
+  // gate; model-emitted blocks are merged, not trusted blindly.
+  operator_supplied_members: z.array(z.string()).optional(),
+  matched_to_candidates: z.array(z.string()).optional(),
+  added_this_pass: z.array(z.string()).optional(),
+  unmatched: z.array(z.string()).optional(),
+  excluded_with_reason: z.array(
+    z.object({
+      member: z.string().min(1),
+      reason: z.string().optional(),
+    }).passthrough(),
+  ).optional(),
+}).passthrough();
+
+export const scanContractSchema = z.object({
+  contract_version: z.string().optional(),
+  sweep_ledger: z.array(sweepLedgerRowSchema).optional(),
+  coverage_attestation: coverageAttestationSchema.optional(),
+  municipality_coverage: z.array(municipalityCoverageRowSchema).optional(),
+  reconciliation: reconciliationSchema.nullable().optional(),
 }).passthrough();
 
 // ─── Top-level schema ────────────────────────────────────────────────────
@@ -238,7 +318,379 @@ export const intelligenceDiscoverySchema = z.object({
       suggested_call_to_action: z.string(),
     }).passthrough(),
   }).passthrough().optional(),
+
+  // Discovery Scan Contract (spec §3) — per-unit sweep ledger + derived
+  // coverage attestation. Optional so pre-contract payloads still validate;
+  // the normalizer synthesizes an "unverified" block when absent.
+  scan_contract: scanContractSchema.optional(),
 }).passthrough();
+
+// ─── Scan contract — key derivation, claim derivation, invariant collector ───
+//
+// candidate_key rule (spec v1.3): slug(business_name)--slug(city state). The
+// slugger lowercases, drops legal suffixes, strips punctuation, and
+// hyphen-joins, so "Universal African Market LLC" in Gladstone keys as
+// "universal-african-market--gladstone-mo". candidate_key_aliases are alternate
+// names slugged the same way — INV-1/INV-7 accept any of them.
+
+const LEGAL_SUFFIXES = new Set([
+  'llc', 'inc', 'ltd', 'co', 'corp', 'corporation', 'company', 'lp', 'llp', 'plc', 'dba',
+]);
+
+export function slugifyCandidatePart(value: unknown): string {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[''`]/g, '')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/[\s-]+/)
+    .filter((t) => t.length > 0 && !LEGAL_SUFFIXES.has(t))
+    .join('-');
+}
+
+/**
+ * Display form of a candidate_key: `name-slug--city-state-slug` — e.g.
+ * `universal-african-market--gladstone-mo`. State rides with city so the same
+ * name in Springfield, IL vs Springfield, MO keys differently; both optional.
+ */
+export function deriveCandidateKey(businessName: unknown, city: unknown, state?: unknown): string {
+  const n = slugifyCandidatePart(businessName);
+  if (!n) return '';
+  const c = slugifyCandidatePart([city, state].filter(Boolean).join(' '));
+  return c ? `${n}--${c}` : n;
+}
+
+/**
+ * Canonical comparison form — separators removed entirely, so
+ * "universal-african-market--gladstone-mo", "Universal African Market
+ * (Gladstone, MO)", and "universal african market gladstone mo" all compare
+ * equal. Separator/casing drift must never produce false INV-1/INV-7 misses.
+ */
+export function canonicalCandidateKey(key: unknown): string {
+  return slugifyCandidatePart(key).replace(/-/g, '');
+}
+
+/**
+ * All canonical keys a candidate may match on: primary name+city, name alone
+ * (tolerance for name-only ledger keys), and the same pair per alias.
+ */
+export function candidateKeySet(biz: any): Set<string> {
+  const keys = new Set<string>();
+  const add = (name: unknown, city: unknown, state: unknown) => {
+    const full = canonicalCandidateKey(deriveCandidateKey(name, city, state));
+    if (full) keys.add(full);
+    const nameOnly = canonicalCandidateKey(name);
+    if (nameOnly) keys.add(nameOnly);
+  };
+  add(biz?.business_name, biz?.city, biz?.state);
+  for (const alias of Array.isArray(biz?.candidate_key_aliases) ? biz.candidate_key_aliases : []) {
+    add(alias, biz?.city, biz?.state);
+  }
+  return keys;
+}
+
+/** The §3.1 claim ladder, computed from the attestation — never trusted from the model. */
+export function deriveCompletenessClaim(att: any): 'verified_full' | 'verified_partial' | 'unverified' {
+  if (!att || typeof att !== 'object') return 'unverified';
+  const num = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  if (num(att.units_executed) === 0) return 'unverified';
+  const full = num(att.units_not_executed) === 0
+    && num(att.vectors_not_executed) === 0
+    && (Array.isArray(att.uncovered_municipalities) ? att.uncovered_municipalities.length : 0) === 0;
+  return full ? 'verified_full' : 'verified_partial';
+}
+
+/** Minimal block synthesized when a payload omits scan_contract entirely (§4 degraded mode). */
+export function synthesizeMissingScanContract(): any {
+  return {
+    contract_version: DISCOVERY_SCAN_CONTRACT_VERSION,
+    sweep_ledger: [],
+    coverage_attestation: {
+      units_total: 0,
+      units_executed: 0,
+      units_executed_empty: 0,
+      units_not_executed: 0,
+      units_blocked: 0,
+      vectors_total: 0,
+      vectors_executed: 0,
+      vectors_not_executed: 0,
+      coverage_ratio: 0,
+      completeness_claim: 'unverified',
+      uncovered_municipalities: [],
+      unexecuted_vector_list: [],
+      attestation_basis: 'No scan_contract emitted by the run — synthesized on import; coverage is unverified.',
+    },
+    municipality_coverage: [],
+    reconciliation: null,
+  };
+}
+
+export interface DiscoveryContractViolation {
+  invariant: 'INV-1' | 'INV-2' | 'INV-3' | 'INV-4' | 'INV-5' | 'INV-6' | 'INV-7' | 'INV-8';
+  path?: string;
+  message: string;
+}
+
+function extractLedgerZip(row: any): string | null {
+  const id = String(row?.unit_id ?? '').trim();
+  const m = /^zip:(\d{5})/.exec(id);
+  if (m) return m[1];
+  if (/^\d{5}$/.test(id)) return id;
+  return null;
+}
+
+const normMunicipality = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Report-mode invariant check (spec §4, v1.3). Returns the violation list the
+ * import gate stamps into audit_data.scan_contract_violations — nothing here
+ * rejects the payload. INV-3/INV-4 are grid-parameterized: callers pass the
+ * authoritative sweep units (cached grid > campaign zips) via opts; with no
+ * expected units those invariants are skipped (a scan with no declared grid
+ * can't be checked against one).
+ */
+export function collectDiscoveryContractViolations(
+  data: any,
+  opts?: { expectedZips?: string[]; expectedMunicipalities?: string[] },
+): DiscoveryContractViolation[] {
+  const violations: DiscoveryContractViolation[] = [];
+  if (!data || typeof data !== 'object') return violations;
+  const contract = data.scan_contract;
+  if (!contract || typeof contract !== 'object') return violations; // absent → normalizer synthesizes unverified
+  const ledger: any[] = Array.isArray(contract.sweep_ledger) ? contract.sweep_ledger : [];
+  const att = contract.coverage_attestation ?? {};
+  const discovered: any[] = Array.isArray(data.discovered_businesses) ? data.discovered_businesses : [];
+
+  // INV-1 — provenance closure: every candidate appears in ≥1 ledger row.
+  const ledgerKeys = new Set<string>();
+  for (const row of ledger) {
+    for (const k of Array.isArray(row?.candidate_keys) ? row.candidate_keys : []) {
+      const c = canonicalCandidateKey(k);
+      if (c) ledgerKeys.add(c);
+    }
+  }
+  discovered.forEach((biz: any, i: number) => {
+    if (!biz || typeof biz !== 'object') return;
+    const keys = candidateKeySet(biz);
+    if (keys.size === 0) return;
+    if (![...keys].some((k) => ledgerKeys.has(k))) {
+      violations.push({
+        invariant: 'INV-1',
+        path: `discovered_businesses[${i}].business_name`,
+        message: `Candidate "${biz.business_name ?? '?'}" does not appear in any sweep_ledger row's candidate_keys`,
+      });
+    }
+  });
+
+  // INV-2 + INV-8 — per-row consistency; "executed" means queried.
+  ledger.forEach((row: any, i: number) => {
+    const status = row?.status;
+    const path = `scan_contract.sweep_ledger[${i}]`;
+    const label = row?.unit_id ?? `#${i}`;
+    const cks = Array.isArray(row?.candidate_keys) ? row.candidate_keys : [];
+    if (status === 'executed_with_findings') {
+      if (!(typeof row?.findings_count === 'number' && row.findings_count >= 1) || cks.length === 0) {
+        violations.push({ invariant: 'INV-2', path, message: `Row "${label}" claims executed_with_findings but findings_count/candidate_keys do not back it` });
+      }
+    } else if (status === 'executed_empty') {
+      if (row?.findings_count !== 0 || cks.length !== 0) {
+        violations.push({ invariant: 'INV-2', path, message: `Row "${label}" claims executed_empty but findings_count !== 0 or candidate_keys is non-empty` });
+      }
+    } else if (status === 'blocked') {
+      if (typeof row?.blocked_reason !== 'string' || !row.blocked_reason.trim()) {
+        violations.push({ invariant: 'INV-2', path, message: `Row "${label}" is blocked but carries no blocked_reason` });
+      }
+    }
+    if ((status === 'executed_with_findings' || status === 'executed_empty')
+      && (row?.unit_type === 'zip_label_matrix' || row?.unit_type === 'corridor')) {
+      const ps = Array.isArray(row?.platforms_swept) ? row.platforms_swept : [];
+      const ls = Array.isArray(row?.labels_swept) ? row.labels_swept : [];
+      if (ps.length === 0 || ls.length === 0) {
+        violations.push({ invariant: 'INV-8', path, message: `Row "${label}" claims "${status}" with empty platforms_swept/labels_swept — executed means queried, not visited` });
+      }
+    }
+  });
+
+  // INV-5 — claimed == derived (the gate also rewrites the stored claim).
+  const claimed = att?.completeness_claim;
+  const derived = deriveCompletenessClaim(att);
+  if (!claimed) {
+    violations.push({ invariant: 'INV-5', path: 'scan_contract.coverage_attestation.completeness_claim', message: `completeness_claim missing — derived claim is "${derived}"` });
+  } else if (claimed !== derived) {
+    violations.push({ invariant: 'INV-5', path: 'scan_contract.coverage_attestation.completeness_claim', message: `completeness_claim "${claimed}" disagrees with derived claim "${derived}"` });
+  }
+
+  // INV-6 — every unexecuted vector is named with a reason.
+  const vecNot = typeof att?.vectors_not_executed === 'number' ? att.vectors_not_executed : 0;
+  const unexecList = Array.isArray(att?.unexecuted_vector_list) ? att.unexecuted_vector_list : [];
+  if (unexecList.length < vecNot) {
+    violations.push({
+      invariant: 'INV-6',
+      path: 'scan_contract.coverage_attestation.unexecuted_vector_list',
+      message: `${vecNot} vectors reported not executed but only ${unexecList.length} named in unexecuted_vector_list`,
+    });
+  }
+
+  // INV-3 — every expected ZIP has exactly one zip_label_matrix row.
+  const expectedZips = (opts?.expectedZips ?? []).map((z) => String(z).trim()).filter(Boolean);
+  if (expectedZips.length > 0) {
+    const zipRowCount = new Map<string, number>();
+    for (const row of ledger) {
+      if (row?.unit_type !== 'zip_label_matrix') continue;
+      const zip = extractLedgerZip(row);
+      if (!zip) continue;
+      zipRowCount.set(zip, (zipRowCount.get(zip) ?? 0) + 1);
+    }
+    for (const zip of expectedZips) {
+      const n = zipRowCount.get(zip) ?? 0;
+      if (n === 0) {
+        violations.push({ invariant: 'INV-3', path: 'scan_contract.sweep_ledger', message: `Expected ZIP ${zip} has no zip_label_matrix row — a mandated sweep unit never opened` });
+      } else if (n > 1) {
+        violations.push({ invariant: 'INV-3', path: 'scan_contract.sweep_ledger', message: `Expected ZIP ${zip} appears in ${n} zip_label_matrix rows — must be exactly one` });
+      }
+    }
+  }
+
+  // INV-4 — municipality coverage completeness.
+  const muniRows: any[] = Array.isArray(contract.municipality_coverage) ? contract.municipality_coverage : [];
+  const coveredMunis = new Set(muniRows.map((r) => normMunicipality(r?.municipality)));
+  for (const m of (opts?.expectedMunicipalities ?? []).map((s) => String(s).trim()).filter(Boolean)) {
+    if (!coveredMunis.has(normMunicipality(m))) {
+      violations.push({ invariant: 'INV-4', path: 'scan_contract.municipality_coverage', message: `Expected municipality "${m}" has no municipality_coverage row` });
+    }
+  }
+  const attUn = new Set((Array.isArray(att?.uncovered_municipalities) ? att.uncovered_municipalities : []).map(normMunicipality));
+  muniRows.forEach((r: any, i: number) => {
+    if (r?.status === 'uncovered' && !attUn.has(normMunicipality(r?.municipality))) {
+      violations.push({ invariant: 'INV-4', path: `scan_contract.municipality_coverage[${i}]`, message: `Municipality "${r?.municipality}" marked uncovered but absent from coverage_attestation.uncovered_municipalities` });
+    }
+  });
+
+  // INV-7 — every operator-supplied member resolves to a candidate or an
+  // exclusion. A member in `unmatched` IS a violation (§7.1 G4: zero unmatched
+  // members — the scan missed a real business), and a member absent from every
+  // list is the silent-drop case. The import gate additionally injects and
+  // diffs import-time members; this checks the (possibly merged) block.
+  const recon = contract.reconciliation;
+  if (recon && typeof recon === 'object') {
+    const canonList = (arr: any): string[] => (Array.isArray(arr) ? arr : []).map(canonicalCandidateKey).filter(Boolean);
+    const matchedCanons = [...canonList(recon.matched_to_candidates), ...canonList(recon.added_this_pass)];
+    const unmatchedCanons = new Set(canonList(recon.unmatched));
+    const excludedCanons = new Set(
+      (Array.isArray(recon.excluded_with_reason) ? recon.excluded_with_reason : [])
+        .map((e: any) => canonicalCandidateKey(e?.member)),
+    );
+    const candidateNames = new Set<string>();
+    for (const biz of discovered) {
+      if (!biz || typeof biz !== 'object') continue;
+      for (const name of [biz.business_name, ...(Array.isArray(biz.candidate_key_aliases) ? biz.candidate_key_aliases : [])]) {
+        const c = canonicalCandidateKey(name);
+        if (c) candidateNames.add(c);
+      }
+    }
+    const members: any[] = Array.isArray(recon.operator_supplied_members) ? recon.operator_supplied_members : [];
+    members.forEach((m: any, i: number) => {
+      const canon = canonicalCandidateKey(m);
+      if (!canon) return;
+      const path = `scan_contract.reconciliation.operator_supplied_members[${i}]`;
+      // A member resolves to a candidate when its name canon equals a
+      // candidate name canon, or prefixes a matched/added candidate_key canon
+      // (keys carry a `--city-state` suffix the member name lacks). The ≥6
+      // guard keeps short names from prefix-matching unrelated keys.
+      const matched = candidateNames.has(canon)
+        || (canon.length >= 6 && matchedCanons.some((k) => k === canon || k.startsWith(canon)));
+      if (matched || excludedCanons.has(canon)) return;
+      violations.push({
+        invariant: 'INV-7',
+        path,
+        message: unmatchedCanons.has(canon)
+          ? `Operator-supplied member "${m}" is unmatched — the scan missed a real business`
+          : `Operator-supplied member "${m}" resolves to nothing — no candidate match, unmatched entry, or exclusion`,
+      });
+    });
+  }
+
+  return violations;
+}
+
+/**
+ * The import-time coverage gate (Discovery Scan Contract v1.3) — applied in
+ * MarketingPromptService.importExternalResult on the RAW parsed JSON, same
+ * seam as applyRenderControlCoverageGate. Report-mode: the import always
+ * succeeds; violations are stamped into `scan_contract_violations` and the
+ * stored completeness_claim is overwritten with the derived value.
+ *
+ *   1. Injects import-time operator-supplied members into
+ *      scan_contract.reconciliation and computes the diff against the
+ *      candidate set (model-emitted blocks are merged, never trusted blindly).
+ *   2. Collects INV-1…INV-8 violations (INV-3/4 via the caller-supplied
+ *      authoritative grid).
+ *   3. Overwrites completeness_claim with the derived claim on mismatch.
+ *   4. Stamps the violation list at audit_data.scan_contract_violations.
+ */
+export function applyDiscoveryScanContractGate(
+  data: any,
+  opts: {
+    expectedZips?: string[];
+    expectedMunicipalities?: string[];
+    operatorSuppliedMembers?: string[];
+  } = {},
+): any {
+  if (!data || typeof data !== 'object') return data;
+  const contract = data.scan_contract;
+  if (!contract || typeof contract !== 'object') return data;
+
+  // 1. Reconciliation — import-time members, computed not authored.
+  const members = (opts.operatorSuppliedMembers ?? []).map((m) => String(m).trim()).filter(Boolean);
+  if (members.length > 0) {
+    const discovered: any[] = Array.isArray(data.discovered_businesses) ? data.discovered_businesses : [];
+    const recon = (contract.reconciliation && typeof contract.reconciliation === 'object')
+      ? contract.reconciliation
+      : {};
+    const supplied = new Set<string>(Array.isArray(recon.operator_supplied_members) ? recon.operator_supplied_members : []);
+    const matched = new Set<string>(Array.isArray(recon.matched_to_candidates) ? recon.matched_to_candidates : []);
+    const unmatched = new Set<string>(Array.isArray(recon.unmatched) ? recon.unmatched : []);
+    for (const member of members) {
+      supplied.add(member);
+      const canon = canonicalCandidateKey(member);
+      const hit = discovered.find((biz: any) => {
+        if (!biz || typeof biz !== 'object') return false;
+        return [biz.business_name, ...(Array.isArray(biz.candidate_key_aliases) ? biz.candidate_key_aliases : [])]
+          .some((n) => canonicalCandidateKey(n) === canon);
+      });
+      if (hit) {
+        matched.add(deriveCandidateKey(hit.business_name, hit.city, hit.state));
+      } else {
+        unmatched.add(member);
+      }
+    }
+    contract.reconciliation = {
+      ...recon,
+      operator_supplied_members: [...supplied],
+      matched_to_candidates: [...matched],
+      unmatched: [...unmatched],
+    };
+  }
+
+  // 2. Violations are collected BEFORE the claim overwrite so INV-5 records
+  //    what the model claimed versus what the ledger derives.
+  const violations = collectDiscoveryContractViolations(data, opts);
+
+  // 3. Derived, not asserted — the stored claim is the computed one.
+  const att = contract.coverage_attestation;
+  if (att && typeof att === 'object') {
+    const derived = deriveCompletenessClaim(att);
+    if (att.completeness_claim !== derived) att.completeness_claim = derived;
+  }
+
+  // 4. Stamp (or clear, if re-applied on a clean payload).
+  if (violations.length > 0) {
+    data.scan_contract_violations = violations;
+  } else {
+    delete data.scan_contract_violations;
+  }
+  return data;
+}
 
 // ─── Payload normalization (reference-style + missing qualifying_businesses) ───
 //
@@ -285,6 +737,14 @@ function isQualifyingCandidate(biz: any): boolean {
 
 export function normalizeIntelligenceDiscoveryPayload(parsed: any): any {
   if (!parsed || typeof parsed !== 'object') return parsed;
+
+  // Degraded mode (Discovery Scan Contract §4): a payload with no scan_contract
+  // imports as coverage-unverified rather than failing — the absent ledger is
+  // itself the honest coverage statement.
+  if (parsed.scan_contract === undefined || parsed.scan_contract === null) {
+    parsed = { ...parsed, scan_contract: synthesizeMissingScanContract() };
+  }
+
   const discovered: any[] = Array.isArray(parsed.discovered_businesses) ? parsed.discovered_businesses : [];
   if (discovered.length === 0) return parsed;
 
@@ -321,6 +781,44 @@ export function normalizeIntelligenceDiscoveryPayload(parsed: any): any {
 
   return { ...parsed, qualifying_businesses: resolved };
 }
+
+// ─── Operating posture (Discovery Scan Contract §5.0) ────────────────────
+//
+// Injected by PromptComposerService ahead of the focus fragment so the posture
+// is set before the mechanism set is read. The contract exists because a fast
+// pass reported coverage it did not perform (§1.1) — this block frames the run
+// as enumeration work, and INV-8 makes the posture checkable.
+
+export const DISCOVERY_OPERATING_POSTURE = `=== OPERATING POSTURE — DILIGENCE OVER SPEED ===
+This is an enumeration task with a fixed floor and variable depth. The floor is
+not optional and it is not a formality: every sweep unit named in the geography
+grid must be opened and classified, and a unit you did not open is a blind spot
+you must report.
+
+Do not treat a fast pass as coverage. A scan that issues a handful of well-chosen
+queries and then reports its vector log as complete has not swept the market — it
+has swept the queries. The failure this contract exists to prevent is a run that
+reports "executed" for work it did not perform.
+
+Work the floor first, then deepen where the evidence points:
+
+1. Enumerate before you interpret. Open every unit before reasoning about which
+   units matter. Judgement about relevance comes after enumeration, never instead
+   of it.
+2. One query is not a sweep. A unit is swept when its labels and platforms have
+   been queried and the results classified — not when one search came back empty.
+3. Absence of results is a finding, not a reason to move on. Record
+   executed_empty with the labels and platforms you actually issued.
+4. Prefer a second angle over a faster answer. When a unit returns nothing under
+   the obvious label, try the neighbouring labels, the token-free enumeration,
+   and the attribute filters before marking it empty.
+5. Never launder a skip as "blocked." blocked means attempted and failed, with
+   the failure named. A unit you chose not to open is not_executed, and it caps
+   your completeness claim.
+6. Take the time the enumeration costs. This operation is sized for careful work.
+   A rushed pass is a re-run, and a re-run costs more than the careful pass would
+   have.
+=== END OPERATING POSTURE ===`;
 
 // ─── Cross-field refinements (hold conditions) ───────────────────────────
 
@@ -450,6 +948,55 @@ Return a single JSON object with this structure:
       "primary_angle": "<outreach angle>",
       "suggested_call_to_action": "<CTA>"
     }
+  },
+  "scan_contract": {
+    "contract_version": "discovery-scan-contract-v1",
+    "sweep_ledger": [
+      {
+        "unit_id": "zip:<zip> — e.g. zip:64118 | corridor:<slug> | dataset:<slug>",
+        "unit_type": "zip_label_matrix" | "corridor" | "dataset_geography",
+        "unit": "<human label — e.g. 64118 (Kansas City, MO + Gladstone, MO)>",
+        "platforms_swept": ["<platforms actually queried in this unit>"],
+        "labels_swept": ["<labels actually queried in this unit>"],
+        "status": "executed_with_findings" | "executed_empty" | "not_executed" | "blocked",
+        "findings_count": <int — required for executed_*; 0 for executed_empty>,
+        "candidate_keys": ["<slug(business_name)--slug(city state)>", ...],
+        "executed_at": "<date>",
+        "blocked_reason": "<required when status is blocked — the named failure>"
+      }
+    ],
+    "coverage_attestation": {
+      "units_total": <int>,
+      "units_executed": <int>,
+      "units_executed_empty": <int>,
+      "units_not_executed": <int>,
+      "units_blocked": <int>,
+      "vectors_total": <int>,
+      "vectors_executed": <int>,
+      "vectors_not_executed": <int>,
+      "coverage_ratio": <0-1>,
+      "completeness_claim": "verified_full" | "verified_partial" | "unverified",
+      "uncovered_municipalities": ["<municipality>", ...],
+      "unexecuted_vector_list": [
+        { "vector": "<mechanism-set vector not executed>", "reason": "<why>" }
+      ]
+    },
+    "municipality_coverage": [
+      {
+        "municipality": "<adjacent municipality from the geography grid>",
+        "shared_zip": "<shared ZIP, if any>",
+        "platform_zip_rows": ["zip:<zip>", ...],
+        "label_independent_datasets": ["<dataset>", ...],
+        "status": "covered" | "platform_only" | "uncovered"
+      }
+    ],
+    "reconciliation": {
+      "operator_supplied_members": ["<member name>", ...],
+      "matched_to_candidates": ["<candidate_key>", ...],
+      "added_this_pass": ["<candidate_key>", ...],
+      "unmatched": ["<member name>", ...],
+      "excluded_with_reason": [{ "member": "<member name>", "reason": "<why excluded>" }]
+    }
   }
 }
 
@@ -466,6 +1013,12 @@ Rules:
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 - BRONZE REASON ATTRIBUTION: When a "=== BRONZE STANDARD — MARKET CALIBRATION ===" block is present in the prompt, attribute each candidate to the catalog reason(s) DIRECTLY RESPONSIBLE for the find — the reason whose expected_vectors surfaced the business, or whose signal vocabulary is what identifies it as category-qualified-but-invisible. Emit one bronze_attribution entry per responsible reason with its reason_key exactly as given in the block and a one-line basis naming the vector or signal that produced the find. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway gets NO attribution, and a candidate that merely looks like a bronze exemplar but was not reached through the reason's vector gets none either. When NO bronze calibration block is present, or no reason was responsible for a candidate, OMIT bronze_attribution entirely.
 - COMPETITIVE WEAKNESS ATTRIBUTION: When focus is "competitive", leaders are selected for their strengths — weaknesses are documented during selection, not used as a selection filter. Attribute each qualifying candidate to the weakness(es) observed during evaluation — named exposures from the weakness vocabulary in the COMPETITIVE FOCUS block. Emit one competitive_weaknesses entry per weakness with its weakness_key exactly as given and a one-line basis naming the observation that identifies the exposure. A recommended qualifying candidate SHOULD carry at least one entry — the weakness is the pitch wedge (no pain, no pitch). A leader with no observable weakness is a benchmark, not a prospect: emit benchmark_only: true and no weaknesses. When focus is "emerging", OMIT competitive_weaknesses and benchmark_only entirely.
+- SCAN CONTRACT (coverage proof — both focuses): scan_contract is your coverage ledger, not a formality. Emit ONE sweep_ledger row per geography-grid ZIP (unit_id "zip:<zip>"), one per corridor actually swept (unit_id "corridor:<slug>"), and one per dataset x geography unit (unit_id "dataset:<slug>"). Statuses: executed_with_findings (≥1 candidate), executed_empty (swept, zero findings — MUST be reported, never silently skipped), not_executed (admitted blind spot), blocked (attempted and failed — requires blocked_reason naming the failure). An executed_* row MUST carry the platforms_swept and labels_swept you actually issued — a row claiming executed with empty lists is not a sweep, it is a visit.
+- CANDIDATE KEYS: every discovered business MUST appear in at least one ledger row's candidate_keys — key format slug(business_name)--slug(city state), e.g. universal-african-market--gladstone-mo. A business found in multiple units may appear in multiple rows. For a business operating under alternate names, list them in candidate_key_aliases so the ledger and the candidate record resolve to the same business.
+- COVERAGE ATTESTATION IS DERIVED: units_total/units_executed/units_executed_empty/units_not_executed/units_blocked are counts computed from your ledger rows. completeness_claim follows the ladder: verified_full only when nothing is unexecuted and no municipality is uncovered; verified_partial when ≥1 unit executed with any gap; unverified when nothing executed. Every vector in the mechanism set you did not execute MUST appear in unexecuted_vector_list with a reason — unexecuted_vector_list.length must equal vectors_not_executed.
+- MUNICIPALITY COVERAGE: emit one municipality_coverage row per adjacent municipality named in the geography grid. status "uncovered" must ALSO appear in coverage_attestation.uncovered_municipalities.
+- COVERAGE SELF-TEST AS RUN-TIME ASSERTION: for each class in the profile's coverage_self_test, cite the unit_id(s) you actually executed and the result. A class that names a mechanism but cites no executed unit is uncovered — say so.
+- RECONCILIATION: if the prompt carries operator-supplied category members, every member MUST resolve to a candidate_key (or candidate_key_aliases match), an unmatched entry, or an excluded_with_reason entry — never silently dropped.
 `;
 
 // ─── Discovery Context (Migration 253 — GAP-E3) ──────────────────────────

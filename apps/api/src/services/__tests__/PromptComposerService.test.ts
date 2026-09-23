@@ -198,6 +198,20 @@ describe('PromptComposerService.composeIntelligencePrompt', () => {
     expect(result.resolution.profile_version).toBeNull();
   });
 
+  it('injects the operating posture ahead of the focus fragment (Discovery Scan Contract §5.0)', async () => {
+    mockProfileService.resolve.mockResolvedValueOnce(null);
+
+    const result = await service.composeIntelligencePrompt({
+      category: 'Auto Repair',
+      focus: 'emerging',
+    });
+
+    expect(result.body).toContain('=== OPERATING POSTURE — DILIGENCE OVER SPEED ===');
+    // Posture lands before the mechanism set so the run is framed as
+    // enumeration work before the patterns are read.
+    expect(result.body.indexOf('OPERATING POSTURE')).toBeLessThan(result.body.indexOf('FOCUS_EMERGING_BODY'));
+  });
+
   it('assembled body does not contain business_name variable reference', async () => {
     mockProfileService.resolve.mockResolvedValueOnce(null);
 

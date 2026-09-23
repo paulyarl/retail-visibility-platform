@@ -16,6 +16,12 @@ import {
   intelligenceDiscoverySchemaWithRefinements as schema,
   normalizeIntelligenceDiscoveryPayload,
   validateDiscoveryContext,
+  deriveCandidateKey,
+  canonicalCandidateKey,
+  candidateKeySet,
+  deriveCompletenessClaim,
+  collectDiscoveryContractViolations,
+  applyDiscoveryScanContractGate,
   INTELLIGENCE_DISCOVERY_SCHEMA_NAME,
 } from '../../validators/intelligence-discovery.schema';
 
@@ -638,5 +644,342 @@ describe('intelligence_discovery schema — platform_analysis section', () => {
     const data = validDiscovery({ platform_analysis: pa });
     const result = schema.safeParse(data);
     expect(result.success).toBe(true);
+  });
+});
+
+// ─── Scan contract (Discovery Scan Contract Spec v1.3) ────────────────────
+
+const validLedgerRow = (overrides: Record<string, any> = {}) => ({
+  unit_id: 'zip:64118',
+  unit_type: 'zip_label_matrix',
+  unit: '64118 (Kansas City, MO + Gladstone, MO)',
+  platforms_swept: ['google'],
+  labels_swept: ['Grocery store'],
+  status: 'executed_with_findings',
+  findings_count: 1,
+  candidate_keys: ['test-auto--austin-tx'],
+  executed_at: '2026-09-22',
+  ...overrides,
+});
+
+const validContract = (overrides: Record<string, any> = {}) => ({
+  contract_version: 'discovery-scan-contract-v1',
+  sweep_ledger: [validLedgerRow()],
+  coverage_attestation: {
+    units_total: 1,
+    units_executed: 1,
+    units_executed_empty: 0,
+    units_not_executed: 0,
+    units_blocked: 0,
+    vectors_total: 1,
+    vectors_executed: 1,
+    vectors_not_executed: 0,
+    coverage_ratio: 1,
+    completeness_claim: 'verified_full',
+    uncovered_municipalities: [],
+    unexecuted_vector_list: [],
+  },
+  municipality_coverage: [],
+  reconciliation: null,
+  ...overrides,
+});
+
+describe('intelligence_discovery schema — scan_contract', () => {
+  it('accepts a payload carrying a valid scan_contract', () => {
+    const data = validDiscovery({ scan_contract: validContract() });
+    expect(schema.safeParse(data).success).toBe(true);
+  });
+
+  it('accepts payload without scan_contract (pre-contract / degraded)', () => {
+    expect(schema.safeParse(validDiscovery()).success).toBe(true);
+  });
+
+  it('rejects a ledger row with an unknown status', () => {
+    const c = validContract({ sweep_ledger: [validLedgerRow({ status: 'swept' })] });
+    expect(schema.safeParse(validDiscovery({ scan_contract: c })).success).toBe(false);
+  });
+
+  it('accepts candidate_key_aliases on a candidate', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({ candidate_key_aliases: ['Al-Hallal Market', 'Darsalaam Foods'] })],
+    });
+    expect(schema.safeParse(data).success).toBe(true);
+  });
+});
+
+describe('normalizeIntelligenceDiscoveryPayload — scan_contract degraded mode', () => {
+  it('synthesizes an unverified scan_contract when absent', () => {
+    const normalized = normalizeIntelligenceDiscoveryPayload(validDiscovery());
+    expect(normalized.scan_contract).toBeDefined();
+    expect(normalized.scan_contract.coverage_attestation.completeness_claim).toBe('unverified');
+    expect(normalized.scan_contract.sweep_ledger).toEqual([]);
+  });
+
+  it('leaves a model-emitted scan_contract untouched', () => {
+    const contract = validContract();
+    const normalized = normalizeIntelligenceDiscoveryPayload(validDiscovery({ scan_contract: contract }));
+    expect(normalized.scan_contract).toBe(contract);
+  });
+});
+
+describe('candidate_key derivation', () => {
+  it('slugs name + city + state, dropping legal suffixes and punctuation', () => {
+    expect(deriveCandidateKey('Universal African Market LLC', 'Gladstone', 'MO'))
+      .toBe('universal-african-market--gladstone-mo');
+    expect(deriveCandidateKey("O'Brien & Sons, Inc.", 'Kansas City', 'MO'))
+      .toBe('obrien-and-sons--kansas-city-mo');
+    expect(deriveCandidateKey('Springfield Diner', 'Springfield', 'IL'))
+      .not.toBe(deriveCandidateKey('Springfield Diner', 'Springfield', 'MO'));
+  });
+
+  it('canonicalizes separator/casing drift to the same key', () => {
+    const a = canonicalCandidateKey('universal-african-market--gladstone-mo');
+    const b = canonicalCandidateKey('Universal African Market (Gladstone, MO)');
+    const c = canonicalCandidateKey('universal african market gladstone mo');
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+  });
+
+  it('candidateKeySet covers primary key, name-only, and aliases', () => {
+    const keys = candidateKeySet({
+      business_name: 'Tawakal Market',
+      city: 'Kansas City',
+      candidate_key_aliases: ['Al-Hallal', 'Darsalaam'],
+    });
+    expect(keys.has(canonicalCandidateKey('tawakal-market--kansas-city'))).toBe(true);
+    expect(keys.has(canonicalCandidateKey('Tawakal Market'))).toBe(true);
+    expect(keys.has(canonicalCandidateKey('al-hallal--kansas-city'))).toBe(true);
+    expect(keys.has(canonicalCandidateKey('darsalaam--kansas-city'))).toBe(true);
+  });
+});
+
+describe('deriveCompletenessClaim', () => {
+  it('returns unverified when nothing executed', () => {
+    expect(deriveCompletenessClaim({ units_executed: 0 })).toBe('unverified');
+    expect(deriveCompletenessClaim(null)).toBe('unverified');
+  });
+
+  it('returns verified_full only when nothing is unexecuted or uncovered', () => {
+    expect(deriveCompletenessClaim({
+      units_executed: 5, units_not_executed: 0, vectors_not_executed: 0, uncovered_municipalities: [],
+    })).toBe('verified_full');
+  });
+
+  it('caps at verified_partial when anything is unexecuted or uncovered', () => {
+    expect(deriveCompletenessClaim({
+      units_executed: 5, units_not_executed: 1, vectors_not_executed: 0, uncovered_municipalities: [],
+    })).toBe('verified_partial');
+    expect(deriveCompletenessClaim({
+      units_executed: 5, units_not_executed: 0, vectors_not_executed: 2, uncovered_municipalities: [],
+    })).toBe('verified_partial');
+    expect(deriveCompletenessClaim({
+      units_executed: 5, units_not_executed: 0, vectors_not_executed: 0, uncovered_municipalities: ['Gladstone, MO'],
+    })).toBe('verified_partial');
+  });
+});
+
+describe('collectDiscoveryContractViolations', () => {
+  const payloadWith = (contract: any, candidates: any[] = [validCandidate()]) =>
+    validDiscovery({ discovered_businesses: candidates, qualifying_businesses: candidates, scan_contract: contract });
+
+  it('returns no violations for a clean contract', () => {
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ candidate_keys: ['test-auto--austin-tx'] })],
+    }));
+    expect(collectDiscoveryContractViolations(data)).toEqual([]);
+  });
+
+  it('returns no violations when scan_contract is absent (synthesized upstream)', () => {
+    expect(collectDiscoveryContractViolations(validDiscovery())).toEqual([]);
+  });
+
+  it('INV-1: candidate absent from every ledger row → violation', () => {
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ candidate_keys: ['somebody-else--austin-tx'] })],
+    }));
+    const v = collectDiscoveryContractViolations(data);
+    expect(v.some((x) => x.invariant === 'INV-1')).toBe(true);
+  });
+
+  it('INV-1: alias match satisfies provenance (Tawakal / Al-Hallal case)', () => {
+    const biz = validCandidate({ business_name: 'Tawakal Market', candidate_key_aliases: ['Al-Hallal Market'] });
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ candidate_keys: ['al-hallal-market--austin-tx'] })],
+    }), [biz]);
+    expect(collectDiscoveryContractViolations(data).filter((x) => x.invariant === 'INV-1')).toEqual([]);
+  });
+
+  it('INV-2: executed_with_findings without backing keys → violation', () => {
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ findings_count: 0, candidate_keys: [] })],
+    }));
+    expect(collectDiscoveryContractViolations(data).some((x) => x.invariant === 'INV-2')).toBe(true);
+  });
+
+  it('INV-2: blocked row without blocked_reason → violation', () => {
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ status: 'blocked', findings_count: null, candidate_keys: [] })],
+    }));
+    expect(collectDiscoveryContractViolations(data).some((x) => x.invariant === 'INV-2')).toBe(true);
+  });
+
+  it('INV-5: claimed verified_full over a partial ledger → violation', () => {
+    const data = payloadWith(validContract({
+      coverage_attestation: {
+        ...validContract().coverage_attestation,
+        units_not_executed: 3,
+      },
+    }));
+    const v = collectDiscoveryContractViolations(data);
+    const inv5 = v.find((x) => x.invariant === 'INV-5');
+    expect(inv5).toBeDefined();
+    expect(inv5!.message).toContain('verified_partial');
+  });
+
+  it('INV-6: unexecuted vectors not named → violation', () => {
+    const data = payloadWith(validContract({
+      coverage_attestation: {
+        ...validContract().coverage_attestation,
+        vectors_not_executed: 2,
+        unexecuted_vector_list: [{ vector: 'Street View sweep', reason: 'no imagery review' }],
+        completeness_claim: 'verified_partial',
+      },
+    }));
+    expect(collectDiscoveryContractViolations(data).some((x) => x.invariant === 'INV-6')).toBe(true);
+  });
+
+  it('INV-8: executed_empty with empty platforms/labels → violation', () => {
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ status: 'executed_empty', findings_count: 0, candidate_keys: [], platforms_swept: [], labels_swept: [] })],
+      coverage_attestation: { ...validContract().coverage_attestation, completeness_claim: 'verified_full' },
+    }));
+    expect(collectDiscoveryContractViolations(data).some((x) => x.invariant === 'INV-8')).toBe(true);
+  });
+
+  it('INV-3: expected ZIP with no ledger row → violation; satisfied when row exists', () => {
+    const data = payloadWith(validContract());
+    const missing = collectDiscoveryContractViolations(data, { expectedZips: ['64118', '64131'] });
+    expect(missing.filter((x) => x.invariant === 'INV-3')).toHaveLength(1);
+    const covered = collectDiscoveryContractViolations(data, { expectedZips: ['64118'] });
+    expect(covered.filter((x) => x.invariant === 'INV-3')).toHaveLength(0);
+  });
+
+  it('INV-4: expected municipality missing; uncovered row not echoed to attestation', () => {
+    const data = payloadWith(validContract({
+      municipality_coverage: [{ municipality: 'Gladstone, MO', status: 'uncovered' }],
+    }));
+    const v = collectDiscoveryContractViolations(data, {
+      expectedMunicipalities: ['Gladstone, MO', 'Liberty, MO'],
+    });
+    const inv4 = v.filter((x) => x.invariant === 'INV-4');
+    // Liberty missing a row + Gladstone uncovered-not-echoed = 2 violations
+    expect(inv4).toHaveLength(2);
+  });
+
+  it('INV-7: operator member resolving to nothing → violation', () => {
+    const data = payloadWith(validContract({
+      reconciliation: {
+        operator_supplied_members: ['Test Auto', 'Ghost Business'],
+        matched_to_candidates: ['test-auto--austin-tx'],
+        unmatched: [],
+        excluded_with_reason: [],
+      },
+    }));
+    const v = collectDiscoveryContractViolations(data).filter((x) => x.invariant === 'INV-7');
+    expect(v).toHaveLength(1);
+    expect(v[0].message).toContain('Ghost Business');
+  });
+
+  it('INV-7: member matching a candidate name resolves clean', () => {
+    const data = payloadWith(validContract({
+      reconciliation: { operator_supplied_members: ['Test Auto'], unmatched: [] },
+    }));
+    expect(collectDiscoveryContractViolations(data).filter((x) => x.invariant === 'INV-7')).toHaveLength(0);
+  });
+
+  it('INV-7: member listed in unmatched is itself a violation (G4)', () => {
+    const data = payloadWith(validContract({
+      reconciliation: { operator_supplied_members: ['Missed Business'], unmatched: ['Missed Business'] },
+    }));
+    const v = collectDiscoveryContractViolations(data).filter((x) => x.invariant === 'INV-7');
+    expect(v).toHaveLength(1);
+    expect(v[0].message).toContain('missed a real business');
+  });
+
+  it('INV-7: member in excluded_with_reason resolves clean', () => {
+    const data = payloadWith(validContract({
+      reconciliation: {
+        operator_supplied_members: ['Excluded Biz'],
+        excluded_with_reason: [{ member: 'Excluded Biz', reason: 'national chain' }],
+      },
+    }));
+    expect(collectDiscoveryContractViolations(data).filter((x) => x.invariant === 'INV-7')).toHaveLength(0);
+  });
+});
+
+describe('applyDiscoveryScanContractGate', () => {
+  const payloadWith = (contract: any, candidates: any[] = [validCandidate()]) =>
+    validDiscovery({ discovered_businesses: candidates, qualifying_businesses: candidates, scan_contract: contract });
+
+  it('returns the payload untouched when scan_contract is absent', () => {
+    const data = validDiscovery();
+    expect(applyDiscoveryScanContractGate(data)).toBe(data);
+    expect(data.scan_contract_violations).toBeUndefined();
+  });
+
+  it('stamps violations into scan_contract_violations (report-mode)', () => {
+    const data = payloadWith(validContract({
+      sweep_ledger: [validLedgerRow({ candidate_keys: ['somebody-else--austin-tx'] })],
+    }));
+    applyDiscoveryScanContractGate(data);
+    expect(Array.isArray(data.scan_contract_violations)).toBe(true);
+    expect(data.scan_contract_violations.some((v: any) => v.invariant === 'INV-1')).toBe(true);
+  });
+
+  it('overwrites an over-claimed completeness_claim with the derived value', () => {
+    const data = payloadWith(validContract({
+      coverage_attestation: {
+        ...validContract().coverage_attestation,
+        units_not_executed: 4,
+      },
+    }));
+    applyDiscoveryScanContractGate(data);
+    expect(data.scan_contract.coverage_attestation.completeness_claim).toBe('verified_partial');
+    expect(data.scan_contract_violations.some((v: any) => v.invariant === 'INV-5')).toBe(true);
+  });
+
+  it('computes reconciliation for import-time members: match → key, miss → unmatched + INV-7', () => {
+    const data = payloadWith(validContract());
+    applyDiscoveryScanContractGate(data, {
+      operatorSuppliedMembers: ['Test Auto', 'Ghost Business LLC'],
+    });
+    const recon = data.scan_contract.reconciliation;
+    expect(recon.operator_supplied_members).toEqual(expect.arrayContaining(['Test Auto', 'Ghost Business LLC']));
+    expect(recon.matched_to_candidates).toContain('test-auto--austin-tx');
+    expect(recon.unmatched).toContain('Ghost Business LLC');
+    expect(data.scan_contract_violations.some((v: any) => v.invariant === 'INV-7')).toBe(true);
+  });
+
+  it('merges model-emitted reconciliation rather than overwriting', () => {
+    const data = payloadWith(validContract({
+      reconciliation: {
+        operator_supplied_members: ['Earlier Member'],
+        matched_to_candidates: ['earlier-member--austin-tx'],
+        unmatched: ['Earlier Miss'],
+        excluded_with_reason: [{ member: 'Excluded Biz', reason: 'chain' }],
+      },
+    }));
+    applyDiscoveryScanContractGate(data, { operatorSuppliedMembers: ['Test Auto'] });
+    const recon = data.scan_contract.reconciliation;
+    expect(recon.operator_supplied_members).toEqual(expect.arrayContaining(['Earlier Member', 'Test Auto']));
+    expect(recon.matched_to_candidates).toEqual(expect.arrayContaining(['earlier-member--austin-tx', 'test-auto--austin-tx']));
+    expect(recon.unmatched).toContain('Earlier Miss');
+    expect(recon.excluded_with_reason).toHaveLength(1);
+  });
+
+  it('passes expectedZips through to INV-3', () => {
+    const data = payloadWith(validContract());
+    applyDiscoveryScanContractGate(data, { expectedZips: ['64118', '64131'] });
+    expect(data.scan_contract_violations.filter((v: any) => v.invariant === 'INV-3')).toHaveLength(1);
   });
 });

@@ -15,7 +15,7 @@ import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { applyRenderControlCoverageGate, BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
-import { normalizeIntelligenceDiscoveryPayload, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
+import { normalizeIntelligenceDiscoveryPayload, applyDiscoveryScanContractGate, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import { isNationalSentinel } from './intelligence/geography-grid';
@@ -683,6 +683,11 @@ export class MarketingPromptService extends BaseService {
     };
     /** Intelligence focus for intelligence-scope imports (§41 run record). */
     focus?: 'emerging' | 'competitive' | 'gold_standards' | 'bronze_standards';
+    /** Discovery Scan Contract (v1.3, INV-7): operator-supplied category members
+     *  diffed against the candidate set at import — the §1.1 mechanism. The
+     *  gate injects them into scan_contract.reconciliation and stamps unmatched
+     *  members as violations. Report-mode: never rejects the import. */
+    operatorSuppliedMembers?: string[];
   }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null; enrichmentApplied: boolean }> {
     try {
       // 1. Load template + campaign
@@ -753,6 +758,43 @@ export class MarketingPromptService extends BaseService {
           parsedJson = schemaName === BUSINESS_ANALYSIS_SCHEMA_NAME
             ? applyRenderControlCoverageGate(candidateJson, platformSignalWeights)
             : candidateJson;
+
+          // Discovery Scan Contract (v1.3) — report-mode coverage gate on the
+          // raw JSON (same seam as the render-control gate above): inject
+          // import-time operator members, compute the reconciliation diff,
+          // collect INV-1…INV-8 violations against the authoritative grid, and
+          // overwrite an over-claimed completeness_claim with the derived
+          // value. Violations stamp into audit_data; the import never fails.
+          if (schemaName === INTELLIGENCE_DISCOVERY_SCHEMA_NAME) {
+            let expectedZips: string[] = [];
+            let expectedMunicipalities: string[] = [];
+            try {
+              const [{ GeographyGridService }, { parseZipCodes }] = await Promise.all([
+                import('./intelligence/GeographyGridService.js'),
+                import('./intelligence/geography-grid.js'),
+              ]);
+              const campaignRow = await this.prisma.mkt_campaigns_list.findUnique({
+                where: { id: input.campaignId },
+                select: { city: true, state: true, intelligence_zip_codes: true },
+              });
+              const campaignZips = parseZipCodes(campaignRow?.intelligence_zip_codes);
+              const grid = await GeographyGridService.getInstance().getGrid(
+                campaignRow?.city, campaignRow?.state, campaignZips, ctx,
+              );
+              expectedZips = grid?.zips?.length ? grid.zips : campaignZips;
+              expectedMunicipalities = grid?.adjacent_municipalities ?? [];
+            } catch (gridErr) {
+              logger.warn('Discovery contract gate: grid lookup failed (non-fatal)', ctx, {
+                campaignId: input.campaignId,
+                error: (gridErr as Error).message,
+              });
+            }
+            parsedJson = applyDiscoveryScanContractGate(parsedJson, {
+              expectedZips,
+              expectedMunicipalities,
+              operatorSuppliedMembers: input.operatorSuppliedMembers,
+            });
+          }
           break;
         }
         // Preserve the first candidate's validation issues for error reporting

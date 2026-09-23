@@ -58,8 +58,13 @@ import { INTELLIGENCE_PROFILE_SCHEMA_NAME } from '../validators/intelligence-pro
  * (MarketingExecutionService.resolvePrompt substitutes it on the sentinel).
  * Same output schema; no geography_grid; national-scope platform signal
  * weights.
+ *
+ * 2026-09-22-hide-reveal-labels (Discovery Scan Contract §5.1.3): splits
+ * generic_label_set by role — "labels" stay the hide/enumeration labels and a
+ * new "reveal_labels" field carries the correct/gold-standard labels used for
+ * qualification. A label may live in both lists.
  */
-const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-22-national-variant';
+const SEED_VERSION_MARKER = 'intel-profile-establishment-2026-09-22-hide-reveal-labels';
 
 const ESTABLISHMENT_TEMPLATE = {
   id: 'mpt-seed-intel-profile-establishment-001',
@@ -186,7 +191,7 @@ an industrial or arterial stretch that no general city guide mentions.
 
 4b. DISCOVERY SUBSTRATE (REQUIRED — CATEGORY-INDEPENDENT) — This section must NOT depend on the category's name, vocabulary, or tokens. It is the enumeration floor that surfaces businesses whose names do NOT self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). Produce three structured fields:
    - geography_grid — the sweep units for this market, independent of category: { "city", "state", "zips": [every ZIP the market's commercial addresses fall in], "corridors": [arterial commercial stretches, derived from address evidence where possible], "adjacent_municipalities": [separately-incorporated suburbs / contiguous commercial municipalities in the catchment], "radius_miles" }. SCOPE IS THE RETAIL CATCHMENT, NOT THE ADMINISTRATIVE CITY: the principal city PLUS its contiguous commercial suburbs, including separately-incorporated municipalities that share ZIPs with the principal city (e.g. a suburb like Gladstone, MO sharing 64118 with Kansas City). List EVERY ZIP the catchment's commercial addresses fall in — not only the ZIPs where category businesses were already found, and not only the principal city's administrative ZIPs. Name the shared-ZIP suburbs explicitly in adjacent_municipalities; a ZIP spanning the principal city and a suburb is ONE sweep unit. The grid is the exhaustive enumeration unit: every ZIP must be swept, and a ZIP with zero findings must be reported as an executed-empty result, never silently skipped.
-   - generic_label_set — the platform labels that SWALLOW this category: the generic buckets a mislabeled business sits under. One entry per platform: { "platform", "labels": [...] }. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). Do NOT list the correct category label — that is the label the business is MISSING.
+   - generic_label_set — the platform labels split by ROLE. One entry per platform: { "platform", "labels": [...], "reveal_labels": [...] }. "labels" are the HIDE labels — the generic buckets a mislabeled business sits under; they drive enumeration. "reveal_labels" are the CORRECT / gold-standard labels for this category on that platform; they drive qualification. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). A label can be BOTH — e.g. the platform's correct category label is also where mislabeled businesses get filed — put it in both lists. Do NOT put the correct label in "labels" alone, and never omit a hide label just because it is also the correct one.
    - label_independent_sweeps — the address-indexed datasets to sweep WITHOUT a category name token. One entry per dataset: { "dataset", "url", "sweep_key": "geography", "filter": "none", "post_filter": "assortment" }. The sweep_key MUST be "geography": these datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. Never keyed by the category name.
 
    A profile whose only discovery paths are keyed on the category's own tokens is incomplete. The substrate is what makes discovery category-independent.
@@ -232,7 +237,7 @@ Record the result in discovery_patterns under the key "coverage_self_test", stat
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-2026-09-18-signal-weights+physical-retail -->`,
+<!-- seed-version: intel-profile-establishment-2026-09-22-hide-reveal-labels -->`,
   variables: ['category', 'city', 'state', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,
@@ -379,7 +384,7 @@ Produce the layer of category intelligence that holds across US markets:
    - Hosted pages are typically client-side rendered, so a search-index hit proves the URL exists, not that it renders for an ordinary visitor.
 
 4b. DISCOVERY SUBSTRATE (REQUIRED — CATEGORY-INDEPENDENT) — This section must NOT depend on the category's name, vocabulary, or tokens. It is the enumeration floor that surfaces businesses whose names do NOT self-identify with the category (e.g. "Universal Tropical Market" for an African grocery, "A-1 Market" for an Asian grocery, "Sunny Beauty" for a beauty-supply store). At NATIONAL scope, produce two structured fields:
-   - generic_label_set — the platform labels that SWALLOW this category: the generic buckets a mislabeled business sits under. One entry per platform: { "platform", "labels": [...] }. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). Do NOT list the correct category label — that is the label the business is MISSING.
+   - generic_label_set — the platform labels split by ROLE. One entry per platform: { "platform", "labels": [...], "reveal_labels": [...] }. "labels" are the HIDE labels — the generic buckets a mislabeled business sits under; they drive enumeration. "reveal_labels" are the CORRECT / gold-standard labels for this category on that platform; they drive qualification. This is category-specific in content but universal in class — for ANY category, name the generic labels that hide it (e.g. "Grocery store", "Convenience store", "Supermarket" for a specialty grocer; "Beauty supply", "Cosmetics", "Variety store" for a specialty beauty retailer; "International grocery", "Halal market", "Mediterranean market" for specialty food retailers). A label can be BOTH — e.g. the platform's correct category label is also where mislabeled businesses get filed — put it in both lists. Do NOT put the correct label in "labels" alone, and never omit a hide label just because it is also the correct one.
    - label_independent_sweeps — the address-indexed datasets to sweep WITHOUT a category name token. One entry per dataset: { "dataset", "url", "sweep_key": "geography", "filter": "none", "post_filter": "assortment" }. The sweep_key MUST be "geography": these datasets are enumerated by ZIP/address and filtered to category fit by assortment evidence AFTER enumeration. At national scope, name the dataset and the jurisdiction level at which it is enumerated (federal dataset → once nationally; state registry → per-state enumeration; county licensing → per-county). Never keyed by the category name.
 
    DO NOT emit a geography_grid field. A national profile has no single retail
@@ -430,7 +435,7 @@ Record the result in discovery_patterns under the key "coverage_self_test", stat
 
 === OUTPUT REQUIREMENT ===
 Respond with a SINGLE JSON object only. Do NOT wrap it in markdown code fences. Do NOT include prose before or after the JSON. Do NOT include commentary. The JSON object must match the structure described in the EXPECTED OUTPUT FORMAT section below.
-<!-- seed-version: intel-profile-establishment-national-2026-09-22+physical-retail -->`,
+<!-- seed-version: intel-profile-establishment-national-2026-09-22-hide-reveal-labels -->`,
   variables: ['category', 'platform'],
   outputSchema: {
     name: INTELLIGENCE_PROFILE_SCHEMA_NAME,

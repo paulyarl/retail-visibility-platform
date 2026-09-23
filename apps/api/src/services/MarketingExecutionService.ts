@@ -2155,6 +2155,12 @@ export class MarketingExecutionService extends BaseService {
           if (leadsBlock) {
             gsAmplified = gsAmplified + '\n' + leadsBlock;
           }
+          // Identity ledger — operator/owner-verified evidence the analyst
+          // can weigh against the scan-claimed leads above.
+          const verifiedBlock = await this.renderVerifiedEvidenceBlock(input.campaign, ctx);
+          if (verifiedBlock) {
+            gsAmplified = gsAmplified + '\n' + verifiedBlock;
+          }
           // Market context injection (seed gains market awareness).
           const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
           if (marketCtxBlock) {
@@ -2173,6 +2179,7 @@ export class MarketingExecutionService extends BaseService {
               profile_version: goldStandardOnly.version,
               intelligence_mode: 'profile',
               discovery_leads_injected: !!leadsBlock,
+              verified_evidence_injected: !!verifiedBlock,
             },
           };
         }
@@ -2183,6 +2190,11 @@ export class MarketingExecutionService extends BaseService {
       let noProfileAmplified = leadsBlockNoProfile
         ? baseRendered + '\n' + leadsBlockNoProfile
         : baseRendered;
+      // Identity ledger — operator/owner-verified evidence.
+      const verifiedBlockNoProfile = await this.renderVerifiedEvidenceBlock(input.campaign, ctx);
+      if (verifiedBlockNoProfile) {
+        noProfileAmplified = noProfileAmplified + '\n' + verifiedBlockNoProfile;
+      }
       // Market context injection (seed gains market awareness).
       const marketCtxNoProfile = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
       if (marketCtxNoProfile) {
@@ -2195,6 +2207,7 @@ export class MarketingExecutionService extends BaseService {
           profile_version: null,
           intelligence_mode: 'none',
           discovery_leads_injected: !!leadsBlockNoProfile,
+          verified_evidence_injected: !!verifiedBlockNoProfile,
         },
       };
     }
@@ -2230,6 +2243,13 @@ export class MarketingExecutionService extends BaseService {
       amplified = amplified + '\n' + leadsBlock;
     }
 
+    // Identity ledger — operator/owner-verified evidence the analyst can
+    // weigh against the scan-claimed leads above.
+    const verifiedBlock = await this.renderVerifiedEvidenceBlock(input.campaign, ctx);
+    if (verifiedBlock) {
+      amplified = amplified + '\n' + verifiedBlock;
+    }
+
     // Market context injection (seed gains market awareness): category
     // sentiment + location sentiment from prior enrichment runs.
     const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
@@ -2255,6 +2275,7 @@ export class MarketingExecutionService extends BaseService {
         profile_version: profile.version,
         intelligence_mode: 'profile',
         discovery_leads_injected: !!leadsBlock,
+        verified_evidence_injected: !!verifiedBlock,
       },
     };
   }
@@ -2717,6 +2738,69 @@ export class MarketingExecutionService extends BaseService {
     );
 
     return lines.join('\n');
+  }
+
+  /**
+   * Render the "Verified Evidence — Operator / Owner" block for the audit
+   * path. The Identity tab's evidence ledger (mkt_identity_evidence) is
+   * operator-captured ground truth: owner confirmations, corrections, and
+   * disputes recorded during verification calls, plus sourced evidence the
+   * operator logged manually. The audit prompt otherwise sees only canonical
+   * campaign fields — not which were verified, by whom, or contested — so
+   * this block injects the ledger and lets the analyst weigh owner-confirmed
+   * facts against platform data and scan-claimed leads (Discovery Leads,
+   * competitive weaknesses).
+   *
+   * Rows are newest-first (listForCampaign ordering), capped at 8. Returns
+   * '' when the campaign carries no evidence rows — byte-identical render
+   * for campaigns that predate the ledger or were never verified.
+   */
+  private async renderVerifiedEvidenceBlock(campaign: any, ctx?: RequestCtx): Promise<string> {
+    const campaignId = campaign?.id;
+    if (!campaignId) return '';
+    try {
+      // Dynamic import — IdentityEvidenceService reaches IdentityPacketService,
+      // which reads campaign rows through MarketingCampaignService; a static
+      // import risks a cycle.
+      const { default: identityEvidenceService } = await import('./IdentityEvidenceService.js');
+      const rows = await identityEvidenceService.listForCampaign(campaignId);
+      if (!Array.isArray(rows) || rows.length === 0) return '';
+
+      const cap = 8;
+      const lines: string[] = [
+        '=== VERIFIED EVIDENCE — OPERATOR / OWNER ===',
+        'The operator has logged the evidence below for this business (the',
+        'Identity ledger — verification calls and sourced confirmations).',
+        'owner_confirmed / owner_corrected facts are the strongest evidence',
+        'available for those fields: treat them as ground truth when platform',
+        'data or scan-claimed leads disagree, and do not re-derive a verdict',
+        'the evidence already settles. conflicting / owner_disputed rows mean',
+        'the canonical record is contested — verify rather than assume.',
+        '',
+      ];
+      for (const row of rows.slice(0, cap)) {
+        const fields = Array.isArray(row.corroborates) && row.corroborates.length > 0
+          ? ` corroborates ${row.corroborates.join(', ')}`
+          : '';
+        const when = row.accessedAt ?? (typeof row.createdAt === 'string' ? row.createdAt.slice(0, 10) : 'unknown date');
+        const url = row.sourceUrl ? ` ${row.sourceUrl}` : '';
+        const owner = row.ownerName || row.ownerPhone || row.ownerEmail ? ' · owner contact captured' : '';
+        const shared = row.shared ? ' · shared from sibling campaign' : '';
+        const notes = row.notes ? ` — ${row.notes}` : '';
+        lines.push(`- [${row.evidenceState}] ${row.sourceName}${fields} (${when})${url}${owner}${shared}${notes}`);
+      }
+      if (rows.length > cap) lines.push(`… +${rows.length - cap} more`);
+
+      return lines.join('\n');
+    } catch (err: any) {
+      // The ledger is additive context — a read failure must never break a
+      // render that was valid without it.
+      logger.warn('renderVerifiedEvidenceBlock: ledger read failed (non-fatal)', ctx, {
+        campaignId,
+        error: err?.message,
+      });
+      return '';
+    }
   }
 
   /**
