@@ -168,6 +168,32 @@ export interface SeedSummary {
 
 class DirectoryPresenceSeedService {
   /**
+   * Translate a queue entry's discovery_provenance ({source, role, url,
+   * accessed_at} — WHERE the business was found) into seed field-provenance
+   * rows ({fieldKey, value, sourceName, ...}). Discovery sources aren't
+   * listing fields, so they record under the synthetic 'discovery' key.
+   */
+  private toSeedProvenance(discoveryProvenance: any[] | null | undefined): CreateSeedInput['provenance'] {
+    if (!Array.isArray(discoveryProvenance)) return [];
+    return discoveryProvenance
+      .filter((p) => p && (p.source || p.source_name))
+      .map((p) => {
+        const source = p.source || p.source_name;
+        const sourceKey = String(source).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        return {
+          // field_key is varchar(50) — 'discovery:' + slug, truncated.
+          fieldKey: `discovery:${sourceKey}`.slice(0, 50),
+          value: p.role || p.value || undefined,
+          sourceName: String(source).slice(0, 50),
+          sourceUrl: p.url || p.source_url || undefined,
+          accessedAt: p.accessed_at ? new Date(p.accessed_at) : p.accessedAt,
+          confidence: (['high', 'medium', 'low'].includes(p.confidence) ? p.confidence : 'medium') as 'high' | 'medium' | 'low',
+          showOnPublic: false,
+        };
+      });
+  }
+
+  /**
    * List all presence seeds, optionally filtered by seed_batch, status, city,
    * state, category, identity_confidence, category_fit, or claim-token state.
    *
@@ -540,6 +566,7 @@ class DirectoryPresenceSeedService {
     // Insert provenance rows
     if (input.provenance && input.provenance.length > 0) {
       for (const p of input.provenance) {
+        if (!p.fieldKey) continue;
         const provenanceId = generateDirectoryFieldProvenanceId(tenantId);
         await prisma.$executeRaw`
           INSERT INTO directory_field_provenance (
@@ -1585,7 +1612,7 @@ class DirectoryPresenceSeedService {
           // Migration 296 — opening hours captured on the verification call
           // (snapshot.hours) or the verified_nap provenance block.
           businessHours: snapshot.hours || snapshot.verified_nap?.hours || undefined,
-          provenance: entry.discovery_provenance || [],
+          provenance: this.toSeedProvenance(entry.discovery_provenance),
         };
 
         const result = await this.createSeed(seedInput, ctx);
@@ -1715,7 +1742,7 @@ class DirectoryPresenceSeedService {
           // Migration 296 — opening hours captured on the verification call
           // (snapshot.hours) or the verified_nap provenance block.
           businessHours: snapshot.hours || snapshot.verified_nap?.hours || undefined,
-          provenance: entry.discovery_provenance || [],
+          provenance: this.toSeedProvenance(entry.discovery_provenance),
         };
 
         const result = await this.createSeed(seedInput, ctx);
