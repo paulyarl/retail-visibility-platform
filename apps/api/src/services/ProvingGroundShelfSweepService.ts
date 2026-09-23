@@ -120,6 +120,16 @@ export interface ShelfSweepReport {
     created: boolean;
     marketCount: number;
     mergedMarkets?: number;
+    /** True when the domain was already fully claimed and this campaign
+     *  absorbed the other claimants' markets (anchor consolidation). */
+    consolidated?: boolean;
+    /** True when nothing changed — an existing campaign already carries
+     *  the domain; surfaced so the UI can link it. */
+    existing?: boolean;
+    /** True when the surviving campaign's signature moved to the
+     *  preferred anchor (sweep-child migration). */
+    migrated?: boolean;
+    closedCampaignIds?: string[];
   } | null;
 }
 
@@ -448,33 +458,151 @@ class ProvingGroundShelfSweepService extends BaseService {
     // Anchor = the PG's own signature: pg.category × the PG's declared
     // market; mixed-market PGs (no declared city/state) adopt the dominant
     // prospect geo. If the anchor market is already claimed by an active
-    // single-market child of this PG, the payload folds INTO that child —
-    // it becomes the set campaign and its own market joins the set for the
-    // AI packet. Conflicts with campaigns outside the PG tree fall through
-    // to the next anchor candidate (payload markets carrying the PG
-    // category, then the home-geo payload market, then the first).
+    // child of this PG, the payload folds INTO that child — it becomes the
+    // set campaign and its own market joins the set for the AI packet.
+    // Conflicts with campaigns outside the PG tree fall through to the next
+    // anchor candidate (payload markets carrying the PG category, then the
+    // home-geo payload market, then the first). When the whole domain is
+    // already claimed by PG children, a consolidation pass still runs: the
+    // child claiming the preferred anchor absorbs every claimant's markets
+    // and the superseded campaigns close — one SET campaign per PG.
+    const keyOf = (m: SweepMarket) => marketKey(m.categoryKey, m.city, m.state);
+    const pgCategoryKey = normalizeCategoryKey(pg.category ?? '');
+    let anchorGeoCity = normalizeReferenceCity(pg.city);
+    let anchorGeoState = normalizeReferenceState(pg.state);
+    if (!anchorGeoCity || !anchorGeoState) {
+      const top = [...geoCounts.values()].sort((a, b) => b.count - a.count)[0];
+      if (top) { anchorGeoCity = top.city; anchorGeoState = top.state; }
+    }
+    const anchorCity = anchorGeoCity;
+    const anchorState = anchorGeoState;
+    const anchorMarket: SweepMarket | null =
+      pgCategoryKey && anchorCity && anchorState
+        ? { category: (pg.category ?? '').trim(), categoryKey: pgCategoryKey, city: anchorCity, state: anchorState }
+        : null;
+    const inAnchorGeo = (m: SweepMarket) =>
+      !!anchorCity && !!anchorState
+      && m.city.toLowerCase() === anchorCity.toLowerCase()
+      && m.state.toLowerCase() === anchorState.toLowerCase();
+
+    // Active PG-child enrichment campaigns and the markets each claims —
+    // its scope='category' signature plus any shelf_sweep payload markets.
+    const pgChildren = await this.prisma.mkt_campaigns_list.findMany({
+      where: {
+        parent_campaign_id: provingGroundId,
+        campaign_category: 'directory_enrichment',
+      },
+      select: { id: true, stage: true, scope: true, category: true, city: true, state: true, discovery_context: true },
+    });
+    const activeChildren = pgChildren.filter((c) => !INACTIVE_STAGES.has((c.stage ?? '').toLowerCase()));
+    const claimedOf = (c: (typeof activeChildren)[number]): SweepMarket[] => {
+      const out: SweepMarket[] = [];
+      if ((c.scope ?? '').toLowerCase() === 'category') {
+        const sm = toSweepMarket(c.category ?? '', c.city ?? '', c.state ?? '');
+        if (sm) out.push(sm);
+      }
+      out.push(...sweepMarketsOf(c));
+      return out;
+    };
+    const domainKeys = new Set(categoryMarkets.map(keyOf));
+    // Children that claim at least one swept-domain market — the set that
+    // gets folded into the winning campaign. Unrelated children are left
+    // alone.
+    const claimants = activeChildren.filter((c) => claimedOf(c).some((m) => domainKeys.has(keyOf(m))));
+    // A sweep-created child carries discovery_context.shelf_sweep — the PG
+    // spawned it for this purpose, so it is the preferred survivor: the
+    // sweep "migrates" its signature to the correct anchor rather than
+    // folding it away into an older campaign.
+    const isSweepChild = (c: (typeof activeChildren)[number]) =>
+      !!(c.discovery_context as any)?.shelf_sweep;
+    const signatureKey = (c: (typeof activeChildren)[number]): string | null => {
+      if ((c.scope ?? '').toLowerCase() !== 'category') return null;
+      const sm = toSweepMarket(c.category ?? '', c.city ?? '', c.state ?? '');
+      return sm ? keyOf(sm) : null;
+    };
+    // True when a campaign OUTSIDE the fold set claims this market key —
+    // migrating a signature onto it would mint a live duplicate.
+    const claimedByOutsider = (key: string, keepIds: Set<string>) =>
+      activeCampaigns.some((c) => {
+        if (INACTIVE_STAGES.has((c.stage ?? '').toLowerCase())) return false;
+        if (keepIds.has(c.id)) return false;
+        if ((c.scope ?? '').toLowerCase() === 'category') {
+          const sm = toSweepMarket(c.category ?? '', c.city ?? '', c.state ?? '');
+          if (sm && keyOf(sm) === key) return true;
+        }
+        return sweepMarketsOf(c).some((m) => keyOf(m) === key);
+      });
+
+    const dedupe = (markets: SweepMarket[]): SweepMarket[] => {
+      const seen = new Set<string>();
+      return markets.filter((m) => {
+        const k = keyOf(m);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    };
+
+    // Fold every claimant's claimed markets (plus extras) into the target
+    // campaign's shelf_sweep payload and close the superseded children.
+    // When `migrate` is set the target's signature moves to that market —
+    // the sweep child keeps its identity but takes the correct anchor.
+    // Returns the union actually carried by the target.
+    const foldInto = async (
+      target: (typeof activeChildren)[number],
+      extras: SweepMarket[],
+      migrate?: SweepMarket | null,
+    ) => {
+      const others = claimants.filter((c) => c.id !== target.id);
+      const union = dedupe([
+        ...claimedOf(target),
+        ...(migrate ? [migrate] : []),
+        ...extras,
+        ...others.flatMap(claimedOf),
+      ]);
+      const dc = (target.discovery_context ?? {}) as any;
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: target.id },
+        data: {
+          ...(migrate
+            ? { category: migrate.category, city: migrate.city, state: migrate.state }
+            : {}),
+          discovery_context: {
+            ...dc,
+            shelf_sweep: {
+              ...(dc.shelf_sweep ?? {}),
+              proving_ground_id: provingGroundId,
+              swept_at: new Date().toISOString(),
+              markets: union.map((m) => ({ category: m.category, city: m.city, state: m.state })),
+            },
+          } as any,
+          updated_at: new Date(),
+        },
+      });
+      for (const o of others) {
+        const odc = (o.discovery_context ?? {}) as any;
+        await this.prisma.mkt_campaigns_list.update({
+          where: { id: o.id },
+          data: {
+            stage: 'closed',
+            discovery_context: {
+              ...odc,
+              shelf_sweep: {
+                ...(odc.shelf_sweep ?? {}),
+                superseded_by: target.id,
+              },
+            } as any,
+            updated_at: new Date(),
+          },
+        });
+      }
+      return union;
+    };
+
     let sweepCampaign: ShelfSweepReport['sweepCampaign'] = null;
     if (needsAi.length > 0 && opts.createCampaign !== false) {
-      const pgCategoryKey = normalizeCategoryKey(pg.category ?? '');
-      let anchorGeoCity = normalizeReferenceCity(pg.city);
-      let anchorGeoState = normalizeReferenceState(pg.state);
-      if (!anchorGeoCity || !anchorGeoState) {
-        const top = [...geoCounts.values()].sort((a, b) => b.count - a.count)[0];
-        if (top) { anchorGeoCity = top.city; anchorGeoState = top.state; }
-      }
-      const anchorCity = anchorGeoCity;
-      const anchorState = anchorGeoState;
-
-      const keyOf = (m: SweepMarket) => marketKey(m.categoryKey, m.city, m.state);
-      const inAnchorGeo = (m: SweepMarket) =>
-        !!anchorCity && !!anchorState
-        && m.city.toLowerCase() === anchorCity.toLowerCase()
-        && m.state.toLowerCase() === anchorState.toLowerCase();
-
       const candidates: SweepMarket[] = [];
-      if (pgCategoryKey && anchorCity && anchorState) {
-        candidates.push({ category: (pg.category ?? '').trim(), categoryKey: pgCategoryKey, city: anchorCity, state: anchorState });
-      }
+      if (anchorMarket) candidates.push(anchorMarket);
       candidates.push(...needsAi.filter((m) => m.categoryKey === pgCategoryKey));
       candidates.push(...needsAi.filter(inAnchorGeo));
       candidates.push(needsAi[0]);
@@ -506,62 +634,88 @@ class ProvingGroundShelfSweepService extends BaseService {
             parentCampaignId: provingGroundId,
             discoveryContext: payload as any,
           }, ctx);
-          sweepCampaign = { id: created.id, created: true, marketCount: needsAi.length };
+          // A claimant holding other domain markets folds into the new set
+          // campaign — one SET campaign per PG.
+          const others = claimants.filter((c) => c.id !== created.id);
+          if (others.length > 0) {
+            const union = await foldInto(created as any, needsAi);
+            sweepCampaign = { id: created.id, created: true, marketCount: union.length, mergedMarkets: union.length - needsAi.length };
+          } else {
+            sweepCampaign = { id: created.id, created: true, marketCount: needsAi.length };
+          }
           break;
         } catch (err) {
           if (!(err instanceof ConflictError)) throw err;
           lastErr = err;
-          // Merge targets under this PG: a prior set campaign (shelf_sweep
-          // payload) or the single-market child whose signature IS this
-          // anchor — either absorbs the set.
-          const children = await this.prisma.mkt_campaigns_list.findMany({
-            where: {
-              parent_campaign_id: provingGroundId,
-              campaign_category: 'directory_enrichment',
-            },
-            select: { id: true, stage: true, scope: true, category: true, city: true, state: true, discovery_context: true },
-          });
-          const active = children.filter((c) => !INACTIVE_STAGES.has((c.stage ?? '').toLowerCase()));
-          const anchorChild = active.find((c) => {
-            if ((c.scope ?? '').toLowerCase() !== 'category') return false;
-            const sm = toSweepMarket(c.category ?? '', c.city ?? '', c.state ?? '');
-            return sm ? keyOf(sm) === keyOf(anchor) : false;
-          });
-          const existingSet = active.find((c) => sweepMarketsOf(c).length > 0);
-          const target = anchorChild ?? existingSet;
+          // Merge targets under this PG — the sweep's own child survives:
+          // it gets migrated onto the anchor and absorbs the rest. Else the
+          // child claiming this anchor's market, else any claimant.
+          const anchorKey = keyOf(anchor);
+          const anchorChild = claimants.find((c) => claimedOf(c).some((m) => keyOf(m) === anchorKey));
+          const sweepChild = claimants.find(isSweepChild);
+          const target = sweepChild ?? anchorChild ?? claimants[0];
           if (!target) continue; // conflict came from outside the tree — try the next anchor
 
-          const base = sweepMarketsOf(target);
-          const additions = [...needsAi];
-          if (target === anchorChild) additions.unshift(anchor); // the child's own market joins the set
-          const existingKeys = new Set(base.map(keyOf));
-          const fresh = additions.filter((m) => !existingKeys.has(keyOf(m)));
-          if (fresh.length > 0) {
-            const dc = (target.discovery_context ?? {}) as any;
-            await this.prisma.mkt_campaigns_list.update({
-              where: { id: target.id },
-              data: {
-                discovery_context: {
-                  ...dc,
-                  shelf_sweep: {
-                    ...(dc.shelf_sweep ?? {}),
-                    proving_ground_id: provingGroundId,
-                    swept_at: new Date().toISOString(),
-                    markets: [
-                      ...base.map((m) => ({ category: m.category, city: m.city, state: m.state })),
-                      ...fresh.map((m) => ({ category: m.category, city: m.city, state: m.state })),
-                    ],
-                  },
-                } as any,
-                updated_at: new Date(),
-              },
-            });
-          }
-          sweepCampaign = { id: target.id, created: false, marketCount: base.length + fresh.length, mergedMarkets: fresh.length };
+          const others = claimants.filter((c) => c.id !== target.id);
+          const keepIds = new Set([target.id, ...others.map((o) => o.id)]);
+          // Migrate the target's signature onto this anchor when nothing
+          // outside the fold claims it (the in-fold claimant is closing).
+          const migrate =
+            signatureKey(target) !== anchorKey && !claimedByOutsider(anchorKey, keepIds)
+              ? anchor
+              : null;
+          const baseCount = dedupe(claimedOf(target)).length;
+          const union = await foldInto(target, needsAi, migrate);
+          sweepCampaign = {
+            id: target.id,
+            created: false,
+            marketCount: union.length,
+            mergedMarkets: union.length - baseCount,
+            ...(migrate ? { migrated: true } : {}),
+            ...(others.length ? { closedCampaignIds: others.map((o) => o.id) } : {}),
+          };
           break;
         }
       }
       if (!sweepCampaign && lastErr) throw lastErr;
+    } else if (needsAi.length === 0 && opts.createCampaign !== false && claimants.length > 0) {
+      // ── Consolidation: every swept market is already claimed by a PG
+      // child. The sweep's own child is the preferred survivor — the PG
+      // spawned it for this, so it migrates onto the preferred anchor
+      // (pg.category × PG market / dominant prospect geo) and absorbs the
+      // other claimants' markets; they close as superseded. Without a
+      // sweep child the anchor claimant absorbs instead. Nothing to fold
+      // → just link the existing carrier.
+      const anchorKey = anchorMarket ? keyOf(anchorMarket) : null;
+      const anchorChild = anchorKey
+        ? claimants.find((c) => claimedOf(c).some((m) => keyOf(m) === anchorKey))
+        : undefined;
+      const target = claimants.find(isSweepChild) ?? anchorChild ?? claimants[0];
+      const others = claimants.filter((c) => c.id !== target.id);
+      const keepIds = new Set([target.id, ...others.map((o) => o.id)]);
+      // Re-anchor only when the anchor market is either unclaimed or
+      // claimed by an in-fold child (which is closing) — never duplicate
+      // a signature an outside campaign holds.
+      const migrate =
+        anchorMarket && signatureKey(target) !== anchorKey && !claimedByOutsider(anchorKey!, keepIds)
+          ? anchorMarket
+          : null;
+      if (others.length > 0 || migrate) {
+        const baseCount = dedupe(claimedOf(target)).length;
+        const union = await foldInto(target, [], migrate);
+        sweepCampaign = {
+          id: target.id,
+          created: false,
+          marketCount: union.length,
+          mergedMarkets: union.length - baseCount,
+          consolidated: true,
+          ...(migrate ? { migrated: true } : {}),
+          ...(others.length ? { closedCampaignIds: others.map((o) => o.id) } : {}),
+        };
+      } else {
+        // Correctly anchored, sole claimant — nothing to consolidate.
+        sweepCampaign = { id: target.id, created: false, marketCount: claimedOf(target).length, existing: true };
+      }
     }
 
     logger.info('ProvingGroundShelfSweepService.sweep', ctx, {

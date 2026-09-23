@@ -401,8 +401,9 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
     );
     expect(report.categoryMarkets.find((m) => m.city === 'Fort Wayne' && m.category === 'Halal Market')?.status)
       .toBe('campaign_exists');
-    // 3 payload markets + the child's own anchor market = 4 in the merged set.
-    expect(report.sweepCampaign).toEqual({ id: 'ec-single', created: false, marketCount: 4, mergedMarkets: 4 });
+    // 3 payload markets + the child's own anchor market = 4 in the merged set;
+    // the signature market was already claimed so mergedMarkets counts the 3 new.
+    expect(report.sweepCampaign).toEqual({ id: 'ec-single', created: false, marketCount: 4, mergedMarkets: 3 });
     expect(mockCampaignUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'ec-single' },
@@ -418,6 +419,107 @@ describe('ProvingGroundShelfSweepService.sweep', () => {
         }),
       }),
     );
+  });
+
+  it('migrates the sweep-created child onto the preferred anchor when the domain is fully claimed', async () => {
+    // All 4 domain markets are campaign_exists: the anchor market is the
+    // signature of a single-market child, the rest ride in the sweep's own
+    // set campaign (anchored on the wrong geo, carrying one extra market).
+    // The sweep child SURVIVES — its signature migrates to the PG's market
+    // and it absorbs the single-market child's claim; that child closes.
+    const anchorChild = {
+      id: 'ec-anchor', stage: 'seek', scope: 'category',
+      category: 'Halal Market', city: 'Fort Wayne', state: 'IN',
+      discovery_context: null,
+    };
+    const sweepChild = {
+      id: 'ec-set', stage: 'seek', scope: 'category',
+      category: 'Halal Market', city: 'Olathe', state: 'KS',
+      discovery_context: {
+        shelf_sweep: {
+          markets: [
+            { category: 'Halal Market', city: 'Auburn', state: 'IN' },
+            { category: 'Butcher Shop', city: 'Fort Wayne', state: 'IN' },
+            { category: 'Butcher Shop', city: 'Auburn', state: 'IN' },
+            { category: 'Halal Market', city: 'Olathe', state: 'KS' },
+          ],
+        },
+      },
+    };
+    routeCampaignFindMany([], [anchorChild, sweepChild], [anchorChild, sweepChild]);
+
+    const report = await sweepService.sweep('pg-1');
+
+    expect(report.needsAi).toHaveLength(0);
+    expect(report.categoryMarkets.every((m) => m.status === 'campaign_exists')).toBe(true);
+    expect(report.sweepCampaign).toEqual({
+      id: 'ec-set',
+      created: false,
+      marketCount: 5,
+      mergedMarkets: 1,
+      consolidated: true,
+      migrated: true,
+      closedCampaignIds: ['ec-anchor'],
+    });
+    expect(mockCreateCampaign).not.toHaveBeenCalled();
+    // The sweep child keeps its identity but its signature migrates to the
+    // PG's market, and the displaced child's claim joins the payload
+    // (Olathe stays — nothing is orphaned).
+    expect(mockCampaignUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ec-set' },
+        data: expect.objectContaining({
+          category: 'Halal Market',
+          city: 'Fort Wayne',
+          state: 'IN',
+          discovery_context: expect.objectContaining({
+            shelf_sweep: expect.objectContaining({
+              markets: expect.arrayContaining([
+                expect.objectContaining({ category: 'Halal Market', city: 'Fort Wayne', state: 'IN' }),
+                expect.objectContaining({ category: 'Halal Market', city: 'Olathe', state: 'KS' }),
+                expect.objectContaining({ category: 'Butcher Shop', city: 'Auburn', state: 'IN' }),
+              ]),
+            }),
+          }),
+        }),
+      }),
+    );
+    // The single-market child is closed and stamped with its successor.
+    expect(mockCampaignUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ec-anchor' },
+        data: expect.objectContaining({
+          stage: 'closed',
+          discovery_context: expect.objectContaining({
+            shelf_sweep: expect.objectContaining({ superseded_by: 'ec-set' }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('reports the existing set campaign when it is already correctly anchored', async () => {
+    // The sweep child's signature IS the PG market and its payload covers
+    // the rest — nothing to migrate or fold; just link it.
+    const set = {
+      id: 'ec-set', stage: 'seek', scope: 'category',
+      category: 'Halal Market', city: 'Fort Wayne', state: 'IN',
+      discovery_context: {
+        shelf_sweep: {
+          markets: [
+            { category: 'Halal Market', city: 'Auburn', state: 'IN' },
+            { category: 'Butcher Shop', city: 'Fort Wayne', state: 'IN' },
+            { category: 'Butcher Shop', city: 'Auburn', state: 'IN' },
+          ],
+        },
+      },
+    };
+    routeCampaignFindMany([], [set], [set]);
+
+    const report = await sweepService.sweep('pg-1');
+    expect(report.needsAi).toHaveLength(0);
+    expect(report.sweepCampaign).toEqual({ id: 'ec-set', created: false, marketCount: 4, existing: true });
+    expect(mockCampaignUpdate).not.toHaveBeenCalled();
   });
 
   it('mixed-market PGs anchor on pg.category × the dominant prospect geo', async () => {

@@ -5689,7 +5689,16 @@ class MarketingOpsService extends AdminApiSingleton {
     /** Refresh outcome for the national ('__all__') location row — runs every sweep. */
     nationalLocation?: { city: string; state: string; status: string; detail?: string } | null;
     needsAi: Array<{ category: string; categoryKey: string; city: string; state: string }>;
-    sweepCampaign: { id: string; created: boolean; marketCount: number; mergedMarkets?: number } | null;
+    sweepCampaign: {
+      id: string;
+      created: boolean;
+      marketCount: number;
+      mergedMarkets?: number;
+      consolidated?: boolean;
+      existing?: boolean;
+      migrated?: boolean;
+      closedCampaignIds?: string[];
+    } | null;
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${provingGroundId}/enrich-sweep`,
