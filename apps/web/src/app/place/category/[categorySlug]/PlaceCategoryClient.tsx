@@ -298,17 +298,6 @@ export default function PlaceCategoryClient({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <AddBusinessCta
-          category={categoryName}
-          source={`/place/category/${categorySlug}`}
-        />
-        <SuggestBusinessCta
-          category={categoryName}
-          source={`/place/category/${categorySlug}`}
-        />
-      </div>
-
       {/* Enrichment Content: About + Shopper Guide + Hierarchy + FAQ */}
       {(enrichment?.shopperGuide ||
         enrichment?.context?.category_overview ||
@@ -416,6 +405,18 @@ export default function PlaceCategoryClient({
           </div>
         </div>
       )}
+
+      {/* Footer CTAs — sit directly above the platform footer. */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <AddBusinessCta
+          category={categoryName}
+          source={`/place/category/${categorySlug}`}
+        />
+        <SuggestBusinessCta
+          category={categoryName}
+          source={`/place/category/${categorySlug}`}
+        />
+      </div>
 
       <PoweredByFooter />
 
