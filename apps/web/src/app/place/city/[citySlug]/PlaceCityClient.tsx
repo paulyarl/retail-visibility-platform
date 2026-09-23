@@ -144,11 +144,17 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Places in {data.city}{data.state ? `, ${data.state}` : ''}
         </h1>
-        <p className="text-gray-600 mb-2">{data.total} business{data.total !== 1 ? 'es' : ''}</p>
+        <p className="text-gray-600">{data.total} business{data.total !== 1 ? 'es' : ''}</p>
         {/* Location enrichment packet — seed-shelf intro copy from the same
-            ('__location__', city, state) row /directory/location renders. */}
+            ('__location__', city, state) row /directory/location renders.
+            Held in its own panel so it reads as a distinct block. */}
         {(enrichment?.effective?.description) && (
-          <p className="text-gray-700 max-w-3xl mb-4">{enrichment.effective.description}</p>
+          <div className="mt-4 max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              Overview
+            </p>
+            <p className="text-gray-700 leading-relaxed">{enrichment.effective.description}</p>
+          </div>
         )}
         {(enrichment?.topCategories?.length ?? 0) > 0 && (
           <div className="mb-6">

@@ -1135,28 +1135,31 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
     );
     const total = parseInt(countResult.rows[0].total) || 0;
 
-    // Resolve the market's dominant seed state — city-only slugs can't
+    // Resolve the market's dominant seed row — city-only slugs can't
     // disambiguate same-name cities across states, so the modal state wins
-    // deterministically — then the location enrichment packet (same row the
-    // /directory/location page renders) for SEO metadata + on-page copy.
+    // deterministically. The DB spelling also wins over the slug-derived
+    // lowercase name ('kansas-city' → 'kansas city'), so the page never
+    // renders a lowercase city. Then the location enrichment packet (same row
+    // the /directory/location page renders) for SEO metadata + on-page copy.
     const stateResult = await pool.query(
-      `SELECT dps.state AS state, COUNT(*) AS cnt
+      `SELECT dps.city AS city, dps.state AS state, COUNT(*) AS cnt
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
          AND LOWER(dps.city) = LOWER($1)
-       GROUP BY dps.state
+       GROUP BY dps.city, dps.state
        ORDER BY cnt DESC
        LIMIT 1`,
       [cityName],
     );
     const cityState: string | null = stateResult.rows[0]?.state ?? null;
+    const displayCity: string = stateResult.rows[0]?.city || cityName;
 
     let enrichment: any = null;
     if (cityState) {
       try {
-        const market = await LocationMarketEnrichmentService.getLocation(cityName, cityState);
+        const market = await LocationMarketEnrichmentService.getLocation(displayCity, cityState);
         if (market) {
           enrichment = {
             market: { city: market.city, state: market.state, locationName: market.locationName },
@@ -1252,7 +1255,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      city: cityName,
+      city: displayCity,
       state: cityState,
       citySlug: decodedSlug,
       categories: Object.values(categoryMap),

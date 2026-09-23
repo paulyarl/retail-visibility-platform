@@ -154,33 +154,19 @@ export default function PlaceCategoryClient({
           </div>
 
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">
                   {categoryName}
                 </h1>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                  {places.length} {places.length === 1 ? 'place' : 'places'} listed
+                  {city ? ` in ${city}` : ''}
+                </p>
               </div>
-              {enrichment?.bodyCopy ? (
-                <p className="text-neutral-600 dark:text-neutral-400 max-w-3xl whitespace-pre-line">
-                  {enrichment.bodyCopy}
-                </p>
-              ) : enrichment?.effective?.description && (
-                <p className="text-neutral-600 dark:text-neutral-400 max-w-3xl">
-                  {enrichment.effective.description}
-                </p>
-              )}
-              {enrichment?.effective?.synonyms && enrichment.effective.synonyms.length > 0 && (
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                  Related: {enrichment.effective.synonyms.join(', ')}
-                </p>
-              )}
-              <p className="text-neutral-600 dark:text-neutral-400 mt-2">
-                {places.length} {places.length === 1 ? 'place' : 'places'} listed
-                {city ? ` in ${city}` : ''}
-              </p>
             </div>
             <Link
               href="/place"
@@ -190,6 +176,24 @@ export default function PlaceCategoryClient({
               All categories
             </Link>
           </div>
+
+          {/* Page intro — held in its own panel so the shelf copy reads as a
+              distinct block rather than trailing the title. */}
+          {(enrichment?.bodyCopy || enrichment?.effective?.description) && (
+            <div className="mt-6 max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 p-5 sm:p-6">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-2">
+                Overview
+              </p>
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {enrichment?.bodyCopy ?? enrichment?.effective?.description}
+              </p>
+              {enrichment?.effective?.synonyms && enrichment.effective.synonyms.length > 0 && (
+                <p className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500 dark:text-neutral-400">
+                  Related: {enrichment.effective.synonyms.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* City filter chips */}
           {cities.length > 1 && (

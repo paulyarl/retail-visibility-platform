@@ -244,21 +244,24 @@ export default function CategoryViewClient({
             </div>
           </div>
 
-          {enrichment?.bodyCopy ? (
-            <p className="mt-2 text-neutral-600 dark:text-neutral-400 max-w-3xl whitespace-pre-line">
-              {enrichment.bodyCopy}
-            </p>
-          ) : enrichment?.effective?.description && (
-            <p className="mt-2 text-neutral-600 dark:text-neutral-400 max-w-3xl">
-              {enrichment.effective.description}
-            </p>
-          )}
-
           <div className="flex items-center gap-4 mt-2 text-sm">
             <p className="text-neutral-600 dark:text-neutral-400">
               {totalItems} {totalItems === 1 ? 'store' : 'stores'} · {category?.productCount || 0} products
             </p>
           </div>
+
+          {/* Page intro — held in its own panel so the shelf copy reads as a
+              distinct block rather than trailing the title. */}
+          {(enrichment?.bodyCopy || enrichment?.effective?.description) && (
+            <div className="mt-5 max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 p-5 sm:p-6">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-2">
+                Overview
+              </p>
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {enrichment?.bodyCopy ?? enrichment?.effective?.description}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
