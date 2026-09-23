@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import placesBrowsePublicService, {
   PlaceListing,
+  type PlaceCategory,
   type CategoryEnrichmentResponse,
 } from '@/services/PlacesBrowsePublicService';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
@@ -24,6 +25,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { MarketIntelSurfaceSidebar } from '@/components/place/MarketIntelSurfaceSidebar';
 import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
+import { resolveShelfForLabel, shelfHrefFor } from '@/lib/place-shelves';
 
 interface PlaceCategoryClientProps {
   categorySlug: string;
@@ -47,6 +49,7 @@ export default function PlaceCategoryClient({
 }: PlaceCategoryClientProps) {
   const [places, setPlaces] = useState<PlaceListing[]>([]);
   const [enrichment, setEnrichment] = useState<CategoryEnrichmentResponse | null>(null);
+  const [shelfIndex, setShelfIndex] = useState<PlaceCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,10 +59,13 @@ export default function PlaceCategoryClient({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [placesData, enrichmentData] = await Promise.all([
+        const [placesData, enrichmentData, shelfData] = await Promise.all([
           placesBrowsePublicService.getPlacesByCategory(categorySlug, city),
           // No city → national category view; fetch the '__all__' packet.
           placesBrowsePublicService.getCategoryEnrichment(categorySlug, city ?? '__all__', state),
+          // Live shelf index — resolves taxonomy labels to real shelves with
+          // canonical slugs + per-market listing counts.
+          placesBrowsePublicService.getCategories(),
         ]);
         if (placesData) {
           setPlaces(placesData.places);
@@ -67,6 +73,7 @@ export default function PlaceCategoryClient({
           setError('Failed to load places.');
         }
         setEnrichment(enrichmentData);
+        setShelfIndex(shelfData?.categories ?? []);
       } catch {
         setError('Failed to load places.');
       } finally {
@@ -103,6 +110,10 @@ export default function PlaceCategoryClient({
     }
   }
   const cities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
+
+  // Taxonomy label → live shelf for this market (see lib/place-shelves).
+  const shelfForLabel = (label: string) => resolveShelfForLabel(label, city, state, shelfIndex);
+  const shelfHref = (slug: string) => shelfHrefFor(slug, city, state);
 
   const jsonLd = enrichment
     ? {
@@ -373,12 +384,7 @@ export default function PlaceCategoryClient({
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {enrichment.context.sub_categories.map((sub) => (
-                    <span
-                      key={sub}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
-                    >
-                      {sub}
-                    </span>
+                    <ShelfChip key={sub} label={sub} shelf={shelfForLabel(sub)} hrefFor={shelfHref} />
                   ))}
                 </div>
               </section>
@@ -392,12 +398,7 @@ export default function PlaceCategoryClient({
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {enrichment.context.adjacent_categories.map((adj) => (
-                    <span
-                      key={adj}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
-                    >
-                      {adj}
-                    </span>
+                    <ShelfChip key={adj} label={adj} shelf={shelfForLabel(adj)} hrefFor={shelfHref} />
                   ))}
                 </div>
               </section>
@@ -429,6 +430,37 @@ export default function PlaceCategoryClient({
         initialTeaser={marketIntelTeaser}
       />
     </div>
+  );
+}
+
+// ====================
+// ShelfChip — taxonomy label that links to its live shelf when one exists
+// ====================
+
+function ShelfChip({
+  label,
+  shelf,
+  hrefFor,
+}: {
+  label: string;
+  shelf: { slug: string; count: number } | null;
+  hrefFor: (slug: string) => string;
+}) {
+  const base =
+    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300';
+
+  if (!shelf) {
+    return <span className={base}>{label}</span>;
+  }
+
+  return (
+    <Link
+      href={hrefFor(shelf.slug)}
+      className={`${base} hover:border-blue-300 hover:text-blue-700 dark:hover:border-blue-700 dark:hover:text-blue-400 transition-colors`}
+    >
+      {label}
+      <span className="text-xs text-neutral-400 dark:text-neutral-500">{shelf.count}</span>
+    </Link>
   );
 }
 
