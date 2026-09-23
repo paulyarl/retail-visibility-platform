@@ -206,10 +206,26 @@ class LocationMarketEnrichmentService extends BaseService {
       categoryEnrichments,
     });
 
+    // A campaign-applied row (composer_version=2) keeps its AI head copy —
+    // this sync is an aggregate refresh, not a revert. Same guard as
+    // enrichNational: enrichLocation fires after every category apply/enrich
+    // and on every sweep, so an unguarded upsert silently downgrades the
+    // public location page back to deterministic copy.
+    const existing = await this.findRow(normalizedCity, normalizedState);
+    const campaignRow = existing?.composer_version === CAMPAIGN_COMPOSER_VERSION;
+    const metaTitle = campaignRow ? existing.meta_title : packet.metaTitle;
+    const description = campaignRow ? existing.description : packet.description;
+    const keywords = campaignRow
+      ? (existing.keywords ?? [])
+      : (packet.keywords.length > 0 ? packet.keywords : []);
+    const secondary = campaignRow
+      ? (existing.secondary_categories ?? [])
+      : (packet.secondaryCategories.length > 0 ? packet.secondaryCategories : []);
+    const schemaTypeHint = campaignRow ? existing.schema_type_hint : packet.schemaTypeHint;
+    const composerVersion = campaignRow ? CAMPAIGN_COMPOSER_VERSION : packet.composerVersion;
+
     const id = generateCategoryMarketEnrichmentId();
     const enrichedAt = new Date();
-    const keywords = packet.keywords.length > 0 ? packet.keywords : [];
-    const secondary = packet.secondaryCategories.length > 0 ? packet.secondaryCategories : [];
 
     const upsert = Prisma.sql`
       INSERT INTO directory_category_enrichment (
@@ -220,11 +236,11 @@ class LocationMarketEnrichmentService extends BaseService {
       )
       VALUES (
         ${id}, ${LOCATION_SENTINEL_KEY}, ${locationName}, ${normalizedCity}, ${normalizedState},
-        ${packet.metaTitle}, ${packet.description},
+        ${metaTitle}, ${description},
         ${textArraySql(keywords)},
         ${textArraySql(secondary)},
-        ${packet.schemaTypeHint},
-        ${null}, ${null}, ${packet.composerVersion},
+        ${schemaTypeHint},
+        ${null}, ${null}, ${composerVersion},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource}, now(), now()
       )
       ON CONFLICT (category_key, city, state) DO UPDATE SET

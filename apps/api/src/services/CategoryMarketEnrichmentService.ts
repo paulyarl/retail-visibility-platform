@@ -163,8 +163,23 @@ class CategoryMarketEnrichmentService extends BaseService {
     const triggerSource = opts.triggerSource ?? 'manual';
     const enrichedBy = opts.enrichedBy ?? null;
 
-    const keywords = packet.keywords.length > 0 ? packet.keywords : [];
-    const secondary = packet.secondaryCategories.length > 0 ? packet.secondaryCategories : [];
+    // A campaign-applied row (composer_version=2) keeps its AI head copy —
+    // this sync refreshes the deterministic baseline on v1 rows only.
+    // Re-enrich triggers (listing re-enrich, profile activation, manual
+    // refresh) must not silently revert campaign packet copy on the public
+    // category page — same guard as the location/national syncs.
+    const existingMarket = await this.getMarketByKey(categoryKey, normalizedCity, normalizedState);
+    const campaignRow = existingMarket?.composerVersion === CAMPAIGN_COMPOSER_VERSION;
+    const metaTitle = campaignRow ? existingMarket.composed.metaTitle : packet.metaTitle;
+    const description = campaignRow ? existingMarket.composed.description : packet.description;
+    const keywords = campaignRow
+      ? (existingMarket.composed.keywords ?? [])
+      : (packet.keywords.length > 0 ? packet.keywords : []);
+    const secondary = campaignRow
+      ? (existingMarket.composed.secondaryCategories ?? [])
+      : (packet.secondaryCategories.length > 0 ? packet.secondaryCategories : []);
+    const schemaTypeHint = campaignRow ? existingMarket.composed.schemaTypeHint : packet.schemaTypeHint;
+    const composerVersion = campaignRow ? CAMPAIGN_COMPOSER_VERSION : packet.composerVersion;
 
     const upsert = Prisma.sql`
       INSERT INTO directory_category_enrichment (
@@ -175,11 +190,11 @@ class CategoryMarketEnrichmentService extends BaseService {
       )
       VALUES (
         ${id}, ${categoryKey}, ${profile.category_name}, ${normalizedCity}, ${normalizedState},
-        ${packet.metaTitle}, ${packet.description},
+        ${metaTitle}, ${description},
         ${textArraySql(keywords)},
         ${textArraySql(secondary)},
-        ${packet.schemaTypeHint},
-        ${packet.inputs.intelligenceProfileId}, ${packet.inputs.goldStandardProfileId}, ${packet.composerVersion},
+        ${schemaTypeHint},
+        ${packet.inputs.intelligenceProfileId}, ${packet.inputs.goldStandardProfileId}, ${composerVersion},
         ${enrichedAt}, ${enrichedBy}, ${triggerSource}, now(), now()
       )
       ON CONFLICT (category_key, city, state) DO UPDATE SET
