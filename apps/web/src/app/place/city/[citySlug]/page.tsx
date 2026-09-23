@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import PlaceCityClient from './PlaceCityClient';
+import PlaceCityHero from './PlaceCityHero';
 import PlaceCityEnrichmentContent from './PlaceCityEnrichmentContent';
 import { Metadata } from 'next';
 import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
@@ -8,9 +9,16 @@ import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
+/** Slug-derived display name — the DB spelling wins whenever it's available. */
+function cityNameFromSlug(citySlug: string): string {
+  return decodeURIComponent(citySlug)
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ citySlug: string }> }): Promise<Metadata> {
   const { citySlug } = await params;
-  const cityName = decodeURIComponent(citySlug).replace(/-/g, ' ');
+  const cityName = cityNameFromSlug(citySlug);
 
   // Packet-driven metadata — the location enrichment row carries metaTitle /
   // description / keywords (mirrors /directory/location/[location]/page.tsx).
@@ -49,13 +57,22 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
     placesBrowsePublicService.getCityShelfSummary(citySlug).catch(() => null),
   ]);
 
-  // DB-spelled city wins over the slug-derived lowercase form so the CTA copy
-  // never renders a lowercase city name.
-  const cityName = summary?.city || decodeURIComponent(citySlug).replace(/-/g, ' ');
+  // DB-spelled city wins over the slug-derived form so the hero/CTA copy never
+  // renders the slug's own casing.
+  const cityName = summary?.city || cityNameFromSlug(citySlug);
   const state = summary?.state ?? undefined;
 
   return (
     <>
+      {/* Hero is server-rendered so the packet narrative + top categories are
+          crawler-visible ahead of the client-driven listings. */}
+      <PlaceCityHero
+        citySlug={citySlug}
+        city={cityName}
+        state={state ?? null}
+        total={summary?.total ?? 0}
+        enrichment={summary?.enrichment ?? null}
+      />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading...</p></div>}>
         <PlaceCityClient
           citySlug={citySlug}

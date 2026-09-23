@@ -6,6 +6,9 @@ import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicSe
  * presented with the seed shelf's "listed from public information" framing.
  * Rendered in page.tsx (outside the client's loading gate) so the copy is
  * crawler-visible without waiting for the listings fetch.
+ *
+ * The packet's narrative (`bodyCopy`) is NOT rendered here — it leads the hero
+ * (PlaceCityHero), so this band carries only the sections below it.
  */
 export default function PlaceCityEnrichmentContent({
   enrichment,
@@ -17,28 +20,18 @@ export default function PlaceCityEnrichmentContent({
   state: string | null;
 }) {
   const locationName = state ? `${city}, ${state}` : city;
-  const bodyCopy = enrichment.bodyCopy;
   const shopperGuide = enrichment.shopperGuide;
   const faq = enrichment.faq ?? [];
   const areaBreakdown = enrichment.areaBreakdown ?? [];
   const metroContext = enrichment.context?.metro_context;
 
-  if (!bodyCopy && !shopperGuide && faq.length === 0 && areaBreakdown.length === 0 && !metroContext) {
+  if (!shopperGuide && faq.length === 0 && areaBreakdown.length === 0 && !metroContext) {
     return null;
   }
 
   return (
     <div className="bg-neutral-100 border-t border-neutral-200">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
-        {bodyCopy && (
-          <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              About {locationName}
-            </h2>
-            <p className="text-gray-700 leading-relaxed whitespace-pre-line">{bodyCopy}</p>
-          </section>
-        )}
-
         {shopperGuide && (
           <section className="max-w-3xl rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">
