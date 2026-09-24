@@ -548,6 +548,52 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       expect(block).toContain('proof is scope-relative');
     });
 
+    it('discovery carries the reason-pattern digest (vectors + signals) for causal attribution', async () => {
+      const patterned = PROFILE({
+        reference_city: 'Kansas City',
+        reference_state: 'MO',
+        configuration_json: {
+          catalog_revision: 1,
+          reason_coverage: [
+            { reason_key: 'trade_manifest_only', status: 'empty_unproven', slots: [], empty_slot_note: 'executed, returned 0' },
+          ],
+          catalog_snapshot: [
+            {
+              reason_key: 'trade_manifest_only',
+              label: 'Trade / import-only visibility',
+              expected_vectors: ['US Customs bill of lading records', 'import manifests'],
+              signals: ['listed in trade databases', 'no consumer-facing listing'],
+            },
+          ],
+        } as any,
+      });
+      const block = await service.serializeBronzeStandard(patterned, 'discovery');
+      expect(block).toContain('--- Reason Patterns (hunt instruments) ---');
+      expect(block).toContain('[trade_manifest_only] Trade / import-only visibility');
+      expect(block).toContain('vectors: US Customs bill of lading records; import manifests');
+      expect(block).toContain('signals: listed in trade databases; no consumer-facing listing');
+      // The block's attribution directive references expected_vectors — the
+      // digest is what makes that causal attribution possible.
+      expect(block).toContain('bronze_attribution');
+    });
+
+    it('establishment_reference does NOT emit the compact digest (it already emits the full catalog)', async () => {
+      const patterned = PROFILE({
+        reference_city: 'Kansas City',
+        reference_state: 'MO',
+        configuration_json: {
+          catalog_revision: 1,
+          reason_coverage: [],
+          catalog_snapshot: [
+            { reason_key: 'trade_manifest_only', label: 'Trade / import-only visibility', expected_vectors: ['manifests'] },
+          ],
+        } as any,
+      });
+      const block = await service.serializeBronzeStandard(patterned, 'establishment_reference');
+      expect(block).not.toContain('--- Reason Patterns');
+      expect(block).toContain('Expected vectors: manifests');
+    });
+
     // ── national_proof — the cascading-profile supplement ────────────────
     // When a market-scoped profile resolves, the national row is injected
     // alongside it as a compact proof record: which reasons are proven, one

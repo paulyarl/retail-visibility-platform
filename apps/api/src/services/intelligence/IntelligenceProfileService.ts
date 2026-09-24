@@ -3201,6 +3201,27 @@ export class IntelligenceProfileService extends BaseService {
       return s ? ` [scope: ${s}]` : '';
     };
 
+    // Reason patterns — the hunt instruments (discovery role only). Without
+    // this the analyst sees reason keys and exemplars but not the mechanics
+    // (signals + expected_vectors) the attribution directive asks it to
+    // reason causally about. Emitted from the profile's revision-stamped
+    // catalog snapshot; a profile without one carries no digest (exemplar
+    // discovered_via values + the vector log still carry partial signal).
+    // establishment_reference emits the full catalog block instead.
+    if (role === 'discovery' && catalogSnapshot.length > 0) {
+      lines.push('--- Reason Patterns (hunt instruments) ---');
+      for (const r of catalogSnapshot) {
+        const vectors = Array.isArray(r.expected_vectors) && r.expected_vectors.length
+          ? ` — vectors: ${r.expected_vectors.join('; ')}`
+          : '';
+        const signals = Array.isArray(r.signals) && r.signals.length
+          ? ` — signals: ${r.signals.join('; ')}`
+          : '';
+        lines.push(`  [${r.reason_key}] ${r.label ?? ''}${vectors}${signals}${scopeSuffix(r.reason_key)}`);
+      }
+      lines.push('');
+    }
+
     // ── Filled slots (capped per reason) + empty-slot report ──────────
     const filledEntries = coverage.filter((e: any) => e.status === 'filled' && Array.isArray(e.slots) && e.slots.length > 0);
     const emptyEntries = coverage.filter((e: any) => e.status !== 'filled');
