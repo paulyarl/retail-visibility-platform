@@ -406,6 +406,44 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       expect(block).toContain('Mama Nkechi');
     });
 
+    it('establishment_reference renders the slot board: occupancy per reason + hunt targets', async () => {
+      const block = await service.serializeBronzeStandard(coverageProfile, 'establishment_reference');
+      // Board summary up front + per-reason occupancy (absent_from_platform
+      // holds 3 stored slots → emitted as at cap; community_only_presence is
+      // an empty hunt target with 2 open slots).
+      expect(block).toContain('Slot board:');
+      expect(block).toContain('--- Filled Slots ---');
+      expect(block).toContain('[absent_from_platform] 2/2 filled — AT CAP');
+      expect(block).toContain('--- Empty Slots — Hunt Targets ---');
+      expect(block).toContain('[community_only_presence] empty_unproven — 2 slots open');
+      // Discovery role keeps the calibration labels instead.
+      const calBlock = await service.serializeBronzeStandard(coverageProfile, 'discovery');
+      expect(calBlock).toContain('--- Calibration Exemplars ---');
+      expect(calBlock).toContain('--- Empty-Slot Report ---');
+      expect(calBlock).not.toContain('Slot board:');
+      expect(calBlock).not.toContain('slots open');
+    });
+
+    it('establishment_reference marks a partially filled reason as an open hunt target', async () => {
+      const partialProfile = PROFILE({
+        reference_city: 'Kansas City',
+        reference_state: 'MO',
+        configuration_json: {
+          catalog_revision: 1,
+          reason_coverage: [
+            {
+              reason_key: 'absent_from_platform',
+              status: 'filled',
+              slots: [{ business_name: 'Mama Nkechi', discovered_by: 'operator_self_discovery' }],
+            },
+          ],
+        } as any,
+      });
+      const block = await service.serializeBronzeStandard(partialProfile, 'establishment_reference');
+      expect(block).toContain('[absent_from_platform] 1/2 filled — 1 slot open');
+      expect(block).toContain('1 partially filled');
+    });
+
     it('caps emitted slots at MAX_SLOTS_PER_REASON (2) and notes the overflow', async () => {
       const block = await service.serializeBronzeStandard(coverageProfile, 'discovery');
       expect(block).toContain('Mama Nkechi');
@@ -494,7 +532,9 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
     it('discovery annotates exemplars + empty slots with the reason scope', async () => {
       const block = await service.serializeBronzeStandard(scopedProfile, 'discovery');
 
-      expect(block).toContain('[trade_manifest_only] Arsema Food Mart [scope: category=african grocery store]');
+      // Scope rides on the per-reason header line; the exemplar is indented below it.
+      expect(block).toContain('[trade_manifest_only] 1/2 filled [scope: category=african grocery store]');
+      expect(block).toContain('Arsema Food Mart');
       expect(block).toContain('[community_only_presence] empty_unproven — executed, returned 0 [scope: universal]');
       expect(block).toContain('REASON SCOPE');
     });

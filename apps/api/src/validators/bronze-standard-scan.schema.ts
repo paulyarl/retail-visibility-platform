@@ -353,8 +353,11 @@ Rules:
   For establishment scans, catalog_snapshot embeds the scope-applicable
   catalog rows verbatim so the profile stays interpretable after the catalog
   moves on.
-- Cap slots at 2 per reason — two exemplars calibrate; more is token cost
-  without marginal signal. Emit the empty-slot report for unfilled reasons;
+- Cap slots at 2 per reason on the committed board — two exemplars calibrate;
+  more is token cost without marginal signal. A DISCOVERY scan may append
+  incidental qualifying finds beyond the cap for an already-full reason
+  (carried occupants first, finds after): they surface as reserve candidates
+  for operator review. Emit the empty-slot report for unfilled reasons;
   do NOT emit the full platform x reason grid.
 - UNCATALOGED BLIND SPOT SUGGESTIONS: If you detect a verified operating business
   with category assortment fit that is invisible due to a distinct discovery

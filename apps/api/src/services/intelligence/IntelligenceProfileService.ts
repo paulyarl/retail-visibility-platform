@@ -82,8 +82,8 @@ export type GoldStandardRole = 'benchmark' | 'target' | 'discovery' | 'discovery
 /**
  * Role for bronze-standard injection into prompts (BRONZE_STANDARD_SPEC §10.3).
  *   - 'establishment_reference' → stage-2 city bronze scan: the resolved
- *     bronze profile (city → national cascade) injected as the hunt list
- *     (full catalog snapshot + proof state) the city scan must cover.
+ *     bronze profile (city → national cascade) injected as the slot board
+ *     (full catalog snapshot + per-reason slot state) the city scan fills.
  *   - 'discovery' → stage-3 emerging discovery scan: the city bronze profile
  *     injected as CALIBRATION framing (§7.1) — exemplars + empty-slot report +
  *     vector execution log. Framing, not a candidate filter.
@@ -3123,7 +3123,7 @@ export class IntelligenceProfileService extends BaseService {
       if (catalogRevision !== null) lines.push(`Catalog revision: ${catalogRevision}`);
       lines.push('');
       lines.push(
-        'DIRECTIVE: This is the established bronze-standard reference profile for this category — the map of what INVISIBLE looks like, typed by discovery-blind-spot reason. Your city scan MUST produce exactly one reason_coverage entry for each applicable reason below. Each reason is a discovery vector: execute its expected_vectors against the reference market, evaluate candidates against the three-part gate (category-qualified by assortment evidence, operationally verified — unable_to_verify never qualifies, low digital quality the reason explains), and record filled slots or the correct empty status with the execution outcome. Reasons proven in the reference profile but empty here are reported empty_proven_elsewhere; reasons with no exemplar at any evaluable scope are empty_unproven — but you still hunt them (the hunt is how they become proven).',
+        'DIRECTIVE: This is the established bronze-standard profile for this category — the slot board this market\'s scan covers, typed by discovery-blind-spot reason. Each reason holds up to 2 exemplar slots; the board below marks every covered reason FILLED AT CAP, PARTIALLY FILLED, or EMPTY. When this profile\'s scope IS your market, its filled slots are committed board occupants: produce exactly one reason_coverage entry per applicable reason, targeted by slot state — carry FILLED AT CAP occupants into your entry verbatim (preserve business_name, address, discovered_by — out-of-loop fills are ground truth, never re-stamped) and do not spend hunt effort on that reason; carry a PARTIALLY FILLED reason\'s occupant and hunt only its remaining slot; hunt each EMPTY reason\'s expected_vectors for qualifying exemplars. Open and weak slots are the priority — but if the hunt crosses a qualifying exemplar for a reason already at cap, still append it after the carried occupants as a reserve candidate (the 2-slot cap applies to the committed board, not to what you report). When this profile\'s scope is NOT your market (a national or other-market cascade), its filled slots are proof-of-reason, not occupants — an out-of-market business cannot fill a slot here, so hunt every applicable reason fresh at your market. Evaluate every candidate against the three-part gate (category-qualified by assortment evidence, operationally verified — unable_to_verify never qualifies, low digital quality the reason explains); your own finds carry discovered_by: bronze_establishment_scan. Empty slots record the correct empty status with the execution outcome: reasons proven here but empty in your market are empty_proven_elsewhere; reasons with no exemplar at any evaluable scope are empty_unproven — but you still hunt them (the hunt is how they become proven). Your filled slots are fill candidates an operator reviews against the board — this scan does not itself change the active profile.',
       );
       lines.push('');
       lines.push(BRONZE_SCOPE_SEMANTICS);
@@ -3156,6 +3156,17 @@ export class IntelligenceProfileService extends BaseService {
         }
         lines.push('');
       }
+
+      // Slot board summary — the scan's hunt is targeted by open capacity,
+      // so the board state is stated up front, not left to be inferred from
+      // the filled/empty sections below.
+      const atCap = coverage.filter((e: any) => e.status === 'filled' && (e.slots?.length ?? 0) >= MAX_SLOTS_PER_REASON).length;
+      const partial = coverage.filter((e: any) => e.status === 'filled' && (e.slots?.length ?? 0) > 0 && (e.slots?.length ?? 0) < MAX_SLOTS_PER_REASON).length;
+      const emptyReasons = coverage.filter((e: any) => e.status !== 'filled').length;
+      lines.push(
+        `Slot board: ${atCap} reason(s) at cap, ${partial} partially filled, ${emptyReasons} empty — every reason with an open slot is a hunt target, including catalog reasons with no coverage entry yet.`,
+      );
+      lines.push('');
     } else {
       // discovery — calibration framing for the emerging scan (§7.1).
       lines.push('');
@@ -3195,41 +3206,48 @@ export class IntelligenceProfileService extends BaseService {
     const emptyEntries = coverage.filter((e: any) => e.status !== 'filled');
 
     if (filledEntries.length > 0) {
-      lines.push(role === 'discovery' ? '--- Calibration Exemplars ---' : '--- National Proof Slots ---');
+      lines.push(role === 'discovery' ? '--- Calibration Exemplars ---' : '--- Filled Slots ---');
       for (const entry of filledEntries) {
-        const slots = (entry.slots as any[]).slice(0, MAX_SLOTS_PER_REASON);
+        const allSlots = entry.slots as any[];
+        const openSlots = MAX_SLOTS_PER_REASON - allSlots.length;
+        const occupancy = role === 'establishment_reference'
+          ? (openSlots > 0 ? ` — ${openSlots} slot${openSlots === 1 ? '' : 's'} open` : ' — AT CAP')
+          : '';
+        lines.push(`  [${entry.reason_key}] ${Math.min(allSlots.length, MAX_SLOTS_PER_REASON)}/${MAX_SLOTS_PER_REASON} filled${occupancy}${scopeSuffix(entry.reason_key)}`);
+        const slots = allSlots.slice(0, MAX_SLOTS_PER_REASON);
         for (const s of slots) {
           const slotLocale = s.observed_city || s.observed_state
             ? ` [${[s.observed_city, s.observed_state].filter(Boolean).join(', ')}]`
             : '';
-          lines.push(`  [${entry.reason_key}] ${s.business_name}${slotLocale}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}${scopeSuffix(entry.reason_key)}`);
-          if (s.digital_quality) lines.push(`    Digital quality: ${s.digital_quality}`);
-          if (s.category_fit_evidence) lines.push(`    Category fit: ${s.category_fit_evidence}`);
-          if (s.operational_evidence) lines.push(`    Operational: ${s.operational_evidence}`);
+          lines.push(`    ${s.business_name}${slotLocale}${s.observed_platform ? ` (observed on: ${s.observed_platform})` : ''}`);
+          if (s.digital_quality) lines.push(`      Digital quality: ${s.digital_quality}`);
+          if (s.category_fit_evidence) lines.push(`      Category fit: ${s.category_fit_evidence}`);
+          if (s.operational_evidence) lines.push(`      Operational: ${s.operational_evidence}`);
           if (s.discovered_by) {
-            lines.push(`    Discovered by: ${s.discovered_by}${s.discovered_via ? ` via ${s.discovered_via}` : ''}${BRONZE_EXTERNAL_PROVENANCE.has(s.discovered_by) ? ' (out-of-loop ground truth)' : ' (confirmatory)'}`);
+            lines.push(`      Discovered by: ${s.discovered_by}${s.discovered_via ? ` via ${s.discovered_via}` : ''}${BRONZE_EXTERNAL_PROVENANCE.has(s.discovered_by) ? ' (out-of-loop ground truth)' : ' (confirmatory)'}`);
           }
           if (Array.isArray(s.evidence_urls) && s.evidence_urls.length) {
-            lines.push(`    Evidence: ${s.evidence_urls.slice(0, 3).join(', ')}`);
+            lines.push(`      Evidence: ${s.evidence_urls.slice(0, 3).join(', ')}`);
           }
           if (s.platform_presence && typeof s.platform_presence === 'object') {
             const pp = Object.entries(s.platform_presence)
               .map(([p, v]) => `${p}: ${v}`)
               .join('; ');
-            lines.push(`    Platform presence: ${pp}`);
+            lines.push(`      Platform presence: ${pp}`);
           }
         }
-        if ((entry.slots as any[]).length > MAX_SLOTS_PER_REASON) {
-          lines.push(`  [${entry.reason_key}] ... +${(entry.slots as any[]).length - MAX_SLOTS_PER_REASON} more slot(s) withheld (cap ${MAX_SLOTS_PER_REASON}/reason)`);
+        if (allSlots.length > MAX_SLOTS_PER_REASON) {
+          lines.push(`    ... +${allSlots.length - MAX_SLOTS_PER_REASON} more slot(s) withheld (cap ${MAX_SLOTS_PER_REASON}/reason)`);
         }
       }
       lines.push('');
     }
 
     if (emptyEntries.length > 0) {
-      lines.push('--- Empty-Slot Report ---');
+      lines.push(role === 'establishment_reference' ? '--- Empty Slots — Hunt Targets ---' : '--- Empty-Slot Report ---');
       for (const e of emptyEntries) {
-        lines.push(`  [${e.reason_key}] ${e.status}${e.empty_slot_note ? ` — ${e.empty_slot_note}` : ''}${scopeSuffix(e.reason_key)}`);
+        const openHint = role === 'establishment_reference' ? ` — ${MAX_SLOTS_PER_REASON} slots open` : '';
+        lines.push(`  [${e.reason_key}] ${e.status}${openHint}${e.empty_slot_note ? ` — ${e.empty_slot_note}` : ''}${scopeSuffix(e.reason_key)}`);
       }
       lines.push('');
     }
