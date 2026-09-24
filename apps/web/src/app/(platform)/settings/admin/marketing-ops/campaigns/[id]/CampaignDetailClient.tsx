@@ -25,6 +25,7 @@ import EnrichmentAuditCard from '@/components/marketing-ops/EnrichmentAuditCard'
 import CategoryIdentificationAuditCard from '@/components/marketing-ops/CategoryIdentificationAuditCard';
 import IntelligenceEstablishmentPanel from '@/components/marketing-ops/IntelligenceEstablishmentPanel';
 import GoldStandardDiscoveryPanel from '@/components/marketing-ops/GoldStandardDiscoveryPanel';
+import BronzeStandardDiscoveryPanel from '@/components/marketing-ops/BronzeStandardDiscoveryPanel';
 import AuditImportMetadataBadge from '@/components/marketing-ops/AuditImportMetadataBadge';
 import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
@@ -1651,6 +1652,10 @@ export default function CampaignDetailClient({
                 ) : campaign.scope === 'intelligence' && campaign.intelligence_focus === 'gold_standards' ? (
                   <div className="space-y-4">
                     <GoldStandardDiscoveryPanel campaign={campaign} audits={campaign.audits ?? []} />
+                  </div>
+                ) : campaign.scope === 'intelligence' && campaign.intelligence_focus === 'bronze_standards' ? (
+                  <div className="space-y-4">
+                    <BronzeStandardDiscoveryPanel campaign={campaign} />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -6725,6 +6725,19 @@ interface MarketingOpsService {
     reason_key: string;
     slot: BronzeExternalFillSlot;
   }): Promise<IntelligenceProfile>;
+  // Bronze discovery slot fill — direct commit to the ACTIVE profile
+  // (version bump per fill), the bronze mirror of gold's /candidates
+  // promote/remove. Distinct from recordBronzeExternalFill, which writes a
+  // draft-gated §7.3 out-of-loop fill.
+  addBronzeReasonFill(profileId: string, input: {
+    reason_key: string;
+    slot: BronzeExternalFillSlot;
+  }): Promise<IntelligenceProfile>;
+  removeBronzeReasonFill(profileId: string, input: {
+    reason_key: string;
+    business_name: string;
+    address?: string | null;
+  }): Promise<IntelligenceProfile>;
 }
 
 MarketingOpsService.prototype.generateGalleryToken = async function (
@@ -7311,6 +7324,44 @@ MarketingOpsService.prototype.recordBronzeExternalFill = async function (
   );
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to record bronze external fill');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profiles');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.addBronzeReasonFill = async function (
+  this: MarketingOpsService,
+  profileId: string,
+  input: { reason_key: string; slot: BronzeExternalFillSlot },
+): Promise<IntelligenceProfile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${encodeURIComponent(profileId)}/bronze-slots`,
+    { method: 'POST', body: JSON.stringify(input) },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fill bronze reason slot');
+  }
+  await this.invalidateCachePattern('mkt-ops-intel-profiles');
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.removeBronzeReasonFill = async function (
+  this: MarketingOpsService,
+  profileId: string,
+  input: { reason_key: string; business_name: string; address?: string | null },
+): Promise<IntelligenceProfile> {
+  const params = new URLSearchParams({ reason_key: input.reason_key, business_name: input.business_name });
+  if (input.address) params.set('address', input.address);
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/intelligence-profiles/${encodeURIComponent(profileId)}/bronze-slots?${params.toString()}`,
+    { method: 'DELETE' },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to remove bronze reason slot');
   }
   await this.invalidateCachePattern('mkt-ops-intel-profiles');
   return result.data?.data ?? result.data;

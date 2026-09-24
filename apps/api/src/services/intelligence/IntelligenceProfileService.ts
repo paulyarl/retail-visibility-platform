@@ -3471,6 +3471,241 @@ export class IntelligenceProfileService extends BaseService {
     return out;
   }
 
+  /**
+   * Bronze discovery slot fill — the bronze mirror of
+   * addGoldStandardCandidate. A bronze discovery scan surfaces exemplar
+   * candidates for the profile's reason slots; the operator promotes one
+   * into the ACTIVE profile's reason_coverage. Unlike
+   * recordBronzeExternalFills (draft-gated §7.3 out-of-loop writes), an
+   * operator promotion commits directly: retire the current active and
+   * write a new ACTIVE version — one version bump per fill, same as gold.
+   *
+   * Dedupes on business_name + address within the reason; enforces the
+   * 2-slot cap per reason. Idempotent: re-filling an already-present slot
+   * returns the current active without a new version.
+   */
+  async addBronzeReasonFill(profileId: string, input: {
+    reason_key: string;
+    slot: BronzeExternalFillSlot;
+  }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
+    const reasonKey = (input.reason_key || '').trim();
+    const businessName = (input.slot?.business_name || '').trim();
+    if (!reasonKey) {
+      throw new Error('reason_key is required');
+    }
+    if (!businessName) {
+      throw new Error('slot.business_name is required');
+    }
+
+    try {
+      const active = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId, status: 'active' },
+      });
+      if (!active) {
+        throw new Error(`Active profile ${profileId} not found`);
+      }
+      if (active.intelligence_focus !== 'bronze_standards') {
+        throw new Error(
+          `Profile ${profileId} is not a bronze-standard profile (focus: ${active.intelligence_focus}). Only bronze-standard profiles have reason slots.`,
+        );
+      }
+
+      const dedupeKey = (s: any) =>
+        `${(s.business_name || '').trim().toLowerCase()}|${(s.address || '').trim().toLowerCase()}`;
+
+      const config = JSON.parse(JSON.stringify(active.configuration_json ?? {})) as Record<string, any>;
+      const coverage: any[] = Array.isArray(config.reason_coverage) ? config.reason_coverage : [];
+
+      let entry = coverage.find((e: any) => e.reason_key === reasonKey);
+      if (!entry) {
+        entry = { reason_key: reasonKey, status: 'filled', slots: [], empty_slot_note: null };
+        coverage.push(entry);
+      }
+      entry.slots = Array.isArray(entry.slots) ? entry.slots : [];
+
+      const newKey = dedupeKey(input.slot);
+      if (entry.slots.some((s: any) => dedupeKey(s) === newKey)) {
+        // Idempotent — already in the reason's slot.
+        logger.info('Bronze reason fill already in slot (idempotent)', ctx, {
+          profileId,
+          reasonKey,
+          businessName,
+        });
+        return active as IntelligenceProfile;
+      }
+
+      if (entry.slots.length >= MAX_SLOTS_PER_REASON) {
+        throw new Error(
+          `Reason "${reasonKey}" already has ${MAX_SLOTS_PER_REASON} exemplars. Remove one before adding another.`,
+        );
+      }
+
+      entry.slots.push(input.slot);
+      entry.status = 'filled';
+      entry.empty_slot_note = null;
+      config.reason_coverage = coverage;
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        const latest = await tx.mkt_intelligence_profiles.findFirst({
+          where: { id: profileId },
+          orderBy: { version: 'desc' },
+        });
+        if (!latest) {
+          throw new Error(`Profile ${profileId} not found`);
+        }
+        await tx.mkt_intelligence_profiles.updateMany({
+          where: { id: profileId, status: 'active' },
+          data: { status: 'retired', updated_at: new Date() },
+        });
+        return tx.mkt_intelligence_profiles.create({
+          data: {
+            id: profileId,
+            category_key: latest.category_key,
+            category_name: latest.category_name,
+            version: latest.version + 1,
+            intelligence_focus: latest.intelligence_focus,
+            reference_city: latest.reference_city,
+            reference_state: latest.reference_state,
+            reference_platform: latest.reference_platform,
+            configuration_json: config as any,
+            status: 'active',
+          },
+        });
+      });
+
+      logger.info('Bronze reason slot filled', ctx, {
+        profileId,
+        version: result.version,
+        reasonKey,
+        businessName,
+      });
+      return result as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.addBronzeReasonFill failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        reasonKey,
+        businessName,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Remove an exemplar from a bronze reason slot — the inverse of
+   * addBronzeReasonFill, mirroring removeGoldStandardCandidate. Frees the
+   * slot so a new discovery can fill it. When the reason's last slot is
+   * removed the entry reverts to empty_unproven (the conservative state —
+   * the scan's prior empty classification is not recoverable). Idempotent:
+   * a missing slot returns the current active without a new version.
+   */
+  async removeBronzeReasonFill(profileId: string, input: {
+    reason_key: string;
+    business_name: string;
+    address?: string | null;
+  }, ctx?: RequestCtx): Promise<IntelligenceProfile> {
+    const reasonKey = (input.reason_key || '').trim();
+    const businessName = (input.business_name || '').trim();
+    if (!reasonKey) {
+      throw new Error('reason_key is required');
+    }
+    if (!businessName) {
+      throw new Error('business_name is required');
+    }
+
+    try {
+      const active = await this.prisma.mkt_intelligence_profiles.findFirst({
+        where: { id: profileId, status: 'active' },
+      });
+      if (!active) {
+        throw new Error(`Active profile ${profileId} not found`);
+      }
+      if (active.intelligence_focus !== 'bronze_standards') {
+        throw new Error(
+          `Profile ${profileId} is not a bronze-standard profile (focus: ${active.intelligence_focus}).`,
+        );
+      }
+
+      const dedupeKey = (s: any) =>
+        `${(s.business_name || '').trim().toLowerCase()}|${(s.address || '').trim().toLowerCase()}`;
+      const hasAddress = !!(input.address || '').trim();
+      const targetKey = `${businessName.toLowerCase()}|${(input.address || '').trim().toLowerCase()}`;
+      const targetName = businessName.toLowerCase();
+
+      const config = JSON.parse(JSON.stringify(active.configuration_json ?? {})) as Record<string, any>;
+      const coverage: any[] = Array.isArray(config.reason_coverage) ? config.reason_coverage : [];
+      const entry = coverage.find((e: any) => e.reason_key === reasonKey);
+      const slots: any[] = Array.isArray(entry?.slots) ? entry.slots : [];
+      // Address narrows the match when supplied; name alone otherwise.
+      const idx = slots.findIndex((s: any) =>
+        hasAddress
+          ? dedupeKey(s) === targetKey
+          : (s.business_name || '').trim().toLowerCase() === targetName,
+      );
+
+      if (!entry || idx < 0) {
+        logger.info('Bronze reason slot occupant not found (idempotent)', ctx, {
+          profileId,
+          reasonKey,
+          businessName,
+        });
+        return active as IntelligenceProfile;
+      }
+
+      slots.splice(idx, 1);
+      entry.slots = slots;
+      if (slots.length === 0) {
+        entry.status = 'empty_unproven';
+        entry.empty_slot_note = null;
+      }
+      config.reason_coverage = coverage;
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        const latest = await tx.mkt_intelligence_profiles.findFirst({
+          where: { id: profileId },
+          orderBy: { version: 'desc' },
+        });
+        if (!latest) {
+          throw new Error(`Profile ${profileId} not found`);
+        }
+        await tx.mkt_intelligence_profiles.updateMany({
+          where: { id: profileId, status: 'active' },
+          data: { status: 'retired', updated_at: new Date() },
+        });
+        return tx.mkt_intelligence_profiles.create({
+          data: {
+            id: profileId,
+            category_key: latest.category_key,
+            category_name: latest.category_name,
+            version: latest.version + 1,
+            intelligence_focus: latest.intelligence_focus,
+            reference_city: latest.reference_city,
+            reference_state: latest.reference_state,
+            reference_platform: latest.reference_platform,
+            configuration_json: config as any,
+            status: 'active',
+          },
+        });
+      });
+
+      logger.info('Bronze reason slot emptied', ctx, {
+        profileId,
+        version: result.version,
+        reasonKey,
+        businessName,
+      });
+      return result as IntelligenceProfile;
+    } catch (error) {
+      logger.error('IntelligenceProfileService.removeBronzeReasonFill failed', ctx, {
+        error: (error as Error).message,
+        profileId,
+        reasonKey,
+        businessName,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   // ─── Coverage aggregation ─────────────────────────────────────────────
   // Returns a coverage map grouped by category with TWO orthogonal state
   // dimensions per slot position:

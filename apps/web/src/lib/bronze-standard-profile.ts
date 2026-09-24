@@ -275,3 +275,68 @@ export function bronzeStandardSummary(profile: IntelligenceProfile): BronzeStand
     catalogRevision: typeof config.catalog_revision === 'number' ? config.catalog_revision : null,
   };
 }
+
+// ─── Discovery slot candidates ───────────────────────────────────────────
+
+/** Max exemplars per reason slot (mirrors MAX_SLOTS_PER_REASON on the API). */
+export const BRONZE_MAX_SLOTS_PER_REASON = 2;
+
+/** business_name|address identity used to dedupe slots within a reason. */
+export function bronzeSlotKey(slot: { business_name?: string | null; address?: string | null }): string {
+  return `${(slot.business_name || '').trim().toLowerCase()}|${(slot.address || '').trim().toLowerCase()}`;
+}
+
+export interface BronzeDiscoveryCandidate {
+  reason_key: string;
+  /** Catalog label when the draft's snapshot carries one (else null). */
+  reason_label: string | null;
+  slot: BronzeSlot;
+  /** Already occupying a slot on the ACTIVE profile for this reason. */
+  alreadyInSlot: boolean;
+  /** Active profile's reason slot is at cap — cannot accept another fill. */
+  slotFull: boolean;
+  activeSlotCount: number;
+}
+
+/**
+ * Diff a bronze discovery scan's reason_coverage (the imported draft)
+ * against the ACTIVE profile's coverage to find fillable candidates —
+ * the bronze mirror of gold discovery's "candidate → platform slot"
+ * promote list. Pure — unit-testable without profiles or the DB.
+ *
+ * A draft slot is a candidate when the active profile does not already
+ * hold that business (name+address) under the same reason. `slotFull`
+ * marks candidates the operator can't fill until a slot frees up.
+ */
+export function bronzeDiscoveryFillCandidates(
+  activeConfig: BronzeProfileConfig | null | undefined,
+  draftConfig: BronzeProfileConfig | null | undefined,
+): BronzeDiscoveryCandidate[] {
+  const draftCoverage = draftConfig?.reason_coverage ?? [];
+  const activeCoverage = activeConfig?.reason_coverage ?? [];
+  const labels = new Map<string, string>();
+  for (const row of draftConfig?.catalog_snapshot ?? []) {
+    if (row.reason_key && row.label) labels.set(row.reason_key, row.label);
+  }
+
+  const out: BronzeDiscoveryCandidate[] = [];
+  for (const entry of draftCoverage) {
+    const slots = entry.slots ?? [];
+    if (slots.length === 0) continue;
+    const activeEntry = activeCoverage.find((e) => e.reason_key === entry.reason_key);
+    const activeSlots = activeEntry?.slots ?? [];
+    const activeKeys = new Set(activeSlots.map(bronzeSlotKey));
+    for (const slot of slots) {
+      const key = bronzeSlotKey(slot);
+      out.push({
+        reason_key: entry.reason_key,
+        reason_label: labels.get(entry.reason_key) ?? null,
+        slot,
+        alreadyInSlot: activeKeys.has(key),
+        slotFull: activeSlots.length >= BRONZE_MAX_SLOTS_PER_REASON,
+        activeSlotCount: activeSlots.length,
+      });
+    }
+  }
+  return out;
+}

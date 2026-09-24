@@ -7770,6 +7770,28 @@ const bronzeExternalFillSchema = z.object({
   }).passthrough(),
 });
 
+// Bronze discovery slot fill — an operator promotes a discovery-scan
+// exemplar into a reason slot on the ACTIVE bronze profile (direct version
+// bump, the gold /candidates promote pattern — not the draft-gated
+// /bronze-fill path). Provenance stays operator/audit: the operator's click
+// IS the confirmation, so the fill is ground truth that survives re-scans.
+const bronzeSlotFillSchema = z.object({
+  reason_key: z.string().regex(BRONZE_REASON_KEY_PATTERN),
+  slot: z.object({
+    business_name: z.string().min(1).max(200),
+    address: z.string().max(300).nullable().optional(),
+    observed_platform: z.enum(['google', 'yelp', 'facebook', 'bbb', 'apple_maps', 'bing']).nullable().optional(),
+    category_fit_evidence: z.string().optional(),
+    operational_evidence: z.string().optional(),
+    operational_status: z.enum(['active', 'likely_active', 'unable_to_verify']).nullable().optional(),
+    discovered_by: z.enum(['operator_self_discovery', 'business_audit']),
+    discovered_via: z.string().max(500).nullable().optional(),
+    evidence_urls: z.array(z.string()).optional(),
+    digital_quality: z.enum(['low', 'very_low']).optional(),
+    platform_presence: z.record(z.string(), z.string()).optional(),
+  }).passthrough(),
+});
+
 // Single-reason test scan (sprint plan D3) — two modes, NEITHER persists a
 // profile. 'render' returns the single-reason prompt for an external agent;
 // 'validate' checks pasted output against the bronze scan schema.
@@ -8282,6 +8304,86 @@ router.post('/intelligence-profiles/:id/bronze-fill', async (req, res) => {
       });
     }
     res.status(201).json({ success: true, data: draft });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /intelligence-profiles/:id/bronze-slots — promote a discovery-scan
+// exemplar into a bronze reason slot on the ACTIVE profile. Direct commit
+// (retire current active → new active version), the bronze mirror of
+// POST /:id/candidates for gold standards.
+router.post('/intelligence-profiles/:id/bronze-slots', async (req, res) => {
+  try {
+    const parsed = bronzeSlotFillSchema.parse(req.body);
+    const profile = await IntelligenceProfileService.getInstance().addBronzeReasonFill(
+      req.params.id,
+      { reason_key: parsed.reason_key, slot: parsed.slot },
+      getCtx(req),
+    );
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: PLATFORM_SCOPE,
+        actor: req.user?.id || 'unknown',
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: `${profile.id}@${profile.version}`,
+          action_description: 'operator_fill_bronze_reason_slot',
+          profile_id: profile.id,
+          profile_version: profile.version,
+          reason_key: parsed.reason_key,
+          business_name: parsed.slot.business_name,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] bronze slot fill audit failed', getCtx(req), { error: (e as Error).message });
+    }
+    res.status(201).json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// DELETE /intelligence-profiles/:id/bronze-slots — remove an exemplar from a
+// bronze reason slot on the ACTIVE profile (frees the slot for a new
+// discovery). Mirrors DELETE /:id/candidates for gold standards.
+router.delete('/intelligence-profiles/:id/bronze-slots', async (req, res) => {
+  try {
+    const reasonKey = typeof req.query.reason_key === 'string' ? req.query.reason_key : '';
+    const businessName = typeof req.query.business_name === 'string' ? req.query.business_name : '';
+    const address = typeof req.query.address === 'string' ? req.query.address : undefined;
+    if (!reasonKey || !businessName) {
+      return res.status(400).json({ success: false, error: 'reason_key and business_name query params are required' });
+    }
+    const profile = await IntelligenceProfileService.getInstance().removeBronzeReasonFill(
+      req.params.id,
+      { reason_key: reasonKey, business_name: businessName, address },
+      getCtx(req),
+    );
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: PLATFORM_SCOPE,
+        actor: req.user?.id || 'unknown',
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: `${profile.id}@${profile.version}`,
+          action_description: 'operator_remove_bronze_reason_slot',
+          profile_id: profile.id,
+          profile_version: profile.version,
+          reason_key: reasonKey,
+          business_name: businessName,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] bronze slot removal audit failed', getCtx(req), { error: (e as Error).message });
+    }
+    res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -51,6 +51,12 @@ Non-Mantine components need **no provider** — plain elements + Radix wrappers 
 
 Both surfaces must dispatch: `IntelligenceProfilesClient` (View modal) and `IntelligenceEstablishmentPanel` (campaign Overview tab). The panel renders `activeProfile ?? bestMatchingDraft` — a draft shows as a labeled preview, so an establishment campaign's overview renders the scan output **before** activation too.
 
+### Bronze discovery — reason-slot fill pattern (added 2026-09-23)
+
+Bronze discovery campaigns (`scope=intelligence`, `focus=bronze_standards`, `kind=discovery`) mirror gold discovery: the ACTIVE profile owns a slot board of per-reason exemplar slots (cap 2, `MAX_SLOTS_PER_REASON`), and the imported city scan's draft is the candidate pool. `BronzeStandardDiscoveryPanel` renders on the campaign Overview tab (after the establishment branch in `CampaignDetailClient`) — the slot board, discovered candidates (`bronzeDiscoveryFillCandidates` in `lib/bronze-standard-profile.ts` diffs draft vs active on name+address), and click-to-fill/remove.
+
+Fill/unfill commit DIRECTLY to the active profile — retire old active + new active version in one transaction, one version bump per action, mirroring `addGoldStandardCandidate`/`removeGoldStandardCandidate`. Endpoints: `POST/DELETE /intelligence-profiles/:id/bronze-slots` → `IntelligenceProfileService.addBronzeReasonFill`/`removeBronzeReasonFill`. Distinct from the draft-gated `POST /:id/bronze-fill` (§7.3 out-of-loop writes). Removing a reason's last slot reverts the entry to `empty_unproven`. With no active profile the imported draft shows as proposed coverage — activating it establishes the board.
+
 ### Bronze catalog snapshot — DB truth, not the model's echo
 
 A bronze profile's `catalog_snapshot` is documented as a verbatim embedding of the scope-applicable catalog rows (§4), but the model re-echoes ~17 rows by hand and **the injected block is its only source**. Two consequences to keep in mind when touching either side:

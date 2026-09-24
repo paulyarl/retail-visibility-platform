@@ -689,7 +689,15 @@ export class MarketingPromptService extends BaseService {
      *  gate injects them into scan_contract.reconciliation and stamps unmatched
      *  members as violations. Report-mode: never rejects the import. */
     operatorSuppliedMembers?: string[];
-  }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null; enrichmentApplied: boolean }> {
+  }, ctx?: RequestCtx): Promise<{
+    execution: any;
+    audit: any | null;
+    enrichmentApplied: boolean;
+    /** Draft profile persisted by a schema hook (null when the schema produces none or the best-effort write failed). */
+    draftProfile: { id: string; version: number } | null;
+    /** Error message when a schema hook's draft write failed — the hook is best-effort so this is the only place the failure surfaces. */
+    draftProfileError: string | null;
+  }> {
     try {
       // 1. Load template + campaign
       const template = await this.getTemplate(input.templateId, ctx);
@@ -976,6 +984,14 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
+      // Draft-profile outcome for the response — the three schema hooks
+      // below (intelligence_profile, gold_standard_scan establishment,
+      // bronze_standard_scan) persist drafts best-effort: failures are
+      // logged, not thrown, so without this the import response cannot
+      // distinguish "draft created" from "hook failed".
+      let draftProfile: { id: string; version: number } | null = null;
+      let draftProfileError: string | null = null;
+
       // GAP-P8: best-effort post-import hook for intelligence_profile schema.
       // When an operator imports an externally-generated profile via
       // /executions/external, the validated JSON is persisted as a DRAFT
@@ -984,7 +1000,9 @@ export class MarketingPromptService extends BaseService {
       // must explicitly activate it before it affects any prompts.
       // Catches + logs errors so a persistence failure never fails the import.
       if (schemaName === 'intelligence_profile' && resolved.auditPlatform === null) {
-        await this.persistIntelligenceProfileDraft(input.campaignId, parsedJson, ctx);
+        const outcome = await this.persistIntelligenceProfileDraft(input.campaignId, parsedJson, ctx);
+        draftProfile = outcome.profile;
+        draftProfileError = outcome.error;
       }
 
       // Gold Standard System — Sprint 0: post-import hook for
@@ -1054,6 +1072,7 @@ export class MarketingPromptService extends BaseService {
               referenceState,
               referencePlatform: scanPlatform,
             }, ctx);
+            draftProfile = { id: profile.id, version: profile.version };
             logger.info('Gold standard profile imported as draft', ctx, {
               profileId: profile.id,
               version: profile.version,
@@ -1066,6 +1085,7 @@ export class MarketingPromptService extends BaseService {
             });
           }
         } catch (profileErr) {
+          draftProfileError = (profileErr as Error).message;
           logger.error('Gold standard profile draft persistence failed (best-effort)', ctx, {
             error: (profileErr as Error).message,
             campaignId: input.campaignId,
@@ -1206,6 +1226,7 @@ export class MarketingPromptService extends BaseService {
             referenceState,
             referencePlatform: scanPlatform,
           }, ctx);
+          draftProfile = { id: profile.id, version: profile.version };
           logger.info('Bronze standard profile imported as draft', ctx, {
             profileId: profile.id,
             version: profile.version,
@@ -1217,6 +1238,7 @@ export class MarketingPromptService extends BaseService {
             campaignId: input.campaignId,
           });
         } catch (profileErr) {
+          draftProfileError = (profileErr as Error).message;
           logger.error('Bronze standard profile draft persistence failed (best-effort)', ctx, {
             error: (profileErr as Error).message,
             campaignId: input.campaignId,
@@ -1400,7 +1422,7 @@ export class MarketingPromptService extends BaseService {
         }
       }
 
-      return { ...result, enrichmentApplied };
+      return { ...result, enrichmentApplied, draftProfile, draftProfileError };
     } catch (error) {
       if (error instanceof ScopeMismatchError) {
         logger.warn('External import scope mismatch', ctx, { error: error.message });
@@ -1424,7 +1446,14 @@ export class MarketingPromptService extends BaseService {
    * sentinel is a campaign-layer marker, never a literal profile slot. Never
    * throws — every failure is caught + logged so it cannot fail the import.
    */
-  private async persistIntelligenceProfileDraft(campaignId: string, parsedJson: any, ctx?: RequestCtx): Promise<void> {
+  private async persistIntelligenceProfileDraft(campaignId: string, parsedJson: any, ctx?: RequestCtx): Promise<{
+    profile: { id: string; version: number } | null;
+    error: string | null;
+  }> {
+    let outcome: { profile: { id: string; version: number } | null; error: string | null } = {
+      profile: null,
+      error: null,
+    };
     try {
       const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
       // Migration 202 — Profile Type Alignment: read the establishment
@@ -1477,6 +1506,7 @@ export class MarketingPromptService extends BaseService {
         referenceCity,
         referencePlatform,
       }, ctx);
+      outcome = { profile: { id: profile.id, version: profile.version }, error: null };
       logger.info('Intelligence profile imported as draft (GAP-P8)', ctx, {
         profileId: profile.id,
         version: profile.version,
@@ -1517,6 +1547,7 @@ export class MarketingPromptService extends BaseService {
         }
       }
     } catch (profileErr) {
+      outcome = { profile: null, error: (profileErr as Error).message };
       logger.error('Intelligence profile draft persistence failed (best-effort, GAP-P8)', ctx, {
         error: (profileErr as Error).message,
         campaignId,
@@ -1541,6 +1572,7 @@ export class MarketingPromptService extends BaseService {
         campaignId,
       });
     }
+    return outcome;
   }
 
   /**

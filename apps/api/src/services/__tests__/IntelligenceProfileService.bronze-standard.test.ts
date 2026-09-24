@@ -560,6 +560,180 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
     });
   });
 
+  // Discovery slot fill — the bronze mirror of addGoldStandardCandidate /
+  // removeGoldStandardCandidate: an operator promotes a scan exemplar into
+  // a reason slot on the ACTIVE profile, one version bump per fill.
+  describe('addBronzeReasonFill / removeBronzeReasonFill', () => {
+    const activeWithCoverage = (coverage: any[]) => PROFILE({
+      configuration_json: { catalog_revision: 1, reason_coverage: coverage } as any,
+    });
+    const fillSlot = {
+      business_name: 'Cedar Market',
+      address: '1234 W Layton Ave',
+      discovered_by: 'operator_self_discovery' as const,
+      digital_quality: 'low' as const,
+    };
+
+    it('fills an empty reason slot and bumps the active version', async () => {
+      const active = activeWithCoverage([
+        { reason_key: 'absent_from_platform', status: 'empty_unproven', slots: [], empty_slot_note: 'No exemplar found' },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+      mockPrisma.mkt_intelligence_profiles.create.mockImplementation(async ({ data }: any) => data);
+
+      const result = await service.addBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        slot: fillSlot,
+      });
+
+      expect(result.version).toBe(2);
+      expect(result.status).toBe('active');
+      const created = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data;
+      const entry = created.configuration_json.reason_coverage.find((e: any) => e.reason_key === 'absent_from_platform');
+      expect(entry.status).toBe('filled');
+      expect(entry.slots).toHaveLength(1);
+      expect(entry.slots[0].business_name).toBe('Cedar Market');
+      expect(entry.empty_slot_note).toBeNull();
+      expect(mockPrisma.mkt_intelligence_profiles.updateMany).toHaveBeenCalledWith({
+        where: { id: 'mip-bronze-1', status: 'active' },
+        data: expect.objectContaining({ status: 'retired' }),
+      });
+    });
+
+    it('creates the coverage entry when the reason is absent from coverage', async () => {
+      const active = activeWithCoverage([
+        { reason_key: 'misaligned_platform_category', status: 'filled', slots: [{ business_name: 'Other' }] },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+      mockPrisma.mkt_intelligence_profiles.create.mockImplementation(async ({ data }: any) => data);
+
+      await service.addBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'community_only_presence',
+        slot: fillSlot,
+      });
+
+      const created = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data;
+      const entry = created.configuration_json.reason_coverage.find((e: any) => e.reason_key === 'community_only_presence');
+      expect(entry.status).toBe('filled');
+      expect(entry.slots).toHaveLength(1);
+    });
+
+    it('is idempotent — same business+address returns active without a new version', async () => {
+      const active = activeWithCoverage([
+        { reason_key: 'absent_from_platform', status: 'filled', slots: [fillSlot] },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+
+      const result = await service.addBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        slot: { ...fillSlot, business_name: '  CEDAR MARKET ' },
+      });
+
+      expect(result.version).toBe(1);
+      expect(mockPrisma.mkt_intelligence_profiles.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a fill when the reason already has 2 slots', async () => {
+      const active = activeWithCoverage([
+        {
+          reason_key: 'absent_from_platform',
+          status: 'filled',
+          slots: [{ business_name: 'A' }, { business_name: 'B' }],
+        },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+
+      await expect(service.addBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        slot: fillSlot,
+      })).rejects.toThrow('already has 2 exemplars');
+    });
+
+    it('rejects a fill on a non-bronze profile', async () => {
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(
+        PROFILE({ intelligence_focus: 'gold_standards' }),
+      );
+      await expect(service.addBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        slot: fillSlot,
+      })).rejects.toThrow('not a bronze-standard profile');
+    });
+
+    it('removeBronzeReasonFill frees a slot and keeps the reason filled while occupants remain', async () => {
+      const active = activeWithCoverage([
+        {
+          reason_key: 'absent_from_platform',
+          status: 'filled',
+          slots: [fillSlot, { business_name: 'Second', address: '9 Other St' }],
+        },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+      mockPrisma.mkt_intelligence_profiles.create.mockImplementation(async ({ data }: any) => data);
+
+      const result = await service.removeBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        business_name: 'cedar market',
+        address: '1234 w layton ave',
+      });
+
+      expect(result.version).toBe(2);
+      const created = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data;
+      const entry = created.configuration_json.reason_coverage[0];
+      expect(entry.slots).toHaveLength(1);
+      expect(entry.slots[0].business_name).toBe('Second');
+      expect(entry.status).toBe('filled');
+    });
+
+    it('removeBronzeReasonFill reverts to empty_unproven when the last slot empties', async () => {
+      const active = activeWithCoverage([
+        { reason_key: 'absent_from_platform', status: 'filled', slots: [fillSlot] },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+      mockPrisma.mkt_intelligence_profiles.create.mockImplementation(async ({ data }: any) => data);
+
+      await service.removeBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        business_name: 'Cedar Market',
+        address: '1234 W Layton Ave',
+      });
+
+      const created = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data;
+      const entry = created.configuration_json.reason_coverage[0];
+      expect(entry.status).toBe('empty_unproven');
+      expect(entry.slots).toHaveLength(0);
+    });
+
+    it('removeBronzeReasonFill matches on business_name alone when no address is given', async () => {
+      const active = activeWithCoverage([
+        { reason_key: 'absent_from_platform', status: 'filled', slots: [fillSlot] },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+      mockPrisma.mkt_intelligence_profiles.create.mockImplementation(async ({ data }: any) => data);
+
+      await service.removeBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        business_name: 'Cedar Market',
+      });
+
+      expect(mockPrisma.mkt_intelligence_profiles.create).toHaveBeenCalled();
+    });
+
+    it('removeBronzeReasonFill is idempotent when the occupant is not in the slot', async () => {
+      const active = activeWithCoverage([
+        { reason_key: 'absent_from_platform', status: 'filled', slots: [fillSlot] },
+      ]);
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValue(active);
+
+      const result = await service.removeBronzeReasonFill('mip-bronze-1', {
+        reason_key: 'absent_from_platform',
+        business_name: 'Nobody',
+      });
+
+      expect(result.version).toBe(1);
+      expect(mockPrisma.mkt_intelligence_profiles.create).not.toHaveBeenCalled();
+    });
+  });
+
   // §10.2 regression — the whole reason bronze uses its own intelligence_focus
   // (Option A). activateDraft's retire query is focus-scoped, so activating a
   // bronze draft must NOT retire the active gold_standards profile for the

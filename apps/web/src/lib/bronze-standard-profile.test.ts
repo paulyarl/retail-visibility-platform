@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  bronzeDiscoveryFillCandidates,
   bronzeScopeLabel,
+  bronzeSlotKey,
   bronzeStandardSummary,
   isBronzeStandardProfile,
   slugifyReasonKey,
+  BRONZE_MAX_SLOTS_PER_REASON,
+  type BronzeProfileConfig,
 } from './bronze-standard-profile';
 import type { IntelligenceProfile } from '@/services/MarketingOpsService';
 
@@ -151,5 +155,93 @@ describe('slugifyReasonKey', () => {
     );
     expect(slugifyReasonKey('123 Numbers First')).toBe('reason_123_numbers_first');
     expect(slugifyReasonKey('Special chars & symbols! %')).toBe('special_chars_symbols');
+  });
+});
+
+// ─── Discovery slot candidates (BronzeStandardDiscoveryPanel) ───────────
+// A discovery scan's draft carries candidate slots; the active profile
+// carries committed slots; candidates = draft slots not already occupying
+// the active board (the bronze mirror of gold's promote list).
+
+describe('bronzeSlotKey', () => {
+  it('normalizes case and whitespace, tolerates missing address', () => {
+    expect(bronzeSlotKey({ business_name: '  Cedar MARKET ', address: '123 Main' })).toBe(
+      'cedar market|123 main',
+    );
+    expect(bronzeSlotKey({ business_name: 'Cedar Market' })).toBe('cedar market|');
+  });
+});
+
+describe('bronzeDiscoveryFillCandidates', () => {
+  const coverageConfig = (
+    coverage: BronzeProfileConfig['reason_coverage'],
+    snapshot?: BronzeProfileConfig['catalog_snapshot'],
+  ): BronzeProfileConfig => ({
+    reason_coverage: coverage,
+    catalog_snapshot: snapshot,
+  });
+
+  it('returns draft slots not already on the active board', () => {
+    const active = coverageConfig([
+      { reason_key: 'absent_from_platform', status: 'filled', slots: [{ business_name: 'Existing Biz', address: '1 St' }] },
+    ]);
+    const draft = coverageConfig([
+      {
+        reason_key: 'absent_from_platform',
+        status: 'filled',
+        slots: [{ business_name: 'Existing Biz', address: '1 st' }, { business_name: 'New Find', address: '9 Ave' }],
+      },
+    ]);
+    const out = bronzeDiscoveryFillCandidates(active, draft);
+    expect(out).toHaveLength(2);
+    const existing = out.find((c) => c.slot.business_name === 'Existing Biz');
+    const fresh = out.find((c) => c.slot.business_name === 'New Find');
+    expect(existing?.alreadyInSlot).toBe(true);
+    expect(fresh?.alreadyInSlot).toBe(false);
+  });
+
+  it('marks candidates for reasons absent from active coverage as fillable', () => {
+    const draft = coverageConfig([
+      { reason_key: 'community_only_presence', status: 'filled', slots: [{ business_name: 'Find' }] },
+    ]);
+    const out = bronzeDiscoveryFillCandidates(coverageConfig([]), draft);
+    expect(out).toHaveLength(1);
+    expect(out[0].alreadyInSlot).toBe(false);
+    expect(out[0].slotFull).toBe(false);
+    expect(out[0].activeSlotCount).toBe(0);
+  });
+
+  it('marks candidates slotFull when the active reason is at cap', () => {
+    const active = coverageConfig([
+      {
+        reason_key: 'absent_from_platform',
+        status: 'filled',
+        slots: [{ business_name: 'A' }, { business_name: 'B' }],
+      },
+    ]);
+    const draft = coverageConfig([
+      { reason_key: 'absent_from_platform', status: 'filled', slots: [{ business_name: 'C' }] },
+    ]);
+    const out = bronzeDiscoveryFillCandidates(active, draft);
+    expect(out[0].slotFull).toBe(true);
+    expect(out[0].activeSlotCount).toBe(BRONZE_MAX_SLOTS_PER_REASON);
+  });
+
+  it('pulls the reason label from the draft catalog snapshot', () => {
+    const draft = coverageConfig(
+      [{ reason_key: 'absent_from_platform', status: 'filled', slots: [{ business_name: 'Find' }] }],
+      [{ reason_key: 'absent_from_platform', label: 'Absent from platform' }],
+    );
+    const out = bronzeDiscoveryFillCandidates(null, draft);
+    expect(out[0].reason_label).toBe('Absent from platform');
+  });
+
+  it('skips reasons with no slots and tolerates null configs', () => {
+    const draft = coverageConfig([
+      { reason_key: 'absent_from_platform', status: 'empty_unproven', slots: [], empty_slot_note: 'None found' },
+    ]);
+    expect(bronzeDiscoveryFillCandidates(null, draft)).toHaveLength(0);
+    expect(bronzeDiscoveryFillCandidates(null, null)).toHaveLength(0);
+    expect(bronzeDiscoveryFillCandidates(undefined, {})).toHaveLength(0);
   });
 });
