@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { permanentRedirect } from 'next/navigation';
 import PlaceCityClient from './PlaceCityClient';
 import PlaceCityHero from './PlaceCityHero';
 import PlaceCityEnrichmentContent from './PlaceCityEnrichmentContent';
@@ -9,12 +10,13 @@ import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
+import { parsePlaceCitySlug } from '@/utils/slug';
 
-/** Slug-derived display name — the DB spelling wins whenever it's available. */
+/** Slug-derived display name — the DB spelling wins whenever it's available.
+ *  Strips the trailing state segment so 'indianapolis-in' reads 'Indianapolis'. */
 function cityNameFromSlug(citySlug: string): string {
-  return decodeURIComponent(citySlug)
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return parsePlaceCitySlug(citySlug)
+    .city.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ citySlug: string }> }): Promise<Metadata> {
@@ -59,6 +61,15 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
     marketIntelSurfaceService.getCityTeaser(citySlug).catch(() => null),
     placesBrowsePublicService.getCityShelfSummary(citySlug).catch(() => null),
   ]);
+
+  // Legacy bare-city slugs (and full-name state tokens) 308 to the canonical
+  // "{city}-{state}" URL so same-name cities across states never share a URL.
+  if (
+    summary?.canonicalSlug
+    && summary.canonicalSlug !== decodeURIComponent(citySlug).toLowerCase()
+  ) {
+    permanentRedirect(`/place/city/${summary.canonicalSlug}`);
+  }
 
   // DB-spelled city wins over the slug-derived form so the hero/CTA copy never
   // renders the slug's own casing.

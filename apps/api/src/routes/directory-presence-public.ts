@@ -1106,6 +1106,66 @@ router.get('/attribute-definitions', async (req: Request, res: Response) => {
 // City pages, map data, sitemap (Sprint 5)
 // ====================
 
+// Trailing-segment tokens that mark the state in a "{city}-{state}" shelf
+// slug. Postal codes AND full names map to the lowercase code — emitters slug
+// the raw stored state, which may be either form. The token must map here to
+// count as a state, so multi-word city names never mis-split ('south-bend'
+// stays a bare city; 'bluefield-west-virginia' → 'bluefield' + 'wv').
+const CITY_SLUG_STATE_TOKENS: Record<string, string> = {
+  al: 'al', alabama: 'al', ak: 'ak', alaska: 'ak', az: 'az', arizona: 'az',
+  ar: 'ar', arkansas: 'ar', ca: 'ca', california: 'ca', co: 'co', colorado: 'co',
+  ct: 'ct', connecticut: 'ct', de: 'de', delaware: 'de', dc: 'dc',
+  fl: 'fl', florida: 'fl', ga: 'ga', georgia: 'ga', hi: 'hi', hawaii: 'hi',
+  id: 'id', idaho: 'id', il: 'il', illinois: 'il', in: 'in', indiana: 'in',
+  ia: 'ia', iowa: 'ia', ks: 'ks', kansas: 'ks', ky: 'ky', kentucky: 'ky',
+  la: 'la', louisiana: 'la', me: 'me', maine: 'me', md: 'md', maryland: 'md',
+  ma: 'ma', massachusetts: 'ma', mi: 'mi', michigan: 'mi', mn: 'mn', minnesota: 'mn',
+  ms: 'ms', mississippi: 'ms', mo: 'mo', missouri: 'mo', mt: 'mt', montana: 'mt',
+  ne: 'ne', nebraska: 'ne', nv: 'nv', nevada: 'nv', nh: 'nh', 'new hampshire': 'nh',
+  nj: 'nj', 'new jersey': 'nj', nm: 'nm', 'new mexico': 'nm', ny: 'ny', 'new york': 'ny',
+  nc: 'nc', 'north carolina': 'nc', nd: 'nd', 'north dakota': 'nd', oh: 'oh', ohio: 'oh',
+  ok: 'ok', oklahoma: 'ok', or: 'or', oregon: 'or', pa: 'pa', pennsylvania: 'pa',
+  ri: 'ri', 'rhode island': 'ri', sc: 'sc', 'south carolina': 'sc', sd: 'sd', 'south dakota': 'sd',
+  tn: 'tn', tennessee: 'tn', tx: 'tx', texas: 'tx', ut: 'ut', utah: 'ut',
+  vt: 'vt', vermont: 'vt', va: 'va', virginia: 'va', wa: 'wa', washington: 'wa',
+  wv: 'wv', 'west virginia': 'wv', wi: 'wi', wisconsin: 'wi', wy: 'wy', wyoming: 'wy',
+};
+
+/** 'Coeur d'Alene' ⇄ 'coeur-d-alene' — slug and DB form share one normalization. */
+function normalizeCityForMatch(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Parse a /place/city shelf slug. Canonical form is "{city}-{state}"
+ * ('indianapolis-in'); a bare city slug ('springfield') is the legacy form —
+ * it resolves to the market's modal state and `canonicalSlug` in the response
+ * carries the disambiguated URL the page 308s to. State suffix is checked
+ * longest-first so two-word state names parse before their last word does.
+ */
+function parseCityShelfSlug(rawSlug: string): { cityName: string; stateCode: string | null; stateVariants: string[] | null } {
+  const decoded = decodeURIComponent(rawSlug).toLowerCase().trim();
+  const parts = decoded.split('-');
+  for (const n of [2, 1]) {
+    if (parts.length <= n) continue;
+    const token = parts.slice(-n).join(' ');
+    const code = CITY_SLUG_STATE_TOKENS[token];
+    if (code) {
+      const cityName = normalizeCityForMatch(parts.slice(0, -n).join('-'));
+      if (cityName) {
+        return {
+          cityName,
+          stateCode: code,
+          // Match both storage conventions — the code and the raw token
+          // ('in' + 'indiana', 'wv' + 'west virginia').
+          stateVariants: Array.from(new Set([code, token])),
+        };
+      }
+    }
+  }
+  return { cityName: normalizeCityForMatch(decoded), stateCode: null, stateVariants: null };
+}
+
 /** GET /api/public/directory/places/city/:citySlug — all presence listings in a city, grouped by category */
 router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
   try {
@@ -1117,7 +1177,13 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
 
     const pool = getDirectPool();
     const decodedSlug = decodeURIComponent(citySlug);
-    const cityName = decodedSlug.replace(/-/g, ' ');
+    const { cityName, stateVariants } = parseCityShelfSlug(citySlug);
+    // State-qualified slugs filter on dps.state too; bare city slugs keep the
+    // legacy city-only match. The city compare is punctuation-insensitive so
+    // slugified punctuation ('Coeur d'Alene' → 'coeur-d-alene') still matches.
+    const cityClause = `btrim(regexp_replace(lower(dps.city), '[^a-z0-9]+', ' ', 'g')) = $1`;
+    const stateClause = stateVariants ? ` AND lower(dps.state) = ANY($2::text[])` : '';
+    const marketParams: any[] = stateVariants ? [cityName, stateVariants] : [cityName];
 
     let orderBy = 'dll.business_name ASC';
     if (sort === 'recent') orderBy = 'dps.published_at DESC';
@@ -1130,31 +1196,38 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
-         AND LOWER(dps.city) = LOWER($1)`,
-      [cityName],
+         AND ${cityClause}${stateClause}`,
+      marketParams,
     );
     const total = parseInt(countResult.rows[0].total) || 0;
 
-    // Resolve the market's dominant seed row — city-only slugs can't
+    // Resolve the market's dominant seed row — a bare city slug can't
     // disambiguate same-name cities across states, so the modal state wins
-    // deterministically. The DB spelling also wins over the slug-derived
-    // lowercase name ('kansas-city' → 'kansas city'), so the page never
-    // renders a lowercase city. Then the location enrichment packet (same row
-    // the /directory/location page renders) for SEO metadata + on-page copy.
+    // deterministically (a state-qualified slug already pins it). The DB
+    // spelling also wins over the slug-derived lowercase name
+    // ('kansas-city' → 'kansas city'), so the page never renders a lowercase
+    // city. Then the location enrichment packet (same row the
+    // /directory/location page renders) for SEO metadata + on-page copy.
     const stateResult = await pool.query(
       `SELECT dps.city AS city, dps.state AS state, COUNT(*) AS cnt
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
-         AND LOWER(dps.city) = LOWER($1)
+         AND ${cityClause}${stateClause}
        GROUP BY dps.city, dps.state
        ORDER BY cnt DESC
        LIMIT 1`,
-      [cityName],
+      marketParams,
     );
     const cityState: string | null = stateResult.rows[0]?.state ?? null;
     const displayCity: string = stateResult.rows[0]?.city || cityName;
+    // Canonical "{city}-{state}" slug — only emitted when the stored state
+    // maps to a code, so the page never redirects to a slug that won't parse.
+    const canonicalStateCode = cityState
+      ? CITY_SLUG_STATE_TOKENS[cityState.trim().toLowerCase()] ?? null
+      : null;
+    const canonicalSlug = slugify(displayCity) + (canonicalStateCode ? `-${canonicalStateCode}` : '');
 
     let enrichment: any = null;
     if (cityState) {
@@ -1202,10 +1275,10 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
        LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(dps.category)
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
-         AND LOWER(dps.city) = LOWER($1)
+         AND ${cityClause}${stateClause}
        ORDER BY ${orderBy}
-       LIMIT $2 OFFSET $3`,
-      [cityName, perPage, offset],
+       LIMIT $${marketParams.length + 1} OFFSET $${marketParams.length + 2}`,
+      [...marketParams, perPage, offset],
     );
 
     const places = result.rows.map((row: any) => ({
@@ -1258,6 +1331,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       city: displayCity,
       state: cityState,
       citySlug: decodedSlug,
+      canonicalSlug,
       categories: Object.values(categoryMap),
       places,
       total,
@@ -1378,9 +1452,11 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
        LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)`,
     );
 
-    // Fetch all cities with published listings
+    // Fetch all markets (city+state pairs) with published listings — the
+    // canonical "/place/city/{city}-{state}" slug disambiguates same-name
+    // cities across states.
     const citiesResult = await pool.query(
-      `SELECT DISTINCT LOWER(dps.city) AS city_slug
+      `SELECT DISTINCT LOWER(dps.city) AS city_slug, LOWER(dps.state) AS state_slug
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
@@ -1408,7 +1484,11 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
 
     // City pages
     for (const row of citiesResult.rows) {
-      const citySlug = (row.city_slug as string).replace(/\s+/g, '-');
+      const stateCode = row.state_slug
+        ? CITY_SLUG_STATE_TOKENS[(row.state_slug as string).trim()] ?? null
+        : null;
+      const citySlug = slugify(row.city_slug as string)
+        + (stateCode ? `-${stateCode}` : '');
       urls.push(`  <url>
     <loc>${baseUrl}/place/city/${encodeURIComponent(citySlug)}</loc>
     <changefreq>weekly</changefreq>

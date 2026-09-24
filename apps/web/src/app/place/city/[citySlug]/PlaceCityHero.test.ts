@@ -29,7 +29,7 @@ const enrichment = {
 } as any;
 
 const baseProps = {
-  citySlug: 'kansas-city',
+  citySlug: 'kansas-city-mo',
   city: 'Kansas City',
   state: 'MO',
   total: 1,
@@ -62,7 +62,7 @@ describe('PlaceCityHero', () => {
     expect(html).toContain('Top categories in Kansas City');
     expect(html).toContain('grocery stores');
     expect(html).toContain('CollectionPage');
-    expect(html).toContain('/place/city/kansas-city');
+    expect(html).toContain('/place/city/kansas-city-mo');
   });
 
   it('pluralizes the count and omits it when no total is known', () => {

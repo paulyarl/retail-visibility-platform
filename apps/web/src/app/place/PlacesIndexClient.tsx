@@ -8,6 +8,7 @@ import placesBrowsePublicService, {
   NationalCategoryRosterEntry,
 } from '@/services/PlacesBrowsePublicService';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 export default function PlacesIndexClient({
   roster,
@@ -139,13 +140,13 @@ export default function PlacesIndexClient({
               </Link>
 
               {/* City breakdown — each chip links the seed city shelf
-                  (/place/city/{city-slug}, city-only slug per the API). */}
+                  (/place/city/{city}-{state}, the canonical market slug). */}
               {cat.cities.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
                   {cat.cities.slice(0, 4).map((c) => (
                     <Link
                       key={`${c.city}-${c.state}`}
-                      href={`/place/city/${c.city.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
+                      href={getPlaceCityShelfUrl(c.city, c.state)}
                       className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors"
                     >
                       <MapPin className="w-3 h-3" />

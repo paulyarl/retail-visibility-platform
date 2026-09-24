@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Info, MapPin, ShieldCheck, Tag } from 'lucide-react';
-import { getCategoryUrl, getCityUrl, slugify } from '@/utils/slug';
+import { getCategoryUrl, getCityUrl, getPlaceCityShelfUrl } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
@@ -437,7 +437,7 @@ export default function PlaceEntryEditorialLayout({
                 )}
                 {listing.city && listing.state && (
                   <Link
-                    href={`/place/city/${slugify(listing.city)}`}
+                    href={getPlaceCityShelfUrl(listing.city, listing.state)}
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-50 hover:bg-green-100 border border-green-200 rounded-full text-sm font-medium text-green-700 transition-colors"
                   >
                     <MapPin className="w-4 h-4" />

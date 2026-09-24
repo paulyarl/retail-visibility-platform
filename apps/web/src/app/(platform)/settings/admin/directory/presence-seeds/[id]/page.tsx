@@ -61,7 +61,7 @@ import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import ReportQrDesignerModal from './ReportQrDesignerModal';
 import TrafficEngagementPanel from './TrafficEngagementPanel';
-import { slugify } from '@/utils/slug';
+import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
 const PROVENANCE_FIELD_KEYS = [
@@ -864,7 +864,7 @@ function PresenceSeedDetailClient() {
     return `/place/category/${slug}${cityQs}`;
   };
 
-  // City shelf page — /place/city/{city-slug} for unclaimed seeds,
+  // City shelf page — /place/city/{city}-{state} for unclaimed seeds,
   // /directory/location/{city}-{state} once claimed (that surface needs a
   // state segment to parse, so no link without one).
   const cityShelf =
@@ -873,7 +873,7 @@ function PresenceSeedDetailClient() {
         ? `/directory/location/${slugify(listing.city)}-${slugify(listing.state)}`
         : null
       : listing?.city
-        ? `/place/city/${slugify(listing.city)}`
+        ? getPlaceCityShelfUrl(listing.city, listing.state)
         : null;
 
   const handleGetCoordinates = async () => {

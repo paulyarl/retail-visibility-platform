@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MapPin, Store } from 'lucide-react';
 import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
+import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 /**
  * Server-rendered national coverage band for the /place home. Renders the
@@ -25,12 +26,6 @@ export default function PlaceNationalPanel({
   const intro = enrichment.bodyCopy || enrichment.effective?.description || null;
 
   if (!intro && topCities.length === 0) return null;
-
-  const citySlug = (city: string) =>
-    city
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '-');
 
   return (
     <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
@@ -73,7 +68,7 @@ export default function PlaceNationalPanel({
               {topCities.map((c) => (
                 <Link
                   key={`${c.city}-${c.state}`}
-                  href={`/place/city/${citySlug(c.city)}`}
+                  href={getPlaceCityShelfUrl(c.city, c.state)}
                   className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors"
                 >
                   <MapPin className="w-3.5 h-3.5" />

@@ -27,6 +27,7 @@ import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 import { resolveShelfForLabel, shelfHrefFor } from '@/lib/place-shelves';
+import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 interface PlaceCategoryClientProps {
   categorySlug: string;
@@ -247,7 +248,7 @@ export default function PlaceCategoryClient({
           {city && (
             <div className="mt-3">
               <Link
-                href={`/place/city/${city.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
+                href={getPlaceCityShelfUrl(city, cityStateMap[city] ?? state)}
                 className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
                 Browse all places in {city}

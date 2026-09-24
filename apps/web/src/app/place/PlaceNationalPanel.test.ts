@@ -49,9 +49,9 @@ describe('PlaceNationalPanel', () => {
     expect(html).toContain('340 places listed');
     expect(html).toContain('12 markets');
     expect(html).toContain('3 states covered');
-    // Top markets link into the seed city shelves (city-only slugs).
-    expect(html).toContain('/place/city/indianapolis');
-    expect(html).toContain('/place/city/columbus');
+    // Top markets link into the seed city shelves (canonical {city}-{state}).
+    expect(html).toContain('/place/city/indianapolis-in');
+    expect(html).toContain('/place/city/columbus-oh');
   });
 
   it('falls back to effective.description when bodyCopy is absent', () => {

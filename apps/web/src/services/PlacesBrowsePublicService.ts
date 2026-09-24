@@ -281,6 +281,9 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
     state: string | null;
     total: number;
     enrichment: LocationEnrichmentResponse | null;
+    /** "{city}-{state}" slug the page should 308 to when the requested slug
+     *  was the legacy bare-city form (or a full-name state token). */
+    canonicalSlug: string | null;
   } | null> {
     try {
       const result = await this.makeDefaultRequest<any>(
@@ -297,6 +300,7 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
         state: data.state ?? null,
         total: data.total ?? 0,
         enrichment: data.enrichment ?? null,
+        canonicalSlug: data.canonicalSlug ?? null,
       };
     } catch {
       return null;

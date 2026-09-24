@@ -152,6 +152,40 @@ export function getCityUrl(
   return `${basePath}/${slugify(city)}-${slugify(state)}`;
 }
 
+/** Postal codes that mark the trailing state segment of a "{city}-{state}" shelf slug. */
+const PLACE_CITY_STATE_CODES = new Set([
+  'al','ak','az','ar','ca','co','ct','de','dc','fl','ga','hi','id','il','in',
+  'ia','ks','ky','la','me','md','ma','mi','mn','ms','mo','mt','ne','nv','nh',
+  'nj','nm','ny','nc','nd','oh','ok','or','pa','ri','sc','sd','tn','tx','ut',
+  'vt','va','wa','wv','wi','wy',
+]);
+
+/**
+ * Split a /place/city shelf slug into display parts. Canonical form is
+ * "{city}-{state}" ('indianapolis-in'); a bare city slug is the legacy form.
+ * The trailing token only counts as a state when it's a real postal code, so
+ * multi-word city names never mis-split.
+ */
+export function parsePlaceCitySlug(slug: string): { city: string; state: string | null } {
+  const parts = decodeURIComponent(slug).toLowerCase().split('-');
+  const last = parts[parts.length - 1];
+  if (parts.length > 1 && PLACE_CITY_STATE_CODES.has(last)) {
+    return { city: parts.slice(0, -1).join(' '), state: last };
+  }
+  return { city: parts.join(' '), state: null };
+}
+
+/**
+ * Canonical URL for a /place seed city shelf — "{city}-{state}" when the
+ * state is known ('/place/city/indianapolis-in'), which disambiguates
+ * same-name cities across states. Bare city slugs still resolve server-side
+ * (the shelf 308s to the canonical URL), so a missing state degrades
+ * gracefully instead of breaking the link.
+ */
+export function getPlaceCityShelfUrl(city: string, state?: string | null): string {
+  return state ? getCityUrl(city, state, '/place/city') : `/place/city/${slugify(city)}`;
+}
+
 /**
  * Generate navigation URL for a directory listing.
  * Tier-aware: unclaimed "directory_presence" listings live at /place/{slug},
