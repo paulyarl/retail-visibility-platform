@@ -491,7 +491,10 @@ export function formatEnrichmentCategoryVocabulary(
   }
 
   if (registered.length > 0) {
-    lines.push('', `REGISTERED LABELS (${registered.length}) — operator- and analyst-added, not all are directory shelves:`);
+    lines.push('', `REGISTERED LABELS (${registered.length}) — reference only, NOT emit-eligible:`);
+    lines.push('  operator- and analyst-added labels, including service packages');
+    lines.push('  that are not categories. Do not emit these in related-category fields;');
+    lines.push('  if one fits the category genuinely, note it in context.category_notes.');
     lines.push(`  ${registered.join(', ')}`);
   }
 
