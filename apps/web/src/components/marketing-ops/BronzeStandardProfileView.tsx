@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Accordion,
   Alert,
@@ -226,6 +226,36 @@ export default function BronzeStandardProfileView({ profile }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
+  const [catalogKeys, setCatalogKeys] = useState<Set<string> | null>(null);
+
+  // Catalog keys the profile itself already knows — coverage rows, out-of-scope
+  // keys, and the embedded snapshot. Synchronous so the first paint reflects
+  // scan-time collisions before the live catalog fetch lands.
+  const knownCatalogKeys = new Set<string>([
+    ...coverage.map((c) => c.reason_key),
+    ...notApplicable,
+    ...snapshot.map((r) => r.reason_key),
+  ]);
+
+  // Live catalog fetch — a suggestion may already have been authored after the
+  // scan (from this view, the catalog admin page, or another profile), which is
+  // the case the profile-embedded keys cannot see. includeDeprecated because a
+  // retired key still conflicts (keys are never reused).
+  useEffect(() => {
+    if (suggested.length === 0) return;
+    let cancelled = false;
+    marketingOpsService
+      .listBronzeReasons({ includeDeprecated: true })
+      .then((res) => {
+        if (!cancelled) setCatalogKeys(new Set(res.reasons.map((r) => r.reason_key)));
+      })
+      .catch(() => {
+        // Best-effort — knownCatalogKeys and the POST's 409 are the backstops.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id, suggested.length]);
 
   const [authorForm, setAuthorForm] = useState({
     reason_key: '',
@@ -290,6 +320,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
     }
     if (!authorForm.definition.trim()) {
       setModalError('Definition is required');
+      return;
+    }
+    if (knownCatalogKeys.has(key) || (catalogKeys?.has(key) ?? false)) {
+      setModalError(`reason_key "${key}" already exists in the catalog — keys are immutable and never reused`);
       return;
     }
 
@@ -522,6 +556,7 @@ export default function BronzeStandardProfileView({ profile }: Props) {
                   {suggested.map((s, idx) => {
                     const key = s.reason_key || slugifyReasonKey(s.proposed_label);
                     const isAdded = addedKeys.has(key);
+                    const existsInCatalog = !isAdded && (knownCatalogKeys.has(key) || (catalogKeys?.has(key) ?? false));
                     const isFamily = Boolean(s.category_family_applicable);
                     return (
                       <Paper key={idx} withBorder radius="sm" p="sm" bg="white">
@@ -551,13 +586,13 @@ export default function BronzeStandardProfileView({ profile }: Props) {
                             </Stack>
                             <Button
                               size="xs"
-                              variant={isAdded ? 'light' : 'filled'}
-                              color={isAdded ? 'green' : 'blue'}
-                              leftSection={isAdded ? <IconCheck size={14} /> : <IconPlus size={14} />}
-                              disabled={isAdded}
+                              variant={isAdded ? 'light' : existsInCatalog ? 'outline' : 'filled'}
+                              color={isAdded ? 'green' : existsInCatalog ? 'gray' : 'blue'}
+                              leftSection={isAdded || existsInCatalog ? <IconCheck size={14} /> : <IconPlus size={14} />}
+                              disabled={isAdded || existsInCatalog}
                               onClick={() => handleOpenAddModal(s)}
                             >
-                              {isAdded ? 'Added to Catalog' : 'Add to Catalog'}
+                              {isAdded ? 'Added to Catalog' : existsInCatalog ? 'Already in Catalog' : 'Add to Catalog'}
                             </Button>
                           </Group>
 

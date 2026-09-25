@@ -7249,7 +7249,9 @@ MarketingOpsService.prototype.createBronzeReason = async function (
     0,
   );
   if (!result.success) {
-    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create bronze reason');
+    throw new Error(
+      typeof result.error === 'string' ? result.error : (result.error?.message ?? 'Failed to create bronze reason'),
+    );
   }
   await this.invalidateCachePattern('mkt-ops-bronze-reasons');
   return result.data?.data ?? result.data;

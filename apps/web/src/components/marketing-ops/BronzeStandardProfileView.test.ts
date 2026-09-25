@@ -181,4 +181,38 @@ describe('BronzeStandardProfileView', () => {
     expect(rendered).toContain('diaspora business registry');
     expect(rendered).toContain('Suggested Blind Spots');
   });
+
+  it('disables the catalog button when the suggested reason_key already exists', () => {
+    // Keys are immutable and never reused — a suggestion whose key collides
+    // with a catalog row (here via the embedded snapshot / coverage, and via
+    // the not-applicable list) must not offer an "Add to Catalog" POST that
+    // can only 409.
+    const profileWithCollisions = {
+      ...PROFILE,
+      configuration_json: {
+        ...(PROFILE.configuration_json as any),
+        suggested_reasons: [
+          {
+            reason_key: 'no_mainstream_profile',
+            proposed_label: 'No platform profile at all (re-suggested)',
+            proposed_definition: 'Analyst re-suggested a reason already in the catalog.',
+            scope_level: 'universal',
+          },
+          {
+            reason_key: 'wholesale_or_hybrid_role',
+            proposed_label: 'Wholesale or hybrid role (re-suggested)',
+            proposed_definition: 'Collides with a key in the not-applicable list.',
+            scope_level: 'universal',
+          },
+        ],
+      },
+    } as unknown as IntelligenceProfile;
+
+    const rendered = renderToStaticMarkup(
+      createElement(MantineProvider, null, createElement(BronzeStandardProfileView, { profile: profileWithCollisions })),
+    );
+
+    expect(rendered).toContain('Already in Catalog');
+    expect(rendered).not.toContain('Add to Catalog');
+  });
 });
