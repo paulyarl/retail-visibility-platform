@@ -36,7 +36,7 @@ import {
 // Bump this marker when the template bodies change — the seed checks for the
 // marker's presence in the stored body, not the absence of an old section
 // (AGENTS.md idempotency discipline).
-const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V12';
+const SEED_VERSION_MARKER = 'ENRICHMENT_DIRECTIVE_V13';
 
 const CATEGORY_TEMPLATE = {
   id: 'mpt-category-enrichment-default',
@@ -62,13 +62,13 @@ Uniform platform voice — the same register used on every public surface (busin
 - meta_title: <= 70 chars. Pattern: "{Category} in {City}, {ST} — VisibleShelf Places" for market pages; "{Category} — VisibleShelf Places" for national. Front-load the category noun.
 - description: <= 300 chars meta description. Browse-oriented: who is listed, that listings come from public information, and 1-2 related terms shoppers search.
 - keywords: 8-15 search terms — the category name, synonyms, "near me" variants, related product/service terms. No keyword stuffing, no competitor brand names.
-- secondary_categories: 3-6 closely related category names relevant in this market that a shopper might also browse (real categories, not invented niches).
+- secondary_categories: 3-6 closely related category names relevant in this market that a shopper might also browse — emit verbatim labels from the KNOWN CATEGORIES vocabulary appended to this prompt whenever one fits (real categories, not invented niches).
 - schema_type_hint: the schema.org type that best fits the page — typically "CollectionPage" for a category listing page.
 - body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what shoppers find on this page and how listings are sourced. Warm and factual, per the TONE section. Definitional "what is this category" content belongs in category_overview, not here.
 - category_overview: 1-2 paragraphs (<= 5000 chars) of definitional content — what this category IS, what businesses in it do, who they serve. For shoppers who don't know the category (e.g. "African grocery stores sell pantry staples, fresh produce, frozen foods, and specialty products from African countries"). Distinct from body_copy (page intro) and shopper_guide (how to choose). This is "what is this category."
-- super_categories: 2-4 containing categories that this one belongs to (e.g. "grocery stores", "food retail", "retail"). Used for breadcrumbs on the category page.
+- super_categories: 2-4 platform parent shelves this category belongs to — verbatim labels from the KNOWN CATEGORIES vocabulary (e.g. "Grocery Store" for a specialty grocery). Never generic industry buckets like "retail" or "food retail" — they are not shelves. Used for breadcrumbs on the category page.
 - sub_categories: 2-6 specializations within this category (e.g. "West African grocery", "Afro-Caribbean grocery", "pan-African grocery"). Used for drill-down on the category page. Return an empty array if the category has no meaningful sub-specializations.
-- adjacent_categories: 2-5 sibling categories at the same taxonomy level (e.g. "Asian grocery store", "Latin American grocery store", "Middle Eastern grocery store"). Used for "Related categories" on the category page.
+- adjacent_categories: 2-5 sibling categories at the same taxonomy level — verbatim labels from the KNOWN CATEGORIES vocabulary when one fits (e.g. "Asian Grocery Store", "Mexican Grocery Store", "Indian Grocery Store"). Used for "Related categories" on the category page.
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this category, what makes a listing worth visiting, what to check (hours, website, product scope, reviews). Warm, helpful, per the TONE section. Distinct from body_copy (which is intro copy); this is "how to choose" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about this category. Each answer 1-3 sentences, warm and factual, per the TONE section. Used for an FAQ section + FAQ schema on the page.
 
@@ -122,13 +122,13 @@ Uniform platform voice — the same register used on every public surface (busin
 - meta_title: <= 70 chars. Pattern: "Local Businesses in {City}, {ST} — VisibleShelf Directory". Front-load the place.
 - description: <= 300 chars meta description. What the page offers: a browsable index of local businesses in the city, listed from public information.
 - keywords: 8-15 search terms — "{city} businesses", "local shops {city}", categories likely strong in this market, "near me" variants. No keyword stuffing.
-- secondary_categories: 3-6 category names likely to be strong in this location's business mix (generic, e.g. "restaurants", "grocery stores").
-- top_categories: 3-8 category names most representative of this city's business landscape — used to describe what the location is known for. Prefer real, common categories over invented niches.
+- secondary_categories: 3-6 category names likely to be strong in this location's business mix — emit verbatim labels from the KNOWN CATEGORIES vocabulary appended to this prompt whenever one fits (the vocabulary is retail storefront shelves; non-shelf categories like restaurants are legitimate unlisted picks).
+- top_categories: 3-8 category names most representative of this city's business landscape — used to describe what the location is known for. Prefer verbatim KNOWN CATEGORIES labels so they hot-link on the page; real, common categories over invented niches.
 - schema_type_hint: usually "WebPage".
 - body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the location page — what the city's local business scene looks like, how listings are sourced, what shoppers can browse. Warm and factual, per the TONE section.
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this city, how to find what you need, any city-specific shopping context. Distinct from body_copy (which is intro copy); this is "how to browse" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about businesses in this city. Each answer 1-3 sentences, warm and factual, per the TONE section. Used for an FAQ section + FAQ schema on the page.
-- area_breakdown: 3-6 named areas, corridors, or neighborhoods in this city with a short description and the categories strong there. Used for a "Browse by Area" section on the page.
+- area_breakdown: 3-6 named areas, corridors, or neighborhoods in this city with a short description and the categories strong there — prefer verbatim KNOWN CATEGORIES labels for strong_categories (they render as hot-link chips). Used for a "Browse by Area" section on the page.
 
 === REUSABLE CONTEXT (multiple consumers) ===
 Produce a context object with multiple consumers:
@@ -145,7 +145,7 @@ Place-specific fields (market_summary, notable_areas, market_gaps, metro_dynamic
 - context.notable_areas: named areas (simplified list — the structured area_breakdown is the page-rendered version).
 - context.market_notes: optional free-text notes useful for downstream work (e.g. "strong tech corridor on the north side", "large immigrant communities drive specialty grocery demand").
 - context.city_profile: STRUCTURAL city characteristics (NO place names — no neighborhoods, corridors, or districts). This is shared with category enrichment to ground category copy in the city's market. Fields: { metro_description (qualitative, e.g. "major Midwest metro, state capital"), major_industries (string[]), growth_trajectory (qualitative, e.g. "growing tech and logistics sector"), demographic_character (qualitative, e.g. "diverse, large immigrant communities"), market_character (1-2 sentences: overall business market character) }. Use qualitative descriptors, NOT specific population counts or income figures.
-- context.market_gaps: 2-5 categories with unmet demand in this city — what to prospect first. Each entry: { category, signal, area }. The signal explains why this is a gap (e.g. "large West African community, few dedicated stores"). The area is optional (e.g. "south side"). Use general knowledge — do not fabricate counts or specific business names.
+- context.market_gaps: 2-5 categories with unmet demand in this city — what to prospect first. Each entry: { category, signal, area }. Prefer verbatim KNOWN CATEGORIES labels for "category" (they feed prospect matching). The signal explains why this is a gap (e.g. "large West African community, few dedicated stores"). The area is optional (e.g. "south side"). Use general knowledge — do not fabricate counts or specific business names.
 - context.metro_context: 1-2 paragraphs (shopper-facing) describing where this city sits in its metro area — surrounding suburbs, how they relate, where shoppers might also look. Helps shoppers understand the broader area. Warm and factual, per the TONE section.
 - context.metro_dynamics: 2-6 nearby cities/suburbs with their character and dynamics. Each entry: { city, state, relationship, character, business_scene, notes }. Use qualitative descriptors (e.g. "affluent", "fast-growing"), NOT specific income figures or population counts. relationship = how it relates to this city (e.g. "northern suburb"). character = overall feel (e.g. "affluent planned community"). business_scene = dominant business types (optional). notes = income level, growth, demographics (optional).
 
@@ -201,13 +201,13 @@ Uniform platform voice — the same register used on every public surface (busin
 - meta_title: <= 70 chars. Pattern: "{Category} in {City}, {ST} — VisibleShelf Places". Front-load the category noun.
 - description: <= 300 chars meta description. Browse-oriented: who is listed, that listings come from public information, and 1-2 related terms shoppers search.
 - keywords: 8-15 search terms — the category name, synonyms, "near me" variants, related product/service terms. No keyword stuffing, no competitor brand names.
-- secondary_categories: 3-6 closely related category names relevant in this market that a shopper might also browse (real categories, not invented niches).
+- secondary_categories: 3-6 closely related category names relevant in this market that a shopper might also browse — emit verbatim labels from the KNOWN CATEGORIES vocabulary appended to this prompt whenever one fits (real categories, not invented niches).
 - schema_type_hint: the schema.org type that best fits the page — typically "CollectionPage" for a category listing page.
 - body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the category page — what shoppers find on this page and how listings are sourced. Warm and factual, per the TONE section. Definitional "what is this category" content belongs in category_overview, not here.
 - category_overview: 1-2 paragraphs (<= 5000 chars) of definitional content — what this category IS, what businesses in it do, who they serve. Distinct from body_copy (page intro) and shopper_guide (how to choose).
-- super_categories: 2-4 containing categories (e.g. "grocery stores", "food retail", "retail"). Used for breadcrumbs.
+- super_categories: 2-4 platform parent shelves this category belongs to — verbatim labels from the KNOWN CATEGORIES vocabulary; never generic industry buckets like "retail" or "food retail". Used for breadcrumbs.
 - sub_categories: 2-6 specializations within this category (e.g. "West African grocery", "Afro-Caribbean grocery"). Return an empty array if none are meaningful.
-- adjacent_categories: 2-5 sibling categories at the same taxonomy level. Used for "Related categories".
+- adjacent_categories: 2-5 sibling categories at the same taxonomy level — verbatim labels from the KNOWN CATEGORIES vocabulary when one fits. Used for "Related categories".
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — what to look for when browsing businesses in this category, what makes a listing worth visiting, what to check (hours, website, product scope, reviews). Distinct from body_copy; this is "how to choose" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about this category. Each answer 1-3 sentences, warm and factual. Used for an FAQ section + FAQ schema.
 
@@ -264,13 +264,13 @@ Uniform platform voice — the same register used on every public surface (busin
 - meta_title: <= 70 chars. Pattern: "Local Businesses Across the US — VisibleShelf Directory". No city or state name.
 - description: <= 300 chars meta description. What the page offers: a browsable index of local businesses across covered states and markets, listed from public information.
 - keywords: 8-15 search terms — "local businesses", "businesses near me", "local directory", covered-state and market phrasing, category terms that lead nationally. No keyword stuffing.
-- secondary_categories: 3-6 category names strong across the directory's national business mix (generic, e.g. "restaurants", "grocery stores").
-- top_categories: 3-8 category names most representative of the platform's national listing landscape.
+- secondary_categories: 3-6 category names strong across the directory's national business mix — emit verbatim labels from the KNOWN CATEGORIES vocabulary appended to this prompt whenever one fits (the vocabulary is retail storefront shelves; non-shelf categories are legitimate unlisted picks).
+- top_categories: 3-8 category names most representative of the platform's national listing landscape — prefer verbatim KNOWN CATEGORIES labels so they hot-link on the page.
 - schema_type_hint: usually "CollectionPage".
 - body_copy: 1-2 short paragraphs (<= 5000 chars total) of visible on-page copy for the top of the national page — how coverage is organized (states and markets), how listings are sourced, what shoppers can browse. Warm and factual, per the TONE section. NO single-city claims.
 - shopper_guide: 1-2 short paragraphs (<= 5000 chars) of shopper guidance — how to browse by state or market, how coverage differs region to region, what to expect when drilling into a market page. Distinct from body_copy (which is intro copy); this is "how to browse nationally" guidance.
 - faq: 3-6 question/answer pairs shoppers might have about browsing the directory nationally (e.g. "How many states does VisibleShelf cover?"). Each answer 1-3 sentences, warm and factual. Used for an FAQ section + FAQ schema.
-- area_breakdown: a browse-by-state/market structure — 3-8 covered states or metros, each with a short description and the categories strong there. NOT neighborhoods — this level is states and metros.
+- area_breakdown: a browse-by-state/market structure — 3-8 covered states or metros, each with a short description and the categories strong there — prefer verbatim KNOWN CATEGORIES labels for strong_categories. NOT neighborhoods — this level is states and metros.
 
 === REUSABLE CONTEXT (multiple consumers) ===
 Produce a context object with multiple consumers:
@@ -284,7 +284,7 @@ Produce a context object with multiple consumers:
 - context.notable_areas: covered metros and markets (simplified list — the structured area_breakdown is the page-rendered version).
 - context.market_notes: optional free-text notes useful for downstream work (e.g. "coverage concentrated in Midwest metros", "thin coverage in Mountain West").
 - context.city_profile: STRUCTURAL national coverage characteristics (NO place names). Shared with national category enrichment. Fields: { metro_description (qualitative, e.g. "multi-state coverage concentrated in Midwest metros"), major_industries (string[] — dominant business types across coverage), growth_trajectory (qualitative, e.g. "expanding into adjacent metros"), demographic_character (qualitative), market_character (1-2 sentences: overall national market character) }. Use qualitative descriptors, NOT specific population counts.
-- context.market_gaps: 2-5 uncovered or thin regions — where coverage is sparse relative to population. Each entry: { category: "<region or market>", signal, area }. The signal explains why it reads as a gap (e.g. "populous state with few covered markets"). Use the injected coverage data — do not fabricate counts.
+- context.market_gaps: 2-5 uncovered or thin regions — where coverage is sparse relative to population. Each entry: { category: "<region or market>", signal, area }. On this national packet "category" carries a REGION or market name (not a category label — the KNOWN CATEGORIES vocabulary does not apply here). The signal explains why it reads as a gap (e.g. "populous state with few covered markets"). Use the injected coverage data — do not fabricate counts.
 - context.metro_context: 1-2 paragraphs (shopper-facing) describing how the directory organizes geographically — coverage by state, how markets relate within a state, where shoppers browse next. Warm and factual, per the TONE section.
 - context.metro_dynamics: 2-6 covered states or regions with their character. Each entry: { city: "<state or metro name>", state, relationship, character, business_scene, notes }. relationship = coverage role (e.g. "largest covered market", "recently added state"). Use qualitative descriptors, NOT specific income figures or population counts.
 

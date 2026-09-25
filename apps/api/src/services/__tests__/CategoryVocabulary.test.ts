@@ -134,7 +134,7 @@ describe('formatEnrichmentCategoryVocabulary', () => {
     );
 
     expect(block).toContain('PLATFORM CATEGORY VOCABULARY');
-    expect(block).toContain('directory vocabulary of 2 canonical');
+    expect(block).toContain('the 2 canonical category labels');
     expect(block).toContain('KNOWN CATEGORIES (2):');
     expect(block).toContain('Auto Repair, Grocery Store');
     expect(block).toContain('REGISTERED LABELS (1)');
@@ -158,6 +158,16 @@ describe('formatEnrichmentCategoryVocabulary', () => {
     expect(block).toContain('super_categories are PLATFORM parents');
     expect(block).toContain('drill up to');
     expect(block).toContain('"Retail"');
+  });
+
+  it('leads with the platform goal — physical shelves of independent retailers', () => {
+    const block = formatEnrichmentCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('PLATFORM GOAL');
+    expect(block).toContain('PHYSICAL SHELVES');
+    expect(block).toContain('independent brick-and-mortar retailers');
+    // Non-shelf businesses are a legitimate unlisted pick, not an error.
+    expect(block).toContain('is legitimate when no shelf fits');
   });
 
   it("returns '' when both lists are empty", () => {
