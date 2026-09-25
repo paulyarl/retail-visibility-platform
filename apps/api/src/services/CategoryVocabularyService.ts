@@ -197,8 +197,10 @@ export class CategoryVocabularyService extends BaseService {
                  LATERAL unnest(secondary_categories) sec
           UNION
           SELECT category_name AS name FROM directory_category_enrichment
+            WHERE category_key !~ '^__'
           UNION
           SELECT category_name AS name FROM mkt_intelligence_profiles
+            WHERE category_key !~ '^__'
         ) names
         WHERE name IS NOT NULL
           AND BTRIM(name) <> ''
