@@ -180,9 +180,11 @@ export class CategoryVocabularyService extends BaseService {
    *   - mkt_campaigns_list.secondary_categories (operator-added supplements)
    *   - directory_category_enrichment.category_name (an applied packet →
    *     a live category page exists for that label)
-   *   - mkt_intelligence_profiles.category_name (an established category
-   *     profile — the category is already part of the intelligence corpus)
-   * Sentinel placeholders (__location__, __all__) are excluded. Returned
+   *   - mkt_intelligence_profiles.category_name (an ACTIVE established
+   *     category profile — retired/draft versions don't make a live page)
+   * Sentinel placeholders (__location__, __all__) are excluded by key and
+   * by name — location packets reuse these tables with a sentinel
+   * category_key and the location label in category_name. Returned
    * unsorted/unpartitioned — the formatter partitions against the directory
    * and registered lists.
    */
@@ -200,7 +202,7 @@ export class CategoryVocabularyService extends BaseService {
             WHERE category_key !~ '^__'
           UNION
           SELECT category_name AS name FROM mkt_intelligence_profiles
-            WHERE category_key !~ '^__'
+            WHERE category_key !~ '^__' AND status = 'active'
         ) names
         WHERE name IS NOT NULL
           AND BTRIM(name) <> ''
