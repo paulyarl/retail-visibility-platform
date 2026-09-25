@@ -49,6 +49,14 @@ PRIOR BUSINESS-AUDIT WEBSITE FINDINGS (from the breadth audit — treat as
 leads to verify, not as conclusions):
 {{prior_website_findings}}
 
+=== PLATFORM GOAL: THE DIGITAL SHELF ===
+VisibleShelf exists to make the PHYSICAL SHELVES of independent brick-and-mortar
+retailers visible to customers who walk through the door. For a storefront
+business, the website is the digital extension of that shelf: customers browse
+online and buy at the counter — the site is never a shipping operation. Frame
+every conversion implication in that model: each gap is a customer who would
+have walked in, lost before they left the house.
+
 === OBJECTIVE ===
 Produce a Website Positioning Audit for this business. You are NOT re-running
 the four-platform breadth audit — that already happened. You are judging the

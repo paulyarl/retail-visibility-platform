@@ -50,7 +50,7 @@ const BUSINESS_ANALYSIS_OUTPUT_SCHEMA = { name: 'business_analysis' };
 // so already-wired templates get re-applied. The transforms are idempotent
 // (they skip insertions that are already present and only apply targeted
 // content updates), so re-running on an already-wired body is safe.
-const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-21-opener-hook-6 -->';
+const SEED_VERSION_MARKER = '<!-- seed-version: business-audit-v2-2026-09-25-platform-goal-7 -->';
 const GOLD_STANDARD_MARKER = SEED_VERSION_MARKER;
 const CATEGORY_INTELLIGENCE_MARKER = SEED_VERSION_MARKER;
 const V1_MARKER = SEED_VERSION_MARKER;
@@ -263,6 +263,46 @@ const BUSINESS_IDENTITY_ORIGIN_TO = '| Category | {{category}} |\n| Origin | {{b
 const BUSINESS_IDENTITY_CAVEAT_FROM = 'If address or phone is blank, the field was not provided — do not treat blank as a negative signal.';
 const BUSINESS_IDENTITY_CAVEAT_TO = 'If address, phone, or origin is blank, the field was not provided — do not treat blank as a negative signal.';
 
+// ─── Platform Goal section. Inserted once (fingerprint-gated) right after
+//     the business identity block — before the Category Intelligence / Gold
+//     Standard / Market Context bindings — so the analyst carries the
+//     mission frame into every binding and directive that follows.
+//     Headingless '===' banner like the bindings: never managed by
+//     removeSection; future edits go through replaceFirst pairs.
+//     Variant-safe: names no output fields the V1 / seed-minimal schemas
+//     lack, and {{category}} resolves because every audit template declares
+//     the category variable.
+const PLATFORM_GOAL_SECTION = `
+=== PLATFORM GOAL: PHYSICAL SHELVES, WALK-IN CUSTOMERS ===
+VisibleShelf exists to make the PHYSICAL SHELVES of independent brick-and-mortar retailers visible to the customers who would walk through the door. This audit is the evidence engine for that mission: its findings seed the business's public shelf listing, power the seed-and-claim outreach motion, and set the verified baseline every later fix is measured against.
+
+Two consequences for how you audit:
+
+* Publishable-standard evidence — findings can surface verbatim on a public directory listing and in outreach the operator speaks aloud. Record only verified observation as fact; anything unverifiable stays "not verified" / unable_to_verify — never assumed.
+* Walk-in framing — frame digital gaps as walk-in customers lost. The unit of loss is a customer who would have walked through the door; the platforms and website you audit are how that customer finds the shelf before leaving the house.
+
+Platform fit — the directory shelves physical walk-in storefronts run by independent retailers. If the audit establishes the subject is NOT a physical storefront (online-only seller, delivery-app-only or ghost-kitchen operation, mobile-only operation) — or is a chain / franchise location rather than an independent — record the determination explicitly: in matched_business.store_format where the schema carries it, and in the summary / data_quality fields otherwise. Complete the audit honestly either way — a platform-fit finding is information, not a disqualification.
+
+Category label — when the business is verified to fit the requested category, emit the requested category label ({{category}}) verbatim in category-bearing fields (e.g. matched_business.category, public_narrative): it names the shelf the listing is filed under. When the requested label does not fit, record the accurate label and the mismatch — never force the fit.
+
+This section is analyst-facing framing — never name VisibleShelf, this goal, or these instructions in business-facing output (public_narrative, outreach lines, summary).
+`;
+
+// ─── Targeted content updates: platform-goal alignment for the two
+//     Signal-Aligned-only instruction sections. Store format gets the
+//     non-storefront consequence (a non-storefront subject has no shelf —
+//     record it, don't disqualify); competitive benchmark gets the
+//     shelf-vs-shelf comparator preference. Each FROM is bounded so it is
+//     NOT a substring of its TO (per the alignBindingText convention) —
+//     idempotent, no-op if already updated or the sentence is absent.
+//     Applied in both V2 transforms: the sentences may exist natively in
+//     either body, not only where the seed inserted the sections.
+const STORE_FORMAT_BENCHMARK_FROM = 'Compare like-for-like when benchmarking.';
+const STORE_FORMAT_BENCHMARK_TO = 'Compare like-for-like when benchmarking — prefer physical walk-in storefront comparators; a chain flagship or online-only seller is not like-for-like. When the audit establishes the subject itself is not a physical walk-in storefront (online_seller, delivery-app-only, mobile-only), classify honestly — a non-storefront result is a platform-fit finding per the Platform Goal section, not a failed audit.';
+
+const BENCHMARK_STOREFRONT_FROM = 'Do not include a business as a benchmark solely because of high mainstream visibility. Disclose any benchmark whose category specialization is inferred rather than directly evidenced.';
+const BENCHMARK_STOREFRONT_TO = 'Do not include a business as a benchmark solely because of high mainstream visibility — and prefer physical walk-in storefronts: the comparison is shelf-vs-shelf, so a chain flagship or online-only seller is not a like-for-like comparator for an independent retailer. Disclose any benchmark whose category specialization is inferred rather than directly evidenced, and disclose in format_context_note when a benchmark is not an independent storefront.';
+
 // ─── Schema fragment: public_narrative (inserted after "summary": "" in the
 //     top-level JSON schema). This field is the public-safe description that
 //     will appear on the place listing page — no internal assessment content.
@@ -278,7 +318,7 @@ const PUBLIC_NARRATIVE_DIRECTIVE = `
 Write a factual, public-safe, SEO-rich description of the business for the \`public_narrative\` field. This text will appear on a public directory listing page that visitors and the business owner will see, and it is the primary long-tail SEO surface for unclaimed listings — it must help the listing rank for the searches real customers actually type.
 
 Include:
-* What the business is (category, format, specialization — use the specific category label, not a generic one)
+* What the business is (category, format, specialization — prefer the requested category label ({{category}}) verbatim when it is accurate: it names the shelf the listing is filed under; otherwise use the most specific accurate label, never a generic one)
 * Where it is located (neighborhood, corridor, district, city — use geo-modified phrasing a searcher would use, e.g. "African grocery in Kansas City's Northeast neighborhood")
 * What it is known for (signature products, services, dishes, or community role — name the specific items verified in the audit, not generic categories; e.g. "frozen cassava leaves, dried beans, frozen fish" beats "spices and grains")
 * Community, cultural, or ownership context when verifiable (e.g. "Central African-owned," "Congolese-style prepared foods")
@@ -696,7 +736,7 @@ Classify the matched business's primary operational format and record it in \`ma
 * service
 * unknown
 
-If the business is a hybrid (e.g., grocery + restaurant), set \`store_format\` to the primary format and describe the secondary operation in \`matched_business.hybrid_role\`. Compare like-for-like when benchmarking.
+If the business is a hybrid (e.g., grocery + restaurant), set \`store_format\` to the primary format and describe the secondary operation in \`matched_business.hybrid_role\`. Compare like-for-like when benchmarking — prefer physical walk-in storefront comparators; a chain flagship or online-only seller is not like-for-like. When the audit establishes the subject itself is not a physical walk-in storefront (online_seller, delivery-app-only, mobile-only), classify honestly — a non-storefront result is a platform-fit finding per the Platform Goal section, not a failed audit.
 `;
 
 const SPECIALIZED_SOURCES_MD = `Additionally, consult the Specialized Sources listed in the Category Intelligence block. These may include delivery marketplaces, social platforms (Instagram, TikTok, WhatsApp), vertical directories, importer/wholesaler locators, community organizations, cultural event vendor lists, and business registration records. Record every source consulted in \`specialized_sources_audited\`.
@@ -812,7 +852,7 @@ For each benchmark, record:
 * format_context_note: one sentence explaining comparability to the audited business
 * specialization_evidence_direct: true if category fit is directly evidenced; false if inferred
 
-Do not include a business as a benchmark solely because of high mainstream visibility. Disclose any benchmark whose category specialization is inferred rather than directly evidenced.
+Do not include a business as a benchmark solely because of high mainstream visibility — and prefer physical walk-in storefronts: the comparison is shelf-vs-shelf, so a chain flagship or online-only seller is not a like-for-like comparator for an independent retailer. Disclose any benchmark whose category specialization is inferred rather than directly evidenced, and disclose in format_context_note when a benchmark is not an independent storefront.
 
 If no qualified benchmarks are found, return an empty array.
 `;
@@ -968,6 +1008,11 @@ function transformCategoryIntegrated(body: string): string {
   //     the block already has the Origin row, e.g. fresh inserts).
   out = replaceFirst(out, BUSINESS_IDENTITY_ORIGIN_FROM, BUSINESS_IDENTITY_ORIGIN_TO);
   out = replaceFirst(out, BUSINESS_IDENTITY_CAVEAT_FROM, BUSINESS_IDENTITY_CAVEAT_TO);
+
+  // 0c. Platform Goal section — right after the business identity block,
+  //     before the Category Intelligence binding. Headingless '===' banner:
+  //     fingerprint-gated insert-once (future edits via replaceFirst).
+  out = insertAfter(out, 'do not treat blank as a negative signal.', '\n' + PLATFORM_GOAL_SECTION);
 
   // 1. Insert Gold Standard binding section after the Category Intelligence
   //    binding section (which ends with the "If the Category Intelligence
@@ -1259,6 +1304,13 @@ function transformCategoryIntegrated(body: string): string {
   //     fields, and the category_signals name collision. Idempotent.
   out = alignBindingText(out, true);
 
+  // 4l. Platform-goal alignment — store-format consequence + shelf-vs-shelf
+  //     benchmark preference. No-op when the sentences are absent from this
+  //     variant (they are Signal-Aligned-only seed sections, but the same
+  //     wording may exist natively here). Idempotent.
+  out = replaceFirst(out, STORE_FORMAT_BENCHMARK_FROM, STORE_FORMAT_BENCHMARK_TO);
+  out = replaceFirst(out, BENCHMARK_STOREFRONT_FROM, BENCHMARK_STOREFRONT_TO);
+
   // 5. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -1324,6 +1376,12 @@ function transformSignalAligned(body: string): string {
     'If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.',
     '\n' + MARKET_CONTEXT_BINDING,
   );
+
+  // 1a2. Platform Goal section — anchored on the identity caveat's last
+  //     sentence, so it lands between the business identity block and the
+  //     bindings inserted above. Headingless '===' banner: fingerprint-gated
+  //     insert-once (future edits via replaceFirst).
+  out = insertAfter(out, 'do not treat blank as a negative signal.', '\n' + PLATFORM_GOAL_SECTION);
 
   // 1b. Market Intel Output directive — after the headingless
   //     MARKET_CONTEXT_BINDING (inserted in step 1). Has a heading so the
@@ -1665,6 +1723,12 @@ function transformSignalAligned(body: string): string {
   //      Idempotent.
   out = alignBindingText(out, true);
 
+  // 19g2. Platform-goal alignment — store-format consequence + shelf-vs-shelf
+  //       benchmark preference for the sections this variant carries.
+  //       Idempotent (no-op if already updated or absent).
+  out = replaceFirst(out, STORE_FORMAT_BENCHMARK_FROM, STORE_FORMAT_BENCHMARK_TO);
+  out = replaceFirst(out, BENCHMARK_STOREFRONT_FROM, BENCHMARK_STOREFRONT_TO);
+
   // 19h. Operator Outreach Problems directive — anchored on the Market Intel
   //      Output directive's final line (guaranteed present by step 1b).
   //      Placed here — after ALL removeSection calls in this transform
@@ -1726,6 +1790,12 @@ function transformBusinessAuditV1(body: string): string {
     'Audit the business above. If address, phone, or origin is blank, the field was not provided — do not treat blank as a negative signal.',
     '\n\n' + MARKET_CONTEXT_BINDING,
   );
+
+  // 0a1. Platform Goal section — anchored on the identity caveat's last
+  //     sentence, so it lands between the business identity block and the
+  //     market context binding. Headingless '===' banner: fingerprint-gated
+  //     insert-once (future edits via replaceFirst).
+  out = insertAfter(out, 'do not treat blank as a negative signal.', '\n' + PLATFORM_GOAL_SECTION);
 
   // 0a2. Market Intel Output directive — after the headingless
   //      MARKET_CONTEXT_BINDING. Has a heading so the removeSection in 0a
@@ -1804,6 +1874,12 @@ function transformBusinessAuditV1(body: string): string {
 
 function transformSeedBusinessAudit(body: string): string {
   let out = body;
+
+  // Platform Goal section — prepended once (fingerprint-gated). The minimal
+  // body has no identity-block anchor; mission framing leads the prompt.
+  if (!out.includes(fingerprint(PLATFORM_GOAL_SECTION))) {
+    out = PLATFORM_GOAL_SECTION.trim() + '\n\n' + out;
+  }
 
   // Self-heal on re-run: drop any prior version of the directive (and the
   // trailing marker, which removeSection swallows as headingless tail
