@@ -1443,6 +1443,14 @@ export interface ProspectQueueEntry {
   discovery_signals?: string[] | null;
   business_seek_priority?: string | null;
   intelligence_run_id?: string | null;
+  // Seed confidence meter (discovery → seed lane): composite score toward
+  // "real, distinct, in-market, category-fit business worth seeding" —
+  // computed at list-read time; absent for non-discovery entries.
+  seed_confidence?: {
+    score: number;
+    band: 'high' | 'medium' | 'low' | 'insufficient';
+    factors: Array<{ label: string; delta: number }>;
+  } | null;
   // Verify-then-outreach (Migration 255)
   verification?: VerificationRecord | null;
   // Proving ground (Migration 262)
@@ -2360,6 +2368,11 @@ class MarketingOpsService extends AdminApiSingleton {
     category_override?: string;
     city_override?: string;
     state_override?: string;
+    // Two-lane triage (GAP-E3 + discovery verdict): the discovery candidate's
+    // assessment context — validated server-side; seeds the campaign's
+    // discovery_context AND the partial-verdict stub audit.
+    discovery_context?: Record<string, any>;
+    intelligence_run_id?: string;
   }): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${parentId}/derive-business`,
@@ -7451,12 +7464,19 @@ export interface DetectedSignal {
   label: string;
   family: string;
   contributedToRule: boolean;
+  /** 'discovery_scan' = translated from Category Discovery evidence
+   *  (partial-verdict lane); absent = audit/campaign-field extraction. */
+  origin?: 'discovery_scan';
 }
 
 export interface TriageSourceAudit {
   id: string;
   platform: string;
   createdAt: string;
+  /** audit_metadata.source for stub audits ('discovery_scan',
+   *  'manual_queue', 'queue_promotion', 'derived_from_parent'); null on
+   *  real audit imports. */
+  auditSource: string | null;
 }
 
 export interface TriageResult {
@@ -7481,6 +7501,10 @@ export interface TriageResult {
   detectedSignals: DetectedSignal[];
   isOperatorAccepted: boolean | null;
   evaluatedAt: string;
+  /** Two-lane triage: 'full' = evaluated from a real business_analysis audit;
+   *  'partial' = evaluated from a stub audit (discovery scan, queue
+   *  promotion, derive) or campaign fields only. */
+  verdict: 'partial' | 'full';
   sourceAudit: TriageSourceAudit | null;
 }
 

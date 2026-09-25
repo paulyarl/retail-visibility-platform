@@ -79,6 +79,12 @@ export interface DetectedSignal {
   code: SignalCode;
   label: string;
   contributedToRule: boolean;
+  /**
+   * Evidence lane that produced this signal. 'discovery_scan' = translated
+   * from Category Discovery evidence (partial verdict); absent = audit /
+   * campaign-field extraction (full-verdict lane).
+   */
+  origin?: 'discovery_scan';
 }
 
 /**

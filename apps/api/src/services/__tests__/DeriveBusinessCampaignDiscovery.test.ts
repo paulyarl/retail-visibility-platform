@@ -3,9 +3,10 @@
  * (Migration 253 — GAP-E3).
  *
  *   T1 — Handoff with context: child row has discovery_context +
- *        intelligence_run_id; notes contain the "Discovery context" section;
- *        no business_analysis audit seeded (empty detectedSignals); no
- *        auto-triage.
+ *        intelligence_run_id; notes contain the "Discovery context" section.
+ *        Two-lane triage: the context's evidence is translated into canonical
+ *        signals (discovery-verdict mapper) → a 'discovery_scan' stub audit
+ *        seeds the PARTIAL verdict + auto-triage fires.
  *   T2 — Legacy call (no discovery input): child identical to today — null
  *        columns, unchanged notes shape; detectedSignals audit-seed +
  *        auto-triage behavior unchanged.
@@ -122,7 +123,7 @@ describe('deriveBusinessCampaign — discovery context handoff (Migration 253 �
 
   // ─── T1: Handoff with context ─────────────────────────────────────────
 
-  it('T1: child row has discovery_context + intelligence_run_id; notes contain "Discovery context" section; no audit seeded; no auto-triage', async () => {
+  it('T1: child row has discovery_context + intelligence_run_id; discovery evidence seeds a partial-verdict stub audit + auto-triage', async () => {
     const child = await MarketingCampaignService.deriveBusinessCampaign({
       parentId: 'parent-1',
       businessName: 'African Grocery Store',
@@ -144,17 +145,51 @@ describe('deriveBusinessCampaign — discovery context handoff (Migration 253 �
     expect(child.notes).toContain('Signals: Strong Hidden Trust, Possible Category Misalignment');
     expect(child.notes).toContain('Sources: Somali Community Directory (primary)');
 
-    // No business_analysis audit seeded (detectedSignals is empty for
-    // intelligence entries — INT codes live in discovery_signals, not
-    // detected_signals)
-    expect(mockAudits.create).not.toHaveBeenCalled();
+    // Two-lane triage: field-level derivation fires (no website + no phone
+    // → WC_MISSING_WEBSITE + CP_MISSING_CONTACT_INFO). INT_* codes are never
+    // copied verbatim — the stub carries only canonical codes.
+    expect(mockAudits.create).toHaveBeenCalledTimes(1);
+    const auditCall = mockAudits.create.mock.calls[0][0];
+    expect(auditCall.data.platform).toBe('business_analysis');
+    expect(auditCall.data.audit_data.audit_metadata.source).toBe('discovery_scan');
+    expect(auditCall.data.audit_data.audit_metadata.verdict).toBe('partial');
+    expect(auditCall.data.audit_data.detected_signals).toEqual(
+      expect.arrayContaining(['WC_MISSING_WEBSITE', 'CP_MISSING_CONTACT_INFO']),
+    );
+    expect(
+      auditCall.data.audit_data.detected_signals.every((s: string) => !s.startsWith('INT_')),
+    ).toBe(true);
 
-    // No auto-triage (the detectedSignals audit-seed branch is unchanged —
-    // it only fires when detectedSignals is non-empty)
-    // CampaignTriageService.evaluateTriageForCampaign is the auto-triage
-    // call; verify it was NOT called
+    // Notes carry the discovery-derived signal line too
+    expect(child.notes).toContain('Partial verdict signals (discovery-derived):');
+
+    // Auto-triage fires on the seeded stub — the campaign is born with a
+    // partial verdict.
+    const { default: CampaignTriageService } = await import('../CampaignTriageService');
+    expect(CampaignTriageService.evaluateTriageForCampaign).toHaveBeenCalledTimes(1);
+  });
+
+  it('T1b: discovery context with a real website + phone produces no derivable signals → no stub audit, no auto-triage', async () => {
+    const child = await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'parent-1',
+      businessName: 'Established Biz',
+      discoveryContext: sampleDiscoveryContext,
+      intelligenceRunId: 'mir_run_001',
+      websiteUrl: 'https://established-biz.example.com',
+      phone: '555-123-4567',
+      reviewCount: 200,
+    });
+
+    // Context still persists on the child row.
+    const createCall = mockCampaignsList.create.mock.calls[0][0];
+    expect(createCall.data.discovery_context).toEqual(sampleDiscoveryContext);
+
+    // No mapped evidence (the INT codes in the fixture have no defect
+    // equivalent; website/phone/reviewCount are all healthy) → no stub.
+    expect(mockAudits.create).not.toHaveBeenCalled();
     const { default: CampaignTriageService } = await import('../CampaignTriageService');
     expect(CampaignTriageService.evaluateTriageForCampaign).not.toHaveBeenCalled();
+    expect(child.notes).not.toContain('Partial verdict signals');
   });
 
   // ─── T2: Legacy call (no discovery input) ─────────────────────────────

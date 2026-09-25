@@ -201,7 +201,7 @@ const PLAYBOOK_CATEGORY_TO_PROMPT_CATEGORIES: Record<string, string[]> = {
 // Queue-promotion placeholder audits carry detected_signals only — they are
 // seeded at queue/promotion time so triage can run pre-audit, and must not
 // render as a business_analysis audit card.
-const STUB_AUDIT_SOURCES = new Set(['manual_queue', 'queue_promotion', 'derived_from_parent']);
+const STUB_AUDIT_SOURCES = new Set(['manual_queue', 'queue_promotion', 'derived_from_parent', 'discovery_scan']);
 function isStubBusinessAnalysisAudit(audit: Audit): boolean {
   if (audit.platform !== 'business_analysis') return false;
   const source = (audit.audit_data as any)?.audit_metadata?.source;

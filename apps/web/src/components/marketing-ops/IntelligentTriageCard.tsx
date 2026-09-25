@@ -238,6 +238,22 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Intelligent Triage</h3>
+          {triage?.verdict === 'partial' && (
+            <span
+              className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              title="Evaluated from discovery-scan or pre-audit signals — run a business_analysis audit for the full verdict"
+            >
+              Partial verdict
+            </span>
+          )}
+          {triage?.verdict === 'full' && (
+            <span
+              className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+              title="Evaluated from a real business_analysis audit"
+            >
+              Full verdict
+            </span>
+          )}
           {accepted && (
             <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
               <CheckCircle2 className="w-3 h-3" /> Accepted
@@ -271,7 +287,16 @@ export default function IntelligentTriageCard({ campaign, onRefresh }: Intellige
       {/* Source audit lineage — show which audit fed the triage */}
       {triage && (
         <div className="flex items-start gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-          {triage.sourceAudit ? (
+          {triage.sourceAudit?.auditSource === 'discovery_scan' ? (
+            <>
+              <FileText className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <span>
+                Evaluated from the <strong>Category Discovery</strong> scan — signals translated from
+                discovery evidence. Run a <strong>business_analysis</strong> audit to upgrade this
+                to a full verdict.
+              </span>
+            </>
+          ) : triage.sourceAudit ? (
             <>
               <FileText className="w-3 h-3 flex-shrink-0 mt-0.5" />
               <span>

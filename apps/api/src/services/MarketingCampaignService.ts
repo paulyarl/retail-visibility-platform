@@ -27,6 +27,7 @@ import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 import { normalizeReferenceState } from './intelligence/IntelligenceProfileService.js';
 import { isNationalSentinel } from './intelligence/geography-grid.js';
 import type { DiscoveryContext } from '../validators/intelligence-discovery.schema';
+import { deriveDiscoverySignals } from './triage/discovery-verdict';
 import type { IdentityFieldKey } from './directory/identityScoring';
 
 /** Call outcome — mirrors the queue's VerificationOutcome. */
@@ -2010,6 +2011,32 @@ export class MarketingCampaignService extends BaseService {
         throw new NotFoundError(`Parent campaign ${input.parentId} not found`);
       }
 
+      // Two-lane triage (Category Discovery → partial verdict): when no
+      // explicit audit signals were passed but the derive carries discovery
+      // context, translate the scan's named evidence (competitive weaknesses,
+      // bronze reason attribution, field absences, INT_* codes with clean
+      // audit-family equivalents) into canonical RA/DS/WC/CP/VP codes via the
+      // deterministic mapper. They seed a stub business_analysis audit marked
+      // source='discovery_scan' so the campaign is born with a partial
+      // verdict; a later real audit supersedes it (selectAuditForTriage
+      // prefers non-stub audits, and refreshUndecidedVerdict re-evaluates on
+      // business_analysis import).
+      const discoveryDerived =
+        !(input.detectedSignals?.length) && input.discoveryContext
+          ? deriveDiscoverySignals({
+              discoverySignals: input.discoveryContext.discovery_signals,
+              competitiveWeaknesses: input.discoveryContext.competitive_weaknesses,
+              bronzeAttribution: input.discoveryContext.bronze_attribution,
+              website: input.websiteUrl,
+              phone: input.phone,
+              gbpUrl: input.gbpUrl,
+              reviewCount: input.reviewCount,
+            })
+          : null;
+      const triageSignals = input.detectedSignals?.length
+        ? input.detectedSignals
+        : (discoveryDerived?.signals ?? []);
+
       // Derive estimated_tier from rating + review count heuristics.
       const tier = this.inferTierFromMetrics(input.rating, input.reviewCount);
 
@@ -2028,6 +2055,9 @@ export class MarketingCampaignService extends BaseService {
         input.reviewCount != null ? `Reviews: ${input.reviewCount}` : null,
         outreachAngle ? `Outreach angle: ${outreachAngle}` : null,
         input.detectedSignals?.length ? `Detected signals: ${input.detectedSignals.join(', ')}` : null,
+        discoveryDerived?.signals.length
+          ? `Partial verdict signals (discovery-derived): ${discoveryDerived.signals.join(', ')}`
+          : null,
         input.note ? `Operator note: ${input.note}` : null,
       ].filter(Boolean);
 
@@ -2164,8 +2194,8 @@ export class MarketingCampaignService extends BaseService {
                 review_count: input.reviewCount ?? null,
                 derived_from_campaign_id: child.id,
               } as any,
-              detected_signals: (input.detectedSignals ?? []) as any,
-              signal_count: input.detectedSignals?.length ?? 0,
+              detected_signals: triageSignals as any,
+              signal_count: triageSignals.length,
               rating: input.rating ?? null,
               review_count: input.reviewCount ?? null,
               status: 'campaign_created',
@@ -2200,11 +2230,15 @@ export class MarketingCampaignService extends BaseService {
       }
 
       // If the caller passed detected_signals (from the category audit's
-      // per-business detected_signals[]), create a business_analysis audit
-      // on the child so the triage engine can read them, then auto-trigger
-      // triage to assign a playbook immediately — the "spawn pre-triaged"
-      // flow.
-      if (input.detectedSignals && input.detectedSignals.length > 0) {
+      // per-business detected_signals[]) OR the discovery context produced
+      // translated signals, create a business_analysis stub audit on the
+      // child so the triage engine can read them, then auto-trigger triage
+      // to assign a playbook immediately — the "spawn pre-triaged" flow.
+      // Discovery-derived stubs are marked source='discovery_scan' +
+      // verdict='partial' (two-lane triage: discovery = partial, business
+      // audit = full) and carry discovery_signal_map provenance.
+      if (triageSignals.length > 0) {
+        const isDiscovery = !(input.detectedSignals?.length);
         const auditId = generateMarketingAuditId();
         await this.prisma.mkt_audits_list.create({
           data: {
@@ -2214,18 +2248,25 @@ export class MarketingCampaignService extends BaseService {
             audit_data: {
               audit_metadata: {
                 business_name: input.businessName,
-                source: 'derived_from_parent',
+                source: isDiscovery ? 'discovery_scan' : 'derived_from_parent',
                 parent_campaign_id: input.parentId,
+                ...(isDiscovery ? { verdict: 'partial' } : {}),
               },
-              detected_signals: input.detectedSignals,
-              summary: `Derived from parent campaign with ${input.detectedSignals.length} detected signals.`,
+              detected_signals: triageSignals,
+              ...(discoveryDerived?.contributions.length
+                ? { discovery_signal_map: discoveryDerived.contributions }
+                : {}),
+              summary: isDiscovery
+                ? `Discovery scan verdict (partial) — ${triageSignals.length} signal${triageSignals.length === 1 ? '' : 's'} translated from discovery evidence.`
+                : `Derived from parent campaign with ${triageSignals.length} detected signals.`,
             } as any,
           },
         });
         logger.info('Derived audit with signals created', ctx, {
           campaignId: child.id,
           auditId,
-          signalCount: input.detectedSignals.length,
+          signalCount: triageSignals.length,
+          source: isDiscovery ? 'discovery_scan' : 'derived_from_parent',
         });
 
         // Auto-trigger triage so the campaign is born with a playbook.

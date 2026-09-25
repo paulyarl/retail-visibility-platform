@@ -977,6 +977,31 @@ export default function ProspectQueueClient() {
                               )}
                             </div>
                           )}
+                          {/* Seed confidence meter — composite of identity
+                              corroboration, category fit, location status,
+                              provenance depth, NAP completeness, and
+                              verification outcome (computed at read). */}
+                          {entry.seed_confidence && (
+                            <div className="mt-1">
+                              <span
+                                className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-medium ${
+                                  entry.seed_confidence.band === 'high'
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                    : entry.seed_confidence.band === 'medium'
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                      : entry.seed_confidence.band === 'low'
+                                        ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                }`}
+                                title={
+                                  `Seed confidence: ${entry.seed_confidence.band}\n` +
+                                  entry.seed_confidence.factors.map((f) => `${f.delta > 0 ? '+' : ''}${f.delta} ${f.label}`).join('\n')
+                                }
+                              >
+                                seed {entry.seed_confidence.score}
+                              </span>
+                            </div>
+                          )}
                           {/* Bronze reason attribution (Bronze Standard §7.4) —
                               the catalog blind spot(s) that surfaced this
                               prospect; rides business_snapshot from the

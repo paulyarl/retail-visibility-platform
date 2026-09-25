@@ -151,6 +151,7 @@ import { MarketingHotProspectService } from '../services/MarketingHotProspectSer
 import MarketingAuditService from '../services/MarketingAuditService';
 import MarketingPromptService, { extractJsonCandidates, normalizeExternalJsonText, stripLlmJsonArtifacts } from '../services/MarketingPromptService';
 import { bronzeStandardScanSchema } from '../validators/bronze-standard-scan.schema';
+import { validateDiscoveryContext } from '../validators/intelligence-discovery.schema';
 import MarketingExecutionService from '../services/MarketingExecutionService';
 import MarketingScorecardService from '../services/MarketingScorecardService';
 import MarketingDailyDigestService from '../services/MarketingDailyDigestService';
@@ -2087,6 +2088,13 @@ const deriveBusinessSchema = z.object({
   category_override: z.string().max(255).optional(),
   city_override: z.string().max(255).optional(),
   state_override: z.string().max(255).optional(),
+  // Two-lane triage (GAP-E3 + discovery verdict): the discovery candidate's
+  // assessment context — validated + normalized by validateDiscoveryContext
+  // at the boundary (invalid → dropped, never blocks). Carries INT_* signals,
+  // provenance, fit/confidence, bronze attribution, competitive weaknesses —
+  // the partial-verdict evidence that seeds the campaign's stub audit.
+  discovery_context: z.record(z.string(), z.any()).optional(),
+  intelligence_run_id: z.string().max(100).optional(),
 });
 
 router.post('/:id/derive-business', async (req: any, res: Response) => {
@@ -2118,6 +2126,12 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
       categoryOverride: parsed.category_override,
       cityOverride: parsed.city_override,
       stateOverride: parsed.state_override,
+      // Migration 253 — GAP-E3 discovery context handoff (validation boundary
+      // is at the route: malformed context drops to null, never blocks).
+      discoveryContext: parsed.discovery_context
+        ? validateDiscoveryContext(parsed.discovery_context)
+        : undefined,
+      intelligenceRunId: parsed.intelligence_run_id,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
   } catch (error) {

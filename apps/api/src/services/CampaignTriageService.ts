@@ -20,7 +20,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateCampaignTriageId } from '../lib/id-generator';
-import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import { isStubBusinessAnalysisAudit, STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES } from '../lib/marketing-audits';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { extractSignals, evaluateTriage, fallbackRecommendation, evaluateAllMatchingPlaybooks } from './triage';
 import type {
@@ -74,6 +74,12 @@ export interface TriageSourceAudit {
   id: string;
   platform: string;
   createdAt: Date;
+  /**
+   * audit_data.audit_metadata.source for stub audits ('manual_queue',
+   * 'queue_promotion', 'derived_from_parent', 'discovery_scan'); null for
+   * real audits. Surfaced so the UI can name the evidence lane.
+   */
+  auditSource: string | null;
 }
 
 export interface StoredTriageResult {
@@ -86,6 +92,13 @@ export interface StoredTriageResult {
   detectedSignals: DetectedSignal[];
   isOperatorAccepted: boolean | null;
   evaluatedAt: Date;
+  /**
+   * Two-lane verdict depth: 'full' when the recommendation was evaluated
+   * from a real business_analysis audit; 'partial' when it ran off a stub
+   * audit (discovery scan / queue promotion) or campaign fields only.
+   * Derived at read time from the source audit — no column needed.
+   */
+  verdict: 'partial' | 'full';
   /**
    * The audit whose audit_data fed the signal extractor. NULL when no audit
    * was used (signals derived from campaign columns only). Surfaced in the UI
@@ -131,7 +144,7 @@ export class CampaignTriageService extends BaseService {
     await this.assertBusinessScope(campaignId, ctx);
 
     // 1. Load signals + playbooks (shared with evaluateAllForCampaign)
-    const { signals, playbooks, sourceAuditId } = await this.loadSignalsAndPlaybooks(input, ctx);
+    const { signals, playbooks, sourceAuditId, sourceAuditSource } = await this.loadSignalsAndPlaybooks(input, ctx);
 
     // 2. Run the generic DSL evaluator over the SignalCode[] set.
     let recommendation: TriageRecommendation | null = evaluateTriage(signals, playbooks);
@@ -145,6 +158,16 @@ export class CampaignTriageService extends BaseService {
       recommendation = fallbackRecommendation(signals, fallback);
       playbook = fallback;
       logger.warn('Triage fallback: no playbook rule matched', ctx, { campaignId, signals });
+    }
+
+    // 2b. Discovery-lane provenance: when the selected audit is a
+    //     discovery_scan stub, stamp each detected signal so the UI can mark
+    //     them as scan-derived (partial verdict evidence).
+    if (sourceAuditSource === 'discovery_scan') {
+      recommendation.detectedSignals = recommendation.detectedSignals.map((s) => ({
+        ...s,
+        origin: 'discovery_scan' as const,
+      }));
     }
 
     // 3. Upsert the triage result row (one row per campaign, re-evaluated in place)
@@ -197,7 +220,7 @@ export class CampaignTriageService extends BaseService {
   private async loadSignalsAndPlaybooks(
     input: TriageEvaluateInput,
     ctx?: RequestCtx,
-  ): Promise<{ signals: SignalCode[]; playbooks: PlaybookCatalogRow[]; sourceAuditId: string | null }> {
+  ): Promise<{ signals: SignalCode[]; playbooks: PlaybookCatalogRow[]; sourceAuditId: string | null; sourceAuditSource: string | null }> {
     const { campaignId, bbb, operatorAddedSignals, operatorRemovedSignals } = input;
 
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -212,6 +235,10 @@ export class CampaignTriageService extends BaseService {
     const selectedAudit = this.selectAuditForTriage(allAudits);
     const auditData = (selectedAudit?.audit_data as SignalExtractorInput['auditData']) ?? null;
     const sourceAuditId = selectedAudit?.id ?? null;
+    // Stub-audit provenance (manual_queue / queue_promotion /
+    // derived_from_parent / discovery_scan) — null for real audits.
+    const sourceAuditSource =
+      ((selectedAudit?.audit_data as any)?.audit_metadata?.source as string | undefined) ?? null;
 
     // Phase 6 — signal-aligned gap gate. Resolved platform weights decide
     // whether a render-control absence emits DS_MISSING_PROFILE; undefined
@@ -272,7 +299,7 @@ export class CampaignTriageService extends BaseService {
     // (alternatives panel) since it flows through this loader.
     const playbooks = (await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx))
       .filter((p: any) => p.category !== 'proving_ground');
-    return { signals, playbooks, sourceAuditId };
+    return { signals, playbooks, sourceAuditId, sourceAuditSource };
   }
 
   /**
@@ -614,6 +641,18 @@ export class CampaignTriageService extends BaseService {
     overridden: PlaybookCatalogRow | null,
     sourceAudit?: TriageSourceAudit | null,
   ): StoredTriageResult {
+    // Two-lane verdict: 'full' only when the evaluation ran off a real
+    // business_analysis audit. Stub audits (queue promotion, derive,
+    // discovery_scan) and campaign-columns-only evaluations are 'partial'.
+    // auditSource must be a KNOWN stub source — a real audit's audit_metadata
+    // may carry a `source` key of its own (e.g. the importing model), which
+    // does not make it a stub.
+    const isStubSource = !!sourceAudit?.auditSource
+      && (STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES as readonly string[]).includes(sourceAudit.auditSource);
+    const verdict: 'partial' | 'full' =
+      sourceAudit?.platform === 'business_analysis' && !isStubSource
+        ? 'full'
+        : 'partial';
     return {
       id: r.id,
       campaignId: r.campaign_id,
@@ -624,6 +663,7 @@ export class CampaignTriageService extends BaseService {
       detectedSignals: (r.detected_signals as DetectedSignal[]) ?? [],
       isOperatorAccepted: r.is_operator_accepted,
       evaluatedAt: r.evaluated_at,
+      verdict,
       sourceAudit: sourceAudit ?? null,
     };
   }
@@ -631,15 +671,60 @@ export class CampaignTriageService extends BaseService {
   /**
    * Resolve a TriageSourceAudit from a stored source_audit_id by looking up
    * the audit row. Returns null if the id is null or the audit was deleted.
+   * `auditSource` carries audit_metadata.source — set on stub audits
+   * (manual_queue / queue_promotion / derived_from_parent / discovery_scan),
+   * absent on real audit imports.
    */
   private async resolveSourceAudit(sourceAuditId: string | null): Promise<TriageSourceAudit | null> {
     if (!sourceAuditId) return null;
     const audit = await this.prisma.mkt_audits_list.findUnique({
       where: { id: sourceAuditId },
-      select: { id: true, platform: true, created_at: true },
+      select: { id: true, platform: true, created_at: true, audit_data: true },
     });
     if (!audit) return null;
-    return { id: audit.id, platform: audit.platform, createdAt: audit.created_at };
+    const auditSource =
+      ((audit.audit_data as any)?.audit_metadata?.source as string | undefined) ?? null;
+    return { id: audit.id, platform: audit.platform, createdAt: audit.created_at, auditSource };
+  }
+
+  /**
+   * Refresh an undecided verdict after new evidence lands (two-lane triage).
+   *
+   * Called best-effort when a real business_analysis audit is imported: if the
+   * campaign has no triage row, evaluate — the audit produces a 'full' verdict
+   * for free. If it has an UNDECIDED row (e.g. a discovery partial), re-
+   * evaluate — selectAuditForTriage prefers the real audit, so the full
+   * verdict supersedes the partial. A decided verdict (operator accepted or
+   * overrode) is never silently reset — the operator can re-evaluate manually.
+   *
+   * Returns the stored result when a refresh ran, null when skipped.
+   */
+  async refreshUndecidedVerdict(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<StoredTriageResult | null> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { scope: true },
+    }) as any;
+    if (!campaign || campaign.scope !== 'business') return null;
+
+    const existing = await this.prisma.mkt_campaign_triage_results.findUnique({
+      where: { campaign_id: campaignId },
+      select: { is_operator_accepted: true, overridden_playbook_id: true },
+    });
+    if (existing && (existing.is_operator_accepted === true || existing.overridden_playbook_id)) {
+      return null; // operator decided — the full audit does not flip it
+    }
+
+    const refreshed = await this.evaluateTriageForCampaign({ campaignId }, ctx);
+    logger.info('Triage verdict refreshed from business audit import', ctx, {
+      campaignId,
+      verdict: refreshed.verdict,
+      playbookCode: refreshed.recommendedPlaybook.code,
+      hadPriorResult: !!existing,
+    });
+    return refreshed;
   }
 
   /**

@@ -172,7 +172,7 @@ export class SeedOutreachTriggerService extends BaseService {
         WHERE campaign_id = ${campaignId}
           AND platform = 'business_analysis'
           AND COALESCE(audit_data->'audit_metadata'->>'source', '')
-            NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent')
+            NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent', 'discovery_scan')
         ORDER BY created_at DESC LIMIT 1
       `;
       if (auditRow[0]?.audit_data) {

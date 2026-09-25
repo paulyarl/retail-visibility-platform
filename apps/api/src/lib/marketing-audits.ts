@@ -14,11 +14,14 @@
  *   - manual_queue        — MarketingProspectQueueService (queued signals)
  *   - queue_promotion     — MarketingProspectQueueService (attribute handoff)
  *   - derived_from_parent — MarketingCampaignService (spawn pre-triaged)
+ *   - discovery_scan      — MarketingCampaignService (discovery-derived
+ *                           partial verdict — Category Discovery lane)
  */
 export const STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES = [
   'manual_queue',
   'queue_promotion',
   'derived_from_parent',
+  'discovery_scan',
 ] as const;
 
 export function isStubBusinessAnalysisAudit(

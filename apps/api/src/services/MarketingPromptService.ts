@@ -960,6 +960,22 @@ export class MarketingPromptService extends BaseService {
             campaignId: input.campaignId,
           });
         }
+
+        // Two-lane triage — "first partial, next full". A real
+        // business_analysis audit landing on a business-scope campaign
+        // refreshes an undecided verdict (e.g. a discovery partial) into a
+        // full verdict, or produces one when none existed. A decided verdict
+        // (accepted/overridden) is left untouched — the operator made a call.
+        // Best-effort: a refresh failure never fails the import.
+        try {
+          const { default: CampaignTriageService } = await import('./CampaignTriageService.js');
+          await CampaignTriageService.refreshUndecidedVerdict(input.campaignId, ctx);
+        } catch (triageErr) {
+          logger.warn('Triage verdict refresh after audit import failed (non-fatal)', ctx, {
+            error: (triageErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
       }
 
       // Category-identification audit → best-effort NAP enrichment of the

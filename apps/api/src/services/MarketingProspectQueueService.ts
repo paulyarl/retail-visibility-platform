@@ -29,6 +29,7 @@ import { addressParser } from '../lib/address-parser';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
+import { computeSeedConfidence } from './triage/discovery-verdict';
 import {
   normalizeCategoryKey,
   normalizeReferenceCity,
@@ -563,14 +564,14 @@ class MarketingProspectQueueServiceClass extends BaseService {
         if (campaignIds.length > 0) {
           // Only real audits count — queue-promotion placeholder audits
           // (audit_metadata.source = manual_queue/queue_promotion/
-          // derived_from_parent) carry signals, not audit data.
+          // derived_from_parent/discovery_scan) carry signals, not audit data.
           const audits = await this.prisma.$queryRaw<{ campaign_id: string; created_at: Date }[]>`
             SELECT campaign_id, created_at
             FROM mkt_audits_list
             WHERE campaign_id = ANY(${campaignIds})
               AND platform = 'business_analysis'
               AND COALESCE(audit_data->'audit_metadata'->>'source', '')
-                NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent')
+                NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent', 'discovery_scan')
           `;
           for (const a of audits) {
             const prev = auditDates.get(a.campaign_id);
@@ -682,6 +683,37 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // enrichment-only callers still got the raw relation — strip it.
           delete d.mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list;
         }
+      }
+
+      // Seed confidence meter (discovery → seed lane): prospects carrying
+      // discovery evidence get a composite score toward "a real, distinct,
+      // in-market, category-fit business worth seeding" — identity
+      // corroboration (INT_*), category fit, location status, provenance
+      // depth, NAP completeness, verification outcome. Computed at read —
+      // always fresh, no stored column.
+      for (const d of decorated as any[]) {
+        const hasDiscoveryEvidence =
+          d.source_kind === 'intelligence_seek'
+          || d.category_fit != null
+          || d.identity_confidence != null
+          || (Array.isArray(d.discovery_signals) && d.discovery_signals.length > 0)
+          || (Array.isArray(d.discovery_provenance) && d.discovery_provenance.length > 0);
+        if (!hasDiscoveryEvidence) continue;
+        const snapshot = (d.business_snapshot as any) ?? {};
+        const verifiedNap = (snapshot.verified_nap as any) ?? {};
+        d.seed_confidence = computeSeedConfidence({
+          identityConfidence: d.identity_confidence,
+          categoryFit: d.category_fit,
+          locationStatus: d.location_status,
+          businessSeekPriority: d.business_seek_priority,
+          discoverySignals: d.discovery_signals,
+          provenanceCount: Array.isArray(d.discovery_provenance) ? d.discovery_provenance.length : 0,
+          ownershipType: snapshot.ownership_type ?? null,
+          hasAddress: !!(verifiedNap.address ?? snapshot.address),
+          hasPhone: !!(verifiedNap.phone ?? snapshot.phone),
+          hasWebsite: !!(verifiedNap.website ?? snapshot.website),
+          verificationOutcome: (d.verification as any)?.outcome ?? null,
+        });
       }
 
       return { entries: decorated, queuedCount };

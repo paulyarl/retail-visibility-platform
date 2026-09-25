@@ -312,9 +312,12 @@ export default function IntelligenceDiscoveryAuditCard({
     setDeriveError(null);
     try {
       const { default: service } = await import('@/services/MarketingOpsService');
-      // Do NOT pass discovery_signals as detected_signals — INT_* codes must
-      // not enter the triage engine (Sprint §5.11). The discovery context is
-      // preserved in the campaign notes via the derive-business note field.
+      // Two-lane triage (discovery = partial verdict): hand the candidate's
+      // discovery evidence through as discovery_context — the server
+      // validates it (validateDiscoveryContext) and translates the named
+      // findings into audit-family signals for the stub audit. INT_* codes
+      // are NEVER copied into detected_signals — they pass through the
+      // deterministic mapper, which emits only canonical codes.
       //
       // NAP handoff (Migration 253 — GAP-E4): forward the discovery pass's
       // phone/email/website/gbp_url/address onto the derived campaign so the
@@ -333,6 +336,21 @@ export default function IntelligenceDiscoveryAuditCard({
         address: biz.address ?? undefined,
         address_city: biz.city ?? undefined,
         address_state: biz.state ?? undefined,
+        discovery_context: {
+          // focus is enum-gated (emerging|competitive) — omit for
+          // gold_standards audits rather than failing context validation.
+          focus: data.focus === 'emerging' || data.focus === 'competitive' ? data.focus : undefined,
+          discovered_at: audit.created_at,
+          business_seek_priority: biz.business_seek_priority,
+          category_fit: biz.category_fit,
+          identity_confidence: biz.identity_confidence,
+          location_status: biz.location_status,
+          discovery_signals: biz.discovery_signals,
+          discovery_provenance: biz.discovery_provenance,
+          bronze_attribution: Array.isArray(biz.bronze_attribution) ? biz.bronze_attribution : undefined,
+          competitive_weaknesses: Array.isArray(biz.competitive_weaknesses) ? biz.competitive_weaknesses : undefined,
+        },
+        intelligence_run_id: audit.import_metadata?.run_id ?? undefined,
       });
       setDerivedCampaignId((prev) => ({ ...prev, [idx]: child.id }));
     } catch (err: any) {
