@@ -202,7 +202,7 @@ export class CategoryVocabularyService extends BaseService {
         ) names
         WHERE name IS NOT NULL
           AND BTRIM(name) <> ''
-          AND name NOT LIKE '\_\_%' ESCAPE '\'
+          AND name !~ '^__'
         ORDER BY name
       `;
       return rows
