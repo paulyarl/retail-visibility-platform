@@ -52,7 +52,11 @@ export {
   evaluateAllMatchingPlaybooks,
   ruleMatches,
   fallbackRecommendation,
+  buildSignalPlaybookPrefs,
+  applySignalPlaybookPreferences,
+  preferenceFallbackRecommendation,
 } from './TriageEngineService';
+export type { SignalPlaybookPref, SignalPlaybookPrefsMap } from './TriageEngineService';
 
 export type {
   NormalizedSignals,

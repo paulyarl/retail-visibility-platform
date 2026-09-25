@@ -22,7 +22,17 @@ import { NotFoundError, ConflictError, ValidationError } from '../middleware/err
 import { generateCampaignTriageId } from '../lib/id-generator';
 import { isStubBusinessAnalysisAudit, STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES } from '../lib/marketing-audits';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
-import { extractSignals, evaluateTriage, fallbackRecommendation, evaluateAllMatchingPlaybooks } from './triage';
+import MarketingSignalRegistryService from './MarketingSignalRegistryService';
+import {
+  extractSignals,
+  evaluateTriage,
+  fallbackRecommendation,
+  evaluateAllMatchingPlaybooks,
+  buildSignalPlaybookPrefs,
+  applySignalPlaybookPreferences,
+  preferenceFallbackRecommendation,
+  type SignalPlaybookPrefsMap,
+} from './triage';
 import type {
   TriageRecommendation,
   DetectedSignal,
@@ -144,20 +154,47 @@ export class CampaignTriageService extends BaseService {
     await this.assertBusinessScope(campaignId, ctx);
 
     // 1. Load signals + playbooks (shared with evaluateAllForCampaign)
-    const { signals, playbooks, sourceAuditId, sourceAuditSource } = await this.loadSignalsAndPlaybooks(input, ctx);
+    const { signals, playbooks, sourceAuditId, sourceAuditSource, signalPrefs, wiredPrefs } =
+      await this.loadSignalsAndPlaybooks(input, ctx);
 
     // 2. Run the generic DSL evaluator over the SignalCode[] set.
     let recommendation: TriageRecommendation | null = evaluateTriage(signals, playbooks);
     let playbook: PlaybookCatalogRow;
     if (recommendation) {
       playbook = playbooks.find((p) => p.code === recommendation!.playbookCode)!;
+      // Disclose when a registry-wired signal (primary_playbook) is what
+      // pulled this playbook into the match — preference-driven routing is
+      // declared intent, not an authored matching_rules clause.
+      const wiredSignals = wiredPrefs.get(recommendation.playbookCode);
+      const wiredHits = wiredSignals
+        ? recommendation.detectedSignals.filter((s) => s.contributedToRule && wiredSignals.has(s.code))
+        : [];
+      if (wiredHits.length > 0) {
+        recommendation.reasoning +=
+          `; registry-wired signal(s) ${wiredHits.map((s) => s.code).join(', ')} ` +
+          `count toward ${recommendation.playbookCode} via primary_playbook preference`;
+      }
     } else {
-      // No rule matched — fall back to PB-03 (the seeded fallback playbook).
-      const fallback = playbooks.find((p) => p.code === 'PB-03') ?? playbooks[playbooks.length - 1];
-      if (!fallback) throw new NotFoundError('No active playbooks configured for triage');
-      recommendation = fallbackRecommendation(signals, fallback);
-      playbook = fallback;
-      logger.warn('Triage fallback: no playbook rule matched', ctx, { campaignId, signals });
+      // No rule matched — a detected signal's declared playbook preference
+      // (secondary first, primary as heavier weight) beats the blind PB-03
+      // fallback when its target is eligible (none-guard passes, no
+      // all/dual conjunction a declared signal can't satisfy).
+      const prefRecommendation = preferenceFallbackRecommendation(signals, playbooks, signalPrefs);
+      if (prefRecommendation) {
+        recommendation = prefRecommendation;
+        playbook = playbooks.find((p) => p.code === prefRecommendation.playbookCode)!;
+        logger.info('Triage preference route: no rule matched; signal playbook preference selected', ctx, {
+          campaignId,
+          playbookCode: prefRecommendation.playbookCode,
+        });
+      } else {
+        // Fall back to PB-03 (the seeded fallback playbook).
+        const fallback = playbooks.find((p) => p.code === 'PB-03') ?? playbooks[playbooks.length - 1];
+        if (!fallback) throw new NotFoundError('No active playbooks configured for triage');
+        recommendation = fallbackRecommendation(signals, fallback);
+        playbook = fallback;
+        logger.warn('Triage fallback: no playbook rule matched', ctx, { campaignId, signals });
+      }
     }
 
     // 2b. Discovery-lane provenance: when the selected audit is a
@@ -220,7 +257,14 @@ export class CampaignTriageService extends BaseService {
   private async loadSignalsAndPlaybooks(
     input: TriageEvaluateInput,
     ctx?: RequestCtx,
-  ): Promise<{ signals: SignalCode[]; playbooks: PlaybookCatalogRow[]; sourceAuditId: string | null; sourceAuditSource: string | null }> {
+  ): Promise<{
+    signals: SignalCode[];
+    playbooks: PlaybookCatalogRow[];
+    sourceAuditId: string | null;
+    sourceAuditSource: string | null;
+    signalPrefs: SignalPlaybookPrefsMap;
+    wiredPrefs: Map<string, Set<SignalCode>>;
+  }> {
     const { campaignId, bbb, operatorAddedSignals, operatorRemovedSignals } = input;
 
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -297,9 +341,20 @@ export class CampaignTriageService extends BaseService {
     // are aggregate-campaign checklists, not business triage candidates.
     // Excluding them here also removes them from evaluateAllForCampaign
     // (alternatives panel) since it flows through this loader.
-    const playbooks = (await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx))
-      .filter((p: any) => p.category !== 'proving_ground');
-    return { signals, playbooks, sourceAuditId, sourceAuditSource };
+    const [orderedPlaybooks, registryRows] = await Promise.all([
+      MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx),
+      MarketingSignalRegistryService.listSignals({ isActive: true }, ctx),
+    ]);
+    const signalPrefs = buildSignalPlaybookPrefs(registryRows);
+    // Migration 308 — registry-wired signals join their primary playbook's
+    // `any` evidence pool (guards still apply); secondary prefs are the
+    // declared no-match fallback (see preferenceFallbackRecommendation).
+    const { playbooks, wired } = applySignalPlaybookPreferences(
+      orderedPlaybooks.filter((p: any) => p.category !== 'proving_ground'),
+      signals,
+      signalPrefs,
+    );
+    return { signals, playbooks, sourceAuditId, sourceAuditSource, signalPrefs, wiredPrefs: wired };
   }
 
   /**
@@ -343,8 +398,17 @@ export class CampaignTriageService extends BaseService {
     // be applied here too. Without it, PG-01's empty matching_rules ({})
     // crash ruleMatches on `.length` — and once normalized would match every
     // signal set, polluting all alternatives lists.
-    const playbooks = (await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx))
-      .filter((p: any) => p.category !== 'proving_ground');
+    // Registry playbook preferences apply identically so an alternative
+    // wired via primary_playbook surfaces in the alternatives list.
+    const [orderedPlaybooks, registryRows] = await Promise.all([
+      MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx),
+      MarketingSignalRegistryService.listSignals({ isActive: true }, ctx),
+    ]);
+    const { playbooks } = applySignalPlaybookPreferences(
+      orderedPlaybooks.filter((p: any) => p.category !== 'proving_ground'),
+      signals,
+      buildSignalPlaybookPrefs(registryRows),
+    );
 
     // 3. Run the engine in "all matches" mode
     const allMatches = evaluateAllMatchingPlaybooks(signals, playbooks);

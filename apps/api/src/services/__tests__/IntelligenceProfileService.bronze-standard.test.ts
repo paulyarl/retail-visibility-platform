@@ -299,14 +299,111 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
       });
       const r2 = config.reason_coverage.find((e: any) => e.reason_key === 'r2');
       expect(r2.slots.map((s: any) => s.business_name)).toEqual(['Prior Co', 'Second Co']);
-      // A reason absent from prior coverage gets a new filled entry.
-      const r3 = config.reason_coverage.find((e: any) => e.reason_key === 'r3');
-      expect(r3.status).toBe('filled');
-      expect(r3.slots).toHaveLength(1);
+      // Catalog guard: 'r3' is not on the profile's board — the fill is
+      // dropped rather than fabricating a phantom coverage entry, and the
+      // invented key survives as a suggested_reasons proposal.
+      expect(config.reason_coverage.find((e: any) => e.reason_key === 'r3')).toBeUndefined();
+      expect(config.reason_coverage).toHaveLength(2);
+      const r3Suggestion = config.suggested_reasons.find((s: any) => s.reason_key === 'r3');
+      expect(r3Suggestion).toBeDefined();
+      expect(r3Suggestion.source).toBe('unmatched_attribution');
+      expect(r3Suggestion.seen_count).toBe(1);
+      expect(r3Suggestion.exemplar_lead.business_name).toBe('Third Co');
+    });
+
+    it('writes a draft carrying suggestions when every fill cites a reason not on the board', async () => {
+      const active = PROFILE({
+        configuration_json: {
+          reason_coverage: [
+            { reason_key: 'r1', status: 'empty_unproven', slots: [], empty_slot_note: 'executed, returned 0' },
+          ],
+        } as any,
+      });
+      mockPrisma.mkt_intelligence_profiles.findFirst
+        .mockResolvedValueOnce(active)
+        .mockResolvedValueOnce({ version: 1 });
+      mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ id: 'mip-bronze-1', version: 2 });
+
+      // Model-invented keys (e.g. 'rename_residue_splits_the_discovery_trace'
+      // seen in real scans) must not reach the slot board — they convert to
+      // reviewable suggestions instead of vanishing.
+      const result = await service.recordBronzeExternalFills('mip-bronze-1', [
+        { reason_key: 'invented_reason', slot: { business_name: 'B', discovered_by: 'emerging_scan', discovered_via: 'rename vector' } },
+      ]);
+
+      expect(result).not.toBeNull();
+      const config = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data.configuration_json;
+      // Coverage is untouched — the board keeps its single empty entry.
+      expect(config.reason_coverage).toHaveLength(1);
+      expect(config.reason_coverage[0].status).toBe('empty_unproven');
+      const s = config.suggested_reasons.find((x: any) => x.reason_key === 'invented_reason');
+      expect(s).toMatchObject({
+        source: 'unmatched_attribution',
+        seen_count: 1,
+        proposed_label: 'Invented reason',
+      });
+      expect(s.proposed_definition).toContain('not a catalog reason');
+      expect(s.proposed_definition).toContain('rename vector');
+    });
+
+    it('merges scan-provided suggested_reasons and suggested_signals into the draft config', async () => {
+      const active = PROFILE({
+        configuration_json: {
+          reason_coverage: [
+            { reason_key: 'r1', status: 'empty_unproven', slots: [], empty_slot_note: null },
+          ],
+          suggested_reasons: [
+            { reason_key: 'community_directory_only_presence', proposed_label: 'Community directory only', proposed_definition: 'prior', seen_count: 2 },
+          ],
+        } as any,
+      });
+      mockPrisma.mkt_intelligence_profiles.findFirst
+        .mockResolvedValueOnce(active)
+        .mockResolvedValueOnce({ version: 1 });
+      mockPrisma.mkt_intelligence_profiles.create.mockResolvedValue({ id: 'mip-bronze-1', version: 2 });
+
+      await service.recordBronzeExternalFills('mip-bronze-1', [], undefined, {
+        suggestedReasons: [
+          // Recurrence of a prior suggestion — bumps seen_count, no duplicate.
+          { reason_key: 'community_directory_only_presence', proposed_label: 'Community directory only', proposed_definition: 'new wording' },
+          { proposed_label: 'Facebook Group Only Presence', proposed_definition: 'found only via FB group posts' },
+        ],
+        suggestedSignals: [
+          { code: 'INT_SEASONAL_OPERATION', proposed_label: 'Seasonal operation', proposed_definition: 'operates seasonally', exemplar_leads: ['Raja Bazaar'] },
+        ],
+      });
+
+      const config = mockPrisma.mkt_intelligence_profiles.create.mock.calls[0][0].data.configuration_json;
+      const recurring = config.suggested_reasons.find((s: any) => s.reason_key === 'community_directory_only_presence');
+      expect(recurring.seen_count).toBe(3);
+      // First-write-wins: the prior definition is kept, not overwritten.
+      expect(recurring.proposed_definition).toBe('prior');
+      const newSugg = config.suggested_reasons.find((s: any) => s.reason_key === 'facebook_group_only_presence');
+      expect(newSugg).toBeDefined();
+      expect(newSugg.seen_count).toBe(1);
+      expect(config.suggested_signals[0]).toMatchObject({
+        code: 'INT_SEASONAL_OPERATION',
+        seen_count: 1,
+        exemplar_leads: ['Raja Bazaar'],
+      });
+      // Suggestions never touch coverage.
+      expect(config.reason_coverage).toHaveLength(1);
+    });
+
+    it('returns null when there are no fills and no suggestions', async () => {
+      const result = await service.recordBronzeExternalFills('mip-bronze-1', [], undefined, {});
+      expect(result).toBeNull();
+      expect(mockPrisma.mkt_intelligence_profiles.findFirst).not.toHaveBeenCalled();
     });
 
     it('dedupes the same business written under one reason within the batch', async () => {
-      const active = PROFILE({ configuration_json: { reason_coverage: [] } as any });
+      const active = PROFILE({
+        configuration_json: {
+          reason_coverage: [
+            { reason_key: 'r1', status: 'empty_unproven', slots: [], empty_slot_note: null },
+          ],
+        } as any,
+      });
       mockPrisma.mkt_intelligence_profiles.findFirst
         .mockResolvedValueOnce(active)
         .mockResolvedValueOnce({ version: 1 });

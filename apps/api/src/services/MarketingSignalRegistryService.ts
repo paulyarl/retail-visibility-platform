@@ -32,6 +32,10 @@ export interface SignalCreateInput {
   description?: string;
   detectionSource?: DetectionSource;
   derivedRule?: { field: string; op: string; threshold: number | boolean } | null;
+  /** mkt_playbook_catalog code the signal counts as evidence for (joins its `any` pool). */
+  primaryPlaybook?: string | null;
+  /** mkt_playbook_catalog code used as the declared fallback when no rule matches. */
+  secondaryPlaybook?: string | null;
   isActive?: boolean;
 }
 
@@ -41,6 +45,8 @@ export interface SignalUpdateInput {
   description?: string | null;
   detectionSource?: DetectionSource;
   derivedRule?: { field: string; op: string; threshold: number | boolean } | null;
+  primaryPlaybook?: string | null;
+  secondaryPlaybook?: string | null;
   isActive?: boolean;
 }
 
@@ -71,6 +77,8 @@ function validateDetectionSource(source: string): asserts source is DetectionSou
   }
 }
 
+const PLAYBOOK_CODE_PATTERN = /^[A-Z]{2}-\d{2}$/;
+
 // ─── Service ─────────────────────────────────────────────────────────────
 
 export class MarketingSignalRegistryService extends BaseService {
@@ -87,11 +95,46 @@ export class MarketingSignalRegistryService extends BaseService {
     return MarketingSignalRegistryService.instance;
   }
 
+  /**
+   * Playbook preference refs must name real catalog codes — a typo here
+   * silently never routes. Existence check only: an inactive-but-real
+   * playbook is a valid pref (the engine's isActive gate applies at eval
+   * time), and a later deactivation must not invalidate the registry row.
+   */
+  private async validatePlaybookRefs(
+    primary: string | null | undefined,
+    secondary: string | null | undefined,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const codes = [...new Set([primary, secondary].filter((c): c is string => !!c))];
+    if (codes.length === 0) return;
+    for (const code of codes) {
+      if (!PLAYBOOK_CODE_PATTERN.test(code)) {
+        throw new Error(`Invalid playbook code: "${code}". Expected format like PB-04.`);
+      }
+    }
+    if (primary && secondary && primary === secondary) {
+      throw new Error('primary_playbook and secondary_playbook must name different playbooks.');
+    }
+    const rows = await this.prisma.mkt_playbook_catalog.findMany({
+      where: { code: { in: codes } },
+      select: { code: true },
+    });
+    const found = new Set(rows.map((r: { code: string }) => r.code));
+    for (const code of codes) {
+      if (!found.has(code)) {
+        logger.warn('Signal playbook preference references unknown playbook', ctx, { code });
+        throw new Error(`Unknown playbook code: "${code}". Must name a mkt_playbook_catalog row.`);
+      }
+    }
+  }
+
   // ─── CRUD ──────────────────────────────────────────────────────────────
 
   async createSignal(input: SignalCreateInput, ctx?: RequestCtx): Promise<SignalRegistryRow> {
     validateCode(input.code);
     if (input.detectionSource) validateDetectionSource(input.detectionSource);
+    await this.validatePlaybookRefs(input.primaryPlaybook, input.secondaryPlaybook, ctx);
 
     const id = generateSignalRegistryId();
     try {
@@ -104,6 +147,8 @@ export class MarketingSignalRegistryService extends BaseService {
           description: input.description ?? null,
           detection_source: input.detectionSource ?? 'model_emitted',
           derived_rule: (input.derivedRule ?? null) as any,
+          primary_playbook: input.primaryPlaybook ?? null,
+          secondary_playbook: input.secondaryPlaybook ?? null,
           is_active: input.isActive ?? true,
         },
       });
@@ -160,12 +205,24 @@ export class MarketingSignalRegistryService extends BaseService {
   async updateSignal(id: string, input: SignalUpdateInput, ctx?: RequestCtx): Promise<SignalRegistryRow> {
     if (input.detectionSource) validateDetectionSource(input.detectionSource);
 
+    // Distinctness must be checked against the EFFECTIVE pair — an update
+    // that sets only one pref still can't equal the persisted other half.
+    if (input.primaryPlaybook !== undefined || input.secondaryPlaybook !== undefined) {
+      const existing = await this.prisma.mkt_signal_registry.findUnique({ where: { id } });
+      if (!existing) throw new NotFoundError('Signal not found');
+      const effectivePrimary = input.primaryPlaybook !== undefined ? input.primaryPlaybook : (existing as any).primary_playbook;
+      const effectiveSecondary = input.secondaryPlaybook !== undefined ? input.secondaryPlaybook : (existing as any).secondary_playbook;
+      await this.validatePlaybookRefs(effectivePrimary, effectiveSecondary, ctx);
+    }
+
     const data: any = {};
     if (input.family !== undefined) data.family = input.family;
     if (input.label !== undefined) data.label = input.label;
     if (input.description !== undefined) data.description = input.description;
     if (input.detectionSource !== undefined) data.detection_source = input.detectionSource;
     if (input.derivedRule !== undefined) data.derived_rule = input.derivedRule as any;
+    if (input.primaryPlaybook !== undefined) data.primary_playbook = input.primaryPlaybook;
+    if (input.secondaryPlaybook !== undefined) data.secondary_playbook = input.secondaryPlaybook;
     if (input.isActive !== undefined) data.is_active = input.isActive;
 
     try {
@@ -219,6 +276,8 @@ export class MarketingSignalRegistryService extends BaseService {
       description: r.description,
       detectionSource: r.detection_source as DetectionSource,
       derivedRule: r.derived_rule ?? null,
+      primaryPlaybook: r.primary_playbook ?? null,
+      secondaryPlaybook: r.secondary_playbook ?? null,
       isActive: r.is_active,
     };
   }

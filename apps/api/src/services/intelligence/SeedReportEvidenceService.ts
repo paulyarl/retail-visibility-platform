@@ -840,6 +840,8 @@ export class SeedReportEvidenceService extends BaseService {
         description: r.description,
         detectionSource: r.detection_source as any,
         derivedRule: r.derived_rule ?? null,
+        primaryPlaybook: r.primary_playbook ?? null,
+        secondaryPlaybook: r.secondary_playbook ?? null,
         isActive: r.is_active,
       }));
 

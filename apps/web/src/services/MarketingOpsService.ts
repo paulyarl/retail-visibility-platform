@@ -5058,6 +5058,8 @@ class MarketingOpsService extends AdminApiSingleton {
     label: string;
     description?: string;
     detection_source?: string;
+    primary_playbook?: string | null;
+    secondary_playbook?: string | null;
     is_active?: boolean;
   }): Promise<SignalRegistryEntry> {
     const res = await fetch(`${BASE_URL}/signals`, {
@@ -5079,6 +5081,8 @@ class MarketingOpsService extends AdminApiSingleton {
     label: string;
     description: string | null;
     detection_source: string;
+    primary_playbook: string | null;
+    secondary_playbook: string | null;
     is_active: boolean;
   }>): Promise<SignalRegistryEntry> {
     const res = await fetch(`${BASE_URL}/signals/${id}`, {
@@ -7456,6 +7460,10 @@ export interface SignalRegistryEntry {
   label: string;
   description?: string | null;
   detectionSource: 'model_emitted' | 'derived' | 'operator_input';
+  /** Playbook code whose `any` evidence pool this signal joins (migration 308). */
+  primaryPlaybook?: string | null;
+  /** Declared fallback playbook when no playbook's rules match. */
+  secondaryPlaybook?: string | null;
   isActive: boolean;
 }
 

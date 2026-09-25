@@ -46,6 +46,7 @@ import {
   isOutreachStateSignal,
   signalLabel,
   type SignalCode,
+  type SignalRegistryRow,
 } from './signal-taxonomy';
 
 // ─── DSL evaluator ───────────────────────────────────────────────────────
@@ -302,6 +303,155 @@ export function evaluateAllMatchingPlaybooks(
   }
 
   return matches;
+}
+
+// ─── Signal playbook preferences (migration 308 pre-wiring) ─────────────
+//
+// A signal registered via the suggested-signal flow can declare triage intent
+// without anyone editing a playbook's matching_rules:
+//
+//   primary_playbook   — the signal JOINS that playbook's `any` evidence pool
+//                        (augmented at evaluation time). The playbook's own
+//                        all/none/dual guards still apply — a preference can
+//                        add evidence, never bypass a veto. Only applied to
+//                        playbooks with a non-empty `any` clause: injecting a
+//                        signal into an empty `any` would ADD a requirement
+//                        and hijack playbooks (dual-only PB-05, empty-rules
+//                        fallbacks) that never asked for the evidence.
+//   secondary_playbook — the declared fallback. When NO playbook's rules
+//                        match, a detected signal's secondary preference
+//                        routes to its playbook instead of the generic PB-03
+//                        fallback (the playbook's `none` guard is still
+//                        honored; `all`/`dual` conjunctions can't be
+//                        satisfied by a single declared signal).
+//
+// Both preferences are playbook CODES (e.g. 'PB-04') — catalog rows keyed by
+// id would hide the wiring in a join.
+
+export interface SignalPlaybookPref {
+  primary: string | null;
+  secondary: string | null;
+}
+
+/** Detected-signal code → declared playbook preferences. */
+export type SignalPlaybookPrefsMap = ReadonlyMap<SignalCode, SignalPlaybookPref>;
+
+/**
+ * Build the prefs map from registry rows. Only signals that declare at least
+ * one playbook get an entry — the common case (no wiring) costs nothing.
+ */
+export function buildSignalPlaybookPrefs(
+  rows: ReadonlyArray<Pick<SignalRegistryRow, 'code' | 'primaryPlaybook' | 'secondaryPlaybook'>>,
+): SignalPlaybookPrefsMap {
+  const map = new Map<SignalCode, SignalPlaybookPref>();
+  for (const row of rows) {
+    if (row.primaryPlaybook || row.secondaryPlaybook) {
+      map.set(row.code, { primary: row.primaryPlaybook ?? null, secondary: row.secondaryPlaybook ?? null });
+    }
+  }
+  return map;
+}
+
+/**
+ * Return the playbook list with detected signals' primary_playbook prefs
+ * merged into each playbook's `any` pool. Pure — input rows are not mutated.
+ *
+ * Also returns `wired`: playbookCode → the signal codes that joined its pool,
+ * so the caller can disclose preference-derived matches in the reasoning.
+ */
+export function applySignalPlaybookPreferences(
+  playbooks: PlaybookCatalogRow[],
+  signals: SignalCode[],
+  prefs: SignalPlaybookPrefsMap,
+): { playbooks: PlaybookCatalogRow[]; wired: Map<string, Set<SignalCode>> } {
+  const wired = new Map<string, Set<SignalCode>>();
+  if (prefs.size === 0 || playbooks.length === 0) return { playbooks, wired };
+
+  const detected = new Set(signals);
+  const additions = new Map<string, SignalCode[]>();
+  for (const code of detected) {
+    const primary = prefs.get(code)?.primary;
+    if (!primary) continue;
+    const list = additions.get(primary) ?? [];
+    list.push(code);
+    additions.set(primary, list);
+  }
+  if (additions.size === 0) return { playbooks, wired };
+
+  const augmented = playbooks.map((p) => {
+    const extra = additions.get(p.code);
+    if (!extra?.length) return p;
+    const rules = normalizeRules(p.matchingRules);
+    // Never introduce an `any` clause where none existed — for a dual- or
+    // all-guarded playbook that would make the new signal a hard requirement.
+    if (rules.any.length === 0) return p;
+    const fresh = extra.filter((c) => !rules.any.includes(c));
+    if (fresh.length === 0) return p;
+    wired.set(p.code, new Set(fresh));
+    return { ...p, matchingRules: { ...rules, any: [...rules.any, ...fresh] } };
+  });
+  return { playbooks: augmented, wired };
+}
+
+/**
+ * Declared-fallback recommendation: used when evaluateTriage returned null
+ * (no playbook's rules matched). A detected signal's playbook preference —
+ * secondary first-class, primary counted heavier — selects the target so the
+ * signal's wiring beats the blind PB-03 fallback. Eligibility: the playbook
+ * is in the evaluated set + active, its `none` veto passes, and it carries no
+ * `all`/`dual` conjunction a single declared signal cannot satisfy.
+ * Returns null when no preference produces an eligible target — the caller
+ * then falls through to the generic fallback.
+ */
+export function preferenceFallbackRecommendation(
+  signals: SignalCode[],
+  playbooks: PlaybookCatalogRow[],
+  prefs: SignalPlaybookPrefsMap,
+): TriageRecommendation | null {
+  if (prefs.size === 0) return null;
+  const signalSet = new Set(signals.filter((s) => !isOutreachStateSignal(s)));
+
+  const scores = new Map<string, { score: number; contributors: SignalCode[] }>();
+  for (const code of signalSet) {
+    const pref = prefs.get(code);
+    if (!pref) continue;
+    for (const [playbookCode, weight] of [[pref.primary, 2], [pref.secondary, 1]] as const) {
+      if (!playbookCode) continue;
+      const entry = scores.get(playbookCode) ?? { score: 0, contributors: [] };
+      entry.score += weight;
+      entry.contributors.push(code);
+      scores.set(playbookCode, entry);
+    }
+  }
+  if (scores.size === 0) return null;
+
+  const eligible = playbooks
+    .filter((p) => p.isActive && scores.has(p.code))
+    .map((p) => ({ playbook: p, rules: normalizeRules(p.matchingRules), hit: scores.get(p.code)! }))
+    .filter(({ rules }) => rules.all.length === 0 && rules.dual === null)
+    .filter(({ rules }) => !rules.none.some((c) => signalSet.has(c)))
+    .sort((a, b) => b.hit.score - a.hit.score || a.playbook.priorityRank - b.playbook.priorityRank);
+
+  const top = eligible[0];
+  if (!top) return null;
+
+  const contributing = new Set(top.hit.contributors);
+  const detectedSignals = Array.from(signalSet).map((code) => ({
+    code,
+    label: signalLabel(code),
+    contributedToRule: contributing.has(code),
+  }));
+  return {
+    playbookCode: top.playbook.code,
+    playbookName: top.playbook.name,
+    category: top.playbook.category,
+    archetype: top.playbook.archetype,
+    confidence: top.rules.confidence,
+    reasoning:
+      `preference route: no playbook rule matched; detected signal(s) ${top.hit.contributors.join(', ')} ` +
+      `declare ${top.playbook.code} (${top.playbook.name}) as a preferred playbook (signal registry wiring)`,
+    detectedSignals,
+  };
 }
 
 // ─── Fallback recommendation (for misconfiguration) ──────────────────────

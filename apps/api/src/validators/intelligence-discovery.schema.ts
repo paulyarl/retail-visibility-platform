@@ -21,6 +21,7 @@
  */
 
 import { z } from 'zod';
+import { suggestedReasonSchema } from './bronze-standard-scan.schema';
 
 export const INTELLIGENCE_DISCOVERY_SCHEMA_NAME = 'intelligence_discovery';
 
@@ -228,6 +229,39 @@ const reconciliationSchema = z.object({
   ).optional(),
 }).passthrough();
 
+// ─── Suggested discovery signal (uncataloged INT_* pattern) ──────────────
+//
+// Mirror of the bronze suggested_reasons contract for the signal registry:
+// when a candidate exhibits a discovery-relevant pattern no registered INT_*
+// code captures, the analyst proposes it here rather than emitting a
+// non-registry code inside discovery_signals. Proposals land on the resolved
+// bronze profile's suggested_signals for operator review; promotion writes a
+// real mkt_signal_registry row — a suggestion never evaluates in triage.
+
+const suggestedSignalSchema = z.object({
+  /** Proposed registry code — INT_* family only (§S1 lane separation). */
+  code: z.string().regex(/^INT_[A-Z0-9_]+$/),
+  proposed_label: z.string().min(1),
+  proposed_definition: z.string().min(1),
+  /** Business names exhibiting the pattern — review exemplars. */
+  exemplar_leads: z.array(z.string()).optional(),
+  /**
+   * Proposed triage wiring (playbook codes from the TRIAGE PLAYBOOK ROSTER
+   * block): primary = the signal joins that playbook's evidence pool on
+   * registration; secondary = declared fallback route when no playbook's
+   * rules match. Advisory — the promoting operator confirms in the modal.
+   */
+  primary_playbook: z.string().optional(),
+  secondary_playbook: z.string().optional(),
+}).passthrough();
+
+// Suggestions are advisory — a malformed entry must never fail the import.
+// Per-element .catch(undefined) drops the bad row and keeps the rest.
+const dropMalformed = <T extends z.ZodTypeAny>(s: T) =>
+  z.array(s.optional().catch(undefined)).transform(
+    (a) => a.filter((e): e is z.infer<T> => e !== undefined),
+  );
+
 export const scanContractSchema = z.object({
   contract_version: z.string().optional(),
   sweep_ledger: z.array(sweepLedgerRowSchema).optional(),
@@ -323,6 +357,18 @@ export const intelligenceDiscoverySchema = z.object({
   // coverage attestation. Optional so pre-contract payloads still validate;
   // the normalizer synthesizes an "unverified" block when absent.
   scan_contract: scanContractSchema.optional(),
+
+  // Uncataloged blind spots detected during the scan — same contract as
+  // bronze_standard_scan.suggested_reasons: a candidate surfaced by a
+  // discovery mechanism NOT covered by any reason in the BRONZE STANDARD
+  // block is proposed here, never force-fit into bronze_attribution with an
+  // invented reason_key.
+  suggested_reasons: dropMalformed(suggestedReasonSchema).optional(),
+
+  // Uncataloged discovery-signal patterns — a recurring observation no
+  // registered INT_* code captures is proposed here, never emitted as a
+  // non-registry code inside discovery_signals.
+  suggested_signals: dropMalformed(suggestedSignalSchema).optional(),
 }).passthrough();
 
 // ─── Scan contract — key derivation, claim derivation, invariant collector ───
@@ -997,13 +1043,31 @@ Return a single JSON object with this structure:
       "unmatched": ["<member name>", ...],
       "excluded_with_reason": [{ "member": "<member name>", "reason": "<why excluded>" }]
     }
-  }
+  },
+  "suggested_reasons": [
+    {
+      "reason_key": "<proposed snake_case key — becomes the catalog key if accepted>",
+      "proposed_label": "<short display label>",
+      "proposed_definition": "<the discovery MECHANIC — why businesses under this pattern stay hidden>",
+      "observed_signals": ["INT_*"],
+      "expected_vectors": ["<source/vector that would systematically surface this pattern>"],
+      "scope_level": "universal" | "category" | "category_family" | "location",
+      "category_family_applicable": <true | false>,
+      "suggested_category_scope": "<category or family the pattern generalizes to>",
+      "suggested_scope_platform": "<platform or null>",
+      "exemplar_lead": { "business_name": "<name>", "address": "<address>", "observed_platform": "<platform>", "discovery_vector": "<how it was found>", "notes": "<evidence>" }
+    }
+  ],
+  "suggested_signals": [
+    { "code": "INT_<UPPER_SNAKE>", "proposed_label": "<label>", "proposed_definition": "<what the observed pattern means>", "exemplar_leads": ["<business names exhibiting it>"], "primary_playbook": "<playbook code from the TRIAGE PLAYBOOK ROSTER, or omit>", "secondary_playbook": "<fallback playbook code, or omit>" }
+  ]
 }
 
 Rules:
 - discovered_businesses is the full set found; qualifying_businesses excludes outside_market, national_chain, national_franchise, and regional_chain.
 - qualifying_businesses MUST contain full duplicate records (every field), NOT references or summaries. Each entry must be a complete business object identical in shape to its discovered_businesses counterpart.
-- discovery_signals MUST use INT_* codes only. Do NOT use RA/DS/WC/CP/VP signal codes.
+- discovery_signals MUST use INT_* codes only. Do NOT use RA/DS/WC/CP/VP signal codes. Use only codes from the registered discovery-signal vocabulary (the Category Signals block / established INT_* codes). When a candidate exhibits a recurring discovery-relevant pattern that NO registered code captures, do NOT emit an invented code inside discovery_signals — propose it once in the top-level suggested_signals array (code INT_<UPPER_SNAKE>, proposed_label, proposed_definition, exemplar_leads naming the businesses). A proposed signal never evaluates in triage until an operator registers it.
+- SUGGESTED SIGNAL TRIAGE ROUTING: each suggested_signals entry SHOULD name where the pattern belongs in triage once registered — primary_playbook is the playbook whose evidence pool it would join (the business this pattern describes is that playbook's pitch target), secondary_playbook is the fallback route when no playbook's rules match the business. Use ONLY playbook codes listed in the TRIAGE PLAYBOOK ROSTER block; omit both when none genuinely fits — never invent a code.
 - If identity_confidence is "low", business_seek_priority MUST be "hold".
 - If category_fit is "insufficient", business_seek_priority MUST be "hold" OR business_seek_recommended MUST be false.
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
@@ -1012,6 +1076,7 @@ Rules:
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 - BRONZE REASON ATTRIBUTION: When a "=== BRONZE STANDARD — MARKET CALIBRATION ===" block is present in the prompt, attribute each candidate to the catalog reason(s) DIRECTLY RESPONSIBLE for the find — the reason whose expected_vectors surfaced the business, or whose signal vocabulary is what identifies it as category-qualified-but-invisible. Emit one bronze_attribution entry per responsible reason with its reason_key exactly as given in the block and a one-line basis naming the vector or signal that produced the find. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway gets NO attribution, and a candidate that merely looks like a bronze exemplar but was not reached through the reason's vector gets none either. When NO bronze calibration block is present, or no reason was responsible for a candidate, OMIT bronze_attribution entirely.
+- UNCATALOGED REASON SUGGESTIONS: a bronze_attribution reason_key MUST be copied verbatim from the BRONZE STANDARD block — never invent or paraphrase a key there. If a candidate was surfaced by a discovery mechanism no catalog reason covers, propose it ONCE in the top-level suggested_reasons array instead: a proposed snake_case reason_key, label, definition of the discovery mechanic (why the pattern stays hidden — never a business attribute like size or age), the observed INT_* signals, the expected_vectors that would systematically surface it, scope_level + category_family_applicable + suggested_category_scope, and an exemplar_lead naming one representative business. A suggested reason is a proposal for catalog review — it does not attribute the candidate and does not fill a slot.
 - COMPETITIVE WEAKNESS ATTRIBUTION: When focus is "competitive", leaders are selected for their strengths — weaknesses are documented during selection, not used as a selection filter. Attribute each qualifying candidate to the weakness(es) observed during evaluation — named exposures from the weakness vocabulary in the COMPETITIVE FOCUS block. Emit one competitive_weaknesses entry per weakness with its weakness_key exactly as given and a one-line basis naming the observation that identifies the exposure. A recommended qualifying candidate SHOULD carry at least one entry — the weakness is the pitch wedge (no pain, no pitch). A leader with no observable weakness is a benchmark, not a prospect: emit benchmark_only: true and no weaknesses. When focus is "emerging", OMIT competitive_weaknesses and benchmark_only entirely.
 - SCAN CONTRACT (coverage proof — both focuses): scan_contract is your coverage ledger, not a formality. Emit ONE sweep_ledger row per geography-grid ZIP (unit_id "zip:<zip>"), one per corridor actually swept (unit_id "corridor:<slug>"), and one per dataset x geography unit (unit_id "dataset:<slug>"). Statuses: executed_with_findings (≥1 candidate), executed_empty (swept, zero findings — MUST be reported, never silently skipped), not_executed (admitted blind spot), blocked (attempted and failed — requires blocked_reason naming the failure). An executed_* row MUST carry the platforms_swept and labels_swept you actually issued — a row claiming executed with empty lists is not a sweep, it is a visit.
 - CANDIDATE KEYS: every discovered business MUST appear in at least one ledger row's candidate_keys — key format slug(business_name)--slug(city state), e.g. universal-african-market--gladstone-mo. A business found in multiple units may appear in multiple rows. For a business operating under alternate names, list them in candidate_key_aliases so the ledger and the candidate record resolve to the same business.

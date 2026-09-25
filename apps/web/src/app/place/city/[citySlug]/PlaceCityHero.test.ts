@@ -104,4 +104,25 @@ describe('PlaceCityHero', () => {
     expect(html).not.toContain('Overview');
     expect(html).not.toContain('CollectionPage');
   });
+
+  it('hot-links top categories that resolve to a live shelf in this market', () => {
+    const html = renderToStaticMarkup(
+      createElement(PlaceCityHero, {
+        ...baseProps,
+        shelfIndex: [
+          {
+            category: 'grocery stores',
+            slug: 'grocery-stores',
+            placeCount: 40,
+            cities: [{ city: 'Kansas City', state: 'MO', placeCount: 5 }],
+          },
+        ] as any,
+      }),
+    );
+    expect(html).toContain('href="/place/category/grocery-stores?city=Kansas%20City&amp;state=MO"');
+    // The in-market count rides the chip.
+    expect(html).toContain('>5</span>');
+    // 'restaurants' resolves to no shelf → stays inert text.
+    expect(html).toContain('>restaurants</span>');
+  });
 });

@@ -983,3 +983,74 @@ describe('applyDiscoveryScanContractGate', () => {
     expect(data.scan_contract_violations.filter((v: any) => v.invariant === 'INV-3')).toHaveLength(1);
   });
 });
+
+describe('intelligence_discovery schema — vocabulary suggestions', () => {
+  it('accepts suggested_reasons in the bronze scan contract shape', () => {
+    const data = schema.parse(validDiscovery({
+      suggested_reasons: [
+        {
+          reason_key: 'community_directory_only_presence',
+          proposed_label: 'Community directory only presence',
+          proposed_definition: 'Surfaced only via community directories — no mainstream profile.',
+          observed_signals: ['INT_SINGLE_SOURCE'],
+          expected_vectors: ['community directory sweep'],
+          scope_level: 'category_family',
+          category_family_applicable: true,
+          suggested_category_scope: 'grocery',
+          exemplar_lead: { business_name: 'Test Auto', address: '1 Main St' },
+        },
+      ],
+    }));
+    expect(data.suggested_reasons).toHaveLength(1);
+    expect(data.suggested_reasons![0].reason_key).toBe('community_directory_only_presence');
+  });
+
+  it('accepts suggested_signals with INT_* codes', () => {
+    const data = schema.parse(validDiscovery({
+      suggested_signals: [
+        { code: 'INT_SEASONAL_OPERATION', proposed_label: 'Seasonal operation', proposed_definition: 'operates seasonally', exemplar_leads: ['Test Auto'] },
+      ],
+    }));
+    expect(data.suggested_signals![0].code).toBe('INT_SEASONAL_OPERATION');
+  });
+
+  it('accepts suggested_signals carrying proposed playbook wiring (migration 308)', () => {
+    const data = schema.parse(validDiscovery({
+      suggested_signals: [
+        {
+          code: 'INT_SEASONAL_OPERATION',
+          proposed_label: 'Seasonal operation',
+          proposed_definition: 'operates seasonally',
+          exemplar_leads: ['Test Auto'],
+          primary_playbook: 'PB-01',
+          secondary_playbook: 'PB-03',
+        },
+      ],
+    }));
+    expect(data.suggested_signals![0].primary_playbook).toBe('PB-01');
+    expect(data.suggested_signals![0].secondary_playbook).toBe('PB-03');
+  });
+
+  it('drops malformed suggestion entries without failing the payload', () => {
+    const data = schema.parse(validDiscovery({
+      suggested_reasons: [
+        { proposed_label: '', proposed_definition: 'x' },           // min(1) label fails → dropped
+        { proposed_label: 'Ok', proposed_definition: 'valid def' }, // kept
+      ],
+      suggested_signals: [
+        { code: 'RA_NOT_INT', proposed_label: 'x', proposed_definition: 'y' }, // non-INT → dropped
+        { code: 'INT_OK_CODE', proposed_label: 'x', proposed_definition: 'y' },
+        'garbage',                                                            // non-object → dropped
+      ],
+    }));
+    expect(data.suggested_reasons).toHaveLength(1);
+    expect(data.suggested_signals).toHaveLength(1);
+    expect(data.suggested_signals![0].code).toBe('INT_OK_CODE');
+  });
+
+  it('omits suggestion fields cleanly when absent (backward compat)', () => {
+    const data = schema.parse(validDiscovery());
+    expect(data.suggested_reasons).toBeUndefined();
+    expect(data.suggested_signals).toBeUndefined();
+  });
+});

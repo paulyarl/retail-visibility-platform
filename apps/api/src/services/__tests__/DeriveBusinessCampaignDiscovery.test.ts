@@ -169,7 +169,7 @@ describe('deriveBusinessCampaign — discovery context handoff (Migration 253 �
     expect(CampaignTriageService.evaluateTriageForCampaign).toHaveBeenCalledTimes(1);
   });
 
-  it('T1b: discovery context with a real website + phone produces no derivable signals → no stub audit, no auto-triage', async () => {
+  it('T1b: discovery context with a real website + phone translates zero signals — still seeds the partial stub so triage lands on the fallback playbook', async () => {
     const child = await MarketingCampaignService.deriveBusinessCampaign({
       parentId: 'parent-1',
       businessName: 'Established Biz',
@@ -185,11 +185,18 @@ describe('deriveBusinessCampaign — discovery context handoff (Migration 253 �
     expect(createCall.data.discovery_context).toEqual(sampleDiscoveryContext);
 
     // No mapped evidence (the INT codes in the fixture have no defect
-    // equivalent; website/phone/reviewCount are all healthy) → no stub.
-    expect(mockAudits.create).not.toHaveBeenCalled();
+    // equivalent; website/phone/reviewCount are all healthy) — but the stub
+    // still seeds so the campaign carries an explicit partial verdict
+    // (fallback playbook) rather than no triage row at all.
+    expect(mockAudits.create).toHaveBeenCalledTimes(1);
+    const auditCall = mockAudits.create.mock.calls[0][0];
+    expect(auditCall.data.audit_data.audit_metadata.source).toBe('discovery_scan');
+    expect(auditCall.data.audit_data.audit_metadata.verdict).toBe('partial');
+    expect(auditCall.data.audit_data.detected_signals).toEqual([]);
+
     const { default: CampaignTriageService } = await import('../CampaignTriageService');
-    expect(CampaignTriageService.evaluateTriageForCampaign).not.toHaveBeenCalled();
-    expect(child.notes).not.toContain('Partial verdict signals');
+    expect(CampaignTriageService.evaluateTriageForCampaign).toHaveBeenCalledTimes(1);
+    expect(child.notes).toContain('Partial verdict: discovery context present');
   });
 
   // ─── T2: Legacy call (no discovery input) ─────────────────────────────

@@ -325,10 +325,17 @@ export function formatCategoryIdentificationMarketContext(
  *
  * Spec: docs/LocalBiz/CATEGORY_IDENTIFICATION_VOCAB_INJECTION_SPEC.md §4.2
  */
-export function formatKnownCategoryVocabulary(
+
+/**
+ * Dedupe each vocabulary list (case-insensitive, first casing wins, sorted)
+ * and partition the union: a registered label matching a directory name is
+ * excluded — it is already covered by the directory section. Directory
+ * casing wins on overlap.
+ */
+function partitionCategoryVocabulary(
   directoryLabels: string[],
   registeredLabels: string[],
-): string {
+): { directory: string[]; registered: string[] } {
   const dedupe = (labels: string[]): string[] => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -345,7 +352,13 @@ export function formatKnownCategoryVocabulary(
   const directory = dedupe(directoryLabels);
   const directoryKeys = new Set(directory.map((l) => l.toLowerCase()));
   const registered = dedupe(registeredLabels).filter((l) => !directoryKeys.has(l.toLowerCase()));
-
+  return { directory, registered };
+}
+export function formatKnownCategoryVocabulary(
+  directoryLabels: string[],
+  registeredLabels: string[],
+): string {
+  const { directory, registered } = partitionCategoryVocabulary(directoryLabels, registeredLabels);
   if (directory.length === 0 && registered.length === 0) return '';
 
   const lines: string[] = [
@@ -376,6 +389,72 @@ export function formatKnownCategoryVocabulary(
     '    categories the business legitimately belongs on — including labels not',
     '    in this list. Near-duplicate spellings of a listed shelf should still',
     '    resolve to the listed label.',
+  ];
+
+  if (directory.length > 0) {
+    lines.push('', `KNOWN CATEGORIES (${directory.length}):`);
+    lines.push(`  ${directory.join(', ')}`);
+  }
+
+  if (registered.length > 0) {
+    lines.push('', `REGISTERED LABELS (${registered.length}) — operator- and analyst-added, not all are directory shelves:`);
+    lines.push(`  ${registered.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format the platform category vocabulary for directory ENRICHMENT prompts
+ * (category, category-set, and location packets).
+ *
+ * Same union as formatKnownCategoryVocabulary, different framing: the
+ * packet's related-category fields render as chips on the public page that
+ * resolve to a live shelf by exact label match (apps/web
+ * resolveShelfForLabel). An invented near-variant silently degrades to a
+ * plain-text chip, so the analyst is told to prefer listed labels.
+ * sub_categories stay free-form — they are specializations within the
+ * category, not platform shelves.
+ *
+ * Returns '' when both lists are empty (per-source degraded vocabulary).
+ */
+export function formatEnrichmentCategoryVocabulary(
+  directoryLabels: string[],
+  registeredLabels: string[],
+): string {
+  const { directory, registered } = partitionCategoryVocabulary(directoryLabels, registeredLabels);
+  if (directory.length === 0 && registered.length === 0) return '';
+
+  const lines: string[] = [
+    '=== PLATFORM CATEGORY VOCABULARY (canonical shelf labels) ===',
+    '',
+    `The platform maintains a directory vocabulary of ${directory.length} canonical`,
+    'category labels — the shelves that exist as public directory pages. Every',
+    'related-category field you emit renders as a chip that hot-links to a shelf',
+    'ONLY when the name matches a shelf label exactly (trimmed, case-insensitive).',
+    'An invented or near-miss name renders as dead plain text — alignment with',
+    'this list is what makes the link seamless. Category names also feed',
+    'downstream matching (prospect queues, audit context), where canonical',
+    'labels join cleanly and invented ones drift.',
+    '',
+    'DIRECTIVE — emit names verbatim from the KNOWN CATEGORIES list below for:',
+    '  category packets: secondary_categories, adjacent_categories,',
+    '    super_categories',
+    '  location packets: secondary_categories, top_categories,',
+    '    context.market_gaps[].category, area_breakdown[].strong_categories',
+    '',
+    'super_categories are PLATFORM parents, not external taxonomy levels — pick',
+    'the listed shelf a shopper would drill up to (a specialty grocery rolls',
+    'up to the listed grocery shelf). Never emit generic industry buckets like',
+    '"Retail", "Food Retail", or "Consumer Services" that are not listed',
+    'shelves — they render inert and waste the slot.',
+    '',
+    'If your best-fit name is a close variant of a listed label (singular vs',
+    'plural, word order, "Shop" vs "Store"), emit the listed label. Emit an',
+    'unlisted name only when no listed shelf genuinely fits.',
+    '',
+    'sub_categories are exempt — they are specializations within this category,',
+    'not platform shelves; keep them descriptive and free-form.',
   ];
 
   if (directory.length > 0) {

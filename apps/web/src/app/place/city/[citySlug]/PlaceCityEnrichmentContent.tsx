@@ -1,4 +1,6 @@
-import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
+import Link from 'next/link';
+import type { LocationEnrichmentResponse, PlaceCategory } from '@/services/PlacesBrowsePublicService';
+import { resolveShelfForLabel, shelfHrefFor } from '@/lib/place-shelves';
 
 /**
  * Server-rendered location enrichment packet for the seed city shelf —
@@ -14,10 +16,15 @@ export default function PlaceCityEnrichmentContent({
   enrichment,
   city,
   state,
+  shelfIndex = [],
 }: {
   enrichment: LocationEnrichmentResponse;
   city: string;
   state: string | null;
+  // Live shelf index — resolves area strong_categories labels to hot shelf
+  // links (exact label + this market's count > 0). Optional so legacy/test
+  // renders degrade to inert chips.
+  shelfIndex?: PlaceCategory[];
 }) {
   const locationName = state ? `${city}, ${state}` : city;
   const shopperGuide = enrichment.shopperGuide;
@@ -53,14 +60,24 @@ export default function PlaceCityEnrichmentContent({
                   <p className="text-sm text-gray-600 mb-2">{area.description}</p>
                   {area.strong_categories && area.strong_categories.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                      {area.strong_categories.map((cat) => (
-                        <span
-                          key={cat}
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white text-gray-700 border border-gray-200"
-                        >
-                          {cat}
-                        </span>
-                      ))}
+                      {area.strong_categories.map((cat) => {
+                        const shelf = resolveShelfForLabel(cat, city, state ?? undefined, shelfIndex);
+                        const chip =
+                          'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white text-gray-700 border border-gray-200';
+                        if (!shelf) {
+                          return <span key={cat} className={chip}>{cat}</span>;
+                        }
+                        return (
+                          <Link
+                            key={cat}
+                            href={shelfHrefFor(shelf.slug, city, state ?? undefined)}
+                            className={`${chip} hover:border-blue-300 hover:text-blue-700 transition-colors`}
+                          >
+                            {cat}
+                            <span className="ml-1 text-gray-400">{shelf.count}</span>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

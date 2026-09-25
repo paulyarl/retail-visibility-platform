@@ -417,6 +417,34 @@ export default function PlaceCategoryClient({
                 </div>
               </section>
             )}
+
+            {/* Secondary categories — overlapping shelves this category is filed under */}
+            {enrichment?.effective?.secondaryCategories && enrichment.effective.secondaryCategories.length > 0 && (
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
+                  Also Filed Under
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.effective.secondaryCategories.map((label) => (
+                    <ShelfChip key={label} label={label} shelf={shelfForLabel(label)} hrefFor={shelfHref} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Super categories — broader parent shelves */}
+            {enrichment?.context?.super_categories && enrichment.context.super_categories.length > 0 && (
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
+                  Broader Categories
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.context.super_categories.map((label) => (
+                    <ShelfChip key={label} label={label} shelf={shelfForLabel(label)} hrefFor={shelfHref} />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       )}

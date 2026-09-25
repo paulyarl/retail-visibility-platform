@@ -920,6 +920,10 @@ const signalCreateSchema = z.object({
     op: z.string(),
     threshold: z.union([z.number(), z.boolean()]),
   }).nullable().optional(),
+  // Triage pre-wiring (migration 308) — playbook codes validated against
+  // mkt_playbook_catalog by the service, not here (existence, not shape).
+  primary_playbook: z.string().max(20).nullable().optional(),
+  secondary_playbook: z.string().max(20).nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -933,6 +937,8 @@ const signalUpdateSchema = z.object({
     op: z.string(),
     threshold: z.union([z.number(), z.boolean()]),
   }).nullable().optional(),
+  primary_playbook: z.string().max(20).nullable().optional(),
+  secondary_playbook: z.string().max(20).nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -4856,6 +4862,8 @@ router.post('/signals', async (req: any, res: Response) => {
       description: parsed.description,
       detectionSource: parsed.detection_source,
       derivedRule: parsed.derived_rule as { field: string; op: string; threshold: number | boolean } | null | undefined,
+      primaryPlaybook: parsed.primary_playbook,
+      secondaryPlaybook: parsed.secondary_playbook,
       isActive: parsed.is_active,
     }, getCtx(req));
     res.status(201).json({ success: true, data: signal });
@@ -4876,6 +4884,8 @@ router.put('/signals/:id', async (req: any, res: Response) => {
       description: parsed.description,
       detectionSource: parsed.detection_source,
       derivedRule: parsed.derived_rule as { field: string; op: string; threshold: number | boolean } | null | undefined,
+      primaryPlaybook: parsed.primary_playbook,
+      secondaryPlaybook: parsed.secondary_playbook,
       isActive: parsed.is_active,
     }, getCtx(req));
     res.json({ success: true, data: signal });

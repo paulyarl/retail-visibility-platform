@@ -118,6 +118,22 @@ describe('deriveDiscoverySignals', () => {
     expect(signals).not.toContain('WC_MISSING_WEBSITE');
   });
 
+  it('resolves model-invented reason keys through the alias table', () => {
+    // Real scan output (Milwaukee emerging scan) invented non-catalog keys;
+    // the alias map recovers the defect signal the scan was describing while
+    // the contribution keeps the original key for provenance.
+    const { signals, contributions } = deriveDiscoverySignals({
+      bronzeAttribution: [
+        { reason_key: 'rename_residue_splits_the_discovery_trace', basis: 'two trade names at one address' },
+        { reason_key: 'community_directory_only_presence' },
+      ],
+    });
+    expect(signals).toEqual(expect.arrayContaining(['CP_NAP_NAME_DRIFT', 'DS_MISSING_PROFILE']));
+    expect(contributions.map((c) => c.ref)).toEqual(
+      expect.arrayContaining(['rename_residue_splits_the_discovery_trace', 'community_directory_only_presence']),
+    );
+  });
+
   it('dedupes codes emitted by multiple findings', () => {
     const { signals, contributions } = deriveDiscoverySignals({
       discoverySignals: ['INT_LOW_VISIBILITY'],

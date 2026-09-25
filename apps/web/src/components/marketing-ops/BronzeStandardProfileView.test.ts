@@ -215,4 +215,68 @@ describe('BronzeStandardProfileView', () => {
     expect(rendered).toContain('Already in Catalog');
     expect(rendered).not.toContain('Add to Catalog');
   });
+
+  it('renders suggested discovery signals with register action and exemplar leads', () => {
+    const profileWithSignals = {
+      ...PROFILE,
+      configuration_json: {
+        ...(PROFILE.configuration_json as any),
+        suggested_signals: [
+          {
+            code: 'INT_SEASONAL_OPERATION',
+            proposed_label: 'Seasonal Operation',
+            proposed_definition: 'Business operates only during part of the year.',
+            exemplar_leads: ['Raja Bazaar', 'Mei Hua Market'],
+            seen_count: 2,
+            source: 'unmatched_signal',
+            primary_playbook: 'PB-01',
+            secondary_playbook: 'PB-03',
+          },
+        ],
+      },
+    } as unknown as IntelligenceProfile;
+
+    const rendered = renderToStaticMarkup(
+      createElement(MantineProvider, null, createElement(BronzeStandardProfileView, { profile: profileWithSignals })),
+    );
+
+    expect(rendered).toContain('Suggested Discovery Signals');
+    expect(rendered).toContain('INT_SEASONAL_OPERATION');
+    expect(rendered).toContain('Seasonal Operation');
+    expect(rendered).toContain('operates only during part of the year');
+    expect(rendered).toContain('Raja Bazaar');
+    expect(rendered).toContain('Emitted but unregistered');
+    expect(rendered).toContain('seen in 2 scans');
+    // Proposed playbook wiring renders as review badges (migration 308 pre-wiring).
+    expect(rendered).toContain('primary → PB-01');
+    expect(rendered).toContain('fallback → PB-03');
+    expect(rendered).toContain('Register Signal');
+    expect(rendered).toContain('Suggested Signals');
+  });
+
+  it('labels reason suggestions synthesized from invented attribution keys', () => {
+    const profileWithUnmatched = {
+      ...PROFILE,
+      configuration_json: {
+        ...(PROFILE.configuration_json as any),
+        suggested_reasons: [
+          {
+            reason_key: 'rename_residue_splits_the_discovery_trace',
+            proposed_label: 'Rename residue splits the discovery trace',
+            proposed_definition: 'Emitted as a bronze_attribution reason_key by a discovery scan — not a catalog reason.',
+            source: 'unmatched_attribution',
+            seen_count: 1,
+          },
+        ],
+      },
+    } as unknown as IntelligenceProfile;
+
+    const rendered = renderToStaticMarkup(
+      createElement(MantineProvider, null, createElement(BronzeStandardProfileView, { profile: profileWithUnmatched })),
+    );
+
+    expect(rendered).toContain('Invented attribution key — not in catalog');
+    expect(rendered).toContain('rename_residue_splits_the_discovery_trace');
+    expect(rendered).toContain('Add to Catalog');
+  });
 });

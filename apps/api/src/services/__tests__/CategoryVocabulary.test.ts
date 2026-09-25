@@ -30,7 +30,7 @@ vi.mock('../MarketingServiceCategoryService', () => ({
 }));
 
 import { CategoryVocabularyService } from '../CategoryVocabularyService';
-import { formatKnownCategoryVocabulary } from '../intelligence/MarketContextBindingFormatters';
+import { formatKnownCategoryVocabulary, formatEnrichmentCategoryVocabulary } from '../intelligence/MarketContextBindingFormatters';
 
 const service = CategoryVocabularyService.getInstance();
 
@@ -118,6 +118,63 @@ describe('formatKnownCategoryVocabulary', () => {
 
     expect(block).toContain('MARKET CONTEXT block (when that block is present)');
     expect(block).not.toContain('MARKET CONTEXT block above');
+  });
+});
+
+// ─── formatEnrichmentCategoryVocabulary ─────────────────────────────────
+// Same union, different framing: enrichment packets name related categories
+// that the public pages resolve to live shelves by exact label, so the block
+// steers the analyst to prefer listed labels (sub_categories stay free-form).
+
+describe('formatEnrichmentCategoryVocabulary', () => {
+  it('renders both sections with dynamic counts when both lists are present', () => {
+    const block = formatEnrichmentCategoryVocabulary(
+      ['Grocery Store', 'Auto Repair'],
+      ['Somali Grocery Store'],
+    );
+
+    expect(block).toContain('PLATFORM CATEGORY VOCABULARY');
+    expect(block).toContain('directory vocabulary of 2 canonical');
+    expect(block).toContain('KNOWN CATEGORIES (2):');
+    expect(block).toContain('Auto Repair, Grocery Store');
+    expect(block).toContain('REGISTERED LABELS (1)');
+    expect(block).toContain('Somali Grocery Store');
+  });
+
+  it('steers related-category fields to verbatim listed labels while exempting sub_categories', () => {
+    const block = formatEnrichmentCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('DIRECTIVE — emit names verbatim from the KNOWN CATEGORIES');
+    expect(block).toContain('secondary_categories');
+    expect(block).toContain('adjacent_categories');
+    expect(block).toContain('super_categories');
+    expect(block).toContain('sub_categories are exempt');
+    expect(block).toContain('matches a shelf label exactly');
+  });
+
+  it('frames super_categories as platform parents, not external taxonomy buckets', () => {
+    const block = formatEnrichmentCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('super_categories are PLATFORM parents');
+    expect(block).toContain('drill up to');
+    expect(block).toContain('"Retail"');
+  });
+
+  it("returns '' when both lists are empty", () => {
+    expect(formatEnrichmentCategoryVocabulary([], [])).toBe('');
+    expect(formatEnrichmentCategoryVocabulary(['  ', ''], ['   '])).toBe('');
+  });
+
+  it('excludes registered labels that already appear in the directory list (case-insensitive, trimmed)', () => {
+    const block = formatEnrichmentCategoryVocabulary(
+      ['Grocery Store'],
+      ['  grocery store ', 'Somali Grocery Store'],
+    );
+
+    expect(block).toContain('REGISTERED LABELS (1)');
+    const registeredSection = block.split('REGISTERED LABELS')[1];
+    expect(registeredSection).toContain('Somali Grocery Store');
+    expect(registeredSection).not.toContain('Grocery Store,');
   });
 });
 

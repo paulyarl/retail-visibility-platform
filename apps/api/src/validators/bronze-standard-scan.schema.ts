@@ -126,7 +126,7 @@ const reasonCoverageSchema = z.object({
 
 // ─── Suggested reason (analyst-detected uncataloged blind spot) ───────────
 
-const suggestedReasonExemplarLeadSchema = z.object({
+export const suggestedReasonExemplarLeadSchema = z.object({
   business_name: z.string().min(1),
   address: z.string().nullable().optional(),
   observed_platform: observedPlatformEnum.nullable().optional(),
@@ -134,7 +134,7 @@ const suggestedReasonExemplarLeadSchema = z.object({
   notes: z.string().optional(),
 }).passthrough();
 
-const suggestedReasonSchema = z.object({
+export const suggestedReasonSchema = z.object({
   reason_key: z.string().optional(),
   proposed_label: z.string().min(1),
   proposed_definition: z.string().min(1),

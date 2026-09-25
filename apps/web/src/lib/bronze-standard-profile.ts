@@ -110,6 +110,38 @@ export interface BronzeSuggestedReason {
   suggested_category_scope?: string | null;
   suggested_scope_platform?: string | null;
   exemplar_lead?: BronzeSuggestedReasonExemplarLead;
+  /** How many scans have surfaced this proposal (dedupe counter). */
+  seen_count?: number;
+  /**
+   * 'unmatched_attribution' — synthesized from a bronze_attribution key that
+   * isn't on the catalog (the model invented it rather than emitting a
+   * suggestion). Absent/undefined = analyst-authored suggestion.
+   */
+  source?: string;
+  [k: string]: any;
+}
+
+/**
+ * Proposal for a new INT_* discovery signal — the scan emitted a code not in
+ * mkt_signal_registry, or the analyst proposed a pattern no registered code
+ * captures. Promoting writes a real registry row; until then the code never
+ * evaluates in triage.
+ */
+export interface BronzeSuggestedSignal {
+  code: string;
+  proposed_label: string;
+  proposed_definition: string;
+  /** Business names exhibiting the pattern. */
+  exemplar_leads?: string[];
+  /** Proposed triage wiring (playbook codes from the roster block) —
+   *  primary joins that playbook's evidence pool; secondary is the declared
+   *  no-match fallback. Advisory — the promoting operator confirms. */
+  primary_playbook?: string;
+  secondary_playbook?: string;
+  /** How many scans have surfaced this proposal (dedupe counter). */
+  seen_count?: number;
+  /** 'unmatched_signal' — swept from emitted discovery_signals; else scan-proposed. */
+  source?: string;
   [k: string]: any;
 }
 
@@ -124,6 +156,7 @@ export interface BronzeProfileConfig {
   reason_coverage?: BronzeReasonCoverageEntry[];
   not_applicable_reasons?: string[];
   suggested_reasons?: BronzeSuggestedReason[];
+  suggested_signals?: BronzeSuggestedSignal[];
   scope_mix?: BronzeScopeMix;
   vector_execution_log?: BronzeVectorLogEntry[];
   prohibited_inferences?: string[];

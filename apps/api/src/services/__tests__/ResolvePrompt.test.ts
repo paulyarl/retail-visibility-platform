@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService, mockVocabService, mockFormatEnrichmentVocab } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveCategoryIntelligence: vi.fn(async (_category: string, _city?: string | null, _platform?: string | null) => null),
@@ -65,7 +65,13 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     getNationalCoverage: vi.fn(async () => null),
     applyEnrichmentPacket: vi.fn(async () => null),
   };
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService };
+  const mockVocabService = {
+    loadVocabulary: vi.fn(async () => ({ directoryLabels: [], registeredLabels: [] })),
+    isKnownLabel: vi.fn(async () => false),
+    findRegisteredValue: vi.fn(async () => null),
+  };
+  const mockFormatEnrichmentVocab = vi.fn(() => '');
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService, mockVocabService, mockFormatEnrichmentVocab };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -135,6 +141,14 @@ vi.mock('../IdentityEvidenceService', () => ({
 vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
   formatEstablishmentMarketContext: mockFormatEstablishment,
   formatDiscoveryMarketContext: mockFormatDiscovery,
+  formatEnrichmentCategoryVocabulary: mockFormatEnrichmentVocab,
+}));
+
+vi.mock('../CategoryVocabularyService', () => ({
+  CategoryVocabularyService: {
+    getInstance: () => mockVocabService,
+  },
+  default: mockVocabService,
 }));
 
 import { MarketingExecutionService } from '../MarketingExecutionService';
@@ -171,6 +185,10 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     mockCatalogService.serializeCatalogBlock.mockImplementation(() => '');
     // Reset the city-level geography grid cache to a miss (campaign-derived grid).
     mockGeographyGridService.getGrid.mockImplementation(async () => null);
+    // Reset the category vocabulary to empty — no PLATFORM CATEGORY
+    // VOCABULARY block on enrichment renders by default.
+    mockVocabService.loadVocabulary.mockImplementation(async () => ({ directoryLabels: [], registeredLabels: [] }));
+    mockFormatEnrichmentVocab.mockImplementation(() => '');
   });
 
   const makeTemplate = (promptType: string, body = 'Hello {{business_name}} in {{category}}') => ({
@@ -1947,7 +1965,118 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
   });
 
-  // ─── National location enrichment ('__all__' sentinel) ─────────────────
+  // ─── Enrichment — platform category vocabulary injection ──────────────
+  // Every enrichment packet names related categories (secondary/adjacent/
+  // super/top) that the public pages resolve to live shelves by exact label
+  // match. resolvePrompt injects the operator-selectable union so the
+  // analyst aligns to canonical names instead of inventing near-misses.
+  describe('enrichment prompt — platform category vocabulary injection', () => {
+    const makeCategoryTemplate = () => ({
+      body: 'CATEGORY: {{category}}\nCITY: {{city}} STATE: {{state}}',
+      prompt_type: 'enrichment',
+      scope: 'category',
+      output_schema: { name: 'category_enrichment' },
+    });
+    const makeCategoryCampaign = () => ({
+      id: 'camp-enr-vocab-1',
+      scope: 'category',
+      category: 'African Grocery Store',
+      city: 'Indianapolis',
+      state: 'IN',
+      parent_campaign_id: null,
+    });
+    const VOCAB = {
+      directoryLabels: ['Grocery Store', 'Halal Market'],
+      registeredLabels: ['Somali Grocery Store'],
+    };
+
+    it('appends the vocabulary block to a city category enrichment render', async () => {
+      mockVocabService.loadVocabulary.mockResolvedValueOnce(VOCAB);
+      mockFormatEnrichmentVocab.mockReturnValueOnce(
+        '=== PLATFORM CATEGORY VOCABULARY ===\nGrocery Store, Halal Market',
+      );
+
+      const { renderedPrompt, resolution } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign(),
+        variables: undefined,
+      });
+
+      expect(mockFormatEnrichmentVocab).toHaveBeenCalledWith(
+        VOCAB.directoryLabels,
+        VOCAB.registeredLabels,
+      );
+      expect(renderedPrompt).toContain('=== PLATFORM CATEGORY VOCABULARY ===');
+      expect(resolution.intelligence_mode).toBe('none');
+    });
+
+    it('appends the block on the passthrough path (location enrichment, no grid)', async () => {
+      mockVocabService.loadVocabulary.mockResolvedValueOnce(VOCAB);
+      mockFormatEnrichmentVocab.mockReturnValueOnce('=== PLATFORM CATEGORY VOCABULARY ===');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: {
+          body: 'CITY: {{city}} STATE: {{state}}',
+          prompt_type: 'enrichment',
+          scope: 'city',
+          output_schema: { name: 'location_enrichment' },
+        },
+        campaign: {
+          id: 'camp-enr-vocab-loc',
+          scope: 'city',
+          category: '__location__',
+          city: 'Indianapolis',
+          state: 'IN',
+          parent_campaign_id: null,
+        },
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== PLATFORM CATEGORY VOCABULARY ===');
+    });
+
+    it('appends the block to the national (__all__) category render', async () => {
+      mockVocabService.loadVocabulary.mockResolvedValueOnce(VOCAB);
+      mockFormatEnrichmentVocab.mockReturnValueOnce('=== PLATFORM CATEGORY VOCABULARY ===');
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: {
+          ...makeCategoryCampaign(),
+          id: 'camp-enr-vocab-nat',
+          city: '__all__',
+          state: '__all__',
+        },
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('=== PLATFORM CATEGORY VOCABULARY ===');
+    });
+
+    it('renders byte-identical base when the vocabulary is empty', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign(),
+        variables: undefined,
+      });
+
+      expect(mockVocabService.loadVocabulary).toHaveBeenCalled();
+      expect(renderedPrompt).not.toContain('PLATFORM CATEGORY VOCABULARY');
+    });
+
+    it('degrades gracefully when the vocabulary load throws', async () => {
+      mockVocabService.loadVocabulary.mockRejectedValueOnce(new Error('db down'));
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeCategoryTemplate(),
+        campaign: makeCategoryCampaign(),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('CATEGORY: African Grocery Store');
+      expect(renderedPrompt).not.toContain('PLATFORM CATEGORY VOCABULARY');
+    });
+  });
   // The national location page's fact layer is measured coverage, not a
   // city geography grid: resolvePrompt renders the national template
   // variant (no city placeholders), injects the deterministic NATIONAL

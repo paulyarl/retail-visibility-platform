@@ -396,6 +396,23 @@ export function normalizeSignalPlatformKey(s: string | null | undefined): string
   return ALIASES[k] ?? k;
 }
 
+/** Slugify free text into a valid bronze reason_key (/^[a-z][a-z0-9_]{1,79}$/). Returns '' for empty input. */
+function slugifyBronzeReasonKey(text: string): string {
+  let s = String(text ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!s) return '';
+  if (!/^[a-z]/.test(s)) s = `reason_${s}`.replace(/^_+|_+$/g, '');
+  return s.slice(0, 80);
+}
+
+/** `community_directory_only_presence` → `Community directory only presence`. */
+function humanizeBronzeReasonKey(key: string): string {
+  const s = String(key ?? '').replace(/_/g, ' ').trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Uncataloged reason';
+}
+
 const clamp01 = (n: unknown): number | null =>
   typeof n === 'number' && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : null;
 
@@ -3376,14 +3393,36 @@ export class IntelligenceProfileService extends BaseService {
    * business the establishment scan missed, and drop on re-scan unless
    * re-found. `operator_self_discovery`/`business_audit` are ground truth
    * and survive re-scans via mergeBronzeCoverage.
+   *
+   * Catalog guard: fills attach only to reason_keys already on the profile's
+   * board (reason_coverage is seeded from the scope-applicable catalog
+   * rows). Discovery scans occasionally emit invented reason_keys — a key
+   * not on the board is not a reason this profile tracks, so it never
+   * fabricates a coverage entry. Instead, dropped keys are converted into
+   * `suggested_reasons` entries on the draft (source 'unmatched_attribution')
+   * so the pattern survives as a reviewable proposal rather than vanishing.
+   *
+   * extras carries the scan's explicit vocabulary proposals:
+   *   suggestedReasons — bronze_standard_scan-shaped suggestion objects
+   *   suggestedSignals — { code: 'INT_*', proposed_label, proposed_definition,
+   *                      exemplar_leads } proposals for mkt_signal_registry
+   * Both merge into the draft's config (deduped by key, seen_count bumped on
+   * recurrence). A suggestion never fills a slot and never registers a
+   * signal — promotion is an operator action on the overview tab.
    */
   async recordBronzeExternalFills(
     profileId: string,
     fills: Array<{ reason_key: string; slot: BronzeExternalFillSlot }>,
     ctx?: RequestCtx,
+    extras?: {
+      suggestedReasons?: Array<Record<string, any>>;
+      suggestedSignals?: Array<Record<string, any>>;
+    },
   ): Promise<IntelligenceProfile | null> {
     try {
-      if (fills.length === 0) return null;
+      const hasSuggestions =
+        (extras?.suggestedReasons?.length ?? 0) > 0 || (extras?.suggestedSignals?.length ?? 0) > 0;
+      if (fills.length === 0 && !hasSuggestions) return null;
 
       // Load the active version for this profile id.
       const active = await this.prisma.mkt_intelligence_profiles.findFirst({
@@ -3403,10 +3442,94 @@ export class IntelligenceProfileService extends BaseService {
         ? priorConfig.reason_coverage.map((e: any) => ({ ...e, slots: Array.isArray(e.slots) ? [...e.slots] : [] }))
         : [];
 
+      // Catalog guard — drop fills for reason_keys not on the profile's
+      // board rather than fabricating phantom coverage entries.
+      const boardKeys = new Set(priorCoverage.map((e: any) => e.reason_key));
+      const droppedFills = fills.filter((f) => !boardKeys.has(f.reason_key));
+      const droppedKeys = [...new Set(droppedFills.map((f) => f.reason_key))];
+      const boardFills = fills.filter((f) => boardKeys.has(f.reason_key));
+      if (droppedKeys.length > 0) {
+        logger.warn('recordBronzeExternalFills: fills for reason keys not on the profile board become suggestions', ctx, {
+          profileId,
+          droppedKeys,
+        });
+      }
+
+      // Merge vocabulary suggestions into the draft config. Scan-provided
+      // suggestions merge first (richer fields), then dropped fills
+      // synthesize minimal suggestions so an invented key is still
+      // reviewable. Dedupe key: reason_key, else slugged proposed_label;
+      // recurrence bumps seen_count rather than duplicating the entry.
+      const priorSuggested: any[] = Array.isArray(priorConfig.suggested_reasons)
+        ? priorConfig.suggested_reasons.map((s: any) => ({ ...s }))
+        : [];
+      const suggKey = (s: any) =>
+        (typeof s?.reason_key === 'string' && s.reason_key.trim()) || slugifyBronzeReasonKey(s?.proposed_label ?? '');
+      let suggestionsChanged = false;
+      const synthesized = droppedFills.map((f) => ({
+        reason_key: f.reason_key,
+        proposed_label: humanizeBronzeReasonKey(f.reason_key),
+        proposed_definition: f.slot?.discovered_via
+          ? `Emitted as a bronze_attribution reason_key by a discovery scan — not a catalog reason. Stated basis: ${f.slot.discovered_via}`
+          : 'Emitted as a bronze_attribution reason_key by a discovery scan — not a catalog reason.',
+        observed_signals: typeof f.slot?.operational_evidence === 'string'
+          ? f.slot.operational_evidence.split(';').map((s: string) => s.trim()).filter(Boolean)
+          : [],
+        exemplar_lead: {
+          business_name: f.slot?.business_name ?? 'unknown',
+          address: f.slot?.address ?? null,
+          discovery_vector: f.slot?.discovered_via ?? undefined,
+          notes: f.slot?.category_fit_evidence ?? undefined,
+        },
+        source: 'unmatched_attribution',
+      }));
+      for (const s of [...(extras?.suggestedReasons ?? []), ...synthesized]) {
+        const k = suggKey(s);
+        if (!k) continue;
+        const existing = priorSuggested.find((e) => suggKey(e) === k);
+        if (existing) {
+          existing.seen_count = (existing.seen_count ?? 1) + 1;
+        } else {
+          // Stamp the resolved key so the authoring modal can prefill it.
+          priorSuggested.push({ ...s, reason_key: k, seen_count: 1 });
+        }
+        suggestionsChanged = true;
+      }
+
+      const priorSignalSugg: any[] = Array.isArray(priorConfig.suggested_signals)
+        ? priorConfig.suggested_signals.map((s: any) => ({ ...s }))
+        : [];
+      for (const s of extras?.suggestedSignals ?? []) {
+        const code = String(s?.code ?? '').trim();
+        if (!code) continue;
+        const existing = priorSignalSugg.find((e) => e?.code === code);
+        if (existing) {
+          existing.seen_count = (existing.seen_count ?? 1) + 1;
+          const leads = new Set<string>([
+            ...(Array.isArray(existing.exemplar_leads) ? existing.exemplar_leads : []),
+            ...(Array.isArray(s.exemplar_leads) ? s.exemplar_leads : []),
+          ]);
+          existing.exemplar_leads = [...leads].slice(0, 10);
+          // A later scan may propose playbook wiring the first emission
+          // lacked — fill empty slots without overwriting prior proposals.
+          if (!existing.primary_playbook && s.primary_playbook) {
+            existing.primary_playbook = s.primary_playbook;
+          }
+          if (!existing.secondary_playbook && s.secondary_playbook) {
+            existing.secondary_playbook = s.secondary_playbook;
+          }
+        } else {
+          priorSignalSugg.push({ ...s, seen_count: 1 });
+        }
+        suggestionsChanged = true;
+      }
+
+      if (boardFills.length === 0 && !suggestionsChanged) return null;
+
       const dedupeKey = (s: any) =>
         `${(s.business_name || '').trim().toLowerCase()}|${(s.address || '').trim().toLowerCase()}`;
 
-      for (const { reason_key, slot } of fills) {
+      for (const { reason_key, slot } of boardFills) {
         const newKey = dedupeKey(slot);
         let entry = priorCoverage.find((e: any) => e.reason_key === reason_key);
         if (!entry) {
@@ -3424,7 +3547,9 @@ export class IntelligenceProfileService extends BaseService {
         entry.empty_slot_note = null;
       }
 
-      const newConfig = { ...priorConfig, reason_coverage: priorCoverage };
+      const newConfig: any = { ...priorConfig, reason_coverage: priorCoverage };
+      if (priorSuggested.length > 0) newConfig.suggested_reasons = priorSuggested;
+      if (priorSignalSugg.length > 0) newConfig.suggested_signals = priorSignalSugg;
       const maxVersion = await this.prisma.mkt_intelligence_profiles.findFirst({
         where: { id: profileId },
         orderBy: { version: 'desc' },
@@ -3446,9 +3571,11 @@ export class IntelligenceProfileService extends BaseService {
       });
       logger.info('Bronze external fills recorded as draft version', ctx, {
         profileId,
-        fillCount: fills.length,
-        reasonKeys: [...new Set(fills.map((f) => f.reason_key))],
-        discoveredBy: [...new Set(fills.map((f) => f.slot.discovered_by))],
+        fillCount: boardFills.length,
+        reasonKeys: [...new Set(boardFills.map((f) => f.reason_key))],
+        discoveredBy: [...new Set(boardFills.map((f) => f.slot.discovered_by))],
+        suggestedReasons: priorSuggested.length,
+        suggestedSignals: priorSignalSugg.length,
         newVersion: draft.version,
       });
       return draft as IntelligenceProfile;

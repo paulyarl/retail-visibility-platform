@@ -24,10 +24,11 @@ import { IntelligenceProfileService, type IntelligenceProfile, type PromptResolu
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
+import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
 import { buildGeographyGridDirective, buildGeographyGrid, parseZipCodes, isNationalSentinel, type GeographyGrid } from './intelligence/geography-grid';
 import { GeographyGridService } from './intelligence/GeographyGridService';
-import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
+import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary, formatEnrichmentCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
 import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { WEBSITE_POSITIONING_SCHEMA_NAME } from '../validators/website-positioning.schema';
@@ -1422,6 +1423,15 @@ export class MarketingExecutionService extends BaseService {
         });
       }
 
+      // ─── Triage playbook roster (suggested_signals pre-wiring) ────────
+      // A suggested_signal can declare the playbook(s) its pattern should
+      // route to once an operator registers it — the model can only name
+      // real codes when the active roster is visible in the prompt.
+      const playbookRosterBlock = await this.renderTriagePlaybookRosterBlock(ctx);
+      if (playbookRosterBlock) {
+        rendered = rendered + '\n' + playbookRosterBlock;
+      }
+
       logger.info('Intelligence-scope prompt composed', ctx, {
         campaignId: input.campaign.id,
         category,
@@ -1593,6 +1603,34 @@ export class MarketingExecutionService extends BaseService {
       const campaignCity = (input.campaign as any).city || null;
       const campaignState = (input.campaign as any).state || null;
 
+      // Category vocabulary injection — every enrichment packet names related
+      // categories (secondary/adjacent/super/top) that the public pages
+      // resolve to live shelves by exact label match. Inject the operator-
+      // selectable union so the analyst aligns to canonical names instead of
+      // inventing near-miss variants. Never blocks the render — the service
+      // degrades per-source to empty lists and the formatter returns ''.
+      let enrichmentVocabSuffix = '';
+      try {
+        const vocab = await CategoryVocabularyService.getInstance().loadVocabulary(ctx);
+        const vocabBlock = formatEnrichmentCategoryVocabulary(
+          vocab.directoryLabels,
+          vocab.registeredLabels,
+        );
+        if (vocabBlock) {
+          enrichmentVocabSuffix = '\n' + vocabBlock;
+          logger.info('Category vocabulary injected into enrichment prompt', ctx, {
+            campaignId: input.campaign.id,
+            directoryLabelCount: vocab.directoryLabels.length,
+            registeredLabelCount: vocab.registeredLabels.length,
+          });
+        }
+      } catch (err) {
+        logger.warn('Category vocabulary injection failed — continuing without it', ctx, {
+          campaignId: input.campaign.id,
+          error: (err as Error).message,
+        });
+      }
+
       // Category-set enrichment (PG shelf sweep): the campaign carries a set
       // of uncovered (category, city, state) markets in
       // discovery_context.shelf_sweep. Inject one structural city-profile
@@ -1623,7 +1661,7 @@ export class MarketingExecutionService extends BaseService {
             markets: (rawMarkets as any[]).length,
           });
           return {
-            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + setBlocks.join('\n\n'), promptSuffix),
+            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + setBlocks.join('\n\n') + enrichmentVocabSuffix, promptSuffix),
             resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
           };
         }
@@ -1659,7 +1697,7 @@ export class MarketingExecutionService extends BaseService {
 
         locBlocks.push(this.formatNationalSurfaceBlock('location'));
         return {
-          renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + locBlocks.join('\n\n'), promptSuffix),
+          renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + locBlocks.join('\n\n') + enrichmentVocabSuffix, promptSuffix),
           resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
         };
       }
@@ -1687,7 +1725,7 @@ export class MarketingExecutionService extends BaseService {
               state: campaignState,
             });
             return {
-              renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + gridBlock, promptSuffix),
+              renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + gridBlock + enrichmentVocabSuffix, promptSuffix),
               resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
             };
           }
@@ -1742,7 +1780,7 @@ export class MarketingExecutionService extends BaseService {
 
         enrichmentBlocks.push(this.formatNationalSurfaceBlock('category'));
         return {
-          renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + enrichmentBlocks.join('\n\n'), promptSuffix),
+          renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + enrichmentBlocks.join('\n\n') + enrichmentVocabSuffix, promptSuffix),
           resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
         };
       }
@@ -1802,16 +1840,17 @@ export class MarketingExecutionService extends BaseService {
         }
         if (enrichmentBlocks.length > 0) {
           return {
-            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + enrichmentBlocks.join('\n\n'), promptSuffix),
+            renderedPrompt: this.appendPromptSuffix(baseRendered + '\n' + enrichmentBlocks.join('\n\n') + enrichmentVocabSuffix, promptSuffix),
             resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
           };
         }
       }
 
       // No context available (location enrichment, national category,
-      // or no prior location/establishment run) — clean passthrough.
+      // or no prior location/establishment run) — clean passthrough (the
+      // category vocabulary suffix still applies when it resolved).
       return {
-        renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+        renderedPrompt: this.appendPromptSuffix(baseRendered + enrichmentVocabSuffix, promptSuffix),
         resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
       };
     }
@@ -3323,6 +3362,40 @@ ${scopeNote}
       logger.warn('Bronze national proof supplement failed — continuing without it', ctx, {
         error: (err as Error).message,
         category,
+      });
+      return '';
+    }
+  }
+
+  /**
+   * Compact roster of the active business-triage playbooks, injected into
+   * discovery scans so a suggested_signal can name the playbook code(s) it
+   * should route to once registered (primary_playbook / secondary_playbook).
+   * Proving-ground playbooks are excluded — they are aggregate-campaign
+   * checklists, never business triage targets. Best-effort: a catalog read
+   * failure must not block the scan render.
+   */
+  private async renderTriagePlaybookRosterBlock(ctx?: RequestCtx): Promise<string> {
+    try {
+      const playbooks = (await MarketingPlaybookCatalogService.listActivePlaybooksOrdered(ctx))
+        .filter((p: any) => p.category !== 'proving_ground');
+      if (!playbooks.length) return '';
+      const rows = playbooks.map(
+        (p: any) => `  ${p.code} — ${p.name} (${p.archetypeLabel ?? p.archetype})`,
+      );
+      return [
+        '=== TRIAGE PLAYBOOK ROSTER ===',
+        'When a suggested_signal proposal names where its pattern belongs in triage,',
+        'use ONLY codes from this roster:',
+        '  primary_playbook   — first intended route; once registered, the signal counts',
+        '                       as evidence toward this playbook in triage evaluation.',
+        '  secondary_playbook — fallback route used only when no playbook\'s matching',
+        '                       rules fit the business; beats the generic fallback.',
+        ...rows,
+      ].join('\n');
+    } catch (err) {
+      logger.warn('Triage playbook roster block skipped — catalog read failed', ctx, {
+        error: (err as Error).message,
       });
       return '';
     }

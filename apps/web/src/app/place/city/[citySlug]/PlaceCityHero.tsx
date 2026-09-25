@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { MapPin, ArrowLeft } from 'lucide-react';
-import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
+import type { LocationEnrichmentResponse, PlaceCategory } from '@/services/PlacesBrowsePublicService';
 import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
+import { resolveShelfForLabel, shelfHrefFor } from '@/lib/place-shelves';
 
 /**
  * Server-rendered seed city shelf hero — breadcrumb, title, listing count, the
@@ -19,12 +20,16 @@ export default function PlaceCityHero({
   state,
   total,
   enrichment,
+  shelfIndex = [],
 }: {
   citySlug: string;
   city: string;
   state: string | null;
   total: number;
   enrichment: LocationEnrichmentResponse | null;
+  // Live shelf index — resolves top_categories labels to hot shelf links.
+  // Optional so legacy/test renders degrade to inert chips.
+  shelfIndex?: PlaceCategory[];
 }) {
   const locationName = state ? `${city}, ${state}` : city;
   // Legacy packets carry a baked listing count that goes stale (see the helper)
@@ -99,14 +104,29 @@ export default function PlaceCityHero({
           <div className="mt-6">
             <p className="text-sm text-neutral-500 mb-2">Top categories in {city}</p>
             <div className="flex flex-wrap gap-2 max-w-3xl">
-              {topCategories.slice(0, 8).map((category) => (
-                <span
-                  key={category}
-                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
-                >
-                  {category}
-                </span>
-              ))}
+              {topCategories.slice(0, 8).map((category) => {
+                const shelf = resolveShelfForLabel(category, city, state ?? undefined, shelfIndex);
+                if (!shelf) {
+                  return (
+                    <span
+                      key={category}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+                    >
+                      {category}
+                    </span>
+                  );
+                }
+                return (
+                  <Link
+                    key={category}
+                    href={shelfHrefFor(shelf.slug, city, state ?? undefined)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                  >
+                    {category}
+                    <span className="text-blue-400">{shelf.count}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

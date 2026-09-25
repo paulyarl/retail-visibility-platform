@@ -14,6 +14,7 @@ import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
 import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
+import { resolveDirectoryShelfForLabel, directoryShelfHrefFor, type DirectoryShelfIndexEntry } from '@/lib/directory-shelves';
 import { clientLogger } from '@/lib/client-logger';
 
 interface LocationPageProps {
@@ -128,13 +129,17 @@ export default async function LocationPage({ params, searchParams }: LocationPag
   const { city, state } = parsed;
   const locationName = formatLocation(city, state);
 
-  const [data, nearbyLocations, enrichment, marketIntelTeaser] = await Promise.all([
+  const [data, nearbyLocations, enrichment, marketIntelTeaser, mvCategories] = await Promise.all([
     getLocationListings(city, state, page),
     getNearbyLocations(city, state),
     placesBrowsePublicService.getLocationEnrichment(city, state),
     // City teaser takes the "{city}-{state}" slug — same format as this route.
     marketIntelSurfaceService.getCityTeaser(location).catch(() => null),
+    // MV shelf index — resolves packet top_categories / strong_categories
+    // labels to hot directory shelves (only shelves holding listings qualify).
+    recommendationsService.getDirectoryMVCategories().catch(() => null),
   ]);
+  const shelfIndex: DirectoryShelfIndexEntry[] = mvCategories?.categories ?? [];
 
   const effectiveDescription = enrichment?.effective?.description;
   const bodyCopy = enrichment?.bodyCopy;
@@ -238,14 +243,29 @@ export default async function LocationPage({ params, searchParams }: LocationPag
               <div className="mt-6">
                 <p className="text-sm text-neutral-500 mb-2">Top categories in {locationName}</p>
                 <div className="flex flex-wrap gap-2 max-w-3xl">
-                  {topCategories.slice(0, 8).map((category: string) => (
-                    <span
-                      key={category}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
-                    >
-                      {category}
-                    </span>
-                  ))}
+                  {topCategories.slice(0, 8).map((category: string) => {
+                    const shelf = resolveDirectoryShelfForLabel(category, shelfIndex);
+                    if (!shelf) {
+                      return (
+                        <span
+                          key={category}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+                        >
+                          {category}
+                        </span>
+                      );
+                    }
+                    return (
+                      <Link
+                        key={category}
+                        href={directoryShelfHrefFor(shelf.slug)}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                      >
+                        {category}
+                        <span className="text-blue-400">{shelf.count}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -369,14 +389,24 @@ export default async function LocationPage({ params, searchParams }: LocationPag
                         <p className="text-sm text-neutral-600 mb-2">{area.description}</p>
                         {area.strong_categories && area.strong_categories.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
-                            {area.strong_categories.map((cat) => (
-                              <span
-                                key={cat}
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white text-neutral-700 border border-neutral-200"
-                              >
-                                {cat}
-                              </span>
-                            ))}
+                            {area.strong_categories.map((cat) => {
+                              const shelf = resolveDirectoryShelfForLabel(cat, shelfIndex);
+                              const chip =
+                                'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white text-neutral-700 border border-neutral-200';
+                              if (!shelf) {
+                                return <span key={cat} className={chip}>{cat}</span>;
+                              }
+                              return (
+                                <Link
+                                  key={cat}
+                                  href={directoryShelfHrefFor(shelf.slug)}
+                                  className={`${chip} hover:border-blue-300 hover:text-blue-700 transition-colors`}
+                                >
+                                  {cat}
+                                  <span className="ml-1 text-neutral-400">{shelf.count}</span>
+                                </Link>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

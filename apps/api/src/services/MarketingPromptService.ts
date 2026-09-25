@@ -1601,6 +1601,13 @@ export class MarketingPromptService extends BaseService {
    * candidates write; the fills land as ONE new draft version on the
    * resolved active profile (city → state → nationwide cascade). No active
    * profile → noted, not written.
+   *
+   * Vocabulary proposals ride the same draft: the scan's explicit
+   * suggested_reasons/suggested_signals arrays merge into the profile
+   * config, and non-registry INT_* codes observed in discovery_signals are
+   * swept into suggested_signals so an invented code surfaces for review
+   * instead of silently passing through. Invented bronze_attribution keys
+   * likewise become suggested_reasons inside recordBronzeExternalFills.
    */
   private async recordBronzeDiscoveryFills(campaignId: string, parsedJson: any, ctx?: RequestCtx): Promise<void> {
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -1649,7 +1656,55 @@ export class MarketingPromptService extends BaseService {
         });
       }
     }
-    if (fills.length === 0) return;
+
+    // Vocabulary proposals — explicit arrays plus a sweep for INT_* codes
+    // the scan emitted that aren't in mkt_signal_registry. An invented code
+    // becomes a suggested_signals entry for operator review, not a silent
+    // pass-through.
+    const suggestedReasons: any[] = Array.isArray(parsedJson.suggested_reasons)
+      ? parsedJson.suggested_reasons.filter((s: any) => s && typeof s === 'object')
+      : [];
+    const suggestedSignals: any[] = Array.isArray(parsedJson.suggested_signals)
+      ? parsedJson.suggested_signals
+          .filter((s: any) => s && typeof s?.code === 'string')
+          .map((s: any) => ({ ...s, code: String(s.code).toUpperCase() }))
+          .filter((s: any) => /^INT_[A-Z0-9_]+$/.test(s.code))
+      : [];
+    const emittedCodes = new Map<string, Set<string>>();
+    for (const c of candidates) {
+      for (const code of Array.isArray(c?.discovery_signals) ? c.discovery_signals : []) {
+        if (typeof code !== 'string' || !/^INT_/.test(code)) continue;
+        const k = code.trim().toUpperCase();
+        if (!emittedCodes.has(k)) emittedCodes.set(k, new Set());
+        if (c.business_name) emittedCodes.get(k)!.add(c.business_name);
+      }
+    }
+    if (emittedCodes.size > 0) {
+      try {
+        const { default: signalRegistry } = await import('./MarketingSignalRegistryService.js');
+        const known = new Set(
+          (await signalRegistry.listSignals({ family: 'INT' }, ctx)).map((s) => s.code),
+        );
+        for (const [code, names] of emittedCodes) {
+          if (known.has(code)) continue;
+          if (suggestedSignals.some((s) => s.code === code)) continue;
+          suggestedSignals.push({
+            code,
+            proposed_label: code.slice(4).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase()),
+            proposed_definition: 'Emitted in discovery_signals by a discovery scan — not a registered signal code.',
+            exemplar_leads: [...names].slice(0, 10),
+            source: 'unmatched_signal',
+          });
+        }
+      } catch (error) {
+        // Advisory sweep — a registry read failure must never block fills.
+        logger.warn('Bronze discovery signal sweep skipped — registry read failed', ctx, {
+          campaignId,
+          error: (error as Error).message,
+        });
+      }
+    }
+    if (fills.length === 0 && suggestedReasons.length === 0 && suggestedSignals.length === 0) return;
 
     const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService.js');
     const profileService = IntelligenceProfileService.getInstance();
@@ -1661,14 +1716,21 @@ export class MarketingPromptService extends BaseService {
         campaignId,
         category: campaign.category,
         fillCount: fills.length,
+        suggestedReasons: suggestedReasons.length,
+        suggestedSignals: suggestedSignals.length,
       });
       return;
     }
-    const draft = await profileService.recordBronzeExternalFills(profile.id, fills, ctx);
+    const draft = await profileService.recordBronzeExternalFills(profile.id, fills, ctx, {
+      suggestedReasons,
+      suggestedSignals,
+    });
     logger.info('Bronze consumer fills recorded as draft', ctx, {
       campaignId,
       profileId: profile.id,
       fillCount: fills.length,
+      suggestedReasons: suggestedReasons.length,
+      suggestedSignals: suggestedSignals.length,
       draftVersion: draft?.version ?? null,
     });
   }

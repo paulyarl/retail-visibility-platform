@@ -104,6 +104,7 @@ vi.mock('../intelligence/MarketContextBindingFormatters', () => ({
   formatDiscoveryMarketContext: mockFormatDiscovery,
   formatCategoryIdentificationMarketContext: mockFormatCategoryId,
   formatKnownCategoryVocabulary: mockFormatVocab,
+  formatEnrichmentCategoryVocabulary: mockFormatVocab,
 }));
 
 vi.mock('../CategoryVocabularyService', () => ({

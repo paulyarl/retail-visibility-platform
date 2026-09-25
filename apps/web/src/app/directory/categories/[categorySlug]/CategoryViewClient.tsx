@@ -23,6 +23,7 @@ import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import type { CategoryMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import placesBrowsePublicService, { CategoryEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
+import { resolveDirectoryShelfForLabel, directoryShelfHrefFor, type DirectoryShelfIndexEntry } from '@/lib/directory-shelves';
 import { clientLogger } from '@/lib/client-logger';
 
 // Dynamically import Google Maps to avoid SSR issues
@@ -107,6 +108,9 @@ export default function CategoryViewClient({
   // National ('__all__') category enrichment packet — written by a
   // directory_enrichment campaign; renders as the page description when present.
   const [enrichment, setEnrichment] = useState<CategoryEnrichmentResponse | null>(null);
+  // Live directory shelf index (MV-backed: only categories holding published
+  // listings) — resolves enrichment taxonomy labels to hot shelf links.
+  const [shelfIndex, setShelfIndex] = useState<DirectoryShelfIndexEntry[]>([]);
   
   // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
@@ -145,8 +149,13 @@ export default function CategoryViewClient({
         // Decode URL-encoded slug (e.g., health-%26-beauty -> health-&-beauty)
         const decodedSlug = decodeURIComponent(categorySlug);
 
-        // 1. Fetch category info from directory categories API
-        const catData = await recommendationsService.getDirectoryCategories();
+        // 1. Fetch category info from directory categories API (+ the
+        //    MV-backed shelf index for related-category hot links)
+        const [catData, mvCatData] = await Promise.all([
+          recommendationsService.getDirectoryCategories(),
+          recommendationsService.getDirectoryMVCategories(),
+        ]);
+        setShelfIndex(mvCatData?.categories ?? []);
         if (catData) {
           // Use centralized slug matching for robust comparison
           const currentCat = catData.categories?.find((c: any) => 
@@ -477,12 +486,7 @@ export default function CategoryViewClient({
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {enrichment.context.sub_categories.map((sub) => (
-                    <span
-                      key={sub}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
-                    >
-                      {sub}
-                    </span>
+                    <DirectoryShelfChip key={sub} label={sub} shelves={shelfIndex} />
                   ))}
                 </div>
               </section>
@@ -496,12 +500,35 @@ export default function CategoryViewClient({
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {enrichment.context.adjacent_categories.map((adj) => (
-                    <span
-                      key={adj}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
-                    >
-                      {adj}
-                    </span>
+                    <DirectoryShelfChip key={adj} label={adj} shelves={shelfIndex} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Secondary categories — overlapping shelves this category is filed under */}
+            {enrichment?.effective?.secondaryCategories && enrichment.effective.secondaryCategories.length > 0 && (
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
+                  Also Filed Under
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.effective.secondaryCategories.map((label) => (
+                    <DirectoryShelfChip key={label} label={label} shelves={shelfIndex} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Super categories — broader parent shelves */}
+            {enrichment?.context?.super_categories && enrichment.context.super_categories.length > 0 && (
+              <section className="max-w-3xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
+                  Broader Categories
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {enrichment.context.super_categories.map((label) => (
+                    <DirectoryShelfChip key={label} label={label} shelves={shelfIndex} />
                   ))}
                 </div>
               </section>
@@ -537,5 +564,36 @@ export default function CategoryViewClient({
         showBanner={false}
       />
     </div>
+  );
+}
+
+// ====================
+// DirectoryShelfChip — enrichment taxonomy label that links to its live
+// directory shelf when one exists (mirrors ShelfChip on the /place surface)
+// ====================
+
+function DirectoryShelfChip({
+  label,
+  shelves,
+}: {
+  label: string;
+  shelves: DirectoryShelfIndexEntry[];
+}) {
+  const shelf = resolveDirectoryShelfForLabel(label, shelves);
+  const base =
+    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300';
+
+  if (!shelf) {
+    return <span className={base}>{label}</span>;
+  }
+
+  return (
+    <Link
+      href={directoryShelfHrefFor(shelf.slug)}
+      className={`${base} hover:border-blue-300 hover:text-blue-700 dark:hover:border-blue-700 dark:hover:text-blue-400 transition-colors`}
+    >
+      {label}
+      <span className="text-xs text-neutral-400 dark:text-neutral-500">{shelf.count}</span>
+    </Link>
   );
 }

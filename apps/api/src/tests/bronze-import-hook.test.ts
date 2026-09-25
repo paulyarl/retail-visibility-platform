@@ -60,6 +60,18 @@ vi.mock('../services/intelligence/IntelligenceProfileService', () => ({
   normalizeReferenceState: (s: string | null | undefined) => (s ? s.trim().toUpperCase() : null),
   normalizePlatformScope: (s: string | null | undefined) => (s ? s.trim().toLowerCase() || null : null),
 }));
+// The signal-registry sweep is advisory — stub the singleton so the suite
+// controls which INT_* codes count as registered. The fixture emits
+// INT_COMMUNITY_SIGNAL, which is NOT in this list, so it surfaces as a
+// suggested_signals entry.
+vi.mock('../services/MarketingSignalRegistryService', () => ({
+  default: {
+    listSignals: vi.fn(async () => [
+      { code: 'INT_LOW_VISIBILITY' },
+      { code: 'INT_MULTISOURCE_IDENTITY' },
+    ]),
+  },
+}));
 
 import { MarketingPromptService } from '../services/MarketingPromptService';
 
@@ -459,6 +471,7 @@ describe('importExternalResult — bronze consumer write-back', () => {
         }),
       })],
       undefined,
+      expect.objectContaining({ suggestedReasons: [], suggestedSignals: expect.any(Array) }),
     );
   });
 
@@ -475,7 +488,17 @@ describe('importExternalResult — bronze consumer write-back', () => {
       rawOutput: DISCOVERY_PAYLOAD([CANDIDATE()]),
     });
 
-    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
+    // No attribution → no fills. The call still happens because the fixture's
+    // unregistered INT_COMMUNITY_SIGNAL sweeps into suggested_signals — a
+    // suggestions-only draft is the intended "pattern not on the list" path.
+    expect(mockProfileService.recordBronzeExternalFills).toHaveBeenCalledWith(
+      'mip-bronze-1',
+      [],
+      undefined,
+      expect.objectContaining({
+        suggestedSignals: [expect.objectContaining({ code: 'INT_COMMUNITY_SIGNAL', source: 'unmatched_signal' })],
+      }),
+    );
   });
 
   it('skips outside_market and benchmark_only candidates even when attributed', async () => {
@@ -508,7 +531,15 @@ describe('importExternalResult — bronze consumer write-back', () => {
       }),
     });
 
-    expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
+    // No fills — outside_market/benchmark_only candidates are excluded. Their
+    // unregistered signals still feed the vocabulary sweep (a signal pattern
+    // observed on a context candidate is still catalog evidence).
+    expect(mockProfileService.recordBronzeExternalFills).toHaveBeenCalledWith(
+      'mip-bronze-1',
+      [],
+      undefined,
+      expect.objectContaining({ suggestedSignals: expect.any(Array) }),
+    );
   });
 
   it('emits competitive_scan provenance under focus=competitive', async () => {
@@ -533,6 +564,7 @@ describe('importExternalResult — bronze consumer write-back', () => {
         slot: expect.objectContaining({ discovered_by: 'competitive_scan' }),
       })],
       undefined,
+      expect.objectContaining({ suggestedReasons: [], suggestedSignals: expect.any(Array) }),
     );
   });
 
@@ -554,6 +586,53 @@ describe('importExternalResult — bronze consumer write-back', () => {
 
     const fills = mockProfileService.recordBronzeExternalFills.mock.calls[0][1];
     expect(fills).toHaveLength(1);
+  });
+
+  it('passes scan vocabulary proposals and unregistered INT_* codes as suggestions', async () => {
+    vi.spyOn(service, 'getTemplate').mockResolvedValue(DISCOVERY_TEMPLATE as any);
+    mockCampaignService.getCampaign.mockResolvedValue(DISCOVERY_CAMPAIGN);
+    mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({
+      category: 'African Grocery Store', intelligence_platform: null, city: 'Kansas City', state: 'MO',
+    });
+    const attributed = CANDIDATE({
+      bronze_attribution: [{ reason_key: 'community_only_presence', basis: 'vector' }],
+    });
+
+    await service.importExternalResult({
+      campaignId: DISCOVERY_CAMPAIGN.id,
+      templateId: DISCOVERY_TEMPLATE.id,
+      rawOutput: JSON.stringify({
+        intelligence_mode: 'profile',
+        category: 'African Grocery Store',
+        city: 'Kansas City',
+        state: 'MO',
+        focus: 'emerging',
+        discovered_businesses: [attributed],
+        qualifying_businesses: [attributed],
+        candidate_count: 1,
+        qualifying_count: 1,
+        hold_count: 0,
+        suggested_reasons: [
+          { proposed_label: 'Diaspora Classifieds Only', proposed_definition: 'found only via diaspora classifieds' },
+        ],
+        suggested_signals: [
+          { code: 'INT_SEASONAL_OPERATION', proposed_label: 'Seasonal', proposed_definition: 'seasonal hours' },
+          { code: 'RA_NOT_INT', proposed_label: 'bad', proposed_definition: 'non-INT dropped' },
+        ],
+      }),
+    });
+
+    const extras = mockProfileService.recordBronzeExternalFills.mock.calls[0][3];
+    expect(extras.suggestedReasons).toHaveLength(1);
+    expect(extras.suggestedReasons[0].proposed_label).toBe('Diaspora Classifieds Only');
+    // Explicit INT_* proposal kept; the non-INT code dropped; and the fixture's
+    // unregistered INT_COMMUNITY_SIGNAL was swept in as an unmatched_signal.
+    const codes = extras.suggestedSignals.map((s: any) => s.code);
+    expect(codes).toEqual(expect.arrayContaining(['INT_SEASONAL_OPERATION', 'INT_COMMUNITY_SIGNAL']));
+    expect(codes).not.toContain('RA_NOT_INT');
+    const swept = extras.suggestedSignals.find((s: any) => s.code === 'INT_COMMUNITY_SIGNAL');
+    expect(swept.source).toBe('unmatched_signal');
+    expect(swept.exemplar_leads).toContain('KCK Grocery');
   });
 
   it('notes fills without writing when no active bronze profile resolves', async () => {

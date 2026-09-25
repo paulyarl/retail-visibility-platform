@@ -40,6 +40,7 @@ import { notifications } from '@mantine/notifications';
 import marketingOpsService, {
   type BronzeReasonInput,
   type IntelligenceProfile,
+  type PlaybookCatalogEntry,
 } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 import {
@@ -61,6 +62,7 @@ import {
   type BronzeOperationalStatus,
   type BronzeSlot,
   type BronzeSuggestedReason,
+  type BronzeSuggestedSignal,
 } from '@/lib/bronze-standard-profile';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -209,6 +211,7 @@ export default function BronzeStandardProfileView({ profile }: Props) {
   const prohibited = config.prohibited_inferences ?? [];
   const notApplicable = config.not_applicable_reasons ?? [];
   const suggested = config.suggested_reasons ?? [];
+  const suggestedSignals = config.suggested_signals ?? [];
   const scopeMix = config.scope_mix ?? {};
 
   const snapshotByKey = new Map<string, BronzeCatalogSnapshotRow>();
@@ -227,6 +230,24 @@ export default function BronzeStandardProfileView({ profile }: Props) {
   const [modalError, setModalError] = useState<string | null>(null);
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
   const [catalogKeys, setCatalogKeys] = useState<Set<string> | null>(null);
+
+  // Suggested INT_* signal promotion state — mirrors the reason flow: live
+  // registry fetch for post-scan registrations, addedSignalCodes tracks
+  // codes promoted from this view. Registration routes through a modal so
+  // the operator confirms the playbook pre-wiring (primary/secondary) the
+  // signal enters the catalog with.
+  const [registryCodes, setRegistryCodes] = useState<Set<string> | null>(null);
+  const [addedSignalCodes, setAddedSignalCodes] = useState<Set<string>>(new Set());
+  const [promotingSignal, setPromotingSignal] = useState<string | null>(null);
+  const [playbooks, setPlaybooks] = useState<PlaybookCatalogEntry[] | null>(null);
+  const [signalModal, setSignalModal] = useState<{
+    suggestion: BronzeSuggestedSignal;
+    label: string;
+    definition: string;
+    primaryPlaybook: string | null;
+    secondaryPlaybook: string | null;
+  } | null>(null);
+  const [signalModalError, setSignalModalError] = useState<string | null>(null);
 
   // Catalog keys the profile itself already knows — coverage rows, out-of-scope
   // keys, and the embedded snapshot. Synchronous so the first paint reflects
@@ -256,6 +277,108 @@ export default function BronzeStandardProfileView({ profile }: Props) {
       cancelled = true;
     };
   }, [profile.id, suggested.length]);
+
+  // Live signal-registry fetch — a suggested code may have been registered
+  // after the scan; the POST's unique constraint is the backstop either way.
+  // Also loads the active playbook roster for the promotion modal's
+  // primary/secondary preference selects — proving_ground excluded (those
+  // are aggregate checklists, not business triage targets).
+  useEffect(() => {
+    if (suggestedSignals.length === 0) return;
+    let cancelled = false;
+    marketingOpsService
+      .listSignals()
+      .then((rows) => {
+        if (!cancelled) setRegistryCodes(new Set(rows.map((r) => r.code)));
+      })
+      .catch(() => {
+        // Best-effort — the POST's conflict response is the backstop.
+      });
+    marketingOpsService
+      .listPlaybooks({ isActive: true })
+      .then((rows) => {
+        if (!cancelled) setPlaybooks(rows.filter((p) => p.category !== 'proving_ground'));
+      })
+      .catch(() => {
+        // Best-effort — a missing roster yields empty selects; the modal still works.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id, suggestedSignals.length]);
+
+  const playbookOptions = (playbooks ?? []).map((p) => ({
+    value: p.code,
+    label: `${p.code} — ${p.name}`,
+  }));
+  const knownPlaybookCodes = new Set((playbooks ?? []).map((p) => p.code));
+
+  const handleOpenSignalModal = (s: BronzeSuggestedSignal) => {
+    // Pre-fill from the scan's proposed wiring only when it names a real
+    // playbook — a model-invented code gets dropped to empty, not trusted.
+    const proposedPrimary = s.primary_playbook && knownPlaybookCodes.has(s.primary_playbook)
+      ? s.primary_playbook
+      : null;
+    const proposedSecondary = s.secondary_playbook
+      && knownPlaybookCodes.has(s.secondary_playbook)
+      && s.secondary_playbook !== proposedPrimary
+      ? s.secondary_playbook
+      : null;
+    setSignalModal({
+      suggestion: s,
+      label: s.proposed_label,
+      definition: s.proposed_definition,
+      primaryPlaybook: proposedPrimary,
+      secondaryPlaybook: proposedSecondary,
+    });
+    setSignalModalError(null);
+  };
+
+  const handleRegisterSignal = async () => {
+    if (!signalModal) return;
+    const s = signalModal.suggestion;
+    if (!signalModal.label.trim()) {
+      setSignalModalError('Label is required');
+      return;
+    }
+    if (!signalModal.primaryPlaybook) {
+      setSignalModalError(
+        'Primary playbook is required — a registered signal must enter the catalog ' +
+        'pre-wired so triage knows which playbook its evidence belongs to.',
+      );
+      return;
+    }
+    if (signalModal.secondaryPlaybook && signalModal.secondaryPlaybook === signalModal.primaryPlaybook) {
+      setSignalModalError('Secondary playbook must differ from the primary');
+      return;
+    }
+    setPromotingSignal(s.code);
+    setSignalModalError(null);
+    try {
+      await marketingOpsService.createSignal({
+        code: s.code,
+        family: 'INT',
+        label: signalModal.label.trim(),
+        description: signalModal.definition.trim() || undefined,
+        detection_source: 'model_emitted',
+        primary_playbook: signalModal.primaryPlaybook,
+        secondary_playbook: signalModal.secondaryPlaybook,
+        is_active: true,
+      });
+      setAddedSignalCodes((prev) => new Set([...prev, s.code]));
+      setSignalModal(null);
+      notifications.show({
+        title: 'Signal registered',
+        message: `${s.code} is now in the signal registry, wired to ${signalModal.primaryPlaybook} — future scans may emit it and triage routes it automatically.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (err: any) {
+      setSignalModalError(err.message || `Failed to register ${s.code}`);
+    } finally {
+      setPromotingSignal(null);
+    }
+  };
 
   const [authorForm, setAuthorForm] = useState({
     reason_key: '',
@@ -406,6 +529,12 @@ export default function BronzeStandardProfileView({ profile }: Props) {
               <Stack gap={0}>
                 <Text size="xs" c="dimmed">Suggested Blind Spots</Text>
                 <Text size="sm" fw={600} c="blue.7">{suggested.length}</Text>
+              </Stack>
+            )}
+            {suggestedSignals.length > 0 && (
+              <Stack gap={0}>
+                <Text size="xs" c="dimmed">Suggested Signals</Text>
+                <Text size="sm" fw={600} c="violet.7">{suggestedSignals.length}</Text>
               </Stack>
             )}
           </Group>
@@ -582,6 +711,16 @@ export default function BronzeStandardProfileView({ profile }: Props) {
                                     @{bronzePlatformLabel(s.suggested_scope_platform)}
                                   </Badge>
                                 )}
+                                {s.source === 'unmatched_attribution' && (
+                                  <Badge size="xs" variant="light" color="orange">
+                                    Invented attribution key — not in catalog
+                                  </Badge>
+                                )}
+                                {(s.seen_count ?? 0) > 1 && (
+                                  <Badge size="xs" variant="outline" color="blue">
+                                    seen in {s.seen_count} scans
+                                  </Badge>
+                                )}
                               </Group>
                             </Stack>
                             <Button
@@ -643,6 +782,88 @@ export default function BronzeStandardProfileView({ profile }: Props) {
                                 )}
                               </Stack>
                             </Paper>
+                          )}
+                        </Stack>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+            </Paper>
+          )}
+
+          {/* ─── Suggested discovery signals (INT_* proposals for mkt_signal_registry) ─── */}
+          {suggestedSignals.length > 0 && (
+            <Paper withBorder radius="md" p="md" style={{ backgroundColor: 'var(--mantine-color-violet-0)', borderColor: 'var(--mantine-color-violet-3)' }}>
+              <Stack gap="sm">
+                <Group justify="space-between" wrap="wrap">
+                  <SectionHeader icon={<IconSparkles size={16} color="var(--mantine-color-violet-6)" />} title="Suggested Discovery Signals" count={suggestedSignals.length} />
+                  <Badge size="xs" variant="light" color="violet">Registry Review</Badge>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  INT_* signal codes the scan proposed — or emitted without a registry entry — that no registered
+                  discovery signal captures. Registration pre-wires the signal into triage: a primary playbook
+                  whose evidence pool it joins, and an optional secondary fallback for the no-rule-match case.
+                  A suggestion never evaluates in triage until registered.
+                </Text>
+                <Stack gap="xs">
+                  {suggestedSignals.map((s, idx) => {
+                    const isAdded = addedSignalCodes.has(s.code);
+                    const isRegistered = !isAdded && (registryCodes?.has(s.code) ?? false);
+                    return (
+                      <Paper key={idx} withBorder radius="sm" p="sm" bg="white">
+                        <Stack gap="xs">
+                          <Group justify="space-between" align="flex-start" wrap="wrap">
+                            <Stack gap={2}>
+                              <Group gap="xs" wrap="wrap">
+                                <Text size="sm" fw={600} ff="monospace">{s.code}</Text>
+                                <Text size="sm" c="dimmed">{s.proposed_label}</Text>
+                                {s.source === 'unmatched_signal' && (
+                                  <Badge size="xs" variant="light" color="orange">
+                                    Emitted but unregistered
+                                  </Badge>
+                                )}
+                                {(s.seen_count ?? 0) > 1 && (
+                                  <Badge size="xs" variant="outline" color="violet">
+                                    seen in {s.seen_count} scans
+                                  </Badge>
+                                )}
+                                {s.primary_playbook && (
+                                  <Badge size="xs" variant="light" color="blue" ff="monospace">
+                                    primary → {s.primary_playbook}
+                                  </Badge>
+                                )}
+                                {s.secondary_playbook && (
+                                  <Badge size="xs" variant="light" color="cyan" ff="monospace">
+                                    fallback → {s.secondary_playbook}
+                                  </Badge>
+                                )}
+                              </Group>
+                            </Stack>
+                            <Button
+                              size="xs"
+                              variant={isAdded ? 'light' : isRegistered ? 'outline' : 'filled'}
+                              color={isAdded ? 'green' : isRegistered ? 'gray' : 'violet'}
+                              leftSection={isAdded || isRegistered ? <IconCheck size={14} /> : <IconPlus size={14} />}
+                              disabled={isAdded || isRegistered || promotingSignal === s.code}
+                              loading={promotingSignal === s.code}
+                              onClick={() => handleOpenSignalModal(s)}
+                            >
+                              {isAdded ? 'Registered' : isRegistered ? 'Already in Registry' : 'Register Signal'}
+                            </Button>
+                          </Group>
+
+                          <Text size="xs" c="gray.7">{s.proposed_definition}</Text>
+
+                          {s.exemplar_leads && s.exemplar_leads.length > 0 && (
+                            <Stack gap={2}>
+                              <Text size="xs" fw={600}>Exemplar businesses</Text>
+                              <Group gap={4} wrap="wrap">
+                                {s.exemplar_leads.map((name, i) => (
+                                  <Badge key={i} size="xs" variant="light" color="gray">{name}</Badge>
+                                ))}
+                              </Group>
+                            </Stack>
                           )}
                         </Stack>
                       </Paper>
@@ -990,6 +1211,106 @@ export default function BronzeStandardProfileView({ profile }: Props) {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      {/* ─── Register Signal Modal (with playbook pre-wiring) ─── */}
+      <Modal
+        opened={signalModal !== null}
+        onClose={() => setSignalModal(null)}
+        title={
+          <Group gap="xs">
+            <IconPlus size={16} />
+            <Text fw={600} size="sm">Register Discovery Signal</Text>
+            {signalModal && (
+              <Badge size="sm" variant="light" color="violet" ff="monospace">
+                {signalModal.suggestion.code}
+              </Badge>
+            )}
+          </Group>
+        }
+        size="md"
+      >
+        {signalModal && (
+          <Stack gap="md">
+            {signalModalError && (
+              <Alert color="red" icon={<IconAlertTriangle size={16} />}>
+                {signalModalError}
+              </Alert>
+            )}
+
+            <Text size="xs" c="dimmed">
+              The signal enters mkt_signal_registry pre-wired for triage: the primary playbook&apos;s
+              evidence pool gains this code immediately, and the secondary playbook is the declared
+              fallback when no playbook&apos;s matching rules fit the business.
+            </Text>
+
+            <TextInput
+              label="Label"
+              description="Human-readable short name"
+              value={signalModal.label}
+              onChange={(e) => setSignalModal((prev) => prev && ({ ...prev, label: e.currentTarget.value }))}
+              required
+            />
+
+            <Textarea
+              label="Definition"
+              description="What the observed pattern means"
+              rows={3}
+              value={signalModal.definition}
+              onChange={(e) => setSignalModal((prev) => prev && ({ ...prev, definition: e.currentTarget.value }))}
+            />
+
+            <Select
+              label="Primary Playbook"
+              description="First intended route — the signal joins this playbook's evidence pool, subject to that playbook's own guards"
+              placeholder="Select playbook"
+              data={playbookOptions}
+              value={signalModal.primaryPlaybook}
+              onChange={(val) =>
+                setSignalModal((prev) => prev && ({
+                  ...prev,
+                  primaryPlaybook: val,
+                  // A duplicate secondary can't survive a primary change.
+                  secondaryPlaybook: prev.secondaryPlaybook === val ? null : prev.secondaryPlaybook,
+                }))
+              }
+              required
+              searchable
+            />
+
+            <Select
+              label="Secondary Playbook (fallback)"
+              description="Declared route when no playbook's rules match — beats the generic fallback. Optional."
+              placeholder="None"
+              data={playbookOptions.filter((o) => o.value !== signalModal.primaryPlaybook)}
+              value={signalModal.secondaryPlaybook}
+              onChange={(val) => setSignalModal((prev) => prev && ({ ...prev, secondaryPlaybook: val }))}
+              clearable
+              searchable
+            />
+
+            {signalModal.suggestion.exemplar_leads && signalModal.suggestion.exemplar_leads.length > 0 && (
+              <Paper withBorder radius="sm" p="xs" bg="gray.0">
+                <Text size="xs" fw={600} mb={2}>Exemplar businesses from scan:</Text>
+                <Text size="xs" c="dimmed">{signalModal.suggestion.exemplar_leads.join(', ')}</Text>
+              </Paper>
+            )}
+
+            <Group justify="flex-end" gap="sm">
+              <Button variant="default" onClick={() => setSignalModal(null)} disabled={promotingSignal !== null}>
+                Cancel
+              </Button>
+              <Button
+                color="violet"
+                onClick={handleRegisterSignal}
+                loading={promotingSignal === signalModal.suggestion.code}
+                leftSection={<IconCheck size={16} />}
+              >
+                Register Signal
+              </Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
     </Stack>
   );

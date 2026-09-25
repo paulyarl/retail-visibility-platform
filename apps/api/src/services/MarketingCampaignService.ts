@@ -2057,7 +2057,9 @@ export class MarketingCampaignService extends BaseService {
         input.detectedSignals?.length ? `Detected signals: ${input.detectedSignals.join(', ')}` : null,
         discoveryDerived?.signals.length
           ? `Partial verdict signals (discovery-derived): ${discoveryDerived.signals.join(', ')}`
-          : null,
+          : discoveryDerived
+            ? 'Partial verdict: discovery context present; no defect-equivalent signals translated.'
+            : null,
         input.note ? `Operator note: ${input.note}` : null,
       ].filter(Boolean);
 
@@ -2230,14 +2232,17 @@ export class MarketingCampaignService extends BaseService {
       }
 
       // If the caller passed detected_signals (from the category audit's
-      // per-business detected_signals[]) OR the discovery context produced
-      // translated signals, create a business_analysis stub audit on the
-      // child so the triage engine can read them, then auto-trigger triage
-      // to assign a playbook immediately — the "spawn pre-triaged" flow.
+      // per-business detected_signals[]) OR a discovery context was handed
+      // off, create a business_analysis stub audit on the child so the triage
+      // engine can read them, then auto-trigger triage to assign a playbook
+      // immediately — the "spawn pre-triaged" flow.
       // Discovery-derived stubs are marked source='discovery_scan' +
       // verdict='partial' (two-lane triage: discovery = partial, business
       // audit = full) and carry discovery_signal_map provenance.
-      if (triageSignals.length > 0) {
+      // A discovery context that produced ZERO translated signals still seeds
+      // the stub — the campaign is explicitly in the partial lane, and triage
+      // lands on the fallback playbook instead of having no verdict at all.
+      if (triageSignals.length > 0 || discoveryDerived) {
         const isDiscovery = !(input.detectedSignals?.length);
         const auditId = generateMarketingAuditId();
         await this.prisma.mkt_audits_list.create({
@@ -2257,7 +2262,9 @@ export class MarketingCampaignService extends BaseService {
                 ? { discovery_signal_map: discoveryDerived.contributions }
                 : {}),
               summary: isDiscovery
-                ? `Discovery scan verdict (partial) — ${triageSignals.length} signal${triageSignals.length === 1 ? '' : 's'} translated from discovery evidence.`
+                ? triageSignals.length > 0
+                  ? `Discovery scan verdict (partial) — ${triageSignals.length} signal${triageSignals.length === 1 ? '' : 's'} translated from discovery evidence.`
+                  : 'Discovery scan verdict (partial) — no defect-equivalent signals translated; awaiting a full business audit.'
                 : `Derived from parent campaign with ${triageSignals.length} detected signals.`,
             } as any,
           },

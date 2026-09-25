@@ -202,6 +202,18 @@ export interface SignalRegistryRow {
   description: string | null;
   detectionSource: DetectionSource;
   derivedRule: { field: string; op: string; threshold: number | boolean } | null;
+  /**
+   * Triage pre-wiring (migration 308): the playbook this signal joins as
+   * evidence — the engine appends the code to that playbook's `any` pool at
+   * evaluation time, subject to the playbook's own all/none/dual guards.
+   */
+  primaryPlaybook: string | null;
+  /**
+   * Declared fallback route: when NO playbook's matching rules fit, a
+   * detected signal's secondary_playbook beats the generic PB-03 fallback
+   * (eligible targets: none-guard passes, no all/dual conjunction).
+   */
+  secondaryPlaybook: string | null;
   isActive: boolean;
 }
 

@@ -125,6 +125,34 @@ const BRONZE_REASON_SIGNAL_MAP: Record<string, SignalCode[]> = {
   //   no_category_token_in_name, low_rating_floor — left unmapped on purpose.
 };
 
+/**
+ * Aliases for reason keys discovery scans emit that are NOT in
+ * mkt_bronze_reason_catalog — the model periodically improvises descriptive
+ * keys instead of citing the catalog (observed in a real emerging scan:
+ * 'rename_residue_splits_the_discovery_trace' etc.). Each alias points at the
+ * semantically matching catalog key so the invented attribution still yields
+ * its defect signal. Keys with no catalog equivalent are deliberately absent
+ * — they map to nothing, same as any unknown key.
+ *
+ * Note: aliasing only affects verdict-signal derivation. The bronze profile
+ * write-back (recordBronzeExternalFills) is catalog-gated and still drops
+ * non-board keys — invented keys never reach the slot board.
+ */
+const BRONZE_REASON_ALIASES: Record<string, string> = {
+  // ≈ alternate_identity — rename residue splits the discovery trace.
+  rename_residue_splits_the_discovery_trace: 'alternate_identity',
+  // ≈ no_mainstream_profile — community/niche directories carry the only
+  // real presence.
+  community_directory_only_presence: 'no_mainstream_profile',
+  aggregator_shadow_presence_only: 'no_mainstream_profile',
+  // ≈ trade_manifest_only — reachable only via permit/registry records.
+  // (Hunt-mechanism reason; aliases to a key with no signal mapping — kept
+  // here so the equivalence is documented in one place.)
+  permit_or_trade_manifest_trace_only: 'trade_manifest_only',
+  // 'unofficial_third_party_site_shadows_the_business' is left unmapped — a
+  // shadow domain outranking the business has no clean canonical reason.
+};
+
 const LOW_REVIEW_VOLUME_THRESHOLD = 15; // mirrors RA_LOW_REVIEW_VOLUME rule
 
 // ─── Output ──────────────────────────────────────────────────────────────
@@ -171,7 +199,11 @@ export function deriveDiscoverySignals(input: DiscoveryVerdictInput): DerivedDis
     }
   }
   for (const r of input.bronzeAttribution ?? []) {
-    for (const mapped of BRONZE_REASON_SIGNAL_MAP[r.reason_key] ?? []) {
+    // Resolve invented keys through the alias table; the contribution keeps
+    // the ORIGINAL key as its ref so the stub audit's provenance records
+    // what the scan actually said.
+    const key = BRONZE_REASON_ALIASES[r.reason_key] ?? r.reason_key;
+    for (const mapped of BRONZE_REASON_SIGNAL_MAP[key] ?? []) {
       push(mapped, 'reason_key', r.reason_key, r.basis);
     }
   }

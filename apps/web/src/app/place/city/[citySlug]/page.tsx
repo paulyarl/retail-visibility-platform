@@ -57,9 +57,12 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
   // Server-render the market intel teaser (§11.5) and the city shelf summary
   // (dominant state + location enrichment packet) for SEO — the packet copy
   // renders below the client-driven listings grid.
-  const [marketIntelTeaser, summary] = await Promise.all([
+  const [marketIntelTeaser, summary, shelfIndex] = await Promise.all([
     marketIntelSurfaceService.getCityTeaser(citySlug).catch(() => null),
     placesBrowsePublicService.getCityShelfSummary(citySlug).catch(() => null),
+    // Live shelf index — resolves packet top_categories / strong_categories
+    // labels to hot shelf links (exact label + this market's count > 0).
+    placesBrowsePublicService.getCategories().catch(() => null),
   ]);
 
   // Legacy bare-city slugs (and full-name state tokens) 308 to the canonical
@@ -86,6 +89,7 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
         state={state ?? null}
         total={summary?.total ?? 0}
         enrichment={summary?.enrichment ?? null}
+        shelfIndex={shelfIndex?.categories ?? []}
       />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading...</p></div>}>
         <PlaceCityClient
@@ -95,7 +99,12 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
         />
       </Suspense>
       {summary?.enrichment && (
-        <PlaceCityEnrichmentContent enrichment={summary.enrichment} city={summary.city} state={summary.state} />
+        <PlaceCityEnrichmentContent
+          enrichment={summary.enrichment}
+          city={summary.city}
+          state={summary.state}
+          shelfIndex={shelfIndex?.categories ?? []}
+        />
       )}
 
       {/* Footer CTAs — sit directly above the platform footer. */}

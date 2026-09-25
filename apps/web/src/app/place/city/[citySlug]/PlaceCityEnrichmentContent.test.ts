@@ -31,12 +31,13 @@ const enrichment = {
   context: { metro_context: 'Kansas City sits at the center of a metro area.' },
 } as any;
 
-const render = (over: any = {}) =>
+const render = (over: any = {}, props: any = {}) =>
   renderToStaticMarkup(
     createElement(PlaceCityEnrichmentContent, {
       enrichment: { ...enrichment, ...over },
       city: 'Kansas City',
       state: 'MO',
+      ...props,
     }),
   );
 
@@ -77,5 +78,23 @@ describe('PlaceCityEnrichmentContent', () => {
     expect(html).toContain('Browse by Area');
     expect(html).toContain('Downtown and River Market');
     expect(html).toContain('Metro Area');
+  });
+
+  it('hot-links area strong_categories that resolve to a live shelf in this market', () => {
+    const html = render(
+      {},
+      {
+        shelfIndex: [
+          {
+            category: 'restaurants',
+            slug: 'restaurants',
+            placeCount: 900,
+            cities: [{ city: 'Kansas City', state: 'MO', placeCount: 31 }],
+          },
+        ],
+      },
+    );
+    expect(html).toContain('href="/place/category/restaurants?city=Kansas%20City&amp;state=MO"');
+    expect(html).toContain('>31</span>');
   });
 });
