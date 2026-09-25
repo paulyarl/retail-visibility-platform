@@ -11,13 +11,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockFindMany, mockListCategories } = vi.hoisted(() => ({
+const { mockFindMany, mockListCategories, mockQueryRaw } = vi.hoisted(() => ({
   mockFindMany: vi.fn(),
   mockListCategories: vi.fn(),
+  mockQueryRaw: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
-  prisma: { platform_categories: { findMany: mockFindMany } },
+  prisma: {
+    platform_categories: { findMany: mockFindMany },
+    $queryRaw: mockQueryRaw,
+  },
 }));
 
 vi.mock('../../logger', () => ({
@@ -37,6 +41,8 @@ const service = CategoryVocabularyService.getInstance();
 beforeEach(() => {
   mockFindMany.mockReset();
   mockListCategories.mockReset();
+  mockQueryRaw.mockReset();
+  mockQueryRaw.mockResolvedValue([]);
   service.resetCache();
 });
 
@@ -170,9 +176,49 @@ describe('formatEnrichmentCategoryVocabulary', () => {
     expect(block).toContain('is legitimate when no shelf fits');
   });
 
-  it("returns '' when both lists are empty", () => {
+  it("returns '' when all lists are empty", () => {
     expect(formatEnrichmentCategoryVocabulary([], [])).toBe('');
     expect(formatEnrichmentCategoryVocabulary(['  ', ''], ['   '])).toBe('');
+    expect(formatEnrichmentCategoryVocabulary([], [], [])).toBe('');
+    expect(formatEnrichmentCategoryVocabulary([], [], ['  '])).toBe('');
+  });
+
+  it('renders the ENRICHED CATEGORIES section for supplement labels', () => {
+    const block = formatEnrichmentCategoryVocabulary(
+      ['Grocery Store'],
+      [],
+      ['Middle Eastern Grocery Store', 'Ramen Shop'],
+    );
+
+    expect(block).toContain('ENRICHED CATEGORIES (2)');
+    expect(block).toContain('Middle Eastern Grocery Store');
+    expect(block).toContain('Ramen Shop');
+    expect(block).toContain('the KNOWN CATEGORIES and');
+    expect(block).toContain('lists below');
+  });
+
+  it('renders supplement labels alone when the other lists are empty', () => {
+    const block = formatEnrichmentCategoryVocabulary([], [], ['Middle Eastern Grocery Store']);
+
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    expect(block).not.toContain('KNOWN CATEGORIES (');
+    expect(block).not.toContain('REGISTERED LABELS');
+  });
+
+  it('partitions supplement labels against directory and registered labels (case-insensitive)', () => {
+    const block = formatEnrichmentCategoryVocabulary(
+      ['Grocery Store'],
+      ['Somali Grocery Store'],
+      ['grocery store', '  Somali Grocery Store ', 'Middle Eastern Grocery Store'],
+    );
+
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    const supplementSection = block
+      .split('ENRICHED CATEGORIES')[1]
+      .split('REGISTERED LABELS')[0];
+    expect(supplementSection).toContain('Middle Eastern Grocery Store');
+    expect(supplementSection).not.toContain('grocery store,');
+    expect(supplementSection).not.toContain('Somali Grocery Store');
   });
 
   it('excludes registered labels that already appear in the directory list (case-insensitive, trimmed)', () => {
@@ -191,19 +237,22 @@ describe('formatEnrichmentCategoryVocabulary', () => {
 // ─── CategoryVocabularyService ──────────────────────────────────────────
 
 describe('CategoryVocabularyService.loadVocabulary', () => {
-  it('returns both lists from their sources', async () => {
+  it('returns all three lists from their sources', async () => {
     mockFindMany.mockResolvedValue([{ name: 'Grocery Store' }, { name: 'Auto Repair' }]);
     mockListCategories.mockResolvedValue([{ value: 'somali_grocery_store', label: 'Somali Grocery Store' }]);
+    mockQueryRaw.mockResolvedValue([{ name: 'Middle Eastern Grocery Store' }]);
 
     const vocab = await service.loadVocabulary();
 
     expect(vocab.directoryLabels).toEqual(['Grocery Store', 'Auto Repair']);
     expect(vocab.registeredLabels).toEqual(['Somali Grocery Store']);
+    expect(vocab.supplementLabels).toEqual(['Middle Eastern Grocery Store']);
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { is_active: true },
       select: { name: true },
       orderBy: { name: 'asc' },
     });
+    expect(mockQueryRaw).toHaveBeenCalled();
   });
 
   it('degrades the directory list to [] when platform_categories read fails, keeping registered labels', async () => {
@@ -226,13 +275,38 @@ describe('CategoryVocabularyService.loadVocabulary', () => {
     expect(vocab.registeredLabels).toEqual([]);
   });
 
-  it('never throws when both sources fail', async () => {
-    mockFindMany.mockRejectedValue(new Error('down'));
-    mockListCategories.mockRejectedValue(new Error('down'));
+  it('degrades the supplement list to [] when the module-category query fails', async () => {
+    mockFindMany.mockResolvedValue([{ name: 'Grocery Store' }]);
+    mockQueryRaw.mockRejectedValue(new Error('table missing'));
 
     const vocab = await service.loadVocabulary();
 
-    expect(vocab).toEqual({ directoryLabels: [], registeredLabels: [] });
+    expect(vocab.directoryLabels).toEqual(['Grocery Store']);
+    expect(vocab.supplementLabels).toEqual([]);
+  });
+
+  it('filters sentinel placeholder categories out of the supplement list', async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockQueryRaw.mockResolvedValue([
+      { name: '  __location__  ' },
+      { name: '__all__' },
+      { name: '   ' },
+      { name: 'Middle Eastern Grocery Store' },
+    ]);
+
+    const vocab = await service.loadVocabulary();
+
+    expect(vocab.supplementLabels).toEqual(['Middle Eastern Grocery Store']);
+  });
+
+  it('never throws when all sources fail', async () => {
+    mockFindMany.mockRejectedValue(new Error('down'));
+    mockListCategories.mockRejectedValue(new Error('down'));
+    mockQueryRaw.mockRejectedValue(new Error('down'));
+
+    const vocab = await service.loadVocabulary();
+
+    expect(vocab).toEqual({ directoryLabels: [], registeredLabels: [], supplementLabels: [] });
   });
 
   it('serves repeat loads from cache within the TTL', async () => {
@@ -259,6 +333,12 @@ describe('CategoryVocabularyService.isKnownLabel', () => {
 
   it('matches registered labels', async () => {
     expect(await service.isKnownLabel('Somali Grocery Store')).toBe(true);
+  });
+
+  it('matches enrichment-supplement labels', async () => {
+    mockQueryRaw.mockResolvedValue([{ name: 'Middle Eastern Grocery Store' }]);
+
+    expect(await service.isKnownLabel('middle eastern grocery store')).toBe(true);
   });
 
   it('returns false for labels outside the union', async () => {

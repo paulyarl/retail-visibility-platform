@@ -1988,6 +1988,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     const VOCAB = {
       directoryLabels: ['Grocery Store', 'Halal Market'],
       registeredLabels: ['Somali Grocery Store'],
+      supplementLabels: ['Middle Eastern Grocery Store'],
     };
 
     it('appends the vocabulary block to a city category enrichment render', async () => {
@@ -2005,6 +2006,7 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(mockFormatEnrichmentVocab).toHaveBeenCalledWith(
         VOCAB.directoryLabels,
         VOCAB.registeredLabels,
+        VOCAB.supplementLabels,
       );
       expect(renderedPrompt).toContain('=== PLATFORM CATEGORY VOCABULARY ===');
       expect(resolution.intelligence_mode).toBe('none');

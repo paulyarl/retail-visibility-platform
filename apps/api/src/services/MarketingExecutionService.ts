@@ -1615,6 +1615,7 @@ export class MarketingExecutionService extends BaseService {
         const vocabBlock = formatEnrichmentCategoryVocabulary(
           vocab.directoryLabels,
           vocab.registeredLabels,
+          vocab.supplementLabels,
         );
         if (vocabBlock) {
           enrichmentVocabSuffix = '\n' + vocabBlock;
@@ -1622,6 +1623,7 @@ export class MarketingExecutionService extends BaseService {
             campaignId: input.campaign.id,
             directoryLabelCount: vocab.directoryLabels.length,
             registeredLabelCount: vocab.registeredLabels.length,
+            supplementLabelCount: vocab.supplementLabels.length,
           });
         }
       } catch (err) {

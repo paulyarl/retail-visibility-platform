@@ -7,6 +7,14 @@
  *   2. mkt_service_categories_list (is_active) — registered labels, including
  *      analyst-registered categories AND marketing service packages (the
  *      table has no kind discriminator — see spec §2.3)
+ * plus a third enrichment-ecosystem supplement:
+ *   3. supplementLabels — distinct category names carried by the marketing
+ *      module itself: mkt_campaigns_list.category + secondary_categories,
+ *      directory_category_enrichment.category_name, and
+ *      mkt_intelligence_profiles.category_name. These are labels operators
+ *      created off-list at campaign creation ("Middle Eastern Grocery
+ *      Store") — they already have live enriched pages, so the enrichment
+ *      analyst should be able to align to them verbatim.
  *
  * Two consumers:
  *   - MarketingExecutionService injects the union into the category-
@@ -31,6 +39,7 @@ import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 export interface CategoryVocabulary {
   directoryLabels: string[];
   registeredLabels: string[];
+  supplementLabels: string[];
 }
 
 interface RegisteredRow {
@@ -41,8 +50,13 @@ interface RegisteredRow {
 interface VocabularyCache {
   directory: string[];
   registered: RegisteredRow[];
+  supplement: string[];
   expiresAt: number;
 }
+
+// Sentinel values that ride the required `category` column on non-category
+// scopes — never a shelf label.
+const SENTINEL_CATEGORIES = new Set(['__location__', '__all__']);
 
 export class CategoryVocabularyService extends BaseService {
   private static instance: CategoryVocabularyService;
@@ -75,22 +89,26 @@ export class CategoryVocabularyService extends BaseService {
       return {
         directoryLabels: this.cache.directory,
         registeredLabels: this.cache.registered.map((r) => r.label),
+        supplementLabels: this.cache.supplement,
       };
     }
 
-    const [directory, registered] = await Promise.all([
+    const [directory, registered, supplement] = await Promise.all([
       this.loadDirectoryLabels(ctx),
       this.loadRegisteredRows(ctx),
+      this.loadSupplementLabels(ctx),
     ]);
 
     this.cache = {
       directory,
       registered,
+      supplement,
       expiresAt: Date.now() + CategoryVocabularyService.CACHE_TTL_MS,
     };
     return {
       directoryLabels: directory,
       registeredLabels: registered.map((r) => r.label),
+      supplementLabels: supplement,
     };
   }
 
@@ -105,7 +123,8 @@ export class CategoryVocabularyService extends BaseService {
     const vocab = await this.loadVocabulary(ctx);
     return (
       vocab.directoryLabels.some((l) => l.trim().toLowerCase() === needle) ||
-      vocab.registeredLabels.some((l) => l.trim().toLowerCase() === needle)
+      vocab.registeredLabels.some((l) => l.trim().toLowerCase() === needle) ||
+      vocab.supplementLabels.some((l) => l.trim().toLowerCase() === needle)
     );
   }
 
@@ -147,6 +166,50 @@ export class CategoryVocabularyService extends BaseService {
         .map((r) => ({ value: r.value, label: r.label }));
     } catch (err) {
       logger.warn('Failed to load registered category vocabulary', ctx, {
+        error: (err as Error).message,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Enrichment-ecosystem supplement — distinct category names that exist in
+   * the marketing module regardless of platform_categories membership:
+   *   - mkt_campaigns_list.category (operator-typed primary, e.g. a label
+   *     created via the selector's allowCreateNew at campaign creation)
+   *   - mkt_campaigns_list.secondary_categories (operator-added supplements)
+   *   - directory_category_enrichment.category_name (an applied packet →
+   *     a live category page exists for that label)
+   *   - mkt_intelligence_profiles.category_name (an established category
+   *     profile — the category is already part of the intelligence corpus)
+   * Sentinel placeholders (__location__, __all__) are excluded. Returned
+   * unsorted/unpartitioned — the formatter partitions against the directory
+   * and registered lists.
+   */
+  private async loadSupplementLabels(ctx?: RequestCtx): Promise<string[]> {
+    try {
+      const rows = await this.prisma.$queryRaw<{ name: string }[]>`
+        SELECT DISTINCT name FROM (
+          SELECT category AS name FROM mkt_campaigns_list
+          UNION
+          SELECT TRIM(sec) AS name
+            FROM mkt_campaigns_list,
+                 LATERAL unnest(secondary_categories) sec
+          UNION
+          SELECT category_name AS name FROM directory_category_enrichment
+          UNION
+          SELECT category_name AS name FROM mkt_intelligence_profiles
+        ) names
+        WHERE name IS NOT NULL
+          AND BTRIM(name) <> ''
+          AND name NOT LIKE '\_\_%' ESCAPE '\'
+        ORDER BY name
+      `;
+      return rows
+        .map((r) => r.name.trim())
+        .filter((n) => n.length > 0 && !SENTINEL_CATEGORIES.has(n.toLowerCase()));
+    } catch (err) {
+      logger.warn('Failed to load enrichment supplement category vocabulary', ctx, {
         error: (err as Error).message,
       });
       return [];

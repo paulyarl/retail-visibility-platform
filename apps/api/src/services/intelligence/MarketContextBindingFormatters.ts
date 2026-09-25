@@ -335,7 +335,8 @@ export function formatCategoryIdentificationMarketContext(
 function partitionCategoryVocabulary(
   directoryLabels: string[],
   registeredLabels: string[],
-): { directory: string[]; registered: string[] } {
+  supplementLabels: string[] = [],
+): { directory: string[]; registered: string[]; supplement: string[] } {
   const dedupe = (labels: string[]): string[] => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -352,7 +353,11 @@ function partitionCategoryVocabulary(
   const directory = dedupe(directoryLabels);
   const directoryKeys = new Set(directory.map((l) => l.toLowerCase()));
   const registered = dedupe(registeredLabels).filter((l) => !directoryKeys.has(l.toLowerCase()));
-  return { directory, registered };
+  const registeredKeys = new Set(registered.map((l) => l.toLowerCase()));
+  const supplement = dedupe(supplementLabels).filter(
+    (l) => !directoryKeys.has(l.toLowerCase()) && !registeredKeys.has(l.toLowerCase()),
+  );
+  return { directory, registered, supplement };
 }
 export function formatKnownCategoryVocabulary(
   directoryLabels: string[],
@@ -416,14 +421,23 @@ export function formatKnownCategoryVocabulary(
  * sub_categories stay free-form — they are specializations within the
  * category, not platform shelves.
  *
- * Returns '' when both lists are empty (per-source degraded vocabulary).
+ * supplementLabels carries the enrichment-ecosystem categories — labels
+ * operators created off-list at campaign creation, applied enrichment
+ * packets, and established intelligence profiles. They name live category
+ * pages even when they are absent from platform_categories, so the
+ * analyst should align to them verbatim the same as canonical shelves.
+ *
+ * Returns '' when all lists are empty (per-source degraded vocabulary).
  */
 export function formatEnrichmentCategoryVocabulary(
   directoryLabels: string[],
   registeredLabels: string[],
+  supplementLabels: string[] = [],
 ): string {
-  const { directory, registered } = partitionCategoryVocabulary(directoryLabels, registeredLabels);
-  if (directory.length === 0 && registered.length === 0) return '';
+  const { directory, registered, supplement } = partitionCategoryVocabulary(
+    directoryLabels, registeredLabels, supplementLabels,
+  );
+  if (directory.length === 0 && registered.length === 0 && supplement.length === 0) return '';
 
   const lines: string[] = [
     '=== PLATFORM CATEGORY VOCABULARY (canonical shelf labels) ===',
@@ -444,7 +458,8 @@ export function formatEnrichmentCategoryVocabulary(
     'Category names also feed downstream matching (prospect queues, audit',
     'context), where canonical labels join cleanly and invented ones drift.',
     '',
-    'DIRECTIVE — emit names verbatim from the KNOWN CATEGORIES list below for:',
+    'DIRECTIVE — emit names verbatim from the KNOWN CATEGORIES and ENRICHED',
+    'CATEGORIES lists below for:',
     '  category packets: secondary_categories, adjacent_categories,',
     '    super_categories',
     '  location packets: secondary_categories, top_categories,',
@@ -467,6 +482,12 @@ export function formatEnrichmentCategoryVocabulary(
   if (directory.length > 0) {
     lines.push('', `KNOWN CATEGORIES (${directory.length}):`);
     lines.push(`  ${directory.join(', ')}`);
+  }
+
+  if (supplement.length > 0) {
+    lines.push('', `ENRICHED CATEGORIES (${supplement.length}) — established by enrichment campaigns`);
+    lines.push('  and profiles; each names a live category page in the ecosystem:');
+    lines.push(`  ${supplement.join(', ')}`);
   }
 
   if (registered.length > 0) {
