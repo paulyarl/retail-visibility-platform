@@ -1,9 +1,11 @@
 /**
  * Backfill script — re-runs SeedSeoComposer for seeds without seo_enrichment.
  *
- * Handles two scenarios:
+ * Handles three scenarios:
  *   1. Seeds linked to a campaign with a business_analysis audit → full packet
- *   2. Seeds without a campaign/audit → degraded Tier-A packet from listing
+ *   2. Seeds with only a reachable category_identification audit (campaign or
+ *      its parent) → partial packet (narrative, keywords, sameAs)
+ *   3. Seeds without a campaign/audit → degraded Tier-A packet from listing
  *      facts only (e.g. the 10 indianapolis-african-grocery-2026 seeds)
  *
  * Idempotency marker: presence of seo_enrichment with composer_version on
@@ -18,8 +20,10 @@ import { logger } from '../logger';
 import {
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
+  extractCatIdSeoFields,
 } from '../services/directory/SeedSeoComposer';
 import IntelligenceProfileService from '../services/intelligence/IntelligenceProfileService';
+import { resolveCatIdAudit } from '../services/intelligence/auditPublicNarrative';
 
 async function backfillSeedSeo() {
   // Find all seeds without seo_enrichment (or with null composer_version)
@@ -106,14 +110,26 @@ async function backfillSeedSeo() {
         continue;
       }
 
-      const auditFields = audit
+      // Partial SEO lane — the reachable cat-id audit (campaign or its
+      // parent) feeds narrative (cat-primary inside the composer),
+      // profile URLs, and candidate-category keywords; the business_analysis
+      // audit remains the full lane.
+      const catIdAudit = campaign
+        ? await resolveCatIdAudit(
+            prisma,
+            seed.campaign_id,
+            campaign.parent_campaign_id ?? null,
+          ).catch(() => null)
+        : null;
+
+      const auditFields = (audit || catIdAudit)
         ? {
-            auditId: audit.id,
-            storeFormat: (audit.audit_data?.audit_metadata?.matched_business?.store_format) ?? null,
-            googleAdditionalCategories: (audit.audit_data?.platforms?.google?.additional_categories) ?? null,
-            publicNarrative: (audit.audit_data?.public_narrative) ?? null,
+            auditId: audit?.id ?? '',
+            storeFormat: (audit?.audit_data?.audit_metadata?.matched_business?.store_format) ?? null,
+            googleAdditionalCategories: (audit?.audit_data?.platforms?.google?.additional_categories) ?? null,
+            publicNarrative: (audit?.audit_data?.public_narrative) ?? null,
             platformProfileUrls: (() => {
-              const platforms = audit.audit_data?.platforms ?? {};
+              const platforms = audit?.audit_data?.platforms ?? {};
               const urls: Array<{ platform: string; url: string }> = [];
               for (const pkey of ['google', 'yelp', 'facebook', 'bbb']) {
                 const pdata = (platforms as any)[pkey];
@@ -143,6 +159,9 @@ async function backfillSeedSeo() {
             : null,
         },
         audit: auditFields,
+        categoryIdAudit: catIdAudit
+          ? extractCatIdSeoFields(catIdAudit.auditData, catIdAudit.id)
+          : null,
         intelligenceProfile: profile
           ? {
               profileId: profile.id,
@@ -175,7 +194,7 @@ async function backfillSeedSeo() {
         WHERE id = ${seed.seed_id}
       `;
 
-      if (audit) {
+      if (audit || catIdAudit) {
         enriched++;
       } else {
         degraded++;
@@ -183,7 +202,7 @@ async function backfillSeedSeo() {
 
       logger.info('backfill-seed-seo: enriched', undefined, {
         seedId: seed.seed_id,
-        mode: audit ? 'full' : 'degraded',
+        mode: audit ? 'full' : catIdAudit ? 'partial' : 'degraded',
         hasDescription: !!packet.description,
         keywordCount: packet.keywords.length,
         sameAsCount: packet.sameAs.length,

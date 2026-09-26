@@ -325,9 +325,11 @@ export interface DirectoryListingAttribute {
   asOf?: string;
 }
 
-/** SEO packet composed from a campaign's business_analysis audit (SeedSeoComposer). */
+/** SEO packet composed from a campaign's audits (SeedSeoComposer) —
+ *  full lane = business_analysis; partial lane = category_identification. */
 export interface SeedSeoPreview {
   hasAudit: boolean;
+  hasCategoryIdAudit: boolean;
   businessName: string;
   metaTitle: string;
   description: string;

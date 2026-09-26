@@ -45,6 +45,9 @@ export interface DirectoryListing {
   reason?: string; // Recommendation reason (e.g., "Same category in Indianapolis")
   isDemo?: boolean;
   demoExpiresAt?: string | null;
+  /** Composed listing description — cat-id public_narrative primary (BA
+   *  fallback) for campaign-seeded listings. */
+  description?: string;
 }
 
 interface UnifiedStoreCardProps {
@@ -277,6 +280,12 @@ export function UnifiedStoreCard({
                       )}
                     </div>
 
+                    {listing.description && (
+                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {listing.description}
+                      </p>
+                    )}
+
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2">
                         <button
@@ -442,6 +451,12 @@ export function UnifiedStoreCard({
                 )}
               </Text>
             </Group>
+          )}
+
+          {listing.description && (
+            <Text size="sm" c="dimmed" lineClamp={2} mt="xs">
+              {listing.description}
+            </Text>
           )}
         </Card.Section>
 

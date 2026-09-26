@@ -42,6 +42,7 @@ import {
 import {
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
+  extractCatIdSeoFields,
   DISCLOSURE_SENTENCE,
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
@@ -55,6 +56,7 @@ import IntelligenceProfileService, {
   normalizeReferenceCity,
   normalizeReferenceState,
 } from './intelligence/IntelligenceProfileService';
+import { resolveCatIdAudit } from './intelligence/auditPublicNarrative';
 import type { RequestCtx } from '../context';
 /** Audit context for seed/claim operations */
 interface SeedAuditCtx {
@@ -2308,8 +2310,10 @@ class DirectoryPresenceSeedService {
     // ── SEO enrichment (spec §5.1, §4.2) ────────────────────────────────
     // Composed from the latest business_analysis audit + intelligence
     // profile + gold standard via the shared composer (also powers the
-    // manual Create Seed form's seo-preview prefill).
-    const { packet: seoPacket, enrichmentJson: seoEnrichmentJson } =
+    // manual Create Seed form's seo-preview prefill). The composer also
+    // pulls the category_identification audit (self + parent) for the
+    // partial lane — narrative (cat-primary), profile URLs, keywords.
+    const { packet: seoPacket, enrichmentJson: seoEnrichmentJson, catIdAudit } =
       await this.composeCampaignSeoPacket(campaign, d, (audit ?? stubAudit)?.id ?? '', businessName);
 
     // ── Sourced attributes (migration 267) ───────────────────────────────
@@ -2363,7 +2367,8 @@ class DirectoryPresenceSeedService {
       seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
       identityConfidence,
       categoryFit,
-      notes: typeof d.summary === 'string' ? d.summary.substring(0, 1000) : undefined,
+      notes: ([d.summary, (catIdAudit?.auditData as any)?.business_summary]
+        .find((s): s is string => typeof s === 'string' && s.trim().length > 0))?.substring(0, 1000),
       businessHours: campaign.business_hours || d.business_hours || undefined,
       description: seoPacket.description,
       keywords: seoPacket.keywords,
@@ -2440,6 +2445,12 @@ class DirectoryPresenceSeedService {
    * createFromCampaign and previewCampaignSeo so the manual Create Seed form
    * prefills exactly what the automated path would write. Degrades to Tier A
    * campaign facts when the audit blob is empty.
+   *
+   * The packet runs the full/partial lane split: a business_analysis audit
+   * produces the full packet; the category_identification audit (on this
+   * campaign or its parent — derive lanes stamp parent_campaign_id from
+   * source_campaign_id) supplies the partial lane — narrative PRIMARY on
+   * cat surfaces, profile URLs, and candidate-category keyword terms.
    */
   private async composeCampaignSeoPacket(
     campaign: any,
@@ -2449,10 +2460,21 @@ class DirectoryPresenceSeedService {
   ): Promise<{
     packet: SeedSeoPacket;
     enrichmentJson: ReturnType<typeof buildSeoEnrichmentJson>;
+    /** Latest cat-id audit row reachable via self+parent, when present. */
+    catIdAudit: { id: string; auditData: unknown } | null;
   }> {
     const d = auditData ?? {};
     const meta = d.audit_metadata ?? {};
     const google = d.platforms?.google ?? {};
+
+    // Partial SEO lane — the category_identification audit that filed this
+    // business onto its shelves. Feeds narrative (cat-primary), sameAs, and
+    // candidate-category keywords inside the composer.
+    const catIdAudit = await resolveCatIdAudit(
+      prisma,
+      campaign.id,
+      campaign.parent_campaign_id ?? null,
+    ).catch(() => null);
 
     const seoFocus = (campaign.intelligence_focus === 'gold_standards'
       ? 'competitive'
@@ -2504,6 +2526,9 @@ class DirectoryPresenceSeedService {
         platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
         publicNarrative: d.public_narrative ?? null,
       },
+      categoryIdAudit: catIdAudit
+        ? extractCatIdSeoFields(catIdAudit.auditData, catIdAudit.id)
+        : null,
       intelligenceProfile: profile
         ? {
             profileId: profile.id,
@@ -2525,18 +2550,21 @@ class DirectoryPresenceSeedService {
         : null,
     });
 
-    return { packet, enrichmentJson: buildSeoEnrichmentJson(packet) };
+    return { packet, enrichmentJson: buildSeoEnrichmentJson(packet), catIdAudit };
   }
 
   /**
    * Preview the SEO packet a campaign would contribute to a seed (spec §5.1)
    * without creating anything — the manual Create Seed form prefills its SEO
    * enrichment section from this when the operator loads a campaign prospect.
-   * Degrades to Tier A campaign facts when no business_analysis audit exists
-   * (seoEnrichment null in that case — nothing to store).
+   * Full lane: business_analysis audit. Partial lane: a reachable
+   * category_identification audit alone still produces an enriched packet
+   * (seoEnrichment sent). Degrades to Tier A campaign facts only when
+   * neither audit exists (seoEnrichment null — nothing to store).
    */
   async previewCampaignSeo(campaignId: string): Promise<{
     hasAudit: boolean;
+    hasCategoryIdAudit: boolean;
     businessName: string;
     metaTitle: string;
     description: string;
@@ -2568,7 +2596,7 @@ class DirectoryPresenceSeedService {
       campaign.category ||
       'Business';
 
-    const { packet, enrichmentJson } = await this.composeCampaignSeoPacket(
+    const { packet, enrichmentJson, catIdAudit } = await this.composeCampaignSeoPacket(
       campaign,
       d,
       audit?.id ?? 'preview',
@@ -2577,6 +2605,7 @@ class DirectoryPresenceSeedService {
 
     return {
       hasAudit: !!audit,
+      hasCategoryIdAudit: !!catIdAudit,
       businessName,
       metaTitle: packet.metaTitle,
       description: packet.description,
@@ -2584,7 +2613,9 @@ class DirectoryPresenceSeedService {
       secondaryCategories: packet.secondaryCategories,
       sameAs: packet.sameAs,
       schemaTypeHint: packet.schemaTypeHint,
-      seoEnrichment: audit ? enrichmentJson : null,
+      // Partial lane counts as audit-derived: a cat-id audit alone still
+      // produces an enriched packet (narrative, keywords, sameAs).
+      seoEnrichment: (audit || catIdAudit) ? enrichmentJson : null,
     };
   }
 

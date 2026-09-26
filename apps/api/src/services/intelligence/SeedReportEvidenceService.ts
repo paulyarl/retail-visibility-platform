@@ -564,27 +564,30 @@ export class SeedReportEvidenceService extends BaseService {
       const campaignId = linkRows?.[0]?.campaign_id ?? null;
       context.campaign_id = campaignId;
 
-      // 2. campaign → discovery_context + audits (parallel)
+      // 2. campaign → discovery_context + audits (parallel). Audits resolve
+      //    on the linked campaign AND its parent — cat-id audits stay on the
+      //    scan campaign that produced them (derive lanes stamp
+      //    parent_campaign_id from source_campaign_id).
       let discoveryContext: Record<string, unknown> | null = null;
       let baData: Record<string, unknown> | null = null;
       let catData: Record<string, unknown> | null = null;
 
       if (campaignId) {
-        const [campaignRows, auditRows] = await Promise.all([
-          this.prisma.$queryRaw<any[]>`
-            SELECT discovery_context
-            FROM mkt_campaigns_list
-            WHERE id = ${campaignId}
-            LIMIT 1
-          `,
-          this.prisma.$queryRaw<any[]>`
-            SELECT id, platform, audit_data
-            FROM mkt_audits_list
-            WHERE campaign_id = ${campaignId}
-              AND platform IN ('business_analysis', 'category_identification')
-            ORDER BY created_at DESC
-          `,
-        ]);
+        const campaignRows = await this.prisma.$queryRaw<any[]>`
+          SELECT discovery_context, parent_campaign_id
+          FROM mkt_campaigns_list
+          WHERE id = ${campaignId}
+          LIMIT 1
+        `;
+
+        const parentCampaignId = campaignRows?.[0]?.parent_campaign_id ?? null;
+        const auditRows = await this.prisma.$queryRaw<any[]>`
+          SELECT id, platform, audit_data
+          FROM mkt_audits_list
+          WHERE campaign_id = ANY(${[campaignId, parentCampaignId].filter(Boolean)})
+            AND platform IN ('business_analysis', 'category_identification')
+          ORDER BY created_at DESC
+        `;
 
         discoveryContext =
           campaignRows?.[0]?.discovery_context &&

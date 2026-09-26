@@ -140,14 +140,16 @@ function NewPresenceSeedClient() {
     label: string;
   } | null>(null);
 
-  // SEO enrichment (prefilled from the source campaign's business_analysis
-  // audit via the seo-preview endpoint — same composer the automated
-  // campaign → seed path uses).
+  // SEO enrichment (prefilled from the source campaign's audits via the
+  // seo-preview endpoint — same composer the automated campaign → seed
+  // path uses; business_analysis is the full lane, category_identification
+  // the partial lane).
   const [description, setDescription] = useState('');
   const [keywords, setKeywords] = useState('');
   const [sameAs, setSameAs] = useState('');
   const [seoMetaTitle, setSeoMetaTitle] = useState('');
   const [seoHasAudit, setSeoHasAudit] = useState(false);
+  const [seoHasCatIdAudit, setSeoHasCatIdAudit] = useState(false);
   const [seoLoading, setSeoLoading] = useState(false);
   const [seoEnrichment, setSeoEnrichment] = useState<Record<string, any> | null>(null);
 
@@ -270,6 +272,7 @@ function NewPresenceSeedClient() {
       if (!preview) return;
       setSeoMetaTitle(preview.metaTitle || '');
       setSeoHasAudit(preview.hasAudit);
+      setSeoHasCatIdAudit(preview.hasCategoryIdAudit ?? false);
       setDescription(preview.description || '');
       setKeywords((preview.keywords || []).join(', '));
       setSameAs((preview.sameAs || []).join('\n'));
@@ -1183,15 +1186,22 @@ function NewPresenceSeedClient() {
             )}
           </div>
           <p className="text-xs text-gray-500">
-            Prefilled by the SEO composer from the source campaign's
-            business_analysis audit — the analyst's public narrative becomes the
-            description; keywords compose category, audit store format and
-            additional categories, intelligence-profile synonyms/subcategories,
-            and gold-standard field hints.
+            Prefilled by the SEO composer from the source campaign's audits —
+            a business_analysis audit gives the full packet; a
+            category_identification scan alone gives the partial packet
+            (its public narrative becomes the description, its candidate
+            categories feed keywords, its profile URLs feed sameAs).
+            Keywords also compose category, store format,
+            intelligence-profile synonyms/subcategories, and gold-standard
+            field hints.
             {seoMetaTitle && !seoLoading && (
               <>
                 {' '}Composed meta title: <strong>{seoMetaTitle}</strong>
-                {!seoHasAudit && ' (Tier A — no business_analysis audit on the campaign yet)'}
+                {seoHasAudit
+                  ? ' (full SEO — business_analysis audit)'
+                  : seoHasCatIdAudit
+                    ? ' (partial SEO — category_identification scan, no business_analysis audit yet)'
+                    : ' (Tier A — no audits on the campaign yet)'}
               </>
             )}
           </p>

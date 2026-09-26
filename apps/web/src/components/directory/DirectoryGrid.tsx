@@ -34,6 +34,10 @@ interface DirectoryListing {
   isDemo?: boolean;
   demoExpiresAt?: string | null;
   listingOrigin?: string | null;
+  /** Composed listing description — cat-id public_narrative primary (BA
+   *  fallback) for seeds created via the campaign path. Rendered as the
+   *  card's narrative line on cat surfaces. */
+  description?: string;
 }
 
 interface Pagination {
@@ -82,6 +86,7 @@ function transformListing(listing: DirectoryListing): StoreData {
     isDemo: listing.isDemo,
     demoExpiresAt: listing.demoExpiresAt,
     listingOrigin: listing.listingOrigin,
+    description: listing.description,
   };
 }
 

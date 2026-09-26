@@ -24,6 +24,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
+import { resolveCatIdPublicNarrative } from './intelligence/auditPublicNarrative';
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -150,6 +151,37 @@ export class MarketIntelService extends BaseService {
     };
   }
 
+  /**
+   * Walk the §8.4 chain up to the campaign link (listing → seed → primary
+   * campaign link) WITHOUT requiring a business_analysis audit row. Used to
+   * reach the category_identification audit — it lives on the linked
+   * campaign (or its parent via `parent_campaign_id`) even when no BA audit
+   * exists yet, and its public_narrative is the mutual fallback on surfaces
+   * that emit a narrative.
+   */
+  private async resolveLinkedCampaignId(businessSlug: string): Promise<string | null> {
+    if (!businessSlug) return null;
+
+    const listing = await this.prisma.directory_listings_list.findFirst({
+      where: { slug: businessSlug },
+      select: { id: true },
+    });
+    if (!listing) return null;
+
+    const seed = await this.prisma.directory_presence_seeds.findUnique({
+      where: { listing_id: listing.id },
+      select: { id: true },
+    });
+    if (!seed) return null;
+
+    const campaignLink = await this.prisma.directory_seed_campaign_links.findFirst({
+      where: { seed_id: seed.id },
+      orderBy: [{ link_role: 'asc' }],
+      select: { campaign_id: true },
+    });
+    return campaignLink?.campaign_id ?? null;
+  }
+
   // ─── Fallback derivation (§8.5.4) ──────────────────────────────────────
 
   /**
@@ -273,13 +305,22 @@ export class MarketIntelService extends BaseService {
   async getTeaserSummary(businessSlug: string): Promise<MarketIntelTeaserSummary> {
     const resolved = await this.resolveSeedAuditBySlug(businessSlug);
 
+    // Mutual fallback: the category_identification narrative fills in when
+    // the BA audit has none (or doesn't exist yet). It lives on the linked
+    // campaign or its parent — resolvable even on the no-BA branch.
+    const campaignId =
+      resolved?.campaignId ?? (await this.resolveLinkedCampaignId(businessSlug));
+    const catNarrative = campaignId
+      ? await resolveCatIdPublicNarrative(this.prisma, campaignId).catch(() => null)
+      : null;
+
     // No audit → sidebar still renders, cards show available: false.
     if (!resolved) {
       return {
         businessSlug,
         businessName: null,
         hasAudit: false,
-        publicNarrative: null,
+        publicNarrative: catNarrative,
         cards: {
           growthOpportunities: { available: false, teaser: 'No growth opportunities spotted yet', count: 0 },
           howItStacksUp: { available: false, teaser: 'Signal check still in progress' },
@@ -297,9 +338,12 @@ export class MarketIntelService extends BaseService {
     );
 
     // public_narrative — Tier-C-safe audit field rendered in the About
-    // section (§1.1). Falls back to null when absent; the layout keeps its
-    // existing description/disclaimer fallback chain.
-    const publicNarrative = this.readPublicNarrative(resolved.auditData);
+    // section (§1.1). BA primary (this surface isn't a cat surface); the
+    // cat-id narrative fills in when the BA audit has none. Still falls
+    // back to null when neither exists; the layout keeps its existing
+    // description/disclaimer fallback chain.
+    const publicNarrative =
+      this.readPublicNarrative(resolved.auditData) ?? catNarrative;
 
     // Growth Opportunities — §8.5.4 fallback derivation.
     const oppCount = this.deriveOpportunityCount(resolved.auditData);

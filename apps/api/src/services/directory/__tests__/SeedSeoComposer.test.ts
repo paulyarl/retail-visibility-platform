@@ -12,9 +12,11 @@ import { describe, it, expect } from 'vitest';
 import {
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
+  extractCatIdSeoFields,
   type SeedSeoInput,
   type CampaignSeoFields,
   type AuditSeoFields,
+  type CatIdSeoFields,
   type IntelligenceProfileSeoFields,
   type GoldStandardSeoFields,
 } from '../SeedSeoComposer';
@@ -67,6 +69,43 @@ const fullGoldStandard: GoldStandardSeoFields = {
   profileId: 'mip-gs-test-001',
   expectedFieldNames: ['hours', 'phone', 'website'],
 };
+
+/**
+ * Realistic category_identification audit_data blob — the raw shape the
+ * cat-id analyst emits (nap.directory_profile_urls, digital_footprint
+ * platform/social URLs, candidate_categories, public_narrative).
+ * The facebook URL deliberately duplicates the BA fixture's so the
+ * sameAs union-dedupe is exercised.
+ */
+const fullCatIdAuditData = {
+  public_narrative:
+    'A shelf-stocked African grocery on Lafayette Road carrying imported staples, fresh produce, and a weekday prepared-foods counter.',
+  candidate_categories: [
+    { category: 'Specialty Food Store', confidence: 'high' },
+    { category: 'International Grocery', confidence: 'medium' },
+  ],
+  nap: {
+    business_name: 'Sahel African Market',
+    directory_profile_urls: [
+      { platform: 'yelp', url: 'https://yelp.com/biz/sahel-catid' },
+      { platform: 'facebook', url: 'https://facebook.com/example' },
+    ],
+  },
+  digital_footprint: {
+    platforms_found: [
+      { platform: 'google', url: 'https://maps.google.com/sahel-catid' },
+    ],
+    social_profiles: [
+      { platform: 'instagram', url: 'https://instagram.com/sahel-catid' },
+    ],
+  },
+};
+
+/** Extracted composer input — what DirectoryPresenceSeedService passes. */
+const catIdAuditFields: CatIdSeoFields = extractCatIdSeoFields(
+  fullCatIdAuditData,
+  'maud-cat-001',
+);
 
 // ─── Tests ───────────────────────────────────────────────────────────────
 
@@ -884,6 +923,218 @@ describe('SeedSeoComposer', () => {
       expect(json.generated_at).toBeTruthy();
       // generated_at should be a valid ISO date
       expect(() => new Date(json.generated_at)).not.toThrow();
+    });
+
+    it('records the cat-id audit id in inputs when the partial lane contributed', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      const json = buildSeoEnrichmentJson(packet);
+
+      expect(json.inputs.audit_id).toBeNull();
+      expect(json.inputs.category_identification_audit_id).toBe('maud-cat-001');
+    });
+  });
+
+  // ─── Partial SEO lane — category_identification ────────────────────────
+
+  describe('extractCatIdSeoFields', () => {
+    it('extracts narrative, profile URLs, and candidate categories from a cat-id audit blob', () => {
+      const fields = extractCatIdSeoFields(fullCatIdAuditData, 'maud-cat-001');
+
+      expect(fields.auditId).toBe('maud-cat-001');
+      expect(fields.publicNarrative).toContain('shelf-stocked African grocery');
+      const urls = (fields.platformProfileUrls ?? []).map((u) => u.url);
+      expect(urls).toContain('https://yelp.com/biz/sahel-catid');
+      expect(urls).toContain('https://maps.google.com/sahel-catid');
+      expect(urls).toContain('https://instagram.com/sahel-catid');
+      expect(fields.candidateCategories).toContain('Specialty Food Store');
+      expect(fields.candidateCategories).toContain('International Grocery');
+    });
+
+    it('drops non-http(s) URLs and missing values', () => {
+      const fields = extractCatIdSeoFields(
+        {
+          nap: {
+            directory_profile_urls: [
+              { platform: 'google', url: 'ftp://bad.example.com' },
+              { platform: 'yelp', url: 'https://good.example.com' },
+              { platform: 'bbb' },
+            ],
+          },
+          digital_footprint: {
+            platforms_found: [{ platform: 'google', url: 'not-a-url' }],
+            social_profiles: 'not-an-array',
+          },
+        },
+        'maud-cat-x',
+      );
+
+      const urls = (fields.platformProfileUrls ?? []).map((u) => u.url);
+      expect(urls).toEqual(['https://good.example.com']);
+    });
+
+    it('dedupes candidate categories case-insensitively and ignores malformed entries', () => {
+      const fields = extractCatIdSeoFields(
+        {
+          candidate_categories: [
+            { category: 'Grocery Store' },
+            { category: 'grocery store' },
+            { category: '  ' },
+            { category: 42 },
+            'not-an-object',
+            { category: 'Bakery' },
+          ],
+        },
+        'maud-cat-x',
+      );
+
+      expect(fields.candidateCategories).toEqual(['Grocery Store', 'Bakery']);
+    });
+
+    it('returns null narrative when public_narrative is absent or blank', () => {
+      expect(extractCatIdSeoFields({}, 'x').publicNarrative).toBeNull();
+      expect(
+        extractCatIdSeoFields({ public_narrative: '   ' }, 'x').publicNarrative,
+      ).toBeNull();
+    });
+  });
+
+  describe('partial SEO lane (category_identification only)', () => {
+    it('emits the cat-id narrative as description with the disclosure appended', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.description).toContain('shelf-stocked African grocery');
+      expect(packet.description).toContain('Listed on VisibleShelf from public information');
+      expect(packet.description).toContain('Claim this listing');
+    });
+
+    it('feeds candidate categories into keywords as plain terms', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.keywords).toContain('specialty food store');
+      expect(packet.keywords).toContain('international grocery');
+    });
+
+    it('feeds cat-id profile URLs into sameAs', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'test' },
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.sameAs).toContain('https://yelp.com/biz/sahel-catid');
+      expect(packet.sameAs).toContain('https://maps.google.com/sahel-catid');
+      expect(packet.sameAs).toContain('https://instagram.com/sahel-catid');
+    });
+
+    it('does NOT file unaccepted candidate categories as secondaryCategories', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.secondaryCategories).not.toContain('specialty food store');
+      expect(packet.secondaryCategories).not.toContain('international grocery');
+    });
+
+    it('records categoryIdentificationAuditId and a null auditId in inputs', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.inputs.auditId).toBeNull();
+      expect(packet.inputs.categoryIdentificationAuditId).toBe('maud-cat-001');
+    });
+
+    it('still filters candidate categories through prohibited_keywords', () => {
+      const profile: IntelligenceProfileSeoFields = {
+        profileId: 'p1',
+        prohibitedKeywords: ['specialty food store'],
+      };
+
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'test' },
+        audit: null,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: profile,
+        goldStandard: null,
+      });
+
+      expect(packet.keywords).not.toContain('specialty food store');
+      expect(packet.keywords).toContain('international grocery');
+    });
+  });
+
+  describe('partial vs full precedence', () => {
+    it('cat-id narrative wins over business_analysis narrative (cat-primary)', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: { ...fullAudit, publicNarrative: 'BA narrative copy here.' },
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.description).toContain('shelf-stocked African grocery');
+      expect(packet.description).not.toContain('BA narrative copy');
+    });
+
+    it('falls back to the business_analysis narrative when cat-id has none', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: fullCampaign,
+        audit: { ...fullAudit, publicNarrative: 'BA narrative copy here.' },
+        categoryIdAudit: { ...catIdAuditFields, publicNarrative: null },
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.description).toContain('BA narrative copy here.');
+    });
+
+    it('unions BA and cat-id profile URLs in sameAs', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'test' },
+        audit: fullAudit,
+        categoryIdAudit: catIdAuditFields,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.sameAs).toContain('https://yelp.com/biz/example');
+      expect(packet.sameAs).toContain('https://yelp.com/biz/sahel-catid');
+      // Dedupe holds across the union — the fixture shares one URL with the
+      // BA fixture
+      const dupCount = packet.sameAs.filter(
+        (u) => u === 'https://facebook.com/example',
+      ).length;
+      expect(dupCount).toBe(1);
     });
   });
 });

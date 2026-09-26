@@ -694,8 +694,9 @@ router.get('/presence-seeds/:id/attribute-suggestions', requirePlatformStaff, as
  * GET /api/admin/directory-presence/presence-seeds/seo-preview?campaignId=<id>
  *
  * Compose the SEO packet (meta title, description, keywords, secondary
- * categories, same_as) the campaign's latest business_analysis audit would
- * contribute to a seed — without creating anything. The manual Create Seed
+ * categories, same_as) the campaign's audits would contribute to a seed —
+ * full lane from business_analysis, partial lane from a reachable
+ * category_identification audit — without creating anything. The manual Create Seed
  * form prefills its SEO Enrichment section from this when the operator loads
  * a campaign prospect (or a queue entry with a source campaign). Declared
  * before /presence-seeds/:id so 'seo-preview' is not swallowed as an id.

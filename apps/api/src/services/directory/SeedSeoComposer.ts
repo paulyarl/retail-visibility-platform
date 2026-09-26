@@ -57,6 +57,79 @@ export interface AuditSeoFields {
 }
 
 /**
+ * Subset of the category_identification audit_data — the PARTIAL SEO lane.
+ * A prospect seeded off a cat-id scan without a business_analysis audit
+ * still gets analyst-derived copy: the cat-id analyst filed the business
+ * onto its shelves, so its fields are the canonical cat-surface sources.
+ *
+ * Same caller-extraction boundary as AuditSeoFields — the composer never
+ * receives the raw blob.
+ */
+export interface CatIdSeoFields {
+  auditId: string;
+  /** audit_data.public_narrative — PRIMARY narrative on cat surfaces */
+  publicNarrative?: string | null;
+  /** Profile URLs from nap.directory_profile_urls +
+   *  digital_footprint.platforms_found + digital_footprint.social_profiles */
+  platformProfileUrls?: Array<{ platform: string; url: string }> | null;
+  /** candidate_categories[].category — verbatim category vocabulary the
+   *  analyst emitted for this business. Keyword material only; they are
+   *  NOT filed as secondary_categories (those are the operator-accepted
+   *  shelf assignments on campaign.secondary_categories). */
+  candidateCategories?: string[] | null;
+}
+
+/**
+ * Extract the composer's cat-id fields from a raw category_identification
+ * audit_data blob. Kept colocated with the composer so the field contract
+ * lives next to the consumers.
+ */
+export function extractCatIdSeoFields(
+  auditData: unknown,
+  auditId: string,
+): CatIdSeoFields {
+  const d = (auditData ?? {}) as any;
+
+  const urls: Array<{ platform: string; url: string }> = [];
+  const pushUrl = (platform: unknown, url: unknown) => {
+    if (typeof url === 'string' && isHttpOrHttps(url)) {
+      urls.push({ platform: String(platform ?? 'unknown'), url });
+    }
+  };
+  const napProfiles = d.nap?.directory_profile_urls;
+  if (Array.isArray(napProfiles)) {
+    for (const p of napProfiles) pushUrl(p?.platform, p?.url);
+  }
+  const platformsFound = d.digital_footprint?.platforms_found;
+  if (Array.isArray(platformsFound)) {
+    for (const p of platformsFound) pushUrl(p?.platform, p?.url);
+  }
+  const socialProfiles = d.digital_footprint?.social_profiles;
+  if (Array.isArray(socialProfiles)) {
+    for (const p of socialProfiles) pushUrl(p?.platform, p?.url);
+  }
+
+  const candidates = d.candidate_categories;
+  const candidateCategories = Array.isArray(candidates)
+    ? candidates
+        .map((c: any) => (typeof c?.category === 'string' ? c.category.trim() : ''))
+        .filter((c: string, i: number, arr: string[]) =>
+          c.length > 0 && arr.findIndex((x) => x.toLowerCase() === c.toLowerCase()) === i)
+        .slice(0, 10)
+    : null;
+
+  return {
+    auditId,
+    publicNarrative:
+      typeof d.public_narrative === 'string' && d.public_narrative.trim()
+        ? d.public_narrative.trim()
+        : null,
+    platformProfileUrls: urls.length > 0 ? urls : null,
+    candidateCategories,
+  };
+}
+
+/**
  * Subset of the intelligence profile configuration needed by the composer.
  * Resolved via IntelligenceProfileService.resolve() with an explicit
  * non-gold_standards focus.
@@ -86,6 +159,10 @@ export interface GoldStandardSeoFields {
 export interface SeedSeoInput {
   campaign: CampaignSeoFields;
   audit: AuditSeoFields | null;
+  /** Partial SEO lane — the category_identification audit on this campaign
+   *  or its parent. Cat-primary for narrative/keyword terms it carries;
+   *  BA fields still win where both exist for non-narrative fields. */
+  categoryIdAudit?: CatIdSeoFields | null;
   intelligenceProfile: IntelligenceProfileSeoFields | null;
   goldStandard: GoldStandardSeoFields | null;
 }
@@ -99,6 +176,7 @@ export interface SeedSeoPacket {
   schemaTypeHint: string | null;
   inputs: {
     auditId: string | null;
+    categoryIdentificationAuditId: string | null;
     intelligenceProfileId: string | null;
     goldStandardProfileId: string | null;
   };
@@ -239,13 +317,17 @@ function composeDescription(
   campaign: CampaignSeoFields,
   categoryLabel: string,
   audit: AuditSeoFields | null,
+  catIdAudit: CatIdSeoFields | null | undefined,
 ): string {
   const disclosure = ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
 
   // Prefer the analyst-composed public narrative when present (Phase 1.2).
-  // This is a rich, public-safe description written by the audit analyst.
-  if (audit?.publicNarrative && audit.publicNarrative.trim()) {
-    const narrative = audit.publicNarrative.trim();
+  // Cat surfaces get the cat-id narrative as PRIMARY — the analyst that
+  // filed the business onto its shelves wrote the canonical shelf copy;
+  // the business_analysis narrative is the fallback (mutual-fallback rule).
+  const narrative =
+    catIdAudit?.publicNarrative?.trim() || audit?.publicNarrative?.trim() || null;
+  if (narrative) {
     return truncateAtWordBoundary(narrative + disclosure, DESCRIPTION_MAX);
   }
 
@@ -263,6 +345,7 @@ function composeDescription(
 function composeKeywords(
   campaign: CampaignSeoFields,
   audit: AuditSeoFields | null,
+  catIdAudit: CatIdSeoFields | null | undefined,
   profile: IntelligenceProfileSeoFields | null,
   goldStandard: GoldStandardSeoFields | null,
   prohibitedKeywords: Set<string>,
@@ -285,6 +368,15 @@ function composeKeywords(
   // 4. audit additional_categories (plain terms)
   if (audit?.googleAdditionalCategories) {
     for (const cat of audit.googleAdditionalCategories) {
+      ordered.push(cat);
+    }
+  }
+
+  // 4b. cat-id candidate categories (plain terms, verbatim audit vocabulary —
+  //     same trust tier as google additional_categories; partial lane's
+  //     category reach).
+  if (catIdAudit?.candidateCategories) {
+    for (const cat of catIdAudit.candidateCategories) {
       ordered.push(cat);
     }
   }
@@ -361,6 +453,7 @@ function composeSecondaryCategories(
 function composeSameAs(
   campaign: CampaignSeoFields,
   audit: AuditSeoFields | null,
+  catIdAudit: CatIdSeoFields | null | undefined,
 ): string[] {
   const urls: string[] = [];
 
@@ -386,6 +479,16 @@ function composeSameAs(
   // Audit platforms.*.profile_url
   if (audit?.platformProfileUrls) {
     for (const { url } of audit.platformProfileUrls) {
+      if (isHttpOrHttps(url)) {
+        urls.push(url);
+      }
+    }
+  }
+
+  // Cat-id nap.directory_profile_urls + digital_footprint profile/social
+  // URLs (partial lane's identity graph)
+  if (catIdAudit?.platformProfileUrls) {
+    for (const { url } of catIdAudit.platformProfileUrls) {
       if (isHttpOrHttps(url)) {
         urls.push(url);
       }
@@ -452,7 +555,7 @@ function resolveCategoryLabel(
  * from Tier A campaign facts only.
  */
 export function buildSeedSeoPacket(input: SeedSeoInput): SeedSeoPacket {
-  const { campaign, audit, intelligenceProfile, goldStandard } = input;
+  const { campaign, audit, categoryIdAudit, intelligenceProfile, goldStandard } = input;
 
   // Build prohibited keywords set (case-insensitive exact match)
   const prohibitedKeywords = new Set<string>();
@@ -465,10 +568,11 @@ export function buildSeedSeoPacket(input: SeedSeoInput): SeedSeoPacket {
   const categoryLabel = resolveCategoryLabel(campaign, audit);
 
   const metaTitle = composeMetaTitle(campaign, categoryLabel);
-  const description = composeDescription(campaign, categoryLabel, audit);
+  const description = composeDescription(campaign, categoryLabel, audit, categoryIdAudit);
   const keywords = composeKeywords(
     campaign,
     audit,
+    categoryIdAudit,
     intelligenceProfile,
     goldStandard,
     prohibitedKeywords,
@@ -478,7 +582,7 @@ export function buildSeedSeoPacket(input: SeedSeoInput): SeedSeoPacket {
     audit,
     intelligenceProfile,
   );
-  const sameAs = composeSameAs(campaign, audit);
+  const sameAs = composeSameAs(campaign, audit, categoryIdAudit);
   const schemaTypeHint = composeSchemaTypeHint(
     campaign,
     audit,
@@ -494,6 +598,7 @@ export function buildSeedSeoPacket(input: SeedSeoInput): SeedSeoPacket {
     schemaTypeHint,
     inputs: {
       auditId: audit?.auditId ?? null,
+      categoryIdentificationAuditId: categoryIdAudit?.auditId ?? null,
       intelligenceProfileId: intelligenceProfile?.profileId ?? null,
       goldStandardProfileId: goldStandard?.profileId ?? null,
     },
@@ -511,6 +616,7 @@ export function buildSeoEnrichmentJson(packet: SeedSeoPacket): {
   schema_type_hint: string | null;
   inputs: {
     audit_id: string | null;
+    category_identification_audit_id: string | null;
     intelligence_profile_id: string | null;
     gold_standard_profile_id: string | null;
   };
@@ -522,6 +628,7 @@ export function buildSeoEnrichmentJson(packet: SeedSeoPacket): {
     schema_type_hint: packet.schemaTypeHint,
     inputs: {
       audit_id: packet.inputs.auditId,
+      category_identification_audit_id: packet.inputs.categoryIdentificationAuditId,
       intelligence_profile_id: packet.inputs.intelligenceProfileId,
       gold_standard_profile_id: packet.inputs.goldStandardProfileId,
     },
@@ -615,7 +722,7 @@ export function buildCategorySeoPacket(input: {
     addressState: effectiveState,
   };
 
-  const keywords = composeKeywords(syntheticCampaign, null, intelligenceProfile, goldStandard, prohibitedKeywords);
+  const keywords = composeKeywords(syntheticCampaign, null, null, intelligenceProfile, goldStandard, prohibitedKeywords);
   const secondaryCategories = composeSecondaryCategories(syntheticCampaign, null, intelligenceProfile);
   const schemaTypeHint = composeSchemaTypeHint(syntheticCampaign, null, intelligenceProfile);
 
