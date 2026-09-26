@@ -33,6 +33,7 @@ import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { WEBSITE_POSITIONING_SCHEMA_NAME } from '../validators/website-positioning.schema';
 import { discoveryContextSchema, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 
 // ─── INT signal labels (Migration 253 — GAP-E3, spec §8.4) ───────────────
 // Hardcoded label map for the INT_* discovery signal family. The intelligence
@@ -361,6 +362,37 @@ export class MarketingExecutionService extends BaseService {
           },
         },
       });
+
+      // Post-audit sharpen — a narrative-bearing audit (business_analysis or
+      // category_identification) recomposes every live primary-linked seed
+      // on this campaign (and derived children): a seed born on Tier-A gets
+      // the cat-id partial packet, then the BA full packet when it lands.
+      // Best-effort — a sharpen failure must not fail the execution.
+      if (
+        (resolved.auditPlatform === 'business_analysis' ||
+          resolved.auditPlatform === 'category_identification') &&
+        !isStubBusinessAnalysisAudit({
+          platform: resolved.auditPlatform,
+          audit_data: parsedJson,
+        })
+      ) {
+        try {
+          const { default: DirectoryPresenceSeedService } =
+            await import('./DirectoryPresenceSeedService.js');
+          await DirectoryPresenceSeedService.resharpenSeedsForCampaign(input.campaign.id, {
+            actorType: 'user',
+            actorId: ctx?.userId,
+            ip: ctx?.ip,
+            userAgent: ctx?.userAgent,
+          });
+        } catch (err) {
+          logger.warn('post-audit seed sharpen failed (best-effort)', ctx, {
+            error: (err as Error).message,
+            campaignId: input.campaign.id,
+            executionId: input.executionId,
+          });
+        }
+      }
     }
 
     const campaignRef = {

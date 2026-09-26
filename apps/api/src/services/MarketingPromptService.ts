@@ -13,6 +13,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { createHash } from 'crypto';
 import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { applyRenderControlCoverageGate, BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
 import { normalizeIntelligenceDiscoveryPayload, applyDiscoveryScanContractGate, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
@@ -901,6 +902,35 @@ export class MarketingPromptService extends BaseService {
         schemaName,
         auditCreated: !!result.audit,
       });
+
+      // Post-audit sharpen — a narrative-bearing audit (business_analysis
+      // or category_identification) recomposes every live primary-linked
+      // seed on this campaign (and derived children): a seed born on
+      // Tier-A picks up the cat-id partial packet, then the BA full packet
+      // when it lands. Best-effort — must not fail the import.
+      if (
+        result.audit &&
+        (resolved.auditPlatform === 'business_analysis' ||
+          resolved.auditPlatform === 'category_identification') &&
+        !isStubBusinessAnalysisAudit(result.audit)
+      ) {
+        try {
+          const { default: DirectoryPresenceSeedService } =
+            await import('./DirectoryPresenceSeedService.js');
+          await DirectoryPresenceSeedService.resharpenSeedsForCampaign(input.campaignId, {
+            actorType: 'user',
+            actorId: ctx?.userId,
+            ip: ctx?.ip,
+            userAgent: ctx?.userAgent,
+          });
+        } catch (sharpenErr) {
+          logger.error('Post-audit seed sharpen failed (best-effort)', ctx, {
+            error: (sharpenErr as Error).message,
+            auditId: result.audit.id,
+            campaignId: input.campaignId,
+          });
+        }
+      }
 
       // Sprint 4: best-effort auto-sync of business_analysis audits onto
       // the campaign (data_quality-gated field sync + hotness derivation).

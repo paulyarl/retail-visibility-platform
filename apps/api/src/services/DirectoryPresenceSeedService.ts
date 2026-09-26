@@ -3281,6 +3281,178 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Post-audit sharpen — fires when a REAL (non-stub) narrative-bearing
+   * audit (business_analysis or category_identification) lands on a
+   * campaign. The intended cadence is cat-id scan → business audit right
+   * after, so a seed born on the partial/discovery lanes upgrades without
+   * waiting for a manual Reset: recompose description/keywords/same_as +
+   * seo_enrichment from the linked campaign's CURRENT audit state (the
+   * same composeCampaignSeoPacket path seeds are born with — the market
+   * sweep's getComposedEnrichment is NOT used: it passes audit: null and
+   * would strip audit-driven narratives).
+   *
+   * Reachability mirrors the narrative resolver: the audit may land on the
+   * seeded campaign OR on the scan campaign it was derived from, so live
+   * primary-linked seeds are resolved across the campaign AND its parent.
+   * Each seed's packet is composed from ITS OWN linked campaign.
+   *
+   * Guards (same posture as the promote + sweep lanes):
+   *  - 'claimed' / 'suppressed' seeds are skipped (owner-managed / retired)
+   *  - a seed whose description/keywords/same_as provenance row carries
+   *    override_by is skipped — a hand edit outranks audit copy
+   *
+   * Fire-and-forget by contract: callers wrap in try/catch — a sharpen
+   * failure must never roll back the audit that triggered it.
+   */
+  async resharpenSeedsForCampaign(
+    campaignId: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ sharpened: string[]; skipped: string[] }> {
+    const seeds = await prisma.$queryRaw<
+      { seed_id: string; campaign_id: string; listing_id: string; tenant_id: string }[]
+    >`
+      SELECT dscl.seed_id, dscl.campaign_id, dps.listing_id, dps.tenant_id
+      FROM directory_seed_campaign_links dscl
+      JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+      WHERE dscl.link_role = 'primary'
+        AND dps.status IS DISTINCT FROM 'claimed'
+        AND dps.status IS DISTINCT FROM 'suppressed'
+        AND dscl.campaign_id IN (
+          SELECT c.id FROM mkt_campaigns_list c
+          WHERE c.id = ${campaignId} OR c.parent_campaign_id = ${campaignId}
+        )
+    `;
+    if (seeds.length === 0) return { sharpened: [], skipped: [] };
+
+    // Compose the packet ONCE per linked campaign — several seeds may share
+    // the same parent (successor children post-swap).
+    const packetByCampaign = new Map<
+      string,
+      { packet: SeedSeoPacket; enrichmentJson: any; sourceName: string }
+    >();
+    const campaignsFor = async (campId: string) => {
+      const cached = packetByCampaign.get(campId);
+      if (cached) return cached;
+      const campaign = await prisma.mkt_campaigns_list.findUnique({ where: { id: campId } });
+      if (!campaign) return null;
+      const auditCandidates = await prisma.mkt_audits_list.findMany({
+        where: { campaign_id: campId, platform: 'business_analysis' },
+        orderBy: { created_at: 'desc' },
+        take: 10,
+      });
+      const audit =
+        (Array.isArray(auditCandidates) ? auditCandidates : []).find(
+          (a: any) => !isStubBusinessAnalysisAudit(a),
+        ) ?? null;
+      const stubAudit = audit
+        ? null
+        : ((Array.isArray(auditCandidates) ? auditCandidates : []).find(
+            (a: any) => isStubBusinessAnalysisAudit(a),
+          ) ?? null);
+      const d = ((audit ?? stubAudit)?.audit_data ?? {}) as any;
+      const resolvedNap = resolveCampaignNap(campaign, d);
+      const composed = await this.composeCampaignSeoPacket(
+        campaign,
+        d,
+        (audit ?? stubAudit)?.id ?? '',
+        resolvedNap.name || campaign.business_name || 'Business',
+      );
+      const entry = {
+        packet: composed.packet,
+        enrichmentJson: composed.enrichmentJson,
+        // Cite the lane honestly — a real audit for the full lane, the
+        // linked campaign for the partial/discovery lanes.
+        sourceName: audit ? 'business_analysis_audit' : 'linked_campaign',
+      };
+      packetByCampaign.set(campId, entry);
+      return entry;
+    };
+
+    const now = new Date();
+    const sharpened: string[] = [];
+    const skipped: string[] = [];
+    for (const s of seeds) {
+      const overridden = await prisma.$queryRaw<{ overridden: boolean }[]>`
+        SELECT EXISTS(
+          SELECT 1 FROM directory_field_provenance
+          WHERE seed_id = ${s.seed_id}
+            AND field_key IN ('description', 'keywords', 'same_as')
+            AND override_by IS NOT NULL
+        ) AS overridden
+      `;
+      const composed = overridden[0]?.overridden ? null : await campaignsFor(s.campaign_id);
+      if (!composed) {
+        skipped.push(s.seed_id);
+        continue;
+      }
+      const { packet, enrichmentJson, sourceName } = composed;
+
+      await prisma.$executeRaw`
+        UPDATE directory_listings_list
+        SET description = ${packet.description},
+            keywords = ${packet.keywords}::text[],
+            same_as = ${packet.sameAs}::text[],
+            updated_at = now()
+        WHERE id = ${s.listing_id}
+      `;
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET seo_enrichment = ${enrichmentJson}::jsonb,
+            updated_at = now()
+        WHERE id = ${s.seed_id}
+      `;
+
+      // Provenance — update value/source on conflict but never clear an
+      // override stamp that raced in between the check and the write.
+      for (const [fieldKey, value] of [
+        ['description', packet.description],
+        ['keywords', packet.keywords.join(', ')],
+        ['same_as', packet.sameAs.join(', ')],
+      ] as Array<[string, string]>) {
+        await prisma.$executeRaw`
+          INSERT INTO directory_field_provenance (
+            id, seed_id, tenant_id, field_key, value,
+            source_name, accessed_at, confidence, show_on_public,
+            created_at, updated_at
+          ) VALUES (
+            ${generateDirectoryFieldProvenanceId(s.tenant_id)},
+            ${s.seed_id},
+            ${s.tenant_id},
+            ${fieldKey},
+            ${value},
+            ${sourceName},
+            ${now},
+            'high',
+            true,
+            now(), now()
+          )
+          ON CONFLICT (seed_id, field_key) DO UPDATE SET
+            value = EXCLUDED.value,
+            source_name = EXCLUDED.source_name,
+            accessed_at = EXCLUDED.accessed_at,
+            confidence = EXCLUDED.confidence,
+            show_on_public = EXCLUDED.show_on_public,
+            updated_at = now()
+        `;
+      }
+      sharpened.push(s.seed_id);
+    }
+
+    logger.info('DirectoryPresenceSeedService.resharpenSeedsForCampaign', undefined, {
+      campaignId,
+      sharpened: sharpened.length,
+      skipped: skipped.length,
+    });
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType || 'system',
+      action: 'directory_presence_seed.resharpen',
+      payload: { campaignId, sharpened, skipped },
+    });
+    return { sharpened, skipped };
+  }
+
+  /**
    * List active attribute definitions for the seed editor's attribute picker.
    *
    * When a category is provided, the category's platform_categories slug is

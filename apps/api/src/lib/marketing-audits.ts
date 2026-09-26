@@ -11,16 +11,20 @@
  * preference).
  *
  * Sources that produce stubs:
- *   - manual_queue        — MarketingProspectQueueService (queued signals)
- *   - queue_promotion     — MarketingProspectQueueService (attribute handoff)
- *   - derived_from_parent — MarketingCampaignService (spawn pre-triaged)
- *   - discovery_scan      — MarketingCampaignService (discovery-derived
- *                           partial verdict — Category Discovery lane)
+ *   - manual_queue          — MarketingProspectQueueService (queued signals)
+ *   - queue_promotion       — MarketingProspectQueueService (attribute handoff)
+ *   - derived_from_parent   — MarketingCampaignService (spawn pre-triaged)
+ *   - derived_from_city_scan — MarketingHotProspectService (city-scan spawn
+ *                             pre-triaged — detected_signals only, no
+ *                             business_analysis output-schema contract)
+ *   - discovery_scan        — MarketingCampaignService (discovery-derived
+ *                             partial verdict — Category Discovery lane)
  */
 export const STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES = [
   'manual_queue',
   'queue_promotion',
   'derived_from_parent',
+  'derived_from_city_scan',
   'discovery_scan',
 ] as const;
 

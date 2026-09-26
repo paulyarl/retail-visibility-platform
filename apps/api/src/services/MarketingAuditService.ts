@@ -12,6 +12,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateMarketingAuditId } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 
 export interface AuditInput {
   campaignId: string;
@@ -68,6 +69,33 @@ export class MarketingAuditService extends BaseService {
         },
       });
       logger.info('Marketing audit created', ctx, { auditId: id, campaignId: input.campaignId, platform: input.platform });
+
+      // Post-audit sharpen — a narrative-bearing audit recomposes every
+      // live primary-linked seed on this campaign (and derived children).
+      // Best-effort: a sharpen failure must not fail the audit create.
+      if (
+        (input.platform === 'business_analysis' ||
+          input.platform === 'category_identification') &&
+        !isStubBusinessAnalysisAudit({ platform: input.platform, audit_data: input.auditData })
+      ) {
+        try {
+          const { default: DirectoryPresenceSeedService } =
+            await import('./DirectoryPresenceSeedService.js');
+          await DirectoryPresenceSeedService.resharpenSeedsForCampaign(input.campaignId, {
+            actorType: 'user',
+            actorId: ctx?.userId,
+            ip: ctx?.ip,
+            userAgent: ctx?.userAgent,
+          });
+        } catch (err) {
+          logger.warn('Post-audit seed sharpen failed (best-effort)', ctx, {
+            error: (err as Error).message,
+            auditId: id,
+            campaignId: input.campaignId,
+          });
+        }
+      }
+
       return audit;
     } catch (error) {
       logger.error('Failed to create audit', ctx, { error: (error as Error).message, campaignId: input.campaignId });
