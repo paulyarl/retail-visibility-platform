@@ -1717,38 +1717,6 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                             <AlertTriangle className="w-2.5 h-2.5" /> hold
                           </span>
                         )}
-                        {/* Bronze reason attribution (spec §7.4) — the catalog
-                            blind spot(s) that surfaced this prospect, carried
-                            on business_snapshot from the discovery scan. */}
-                        {(() => {
-                          const attribution = (e.business_snapshot as any)?.bronze_attribution;
-                          if (!Array.isArray(attribution) || attribution.length === 0) return null;
-                          return attribution.slice(0, 2).map((a: any) => (
-                            <span
-                              key={a.reason_key}
-                              className="text-[9px] px-1 py-0.5 rounded font-mono bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700 flex-shrink-0"
-                              title={a.basis ? `${a.reason_key} — ${a.basis}` : `Surfaced via bronze reason: ${a.reason_key}`}
-                            >
-                              bronze:{a.reason_key}
-                            </span>
-                          ));
-                        })()}
-                        {/* Competitive weaknesses (spec §7) — the incumbent's
-                            named exposures, merged onto the snapshot by the
-                            dual-lane queue dedup (§8). */}
-                        {(() => {
-                          const weaknesses = (e.business_snapshot as any)?.competitive_weaknesses;
-                          if (!Array.isArray(weaknesses) || weaknesses.length === 0) return null;
-                          return weaknesses.slice(0, 2).map((w: any) => (
-                            <span
-                              key={w.weakness_key}
-                              className="text-[9px] px-1 py-0.5 rounded font-mono bg-rose-50 text-rose-800 border border-rose-300 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-700 flex-shrink-0"
-                              title={w.basis ? `${w.weakness_key} — ${w.basis}` : `Scan-claimed exposure: ${w.weakness_key}`}
-                            >
-                              weakness:{w.weakness_key}
-                            </span>
-                          ));
-                        })()}
                         {promoted && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 flex-shrink-0">
                             promoted
