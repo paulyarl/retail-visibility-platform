@@ -8191,6 +8191,50 @@ router.patch('/intelligence-profiles/:id/:version', async (req, res) => {
   }
 });
 
+// DELETE /intelligence-profiles/:id/bronze-slots — remove an exemplar from a
+// bronze reason slot on the ACTIVE profile (frees the slot for a new
+// discovery). Mirrors DELETE /:id/candidates for gold standards.
+// IMPORTANT: must be registered BEFORE /:id/:version below — Express matches
+// in registration order and ':version' would shadow 'bronze-slots'.
+router.delete('/intelligence-profiles/:id/bronze-slots', async (req, res) => {
+  try {
+    const reasonKey = typeof req.query.reason_key === 'string' ? req.query.reason_key : '';
+    const businessName = typeof req.query.business_name === 'string' ? req.query.business_name : '';
+    const address = typeof req.query.address === 'string' ? req.query.address : undefined;
+    if (!reasonKey || !businessName) {
+      return res.status(400).json({ success: false, error: 'reason_key and business_name query params are required' });
+    }
+    const profile = await IntelligenceProfileService.getInstance().removeBronzeReasonFill(
+      req.params.id,
+      { reason_key: reasonKey, business_name: businessName, address },
+      getCtx(req),
+    );
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: PLATFORM_SCOPE,
+        actor: req.user?.id || 'unknown',
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: `${profile.id}@${profile.version}`,
+          action_description: 'operator_remove_bronze_reason_slot',
+          profile_id: profile.id,
+          profile_version: profile.version,
+          reason_key: reasonKey,
+          business_name: businessName,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] bronze slot removal audit failed', getCtx(req), { error: (e as Error).message });
+    }
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // DELETE /intelligence-profiles/:id/:version — delete a draft version
 // Only drafts may be deleted; active/retired versions are immutable history.
 router.delete('/intelligence-profiles/:id/:version', async (req, res) => {
@@ -8462,48 +8506,6 @@ router.post('/intelligence-profiles/:id/bronze-slots', async (req, res) => {
       logger.error('[marketing-ops] bronze slot fill audit failed', getCtx(req), { error: (e as Error).message });
     }
     res.status(201).json({ success: true, data: profile });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// DELETE /intelligence-profiles/:id/bronze-slots — remove an exemplar from a
-// bronze reason slot on the ACTIVE profile (frees the slot for a new
-// discovery). Mirrors DELETE /:id/candidates for gold standards.
-router.delete('/intelligence-profiles/:id/bronze-slots', async (req, res) => {
-  try {
-    const reasonKey = typeof req.query.reason_key === 'string' ? req.query.reason_key : '';
-    const businessName = typeof req.query.business_name === 'string' ? req.query.business_name : '';
-    const address = typeof req.query.address === 'string' ? req.query.address : undefined;
-    if (!reasonKey || !businessName) {
-      return res.status(400).json({ success: false, error: 'reason_key and business_name query params are required' });
-    }
-    const profile = await IntelligenceProfileService.getInstance().removeBronzeReasonFill(
-      req.params.id,
-      { reason_key: reasonKey, business_name: businessName, address },
-      getCtx(req),
-    );
-    try {
-      const { audit } = await import('../audit');
-      await audit({
-        tenantId: PLATFORM_SCOPE,
-        actor: req.user?.id || 'unknown',
-        actorType: 'user',
-        action: 'update',
-        payload: {
-          entity_type: 'other',
-          id: `${profile.id}@${profile.version}`,
-          action_description: 'operator_remove_bronze_reason_slot',
-          profile_id: profile.id,
-          profile_version: profile.version,
-          reason_key: reasonKey,
-          business_name: businessName,
-        },
-      });
-    } catch (e) {
-      logger.error('[marketing-ops] bronze slot removal audit failed', getCtx(req), { error: (e as Error).message });
-    }
-    res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

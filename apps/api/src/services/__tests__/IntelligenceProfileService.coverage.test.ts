@@ -31,6 +31,9 @@ const mockPrisma = {
   mkt_audits_list: {
     findMany: vi.fn(),
   },
+  directory_category_enrichment: {
+    findMany: vi.fn(),
+  },
 };
 
 vi.mock('../BaseService', () => {
@@ -64,6 +67,7 @@ const provingGrounds: any[] = [];
 const pgChildren: any[] = [];
 const executedCampaignIds = new Set<string>();
 const auditedCampaignIds = new Set<string>();
+const enrichmentRows: any[] = [];
 
 const makeProfile = (over: Record<string, any> = {}) => ({
   id: 'prof-1',
@@ -122,11 +126,13 @@ describe('IntelligenceProfileService.getCoverage — 7-state slot model', () => 
     pgChildren.length = 0;
     executedCampaignIds.clear();
     auditedCampaignIds.clear();
+    enrichmentRows.length = 0;
 
     // getCoverage queries (dispatched by where-clause shape):
     //   mkt_intelligence_profiles.findMany — active + draft profile pulls
     //   mkt_campaigns_list.findMany — intelligence campaigns, PGs, PG children
     //   mkt_prompt_executions_list / mkt_audits_list — execution detection
+    //   directory_category_enrichment.findMany — enriched packet rows
     mockPrisma.mkt_intelligence_profiles.findMany.mockImplementation(async ({ where }: any) => {
       if (where.status === 'active') return activeProfiles;
       if (where.status === 'draft') return draftProfiles;
@@ -146,6 +152,8 @@ describe('IntelligenceProfileService.getCoverage — 7-state slot model', () => 
       (where.campaign_id.in as string[])
         .filter((id) => auditedCampaignIds.has(id))
         .map((campaign_id) => ({ campaign_id })));
+    mockPrisma.directory_category_enrichment.findMany.mockImplementation(async () =>
+      enrichmentRows);
 
     service = IntelligenceProfileService.getInstance();
   });

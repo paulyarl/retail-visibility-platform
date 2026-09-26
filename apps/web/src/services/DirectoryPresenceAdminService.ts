@@ -101,6 +101,8 @@ export interface IdentityPacketSourceRef {
   authorityClass?: string | null;
   /** The evidence dimension; null for the owner axis. */
   dimension?: string | null;
+  /** True when this source came from discovery provenance (partial lane). */
+  discovery?: boolean;
 }
 
 export interface IdentityPacketFieldScore {
@@ -186,6 +188,8 @@ export interface IdentityPacket {
       earned: boolean;
       guaranteed: boolean;
       ownerOverRule: boolean;
+      /** Discovery doubt markers capped a depth-qualified gate at 'earned'. */
+      doubtCapped?: boolean;
       blockers: string[];
       dimensions: Array<{
         dimension: string;
@@ -198,6 +202,18 @@ export interface IdentityPacket {
   seed: { id: string; status: string; publicUrl: string | null } | null;
   /** Persisted operator seed decision ('wait'), or null when none recorded. */
   seedDecision: { decision: string; at: string; by: string | null } | null;
+  /**
+   * Qualification lane — 'partial' when the packet scored on discovery
+   * evidence (no real business_analysis audit), 'full' when an audit drove
+   * the evidence model. Mirrors triage's two-lane verdict.
+   */
+  lane?: 'full' | 'partial';
+  /** Discovery seed-confidence meter (partial lane only). */
+  seedConfidence?: {
+    score: number;
+    band: 'high' | 'medium' | 'low' | 'insufficient';
+    factors: Array<{ label: string; delta: number }>;
+  } | null;
   generatedAt: string;
 }
 

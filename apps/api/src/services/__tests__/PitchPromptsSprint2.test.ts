@@ -73,11 +73,12 @@ describe('outreach-pitch/prompts — Sprint 2 A6 branching', () => {
     it('uses the A6 product-visibility closer for A6', () => {
       const prompt = buildCloserPromptForArchetype('A6', sampleFieldsJson, 5);
 
-      // The A6 closer references the product visibility plan (with a line break
-      // in the template — normalize whitespace for the assertion)
+      // The A6 closer references the shelf-visibility plan — the template
+      // wraps "shelf-\nvisibility" mid-token, so assert the sibling phrases
+      // that stay on one line.
       const normalized = prompt.replace(/\n/g, ' ');
-      expect(normalized).toContain('product visibility plan');
-      expect(normalized).toContain('fulfillment pathway');
+      expect(normalized).toContain('shelf-visibility mockup');
+      expect(normalized).toContain('counter pickup pathway');
       expect(normalized).toContain('hours sync');
       expect(prompt).toContain('Indy African Market');
       // Should NOT contain the review-management closer language

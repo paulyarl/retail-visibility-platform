@@ -1167,6 +1167,11 @@ class MarketingProspectQueueServiceClass extends BaseService {
             // named exposures, the pitch wedge (COMPETITIVE_WEAKNESS_SPEC §7).
             // Both kinds may coexist on a dual-lane merged prospect (§8).
             competitive_weaknesses: (snapshot.competitive_weaknesses as any[]) ?? undefined,
+            // Seed-confidence inputs the partial qualification lane needs on
+            // the campaign (IdentityPacketService): the meter's ownership
+            // exclusion + resolved verification outcome.
+            ownership_type: (snapshot.ownership_type as string) ?? undefined,
+            verification_outcome: ((entry.verification as any)?.outcome as string) ?? undefined,
           };
           discoveryContext = validateDiscoveryContext(rawContext);
           if (!discoveryContext) {

@@ -85,4 +85,62 @@ describe('createFromCampaign — guarded lane', () => {
     expect(mockBuildForCampaign).toHaveBeenCalledWith('camp-1');
     expect(caught?.message).not.toBe('gate_blocked');
   });
+
+  // Partial lane (two-lane qualification): no real business_analysis audit —
+  // the guarded gate is the arbiter. A packet that qualified on discovery
+  // evidence proceeds past the audit requirement; a blocked one still 409s.
+  it('partial lane: proceeds past the audit requirement when the gate qualifies on discovery evidence', async () => {
+    mockAuditsList.findMany.mockResolvedValue([]);
+    mockBuildForCampaign.mockResolvedValue(pushablePacket);
+    let caught: any = null;
+    try {
+      await DirectoryPresenceSeedService.createFromCampaign('camp-1', { lane: 'guarded' });
+    } catch (e) {
+      caught = e;
+    }
+    expect(mockBuildForCampaign).toHaveBeenCalledWith('camp-1');
+    // Fails later (incomplete NAP on the bare campaign mock) — never on the
+    // audit requirement or the gate.
+    expect(caught?.message).not.toBe('business_analysis_audit_not_found');
+    expect(caught?.message).not.toBe('gate_blocked');
+    expect(caught?.message).toBe('incomplete_nap');
+  });
+
+  it('partial lane: still rejects a gate-blocked packet', async () => {
+    mockAuditsList.findMany.mockResolvedValue([]);
+    mockBuildForCampaign.mockResolvedValue(blockedPacket);
+    await expect(
+      DirectoryPresenceSeedService.createFromCampaign('camp-1', { lane: 'guarded' }),
+    ).rejects.toMatchObject({ message: 'gate_blocked' });
+  });
+
+  it('partial lane: the manual lane still requires a real audit when the campaign has no discovery context', async () => {
+    mockAuditsList.findMany.mockResolvedValue([]);
+    await expect(
+      DirectoryPresenceSeedService.createFromCampaign('camp-1', { lane: 'manual' }),
+    ).rejects.toMatchObject({ message: 'business_analysis_audit_not_found' });
+    expect(mockBuildForCampaign).not.toHaveBeenCalled();
+  });
+
+  it('partial lane: the discovery-aware manual lane seeds without an audit', async () => {
+    mockAuditsList.findMany.mockResolvedValue([]);
+    mockCampaignsList.findUnique.mockResolvedValue({
+      id: 'camp-1',
+      discovery_context: {
+        identity_confidence: 'high',
+        category_fit: 'verified',
+        discovery_provenance: [{ source: 'Google', role: 'primary' }],
+      },
+    });
+    let caught: any = null;
+    try {
+      await DirectoryPresenceSeedService.createFromCampaign('camp-1', { lane: 'manual' });
+    } catch (e) {
+      caught = e;
+    }
+    // Past the audit requirement on discovery evidence — fails later on the
+    // bare campaign's NAP, and never evaluates the gate (manual is ungated).
+    expect(caught?.message).toBe('incomplete_nap');
+    expect(mockBuildForCampaign).not.toHaveBeenCalled();
+  });
 });

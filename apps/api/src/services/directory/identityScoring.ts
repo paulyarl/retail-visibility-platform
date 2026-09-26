@@ -216,6 +216,13 @@ export interface IdentitySourceRef {
    * exactly as before — legacy byte-identity.
    */
   signalWeight?: number | null;
+  /**
+   * True when this source came from the campaign's discovery_context
+   * (discovery_provenance) — the partial qualification lane. Purely
+   * informational: it scores identically to audit-sourced evidence; the flag
+   * lets the ledger/UI mark which lane produced the testimony.
+   */
+  discovery?: boolean;
 }
 
 /** All evidence for a single field, plus its resolved consensus value. */
@@ -226,6 +233,25 @@ export interface IdentityFieldEvidence {
   sources: IdentitySourceRef[];
 }
 
+/**
+ * The partial qualification lane — the discovery scan's own verdict inputs,
+ * bridged onto the packet when no real business_analysis audit exists (a full
+ * audit supersedes the discovery stub, same as triage's two-lane verdict).
+ * The assembler computes these; the scorer only consumes them:
+ *   - `testifies` — the seed-confidence meter cleared the testimony bar, so
+ *     discovery_provenance sources were admitted into the evidence model.
+ *   - `doubtMarkers` — named identity/scope doubt (nap_drift,
+ *     alternate_identity, outside_market, …) — cap a depth-qualified gate at
+ *     'earned' and emit QC signals; the full audit stays the path to
+ *     'guaranteed' for questionable cases.
+ */
+export interface DiscoveryLaneInput {
+  testifies: boolean;
+  seedConfidenceScore: number;
+  seedConfidenceBand: string;
+  doubtMarkers: string[];
+}
+
 export interface IdentityPacketInput {
   identityStatus: IdentityStatus;
   operationalStatus: OperationalStatus;
@@ -234,6 +260,9 @@ export interface IdentityPacketInput {
   fields: IdentityFieldEvidence[];
   /** SNAP/EBT sourced from an allowed evidence source (never inferred). */
   snapSourced?: boolean;
+  /** Partial-lane summary — present only when a discovery_context drove the
+   *  evidence model (no real audit). */
+  discovery?: DiscoveryLaneInput | null;
 }
 
 export interface FieldScore {
@@ -330,6 +359,12 @@ export interface SeedGate {
   guaranteed: boolean;
   /** An `owner_confirmed` capture is present and the gate is short of earning. */
   ownerOverRule: boolean;
+  /**
+   * True when discovery doubt markers capped the decision at 'earned' — the
+   * depth bar was met but named identity/scope doubt keeps the partial lane
+   * short of 'guaranteed'.
+   */
+  doubtCapped?: boolean;
   decision: SeedGateDecision;
   /** Machine-readable blockers (veto codes + prerequisites). */
   blockers: string[];
@@ -363,6 +398,19 @@ const NAP_FIELDS: IdentityFieldKey[] = ['name', 'address', 'phone', 'website'];
 const MISSING_IMPORTANT_PENALTY = 10;
 
 const READY_OPERATIONAL_THRESHOLD = 70;
+
+/** QC messages for discovery doubt markers (see discovery-verdict.ts). */
+const DISCOVERY_DOUBT_MESSAGES: Record<string, string> = {
+  nap_drift: 'Discovery flagged NAP drift — a source disagrees on identity fields.',
+  category_drift: 'Discovery flagged category drift — the business may have shifted category.',
+  alternate_identity: 'Discovery flagged an alternate identity — verify the business name before publishing.',
+  category_misalignment: 'Discovery flagged a possible category misalignment.',
+  category_fit_insufficient: 'Discovery category fit was insufficient — confirm the shelf before seeding.',
+  outside_market: 'Discovery placed the business outside the target market.',
+  identity_confidence_low: 'Discovery identity confidence is low.',
+  single_source: 'Discovery found the business on a single source only.',
+  seek_priority_hold: 'The discovery scan verdict was hold.',
+};
 
 /** Dimensions required to EARN a seed (spec §2). */
 const EARN_DIMENSION_COUNT = 2;
@@ -643,6 +691,33 @@ function collectQcSignals(
     });
   }
 
+  // Partial lane — the packet scored on discovery evidence because no real
+  // business_analysis audit exists. Always say so (the lane is internal
+  // context for the operator), and surface the scan's named doubt markers.
+  if (input.discovery) {
+    const d = input.discovery;
+    if (d.testifies) {
+      signals.push({
+        code: 'partial_lane',
+        severity: 'info',
+        message: `Partial lane — qualified on discovery evidence (seed confidence ${d.seedConfidenceScore}, ${d.seedConfidenceBand}); a full business audit can still refine the record.`,
+      });
+    } else {
+      signals.push({
+        code: 'partial_lane_below_bar',
+        severity: 'warn',
+        message: `Discovery seed confidence ${d.seedConfidenceScore} (${d.seedConfidenceBand}) is below the testimony bar — discovery provenance did not corroborate.`,
+      });
+    }
+    for (const m of d.doubtMarkers) {
+      signals.push({
+        code: `discovery_doubt_${m}`,
+        severity: 'warn',
+        message: DISCOVERY_DOUBT_MESSAGES[m] ?? `Discovery flagged ${m.replace(/_/g, ' ')}.`,
+      });
+    }
+  }
+
   const corroborating = fields.filter((f) => f.independentSources > 0);
   // Authority class is the standing axis — a government (registry) or owner
   // (first-party) source is what "authoritative" means here. Explicit classes
@@ -683,11 +758,17 @@ function collectQcSignals(
  *
  * Owner "rescues only what hasn't earned": it never overrides a hard veto or a
  * guaranteed seed.
+ *
+ * `doubtCapped` (partial lane): when the discovery context names identity/scope
+ * doubt, a depth-qualified gate is capped at 'earned' — it still qualifies the
+ * seed (band 'review', pushable) but 'guaranteed' is reserved for evidence
+ * without named doubt. The full audit remains the path to 'guaranteed'.
  */
 function scoreSeedGate(
   fields: FieldScore[],
   vetoes: IdentityVeto[],
   operationalScore: number,
+  doubtCapped = false,
 ): SeedGate {
   const strength: Record<EvidenceDimension, number> = {
     operational: 0,
@@ -751,9 +832,9 @@ function scoreSeedGate(
 
   const decision: SeedGateDecision = vetoBlocked
     ? 'blocked'
-    : guaranteed
+    : guaranteed && !doubtCapped
       ? 'guaranteed'
-      : earned
+      : earned || guaranteed
         ? 'earned'
         : ownerOverRule
           ? 'rescued'
@@ -773,6 +854,7 @@ function scoreSeedGate(
     earned,
     guaranteed,
     ownerOverRule,
+    ...(doubtCapped && guaranteed ? { doubtCapped: true } : {}),
     decision,
     blockers,
   };
@@ -806,7 +888,21 @@ export function scoreIdentityPacket(input: IdentityPacketInput): IdentityPacketS
 
   const vetoes = collectVetoes(input, fields);
   const qcSignals = collectQcSignals(input, fields, operationalScore);
-  const gate = scoreSeedGate(fields, vetoes, operationalScore);
+  const gate = scoreSeedGate(
+    fields,
+    vetoes,
+    operationalScore,
+    (input.discovery?.doubtMarkers.length ?? 0) > 0,
+  );
+
+  if (gate.doubtCapped) {
+    qcSignals.push({
+      code: 'discovery_doubt_cap',
+      severity: 'info',
+      message:
+        'Discovery doubt markers cap the gate at earned — a full business audit can still qualify the record as guaranteed.',
+    });
+  }
 
   // The band is derived from the gate: guaranteed → ready, earned/rescued →
   // review (pushable, not guaranteed), blocked → blocked.

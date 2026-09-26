@@ -402,7 +402,15 @@ export default function IdentityPacketCard({
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Identity Packet</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Identity Packet</h3>
+              {packet.lane === 'partial' && (
+                <Badge cls="bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400">
+                  partial lane
+                  {packet.seedConfidence ? ` · ${packet.seedConfidence.band} confidence` : ''}
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {packet.businessName ?? 'Unknown business'} · {packet.ledger.length} source
               {packet.ledger.length === 1 ? '' : 's'} · generated {new Date(packet.generatedAt).toLocaleString()}

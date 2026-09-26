@@ -20,6 +20,10 @@ import { audit } from '../audit';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { resolveCampaignNap } from '../lib/canonical-nap';
+import {
+  validateDiscoveryContext,
+  type DiscoveryContext,
+} from '../validators/intelligence-discovery.schema';
 import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
@@ -2187,10 +2191,35 @@ class DirectoryPresenceSeedService {
     // only and must not satisfy the "latest business_analysis audit" lookup.
     const audit = (Array.isArray(auditCandidates) ? auditCandidates : []).find(
       (a: any) => !isStubBusinessAnalysisAudit(a),
-    );
-    if (!audit) throw new Error('business_analysis_audit_not_found');
+    ) ?? null;
+    // The newest stub (discovery_scan / queue promotion) — the partial lane's
+    // fallback blob. Its summary + audit_metadata.source ride the seed's notes
+    // and provenance so a discovery-qualified seed still cites the evidence
+    // lane that produced it.
+    const stubAudit = audit
+      ? null
+      : (Array.isArray(auditCandidates) ? auditCandidates : []).find(
+          (a: any) => isStubBusinessAnalysisAudit(a),
+        ) ?? null;
 
-    const d = (audit.audit_data ?? {}) as any;
+    // The campaign's discovery context — the partial lane's verdict inputs
+    // (identity_confidence / category_fit) for seed confidence + fit stamps.
+    // Re-validated at read, same cheap defense as the packet.
+    const discoveryContext = validateDiscoveryContext(campaign.discovery_context);
+    const dc: DiscoveryContext = discoveryContext ?? {};
+
+    // Two-lane qualification (mirrors triage's partial/full verdict): the
+    // partial lane can seed from discovery evidence without a real audit.
+    // The guarded gate below arbitrates the Identity tab's Push; the manual
+    // lane is discovery-aware too — a campaign carrying a discovery context
+    // is a partial-lane prospect, not an empty record. Only a campaign with
+    // NEITHER a real audit NOR discovery evidence keeps the audit
+    // requirement.
+    if (!audit && opts.lane !== 'guarded' && !discoveryContext) {
+      throw new Error('business_analysis_audit_not_found');
+    }
+
+    const d = ((audit ?? stubAudit)?.audit_data ?? {}) as any;
     const meta = d.audit_metadata ?? {};
     const dataQuality = d.data_quality ?? {};
 
@@ -2199,10 +2228,11 @@ class DirectoryPresenceSeedService {
     }
 
     // Guarded lane (spec §6): the Identity tab's Push evaluates the seed gate
-    // server-side. The raw capability stays open for the manual lane
-    // ("Add to place listing", testing/back channels) — those deliberately
-    // bypass the gate. This is the enforcement point; without it the block is
-    // advisory (UI-only).
+    // server-side. In the partial lane (no real audit) this is also the
+    // testimony check — the packet must have qualified on discovery evidence.
+    // The raw capability stays open for the manual lane ("Add to place
+    // listing", testing/back channels) — those deliberately bypass the gate.
+    // This is the enforcement point; without it the block is advisory (UI-only).
     if (opts.lane === 'guarded') {
       const { default: IdentityPacketService } = await import('./IdentityPacketService');
       const packet = await IdentityPacketService.buildForCampaign(campaignId);
@@ -2251,23 +2281,36 @@ class DirectoryPresenceSeedService {
       };
     }
 
-    const rawConfidence = String(meta.identity_confidence || dataQuality.confidence || 'medium').toLowerCase();
+    // Confidence + fit stamps. Full lane: the audit's own metadata. Partial
+    // lane: the discovery context's verdict fields (a stub carries neither).
+    const rawConfidence = String(
+      meta.identity_confidence || dataQuality.confidence || dc.identity_confidence || 'medium',
+    ).toLowerCase();
     const identityConfidence: 'high' | 'medium' = ['high', 'medium'].includes(rawConfidence) ? (rawConfidence as 'high' | 'medium') : 'medium';
-    const categoryFit: 'verified' | 'probable' = meta.identity_status === 'confirmed' ? 'verified' : 'probable';
+    const categoryFit: 'verified' | 'probable' = audit
+      ? meta.identity_status === 'confirmed' ? 'verified' : 'probable'
+      : dc.category_fit === 'verified' ? 'verified' : 'probable';
 
-    const accessedAt = audit.created_at ? new Date(audit.created_at) : new Date();
-    const sourceName = 'business_analysis_audit';
+    const accessedAt = (audit ?? stubAudit)?.created_at
+      ? new Date((audit ?? stubAudit)!.created_at)
+      : new Date();
+    // Provenance cites the evidence lane honestly — a real audit for the full
+    // lane, the stub's own source marker (discovery_scan / queue_promotion /
+    // manual_queue / derived_from_parent) for the partial lane.
+    const sourceName = audit ? 'business_analysis_audit' : String(meta.source || 'queue_promotion');
     const sourceUrl = `/settings/admin/marketing-ops/campaigns/${campaignId}`;
     const provenanceConfidence = ['high', 'medium', 'low'].includes(dataQuality.confidence)
       ? (dataQuality.confidence as 'high' | 'medium' | 'low')
-      : 'high';
+      : audit
+        ? 'high'
+        : 'medium';
 
     // ── SEO enrichment (spec §5.1, §4.2) ────────────────────────────────
     // Composed from the latest business_analysis audit + intelligence
     // profile + gold standard via the shared composer (also powers the
     // manual Create Seed form's seo-preview prefill).
     const { packet: seoPacket, enrichmentJson: seoEnrichmentJson } =
-      await this.composeCampaignSeoPacket(campaign, d, audit.id, businessName);
+      await this.composeCampaignSeoPacket(campaign, d, (audit ?? stubAudit)?.id ?? '', businessName);
 
     // ── Sourced attributes (migration 267) ───────────────────────────────
     // Mine every attribute-bearing audit on THIS campaign (gold-standard
@@ -2336,10 +2379,10 @@ class DirectoryPresenceSeedService {
         // SEO provenance rows (spec §4.4.6)
         { fieldKey: 'description', value: seoPacket.description, sourceName: 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
-        { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName: 'business_analysis_audit', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
+        { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
         // Sourced attributes — evidence lives on each attribute entry; the
         // provenance row records the audit lineage for the set.
-        { fieldKey: 'attributes', value: sourcedAttributes.length > 0 ? 'sourced' : undefined, sourceName: sourcedAttributes[0]?.sourcePlatform || 'business_analysis_audit', sourceUrl: sourcedAttributes[0]?.sourceUrl || sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: sourcedAttributes.length > 0 },
+        { fieldKey: 'attributes', value: sourcedAttributes.length > 0 ? 'sourced' : undefined, sourceName: sourcedAttributes[0]?.sourcePlatform || sourceName, sourceUrl: sourcedAttributes[0]?.sourceUrl || sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: sourcedAttributes.length > 0 },
       ].filter((p) => p.value != null && p.value !== '') as any,
     };
 

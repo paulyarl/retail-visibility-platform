@@ -16,6 +16,8 @@ import { describe, it, expect } from 'vitest';
 import {
   deriveDiscoverySignals,
   computeSeedConfidence,
+  discoveryDoubtMarkers,
+  discoveryOperationalStatus,
 } from '../discovery-verdict';
 
 describe('deriveDiscoverySignals', () => {
@@ -214,5 +216,80 @@ describe('computeSeedConfidence', () => {
     expect(result.factors).toContainEqual({ label: 'identity_confidence: high', delta: 30 });
     expect(result.factors).toContainEqual({ label: 'category_fit: insufficient', delta: -20 });
     expect(result.factors).toContainEqual({ label: 'single source only', delta: -10 });
+  });
+});
+
+describe('discoveryDoubtMarkers', () => {
+  it('returns no markers for a clean strong discovery', () => {
+    expect(
+      discoveryDoubtMarkers({
+        identityConfidence: 'high',
+        categoryFit: 'verified',
+        locationStatus: 'inside_city',
+        discoverySignals: ['INT_MULTISOURCE_IDENTITY', 'INT_ACTIVE_OPERATIONAL_EVIDENCE'],
+      }),
+    ).toEqual([]);
+  });
+
+  it('flags identity/scope doubt from every carrier', () => {
+    const markers = discoveryDoubtMarkers({
+      identityConfidence: 'low',
+      categoryFit: 'insufficient',
+      locationStatus: 'outside_market',
+      businessSeekPriority: 'hold',
+      discoverySignals: ['INT_POSSIBLE_CATEGORY_MISALIGNMENT', 'INT_SINGLE_SOURCE'],
+      bronzeAttribution: [{ reason_key: 'alternate_identity' }],
+      competitiveWeaknesses: [{ weakness_key: 'nap_drift' }, { weakness_key: 'category_drift' }],
+    });
+    expect(markers).toEqual(
+      expect.arrayContaining([
+        'identity_confidence_low',
+        'category_fit_insufficient',
+        'outside_market',
+        'seek_priority_hold',
+        'category_misalignment',
+        'single_source',
+        'alternate_identity',
+        'nap_drift',
+        'category_drift',
+      ]),
+    );
+  });
+
+  it('resolves invented bronze keys through the alias table', () => {
+    // 'rename_residue_splits_the_discovery_trace' aliases to
+    // 'alternate_identity' — the doubt is honored even when the model
+    // improvised the reason key.
+    expect(
+      discoveryDoubtMarkers({
+        bronzeAttribution: [{ reason_key: 'rename_residue_splits_the_discovery_trace' }],
+      }),
+    ).toContain('alternate_identity');
+  });
+
+  it('does not flag hunt-mechanism reasons or healthy assessments', () => {
+    expect(
+      discoveryDoubtMarkers({
+        identityConfidence: 'medium',
+        categoryFit: 'probable',
+        locationStatus: 'adjacent_city',
+        businessSeekPriority: 'medium',
+        bronzeAttribution: [{ reason_key: 'no_mainstream_profile' }],
+        competitiveWeaknesses: [{ weakness_key: 'website_gap' }],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('discoveryOperationalStatus', () => {
+  it('lifts to likely_active on proven recent activity', () => {
+    expect(discoveryOperationalStatus(['INT_ACTIVE_OPERATIONAL_EVIDENCE'])).toBe('likely_active');
+    expect(discoveryOperationalStatus(['INT_RECENT_BUSINESS_EVIDENCE'])).toBe('likely_active');
+  });
+
+  it('stays silent without operational signals', () => {
+    expect(discoveryOperationalStatus(['INT_MULTISOURCE_IDENTITY'])).toBeNull();
+    expect(discoveryOperationalStatus([])).toBeNull();
+    expect(discoveryOperationalStatus(null)).toBeNull();
   });
 });

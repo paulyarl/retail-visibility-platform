@@ -20,6 +20,14 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { resolveCampaignNap } from '../lib/canonical-nap';
+import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
+import {
+  computeSeedConfidence,
+  discoveryDoubtMarkers,
+  discoveryOperationalStatus,
+  SEED_CONFIDENCE_TESTIMONY_BAR,
+  type SeedConfidence,
+} from './triage/discovery-verdict';
 import IdentityEvidenceService, {
   type IdentityEvidenceRow,
   type OwnerContact,
@@ -32,6 +40,7 @@ import {
   isIdentitySourceTier,
   scoreIdentityPacket,
   sourceGroupSlug,
+  type DiscoveryLaneInput,
   type IdentityEvidenceState,
   type IdentityFieldEvidence,
   type IdentityFieldKey,
@@ -94,6 +103,19 @@ export interface IdentityPacket {
   operationalStatus: OperationalStatus;
   callConfirmed: boolean | null;
   snapSourced: boolean;
+  /**
+   * The qualification lane (mirrors triage's two-lane verdict): 'partial'
+   * when the packet deliberated on the campaign's discovery_context because
+   * no real business_analysis audit exists; 'full' when a real audit drove
+   * the evidence model.
+   */
+  lane: 'full' | 'partial';
+  /**
+   * The discovery seed-confidence meter (queue's seed_confidence) recomputed
+   * on the campaign — partial lane only, null on the full lane. Its score is
+   * the testimony bar for discovery_provenance sources.
+   */
+  seedConfidence: SeedConfidence | null;
   fields: Array<{ field: IdentityFieldKey; value: string | null; sources: IdentitySourceRef[] }>;
   ledger: IdentityPacketLedgerEntry[];
   /** Operator-entered sources visible to this campaign (own + siblings'). */
@@ -161,6 +183,15 @@ export interface AssembleInput {
    * Absent/empty → every source scores unweighted (legacy byte-identity).
    */
   signalWeights?: Record<string, number>;
+  /**
+   * The campaign's discovery_context (mkt_campaigns_list) — the partial
+   * qualification lane. Consulted ONLY when `audit` is null: a real
+   * business_analysis audit supersedes the discovery stub, same as triage's
+   * two-lane verdict. When the seed-confidence meter clears the testimony
+   * bar, each discovery_provenance row corroborates name + address +
+   * primary_category through the ordinary evidence model.
+   */
+  discoveryContext?: DiscoveryContext | null;
 }
 
 const PLATFORM_SOURCES: Array<{ key: string; name: string; tier: IdentitySourceTier; group: string }> = [
@@ -264,7 +295,10 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     meta.identity_status === 'confirmed' || meta.identity_status === 'mismatched'
       ? meta.identity_status
       : 'ambiguous';
-  const operationalStatus: OperationalStatus =
+  // The qualification lane: a real audit supersedes the discovery stub —
+  // discovery evidence is only consulted in the partial lane.
+  const lane: 'full' | 'partial' = audit == null ? 'partial' : 'full';
+  let operationalStatus: OperationalStatus =
     operational.status === 'active' ||
     operational.status === 'likely_active' ||
     operational.status === 'inactive'
@@ -437,6 +471,74 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     }
   }
 
+  // 7. Discovery lane — the partial qualification lane. When no real audit
+  //    exists, the discovery context's provenance rows testify in the same
+  //    evidence model (same tier weights, independence groups, dimension
+  //    gate), gated by the seed-confidence meter. Below the testimony bar
+  //    they corroborate nothing and the packet falls through to the
+  //    full-audit path unchanged.
+  let seedConfidence: SeedConfidence | null = null;
+  let discovery: DiscoveryLaneInput | null = null;
+  const dc = lane === 'partial' ? input.discoveryContext ?? null : null;
+  if (dc) {
+    seedConfidence = computeSeedConfidence({
+      identityConfidence: dc.identity_confidence,
+      categoryFit: dc.category_fit,
+      locationStatus: dc.location_status,
+      businessSeekPriority: dc.business_seek_priority,
+      discoverySignals: dc.discovery_signals,
+      provenanceCount: Array.isArray(dc.discovery_provenance) ? dc.discovery_provenance.length : 0,
+      ownershipType: dc.ownership_type ?? null,
+      hasAddress: !!canonical.address,
+      hasPhone: !!canonical.phone,
+      hasWebsite: !!canonical.website,
+      verificationOutcome: dc.verification_outcome ?? null,
+    });
+    const testifies = seedConfidence.score >= SEED_CONFIDENCE_TESTIMONY_BAR;
+    discovery = {
+      testifies,
+      seedConfidenceScore: seedConfidence.score,
+      seedConfidenceBand: seedConfidence.band,
+      doubtMarkers: discoveryDoubtMarkers({
+        discoverySignals: dc.discovery_signals,
+        bronzeAttribution: dc.bronze_attribution,
+        competitiveWeaknesses: dc.competitive_weaknesses,
+        categoryFit: dc.category_fit,
+        locationStatus: dc.location_status,
+        identityConfidence: dc.identity_confidence,
+        businessSeekPriority: dc.business_seek_priority,
+      }),
+    };
+    if (testifies) {
+      for (const p of dc.discovery_provenance ?? []) {
+        const name = typeof p?.source === 'string' ? p.source.trim() : '';
+        if (!name) continue;
+        const tier = inferSourceTier(name);
+        const group = sourceGroupSlug(name) || 'discovery';
+        // A discovery provenance row asserts "this business was found on this
+        // source under this category" — it corroborates identity (name +
+        // address) and the category the scan filed it under.
+        for (const field of ['name', 'address', 'primary_category'] as IdentityFieldKey[]) {
+          evidence[field].push({
+            name,
+            tier,
+            independenceGroup: group,
+            agrees: true,
+            evidenceState: 'observed',
+            url: p.url ?? null,
+            accessedAt: p.accessed_at ?? null,
+            discovery: true,
+          });
+        }
+      }
+      // Proven recent activity in the scan lifts the operational axis to
+      // 'likely_active'; a real audit's operational_status wins outright.
+      if (operationalStatus === 'unable_to_verify') {
+        operationalStatus = discoveryOperationalStatus(dc.discovery_signals) ?? operationalStatus;
+      }
+    }
+  }
+
   // Annotate every source with its authority class + evidence dimension — the
   // eligibility axis (see directory/evidenceDimensions.ts). Additive metadata:
   // the scorer does not consume it yet (sprint Phase 3), but the packet carries
@@ -470,6 +572,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     callConfirmed: input.callConfirmed ?? null,
     fields,
     snapSourced,
+    discovery,
   });
 
   // De-duplicated source ledger (one row per source, listing the fields it
@@ -510,6 +613,8 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
     operationalStatus,
     callConfirmed: input.callConfirmed ?? null,
     snapSourced,
+    lane,
+    seedConfidence,
     fields,
     ledger: [...ledgerByKey.values()],
     manualEvidence,
@@ -546,6 +651,9 @@ class IdentityPacketService {
         email: true,
         social_profiles: true,
         directory_profiles: true,
+        // Partial qualification lane — the discovery context handed off at
+        // queue→campaign promotion. Scored only when no real audit exists.
+        discovery_context: true,
       },
     });
 
@@ -728,6 +836,9 @@ class IdentityPacketService {
       seed,
       seedDecision,
       signalWeights,
+      // Re-validated at read — cheap defense mirroring the validation boundary
+      // at handoff (validateDiscoveryContext drops empty/malformed context).
+      discoveryContext: validateDiscoveryContext(campaign?.discovery_context),
     });
   }
 

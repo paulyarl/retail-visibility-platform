@@ -479,3 +479,136 @@ describe('assembleIdentityPacket', () => {
     expect(registry.signalWeight).toBeUndefined();
   });
 });
+
+describe('assembleIdentityPacket — discovery lane (partial qualification)', () => {
+  /**
+   * The discovery context a promoted queue entry carries onto the campaign —
+   * the card's "fit / confidence / INT_* / provenance" payload. Strong
+   * findings testify in the packet's own evidence model.
+   */
+  const discoveryContext = (over: Record<string, any> = {}): any => ({
+    focus: 'emerging',
+    identity_confidence: 'high',
+    category_fit: 'verified',
+    location_status: 'inside_city',
+    business_seek_priority: 'high',
+    ownership_type: 'independent',
+    discovery_signals: ['INT_MULTISOURCE_IDENTITY', 'INT_ACTIVE_OPERATIONAL_EVIDENCE'],
+    discovery_provenance: [
+      { source: 'Google', role: 'primary', url: 'https://google.example/biz' },
+      { source: 'Yelp', role: 'corroboration' },
+      { source: 'Somali Community Directory', role: 'primary' },
+    ],
+    ...over,
+  });
+
+  it('qualifies a strong discovery without a full audit — equivalent scoring', () => {
+    const p = assembleIdentityPacket(base({ audit: null, discoveryContext: discoveryContext() }));
+    expect(p.lane).toBe('partial');
+    expect(p.seedConfidence?.band).toBe('high');
+
+    // Each provenance row corroborates name + address + primary_category in
+    // the ordinary evidence model — observed during discovery.
+    const name = p.fields.find((f) => f.field === 'name')!;
+    expect(name.sources).toHaveLength(3);
+    expect(name.sources.every((s) => s.discovery === true && s.agrees && s.evidenceState === 'observed')).toBe(true);
+    const category = p.fields.find((f) => f.field === 'primary_category')!;
+    expect(category.sources).toHaveLength(3);
+
+    // Same machinery, same outcome: Google + Yelp testify on operational,
+    // the community directory on location — two dimensions + depth.
+    expect(p.score.identityScore).toBe(100);
+    expect(p.score.gate.satisfiedCount).toBe(2);
+    expect(p.score.gate.decision).toBe('guaranteed');
+    expect(p.score.band).toBe('ready');
+    expect(p.score.pushRecommended).toBe(true);
+
+    // Proven recent activity lifts the operational axis (no audit → 70).
+    expect(p.operationalStatus).toBe('likely_active');
+    expect(p.score.operationalScore).toBe(70);
+    expect(p.score.qcSignals.map((s) => s.code)).toContain('partial_lane');
+    expect(p.score.qcSignals.map((s) => s.code)).not.toContain('low_operational_recency');
+  });
+
+  it('lets discovery provenance land in the same independence groups as audit sources', () => {
+    const p = assembleIdentityPacket(base({ audit: null, discoveryContext: discoveryContext() }));
+    // 'Google' groups onto the canonical 'google' platform key — a later full
+    // audit's Google block would discount against it, not double-count.
+    const google = p.ledger.find((l) => l.name === 'Google')!;
+    expect(google.independenceGroup).toBe('google');
+    expect(google.tier).toBe('major_aggregator');
+    expect(google.fields).toEqual(expect.arrayContaining(['name', 'address', 'primary_category']));
+  });
+
+  it('keeps the seed blocked when seed confidence is below the testimony bar', () => {
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        discoveryContext: discoveryContext({
+          identity_confidence: 'low',
+          category_fit: 'insufficient',
+          business_seek_priority: 'hold',
+          ownership_type: 'national_chain',
+          discovery_signals: [],
+        }),
+      }),
+    );
+    expect(p.lane).toBe('partial');
+    expect(p.seedConfidence?.score).toBeLessThan(40);
+    // No testimony — the evidence model is empty, exactly like a campaign
+    // with no discovery context.
+    expect(p.fields.every((f) => f.sources.length === 0)).toBe(true);
+    expect(p.score.identityScore).toBe(0);
+    expect(p.score.gate.decision).toBe('blocked');
+    expect(p.score.pushRecommended).toBe(false);
+    const codes = p.score.qcSignals.map((s) => s.code);
+    expect(codes).toContain('partial_lane_below_bar');
+  });
+
+  it('caps a depth-qualified gate at earned when the scan named doubt', () => {
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        discoveryContext: discoveryContext({
+          competitive_weaknesses: [{ weakness_key: 'nap_drift' }],
+        }),
+      }),
+    );
+    // Depth is still met — the doubt marker caps the DECISION, not the evidence.
+    expect(p.score.gate.guaranteed).toBe(true);
+    expect(p.score.gate.doubtCapped).toBe(true);
+    expect(p.score.gate.decision).toBe('earned');
+    expect(p.score.band).toBe('review');
+    expect(p.score.pushRecommended).toBe(true);
+    const codes = p.score.qcSignals.map((s) => s.code);
+    expect(codes).toContain('discovery_doubt_nap_drift');
+    expect(codes).toContain('discovery_doubt_cap');
+  });
+
+  it('qualifies a single-source high-confidence find at earned, not guaranteed', () => {
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        discoveryContext: discoveryContext({
+          discovery_signals: ['INT_SINGLE_SOURCE'],
+          discovery_provenance: [{ source: 'Google', role: 'primary' }],
+        }),
+      }),
+    );
+    expect(p.seedConfidence!.score).toBeGreaterThanOrEqual(40);
+    // Google alone meets the strength bar — but INT_SINGLE_SOURCE is named
+    // doubt, so the decision caps at earned (review before push).
+    expect(p.score.gate.decision).toBe('earned');
+    expect(p.score.gate.doubtCapped).toBe(true);
+    expect(p.score.qcSignals.map((s) => s.code)).toContain('discovery_doubt_single_source');
+  });
+
+  it('ignores the discovery context entirely on the full lane', () => {
+    const p = assembleIdentityPacket(base({ discoveryContext: discoveryContext() }));
+    expect(p.lane).toBe('full');
+    expect(p.seedConfidence).toBeNull();
+    // No discovery-flagged sources — the real audit supersedes the stub.
+    expect(p.fields.flatMap((f) => f.sources).every((s) => !s.discovery)).toBe(true);
+    expect(p.score.qcSignals.map((s) => s.code)).not.toContain('partial_lane');
+  });
+});

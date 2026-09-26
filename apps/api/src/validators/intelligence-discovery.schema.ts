@@ -1139,6 +1139,12 @@ export const discoveryContextSchema = z.object({
       basis: z.string().nullable().optional(),
     }).passthrough(),
   ).optional(),
+  // Ownership classification carried for the identity packet's seed-confidence
+  // meter (queue business_snapshot.ownership_type — chain/franchise exclusion).
+  ownership_type: ownershipTypeEnum.nullable().optional(),
+  // Resolved queue verification outcome at promotion time — the meter's
+  // human-verification override ('operational' clears; negative outcomes sink).
+  verification_outcome: z.string().nullable().optional(),
 }).passthrough();
 
 export type DiscoveryContext = z.infer<typeof discoveryContextSchema>;

@@ -337,3 +337,82 @@ export function computeSeedConfidence(input: SeedConfidenceInput): SeedConfidenc
     score >= 70 ? 'high' : score >= 40 ? 'medium' : score > 0 ? 'low' : 'insufficient';
   return { score, band, factors };
 }
+
+// ─── Identity-packet bridge (partial qualification lane) ─────────────────
+//
+// Two-lane qualification mirrors two-lane triage: a campaign with no real
+// business_analysis audit deliberates on the discovery context (partial lane);
+// a full audit supersedes it. The helpers below translate the context into
+// the packet's own vocabulary — the evidence model, tier weights, and
+// dimension gate score it identically to audit evidence.
+
+/**
+ * Seed-confidence score at which discovery provenance testifies in the
+ * identity packet — 'medium' or better. Below it the discovery evidence is
+ * informational only (the packet falls through to the full-audit path).
+ */
+export const SEED_CONFIDENCE_TESTIMONY_BAR = 40;
+
+/** INT_* codes that express identity/scope doubt rather than corroboration. */
+const DOUBT_DISCOVERY_SIGNALS: Record<string, string> = {
+  INT_POSSIBLE_CATEGORY_MISALIGNMENT: 'category_misalignment',
+  INT_SINGLE_SOURCE: 'single_source',
+};
+
+/** Bronze reason keys (post-alias) that express identity doubt. */
+const DOUBT_REASON_KEYS = new Set(['alternate_identity']);
+
+/** Competitive weakness keys that express identity/scope doubt. */
+const DOUBT_WEAKNESS_KEYS: Record<string, string> = {
+  nap_drift: 'nap_drift',
+  category_drift: 'category_drift',
+};
+
+/**
+ * Named identity/scope doubt from a discovery context. Any marker present
+ * caps a depth-qualified seed gate at 'earned' (band 'review') — the partial
+ * lane still qualifies the seed, but 'guaranteed' is reserved for evidence
+ * without named doubt. QC surfaces each marker as a warn signal.
+ */
+export function discoveryDoubtMarkers(input: {
+  discoverySignals?: string[] | null;
+  bronzeAttribution?: DiscoveryAttribution[] | null;
+  competitiveWeaknesses?: DiscoveryWeakness[] | null;
+  categoryFit?: string | null;
+  locationStatus?: string | null;
+  identityConfidence?: string | null;
+  businessSeekPriority?: string | null;
+}): string[] {
+  const markers = new Set<string>();
+  if (input.identityConfidence === 'low') markers.add('identity_confidence_low');
+  if (input.categoryFit === 'insufficient') markers.add('category_fit_insufficient');
+  if (input.locationStatus === 'outside_market') markers.add('outside_market');
+  if (input.businessSeekPriority === 'hold') markers.add('seek_priority_hold');
+  for (const code of input.discoverySignals ?? []) {
+    const marker = DOUBT_DISCOVERY_SIGNALS[code];
+    if (marker) markers.add(marker);
+  }
+  for (const r of input.bronzeAttribution ?? []) {
+    const key = BRONZE_REASON_ALIASES[r.reason_key] ?? r.reason_key;
+    if (DOUBT_REASON_KEYS.has(key)) markers.add(key);
+  }
+  for (const w of input.competitiveWeaknesses ?? []) {
+    const marker = DOUBT_WEAKNESS_KEYS[w.weakness_key];
+    if (marker) markers.add(marker);
+  }
+  return [...markers];
+}
+
+/**
+ * Operational status contributed by the discovery scan: proven recent
+ * activity → 'likely_active' (the 70 rung), else null. Only consulted in the
+ * partial lane — a real audit's operational_status wins outright.
+ */
+export function discoveryOperationalStatus(
+  signals?: string[] | null,
+): 'likely_active' | null {
+  const s = new Set(signals ?? []);
+  return s.has('INT_ACTIVE_OPERATIONAL_EVIDENCE') || s.has('INT_RECENT_BUSINESS_EVIDENCE')
+    ? 'likely_active'
+    : null;
+}

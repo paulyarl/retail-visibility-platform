@@ -544,6 +544,29 @@ describe('validateDiscoveryContext — competitive_weaknesses', () => {
   });
 });
 
+// ─── validateDiscoveryContext — seed-confidence carry (partial lane) ──────
+
+describe('validateDiscoveryContext — seed-confidence inputs', () => {
+  it('carries ownership_type + verification_outcome for the packet meter', () => {
+    const ctx = validateDiscoveryContext({
+      identity_confidence: 'high',
+      ownership_type: 'local_chain',
+      verification_outcome: 'operational',
+    });
+    expect(ctx).not.toBeNull();
+    expect(ctx?.ownership_type).toBe('local_chain');
+    expect(ctx?.verification_outcome).toBe('operational');
+  });
+
+  it('rejects an unknown ownership_type', () => {
+    const ctx = validateDiscoveryContext({
+      identity_confidence: 'high',
+      ownership_type: 'monopoly' as any,
+    });
+    expect(ctx).toBeNull();
+  });
+});
+
 // ─── Platform analysis section ────────────────────────────────────────────
 
 describe('intelligence_discovery schema — platform_analysis section', () => {
