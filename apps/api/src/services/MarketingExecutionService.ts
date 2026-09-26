@@ -2567,6 +2567,19 @@ export class MarketingExecutionService extends BaseService {
       lines.push('');
     }
 
+    // Discovery scan category context — names the shelf the scan filed this
+    // prospect under when it differs from the category this audit evaluates
+    // (a category-identification reroute can spawn a second audit under a
+    // related category; each audit frames its own context explicitly).
+    const sourceCategory = typeof ctx.source_category === 'string' && ctx.source_category.trim()
+      ? ctx.source_category.trim() : null;
+    const auditCategory = typeof campaign?.category === 'string' && campaign.category.trim()
+      ? campaign.category.trim() : null;
+    if (sourceCategory && sourceCategory.toLowerCase() !== (auditCategory ?? '').toLowerCase()) {
+      lines.push(`Discovery scan category context: this business was surfaced under "${sourceCategory}" — this audit evaluates it as "${auditCategory ?? 'unassigned'}".`);
+      lines.push('');
+    }
+
     // Discovery signals (labeled)
     if (signals.length > 0) {
       lines.push('Discovery signals (hypotheses):');

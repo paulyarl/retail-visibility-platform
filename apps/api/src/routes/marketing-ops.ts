@@ -151,7 +151,7 @@ import { MarketingHotProspectService } from '../services/MarketingHotProspectSer
 import MarketingAuditService from '../services/MarketingAuditService';
 import MarketingPromptService, { extractJsonCandidates, normalizeExternalJsonText, stripLlmJsonArtifacts } from '../services/MarketingPromptService';
 import { bronzeStandardScanSchema } from '../validators/bronze-standard-scan.schema';
-import { validateDiscoveryContext } from '../validators/intelligence-discovery.schema';
+import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 import MarketingExecutionService from '../services/MarketingExecutionService';
 import MarketingScorecardService from '../services/MarketingScorecardService';
 import MarketingDailyDigestService from '../services/MarketingDailyDigestService';
@@ -2220,6 +2220,92 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
       review_count: null,
     }));
 
+    // Dual-lane attribution carry (COMPETITIVE_WEAKNESS_ATTRIBUTION_SPEC §8):
+    // a prospect found by both discovery lanes carries merged attribution on
+    // its queue row. Category identification re-routes the same business
+    // under a different category — the queue dedup triple (name+city+
+    // category) can't see across categories, so look up the prior row by
+    // name (+city/state when present) and re-emit its discovery attribution.
+    // The new queue row / spawned campaign then keeps both lanes' evidence
+    // instead of starting attribution-free.
+    let priorAttributionEntry: any = null;
+    try {
+      const priorWhere: any = {
+        status: { in: ['queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'] },
+        OR: [
+          { business_name: { equals: napBusinessName, mode: 'insensitive' } },
+          { title: { equals: napBusinessName, mode: 'insensitive' } },
+        ],
+      };
+      if (city) priorWhere.city = { equals: city, mode: 'insensitive' };
+      if (state) priorWhere.state = { equals: state, mode: 'insensitive' };
+      const priorCandidates = await prisma.mkt_prospect_queue.findMany({ where: priorWhere });
+      const attributionRichness = (e: any): number => {
+        const snap = (e.business_snapshot as any) ?? {};
+        return (Array.isArray(snap.bronze_attribution) ? snap.bronze_attribution.length : 0)
+          + (Array.isArray(snap.competitive_weaknesses) ? snap.competitive_weaknesses.length : 0)
+          + (Array.isArray(e.discovery_provenance) ? e.discovery_provenance.length : 0)
+          + (Array.isArray(e.discovery_signals) ? e.discovery_signals.length : 0);
+      };
+      priorAttributionEntry = priorCandidates
+        .filter((e) => attributionRichness(e) > 0)
+        .sort((a, b) => attributionRichness(b) - attributionRichness(a))[0] ?? null;
+    } catch (lookupError) {
+      logger.warn('category-identification/act: prior-attribution lookup failed (non-fatal)', ctx, {
+        error: (lookupError as Error).message,
+      });
+    }
+    const priorSnapshot = (priorAttributionEntry?.business_snapshot as Record<string, any>) ?? {};
+    // The snapshot keys mergeAttributionOnDedup unions on a dedup hit —
+    // re-emitted verbatim so a same-category re-queue merges idempotently.
+    const priorSnapshotAttribution = {
+      bronze_attribution: Array.isArray(priorSnapshot.bronze_attribution) ? priorSnapshot.bronze_attribution : undefined,
+      competitive_weaknesses: Array.isArray(priorSnapshot.competitive_weaknesses) ? priorSnapshot.competitive_weaknesses : undefined,
+      // This row files under the IDENTIFIED category, so the origin scan's
+      // category context must ride the snapshot to survive promotion
+      // (createCampaignFromQueue reads it as discovery source_category).
+      source_category: (priorAttributionEntry?.category as string | null) ?? undefined,
+    };
+    const priorIntelligenceColumns = priorAttributionEntry ? {
+      category_fit: priorAttributionEntry.category_fit ?? undefined,
+      identity_confidence: priorAttributionEntry.identity_confidence ?? undefined,
+      location_status: priorAttributionEntry.location_status ?? undefined,
+      discovery_provenance: (priorAttributionEntry.discovery_provenance as any) ?? undefined,
+      discovery_signals: (priorAttributionEntry.discovery_signals as any) ?? undefined,
+      business_seek_priority: priorAttributionEntry.business_seek_priority ?? undefined,
+      intelligence_run_id: priorAttributionEntry.intelligence_run_id ?? undefined,
+    } : {};
+
+    // Rebuild the discovery context for the direct-to-campaign destination —
+    // mirrors createCampaignFromQueue's intelligence_seek block so the
+    // spawned campaign gets the same partial verdict + attribution a queue
+    // promotion would produce (spec §8).
+    let priorDiscoveryContext: DiscoveryContext | undefined;
+    const priorRunId = priorIntelligenceColumns.intelligence_run_id;
+    if (priorAttributionEntry) {
+      let focus: 'emerging' | 'competitive' | undefined;
+      if (priorRunId) {
+        const run = await prisma.mkt_intelligence_runs
+          .findUnique({ where: { id: priorRunId }, select: { focus: true } })
+          .catch(() => null);
+        if (run?.focus === 'emerging' || run?.focus === 'competitive') focus = run.focus;
+      }
+      priorDiscoveryContext = validateDiscoveryContext({
+        focus,
+        discovered_at: priorAttributionEntry.created_at?.toISOString?.() ?? undefined,
+        business_seek_priority: priorAttributionEntry.business_seek_priority ?? undefined,
+        category_fit: priorAttributionEntry.category_fit ?? undefined,
+        identity_confidence: priorAttributionEntry.identity_confidence ?? undefined,
+        location_status: priorAttributionEntry.location_status ?? undefined,
+        seek_batch_id: priorAttributionEntry.seek_batch_id ?? undefined,
+        source_category: (priorAttributionEntry.category as string | null) ?? undefined,
+        discovery_signals: (priorAttributionEntry.discovery_signals as any) ?? [],
+        discovery_provenance: (priorAttributionEntry.discovery_provenance as any) ?? [],
+        bronze_attribution: priorSnapshotAttribution.bronze_attribution,
+        competitive_weaknesses: priorSnapshotAttribution.competitive_weaknesses,
+      }) ?? undefined;
+    }
+
     // Step 1: Register the category in vocab if it's new. The analyst's
     // is_known flag is advisory — membership in the operator-selectable union
     // (platform_categories ∪ mkt_service_categories_list) is a server-side
@@ -2287,6 +2373,11 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
           addressZip: auditNap.postal_code ?? undefined,
           addressCountry: auditNap.country_code ?? undefined,
           directoryProfiles: napDirectoryProfiles.length > 0 ? napDirectoryProfiles : undefined,
+          // Carried dual-lane discovery attribution (spec §8) — the spawned
+          // campaign is born with the merged evidence + partial verdict a
+          // queue promotion would produce, not attribution-free.
+          discoveryContext: priorDiscoveryContext,
+          intelligenceRunId: priorRunId,
         }, ctx);
       } catch (deriveErr) {
         // Migration 271 — structural-duplicate guardrail: an active campaign
@@ -2391,7 +2482,12 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
         address_country: auditNap.country_code ?? null,
         // Structured NAP block for downstream consumers / UI display
         nap: auditNap,
+        // Carried dual-lane attribution (spec §8) — keeps the merged
+        // discovery evidence on the new category's row so promotion
+        // produces the same discovery_context + partial verdict.
+        ...priorSnapshotAttribution,
       },
+      ...priorIntelligenceColumns,
       priority: parsed.confidence === 'high' ? 'high' : 'normal',
       initial_status: parsed.destination === 'verify' ? 'verify_then_outreach' : 'queued',
       queuedBy: req.user?.id,

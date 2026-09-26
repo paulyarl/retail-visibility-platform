@@ -1111,6 +1111,11 @@ export const discoveryContextSchema = z.object({
   identity_confidence: z.enum(['high', 'medium', 'low']).nullable().optional(),
   location_status: z.string().nullable().optional(),
   seek_batch_id: z.string().nullable().optional(),
+  // The discovery scan's own category context — carried so a campaign
+  // spawned under a different (category-identified) category can frame the
+  // find: "surfaced under X, audited as Y". Not rendered when it matches the
+  // campaign's own category.
+  source_category: z.string().nullable().optional(),
   discovery_signals: z.array(z.string().regex(/^INT_/)).optional(),
   discovery_provenance: z.array(discoveryProvenanceSchema).optional(),
   // Bronze Standard System (spec §7.4) — catalog reason(s) directly

@@ -1130,7 +1130,17 @@ class MarketingProspectQueueServiceClass extends BaseService {
         // render-time check in renderDiscoveryLeadsBlock is cheap defense only.
         let discoveryContext: DiscoveryContext | null = null;
         let intelligenceRunId: string | undefined;
-        if (entry.source_kind === 'intelligence_seek') {
+        // Gate on carried discovery evidence, not only source_kind — a
+        // category-identification reroute re-emits the origin lane's
+        // attribution onto the new category's queue row (spec §8 carry), so
+        // its promotion deserves the same context + partial verdict an
+        // intelligence_seek entry gets.
+        const hasDiscoveryEvidence =
+          (Array.isArray(entry.discovery_signals) && (entry.discovery_signals as any[]).length > 0)
+          || (Array.isArray(entry.discovery_provenance) && (entry.discovery_provenance as any[]).length > 0)
+          || (Array.isArray(snapshot.bronze_attribution) && snapshot.bronze_attribution.length > 0)
+          || (Array.isArray(snapshot.competitive_weaknesses) && snapshot.competitive_weaknesses.length > 0);
+        if (entry.source_kind === 'intelligence_seek' || hasDiscoveryEvidence) {
           intelligenceRunId = entry.intelligence_run_id ?? undefined;
           const focus = await this.resolveRunFocus(entry.intelligence_run_id, ctx);
           const rawContext = {
@@ -1141,6 +1151,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
             identity_confidence: entry.identity_confidence ?? undefined,
             location_status: entry.location_status ?? undefined,
             seek_batch_id: entry.seek_batch_id ?? undefined,
+            // The discovery scan's own category context. For
+            // category-identification reroutes the entry's own category is
+            // the IDENTIFIED category — the origin scan's category rides
+            // snapshot.source_category instead (written by the cat-id act
+            // route from the prior lane's queue row).
+            source_category: (snapshot.source_category as string) ?? (entry.category as string) ?? undefined,
             discovery_signals: (entry.discovery_signals as string[]) ?? [],
             discovery_provenance: (entry.discovery_provenance as any[]) ?? [],
             // Bronze reason attribution rides the business_snapshot (written

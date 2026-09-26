@@ -2077,11 +2077,20 @@ export class MarketingCampaignService extends BaseService {
         const sourceLabels = (dc.discovery_provenance ?? [])
           .map((p) => `${p.source} (${p.role})`)
           .join(', ');
+        // Category-identification reroutes can carry the origin scan's
+        // category — surface it when it differs from what this campaign
+        // evaluates as, mirroring the audit prompt's framing.
+        const auditCategoryLabel = (input.categoryOverride ?? parent.category ?? '').trim();
+        const scanCategory = (dc.source_category ?? '').trim();
+        const scanCategoryNote = scanCategory && scanCategory.toLowerCase() !== auditCategoryLabel.toLowerCase()
+          ? `  Discovery scan category: ${scanCategory} — audited as ${auditCategoryLabel || 'unassigned'}`
+          : null;
         noteParts.push(
           `Discovery context (intelligence run ${input.intelligenceRunId ?? 'unknown'}, discovered ${discoveredAt}):`,
           `  Seek priority: ${dc.business_seek_priority ?? 'unknown'} · Category fit: ${dc.category_fit ?? 'unknown'} · Identity confidence: ${dc.identity_confidence ?? 'unknown'}`,
           signalLabels ? `  Signals: ${signalLabels}` : null,
           sourceLabels ? `  Sources: ${sourceLabels}` : null,
+          scanCategoryNote,
         );
       }
       const notes = noteParts.filter(Boolean).join('\n');
