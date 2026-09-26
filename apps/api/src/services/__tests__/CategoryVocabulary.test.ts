@@ -49,40 +49,93 @@ beforeEach(() => {
 // ─── formatKnownCategoryVocabulary ──────────────────────────────────────
 
 describe('formatKnownCategoryVocabulary', () => {
-  it('renders both sections with dynamic counts when both lists are present', () => {
+  it('renders all sections with dynamic counts when all lists are present', () => {
     const block = formatKnownCategoryVocabulary(
       ['Grocery Store', 'Auto Repair'],
       ['Somali Grocery Store'],
+      ['Middle Eastern Grocery Store'],
     );
 
     expect(block).toContain('KNOWN CATEGORY VOCABULARY');
-    expect(block).toContain('directory vocabulary of 2 category labels');
+    expect(block).toContain('the 2 canonical category labels');
     expect(block).toContain('KNOWN CATEGORIES (2):');
     expect(block).toContain('Auto Repair, Grocery Store');
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    expect(block).toContain('Middle Eastern Grocery Store');
     expect(block).toContain('REGISTERED LABELS (1)');
     expect(block).toContain('Somali Grocery Store');
   });
 
-  it('renders the directory section alone when the registered list is empty', () => {
+  it('leads with the platform goal — physical shelves of independent retailers', () => {
+    const block = formatKnownCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('PLATFORM GOAL');
+    expect(block).toContain('PHYSICAL SHELVES');
+    expect(block).toContain('independent brick-and-mortar retailers');
+  });
+
+  it('frames the candidate list as propagating one prospect across shelves', () => {
+    const block = formatKnownCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('ONE prospect across shelves');
+    expect(block).toContain('Secondary candidates file the same business on additional shelves');
+  });
+
+  it('judges is_known_category against all three lists', () => {
+    const block = formatKnownCategoryVocabulary(['Grocery Store'], [], ['Ramen Shop']);
+
+    expect(block).toContain('ENRICHED CATEGORIES = categories established by enrichment');
+    expect(block).toContain('in ANY list below, set is_known_category =');
+  });
+
+  it('renders the directory section alone when the other lists are empty', () => {
     const block = formatKnownCategoryVocabulary(['Grocery Store'], []);
 
     expect(block).toContain('KNOWN CATEGORIES (1):');
     expect(block).toContain('Grocery Store');
-    expect(block).not.toContain('REGISTERED LABELS');
+    expect(block).not.toContain('ENRICHED CATEGORIES (');
+    expect(block).not.toContain('REGISTERED LABELS (');
   });
 
   it('renders the registered section alone when the directory list is empty', () => {
     const block = formatKnownCategoryVocabulary([], ['Somali Grocery Store']);
 
-    expect(block).toContain('directory vocabulary of 0 category labels');
+    expect(block).toContain('the 0 canonical category labels');
     expect(block).not.toContain('KNOWN CATEGORIES (');
     expect(block).toContain('REGISTERED LABELS (1)');
     expect(block).toContain('Somali Grocery Store');
   });
 
-  it("returns '' when both lists are empty", () => {
+  it('renders supplement labels alone when the other lists are empty', () => {
+    const block = formatKnownCategoryVocabulary([], [], ['Middle Eastern Grocery Store']);
+
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    expect(block).toContain('Middle Eastern Grocery Store');
+    expect(block).not.toContain('KNOWN CATEGORIES (');
+    expect(block).not.toContain('REGISTERED LABELS (');
+  });
+
+  it('partitions supplement labels against directory and registered labels (case-insensitive)', () => {
+    const block = formatKnownCategoryVocabulary(
+      ['Grocery Store'],
+      ['Somali Grocery Store'],
+      ['grocery store', '  Somali Grocery Store ', 'Middle Eastern Grocery Store'],
+    );
+
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    const supplementSection = block
+      .split('ENRICHED CATEGORIES (')[1]
+      .split('REGISTERED LABELS')[0];
+    expect(supplementSection).toContain('Middle Eastern Grocery Store');
+    expect(supplementSection).not.toContain('grocery store,');
+    expect(supplementSection).not.toContain('Somali Grocery Store');
+  });
+
+  it("returns '' when all lists are empty", () => {
     expect(formatKnownCategoryVocabulary([], [])).toBe('');
     expect(formatKnownCategoryVocabulary(['  ', ''], ['   '])).toBe('');
+    expect(formatKnownCategoryVocabulary([], [], [])).toBe('');
+    expect(formatKnownCategoryVocabulary([], [], ['  '])).toBe('');
   });
 
   it('excludes registered labels that already appear in the directory list (case-insensitive, trimmed)', () => {

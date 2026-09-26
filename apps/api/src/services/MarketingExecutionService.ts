@@ -1895,12 +1895,17 @@ export class MarketingExecutionService extends BaseService {
       let vocabBlock = '';
       try {
         const vocab = await CategoryVocabularyService.getInstance().loadVocabulary(ctx);
-        vocabBlock = formatKnownCategoryVocabulary(vocab.directoryLabels, vocab.registeredLabels);
+        vocabBlock = formatKnownCategoryVocabulary(
+          vocab.directoryLabels,
+          vocab.registeredLabels,
+          vocab.supplementLabels,
+        );
         if (vocabBlock) {
           logger.info('Known-category vocabulary injected into category identification scan', ctx, {
             campaignId: input.campaign.id,
             directoryLabelCount: vocab.directoryLabels.length,
             registeredLabelCount: vocab.registeredLabels.length,
+            supplementLabelCount: vocab.supplementLabels.length,
           });
         } else {
           logger.warn('Category vocabulary empty — no KNOWN CATEGORY VOCABULARY block injected', ctx, {

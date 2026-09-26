@@ -145,7 +145,7 @@ describe('MarketContext injection into intelligence campaigns', () => {
     mockFormatDiscovery.mockImplementation(() => '');
     mockFormatCategoryId.mockImplementation(() => '');
     mockFormatVocab.mockImplementation(() => '');
-    mockVocabService.loadVocabulary.mockImplementation(async () => ({ directoryLabels: [], registeredLabels: [] }));
+    mockVocabService.loadVocabulary.mockImplementation(async () => ({ directoryLabels: [], registeredLabels: [], supplementLabels: [] }));
   });
 
   // ─── Establishment scan ────────────────────────────────────────────────
@@ -431,6 +431,7 @@ describe('MarketContext injection into intelligence campaigns', () => {
       mockVocabService.loadVocabulary.mockResolvedValueOnce({
         directoryLabels: ['Grocery Store'],
         registeredLabels: ['Somali Grocery Store'],
+        supplementLabels: ['Middle Eastern Grocery Store'],
       });
       mockFormatVocab.mockReturnValueOnce('=== KNOWN CATEGORY VOCABULARY ===\nGrocery Store');
 
@@ -444,7 +445,11 @@ describe('MarketContext injection into intelligence campaigns', () => {
       expect(renderedPrompt).toContain('KNOWN CATEGORY VOCABULARY');
       expect(mockMarketContextLoader.loadLocationContext).toHaveBeenCalledWith('Indianapolis', 'IN', undefined);
       expect(mockFormatCategoryId).toHaveBeenCalledWith(locCtx, 'Indianapolis', 'IN');
-      expect(mockFormatVocab).toHaveBeenCalledWith(['Grocery Store'], ['Somali Grocery Store']);
+      expect(mockFormatVocab).toHaveBeenCalledWith(
+        ['Grocery Store'],
+        ['Somali Grocery Store'],
+        ['Middle Eastern Grocery Store'],
+      );
       // Vocabulary renders after the location block.
       expect(renderedPrompt.indexOf('KNOWN CATEGORY VOCABULARY'))
         .toBeGreaterThan(renderedPrompt.indexOf('MARKET CONTEXT'));
@@ -454,6 +459,7 @@ describe('MarketContext injection into intelligence campaigns', () => {
       mockVocabService.loadVocabulary.mockResolvedValueOnce({
         directoryLabels: ['Grocery Store'],
         registeredLabels: [],
+        supplementLabels: [],
       });
       mockFormatVocab.mockReturnValueOnce('=== KNOWN CATEGORY VOCABULARY ===\nGrocery Store');
 

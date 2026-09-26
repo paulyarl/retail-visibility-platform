@@ -4,6 +4,7 @@
 
 **Status:** Implemented — vocabulary injection + act-flow backstop wired; seeds re-applied (local + prd)
 **Owner:** TBD
+**2026-09-26 alignment:** the block caught up with the enrichment treatment — a `PLATFORM GOAL` physical-shelves preamble, a third `ENRICHED CATEGORIES` section (`supplementLabels`: operator-typed categories that already name live enriched pages — previously dropped at the call site, so a candidate matching one was wrongly judged `is_known_category = false`), and one-prospect-across-shelves framing. `is_known_category` is now judged against **any** of the three lists. Seed re-applied (local + prd).
 **Scope:** `apps/api` prompt render path + category-identification seed template
 
 ---
@@ -211,56 +212,79 @@ No vocabulary variable exists. The body's `=== KNOWN CATEGORIES ===` paragraph i
 
 ### 4.1 Injection source — mirror the dropdown union
 
-Load the two lists **independently** — each read is wrapped in its own try/catch so a failure of one source never takes down the other:
+Load the lists **independently** — each read is wrapped in its own try/catch so a failure of one source never takes down the others:
 
 1. `platform_categories` where `is_active` → ~414 names, `orderBy name asc` (alphabetical — the dropdown's real presentation order; see §2.1)
 2. `mkt_service_categories_list` where `is_active` → registered labels, `orderBy label asc`
+3. Enrichment-ecosystem categories → `supplementLabels` (added 2026-09-26): `mkt_campaigns_list.category` + unnested `secondary_categories`, `directory_category_enrichment.category_name`, and `mkt_intelligence_profiles.category_name` (`status='active'`; `__`-prefixed sentinels excluded by key AND name — location packets reuse `directory_category_enrichment` with `category_key='__location__'`). These are operator-typed labels that already name live enriched category pages — `GET /api/public/directory/places` LEFT JOINs `platform_categories` and falls back to a name-derived slug — so a candidate matching one IS known even without a `platform_categories` row. `CategoryVocabularyService.isKnownLabel` already counted them toward the union; injecting them made the prompt agree with the backstop (§4.6).
 
-The two lists are rendered as **separate sections** (§4.2) that partition the union: a registered label that already matches a directory name (case-insensitive, trimmed) is **excluded from the registered section** — it is already covered by "known". The directory list's casing always wins on overlap. This is the same merge `DirectoryCategorySelectorAdapter` performs for the operator dropdown (`seen` set of `name.trim().toLowerCase()`, directory first).
+The lists are rendered as **separate sections** (§4.2) that partition the union: a label matching an earlier list (case-insensitive, trimmed) is **excluded from later sections** — it is already covered. The directory list's casing always wins on overlap. The directory/registered partition is the same merge `DirectoryCategorySelectorAdapter` performs for the operator dropdown (`seen` set of `name.trim().toLowerCase()`, directory first); the supplement list dedupes against both.
 
-`is_known_category = true` therefore means "the label appears in EITHER section" — the same union the claim-side abuse gate uses (`DirectoryClaimService.applyOwnerVerification`, which computes `platform_categories ∪ mkt_service_categories_list` — note that query omits `is_active` on `platform_categories`; the new reader must include it to match the dropdown).
+`is_known_category = true` therefore means "the label appears in ANY section" — the same union the claim-side abuse gate uses (`DirectoryClaimService.applyOwnerVerification`, which computes `platform_categories ∪ mkt_service_categories_list` — note that query omits `is_active` on `platform_categories`; the new reader must include it to match the dropdown).
 
 **Minimal variant:** if merging the sink list is undesirable for v1, inject `platform_categories` alone. The critical fix is that *some* real vocabulary reaches the prompt. Merging is recommended because it makes the two sides agree exactly.
 
 ### 4.2 Block format
 
-New formatter alongside the existing ones in `MarketContextBindingFormatters.ts`, e.g. `formatKnownCategoryVocabulary(labels: string[], registeredLabels: string[]): string`.
+New formatter alongside the existing ones in `MarketContextBindingFormatters.ts`: `formatKnownCategoryVocabulary(directoryLabels: string[], registeredLabels: string[], supplementLabels: string[] = []): string`. It shares the `partitionCategoryVocabulary` dedupe/partition helper with the enrichment formatter (`formatEnrichmentCategoryVocabulary`).
 
-Shape (counts are dynamic — interpolate `labels.length`, never a literal 414):
+Shape (counts are dynamic — interpolate `directory.length`, never a literal 414):
 
 ```
 === KNOWN CATEGORY VOCABULARY (platform directory shelves) ===
 
-The platform maintains a directory vocabulary of {N} category labels. These are
-the shelves that already exist as public directory pages and that operators can
-select on every category-consuming surface.
+PLATFORM GOAL: this directory exists to make the PHYSICAL SHELVES of
+independent brick-and-mortar retailers visible to customers who walk
+through the door. The vocabulary is therefore shelf-shaped by design —
+the {N} canonical category labels below are the storefront categories
+those retailers are shelved under, each a public directory page, not an
+abstract taxonomy node.
 
-Judge `is_known_category` against THIS list — not against the market shelves in
-the MARKET CONTEXT block (when that block is present). The two are different:
+Your candidate list propagates ONE prospect across shelves: the primary
+candidate becomes its canonical shelf and every accepted secondary files
+the same business on another public shelf. Choose labels for the shelves
+they create, not just for how well they describe the business.
 
-  - MARKET CONTEXT top/secondary categories = shelves observed to be active in
-    this city by a prior enrichment run. Use them for the population test.
-  - KNOWN CATEGORY VOCABULARY = the platform's registered directory labels.
-    Use this list to set `is_known_category`.
+Judge `is_known_category` against the lists below — not against the market
+shelves in the MARKET CONTEXT block (when that block is present). The two
+are different:
 
-If a candidate label appears in either list below, set is_known_category = true;
-otherwise set it to false so the operator is prompted to register it.
+  - MARKET CONTEXT top/secondary categories = shelves observed to be
+    active in this city by a prior enrichment run. Use them for the
+    population test.
+  - KNOWN CATEGORIES = the platform's canonical directory shelves.
+  - ENRICHED CATEGORIES = categories established by enrichment campaigns
+    and intelligence profiles; each names a live category page in the
+    ecosystem.
+  - REGISTERED LABELS = operator- and analyst-added labels, including
+    service packages that are not directory shelves.
+
+If a candidate label appears in ANY list below, set is_known_category =
+true; otherwise set it to false so the operator is prompted to register
+it.
 
 PRIMARY vs SECONDARY:
-  - primary_category is the business's canonical shelf. Prefer a listed label
-    whenever one fits — if your best-fit label is a close variant of a listed
-    label (singular vs plural, word order, "Shop" vs "Store"), use the listed
-    label. Propose a new primary label only when no listed label fits.
-  - Secondary candidates have more flexibility: freely propose adjacent
-    shelves, broader parent (super) categories, and narrower niche (sub)
-    categories the business legitimately belongs on — including labels not
-    in this list. Near-duplicate spellings of a listed shelf should still
-    resolve to the listed label.
+  - primary_category is the business's canonical shelf. Prefer a listed
+    label whenever one fits — if your best-fit label is a close variant
+    of a listed label (singular vs plural, word order, "Shop" vs
+    "Store"), use the listed label. Propose a new primary label only
+    when no listed label fits.
+  - Secondary candidates file the same business on additional shelves:
+    freely propose adjacent shelves, broader parent (super) categories,
+    and narrower niche (sub) categories the business legitimately
+    belongs on — including labels not in this list. Near-duplicate
+    spellings of a listed shelf should still resolve to the listed
+    label.
 
 KNOWN CATEGORIES ({N}):
-  <comma-separated labels, alphabetical>
+  <comma-separated labels, alphabetical — omitted when empty>
 
-REGISTERED LABELS (operator- and analyst-added; not all are directory shelves):
+ENRICHED CATEGORIES ({N}) — established by enrichment campaigns
+  and profiles; each names a live category page in the ecosystem:
+  <comma-separated labels, alphabetical — only labels not already in KNOWN
+  CATEGORIES or REGISTERED LABELS; the whole section is omitted when empty>
+
+REGISTERED LABELS ({N}) — operator- and analyst-added, not all are directory shelves:
   <comma-separated labels, alphabetical — only labels not already in KNOWN
   CATEGORIES; the whole section is omitted when empty>
 ```
@@ -269,14 +293,14 @@ Wording constraints:
 
 - **The market-block reference must be conditional.** The vocabulary is injected even when the campaign has no city (the MARKET CONTEXT block is then absent). Say "the MARKET CONTEXT block (when that block is present)" — not "the MARKET CONTEXT block above".
 - **REGISTERED LABELS are not called categories.** The sink also holds marketing service-package labels (§2.3) — describe them as registered labels only.
-- If both sources are empty, return `''` and log a warning — the template then falls back to its existing general-knowledge behaviour.
+- If all lists are empty, return `''` and log a warning — the template then falls back to its existing general-knowledge behaviour.
 
 ### 4.3 Placement
 
 Append the vocabulary block **after** the location block, in the same branch, so the analyst reads market context first and the vocabulary second — the block's wording depends on that ordering to disambiguate the two lists.
 
 ```ts
-const vocabBlock = formatKnownCategoryVocabulary(directoryLabels, registeredLabels);
+const vocabBlock = formatKnownCategoryVocabulary(directoryLabels, registeredLabels, supplementLabels);
 return {
   renderedPrompt: this.appendPromptSuffix(
     baseRendered
@@ -295,8 +319,9 @@ Replace the `=== KNOWN CATEGORIES ===` paragraph in `seed-category-identificatio
 ```
 === KNOWN CATEGORIES ===
 Where a KNOWN CATEGORY VOCABULARY block is present in this prompt, match the
-business against that list and set is_known_category accordingly. Where the
-block is absent, fall back to general knowledge of common category labels.
+business against its lists (KNOWN CATEGORIES, ENRICHED CATEGORIES, REGISTERED
+LABELS) and set is_known_category accordingly. Where the block is absent,
+fall back to general knowledge of common category labels.
 
 Primary vs secondary: primary_category is the business's canonical shelf —
 prefer a listed label whenever one fits and propose a new label only when no
@@ -307,6 +332,10 @@ mark those is_known_category = false and the operator can register them with
 one click.
 ```
 
+(The `ENRICHED CATEGORIES` list name was added 2026-09-26 alongside the supplement injection.)
+
+The `=== DIRECTORY HOSTING CONTEXT ===` section also opens with the mission + propagation framing (added 2026-09-26): the platform exists to make the physical shelves of independent brick-and-mortar retailers visible to walk-in customers, and the candidate list propagates ONE business across shelves — so the mission framing survives even when the vocabulary block is absent (empty vocabulary → no block).
+
 Add `known_categories` to the template's `variables` metadata array (informational — the actual injection is handled by the render path, mirroring the pattern used by `seed-profile-repair-issue-briefings.ts`).
 
 ### 4.5 Prompt budget
@@ -315,7 +344,7 @@ Add `known_categories` to the template's `variables` metadata array (information
 
 - labels only — no descriptions, slugs, emoji, or product counts
 - one comma-separated list, alphabetical
-- measured against the live DB (local): **414 directory + 10 registered labels → 9,447 chars ≈ ~2.4k tokens**
+- measured against the live DB (local): **414 directory + 10 registered labels → 9,447 chars ≈ ~2.4k tokens** (supplement labels add a small third list — same per-label cost)
 
 If the directory list grows materially (say, past ~800 labels), revisit — consider injecting only labels whose first letter matches the business's name, or a two-pass approach (match, then confirm).
 
@@ -358,11 +387,11 @@ if (!parsed.is_known) {
 ## 5. Implementation tasks
 
 - [ ] Add `CategoryVocabularyService` (`apps/api/src/services/CategoryVocabularyService.ts`) — singleton `BaseService`, 5-minute TTL mirroring `MarketContextLoader`:
-  - `loadVocabulary(ctx?)` → `{ directoryLabels: string[]; registeredLabels: string[] }` — two **independent** try/catch reads (`platform_categories` names `orderBy name asc`; `mkt_service_categories_list` labels via `MarketingServiceCategoryService.listCategories()`, which rethrows — catch locally). Per-source failure degrades that source to `[]`, never throws.
+  - `loadVocabulary(ctx?)` → `{ directoryLabels: string[]; registeredLabels: string[]; supplementLabels: string[] }` — **independent** try/catch reads per source (`platform_categories` names `orderBy name asc`; `mkt_service_categories_list` labels via `MarketingServiceCategoryService.listCategories()`, which rethrows — catch locally; supplement union via `$queryRaw` across the enrichment ecosystem, `__`-sentinels excluded). Per-source failure degrades that source to `[]`, never throws.
   - `isKnownLabel(label, ctx?)` → boolean — case-insensitive trimmed membership over the union (drives the §4.6 backstop).
   - `resetCache()` for tests.
   - Do NOT reuse `PlatformCategoryService.getCategories()` as-is — its `inventory_items` groupBy is wasted work here.
-- [ ] Add `formatKnownCategoryVocabulary(directoryLabels, registeredLabels)` to `apps/api/src/services/intelligence/MarketContextBindingFormatters.ts` — dynamic counts, conditional market-block reference, registered section pre-deduped against the directory list, `''` when both empty.
+- [ ] Add `formatKnownCategoryVocabulary(directoryLabels, registeredLabels, supplementLabels)` to `apps/api/src/services/intelligence/MarketContextBindingFormatters.ts` — dynamic counts, conditional market-block reference, registered/supplement sections pre-deduped against earlier lists, `''` when all empty.
 - [ ] Wire both into the `outputSchemaName === 'category_identification'` branch of `MarketingExecutionService`, appended after the location block; log label counts on inject, warn on empty.
 - [ ] Degrade to empty + warn per-source; never block the render.
 - [ ] Add the §4.6 backstop to `POST /:id/category-identification/act` in `routes/marketing-ops.ts` (`isKnownLabel` check before `upsertCategory`; fail-open to flag behaviour on lookup error; warn on `value` collision with a different label).
@@ -379,17 +408,18 @@ if (!parsed.is_known) {
 
 **Unit — formatter**
 
-- Renders both lists when both are present
-- Renders the directory list alone when the sink is empty
-- Returns `''` when both are empty
-- Registered section excludes labels already in the directory list (case-insensitive, trimmed) and preserves directory-list casing on overlap
+- Renders all sections with dynamic counts when all lists are present
+- Renders the directory list alone when the other lists are empty; renders the supplement list alone likewise
+- Returns `''` when all lists are empty
+- Registered section excludes labels already in the directory list; supplement section excludes labels already in either earlier list (case-insensitive, trimmed) and preserves directory-list casing on overlap
+- PLATFORM GOAL preamble and one-prospect-across-shelves framing are present
 - Does not emit descriptions, slugs, or counts
 - Counts are interpolated (`{N}`), not hardcoded
 - Copy does not claim a MARKET CONTEXT block exists (campaign may have no city)
 
 **Unit — vocabulary service**
 
-- `loadVocabulary` returns both lists; per-source failure degrades that source to `[]` without throwing (mock `listCategories()` to reject — it rethrows by design)
+- `loadVocabulary` returns all lists; per-source failure degrades that source to `[]` without throwing (mock `listCategories()` to reject — it rethrows by design)
 - `isKnownLabel` matches case-insensitively on the trimmed union
 - Cache serves repeat calls within the TTL; `resetCache()` clears
 
