@@ -610,3 +610,118 @@ describe('deriveBusinessCampaign', () => {
     expect(createCall.data.address_line1).toBeNull();
   });
 });
+
+describe('promoteIdentifiedCategory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const businessCampaign = (overrides: any = {}) => ({
+    id: 'mcamp-biz-1',
+    scope: 'business',
+    business_name: 'Raja Bazaar',
+    category: 'Middle Eastern Grocery Store',
+    secondary_categories: ['Indian Grocery Store'],
+    ...overrides,
+  });
+
+  it('promotes the candidate to primary and demotes the incumbent to the front of secondaries', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(businessCampaign());
+    mockCampaignsList.update.mockImplementation(({ data }: any) =>
+      Promise.resolve(businessCampaign(data)));
+
+    const result = await MarketingCampaignService.promoteIdentifiedCategory(
+      'mcamp-biz-1',
+      'Halal Grocery Store',
+    );
+
+    expect(result.registeredAs).toBe('primary');
+    expect(result.demotedPrimary).toBe('Middle Eastern Grocery Store');
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: 'mcamp-biz-1' },
+      data: {
+        category: 'Halal Grocery Store',
+        secondary_categories: ['Middle Eastern Grocery Store', 'Indian Grocery Store'],
+      },
+    });
+  });
+
+  it('removes the promoted label from secondaries when it was already filed there', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(businessCampaign({
+      secondary_categories: ['Halal Grocery Store', 'Indian Grocery Store'],
+    }));
+    mockCampaignsList.update.mockImplementation(({ data }: any) => Promise.resolve(data));
+
+    const result = await MarketingCampaignService.promoteIdentifiedCategory(
+      'mcamp-biz-1',
+      'halal grocery store', // case-insensitive match against the secondary slot
+    );
+
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: 'mcamp-biz-1' },
+      data: {
+        category: 'halal grocery store',
+        secondary_categories: ['Middle Eastern Grocery Store', 'Indian Grocery Store'],
+      },
+    });
+    expect(result.demotedPrimary).toBe('Middle Eastern Grocery Store');
+  });
+
+  it('returns already_present without writing when the label is already primary', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(businessCampaign());
+
+    const result = await MarketingCampaignService.promoteIdentifiedCategory(
+      'mcamp-biz-1',
+      'middle eastern grocery store',
+    );
+
+    expect(result.registeredAs).toBe('already_present');
+    expect(result.demotedPrimary).toBeNull();
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('sets primary directly when the slot is empty', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(businessCampaign({
+      category: null,
+      secondary_categories: ['Halal Grocery Store'],
+    }));
+    mockCampaignsList.update.mockImplementation(({ data }: any) => Promise.resolve(data));
+
+    const result = await MarketingCampaignService.promoteIdentifiedCategory(
+      'mcamp-biz-1',
+      'Halal Grocery Store',
+    );
+
+    expect(result.demotedPrimary).toBeNull();
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: 'mcamp-biz-1' },
+      data: { category: 'Halal Grocery Store', secondary_categories: [] },
+    });
+  });
+
+  it('refuses when secondaries are full and the label is not among them', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(businessCampaign({
+      secondary_categories: Array.from({ length: 9 }, (_, i) => `Sec ${i}`),
+    }));
+
+    await expect(
+      MarketingCampaignService.promoteIdentifiedCategory('mcamp-biz-1', 'Halal Grocery Store'),
+    ).rejects.toThrow(/secondary_categories is full/);
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('promotes at cap when the label already holds a secondary slot (frees one)', async () => {
+    const secs = Array.from({ length: 9 }, (_, i) => `Sec ${i}`);
+    secs[3] = 'Halal Grocery Store';
+    mockCampaignsList.findUnique.mockResolvedValue(businessCampaign({ secondary_categories: secs }));
+    mockCampaignsList.update.mockImplementation(({ data }: any) => Promise.resolve(data));
+
+    await MarketingCampaignService.promoteIdentifiedCategory('mcamp-biz-1', 'Halal Grocery Store');
+
+    const call = mockCampaignsList.update.mock.calls[0][0];
+    expect(call.data.category).toBe('Halal Grocery Store');
+    expect(call.data.secondary_categories).toHaveLength(9);
+    expect(call.data.secondary_categories[0]).toBe('Middle Eastern Grocery Store');
+    expect(call.data.secondary_categories).not.toContain('Halal Grocery Store');
+  });
+});

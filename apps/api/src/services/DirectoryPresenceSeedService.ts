@@ -2261,25 +2261,38 @@ class DirectoryPresenceSeedService {
       throw new Error('incomplete_nap');
     }
 
-    // Idempotency: return an existing primary-linked seed
+    // Idempotency — SHELF-AWARE. A seed is a child of the campaign, and the
+    // child relationship is per shelf filing: when the campaign's primary
+    // category moved since seeding (cat-id Promote swap), the prior seed
+    // keeps its old filing and this call births the SUCCESSOR seed for the
+    // new shelf — the caller then suppresses the old child so exactly one
+    // seed per campaign is visible/claimable. Only a live linked seed whose
+    // listing is ALREADY filed under the current primary short-circuits the
+    // create; suppressed children don't count (they're off every public
+    // surface — a suppressed covering seed must not silently block rebirth).
+    const campaignPrimaryLower = (campaign.category ?? '').trim().toLowerCase();
     const existing = await prisma.$queryRaw<any[]>`
-      SELECT dscl.seed_id, dps.listing_id, dps.tenant_id, dl.slug, dl.is_published
+      SELECT dscl.seed_id, dps.listing_id, dps.tenant_id, dl.slug, dl.is_published,
+             dl.primary_category
       FROM directory_seed_campaign_links dscl
       JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dscl.campaign_id = ${campaignId} AND dscl.link_role = 'primary'
-      LIMIT 1
+        AND dps.status IS DISTINCT FROM 'suppressed'
     `;
-    if (existing[0]) {
+    const covering = existing.find(
+      (r) => (r.primary_category ?? '').trim().toLowerCase() === campaignPrimaryLower,
+    );
+    if (covering) {
       return {
-        seedId: existing[0].seed_id,
-        listingId: existing[0].listing_id,
-        tenantId: existing[0].tenant_id,
-        slug: existing[0].slug,
-        publicUrl: `/place/${existing[0].slug}`,
+        seedId: covering.seed_id,
+        listingId: covering.listing_id,
+        tenantId: covering.tenant_id,
+        slug: covering.slug,
+        publicUrl: `/place/${covering.slug}`,
         created: false,
         seoEnriched: false,
-        published: !!existing[0].is_published,
+        published: !!covering.is_published,
       };
     }
 
@@ -2347,7 +2360,11 @@ class DirectoryPresenceSeedService {
     const campaignSecondaryRaw = Array.isArray(campaign.secondary_categories)
       ? campaign.secondary_categories.map((c: any) => String(c).trim()).filter(Boolean)
       : [];
-    const campaignPrimaryLower = (campaign.category ?? '').toLowerCase();
+    // Post-swap rebirth: the successor's secondaries mirror the campaign's
+    // list verbatim — the demoted incumbent primary sits among them, so the
+    // single visible seed still covers BOTH shelves (primary card on the
+    // new shelf, secondary filing on the old one). The suppressed child is
+    // untouched — it keeps its seed-time filing as the audit record.
     const campaignSecondary = campaignSecondaryRaw
       .filter((c: string) => c.toLowerCase() !== campaignPrimaryLower)
       .slice(0, 9);

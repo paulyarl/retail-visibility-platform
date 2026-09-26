@@ -5342,7 +5342,7 @@ class MarketingOpsService extends AdminApiSingleton {
   async categoryIdentificationAct(campaignId: string, input: {
     category_label: string;
     is_known: boolean;
-    destination: 'queue' | 'verify' | 'campaign' | 'secondary';
+    destination: 'queue' | 'verify' | 'campaign' | 'secondary' | 'primary';
     business_name: string;
     city?: string;
     state?: string;
@@ -5354,6 +5354,10 @@ class MarketingOpsService extends AdminApiSingleton {
     category_added: boolean;
     category_label: string;
     registered_as?: 'primary' | 'secondary' | 'already_present';
+    demoted_primary?: string | null;
+    replacement_seed?: { seedId: string; listingId: string; slug: string } | null;
+    retired_seed_ids?: string[];
+    campaign?: { category?: string | null; secondary_categories?: string[] | null } | null;
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${campaignId}/category-identification/act`,
@@ -5378,6 +5382,10 @@ class MarketingOpsService extends AdminApiSingleton {
       category_added: data?.category_added ?? false,
       category_label: data?.category_label ?? input.category_label,
       registered_as: data?.registered_as,
+      demoted_primary: data?.demoted_primary,
+      replacement_seed: data?.replacement_seed ?? null,
+      retired_seed_ids: data?.retired_seed_ids ?? [],
+      campaign: data?.campaign ?? null,
     };
   }
 

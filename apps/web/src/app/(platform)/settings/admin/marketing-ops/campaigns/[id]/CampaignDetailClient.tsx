@@ -2006,7 +2006,10 @@ export default function CampaignDetailClient({
                                   >
                                     seed
                                   </Link>
-                                  {seed.publicUrl && (
+                                  {/* Public preview only for live seeds — a
+                                      suppressed (retired) child's /place page
+                                      is off every public surface. */}
+                                  {seed.publicUrl && seed.status !== 'suppressed' && (
                                     <>
                                       <span className="text-gray-300 dark:text-neutral-600">·</span>
                                       <a
@@ -2096,6 +2099,7 @@ export default function CampaignDetailClient({
                           campaignId={campaignId}
                           currentCategory={campaign.category}
                           currentSecondaryCategories={campaign.secondary_categories ?? []}
+                          campaignScope={campaign.scope}
                           onSynced={fetchCampaign}
                         />
                       ) : audit.platform === 'gold_standard_scan' && audit.audit_data ? (

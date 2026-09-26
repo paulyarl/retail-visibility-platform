@@ -2945,6 +2945,83 @@ export class MarketingCampaignService extends BaseService {
     }
   }
 
+  /**
+   * Promote an identified category to the campaign's primary slot — the
+   * cat-id "recommended" action.
+   *
+   * The incumbent primary is NOT dropped: it demotes into
+   * secondary_categories (front of the list) so the prospect keeps every
+   * shelf it belongs on — PG sweep engagement and its enrichments are
+   * preserved. The promoted label likewise leaves secondary_categories
+   * when it was already filed there.
+   *
+   * Refuses when the secondary slots are already full and the promoted
+   * label isn't among them — retaining all categories would require an
+   * 11th slot the schema doesn't have. The operator frees a slot first.
+   */
+  async promoteIdentifiedCategory(
+    campaignId: string,
+    categoryLabel: string,
+    ctx?: RequestCtx,
+  ): Promise<{ campaign: any; registeredAs: 'primary' | 'already_present'; demotedPrimary: string | null }> {
+    const label = categoryLabel.trim();
+    if (!label) {
+      throw new ValidationError('category_label is required');
+    }
+
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+      });
+      if (!campaign) {
+        throw new NotFoundError(`Campaign ${campaignId} not found`);
+      }
+
+      const primary = (campaign.category ?? '').trim();
+      const secondary = ((campaign.secondary_categories as string[] | null) ?? [])
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+      if (primary && eq(primary, label)) {
+        return { campaign, registeredAs: 'already_present', demotedPrimary: null };
+      }
+
+      // Demoted incumbent first — it was the canonical shelf, so it keeps
+      // the top secondary slot; the promoted label drops out of the list.
+      const demoted: string[] = [];
+      for (const c of [primary, ...secondary]) {
+        if (!c || eq(c, label) || demoted.some((x) => eq(x, c))) continue;
+        demoted.push(c);
+      }
+      if (demoted.length > MAX_SECONDARY_CATEGORIES) {
+        throw new ValidationError(
+          `secondary_categories is full (${MAX_SECONDARY_CATEGORIES}) — remove a secondary category before promoting "${label}"`,
+        );
+      }
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { category: label, secondary_categories: demoted },
+      });
+      logger.info('Identified category promoted to primary', ctx, {
+        campaignId,
+        category: label,
+        demotedPrimary: primary || null,
+      });
+      return { campaign: updated, registeredAs: 'primary', demotedPrimary: primary || null };
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      logger.error('Failed to promote identified category', ctx, {
+        error: (error as Error).message,
+        campaignId,
+        category: label,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   // ====================
   // STAGE TRANSITION
   // ====================

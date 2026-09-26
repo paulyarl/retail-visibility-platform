@@ -2161,13 +2161,16 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
 //      - "campaign" → deriveBusinessCampaign with category/city/state overrides
 //      - "secondary" → registerIdentifiedCategory on THIS campaign — fills the
 //        primary slot when empty, otherwise appends to secondary_categories
+//      - "primary"   → promoteIdentifiedCategory on THIS campaign — swaps the
+//        label into the primary slot and demotes the incumbent primary into
+//        secondary_categories (prospect keeps every shelf + its enrichments)
 // The operator never has to think "add category first, then queue" — the
 // destination action absorbs vocab registration as a precondition step.
 
 const categoryIdentificationActSchema = z.object({
   category_label: z.string().min(1).max(255),
   is_known: z.boolean(),
-  destination: z.enum(['queue', 'verify', 'campaign', 'secondary']),
+  destination: z.enum(['queue', 'verify', 'campaign', 'secondary', 'primary']),
   business_name: z.string().min(1).max(255),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
@@ -2414,6 +2417,111 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
           campaign: child,
           category_added: categoryAdded,
           category_label: categoryLabel,
+        },
+      });
+    }
+
+    if (parsed.destination === 'primary') {
+      // Promote the candidate to this campaign's primary category — the
+      // incumbent primary demotes into secondary_categories so the prospect
+      // retains every shelf assignment (and its enrichments), not just the
+      // newly promoted one. Business-scope only: on an aggregate scan
+      // campaign the category is the scan context, not a prospect shelf.
+      if (parent.scope !== 'business') {
+        return res.status(400).json({
+          success: false,
+          error: 'primary_promotion_requires_business_scope',
+        });
+      }
+      const promotion = await MarketingCampaignService.promoteIdentifiedCategory(
+        campaignId,
+        categoryLabel,
+        ctx,
+      );
+
+      // Post-seed propagation — RETIRE-AND-REPLACE, not co-visible siblings:
+      // a seed is a child of the campaign, but exactly ONE child is live per
+      // campaign so seed claim has a single source. When the campaign is
+      // already seeded, the prior child is suppressed (terminal — off every
+      // public surface, still linked for audit) and a successor seed is born
+      // under the new primary, mirroring the outgoing seed's publish state.
+      // Owner-facing seeds are left entirely alone: 'claimed' means the
+      // listing has an owner, 'invited' means a live claim token is in the
+      // wild — in both cases the prospect keeps its current filing.
+      let replacementSeed: { seedId: string; listingId: string; slug: string } | null = null;
+      let retiredSeedIds: string[] = [];
+      if (promotion.registeredAs === 'primary') {
+        try {
+          const linked = await prisma.$queryRaw<{ seed_id: string; status: string | null }[]>`
+            SELECT dscl.seed_id, dps.status
+            FROM directory_seed_campaign_links dscl
+            JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+            WHERE dscl.campaign_id = ${campaignId}
+              AND dscl.link_role = 'primary'
+          `;
+          const ownerFacing = linked.some(
+            (s) => s.status === 'claimed' || s.status === 'invited',
+          );
+          if (linked.length > 0 && !ownerFacing) {
+            const { default: DirectoryPresenceSeedService } =
+              await import('../services/DirectoryPresenceSeedService.js');
+            const seedCtx = {
+              actorType: 'user' as const,
+              actorId: (req as any).user?.userId || (req as any).user?.id,
+              ip: req.ip,
+              userAgent: req.get('User-Agent'),
+            };
+            // createFromCampaign's idempotency is shelf-aware AND ignores
+            // suppressed children: it only returns an existing seed when a
+            // LIVE linked listing already covers the campaign's current
+            // primary — otherwise it births the successor (created: true).
+            const created = await DirectoryPresenceSeedService.createFromCampaign(
+              campaignId,
+              { publish: linked.some((s) => s.status === 'published') },
+              seedCtx,
+            );
+            if (created.created) {
+              replacementSeed = {
+                seedId: created.seedId,
+                listingId: created.listingId,
+                slug: created.slug,
+              };
+              for (const s of linked) {
+                if (s.status !== 'suppressed') {
+                  await DirectoryPresenceSeedService.updateStatus(
+                    s.seed_id,
+                    'suppressed',
+                    seedCtx,
+                  );
+                  retiredSeedIds.push(s.seed_id);
+                }
+              }
+            }
+          }
+        } catch (seedErr) {
+          // Non-fatal — the promotion already committed; the operator can
+          // re-seed through the normal "Add to place listing" path.
+          logger.warn('category-identification/act: seed replacement failed (non-fatal)', ctx, {
+            error: (seedErr as Error).message,
+            campaignId,
+            categoryLabel,
+          });
+        }
+      }
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          kind: 'primary_promoted',
+          id: campaignId,
+          campaignId,
+          category_added: categoryAdded,
+          category_label: categoryLabel,
+          registered_as: promotion.registeredAs,
+          demoted_primary: promotion.demotedPrimary,
+          replacement_seed: replacementSeed,
+          retired_seed_ids: retiredSeedIds,
+          campaign: promotion.campaign,
         },
       });
     }

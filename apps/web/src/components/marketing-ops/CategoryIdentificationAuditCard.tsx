@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, Check, Inbox, PhoneCall, ArrowRight, AlertCircle, Tag } from 'lucide-react';
+import { Sparkles, Loader2, Check, Inbox, PhoneCall, ArrowRight, ArrowUp, AlertCircle, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Audit } from '@/services/MarketingOpsService';
@@ -24,6 +24,11 @@ import AuditImportMetadataBadge from './AuditImportMetadataBadge';
  *   - + Secondary  → registerIdentifiedCategory on THIS campaign — fills the
  *                    primary slot when empty, otherwise appends to
  *                    secondary_categories
+ *   - Promote      → promoteIdentifiedCategory on THIS campaign — swaps the
+ *                    candidate into the primary slot and demotes the incumbent
+ *                    primary into secondary_categories (no shelf is lost).
+ *                    Business-scope campaigns only — promoting an aggregate
+ *                    scan campaign's category would corrupt its scan context.
  *
  * When a candidate category is new (is_known_category=false), the composite
  * action also registers it in the service category vocab — the operator never
@@ -112,7 +117,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 };
 
-type ActionKind = 'queued' | 'verify' | 'campaign_created' | 'campaign_exists' | 'already_queued' | 'secondary_registered' | 'created';
+type ActionKind = 'queued' | 'verify' | 'campaign_created' | 'campaign_exists' | 'already_queued' | 'secondary_registered' | 'primary_promoted' | 'created';
 
 interface RowActionState {
   loading: boolean;
@@ -122,6 +127,9 @@ interface RowActionState {
     campaignId?: string;
     category_added?: boolean;
     registered_as?: 'primary' | 'secondary' | 'already_present';
+    demoted_primary?: string | null;
+    replacement_seed?: { seedId: string; listingId: string; slug: string } | null;
+    retired_seed_ids?: string[];
   };
   error?: string;
 }
@@ -131,17 +139,26 @@ export default function CategoryIdentificationAuditCard({
   campaignId,
   currentCategory,
   currentSecondaryCategories,
+  campaignScope,
   onSynced,
 }: {
   audit: Audit;
   campaignId: string;
   currentCategory?: string | null;
   currentSecondaryCategories?: string[];
+  /** Host campaign scope — Promote only renders for 'business' scope. */
+  campaignScope?: string | null;
   onSynced?: () => void;
 }) {
   const data = parseCategoryIdentification(audit);
   const router = useRouter();
   const [actionStates, setActionStates] = useState<Record<number, RowActionState>>({});
+  // Local overrides after a promote — the card reflects the swap instantly
+  // (onSynced refetches the campaign, which then re-feeds these props).
+  const [swappedCategory, setSwappedCategory] = useState<string | null | undefined>(undefined);
+  const [swappedSecondary, setSwappedSecondary] = useState<string[] | undefined>(undefined);
+  const effectiveCategory = swappedCategory !== undefined ? swappedCategory : currentCategory;
+  const effectiveSecondary = swappedSecondary ?? currentSecondaryCategories;
 
   if (!data) return null;
 
@@ -151,7 +168,7 @@ export default function CategoryIdentificationAuditCard({
   const handleAction = async (
     idx: number,
     candidate: CategoryIdentificationData['candidate_categories'][number],
-    destination: 'queue' | 'verify' | 'campaign' | 'secondary',
+    destination: 'queue' | 'verify' | 'campaign' | 'secondary' | 'primary',
   ) => {
     setActionStates((prev) => ({ ...prev, [idx]: { loading: true } }));
     try {
@@ -175,17 +192,27 @@ export default function CategoryIdentificationAuditCard({
             campaignId: result.campaignId,
             category_added: result.category_added,
             registered_as: result.registered_as,
+            demoted_primary: result.demoted_primary,
+            replacement_seed: result.replacement_seed ?? null,
+            retired_seed_ids: result.retired_seed_ids ?? [],
           },
         },
       }));
 
+      // Apply the swap to local state immediately so the Primary/Secondary
+      // badges re-render without waiting for the campaign refetch.
+      if (kind === 'primary_promoted' && result.campaign) {
+        setSwappedCategory(result.campaign.category ?? null);
+        setSwappedSecondary(result.campaign.secondary_categories ?? []);
+      }
       // Navigate to the spawned campaign if that was the action.
       if (kind === 'campaign_created' && result.id) {
         router.push(`/settings/admin/marketing-ops/campaigns/${result.id}`);
       }
-      // Secondary registration mutates this campaign's category slots —
-      // refresh so the header's secondary-category chips update.
-      if (kind === 'secondary_registered') {
+      // Secondary registration / primary promotion mutates this campaign's
+      // category slots — refresh so the header's category chips and this
+      // card's Primary/Secondary badges re-render with the swap.
+      if (kind === 'secondary_registered' || kind === 'primary_promoted') {
         onSynced?.();
       }
     } catch (err: any) {
@@ -245,8 +272,8 @@ export default function CategoryIdentificationAuditCard({
             const state = actionStates[i];
             const isPrimary = c.category === data.primary_category;
             const isDone = !!state?.result;
-            const alreadyPrimary = eqLabel(c.category, currentCategory);
-            const alreadySecondary = (currentSecondaryCategories ?? []).some((s) => eqLabel(s, c.category));
+            const alreadyPrimary = eqLabel(c.category, effectiveCategory);
+            const alreadySecondary = (effectiveSecondary ?? []).some((s) => eqLabel(s, c.category));
             const onCampaign = alreadyPrimary || alreadySecondary;
             return (
               <div
@@ -296,10 +323,15 @@ export default function CategoryIdentificationAuditCard({
                         {state!.result!.kind === 'verify' && 'Sent to verify queue'}
                         {state!.result!.kind === 'already_queued' && 'Already queued'}
                         {state!.result!.kind === 'secondary_registered' && 'Category registered on campaign'}
+                        {state!.result!.kind === 'primary_promoted' && 'Promoted to primary category'}
                         {state!.result!.category_added && ' · added to category vocab'}
                         {state!.result!.registered_as === 'primary' && ' · set as primary category'}
                         {state!.result!.registered_as === 'secondary' && ' · added as secondary category'}
                         {state!.result!.registered_as === 'already_present' && ' · category already on campaign'}
+                        {state!.result!.demoted_primary && ` · ${state!.result!.demoted_primary} moved to secondary`}
+                        {state!.result!.replacement_seed && ' · replacement seed created'}
+                        {(state!.result!.retired_seed_ids?.length ?? 0) > 0 &&
+                          ` · ${state!.result!.retired_seed_ids!.length} prior seed${state!.result!.retired_seed_ids!.length === 1 ? '' : 's'} retired`}
                       </span>
                     </div>
                     {state!.result!.kind === 'campaign_exists' && state!.result!.campaignId && (
@@ -349,6 +381,17 @@ export default function CategoryIdentificationAuditCard({
                       {state?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
                       Spawn campaign
                     </button>
+                    {!alreadyPrimary && campaignScope === 'business' && (
+                      <button
+                        onClick={() => handleAction(i, c, 'primary')}
+                        disabled={state?.loading}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded hover:bg-cyan-100 dark:text-cyan-300 dark:bg-cyan-900/20 dark:border-cyan-700 dark:hover:bg-cyan-900/40 disabled:opacity-50"
+                        title="Promote to primary — the current primary moves to secondary categories (no shelf is lost)"
+                      >
+                        {state?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowUp className="w-3 h-3" />}
+                        Promote
+                      </button>
+                    )}
                     {onCampaign ? (
                       <span
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500"
