@@ -18,6 +18,9 @@ import {
   computeSeedConfidence,
   discoveryDoubtMarkers,
   discoveryOperationalStatus,
+  seedTiltForSignal,
+  loadSignalSeedWiring,
+  type SignalSeedWiring,
 } from '../discovery-verdict';
 
 describe('deriveDiscoverySignals', () => {
@@ -291,5 +294,171 @@ describe('discoveryOperationalStatus', () => {
     expect(discoveryOperationalStatus(['INT_MULTISOURCE_IDENTITY'])).toBeNull();
     expect(discoveryOperationalStatus([])).toBeNull();
     expect(discoveryOperationalStatus(null)).toBeNull();
+  });
+});
+
+// ─── Registry playbook wiring (migration-308 pattern) ────────────────────
+//
+// The qualification-lane mirror of triage's signal playbook preferences: a
+// detected signal's declared primary_playbook/secondary_playbook resolves to
+// the routed playbook's archetype, which tilts the signal's seed semantics —
+// visibility-gap playbooks (A4/A6/A7) corroborate the seed's purpose, a
+// listing-drift playbook (A3) expresses identity doubt, reputation arcs
+// (A1/A2/A5) are neutral.
+
+describe('signal seed wiring (registry playbook preferences)', () => {
+  /** Build a wiring row as loadSignalSeedWiring resolves it. */
+  const wired = (
+    code: string,
+    primary: { pb: string; archetype: string } | null,
+    secondary: { pb: string; archetype: string } | null = null,
+  ): SignalSeedWiring => ({
+    code,
+    primaryPlaybook: primary?.pb ?? null,
+    secondaryPlaybook: secondary?.pb ?? null,
+    primaryArchetype: primary?.archetype ?? null,
+    secondaryArchetype: secondary?.archetype ?? null,
+  });
+
+  describe('seedTiltForSignal', () => {
+    it('maps routed archetypes to tilts — primary wins outright', () => {
+      expect(seedTiltForSignal(wired('INT_X', { pb: 'PB-08', archetype: 'A7' }))).toBe('visibility');
+      expect(seedTiltForSignal(wired('INT_X', { pb: 'PB-07', archetype: 'A6' }))).toBe('visibility');
+      expect(seedTiltForSignal(wired('INT_X', { pb: 'PB-04', archetype: 'A4' }))).toBe('visibility');
+      expect(seedTiltForSignal(wired('INT_X', { pb: 'PB-02', archetype: 'A3' }))).toBe('doubt');
+      expect(seedTiltForSignal(wired('INT_X', { pb: 'PB-01', archetype: 'A1' }))).toBe('neutral');
+    });
+
+    it('a secondary-only route only flags doubt — visibility fallback scores nothing', () => {
+      expect(seedTiltForSignal(wired('INT_X', null, { pb: 'PB-02', archetype: 'A3' }))).toBe('doubt');
+      expect(seedTiltForSignal(wired('INT_X', null, { pb: 'PB-08', archetype: 'A7' }))).toBeNull();
+    });
+
+    it('returns null without wiring — callers fall back to canonical defaults', () => {
+      expect(seedTiltForSignal(undefined)).toBeNull();
+      expect(seedTiltForSignal(wired('INT_X', null, null))).toBeNull();
+    });
+  });
+
+  describe('computeSeedConfidence with signal wiring', () => {
+    const strong = {
+      identityConfidence: 'high',
+      categoryFit: 'verified',
+      locationStatus: 'inside_city',
+      discoverySignals: ['INT_VERTICAL_SOURCE_DISCOVERY'],
+    };
+
+    it('a visibility-tilted route adds a positive factor', () => {
+      const plain = computeSeedConfidence(strong);
+      const wiredResult = computeSeedConfidence({
+        ...strong,
+        signalWiring: [wired('INT_VERTICAL_SOURCE_DISCOVERY', { pb: 'PB-08', archetype: 'A7' })],
+      });
+      expect(wiredResult.score).toBe(plain.score + 5);
+      expect(wiredResult.factors).toContainEqual({
+        label: 'INT_VERTICAL_SOURCE_DISCOVERY → PB-08 (visibility gap)',
+        delta: 5,
+      });
+    });
+
+    it('a drift-tilted route subtracts', () => {
+      const result = computeSeedConfidence({
+        ...strong,
+        signalWiring: [wired('INT_VERTICAL_SOURCE_DISCOVERY', { pb: 'PB-02', archetype: 'A3' })],
+      });
+      expect(result.factors).toContainEqual({
+        label: 'INT_VERTICAL_SOURCE_DISCOVERY → PB-02 (identity-drift route)',
+        delta: -5,
+      });
+    });
+
+    it('declared wiring overrides the canonical term for that code', () => {
+      const result = computeSeedConfidence({
+        discoverySignals: ['INT_SINGLE_SOURCE'],
+        signalWiring: [wired('INT_SINGLE_SOURCE', { pb: 'PB-08', archetype: 'A7' })],
+      });
+      // The canonical 'single source only' −10 is suppressed; the declared
+      // visibility route contributes its own +5.
+      expect(result.factors).not.toContainEqual({ label: 'single source only', delta: -10 });
+      expect(result.factors).toContainEqual({
+        label: 'INT_SINGLE_SOURCE → PB-08 (visibility gap)',
+        delta: 5,
+      });
+    });
+
+    it('a neutral route suppresses the canonical term entirely', () => {
+      const result = computeSeedConfidence({
+        discoverySignals: ['INT_ACTIVE_OPERATIONAL_EVIDENCE'],
+        signalWiring: [wired('INT_ACTIVE_OPERATIONAL_EVIDENCE', { pb: 'PB-01', archetype: 'A1' })],
+      });
+      expect(result.factors).not.toContainEqual({ label: 'operational evidence', delta: 10 });
+      expect(result.factors.every((f) => !f.label.includes('INT_ACTIVE'))).toBe(true);
+    });
+  });
+
+  describe('discoveryDoubtMarkers with signal wiring', () => {
+    it('flags a drift-routed signal as doubt — even an uncataloged code', () => {
+      const markers = discoveryDoubtMarkers({
+        discoverySignals: ['INT_SEASONAL_OPERATION'],
+        signalWiring: [wired('INT_SEASONAL_OPERATION', { pb: 'PB-02', archetype: 'A3' })],
+      });
+      expect(markers).toContain('route_int_seasonal_operation');
+    });
+
+    it('visibility and reputation routes add no doubt', () => {
+      const markers = discoveryDoubtMarkers({
+        discoverySignals: ['INT_X'],
+        signalWiring: [
+          wired('INT_X', { pb: 'PB-08', archetype: 'A7' }, { pb: 'PB-01', archetype: 'A1' }),
+        ],
+      });
+      expect(markers).toEqual([]);
+    });
+
+    it('canonical doubt is additive — a visibility route never un-flags it', () => {
+      const markers = discoveryDoubtMarkers({
+        discoverySignals: ['INT_SINGLE_SOURCE'],
+        signalWiring: [wired('INT_SINGLE_SOURCE', { pb: 'PB-08', archetype: 'A7' })],
+      });
+      expect(markers).toContain('single_source');
+      expect(markers).not.toContain('route_int_single_source');
+    });
+  });
+
+  describe('loadSignalSeedWiring', () => {
+    it('resolves declared prefs to playbook archetypes; skips unwired signals', async () => {
+      const fake = {
+        mkt_signal_registry: {
+          findMany: async () => [
+            { code: 'INT_SEASONAL_OPERATION', primary_playbook: 'PB-08', secondary_playbook: 'PB-02' },
+            { code: 'INT_NO_PREF', primary_playbook: null, secondary_playbook: null },
+          ],
+        },
+        mkt_playbook_catalog: {
+          findMany: async () => [
+            { code: 'PB-08', archetype: 'A7' },
+            { code: 'PB-02', archetype: 'A3' },
+          ],
+        },
+      };
+      const wiring = await loadSignalSeedWiring(fake, ['INT_SEASONAL_OPERATION', 'INT_NO_PREF']);
+      expect(wiring).toEqual([
+        {
+          code: 'INT_SEASONAL_OPERATION',
+          primaryPlaybook: 'PB-08',
+          secondaryPlaybook: 'PB-02',
+          primaryArchetype: 'A7',
+          secondaryArchetype: 'A3',
+        },
+      ]);
+    });
+
+    it('returns empty for no codes', async () => {
+      const fake = {
+        mkt_signal_registry: { findMany: async () => { throw new Error('should not be called'); } },
+        mkt_playbook_catalog: { findMany: async () => [] },
+      };
+      expect(await loadSignalSeedWiring(fake, [])).toEqual([]);
+    });
   });
 });

@@ -611,4 +611,56 @@ describe('assembleIdentityPacket — discovery lane (partial qualification)', ()
     expect(p.fields.flatMap((f) => f.sources).every((s) => !s.discovery)).toBe(true);
     expect(p.score.qcSignals.map((s) => s.code)).not.toContain('partial_lane');
   });
+
+  it('applies registry playbook wiring — a visibility-tilted route adds seed confidence', () => {
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        discoveryContext: discoveryContext({
+          discovery_signals: ['INT_VERTICAL_SOURCE_DISCOVERY'],
+        }),
+        // The registered signal declares PB-08 (A7 website gap) as its
+        // primary route — a visibility problem, which a seed fixes.
+        signalWiring: [
+          {
+            code: 'INT_VERTICAL_SOURCE_DISCOVERY',
+            primaryPlaybook: 'PB-08',
+            primaryArchetype: 'A7',
+          },
+        ],
+      }),
+    );
+    expect(p.seedConfidence?.factors).toContainEqual({
+      label: 'INT_VERTICAL_SOURCE_DISCOVERY → PB-08 (visibility gap)',
+      delta: 5,
+    });
+  });
+
+  it('treats a drift-routed signal as named doubt — caps the gate at earned', () => {
+    const p = assembleIdentityPacket(
+      base({
+        audit: null,
+        discoveryContext: discoveryContext(),
+        // The operator wired the multisource signal to a listing-drift
+        // playbook (A3) — declared routing expresses identity doubt.
+        signalWiring: [
+          {
+            code: 'INT_MULTISOURCE_IDENTITY',
+            primaryPlaybook: 'PB-02',
+            primaryArchetype: 'A3',
+          },
+        ],
+      }),
+    );
+    expect(p.seedConfidence?.factors).toContainEqual({
+      label: 'INT_MULTISOURCE_IDENTITY → PB-02 (identity-drift route)',
+      delta: -5,
+    });
+    expect(p.score.gate.guaranteed).toBe(true);
+    expect(p.score.gate.doubtCapped).toBe(true);
+    expect(p.score.gate.decision).toBe('earned');
+    expect(p.score.qcSignals.map((s) => s.code)).toContain(
+      'discovery_doubt_route_int_multisource_identity',
+    );
+  });
 });

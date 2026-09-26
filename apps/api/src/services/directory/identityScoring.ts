@@ -713,7 +713,11 @@ function collectQcSignals(
       signals.push({
         code: `discovery_doubt_${m}`,
         severity: 'warn',
-        message: DISCOVERY_DOUBT_MESSAGES[m] ?? `Discovery flagged ${m.replace(/_/g, ' ')}.`,
+        // route_<code> markers come from registry playbook wiring — the
+        // signal's declared route resolves to a listing-drift playbook.
+        message: m.startsWith('route_')
+          ? `Discovery signal ${m.slice('route_'.length).toUpperCase()} is registry-wired to a listing-drift playbook — the declared route expresses identity doubt.`
+          : DISCOVERY_DOUBT_MESSAGES[m] ?? `Discovery flagged ${m.replace(/_/g, ' ')}.`,
       });
     }
   }

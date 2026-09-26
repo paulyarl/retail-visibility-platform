@@ -29,7 +29,11 @@ import { addressParser } from '../lib/address-parser';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
-import { computeSeedConfidence } from './triage/discovery-verdict';
+import {
+  computeSeedConfidence,
+  loadSignalSeedWiring,
+  type SignalSeedWiring,
+} from './triage/discovery-verdict';
 import {
   normalizeCategoryKey,
   normalizeReferenceCity,
@@ -691,6 +695,21 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // corroboration (INT_*), category fit, location status, provenance
       // depth, NAP completeness, verification outcome. Computed at read —
       // always fresh, no stored column.
+      // Registry playbook wiring (migration-308 pattern) applies the declared
+      // route's tilt to signal terms — one prefetch over the union of codes,
+      // reused per entry. Non-fatal: canonical defaults still apply.
+      let queueSignalWiring: SignalSeedWiring[] = [];
+      try {
+        const queueSignalCodes = [...new Set(
+          (decorated as any[]).flatMap((d) =>
+            Array.isArray(d.discovery_signals) ? d.discovery_signals : []),
+        )];
+        if (queueSignalCodes.length > 0) {
+          queueSignalWiring = await loadSignalSeedWiring(this.prisma as any, queueSignalCodes);
+        }
+      } catch {
+        queueSignalWiring = [];
+      }
       for (const d of decorated as any[]) {
         const hasDiscoveryEvidence =
           d.source_kind === 'intelligence_seek'
@@ -713,6 +732,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
           hasPhone: !!(verifiedNap.phone ?? snapshot.phone),
           hasWebsite: !!(verifiedNap.website ?? snapshot.website),
           verificationOutcome: (d.verification as any)?.outcome ?? null,
+          signalWiring: queueSignalWiring,
         });
       }
 

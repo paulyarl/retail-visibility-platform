@@ -25,8 +25,10 @@ import {
   computeSeedConfidence,
   discoveryDoubtMarkers,
   discoveryOperationalStatus,
+  loadSignalSeedWiring,
   SEED_CONFIDENCE_TESTIMONY_BAR,
   type SeedConfidence,
+  type SignalSeedWiring,
 } from './triage/discovery-verdict';
 import IdentityEvidenceService, {
   type IdentityEvidenceRow,
@@ -192,6 +194,14 @@ export interface AssembleInput {
    * primary_category through the ordinary evidence model.
    */
   discoveryContext?: DiscoveryContext | null;
+  /**
+   * Registry playbook wiring for the context's discovery_signals (resolved
+   * via loadSignalSeedWiring in buildForCampaign). A declared playbook route
+   * overrides the canonical signal term in the seed-confidence meter and
+   * adds doubt markers when the route resolves to a listing-drift playbook.
+   * Partial lane only; absent → canonical defaults.
+   */
+  signalWiring?: SignalSeedWiring[] | null;
 }
 
 const PLATFORM_SOURCES: Array<{ key: string; name: string; tier: IdentitySourceTier; group: string }> = [
@@ -493,6 +503,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
       hasPhone: !!canonical.phone,
       hasWebsite: !!canonical.website,
       verificationOutcome: dc.verification_outcome ?? null,
+      signalWiring: input.signalWiring,
     });
     const testifies = seedConfidence.score >= SEED_CONFIDENCE_TESTIMONY_BAR;
     discovery = {
@@ -507,6 +518,7 @@ export function assembleIdentityPacket(input: AssembleInput): IdentityPacket {
         locationStatus: dc.location_status,
         identityConfidence: dc.identity_confidence,
         businessSeekPriority: dc.business_seek_priority,
+        signalWiring: input.signalWiring,
       }),
     };
     if (testifies) {
@@ -825,6 +837,29 @@ class IdentityPacketService {
       });
     }
 
+    // Re-validated at read — cheap defense mirroring the validation boundary
+    // at handoff (validateDiscoveryContext drops empty/malformed context).
+    const discoveryContext = validateDiscoveryContext(campaign?.discovery_context);
+
+    // Registry playbook wiring for the partial lane (migration-308 pattern —
+    // the qualification mirror of triage's signal preferences). Only fetched
+    // when the lane will actually deliberate: no real audit + a context that
+    // emits signal codes. Non-fatal — canonical defaults still apply.
+    let signalWiring: SignalSeedWiring[] = [];
+    if (!audit && discoveryContext?.discovery_signals?.length) {
+      try {
+        signalWiring = await loadSignalSeedWiring(
+          prisma as any,
+          discoveryContext.discovery_signals,
+        );
+      } catch (error) {
+        logger.warn('IdentityPacket: signal wiring lookup failed (non-fatal)', undefined, {
+          campaignId,
+          error: (error as Error).message,
+        });
+      }
+    }
+
     return assembleIdentityPacket({
       campaignId,
       campaign,
@@ -836,9 +871,8 @@ class IdentityPacketService {
       seed,
       seedDecision,
       signalWeights,
-      // Re-validated at read — cheap defense mirroring the validation boundary
-      // at handoff (validateDiscoveryContext drops empty/malformed context).
-      discoveryContext: validateDiscoveryContext(campaign?.discovery_context),
+      discoveryContext,
+      signalWiring,
     });
   }
 

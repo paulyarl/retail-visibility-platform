@@ -267,6 +267,13 @@ export interface SeedConfidenceInput {
   hasWebsite?: boolean | null;
   /** Resolved verification outcome, when the entry was verified. */
   verificationOutcome?: string | null;
+  /**
+   * Registry playbook wiring for the detected codes (loadSignalSeedWiring).
+   * A declared route overrides the canonical signal term below: visibility
+   * tilts add, doubt tilts subtract, neutral suppresses. Absent → canonical
+   * defaults only (queue/CI paths that never loaded the registry).
+   */
+  signalWiring?: SignalSeedWiring[] | null;
 }
 
 const CHAIN_OWNERSHIP = new Set(['national_chain', 'national_franchise', 'regional_chain']);
@@ -297,13 +304,39 @@ export function computeSeedConfidence(input: SeedConfidenceInput): SeedConfidenc
   else if (input.locationStatus === 'metro_area') add('location: metro_area', 2);
   else if (input.locationStatus === 'outside_market') add('location: outside_market', -40);
 
-  // Identity corroboration signals.
-  if (signals.has('INT_MULTISOURCE_IDENTITY') || signals.has('INT_MULTI_SOURCE_CONFIRMED')) {
+  // Identity corroboration signals — canonical defaults; a code carrying a
+  // declared registry preference is scored by its tilt instead (below).
+  const wiring = new Map((input.signalWiring ?? []).map((w) => [w.code, w]));
+  const unwired = (code: string) => seedTiltForSignal(wiring.get(code)) == null;
+
+  const multisourceCodes = ['INT_MULTISOURCE_IDENTITY', 'INT_MULTI_SOURCE_CONFIRMED'];
+  if (multisourceCodes.some((c) => signals.has(c) && unwired(c))) {
     add('multi-source identity', 10);
   }
-  if (signals.has('INT_SINGLE_SOURCE')) add('single source only', -10);
-  if (signals.has('INT_ACTIVE_OPERATIONAL_EVIDENCE')) add('operational evidence', 10);
-  if (signals.has('INT_RECENT_BUSINESS_EVIDENCE')) add('recent business evidence', 5);
+  if (signals.has('INT_SINGLE_SOURCE') && unwired('INT_SINGLE_SOURCE')) {
+    add('single source only', -10);
+  }
+  if (signals.has('INT_ACTIVE_OPERATIONAL_EVIDENCE') && unwired('INT_ACTIVE_OPERATIONAL_EVIDENCE')) {
+    add('operational evidence', 10);
+  }
+  if (signals.has('INT_RECENT_BUSINESS_EVIDENCE') && unwired('INT_RECENT_BUSINESS_EVIDENCE')) {
+    add('recent business evidence', 5);
+  }
+
+  // Declared playbook wiring (the migration-308 pattern applied to seed
+  // qualification): the routed playbook's archetype sets the tilt —
+  // visibility-gap routes corroborate the seed's purpose (+), listing-drift
+  // routes express identity doubt (−), reputation routes are neutral and
+  // suppress the canonical term.
+  for (const code of signals) {
+    const w = wiring.get(code);
+    const tilt = seedTiltForSignal(w);
+    if (!tilt) continue;
+    const route = w!.primaryPlaybook ?? w!.secondaryPlaybook ?? 'registry';
+    if (tilt === 'visibility') add(`${code} → ${route} (visibility gap)`, 5);
+    else if (tilt === 'doubt') add(`${code} → ${route} (identity-drift route)`, -5);
+    // 'neutral' — the declared route suppresses the canonical term, adds none.
+  }
 
   // Provenance depth — independent corroborating sources.
   const provCount = input.provenanceCount ?? 0;
@@ -382,6 +415,13 @@ export function discoveryDoubtMarkers(input: {
   locationStatus?: string | null;
   identityConfidence?: string | null;
   businessSeekPriority?: string | null;
+  /**
+   * Registry playbook wiring (loadSignalSeedWiring). A signal whose declared
+   * route resolves to a listing-drift playbook adds a `route_<code>` marker —
+   * the preference expresses identity doubt even when the code itself is
+   * uncataloged. Visibility/neutral routes add none.
+   */
+  signalWiring?: SignalSeedWiring[] | null;
 }): string[] {
   const markers = new Set<string>();
   if (input.identityConfidence === 'low') markers.add('identity_confidence_low');
@@ -391,6 +431,12 @@ export function discoveryDoubtMarkers(input: {
   for (const code of input.discoverySignals ?? []) {
     const marker = DOUBT_DISCOVERY_SIGNALS[code];
     if (marker) markers.add(marker);
+  }
+  const wiringByCode = new Map((input.signalWiring ?? []).map((w) => [w.code, w]));
+  for (const code of input.discoverySignals ?? []) {
+    if (seedTiltForSignal(wiringByCode.get(code)) === 'doubt') {
+      markers.add(`route_${code.toLowerCase()}`);
+    }
   }
   for (const r of input.bronzeAttribution ?? []) {
     const key = BRONZE_REASON_ALIASES[r.reason_key] ?? r.reason_key;
@@ -415,4 +461,122 @@ export function discoveryOperationalStatus(
   return s.has('INT_ACTIVE_OPERATIONAL_EVIDENCE') || s.has('INT_RECENT_BUSINESS_EVIDENCE')
     ? 'likely_active'
     : null;
+}
+
+// ─── Registry playbook-preference wiring (migration 308 pattern) ─────────
+//
+// Mirror of triage's signal playbook preferences: a registered signal's
+// declared route — primary_playbook / secondary_playbook — gives the seed
+// gate a semantic without a deploy. The routed playbook's ARCHETYPE names
+// the kind of problem the pattern describes:
+//
+//   visibility tilt (A7 website gap, A6 product-visibility, A4 CTA gap) —
+//     the routed problem is a visibility gap, which is exactly what a seed
+//     listing exists to fix. Positive seed-confidence influence — never
+//     doubt: a website-tilted route is a visibility issue, not an
+//     operational or identity one.
+//   doubt tilt (A3 listing drift) — the routed problem is identity
+//     inconsistency; that IS seed doubt (adds a doubt marker → gate cap).
+//   neutral (A1 review gap, A2 negative recovery, A5 dual) — reputation
+//     arcs; they neither qualify nor disqualify a seed listing.
+//
+// Canonical INT_* semantics stay the default; a declared preference
+// OVERRIDES the canonical confidence term for that code — registry wiring
+// is explicit operator intent. The exception is doubt: named evidence doubt
+// is additive only. A visibility route can raise the score but can never
+// un-flag a canonical doubt marker (single_source, category_misalignment),
+// so the "cap only on doubt" invariant survives rewiring.
+
+export type SeedSignalTilt = 'visibility' | 'doubt' | 'neutral';
+
+/** Routed-playbook archetype → seed tilt. */
+const PLAYBOOK_ARCHETYPE_TILT: Record<string, SeedSignalTilt> = {
+  A7: 'visibility',
+  A6: 'visibility',
+  A4: 'visibility',
+  A3: 'doubt',
+};
+
+/**
+ * Registry wiring for one detected discovery signal: the declared playbook
+ * prefs plus the resolved archetypes of those playbooks (catalog lookup —
+ * see loadSignalSeedWiring).
+ */
+export interface SignalSeedWiring {
+  code: string;
+  primaryPlaybook?: string | null;
+  secondaryPlaybook?: string | null;
+  primaryArchetype?: string | null;
+  secondaryArchetype?: string | null;
+}
+
+/**
+ * Resolve one signal's declared playbook preference to a seed tilt. The
+ * primary route decides outright; a secondary-only route only contributes
+ * doubt — a declared *fallback* to a visibility playbook doesn't corroborate
+ * the seed (the signal didn't earn the pitch, it just named a landing spot),
+ * but a fallback into listing-drift is still worth flagging.
+ * Returns null when no declared tilt exists → callers fall back to the
+ * canonical defaults.
+ */
+export function seedTiltForSignal(wiring: SignalSeedWiring | undefined): SeedSignalTilt | null {
+  if (!wiring) return null;
+  const primary = wiring.primaryArchetype
+    ? (PLAYBOOK_ARCHETYPE_TILT[wiring.primaryArchetype] ?? 'neutral')
+    : null;
+  if (primary) return primary;
+  const secondary = wiring.secondaryArchetype
+    ? (PLAYBOOK_ARCHETYPE_TILT[wiring.secondaryArchetype] ?? 'neutral')
+    : null;
+  return secondary === 'doubt' ? 'doubt' : null;
+}
+
+/**
+ * Resolve the registry wiring for a set of detected discovery signal codes —
+ * two lookups: signal rows that declare a playbook preference, then the
+ * catalog rows that resolve each pref's archetype. Signals with no declared
+ * pref return no wiring row (callers treat them as canonical defaults).
+ *
+ * Takes the prisma client (or a compatible mock) rather than importing the
+ * singleton so the pure-module boundary stays intact.
+ */
+export async function loadSignalSeedWiring(
+  client: {
+    mkt_signal_registry: { findMany: (arg: any) => Promise<any[]> };
+    mkt_playbook_catalog: { findMany: (arg: any) => Promise<any[]> };
+  },
+  codes: string[],
+): Promise<SignalSeedWiring[]> {
+  const wanted = [...new Set(codes.filter((c) => typeof c === 'string' && c))];
+  if (wanted.length === 0) return [];
+  const rows = await client.mkt_signal_registry.findMany({
+    where: { code: { in: wanted }, is_active: true },
+    select: { code: true, primary_playbook: true, secondary_playbook: true },
+  });
+  const declared = (Array.isArray(rows) ? rows : []).filter(
+    (r) => r.primary_playbook || r.secondary_playbook,
+  );
+  const prefCodes = [
+    ...new Set(
+      declared
+        .flatMap((r) => [r.primary_playbook, r.secondary_playbook])
+        .filter((c): c is string => typeof c === 'string' && !!c),
+    ),
+  ];
+  const playbooks = prefCodes.length
+    ? await client.mkt_playbook_catalog.findMany({
+        where: { code: { in: prefCodes } },
+        select: { code: true, archetype: true },
+      })
+    : [];
+  const archetypeOf = new Map(
+    (Array.isArray(playbooks) ? playbooks : []).map((p) => [p.code, p.archetype] as const),
+  );
+  return declared.map((r) => ({
+    code: r.code,
+    primaryPlaybook: r.primary_playbook ?? null,
+    secondaryPlaybook: r.secondary_playbook ?? null,
+    primaryArchetype: r.primary_playbook ? (archetypeOf.get(r.primary_playbook) ?? null) : null,
+    secondaryArchetype: r.secondary_playbook ? (archetypeOf.get(r.secondary_playbook) ?? null) : null,
+  }));
 }
