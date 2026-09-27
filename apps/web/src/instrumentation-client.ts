@@ -25,8 +25,19 @@ if (process.env.NODE_ENV !== "development" && SENTRY_DSN) {
     // Use custom environment variable to distinguish staging from production
     environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.NODE_ENV,
 
-    // Disable sending user PII by default — opt-in via explicit consent
-    sendDefaultPii: false,
+    // Disable sending user PII by default — opt-in via explicit consent.
+    // v11 removed `sendDefaultPii` in favour of per-category `dataCollection` and
+    // now collects most categories by default, so pin the old restrictive baseline.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+        response: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+      },
+      httpBodies: [],
+      urlQueryParams: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+    },
 
     // Ignore common noise errors
     ignoreErrors: [

@@ -1,7 +1,7 @@
 // apps/web/next.config.ts
 import type { NextConfig } from "next";
 import path from "path";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import withPWAInit from "next-pwa";
 
 const isSentryEnabled = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT) && process.env.SENTRY_DISABLE_BUILD_PLUGIN !== 'true';
