@@ -47,7 +47,7 @@ This section is analyst-facing framing — never name VisibleShelf, this goal, o
 
 
 Category Intelligence — Binding for This Audit
-A CATEGORY INTELLIGENCE block is appended to this prompt after the audit instructions and before the JSON schema. It contains category-specific terminology, specialized sources, evidence rules, prohibited inferences, and category signals for the business category being audited.
+A CATEGORY INTELLIGENCE block is appended at the end of this prompt, after the audit instructions and embedded JSON schema. It contains category-specific terminology, specialized sources, evidence rules, prohibited inferences, and category signals for the business category being audited.
 
 You MUST apply the Category Intelligence block throughout this audit. Specifically:
 
@@ -62,7 +62,7 @@ If the Category Intelligence block is missing or empty, proceed with the general
 Do NOT record notes about which prompt blocks were present or absent in `data_quality.conflicts` — that field is for conflicting EVIDENCE about the business (two different phone numbers in circulation, disagreeing published hours, a name variant published as a separate listing). Block-presence notes belong in `data_quality.limitations`, and only when a block is actually missing; if the Category Intelligence block was present and applied, record nothing about it.
 
 Gold Standard Benchmark — Binding for This Audit
-A GOLD STANDARD BENCHMARK block is appended to this prompt after the Category Intelligence block and before the JSON schema. It contains category-specific expected fields, quality gates, per-platform expected attributes, branding/photo expectations, and pattern exemplars for the business category being audited.
+A GOLD STANDARD BENCHMARK block is appended at the end of this prompt, after the Category Intelligence block. It contains category-specific expected fields, quality gates, per-platform expected attributes, branding/photo expectations, and pattern exemplars for the business category being audited.
 
 You MUST apply the Gold Standard block as a comparison benchmark throughout this audit. Specifically:
 
@@ -74,7 +74,7 @@ Absence vs. Non-Negotiable — A non_negotiable quality gate or expected field i
 Subject-as-Exemplar — If the audited business appears in the benchmark's Pattern Exemplars section, treat those exemplar notes as reference priors only (not as a self-comparison). Use the other exemplar businesses as competitive comparators; do not benchmark the business against itself.
 If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.
 Market Context Intelligence — Binding for This Audit
-A CATEGORY MARKET CONTEXT block and/or a CITY MARKET CONTEXT block may be appended to this prompt after the Gold Standard block and before the JSON schema. They contain structural market intelligence produced by prior enrichment runs for this business's category and location. This is analyst-facing intelligence — not shopper-facing copy — that gives you market-aware context for the audit.
+A CATEGORY MARKET CONTEXT block and/or a CITY MARKET CONTEXT block may be appended at the end of this prompt, after the Gold Standard block. They contain structural market intelligence produced by prior enrichment runs for this business's category and location. This is analyst-facing intelligence — not shopper-facing copy — that gives you market-aware context for the audit.
 
 You MUST apply the Market Context blocks throughout this audit. Specifically:
 
@@ -947,8 +947,8 @@ Omit a conditional field entirely when its governing directive says to omit it (
       "phone": null,
       "website": null
     },
-    "identity_status": "confirmed",
-    "identity_confidence": "high",
+    "identity_status": "confirmed|ambiguous|mismatched",
+    "identity_confidence": "high|medium|low",
     "identity_corroboration_sources": [],
     "limitations": []
   },
@@ -1258,4 +1258,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-09-26-parity-4 -->
+<!-- seed-version: business-audit-default-2026-09-26-parity-5 -->
