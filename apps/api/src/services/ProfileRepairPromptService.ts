@@ -19,6 +19,7 @@ import { extractSignals } from './triage/signal-extractor';
 import { type SignalCode } from './triage/signal-taxonomy';
 import aiProviderFactory from './ai-providers';
 import { generateDeliverableId, generateDeliverableSectionId } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit, STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES } from '../lib/marketing-audits';
 import {
   resolveOutputSchema,
   profileRepairTriageSchema,
@@ -144,9 +145,83 @@ export class ProfileRepairPromptService extends BaseService {
       return '';
     }
 
-    const lines: string[] = [];
+    // Shape dispatch — the two upstream triage lanes feed this variable:
+    //   - business_analysis, real (FULL): verified platform findings, gap
+    //     analysis, quality gates, scores, audit-derived outreach problems.
+    //   - business_analysis, stub (PARTIAL): the partial lane's carrier —
+    //     a placeholder row stamped with a stub audit_metadata.source
+    //     (discovery_scan / queue promotion / derive) carrying translated
+    //     detected_signals, never verified platform findings. Checked by
+    //     source BEFORE the BA shape test: stubs carry audit_metadata +
+    //     detected_signals, so they would otherwise be mislabeled FULL.
+    //   - category_identification (PARTIAL): a cross-platform presence
+    //     snapshot gathered while identifying the category — presence
+    //     observations, not verified platform findings.
+    // Anything else (empty object, unknown shape) is treated as no usable
+    // audit and gets an explicit coverage banner rather than a blank section.
+    if (Array.isArray((auditData as any).candidate_categories)) {
+      return this.serializeCategoryIdentificationAudit(auditData);
+    }
 
-    // 1. Canonical NAP
+    const auditSource = (auditData as any)?.audit_metadata?.source;
+    if (
+      typeof auditSource === 'string' &&
+      (STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES as readonly string[]).includes(auditSource)
+    ) {
+      return this.serializeSignalStubAudit(auditData, auditSource);
+    }
+
+    const looksLikeBusinessAnalysis =
+      'audit_metadata' in auditData ||
+      'summary' in auditData ||
+      'platforms' in auditData ||
+      'nap_consistency' in auditData ||
+      'website' in auditData ||
+      'detected_signals' in auditData;
+    if (!looksLikeBusinessAnalysis) {
+      return [
+        '## Audit Coverage',
+        'NONE — no audit on file for this campaign. Ground the briefing in the collapsed signals and business fields; do not assert platform findings.',
+      ].join('\n');
+    }
+
+    return this.serializeBusinessAnalysisAudit(auditData);
+  }
+
+  /**
+   * FULL lane — serialize the blocks of a business_analysis audit the
+   * repair briefing consumes: identity, canonical NAP, platform status
+   * (enriched with render-control determinations so a control-confirmed
+   * absence is distinguishable from an unverifiable render), website,
+   * operational status, review metrics, scoreline, gap analysis, quality
+   * gates, market opportunities, audit-derived outreach problems, detected
+   * signals, recommended attributes, and data quality.
+   */
+  private serializeBusinessAnalysisAudit(auditData: any): string {
+    const lines: string[] = [
+      '## Audit Coverage',
+      'FULL — business analysis audit on file. The platform findings, gap analysis, quality gates, and audit-derived outreach problems below are verified audit output — consume them directly rather than re-deriving.',
+      '',
+    ];
+
+    // 1. Audit summary + identity
+    const meta = auditData.audit_metadata;
+    if (typeof auditData.summary === 'string' && auditData.summary.trim()) {
+      lines.push('## Audit Summary', auditData.summary.trim(), '');
+    }
+    if (meta && typeof meta === 'object') {
+      const parts: string[] = [];
+      if (meta.identity_status) parts.push(`identity: ${meta.identity_status}`);
+      if (meta.identity_confidence) parts.push(`confidence: ${meta.identity_confidence}`);
+      if (meta.matched_business?.business_name) {
+        parts.push(`matched as: ${meta.matched_business.business_name}`);
+      }
+      if (parts.length > 0) {
+        lines.push('## Identity', `- ${parts.join(' · ')}`, '');
+      }
+    }
+
+    // 2. Canonical NAP
     const nap = auditData.nap_consistency;
     if (nap) {
       lines.push('## Canonical NAP');
@@ -159,21 +234,36 @@ export class ProfileRepairPromptService extends BaseService {
       lines.push('');
     }
 
-    // 2. Platform Status
+    // 3. Platform Status — enriched with render-control determinations so a
+    // control-confirmed absence (business_specific_failure) reads as
+    // "verified absent", not just another unable_to_verify.
     const platforms = auditData.platforms;
+    const renderControls = Array.isArray(auditData.render_controls) ? auditData.render_controls : [];
+    const rcByPlatform = new Map<string, any>(
+      renderControls
+        .filter((rc: any) => rc && typeof rc === 'object' && rc.platform)
+        .map((rc: any) => [String(rc.platform).toLowerCase(), rc]),
+    );
     if (platforms && typeof platforms === 'object') {
       lines.push('## Platform Status');
       for (const [name, p] of Object.entries(platforms) as [string, any][]) {
         if (p && typeof p === 'object') {
           const status = p.profile_status ?? 'unavailable';
           const nameSuffix = p.displayed_name ? ` (${p.displayed_name})` : '';
-          lines.push(`- ${name}: ${status}${nameSuffix}`);
+          const rc = rcByPlatform.get(name.toLowerCase());
+          let renderSuffix = '';
+          if (rc?.determination === 'business_specific_failure') {
+            renderSuffix = ' · verified absent (render control confirmed)';
+          } else if (rc?.determination === 'platform_available') {
+            renderSuffix = ' · rendered';
+          }
+          lines.push(`- ${name}: ${status}${nameSuffix}${renderSuffix}`);
         }
       }
       lines.push('');
     }
 
-    // 3. Website
+    // 4. Website
     const web = auditData.website;
     if (web && typeof web === 'object') {
       lines.push('## Website');
@@ -181,10 +271,141 @@ export class ProfileRepairPromptService extends BaseService {
       if (Array.isArray(web.issues) && web.issues.length > 0) {
         lines.push(`- Issues: ${web.issues.join(', ')}`);
       }
+      if (Array.isArray(web.conversion_opportunities) && web.conversion_opportunities.length > 0) {
+        lines.push(`- Conversion opportunities: ${web.conversion_opportunities.slice(0, 4).join('; ')}`);
+      }
       lines.push('');
     }
 
-    // 4. Detected signals
+    // 5. Operational status
+    const ops = auditData.operational_status;
+    if (ops && typeof ops === 'object') {
+      lines.push('## Operational Status');
+      lines.push(`- ${ops.status ?? 'unknown'}${ops.last_activity_evidence ? ` — ${ops.last_activity_evidence}` : ''}`);
+      lines.push('');
+    }
+
+    // 6. Review metrics
+    const metrics = auditData.combined_review_metrics;
+    if (metrics && typeof metrics === 'object') {
+      lines.push('## Review Metrics');
+      const parts = [
+        `${metrics.observable_total_reviews ?? 0} observable reviews`,
+        metrics.observable_unanswered_reviews != null ? `${metrics.observable_unanswered_reviews} unanswered` : null,
+        metrics.observable_response_rate_percent != null ? `${metrics.observable_response_rate_percent}% response rate` : null,
+        metrics.counts_complete === false ? 'counts incomplete' : null,
+      ].filter(Boolean);
+      lines.push(`- ${parts.join(' · ')}`);
+      if (Array.isArray(auditData.negative_review_themes) && auditData.negative_review_themes.length > 0) {
+        lines.push(`- Negative themes: ${auditData.negative_review_themes.join(', ')}`);
+      }
+      lines.push('');
+    }
+
+    // 7. Scoreline — the audit's own assessment, consumed for viability
+    const score = auditData.digital_opportunity_score;
+    const align = auditData.alignment_scoring;
+    const hasScoreline =
+      (score && typeof score === 'object') ||
+      auditData.recommended_tier != null ||
+      (align && typeof align === 'object' && (align.action_classification != null || align.lead_disposition != null)) ||
+      auditData.high_attention != null;
+    if (hasScoreline) {
+      lines.push('## Scoreline');
+      if (score && typeof score === 'object' && score.score != null) {
+        lines.push(`- Digital opportunity score: ${score.score}${score.classification ? ` (${score.classification})` : ''}`);
+      }
+      if (auditData.recommended_tier != null) {
+        lines.push(`- Recommended tier: ${auditData.recommended_tier}${auditData.tier_rationale ? ` — ${auditData.tier_rationale}` : ''}`);
+      }
+      if (align && typeof align === 'object') {
+        const parts = [
+          align.action_classification != null ? `alignment: ${align.action_classification}` : null,
+          align.lead_disposition != null ? `lead disposition: ${align.lead_disposition}` : null,
+        ].filter(Boolean);
+        if (parts.length > 0) lines.push(`- ${parts.join(' · ')}`);
+        if (align.primary_outreach_hook) {
+          lines.push(`- Audit outreach hook: ${align.primary_outreach_hook}`);
+        }
+      }
+      if (auditData.high_attention === true) {
+        const reasons = Array.isArray(auditData.high_attention_reasons) && auditData.high_attention_reasons.length > 0
+          ? ` — ${auditData.high_attention_reasons.join('; ')}`
+          : '';
+        lines.push(`- High attention: true${reasons}`);
+      }
+      lines.push('');
+    }
+
+    // 8. Gap analysis — the audit's pre-computed gap list
+    const gapAnalysis = auditData.gap_analysis;
+    if (gapAnalysis && typeof gapAnalysis === 'object') {
+      if (Array.isArray(gapAnalysis.gaps) && gapAnalysis.gaps.length > 0) {
+        lines.push('## Gap Analysis');
+        for (const g of gapAnalysis.gaps) {
+          if (!g || typeof g !== 'object') continue;
+          const where = [g.platform, g.field].filter(Boolean).join('.');
+          lines.push(`- [${g.severity ?? 'unranked'}] ${where || 'gap'} — ${g.gap_description ?? g.actual ?? ''}`);
+        }
+        if (gapAnalysis.summary) lines.push(`- Summary: ${gapAnalysis.summary}`);
+        lines.push('');
+      }
+    }
+
+    // 9. Quality gates
+    const gates = auditData.quality_gate_results;
+    if (gates && typeof gates === 'object' && Array.isArray(gates.results) && gates.results.length > 0) {
+      lines.push('## Quality Gates');
+      for (const r of gates.results) {
+        if (!r || typeof r !== 'object') continue;
+        const verdict = r.passed === true ? 'pass' : r.passed === false ? 'FAIL' : 'not verified';
+        const where = [r.platform, r.gate].filter(Boolean).join(' / ');
+        lines.push(`- [${r.severity ?? 'unranked'}] ${where}: ${verdict}${r.notes ? ` — ${r.notes}` : ''}`);
+      }
+      if (gates.summary) lines.push(`- Summary: ${gates.summary}`);
+      lines.push('');
+    }
+
+    // 10. Market opportunities
+    const marketOpps = auditData.market_opportunities;
+    if (Array.isArray(marketOpps) && marketOpps.length > 0) {
+      lines.push('## Market Opportunities');
+      for (const m of marketOpps) {
+        if (!m || typeof m !== 'object') continue;
+        lines.push(`- [${m.impact ?? 'unranked'}] ${m.title ?? 'opportunity'}${m.description ? ` — ${m.description}` : ''}`);
+      }
+      lines.push('');
+    }
+
+    // 11. Audit-derived outreach problems — pre-computed pairs the §6 rules
+    // align and rank rather than reinvent.
+    const auditProblems = auditData.outreach_problems;
+    if (Array.isArray(auditProblems) && auditProblems.length > 0) {
+      lines.push('## Audit Outreach Problems (pre-computed by the audit)');
+      for (const p of auditProblems) {
+        if (!p || typeof p !== 'object') continue;
+        const parts = [p.problem, p.evidence ? `evidence: ${p.evidence}` : null, p.solution ? `fix: ${p.solution}` : null].filter(Boolean);
+        lines.push(`- ${parts.join(' — ')}`);
+      }
+      lines.push('');
+    }
+
+    // 12. Competitive benchmarks (compact — positioning input)
+    const benchmarks = auditData.competitive_benchmarks;
+    if (Array.isArray(benchmarks) && benchmarks.length > 0) {
+      lines.push('## Competitive Benchmarks');
+      for (const b of benchmarks.slice(0, 4)) {
+        if (!b || typeof b !== 'object') continue;
+        const ratings = [
+          b.google_rating != null ? `google ${b.google_rating}${b.google_review_count != null ? ` (${b.google_review_count})` : ''}` : null,
+          b.yelp_rating != null ? `yelp ${b.yelp_rating}${b.yelp_review_count != null ? ` (${b.yelp_review_count})` : ''}` : null,
+        ].filter(Boolean).join(', ');
+        lines.push(`- ${b.business_name ?? 'benchmark'}${b.store_format ? ` (${b.store_format})` : ''}${ratings ? `: ${ratings}` : ''}${b.format_context_note ? ` — ${b.format_context_note}` : ''}`);
+      }
+      lines.push('');
+    }
+
+    // 13. Detected signals
     const signals = auditData.detected_signals;
     if (Array.isArray(signals) && signals.length > 0) {
       lines.push('## Detected Signals');
@@ -194,7 +415,7 @@ export class ProfileRepairPromptService extends BaseService {
       lines.push('');
     }
 
-    // 5. Recommended attributes — advisory chips the business may want to
+    // 14. Recommended attributes — advisory chips the business may want to
     // enable or verify on the named platform. Not observed facts; the
     // fulfill package should frame these as enableable opportunities.
     const recAttrs = auditData.recommended_attributes;
@@ -211,7 +432,215 @@ export class ProfileRepairPromptService extends BaseService {
       lines.push('');
     }
 
+    // 15. Data quality — confidence, conflicts, limitations (risk input)
+    const dq = auditData.data_quality;
+    if (dq && typeof dq === 'object') {
+      lines.push('## Data Quality');
+      if (dq.confidence) lines.push(`- Confidence: ${dq.confidence}`);
+      if (Array.isArray(dq.conflicts) && dq.conflicts.length > 0) {
+        lines.push(`- Conflicts: ${dq.conflicts.slice(0, 6).join('; ')}`);
+      }
+      if (Array.isArray(dq.limitations) && dq.limitations.length > 0) {
+        lines.push(`- Limitations: ${dq.limitations.slice(0, 8).join('; ')}`);
+      }
+      lines.push('');
+    }
+
     return lines.join('\n').trim();
+  }
+
+  /**
+   * PARTIAL lane — serialize a category_identification audit. Its
+   * digital_footprint block is a presence snapshot gathered during category
+   * research: `claimed`, ratings, and review counts are observations, not
+   * verified platform findings. The coverage banner tells the downstream
+   * prompt not to assert platform defects the snapshot does not show.
+   */
+  private serializeCategoryIdentificationAudit(auditData: any): string {
+    const lines: string[] = [
+      '## Audit Coverage',
+      'PARTIAL — category identification only; no platform-level business audit is on file. The Platform Presence Snapshot below records what was FOUND during category research — it is not a verified platform audit. Do not assert a platform defect (stale data, unclaimed listing, missing profile) that the snapshot does not show; absence from the snapshot is not absence from the platform.',
+      '',
+    ];
+
+    // 1. Business identity + category call
+    lines.push('## Business');
+    const nameParts = [auditData.business_name ?? 'unknown'];
+    if (auditData.business_type) nameParts.push(`type: ${auditData.business_type}`);
+    lines.push(`- Name: ${nameParts.join(' · ')}`);
+    if (auditData.primary_category) {
+      lines.push(`- Primary category: ${auditData.primary_category}${auditData.primary_category_confidence ? ` (confidence: ${auditData.primary_category_confidence})` : ''}`);
+    }
+    if (typeof auditData.business_summary === 'string' && auditData.business_summary.trim()) {
+      lines.push(`- ${auditData.business_summary.trim()}`);
+    }
+    lines.push('');
+
+    // 2. Canonical NAP (cat-id shape — flat fields + directory URLs)
+    const nap = auditData.nap;
+    if (nap && typeof nap === 'object') {
+      lines.push('## Canonical NAP');
+      const address = [nap.address_line1, nap.address_line2, nap.city, nap.state, nap.postal_code]
+        .filter(Boolean)
+        .join(', ');
+      if (nap.canonical_name) lines.push(`- Name: ${nap.canonical_name}`);
+      if (address) lines.push(`- Address: ${address}`);
+      if (nap.phone) lines.push(`- Phone: ${nap.phone}`);
+      if (nap.website) lines.push(`- Website: ${nap.website}`);
+      if (Array.isArray(nap.directory_profile_urls) && nap.directory_profile_urls.length > 0) {
+        const urls = nap.directory_profile_urls
+          .filter((d: any) => d && d.platform && d.url)
+          .map((d: any) => `${d.platform}: ${d.url}`);
+        if (urls.length > 0) lines.push(`- Directory profiles: ${urls.join(' · ')}`);
+      }
+      if (nap.provenance) lines.push(`- Provenance: ${nap.provenance}`);
+      lines.push('');
+    }
+
+    // 3. Platform presence snapshot
+    const footprint = auditData.digital_footprint;
+    if (footprint && typeof footprint === 'object') {
+      lines.push('## Platform Presence Snapshot (observed during category research — presence-level, not verified findings)');
+      if (Array.isArray(footprint.platforms_found)) {
+        for (const p of footprint.platforms_found) {
+          if (!p || typeof p !== 'object') continue;
+          const parts = [
+            p.claimed === true ? 'claimed' : p.claimed === false ? 'unclaimed' : null,
+            p.rating != null ? `${p.rating}${p.review_count != null ? ` (${p.review_count} reviews)` : ' rating'}` : null,
+            p.url ?? null,
+            p.notes ?? null,
+          ].filter(Boolean);
+          lines.push(`- ${p.platform ?? 'platform'}${parts.length > 0 ? `: ${parts.join(' · ')}` : ''}`);
+        }
+      }
+      if (footprint.website_url || footprint.website_status) {
+        lines.push(`- Website: ${footprint.website_url ?? 'none located'}${footprint.website_status ? ` (${footprint.website_status})` : ''}`);
+      }
+      if (footprint.gbp_primary_category) {
+        lines.push(`- GBP primary category: ${footprint.gbp_primary_category}`);
+      }
+      if (Array.isArray(footprint.signature_products_services) && footprint.signature_products_services.length > 0) {
+        lines.push(`- Signature products/services: ${footprint.signature_products_services.join(', ')}`);
+      }
+      lines.push('');
+    }
+
+    // 4. Candidate categories
+    if (Array.isArray(auditData.candidate_categories) && auditData.candidate_categories.length > 0) {
+      lines.push('## Candidate Categories');
+      for (const c of auditData.candidate_categories.slice(0, 6)) {
+        if (!c || typeof c !== 'object') continue;
+        lines.push(`- ${c.category}${c.confidence ? ` (${c.confidence})` : ''}${c.is_known_category === false ? ' · not a known platform category' : ''}`);
+      }
+      lines.push('');
+    }
+
+    // 5. Detected signals (rare on this lane, but honor them when present)
+    if (Array.isArray(auditData.detected_signals) && auditData.detected_signals.length > 0) {
+      lines.push('## Detected Signals');
+      for (const s of auditData.detected_signals) {
+        lines.push(`- ${s}`);
+      }
+      lines.push('');
+    }
+
+    // 6. Evidence sources + data quality
+    if (Array.isArray(auditData.evidence_sources) && auditData.evidence_sources.length > 0) {
+      lines.push('## Evidence Sources');
+      for (const e of auditData.evidence_sources.slice(0, 8)) {
+        if (!e || typeof e !== 'object') continue;
+        lines.push(`- ${e.source ?? 'source'}${e.finding ? ` — ${e.finding}` : ''}`);
+      }
+      lines.push('');
+    }
+    const dq = auditData.data_quality;
+    if (dq && typeof dq === 'object') {
+      lines.push('## Data Quality');
+      const parts = [
+        dq.overall_confidence ? `confidence: ${dq.overall_confidence}` : null,
+        dq.sources_consulted != null ? `sources consulted: ${dq.sources_consulted}` : null,
+      ].filter(Boolean);
+      if (parts.length > 0) lines.push(`- ${parts.join(' · ')}`);
+      if (Array.isArray(dq.limitations) && dq.limitations.length > 0) {
+        lines.push(`- Limitations: ${dq.limitations.slice(0, 8).join('; ')}`);
+      }
+      lines.push('');
+    }
+
+    return lines.join('\n').trim();
+  }
+
+  /**
+   * PARTIAL lane — serialize a signal-stub audit. Stubs are placeholder
+   * business_analysis rows created by queue promotion / campaign derivation /
+   * discovery scan so upstream triage has detected_signals to work with
+   * before a real audit runs. They carry translated upstream evidence —
+   * candidate defects to confirm — and must never be presented as verified
+   * audit output.
+   */
+  private serializeSignalStubAudit(auditData: any, source: string): string {
+    const meta = auditData?.audit_metadata;
+    const origin = source === 'discovery_scan' ? 'discovery-scan' : 'queue/derivation';
+    const lines: string[] = [
+      '## Audit Coverage',
+      `PARTIAL — signal stub only (provenance: ${source}); no platform-level business audit is on file. The signals below were translated from upstream ${origin} evidence — treat them as candidate defects to confirm, not verified platform findings.`,
+      '',
+    ];
+
+    if (meta && typeof meta === 'object') {
+      const parts = [
+        meta.business_name ? `business: ${meta.business_name}` : null,
+        meta.verdict ? `verdict: ${meta.verdict}` : null,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        lines.push('## Audit Provenance', `- ${parts.join(' · ')}`, '');
+      }
+    }
+
+    if (typeof auditData.summary === 'string' && auditData.summary.trim()) {
+      lines.push('## Summary', auditData.summary.trim(), '');
+    }
+
+    if (Array.isArray(auditData.detected_signals) && auditData.detected_signals.length > 0) {
+      lines.push('## Detected Signals (translated upstream — unverified)');
+      for (const s of auditData.detected_signals) {
+        if (s != null) lines.push(`- ${s}`);
+      }
+      lines.push('');
+    }
+
+    const sigMap = auditData.discovery_signal_map;
+    if (Array.isArray(sigMap) && sigMap.length > 0) {
+      lines.push('## Signal Provenance (what produced each signal)');
+      for (const c of sigMap.slice(0, 16)) {
+        if (!c || typeof c !== 'object') continue;
+        lines.push(`- ${c.code ?? 'signal'}${c.ref ? ` ← ${c.via ?? 'source'}:${c.ref}` : ''}${c.basis ? ` — ${c.basis}` : ''}`);
+      }
+      lines.push('');
+    }
+
+    return lines.join('\n').trim();
+  }
+
+  /**
+   * Lane-aware audit selection for repair consumers:
+   *   1. Real business_analysis audit (FULL) — the fuller artifact. Stub
+   *      rows are skipped so a placeholder can neither mislabel itself
+   *      FULL nor shadow a real audit.
+   *   2. category_identification audit (PARTIAL) — the richer partial
+   *      artifact: presence snapshot, NAP, candidate categories.
+   *   3. Stub business_analysis audit (PARTIAL) — the partial lane's
+   *      signal carrier when no descriptive audit exists yet.
+   * Anything else does not feed the repair briefing.
+   */
+  pickRepairSourceAudit(audits: any[] | null | undefined): any | null {
+    const list = Array.isArray(audits) ? audits : [];
+    return (
+      list.find((a) => a?.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a)) ??
+      list.find((a) => a?.platform === 'category_identification') ??
+      list.find((a) => isStubBusinessAnalysisAudit(a)) ??
+      null
+    );
   }
 
   buildSeekVariables(
@@ -219,7 +648,11 @@ export class ProfileRepairPromptService extends BaseService {
     latestAudit?: any,
     platformSignalWeights?: Record<string, number>,
   ): Record<string, string> {
-    const audit = latestAudit || campaign?.audits?.[0] || campaign?.mkt_audits_list?.[0] || null;
+    const audit =
+      latestAudit ||
+      this.pickRepairSourceAudit(campaign?.audits) ||
+      this.pickRepairSourceAudit(campaign?.mkt_audits_list) ||
+      null;
     const signalCodes = extractSignals({
       campaign,
       auditData: audit?.audit_data,
@@ -433,7 +866,13 @@ export class ProfileRepairPromptService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
+          // Both audit lanes feed repair triage — business_analysis is the
+          // full path, category_identification is the partial (fast) path.
+          mkt_audits_list: {
+            where: { platform: { in: ['business_analysis', 'category_identification'] } },
+            take: 6,
+            orderBy: { created_at: 'desc' },
+          },
         },
       });
 
@@ -441,7 +880,7 @@ export class ProfileRepairPromptService extends BaseService {
         throw new Error(`Campaign ${campaignId} not found`);
       }
 
-      const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
+      const latestAudit = this.pickRepairSourceAudit(campaign.mkt_audits_list);
       // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
       const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
       const platformSignalWeights = await IntelligenceProfileService.getInstance()
@@ -780,7 +1219,11 @@ export class ProfileRepairPromptService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: {
+            where: { platform: { in: ['business_analysis', 'category_identification'] } },
+            take: 6,
+            orderBy: { created_at: 'desc' },
+          },
           mkt_dispute_intake: {
             where: { intake_kind: 'profile_repair' },
             include: { mkt_dispute_attachments: true },
@@ -795,7 +1238,7 @@ export class ProfileRepairPromptService extends BaseService {
       const template = await promptService.getTemplate(templateId, ctx);
       if (!template) throw new Error(`Template ${templateId} not found`);
 
-      const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
+      const latestAudit = this.pickRepairSourceAudit(campaign.mkt_audits_list);
       const intake = campaign.mkt_dispute_intake?.[0] ?? null;
       // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
       const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');
@@ -851,7 +1294,11 @@ export class ProfileRepairPromptService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
         include: {
-          mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } },
+          mkt_audits_list: {
+            where: { platform: { in: ['business_analysis', 'category_identification'] } },
+            take: 6,
+            orderBy: { created_at: 'desc' },
+          },
           mkt_dispute_intake: {
             where: { intake_kind: 'profile_repair' },
             include: { mkt_dispute_attachments: true },
@@ -862,7 +1309,7 @@ export class ProfileRepairPromptService extends BaseService {
 
       if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
-      const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
+      const latestAudit = this.pickRepairSourceAudit(campaign.mkt_audits_list);
       const intake = campaign.mkt_dispute_intake?.[0] ?? null;
       // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
       const { IntelligenceProfileService } = await import('./intelligence/IntelligenceProfileService');

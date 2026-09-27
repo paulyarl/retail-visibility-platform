@@ -395,6 +395,35 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
     }
   }
 
+  // Category-identification lane (PARTIAL path): a cat-id audit carries a
+  // digital_footprint presence snapshot instead of a platforms block.
+  // Bridge its observed fields into the repair signal vocabulary so triage
+  // is signal-aware when no business_analysis audit exists. Cat-id audits
+  // never carry detected_signals[], so this derive tier always runs for them.
+  const footprint = (auditData as any)?.digital_footprint;
+  if (footprint && typeof footprint === 'object') {
+    // DS_CLAIMED_STATUS — a located platform profile observed unclaimed.
+    if (!signals.has('DS_CLAIMED_STATUS')) {
+      const anyUnclaimed =
+        Array.isArray(footprint.platforms_found) &&
+        footprint.platforms_found.some((p: any) => p?.claimed === false);
+      if (anyUnclaimed) {
+        signals.add('DS_CLAIMED_STATUS');
+      }
+    }
+
+    // WC_MISSING_WEBSITE / WC_BROKEN_WEBSITE — the snapshot's website_status
+    // enum mirrors the BA website.status vocabulary for these two values.
+    const footprintStatus =
+      typeof footprint.website_status === 'string' ? footprint.website_status : null;
+    if (footprintStatus === 'none_found' && !signals.has('WC_MISSING_WEBSITE')) {
+      signals.add('WC_MISSING_WEBSITE');
+    }
+    if (footprintStatus === 'broken' && !signals.has('WC_BROKEN_WEBSITE')) {
+      signals.add('WC_BROKEN_WEBSITE');
+    }
+  }
+
   // WC_* — website & conversion signals
   //
   // §W1: A website "exists" only when the audit confirms one — a url is

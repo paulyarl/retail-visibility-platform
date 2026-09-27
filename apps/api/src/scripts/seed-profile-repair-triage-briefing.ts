@@ -23,7 +23,7 @@ import { logger } from '../logger';
 
 const TEMPLATE_ID = 'mpt-profile-repair-triage-default';
 
-const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v6: shelf-visibility-pitch-clause -->';
+const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v8: stub-partial-lane -->';
 
 const NEW_BODY = `You are a local business profile repair analyst producing an operator briefing.
 
@@ -39,6 +39,8 @@ Your job is NOT to classify signals — the signal→track mapping is determinis
 ## Audit Results
 
 {{audit_results}}
+
+The Audit Results block opens with an Audit Coverage line. FULL means a completed business analysis is on file — its platform findings, gap analysis, quality gates, scores, and audit-derived outreach problems are authoritative; consume them directly rather than re-deriving. PARTIAL means only partial-coverage evidence is on file, in one of two forms: a category-identification run (its Platform Presence Snapshot records what was found during category research, not verified platform findings — never assert a platform defect the snapshot does not show), or a signal stub (Detected Signals translated from upstream discovery or queue evidence — candidate defects to confirm, not verified findings; the Signal Provenance block names what produced each). On either PARTIAL form, treat thin evidence as a viability caveat rather than a defect claim. NONE means no audit is on file — ground scope in the collapsed signals and business fields alone, and say so in scope.summary.
 
 ## Audit Signals (collapsed to triage vocabulary)
 
@@ -56,7 +58,7 @@ Produce an operator briefing with six sections. Each section must be grounded in
 
 Read the audit results and identify what is actually broken. Be specific:
 - **summary**: 1-2 sentence plain-language summary of what's wrong (e.g., "Google and Yelp show a stale phone number; Bing listing is missing entirely.")
-- **broken_platforms**: which platforms have issues (from the Platform Status section of audit_results)
+- **broken_platforms**: which platforms have verified issues (from the Platform Status section — a "verified absent" render-control suffix counts as an issue; an \`unable_to_verify\` status does not). On a PARTIAL audit, name only what the partial evidence shows: platforms the Platform Presence Snapshot shows as defective, or — on a signal stub — the platforms implied by the translated signals, flagged as unconfirmed
 - **drift_details**: specifics of what's drifted — displayed name vs canonical, phone mismatch, address mismatch, etc.
 - **missing_assets**: what's absent (website, Apple Maps listing, photos, hours, category labels, etc.)
 
@@ -121,7 +123,7 @@ Rules:
 * 1–3 entries — the most painful problems only, ranked by severity. One well-grounded pair beats three thin ones: if the audit surfaces a single real issue (e.g. no website, everything else clean), return just that one. Never pad the count with duplicated, weak, or invented problems; never exceed three — when pains are numerous, the three most painful win. Each entry addresses a distinct customer-facing consequence — do not restate the same defect once per platform.
 * Playbook alignment — every entry must serve the confirmed issue (\`issue_type_confirmed\`) the operator is about to pitch, not just the audit's pain list. Most painful AND on-issue is the bar. Off-issue pains belong in the other briefing fields (risks, pitch), never in \`outreach_problems\`. Rank by severity *within* the aligned set.
 * Ground every \`problem\` in the audit data above — do not invent drift, missing platforms, or missed assets that are not present in the audit results. You MAY visit the business's live profile or website as an ordinary public visitor to confirm what is observable today before writing the pair (same access rules as the verification directives: no bypassing bot defenses, no logins, no intrusive testing). \`evidence\` cites what was actually observed — platform + observed fact.
-* When a Gold Standard block is present, treat it as the "what good looks like" reference for every signal in the analysis — a problem is strongest when it names the expected field or quality gate the business fails. Your evidence is the expected fields and quality gates listed in that block, compared against the audit results above: derive the comparison yourself, because no pre-computed gap list is supplied. Reflect any gaps you derive in this briefing's own fields (\`scope.missing_assets\`, \`risks\`, \`pitch.pain_points\`) — the output shape has no dedicated gap field. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
+* When a Gold Standard block is present, treat it as the "what good looks like" reference for every signal in the analysis — a problem is strongest when it names the expected field or quality gate the business fails. Your evidence is the expected fields and quality gates listed in that block, compared against the audit results above: when the audit results carry a \`## Gap Analysis\` section, that IS the pre-computed gap list — align pairs to it rather than re-deriving; otherwise derive the comparison yourself. Reflect any gaps you derive in this briefing's own fields (\`scope.missing_assets\`, \`risks\`, \`pitch.pain_points\`) — the output shape has no dedicated gap field. When the block is absent, ground pairs in the audit results and the category intelligence block alone.
 * When a PLATFORM SIGNAL WEIGHTS block is present, rank the aligned problems by severity AND platform weight together — a defect on a platform that carries the category's traffic outranks the same defect on a platform that does not. An \`unable_to_verify\` or missing profile on a low-weight platform is noise, not a pain — never pad \`outreach_problems\` with it.
 * Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.
 * Frame problems as business consequences ("customers asking Siri for your category are sent to a competitor"), never as technical labels ("NAP inconsistency").
@@ -131,7 +133,7 @@ Rules:
 * \`outreach_use\` must be concrete enough to act on without rework.
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
 
-The output JSON shape is appended after the supplementary blocks (category intelligence, gold standard, platform signal weights, and — emerging-lane prospects only — prospect origin). Return ONLY the JSON object, no markdown fences, no commentary.`;
+The output JSON shape is appended after the supplementary blocks (category intelligence, gold standard, platform signal weights, city/category market context, and — emerging-lane prospects only — prospect origin). Return ONLY the JSON object, no markdown fences, no commentary.`;
 
 async function main() {
   const existing = await prisma.mkt_prompt_templates_list.findUnique({

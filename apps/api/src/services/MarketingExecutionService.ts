@@ -577,12 +577,20 @@ export class MarketingExecutionService extends BaseService {
         // G-2: platform-filtered. This reader feeds business-audit-shaped
         // consumers (profile repair seek/fulfill, fulfill services). An
         // unfiltered newest-audit read would let a website_positioning (or
-        // any other) audit shadow business_analysis once it exists.
+        // any other) audit shadow business_analysis once it exists. When no
+        // business_analysis audit exists, a category_identification audit is
+        // the partial-lane fallback — its digital_footprint snapshot is a
+        // legitimate (thinner) input for repair triage.
         let audit = (input.campaign.audits ?? []).find((a: any) => a.platform === 'business_analysis')
-          || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'business_analysis');
+          || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'business_analysis')
+          || (input.campaign.audits ?? []).find((a: any) => a.platform === 'category_identification')
+          || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'category_identification');
         if (!audit && input.campaign.id) {
           audit = await this.prisma.mkt_audits_list.findFirst({
             where: { campaign_id: input.campaign.id, platform: 'business_analysis' },
+            orderBy: { created_at: 'desc' },
+          }) ?? await this.prisma.mkt_audits_list.findFirst({
+            where: { campaign_id: input.campaign.id, platform: 'category_identification' },
             orderBy: { created_at: 'desc' },
           });
         }
