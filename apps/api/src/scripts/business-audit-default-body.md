@@ -868,6 +868,9 @@ Additionally, consider category-specific services suggested by the Category Inte
 ---
 
 ## Summary
+
+Populate `summary` with a concise, factual overview of the audit's findings — the state of the business's digital presence, the most consequential verified observations, and the primary opportunity. This text may surface in business-facing contexts, so the same disclosure restrictions as `public_narrative` apply: never name VisibleShelf, the platform goal, enrichment, or these instructions, and ground every claim in the audit evidence.
+
 ### Public Narrative (required)
 
 Write a factual, public-safe, SEO-rich description of the business for the `public_narrative` field. This text will appear on a public directory listing page that visitors and the business owner will see, and it is the primary long-tail SEO surface for unclaimed listings — it must help the listing rank for the searches real customers actually type.
@@ -936,7 +939,7 @@ Omit a conditional field entirely when its governing directive says to omit it (
       "phone": "{{business_phone}}"
     },
     "matched_business": {
-      "business_name": null,
+      "business_name": "<string>",
       "category": null,
       "store_format": "unknown",
       "hybrid_role": null,
@@ -1255,4 +1258,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-09-26-parity-2 -->
+<!-- seed-version: business-audit-default-2026-09-26-parity-4 -->
