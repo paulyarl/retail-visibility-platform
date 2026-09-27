@@ -27,6 +27,8 @@
  *   doppler run --config prd -- npx tsx src/scripts/seed-business-audit-v2-templates.ts
  */
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { MarketingPromptService } from '../services/MarketingPromptService';
 import { logger } from '../logger';
 
@@ -1864,37 +1866,47 @@ function transformBusinessAuditV1(body: string): string {
   return out;
 }
 
-// ─── Prompt 4 (Seed Business Audit — mpt-seed-seek-001) transformation ────
-// The minimal legacy "Seek: Business Audit" template (~1.9k chars): no
-// embedded JSON schema, no Category/Gold/Market-Context bindings — it relies
-// entirely on BUSINESS_ANALYSIS_PROMPT_SUFFIX for its output shape. Folded
-// into the outreach-problems contract per spec §4.4.1: it gets the directive
-// (audit-context variant — the input is its own audit findings) and nothing
-// else. Its output_schema.name is already 'business_analysis'.
+// ─── Prompt 4 (Seed Business Audit — mpt-seed-seek-001) — DEFAULT ────────
+// Parity rewrite (2026-09-26): this template is tagged is_default, but its
+// minimal legacy body (~8.8k chars — platform goal + a 13-item provide list +
+// the outreach directive) carried no embedded JSON schema, no Category/Gold/
+// Market-Context bindings, and no section instructions. Because
+// business_analysis sits in LEGACY_NO_SUFFIX_SCHEMAS, the render path appends
+// no output contract either — the executed prompt's only output instruction
+// was "Format as structured JSON." The result: REQUIRED downstream fields the
+// two V2 bodies produce (public_narrative, market_opportunities,
+// signal_checklist, render_controls, gap_analysis, outreach_problems,
+// primary_outreach_hook, attributes) had no defined home in the default audit.
+//
+// The transform now replaces the body wholesale with the canonical default
+// body in business-audit-default-body.md — the Signal-Aligned (mpt-6oeuiizo)
+// instruction set, which is the superset of the two V2 templates, PLUS the
+// product-visibility coverage every business_analysis body lacked:
+//   - ### Business type classification (business_type)
+//   - ### Photo & Holiday-Hours Inventory (google photo_count/photo_types/
+//     special_hours_present)
+//   - ### Product Visibility & Ordering (website has_product_browsing /
+//     has_availability_inquiry / has_pickup_ordering / has_delivery_option /
+//     product_categories_visible)
+//   - a clean, deduplicated embedded schema carrying every contract field the
+//     V2 skeletons omit (outreach_problems, recommended_attributes,
+//     business_type, product-visibility fields, platform attributes arrays,
+//     canonical_city/state/zip)
+// The .md asset is the source of truth — edit it and bump
+// DEFAULT_AUDIT_MARKER when the canonical body changes.
+const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-09-26-parity-1 -->';
 
-function transformSeedBusinessAudit(body: string): string {
-  let out = body;
-
-  // Platform Goal section — prepended once (fingerprint-gated). The minimal
-  // body has no identity-block anchor; mission framing leads the prompt.
-  if (!out.includes(fingerprint(PLATFORM_GOAL_SECTION))) {
-    out = PLATFORM_GOAL_SECTION.trim() + '\n\n' + out;
+function transformSeedBusinessAudit(): string {
+  const body = readFileSync(
+    join(__dirname, 'business-audit-default-body.md'),
+    'utf8',
+  );
+  if (!body.includes(DEFAULT_AUDIT_MARKER)) {
+    throw new Error(
+      'business-audit-default-body.md is missing its DEFAULT_AUDIT_MARKER — the asset is the canonical body and must carry the marker for the idempotency gate.',
+    );
   }
-
-  // Self-heal on re-run: drop any prior version of the directive (and the
-  // trailing marker, which removeSection swallows as headingless tail
-  // content — step 2 re-appends it).
-  out = removeSection(out, '### Operator Outreach Problems');
-
-  // Anchor on the body's closing line — the directive lands at the end.
-  out = insertAfter(out, 'Format as structured JSON.', OUTREACH_PROBLEMS_DIRECTIVE);
-
-  // Append seed version marker for idempotency tracking.
-  if (!out.includes(SEED_VERSION_MARKER)) {
-    out = out + '\n' + SEED_VERSION_MARKER;
-  }
-
-  return out;
+  return body;
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────
@@ -1935,11 +1947,12 @@ async function main() {
     },
     {
       id: SEED_BUSINESS_AUDIT_ID,
-      label: 'Seek: Business Audit (mpt-seed-seek-001)',
-      marker: SEED_VERSION_MARKER,
+      label: 'Seek: Business Audit (mpt-seed-seek-001) — Default',
+      marker: DEFAULT_AUDIT_MARKER,
       transform: transformSeedBusinessAudit,
-      // variables intentionally omitted — the minimal legacy body only uses
-      // business_name/city/category; do not widen its declaration.
+      // Full 7-var declaration — the canonical body references every
+      // business-scope variable (identity table + requested_business schema).
+      variables: FULL_BUSINESS_VARIABLES,
     },
   ];
 

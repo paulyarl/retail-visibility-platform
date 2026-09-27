@@ -64,19 +64,27 @@ Return ONLY the JSON object, no markdown fences, no commentary.`,
   business_analysis: `
 
 Return your response as JSON matching the Business Analysis schema.
-Top-level keys: audit_metadata, detected_signals, summary, platforms,
-specialized_sources_audited, combined_review_metrics, alignment_scoring,
-website, nap_consistency, operational_status, competitive_benchmarks,
+Top-level keys: audit_metadata, detected_signals, summary, public_narrative,
+business_type, platforms, specialized_sources_audited,
+combined_review_metrics, alignment_scoring, website, nap_consistency,
+operational_status, competitive_benchmarks,
 unanswered_negative_review_examples, negative_review_themes,
 digital_opportunity_score, high_attention, high_attention_reasons,
 recommended_tier, tier_rationale, estimated_monthly_service_fee,
-recommended_services, data_quality, sources, gap_analysis,
-quality_gate_results.
+recommended_services, recommended_attributes, data_quality, sources,
+gap_analysis, quality_gate_results, market_opportunities, signal_checklist,
+render_controls, outreach_problems.
 
 When a GOLD STANDARD BENCHMARK section is present in the prompt, also
-populate gap_analysis (per-field gaps vs. expected values) and
-quality_gate_results (per-gate pass/fail), and capture
+populate gap_analysis (per-field gaps vs. expected values),
+quality_gate_results (per-gate pass/fail), and render_controls
+(per-platform render outcome vs. the control business), and capture
 platforms.{platform}.profile_url for each platform.
+
+When Market Context blocks are present, also populate market_opportunities
+and signal_checklist. Conditional fields (outreach_problems,
+recommended_attributes, platforms.{platform}.attributes) are emitted only
+when their governing directive applies — never as empty arrays.
 
 CRITICAL JSON RULES:
 - Every element of a JSON array MUST be a bare JSON object "{ ... }" separated by
