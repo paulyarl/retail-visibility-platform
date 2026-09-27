@@ -57,7 +57,9 @@ Evidence Rules — Obey every rule in the block's Category Evidence Rules sectio
 Prohibited Inferences — Do NOT make any inference listed in the block's PROHIBITED INFERENCES section. These are category-specific guardrails that complement (and are stricter than) the general cautions in this template.
 Category Signals — Populate detected_signals with any INT_* codes from the block's Category Signals list when verified public evidence supports them. These are admissible alongside the RA_*, DS_*, WC_*, CP_*, and VP_* signal families defined later in this template. These INT_* taxonomy codes are distinct from the free-text category_signals list in the CATEGORY MARKET CONTEXT block — the former are codes you may emit, the latter is a qualitative checklist for your assessment.
 Absence Is Not a Negative — If a website, social profile, delivery option, specialty product, or certification listed in the block is not found, record that it was "not verified." Do not convert absence into a claim that the asset does not exist.
-If the Category Intelligence block is missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations.Do NOT record notes about which prompt blocks were present or absent in `data_quality.conflicts` — that field is for conflicting EVIDENCE about the business (two different phone numbers in circulation, disagreeing published hours, a name variant published as a separate listing). Block-presence notes belong in `data_quality.limitations`, and only when a block is actually missing; if the Category Intelligence block was present and applied, record nothing about it.
+If the Category Intelligence block is missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations.
+
+Do NOT record notes about which prompt blocks were present or absent in `data_quality.conflicts` — that field is for conflicting EVIDENCE about the business (two different phone numbers in circulation, disagreeing published hours, a name variant published as a separate listing). Block-presence notes belong in `data_quality.limitations`, and only when a block is actually missing; if the Category Intelligence block was present and applied, record nothing about it.
 
 Gold Standard Benchmark — Binding for This Audit
 A GOLD STANDARD BENCHMARK block is appended to this prompt after the Category Intelligence block and before the JSON schema. It contains category-specific expected fields, quality gates, per-platform expected attributes, branding/photo expectations, and pattern exemplars for the business category being audited.
@@ -68,7 +70,7 @@ Expected Fields — Compare the business's actual profile against the Universal 
 Quality Gates — Evaluate each quality gate (Universal and per-platform). Record pass/fail in quality_gate_results.results with the platform, gate name, passed boolean, severity, and notes.
 Profile URLs — Capture the live profile URL for each platform in platforms.{platform}.profile_url so the benchmark comparison references a concrete destination.
 Platform Scope — The benchmark may define expected fields for platforms beyond the four audited here (google, yelp, facebook, bbb) — e.g., bing, apple_maps. For those platforms, evaluate the expected fields where publicly observable and record any gaps in gap_analysis.gaps with the platform field set accordingly; do not create platform objects for them in the platforms block.
-Absence vs. Non-Negotiable — A non_negotiable quality gate or expected field is recorded as failed (passed: false) ONLY when the field is verified absent. When a field cannot be verified (not found during searched discovery paths), record passed: null and note "not verified" — do NOT convert inability to verify into a failure. This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly.
+Absence vs. Non-Negotiable — A non_negotiable quality gate or expected field is recorded as failed (passed: false) ONLY when the field is verified absent. When a field cannot be verified (not found during searched discovery paths), record passed: null and note "not verified" — do NOT convert inability to verify into a failure. This reconciles the benchmark's non_negotiable gates with the Category Intelligence absence-is-not-a-negative rule. Exception: when the Platform Availability Verification directive establishes a business_specific_failure for a platform, the platform's expected fields are recorded as verified absent for that business, and the gates fail accordingly.
 Subject-as-Exemplar — If the audited business appears in the benchmark's Pattern Exemplars section, treat those exemplar notes as reference priors only (not as a self-comparison). Use the other exemplar businesses as competitive comparators; do not benchmark the business against itself.
 If the Gold Standard block is missing or empty, omit gap_analysis and quality_gate_results and note the absence in data_quality.limitations.
 Market Context Intelligence — Binding for This Audit
@@ -149,36 +151,6 @@ Rules:
 * Ground every claim in the audit data — never fabricate observed evidence. When the audit is too thin for a specific hook, write the most concrete honest sentence the evidence supports rather than generic filler ("baseline audit", "improve online presence").
 * Emit `null` when no outreach angle exists — a balanced/healthy audit with no painful verified gap produces `null`, not a manufactured pitch.
 
-
-
-
-
-
-## Business
-
-Business Name:
-
-{{business_name}}
-
-City:
-
-{{city}}
-
-State:
-
-{{state}}
-
-Category:
-
-{{category}}
-
-Optional Address:
-
-{{business_address}}
-
-Optional Phone:
-
-{{business_phone}}
 
 ---
 
@@ -277,13 +249,17 @@ When a determination is reached, set the platform object's `data_status` accordi
 
 For platforms beyond the four primary platforms (google, yelp, facebook, bbb) — e.g. bing, apple_maps — that are named in the Gold Standard block but have no platform object in the `platforms` block, record the control attempt in `render_controls` only. Do not create a platform object for them.
 
-Do not bypass bot defenses, solve access controls, or perform intrusive testing.When the determination for a platform is `business_specific_failure`, record the absence once rather than fanning it out across every expected field:
+Do not bypass bot defenses, solve access controls, or perform intrusive testing.
+
+When the determination for a platform is `business_specific_failure`, record the absence once rather than fanning it out across every expected field:
 
 * Record one `quality_gate_results.results` entry per non_negotiable gate on that platform with `passed: false` and `notes: "platform verified absent per render control"`.
 * Record one `gap_analysis.gaps` entry for the platform with `field: "profile_presence"`, `expected: "profile exists and renders"`, `actual: "profile not discoverable (control-confirmed)"`, `severity: "non_negotiable"`.
 * Do NOT add per-field gaps (hours, photos, categories, attributes) for that platform — they are subsumed by the profile-presence gap.
 
-Do not record positive platform attributes (rating, reviews, hours, categories, attribute chips) unless the profile content actually loaded.A platform whose data was captured through a syndication or integration path rather than a direct profile render — for example Yelp metrics surfaced inside an Apple Maps place card — is recorded `partial`, with the capture path noted in `data_quality.limitations`. Do NOT list such a platform among those recorded `unable_to_verify`, and do not describe it as one that "could not be rendered": the profile may well be reachable, you simply did not render it directly.
+Do not record positive platform attributes (rating, reviews, hours, categories, attribute chips) unless the profile content actually loaded.
+
+A platform whose data was captured through a syndication or integration path rather than a direct profile render — for example Yelp metrics surfaced inside an Apple Maps place card — is recorded `partial`, with the capture path noted in `data_quality.limitations`. Do NOT list such a platform among those recorded `unable_to_verify`, and do not describe it as one that "could not be rendered": the profile may well be reachable, you simply did not render it directly.
 
 Emit `DS_MISSING_PROFILE` ONLY when the control rendered on that platform and the business profile did not. Do not emit it when the control also failed, when no control was available, or when the platform was not attempted. Non-primary platforms (bing, apple_maps, etc.) record `business_specific_failure` in `render_controls` but do NOT emit `DS_MISSING_PROFILE` — the signal is restricted to the four primary platforms (google, yelp, facebook, bbb).
 
@@ -586,7 +562,9 @@ Assign one of four classifications based on verified metrics:
 * **BALANCED_HEALTHY (Maintenance / Growth Lead):**
   * Condition: All other verified profiles where administrative score and public sentiment are aligned.
   * Disposition: `STANDARD_OUTREACH`
-  * Rationale: Normal operational profile. Suitable for general local SEO, conversion optimization, or review-gating software.When no platform's rating or sentiment could be verified — every in-scope platform is unable_to_verify, so neither the administrative score nor the public sentiment score can be computed — emit `action_classification: null` instead of defaulting to BALANCED_HEALTHY. BALANCED_HEALTHY means "computed and aligned", not "could not be computed".
+  * Rationale: Normal operational profile. Suitable for general local SEO, conversion optimization, or review-gating software.
+
+When no platform's rating or sentiment could be verified — every in-scope platform is unable_to_verify, so neither the administrative score nor the public sentiment score can be computed — emit `action_classification: null` instead of defaulting to BALANCED_HEALTHY. BALANCED_HEALTHY means "computed and aligned", not "could not be computed".
 
 ---
 
@@ -1277,4 +1255,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-09-26-parity-1 -->
+<!-- seed-version: business-audit-default-2026-09-26-parity-2 -->
