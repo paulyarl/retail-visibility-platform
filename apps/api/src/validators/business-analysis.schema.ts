@@ -149,11 +149,16 @@ const mobileFriendlyEnum = z.enum(['yes', 'likely', 'no', 'unable_to_verify']);
  *   - "not_verified" / "not present" / "absent" / "missing" / "false" / "0" / "broken" -> "no"
  *   - "unverified" / "unknown" / "n/a" / "na" -> "unable_to_verify"
  *
+ * Real booleans are also accepted: true -> "yes", false -> "no" — agents
+ * occasionally treat the field as a plain boolean when the neighboring
+ * website fields (`https`, `click_to_call_available`, ...) are booleans.
+ *
  * "yes", "likely", "no", and "unable_to_verify" pass through unchanged.
  * Unknown strings fall through to the enum check so genuine typos still
  * surface as validation errors.
  */
 const mobileFriendlyCoerced = z.preprocess((val) => {
+  if (typeof val === 'boolean') return val ? 'yes' : 'no';
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
     if (s === 'verified' || s === 'present' || s === 'confirmed' || s === 'true' || s === '1' || s === 'working') return 'yes';
@@ -486,7 +491,10 @@ const alignmentScoringSchema = z.object({
   // platform) from "computed as BALANCED_HEALTHY". See
   // AUDIT_PLATFORM_AVAILABILITY_CONTROL_SPEC §6.3 (B3).
   action_classification: actionClassificationEnum.nullable().optional(),
-  lead_disposition: leadDispositionEnum.optional(),
+  // Nullable for the same "not computable" case as action_classification —
+  // when no platform rating could be verified there is no index to derive a
+  // disposition from, so null is the honest emission.
+  lead_disposition: leadDispositionEnum.nullable().optional(),
   primary_outreach_hook: z.string().nullable().optional(),
   alignment_breakdown: z.object({
     admin_score: coercedNumberNullable.optional(),
@@ -942,7 +950,7 @@ Return your response as JSON matching this exact schema:
   "alignment_scoring": {
     "misalignment_index": <number|null>,
     "action_classification": "ADMIN_NEGLECT|CORPORATE_SHIELD|CRITICAL_DISTRESS|BALANCED_HEALTHY|null",
-    "lead_disposition": "HIGH_PRIORITY_OUTREACH|DISCARD|REHABILITATION_OUTREACH|STANDARD_OUTREACH",
+    "lead_disposition": "HIGH_PRIORITY_OUTREACH|DISCARD|REHABILITATION_OUTREACH|STANDARD_OUTREACH|null",
     "primary_outreach_hook": "<string>",
     "alignment_breakdown": { "admin_score": <number|null>, "public_sentiment_score": <number|null>, "delta": <number|null> }
   },

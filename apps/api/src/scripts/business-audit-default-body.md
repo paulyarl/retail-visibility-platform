@@ -1063,8 +1063,8 @@ Omit a conditional field entirely when its governing directive says to omit it (
   },
   "alignment_scoring": {
     "misalignment_index": null,
-    "action_classification": "BALANCED_HEALTHY",
-    "lead_disposition": "STANDARD_OUTREACH",
+    "action_classification": "BALANCED_HEALTHY|null",
+    "lead_disposition": "HIGH_PRIORITY_OUTREACH|DISCARD|REHABILITATION_OUTREACH|STANDARD_OUTREACH|null",
     "primary_outreach_hook": "",
     "alignment_breakdown": {
       "admin_score": null,
@@ -1258,4 +1258,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-09-26-parity-5 -->
+<!-- seed-version: business-audit-default-2026-09-26-parity-6 -->
