@@ -2464,6 +2464,7 @@ export class MarketingExecutionService extends BaseService {
             lines.push(`  - ${s}`);
           }
         }
+        lines.push('', '=== END CATEGORY MARKET CONTEXT ===');
         blocks.push(lines.join('\n'));
       }
 
@@ -2507,6 +2508,7 @@ export class MarketingExecutionService extends BaseService {
             lines.push(`  - ${m.city}${m.state ? `, ${m.state}` : ''} (${m.relationship}): ${m.character}${m.business_scene ? ` — ${m.business_scene}` : ''}${m.notes ? ` — ${m.notes}` : ''}`);
           }
         }
+        lines.push('', '=== END CITY MARKET CONTEXT ===');
         blocks.push(lines.join('\n'));
       }
 
@@ -2679,6 +2681,7 @@ export class MarketingExecutionService extends BaseService {
     lines.push('Absence rules: "not found on a platform during discovery" is a discovery');
     lines.push('signal, not proof of absence. Re-verify platform absence yourself before');
     lines.push('emitting DS_MISSING_PROFILE or similar.');
+    lines.push('', '=== END DISCOVERY LEADS ===');
 
     return lines.join('\n');
   }
@@ -2732,6 +2735,7 @@ export class MarketingExecutionService extends BaseService {
       '(e.g. "we found you in customs records because you have no web presence").',
       'Never present it to the owner as a verdict about the business itself.',
     );
+    lines.push('', '=== END PROSPECT ORIGIN ===');
 
     return lines.join('\n');
   }
@@ -2797,6 +2801,7 @@ export class MarketingExecutionService extends BaseService {
       'claimed exposures — confirm before presenting them as fact, and never',
       'present either to the owner as a verdict about the business itself.',
     );
+    lines.push('', '=== END PROSPECT ORIGIN ===');
 
     return lines.join('\n');
   }
@@ -2835,6 +2840,7 @@ export class MarketingExecutionService extends BaseService {
       'and never present them to the owner as a verdict about the business.',
       'Framed as opportunity, they are the outreach wedge.',
     );
+    lines.push('', '=== END PROSPECT ORIGIN ===');
 
     return lines.join('\n');
   }
@@ -2889,6 +2895,7 @@ export class MarketingExecutionService extends BaseService {
         lines.push(`- [${row.evidenceState}] ${row.sourceName}${fields} (${when})${url}${owner}${shared}${notes}`);
       }
       if (rows.length > cap) lines.push(`… +${rows.length - cap} more`);
+      lines.push('', '=== END VERIFIED EVIDENCE ===');
 
       return lines.join('\n');
     } catch (err: any) {
@@ -3452,6 +3459,7 @@ ${scopeNote}
         '  secondary_playbook — fallback route used only when no playbook\'s matching',
         '                       rules fit the business; beats the generic fallback.',
         ...rows,
+        '=== END TRIAGE PLAYBOOK ROSTER ===',
       ].join('\n');
     } catch (err) {
       logger.warn('Triage playbook roster block skipped — catalog read failed', ctx, {

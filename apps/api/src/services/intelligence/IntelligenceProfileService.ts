@@ -705,6 +705,7 @@ export function serializeSignalWeightContextBlock(
       "weight is your evidence, not the owner's vocabulary.",
   );
   lines.push('');
+  lines.push('=== END PLATFORM SIGNAL WEIGHTS ===');
   return lines.join('\n');
 }
 
