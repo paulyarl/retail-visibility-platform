@@ -82,6 +82,9 @@ export interface PromptExecutionInput {
  *     JSON array. LLMs sometimes emit JS-object-key syntax for subsequent
  *     array elements when the schema example only shows one element. The label
  *     (identifier followed by a colon) is stripped, leaving a bare `{ ... }`.
+ *   - Trailing commas: e.g. `"rationale": "...",\n}`. A comma whose next
+ *     non-whitespace character is `}` or `]` is dropped. The scan is
+ *     string-aware so commas inside string literals are preserved.
  *
  * Does NOT mutate the original string; returns a cleaned copy. If cleaning
  * fails or the input is unchanged, the original is returned so JSON.parse can
@@ -153,6 +156,27 @@ export function stripLlmJsonArtifacts(raw: string): string {
     //    The label is a bare word (letters, digits, underscore) followed by `:`.
     //    We require whitespace or nothing between the comma/bracket and the label.
     text = text.replace(/([\[,])\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*\{/g, '$1 {');
+
+    // 4. Strip trailing commas before a closing `}` or `]` — a common LLM
+    //    artifact (`"key": "value",\n}`). String-aware: commas inside string
+    //    literals are left untouched.
+    let repaired = '';
+    let inString = false;
+    let escape = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { repaired += ch; escape = false; continue; }
+      if (ch === '\\' && inString) { repaired += ch; escape = true; continue; }
+      if (ch === '"') { inString = !inString; repaired += ch; continue; }
+      if (inString) { repaired += ch; continue; }
+      if (ch === ',') {
+        let j = i + 1;
+        while (j < text.length && /\s/.test(text[j])) j++;
+        if (text[j] === '}' || text[j] === ']') continue;
+      }
+      repaired += ch;
+    }
+    text = repaired;
 
     return text;
   } catch {
