@@ -1,26 +1,28 @@
 /**
- * Seed script: Business Audit V2 — wire both intelligence profiles into both
- * seek variants.
+ * Seed script: Business Audit — the default business_analysis template.
  *
- * The two Business Audit V2 templates (Category-Integrated + Signal-Aligned)
- * have the Category Intelligence block AND the Gold Standard Benchmark block
- * appended at runtime by MarketingExecutionService.resolvePrompt(). However,
- * the template BODIES did not instruct the model on how to apply those blocks,
- * and the embedded JSON schemas did not define the output fields the blocks
- * require. This script wires both profiles into both bodies:
+ * History: this script originally wired Category Intelligence + Gold Standard
+ * bindings into the two V2 variants (mpt-j9bbem3l Category-Integrated,
+ * mpt-6oeuiizo Signal-Aligned) plus V1 (mpt-je6m7ru6), and later rewrote the
+ * minimal legacy default (mpt-seed-seek-001) to full parity. The three
+ * non-default bodies were retired 2026-09-26 (is_active=false) — the
+ * business_analysis job has exactly one template, matching the
+ * single-template convention of the other prompt jobs. See the
+ * "Default business audit — parity rewrite" section in AGENTS.md.
  *
- *   - mpt-j9bbem3l (Category-Integrated): already had Category Intelligence
- *     wired in; this adds the Gold Standard binding section + schema fields
- *     (profile_url, gap_analysis, quality_gate_results).
- *   - mpt-6oeuiizo (Signal-Aligned): had NEITHER profile wired in; this adds
- *     the Category Intelligence binding section + all missing CI instruction
- *     sections + schema fields, PLUS the Gold Standard binding section +
- *     schema fields.
+ * What this script does now:
+ *   1. Retires the duplicate bodies (RETIRED_BUSINESS_AUDIT_IDS) —
+ *      is_active=false, is_default=false. Soft-retire, not delete:
+ *      mkt_executions_list.template_id references them (FK NoAction) and
+ *      past executions keep template_body_snapshot.
+ *   2. Rewrites mpt-seed-seek-001's body from the canonical asset
+ *      src/scripts/business-audit-default-body.md whenever the body's
+ *      seed-version marker is older than DEFAULT_AUDIT_MARKER, and fixes
+ *      output_schema/variables columns. The .md asset is the source of
+ *      truth — edit it and bump DEFAULT_AUDIT_MARKER to re-apply.
  *
- * Idempotency: each variant has a marker string. If the marker is already
- * present in the live body, that variant is skipped (update-in-place safety
- * per AGENTS.md — check for the presence of the NEW marker, not the absence
- * of an old section).
+ * Idempotency: marker check on the default; is_active/is_default check on
+ * the retired ids. Safe to re-run on any environment.
  *
  * Usage (from apps/api):
  *   doppler run --config local -- npx tsx src/scripts/seed-business-audit-v2-templates.ts
@@ -1911,40 +1913,57 @@ function transformSeedBusinessAudit(): string {
 
 // ─── Main ────────────────────────────────────────────────────────────────
 
+// ─── Retired duplicate bodies (2026-09-26) ──────────────────────────────
+// The business_analysis job needs exactly one template — the default —
+// matching the single-template convention of the other prompt jobs
+// (category identification, discovery, establishment). The two V2 bodies
+// converged on the same instruction set through shared transforms (their
+// "variant" focus is nominal) and carry heavy duplication damage, so they
+// — plus the thinner V1 body — are retired via is_active=false instead of
+// deleted: mkt_executions_list.template_id references them (FK NoAction)
+// and past executions keep their template_body_snapshot. Their transform
+// functions below are retained for reference but no longer seeded.
+
+const RETIRED_BUSINESS_AUDIT_IDS = [
+  { id: CATEGORY_INTEGRATED_ID, label: 'Business Digital Audit - Cohesive (Category-Integrated)' },
+  { id: SIGNAL_ALIGNED_ID, label: 'Business Digital Audit - Alignment Scoring (Signal-Aligned)' },
+  { id: BUSINESS_AUDIT_V1_ID, label: 'Seek: Business Audit V1' },
+];
+
 async function main() {
   const service = MarketingPromptService.getInstance();
   const prisma = (service as any).prisma;
+
+  // Retire duplicate bodies first — idempotent, runs on every seed.
+  let retired = 0;
+  for (const r of RETIRED_BUSINESS_AUDIT_IDS) {
+    try {
+      const row = await prisma.mkt_prompt_templates_list.findUnique({
+        where: { id: r.id },
+        select: { is_active: true, is_default: true },
+      });
+      if (!row) continue;
+      if (row.is_active || row.is_default) {
+        await prisma.mkt_prompt_templates_list.update({
+          where: { id: r.id },
+          data: { is_active: false, is_default: false, updated_at: new Date() },
+        });
+        logger.info(`Retired duplicate business-audit template: ${r.label}`, undefined, { templateId: r.id });
+        retired++;
+      }
+    } catch (err) {
+      console.error(`[FAILED] retire ${r.label}:`, err instanceof Error ? err.message : String(err));
+    }
+  }
 
   const tasks: Array<{
     id: string;
     label: string;
     marker: string;
     transform: (body: string) => string;
-    /** Declared variables written on transform. Omit to leave the column
-     *  untouched (mpt-seed-seek-001 keeps its own 3-var declaration). */
+    /** Declared variables written on transform. */
     variables?: string[];
   }> = [
-    {
-      id: CATEGORY_INTEGRATED_ID,
-      label: 'Business Digital Audit - Cohesive (Category-Integrated)',
-      marker: GOLD_STANDARD_MARKER,
-      transform: transformCategoryIntegrated,
-      variables: FULL_BUSINESS_VARIABLES,
-    },
-    {
-      id: SIGNAL_ALIGNED_ID,
-      label: 'Business Digital Audit - Alignment Scoring (Signal-Aligned)',
-      marker: CATEGORY_INTELLIGENCE_MARKER,
-      transform: transformSignalAligned,
-      variables: FULL_BUSINESS_VARIABLES,
-    },
-    {
-      id: BUSINESS_AUDIT_V1_ID,
-      label: 'Seek: Business Audit V1',
-      marker: V1_MARKER,
-      transform: transformBusinessAuditV1,
-      variables: FULL_BUSINESS_VARIABLES,
-    },
     {
       id: SEED_BUSINESS_AUDIT_ID,
       label: 'Seek: Business Audit (mpt-seed-seek-001) — Default',
@@ -2029,7 +2048,7 @@ async function main() {
     }
   }
 
-  logger.info(`Seed complete: ${updated} updated, ${skipped} skipped (already wired)`);
+  logger.info(`Seed complete: ${updated} updated, ${skipped} skipped (already wired), ${retired} retired`);
   process.exit(0);
 }
 
