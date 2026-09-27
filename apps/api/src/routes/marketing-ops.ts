@@ -1715,6 +1715,32 @@ router.post('/:id/switch-track', async (req: any, res: Response) => {
   }
 });
 
+// Website Gap (PB-08 / A7) — confirm the build-scope decision. The analog of
+// track confirmation: the positioning audit's build_scope.recommended is
+// advisory; this commits the operator's choice to website_gap_decision.
+const buildScopeSchema = z.object({
+  scope: z.enum(['new_build', 'rebuild', 'repair', 'secure_and_refresh']),
+  reason: z.string().min(1, 'Reason is required'),
+});
+
+router.post('/:id/website-gap/confirm-scope', async (req: any, res: Response) => {
+  try {
+    const parsed = buildScopeSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.confirmWebsiteBuildScope({
+      campaignId: req.params.id,
+      scope: parsed.scope,
+      reason: parsed.reason,
+      changedBy: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Enrich campaign contact fields from Google Places API (opt-in, 72h cache)
 router.post('/:id/enrich-contact', async (req: any, res: Response) => {
   try {

@@ -3520,6 +3520,102 @@ export class MarketingCampaignService extends BaseService {
     }
   }
 
+  /**
+   * PB-08 / A7 — confirm the website build-scope decision.
+   *
+   * The positioning audit's build_scope.recommended is advisory; this commits
+   * the operator's decision to campaign.playbook_decision — the decision
+   * analog of repair track confirmation. The column is playbook-agnostic
+   * (migration 309); this writer namespaces its payload kind
+   * 'website_build_scope'. No stage remap: the website-gap motion keeps its
+   * stage; the decision is workflow state only.
+   *
+   * Eligibility mirrors the web gate (repairCampaignGate.isWebsiteGapCampaign):
+   * playbook_code === 'PB-08' is definitive, and the accepted triage result's
+   * effective playbook archetype === 'A7' is the belt-and-braces fallback.
+   */
+  async confirmWebsiteBuildScope(input: {
+    campaignId: string;
+    scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
+    reason: string;
+    changedBy?: string;
+  }, ctx?: RequestCtx): Promise<any> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: input.campaignId },
+      });
+      if (!campaign) throw new Error(`Campaign ${input.campaignId} not found`);
+
+      let archetype: string | null = null;
+      const triageRow = await this.prisma.mkt_campaign_triage_results.findFirst({
+        where: { campaign_id: input.campaignId, is_operator_accepted: true },
+        include: {
+          playbook: { select: { archetype: true } },
+          overridden_playbook: { select: { archetype: true } },
+        },
+      });
+      archetype = (triageRow as any)?.overridden_playbook?.archetype
+        ?? (triageRow as any)?.playbook?.archetype
+        ?? null;
+
+      const isWebsiteGap = campaign.playbook_code === 'PB-08' || archetype === 'A7';
+      if (!isWebsiteGap) {
+        throw new Error('Build-scope confirmation is only available for website-gap (PB-08 / A7) campaigns');
+      }
+      if (!input.reason || input.reason.trim().length === 0) {
+        throw new Error('A reason is required for build-scope confirmation');
+      }
+
+      // Record divergence from the latest positioning audit's recommendation.
+      const latestAudit = await this.prisma.mkt_audits_list.findFirst({
+        where: { campaign_id: input.campaignId, platform: 'website_positioning' },
+        orderBy: { created_at: 'desc' },
+      });
+      const recommended = (latestAudit?.audit_data as any)?.build_scope?.recommended ?? null;
+
+      const decision = {
+        kind: 'website_build_scope',
+        confirmed_scope: input.scope,
+        recommended_scope: recommended,
+        diverged_from_audit: recommended ? recommended !== input.scope : null,
+        reason: input.reason,
+        decided_at: new Date().toISOString(),
+        decided_by: input.changedBy ?? null,
+        audit_id: latestAudit?.id ?? null,
+      };
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: input.campaignId },
+        data: { playbook_decision: decision },
+      });
+
+      await this.logStageTransition({
+        campaignId: input.campaignId,
+        fromStage: campaign.stage,
+        toStage: campaign.stage,
+        notes: `Build scope confirmed: ${input.scope}${
+          recommended && recommended !== input.scope ? ` (audit recommended ${recommended})` : ''
+        }. Reason: ${input.reason}`,
+        triggerType: 'build_scope_confirm',
+        changedBy: input.changedBy,
+      });
+
+      logger.info('Website gap build scope confirmed', ctx, {
+        campaignId: input.campaignId,
+        scope: input.scope,
+        recommended,
+      });
+
+      return updated;
+    } catch (error) {
+      logger.error('Failed to confirm website build scope', ctx, {
+        error: (error as Error).message,
+        campaignId: input.campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   private async logStageTransition(params: {
     campaignId: string;
     fromStage: string | null;

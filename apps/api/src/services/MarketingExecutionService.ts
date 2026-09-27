@@ -237,17 +237,20 @@ export class MarketingExecutionService extends BaseService {
           model: result.model,
         });
 
-        // Directory Enrichment lane — post-run hook for the two enrichment
-        // output schemas. Parse + validate the raw output, persist an audit
-        // row so the campaign's Audits tab renders a mapped card, then
-        // auto-apply the packet to directory_category_enrichment with
-        // campaign/execution lineage (trigger_source='campaign_run').
+        // Audit-persistence lane — post-run hook for audit-producing output
+        // schemas. Parse + validate the raw output and persist an audit row
+        // so the campaign's Audits tab renders a mapped card. The three
+        // enrichment schemas additionally auto-apply the packet to
+        // directory_category_enrichment with campaign/execution lineage
+        // (trigger_source='campaign_run'); website_positioning_audit persists
+        // the audit only — PB-08's positioning pass has no enrichment apply.
         // Best-effort: the execution stays 'completed' even if apply fails.
         const outputSchemaName = (template.output_schema as any)?.name;
         if (
           outputSchemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME ||
           outputSchemaName === LOCATION_ENRICHMENT_SCHEMA_NAME ||
-          outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME
+          outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME ||
+          outputSchemaName === WEBSITE_POSITIONING_SCHEMA_NAME
         ) {
           try {
             await this.applyEnrichmentFromOutput({
@@ -302,14 +305,16 @@ export class MarketingExecutionService extends BaseService {
   }
 
   /**
-   * Directory Enrichment lane — apply a completed internal execution's output.
+   * Audit-persistence lane — land a completed internal execution's output.
    *
    * Mirrors the external-import path in
    * MarketingPromptService.importExternalResult(): parse the raw output with
    * the same candidate-extraction helpers, validate against the registered
    * output schema, persist an audit row (auditPlatform) so the campaign's
-   * Audits tab renders a mapped card, then auto-apply the packet to
-   * directory_category_enrichment via the campaign-scope-appropriate service.
+   * Audits tab renders a mapped card. For the three enrichment schemas, then
+   * auto-apply the packet to directory_category_enrichment via the
+   * campaign-scope-appropriate service; audit-producing schemas without an
+   * enrichment apply (website_positioning_audit) return after the audit row.
    *
    * Throws on parse/validation/apply failure — the caller wraps this in a
    * best-effort try/catch.
@@ -395,6 +400,22 @@ export class MarketingExecutionService extends BaseService {
       }
     }
 
+    // Audit-producing schemas without an enrichment apply (e.g.
+    // website_positioning_audit) stop here — the audit row above is the whole
+    // post-run contract.
+    if (
+      input.schemaName !== CATEGORY_ENRICHMENT_SCHEMA_NAME &&
+      input.schemaName !== LOCATION_ENRICHMENT_SCHEMA_NAME &&
+      input.schemaName !== CATEGORY_SET_ENRICHMENT_SCHEMA_NAME
+    ) {
+      logger.info('Audit persisted from internal run', ctx, {
+        executionId: input.executionId,
+        campaignId: input.campaign.id,
+        schemaName: input.schemaName,
+      });
+      return;
+    }
+
     const campaignRef = {
       id: input.campaign.id,
       category: input.campaign.category ?? null,
@@ -470,6 +491,83 @@ export class MarketingExecutionService extends BaseService {
       campaignId: input.campaign.id,
       schemaName: input.schemaName,
     });
+  }
+
+  /**
+   * Website positioning audit (PB-08) — build `prior_website_findings` with
+   * explicit upstream-lane provenance. Same precedence as
+   * ProfileRepairPromptService.pickRepairSourceAudit:
+   *
+   *   FULL    — a real business_analysis audit: verified platform findings.
+   *   PARTIAL — a category_identification audit: presence snapshot.
+   *   PARTIAL — a business_analysis stub (discovery_scan / queue-derived):
+   *             translated canonical signals, NOT verified findings.
+   *   NONE    — no prior audit; assess from scratch.
+   *
+   * Stubs are filtered via isStubBusinessAnalysisAudit — an unfiltered
+   * newest-BA read would let a discovery stub shadow a real audit (same bug
+   * class as the repair triage serializer). The EVIDENCE COVERAGE banner is
+   * a code decision about which upstream pipe fed this render, not a new
+   * data point.
+   */
+  private async buildPriorWebsiteFindings(campaign: any): Promise<string> {
+    const audits: any[] = [
+      ...(campaign.audits ?? []),
+      ...(campaign.mkt_audits_list ?? []),
+    ];
+
+    let realAudit = audits.find((a) => a?.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a));
+    let catIdAudit = audits.find((a) => a?.platform === 'category_identification');
+    let stubAudit = audits.find((a) => a?.platform === 'business_analysis' && isStubBusinessAnalysisAudit(a));
+
+    // Audit lists may not be preloaded on the campaign object — one DB read
+    // covering all three lanes when nothing resolved in memory.
+    if (!realAudit && !catIdAudit && !stubAudit && campaign.id) {
+      const rows = await this.prisma.mkt_audits_list.findMany({
+        where: {
+          campaign_id: campaign.id,
+          platform: { in: ['business_analysis', 'category_identification'] },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+      realAudit = rows.find((a) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a));
+      catIdAudit = rows.find((a) => a.platform === 'category_identification');
+      stubAudit = rows.find((a) => a.platform === 'business_analysis' && isStubBusinessAnalysisAudit(a));
+    }
+
+    if (realAudit) {
+      const websiteBlock = (realAudit.audit_data as any)?.website;
+      return [
+        'EVIDENCE COVERAGE: FULL — a verified business audit is on file. Its website findings are platform-verified; re-verify only what may have changed since the audit.',
+        '',
+        websiteBlock
+          ? JSON.stringify(websiteBlock, null, 2)
+          : '(business audit carried no website block — assess the site from scratch)',
+      ].join('\n');
+    }
+
+    if (catIdAudit) {
+      const d = (catIdAudit.audit_data ?? {}) as any;
+      const snapshot = d.digital_footprint ?? d;
+      return [
+        'EVIDENCE COVERAGE: PARTIAL — a category-identification presence snapshot is on file (scan-time observations, not verified findings). Confirm each item before treating it as a defect.',
+        '',
+        JSON.stringify(snapshot, null, 2),
+      ].join('\n');
+    }
+
+    if (stubAudit) {
+      const d = (stubAudit.audit_data ?? {}) as any;
+      return [
+        'EVIDENCE COVERAGE: PARTIAL — discovery-scan-derived signals only (translated upstream evidence, never platform-verified). Treat every item as a hypothesis to confirm, never as an established defect.',
+        '',
+        `source: ${d.audit_metadata?.source ?? 'discovery_scan'}`,
+        `detected_signals: ${JSON.stringify(d.detected_signals ?? [])}`,
+        `summary: ${d.summary ?? '(none)'}`,
+      ].join('\n');
+    }
+
+    return 'EVIDENCE COVERAGE: NONE — no prior audit on file. Assess the site from scratch.';
   }
 
   /**
@@ -707,26 +805,19 @@ export class MarketingExecutionService extends BaseService {
           }
         }
         // 4. Website positioning audit (PB-08 / A7). Auto-source the
-        // campaign's website URL and the prior business_analysis audit's
-        // `website` block so the positioning pass consumes what the breadth
-        // audit already found (spec §6.2).
+        // campaign's website URL and the prior evidence lane's website
+        // findings so the positioning pass consumes what upstream already
+        // found (spec §6.2). Lane-aware: a real business_analysis audit is
+        // FULL verified evidence; a discovery-scan stub or
+        // category_identification audit is PARTIAL — declared in the
+        // EVIDENCE COVERAGE banner so the analyst weighs it as hypothesis,
+        // not fact.
         else if (outputSchemaName === WEBSITE_POSITIONING_SCHEMA_NAME) {
           if (!effectiveVariables.website_url || !String(effectiveVariables.website_url).trim()) {
             effectiveVariables.website_url = input.campaign.website_url ?? '';
           }
           if (!effectiveVariables.prior_website_findings || !String(effectiveVariables.prior_website_findings).trim()) {
-            const businessAudit = (input.campaign.audits ?? []).find((a: any) => a.platform === 'business_analysis')
-              || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'business_analysis')
-              || (input.campaign.id
-                ? await this.prisma.mkt_audits_list.findFirst({
-                    where: { campaign_id: input.campaign.id, platform: 'business_analysis' },
-                    orderBy: { created_at: 'desc' },
-                  })
-                : null);
-            const websiteBlock = (businessAudit?.audit_data as any)?.website;
-            effectiveVariables.prior_website_findings = websiteBlock
-              ? JSON.stringify(websiteBlock, null, 2)
-              : '(no prior business_analysis website findings — assess the site from scratch)';
+            effectiveVariables.prior_website_findings = await this.buildPriorWebsiteFindings(input.campaign);
           }
         }
       } catch (err) {

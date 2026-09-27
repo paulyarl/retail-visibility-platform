@@ -155,6 +155,17 @@ export interface TriageRecommendation {
   _validated?: boolean;
 }
 
+export interface WebsiteGapDecision {
+  kind: 'website_build_scope';
+  confirmed_scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
+  recommended_scope: string | null;
+  diverged_from_audit: boolean | null;
+  reason: string;
+  decided_at: string;
+  decided_by: string | null;
+  audit_id: string | null;
+}
+
 export interface Campaign {
   id: string;
   display_id: string | null;
@@ -163,6 +174,10 @@ export interface Campaign {
   repair_track?: RepairTrack | null;
   repair_issue_type?: string | null;
   repair_triage_briefing?: TriageRecommendation | null;
+  // PB-08 / A7 (migration 309) — operator-confirmed build scope, the decision
+  // analog of repair track confirmation. The column is playbook-agnostic;
+  // the PB-08 writer namespaces payloads kind='website_build_scope'.
+  playbook_decision?: WebsiteGapDecision | null;
   // Profile Repair Fulfillment Sprint (migration 301) — Track A package state.
   repair_fulfillment?: RepairFulfillment | null;
   pipeline?: 'review' | 'recovery';
@@ -2477,6 +2492,24 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to switch repair track');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  // PB-08 / A7 — confirm the operator's build-scope decision (migration 309).
+  async confirmWebsiteBuildScope(id: string, input: {
+    scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
+    reason: string;
+  }): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/website-gap/confirm-scope`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-campaign-website-gap-confirm-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to confirm build scope');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;

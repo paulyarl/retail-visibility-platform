@@ -23,7 +23,10 @@
  *
  * Auto-sourced variables (MarketingExecutionService.resolvePrompt):
  *   - website_url           ← campaign.website_url
- *   - prior_website_findings ← latest business_analysis audit's `website` block
+ *   - prior_website_findings ← lane-aware upstream evidence with an EVIDENCE
+ *     COVERAGE banner: FULL = real business_analysis audit's `website` block;
+ *     PARTIAL = category-identification snapshot or discovery-scan stub's
+ *     translated signals; NONE when no prior audit exists
  *
  * Idempotent — deterministic ID so re-running updates in place.
  *
@@ -45,8 +48,13 @@ conversion implication the owner will feel.
 
 BUSINESS WEBSITE URL: {{website_url}}
 
-PRIOR BUSINESS-AUDIT WEBSITE FINDINGS (from the breadth audit — treat as
-leads to verify, not as conclusions):
+PRIOR WEBSITE FINDINGS — the block opens with an EVIDENCE COVERAGE line:
+  - FULL    — a verified business audit fed this render; its website findings
+              are platform-verified. Re-verify only what may have changed.
+  - PARTIAL — discovery-scan signals or a category-identification presence
+              snapshot fed this render. Treat every item as a hypothesis to
+              confirm, NEVER as an established defect.
+  - NONE    — no prior audit; assess the site from scratch.
 {{prior_website_findings}}
 
 === PLATFORM GOAL: THE DIGITAL SHELF ===

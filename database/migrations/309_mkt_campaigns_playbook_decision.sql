@@ -1,0 +1,33 @@
+-- Migration 309: Playbook Decision Column
+--
+-- Stores the operator-confirmed playbook decision directly on the campaign
+-- row — a playbook-agnostic commitment record for motions where triage
+-- produces an advisory recommendation that an operator must ratify.
+--
+-- First writer: PB-08 / A7 website-gap campaigns. The positioning audit's
+-- build_scope.recommended is advisory; this column records what the operator
+-- actually committed to, including divergence from the audit's call.
+--
+-- Playbook-agnostic by design: the column is generic JSONB workflow state
+-- (same pattern as repair_triage_briefing, cascade_config, directory_profiles)
+-- so any future playbook with a confirmable decision can write here instead
+-- of adding a per-playbook column. Each writer namespaces its payload with a
+-- `kind` discriminator. PB-08 payload shape:
+--   {
+--     kind: 'website_build_scope',
+--     confirmed_scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh',
+--     recommended_scope: string | null,   -- latest positioning audit's call
+--     diverged_from_audit: boolean | null,
+--     reason: string,                     -- required, mirrors track switches
+--     decided_at: ISO timestamp,
+--     decided_by: user id | null,
+--     audit_id: string | null             -- the positioning audit it confirms
+--   }
+--
+-- Repair campaigns do NOT use this column — their decision is relational
+-- state (repair_track + repair_issue_type + track_decided_* columns) because
+-- it is indexed and drives stage remapping. Campaigns with no confirmed
+-- playbook decision leave this NULL.
+
+ALTER TABLE mkt_campaigns_list
+  ADD COLUMN IF NOT EXISTS playbook_decision JSONB;

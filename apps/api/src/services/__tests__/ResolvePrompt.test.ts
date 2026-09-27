@@ -2312,4 +2312,98 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       expect(renderedPrompt).not.toContain('NATIONAL DISCOVERY SCOPE');
     });
   });
+
+  describe('website positioning audit (PB-08) — prior_website_findings lane awareness', () => {
+    const makeWpTemplate = () => ({
+      body: 'SITE: {{website_url}}\nPRIOR: {{prior_website_findings}}',
+      prompt_type: 'seek',
+      scope: 'business',
+      variables: ['website_url', 'prior_website_findings'],
+      output_schema: { name: 'website_positioning_audit' },
+    });
+
+    const makeWpCampaign = (audits: any[] = []) => ({
+      ...makeCampaign('business', 'Auto Repair'),
+      website_url: 'https://example.test',
+      mkt_audits_list: audits,
+    });
+
+    it('FULL — a real business_analysis audit feeds the website block', async () => {
+      const campaign = makeWpCampaign([
+        { platform: 'business_analysis', audit_data: { website: { status: 'present', mobile_friendly: 'yes' } } },
+      ]);
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeWpTemplate(), campaign, variables: undefined,
+      });
+      expect(renderedPrompt).toContain('EVIDENCE COVERAGE: FULL');
+      expect(renderedPrompt).toContain('"mobile_friendly": "yes"');
+    });
+
+    it('PARTIAL — a discovery-scan stub is never labeled verified', async () => {
+      const campaign = makeWpCampaign([
+        {
+          platform: 'business_analysis',
+          audit_data: {
+            audit_metadata: { source: 'discovery_scan', verdict: 'partial' },
+            detected_signals: ['WC_MISSING_WEBSITE'],
+            summary: 'Discovery partial verdict',
+          },
+        },
+      ]);
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeWpTemplate(), campaign, variables: undefined,
+      });
+      expect(renderedPrompt).toContain('EVIDENCE COVERAGE: PARTIAL');
+      expect(renderedPrompt).toContain('discovery_scan');
+      expect(renderedPrompt).toContain('WC_MISSING_WEBSITE');
+      expect(renderedPrompt).not.toContain('EVIDENCE COVERAGE: FULL');
+    });
+
+    it('PARTIAL — a category_identification audit feeds the presence snapshot', async () => {
+      const campaign = makeWpCampaign([
+        { platform: 'category_identification', audit_data: { digital_footprint: { website: 'facebook_only' } } },
+      ]);
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeWpTemplate(), campaign, variables: undefined,
+      });
+      expect(renderedPrompt).toContain('EVIDENCE COVERAGE: PARTIAL');
+      expect(renderedPrompt).toContain('facebook_only');
+    });
+
+    it('a real audit wins over a stub when both exist', async () => {
+      const campaign = makeWpCampaign([
+        {
+          platform: 'business_analysis',
+          audit_data: { audit_metadata: { source: 'discovery_scan' }, detected_signals: ['WC_MISSING_WEBSITE'] },
+        },
+        { platform: 'business_analysis', audit_data: { website: { status: 'parked' } } },
+      ]);
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeWpTemplate(), campaign, variables: undefined,
+      });
+      expect(renderedPrompt).toContain('EVIDENCE COVERAGE: FULL');
+      expect(renderedPrompt).toContain('"status": "parked"');
+    });
+
+    it('NONE — no prior audit renders the from-scratch banner', async () => {
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeWpTemplate(), campaign: makeWpCampaign([]), variables: undefined,
+      });
+      expect(renderedPrompt).toContain('EVIDENCE COVERAGE: NONE');
+      expect(renderedPrompt).toContain('https://example.test');
+    });
+
+    it('caller-supplied prior_website_findings overrides auto-sourcing', async () => {
+      const campaign = makeWpCampaign([
+        { platform: 'business_analysis', audit_data: { website: { status: 'present' } } },
+      ]);
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeWpTemplate(),
+        campaign,
+        variables: { prior_website_findings: 'OPERATOR OVERRIDE' },
+      });
+      expect(renderedPrompt).toContain('PRIOR: OPERATOR OVERRIDE');
+      expect(renderedPrompt).not.toContain('EVIDENCE COVERAGE');
+    });
+  });
 });
