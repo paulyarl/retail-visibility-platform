@@ -899,28 +899,47 @@ function NewPresenceSeedClient() {
 
         {sourceType === 'campaign' && campaignResults.length > 0 && (
           <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
-            {campaignResults.map((campaign) => (
-              <button
-                key={campaign.id}
-                type="button"
-                onClick={() => applyCampaignProspect(campaign)}
-                className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {campaign.business_name || campaign.title || campaign.id}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {[campaign.category, campaign.city, campaign.state]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </div>
-                <div className="text-xs text-gray-400 whitespace-nowrap">
-                  {campaign.display_id || campaign.id} · {campaign.stage}
-                </div>
-              </button>
-            ))}
+            {campaignResults.map((campaign) => {
+              // One seed per prospect — secondary siblings never graduate
+              // to a seed; the primary sibling owns the prospect's listing.
+              const isSecondarySibling =
+                campaign.isPrimarySibling === false && !!campaign.businessProspectId;
+              return (
+                <button
+                  key={campaign.id}
+                  type="button"
+                  disabled={isSecondarySibling}
+                  title={
+                    isSecondarySibling
+                      ? 'Secondary sibling — this prospect\'s seed graduates from its primary sibling campaign'
+                      : undefined
+                  }
+                  onClick={() => applyCampaignProspect(campaign)}
+                  className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 ${
+                    isSecondarySibling ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {campaign.business_name || campaign.title || campaign.id}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {[campaign.category, campaign.city, campaign.state]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-400 whitespace-nowrap flex items-center gap-1.5">
+                    {isSecondarySibling && (
+                      <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700">
+                        sibling
+                      </span>
+                    )}
+                    {campaign.display_id || campaign.id} · {campaign.stage}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 

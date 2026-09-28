@@ -106,9 +106,13 @@ interface BusinessAnalysisAuditCardProps {
   audit: Audit;
   campaignId: string;
   onSynced?: () => void;
+  /** Non-primary sibling campaigns never seed — one seed per prospect lives
+   *  on the primary sibling (the 'sibling' link role attaches this campaign
+   *  to that seed). Disables the "Add to place listing" action. */
+  isNonPrimarySibling?: boolean;
 }
 
-export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced }: BusinessAnalysisAuditCardProps) {
+export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced, isNonPrimarySibling }: BusinessAnalysisAuditCardProps) {
   const [copied, setCopied] = useState(false);
   const [narrativeCopied, setNarrativeCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -309,9 +313,11 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
             </button>
             <button
               onClick={handleAddToPlace}
-              disabled={addingToPlace || identityStatus === 'mismatched' || placeResult != null || isOperationalBlocked}
+              disabled={addingToPlace || identityStatus === 'mismatched' || placeResult != null || isOperationalBlocked || isNonPrimarySibling}
               title={
-                isOperationalBlocked
+                isNonPrimarySibling
+                  ? 'Cannot seed: this is a secondary sibling — the prospect\'s listing graduates from the primary sibling campaign (its secondary categories cover this sibling\'s shelf)'
+                  : isOperationalBlocked
                   ? opCallVerdict === false
                     ? 'Cannot seed: a verification call reported the business as not operating'
                     : `Cannot seed: audit reports '${opStatus.replace(/_/g, ' ')}' — log a verification call (Log Contact → phone → operating status confirmed) first`

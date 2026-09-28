@@ -2096,7 +2096,7 @@ export default function CampaignDetailClient({
                           </p>
                         </div>
                       ) : audit.platform === 'business_analysis' && audit.audit_data ? (
-                        <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} />
+                        <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} isNonPrimarySibling={campaign.isPrimarySibling === false && !!campaign.businessProspectId} />
                       ) : audit.platform === 'website_positioning' && audit.audit_data ? (
                         <WebsitePositioningAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'city_analysis' && audit.audit_data ? (
@@ -2591,6 +2591,7 @@ export default function CampaignDetailClient({
                   campaignId={campaign.id}
                   onSeedCreated={fetchCampaign}
                   onVerified={fetchCampaign}
+                  isNonPrimarySibling={campaign.isPrimarySibling === false && !!campaign.businessProspectId}
                 />
               </div>
             )}

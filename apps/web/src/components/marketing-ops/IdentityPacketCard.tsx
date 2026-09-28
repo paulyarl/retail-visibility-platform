@@ -258,12 +258,16 @@ export default function IdentityPacketCard({
   campaignId,
   onSeedCreated,
   onVerified,
+  isNonPrimarySibling,
 }: {
   campaignId: string;
   onSeedCreated?: () => void;
   /** Called after a Verify record save — the campaign record changed
    *  (canonical NAP + profiles), so the host should refresh it. */
   onVerified?: () => void;
+  /** Non-primary sibling campaigns never seed — one seed per prospect lives
+   *  on the primary sibling. Evidence stays shared; only Push is gated. */
+  isNonPrimarySibling?: boolean;
 }) {
   const [packet, setPacket] = useState<IdentityPacket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -646,10 +650,16 @@ export default function IdentityPacketCard({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={push}
-              disabled={pushing || gateBlocked}
-              title={gateBlocked ? gateBlockReason : 'Create the draft seed'}
-              aria-disabled={pushing || gateBlocked}
-              aria-describedby={gateBlocked ? 'identity-push-blocked' : undefined}
+              disabled={pushing || gateBlocked || isNonPrimarySibling}
+              title={
+                isNonPrimarySibling
+                  ? 'Cannot seed: this is a secondary sibling — the prospect\'s seed graduates from the primary sibling campaign'
+                  : gateBlocked
+                    ? gateBlockReason
+                    : 'Create the draft seed'
+              }
+              aria-disabled={pushing || gateBlocked || isNonPrimarySibling}
+              aria-describedby={gateBlocked || isNonPrimarySibling ? 'identity-push-blocked' : undefined}
               className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               <ArrowUpRight className="h-3.5 w-3.5" /> {pushing ? 'Pushing…' : 'Push draft seed'}
@@ -662,7 +672,13 @@ export default function IdentityPacketCard({
             >
               <PauseCircle className="h-3.5 w-3.5" /> {waited ? 'Waiting' : 'Wait'}
             </button>
-            {gateBlocked && (
+            {isNonPrimarySibling && (
+              <span id="identity-push-blocked" className="text-xs text-purple-600 dark:text-purple-400">
+                Secondary sibling — the prospect&apos;s seed graduates from the primary sibling campaign;
+                this campaign can link to that seed instead.
+              </span>
+            )}
+            {!isNonPrimarySibling && gateBlocked && (
               <span id="identity-push-blocked" className="text-xs text-red-600 dark:text-red-400">
                 {gateBlockReason}
               </span>

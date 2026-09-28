@@ -289,7 +289,8 @@ class DirectorySeedCampaignLinkService {
     const tenantId = seedRow[0].tenant_id;
 
     const campRow = await prisma.$queryRaw<any[]>`
-      SELECT id FROM mkt_campaigns_list WHERE id = ${campaignId} LIMIT 1
+      SELECT id, business_prospect_id, is_primary_sibling FROM mkt_campaigns_list
+      WHERE id = ${campaignId} LIMIT 1
     `;
     if (!campRow[0]) throw new Error('campaign_not_found');
 
@@ -301,6 +302,13 @@ class DirectorySeedCampaignLinkService {
         LIMIT 1
       `;
       if (existingPrimary[0]) throw new Error('primary_link_already_exists');
+
+      // One seed per prospect: a non-primary sibling campaign never owns a
+      // seed's primary link — the prospect's seed belongs to the primary
+      // sibling, and this campaign attaches to it with 'sibling' instead.
+      if (campRow[0].business_prospect_id && campRow[0].is_primary_sibling === false) {
+        throw new Error('non_primary_sibling');
+      }
     }
 
     const napMatch = await this.computeNapMatch(seedId, campaignId);

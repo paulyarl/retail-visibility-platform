@@ -2184,6 +2184,29 @@ class DirectoryPresenceSeedService {
     });
     if (!campaign) throw new Error('campaign_not_found');
 
+    // One seed per prospect: sibling campaigns share a business_prospect_id,
+    // but only the PRIMARY sibling graduates to a seed — a second seed would
+    // duplicate the same business's listing and split the claim surface. The
+    // secondary sibling's shelf coverage rides the primary's seed via
+    // secondary_categories (cat-id Promote expansion), and the sibling itself
+    // can still attach to the primary's seed with link_role='sibling'.
+    if (campaign.business_prospect_id && campaign.is_primary_sibling === false) {
+      const siblingErr: any = new Error('non_primary_sibling');
+      try {
+        // Resolve the primary so the route/UI can point the operator at the
+        // campaign that owns the prospect's seed.
+        const { BusinessProspectService } = await import('./BusinessProspectService.js');
+        const primary = await BusinessProspectService.getInstance().getPrimarySibling(
+          campaign.business_prospect_id,
+        );
+        siblingErr.primaryCampaignId = primary?.id ?? null;
+        siblingErr.primaryCampaignDisplayId = primary?.display_id ?? null;
+      } catch {
+        // Resolution failure must not mask the gate itself.
+      }
+      throw siblingErr;
+    }
+
     const auditCandidates = await (prisma as any).mkt_audits_list.findMany({
       where: { campaign_id: campaignId, platform: 'business_analysis' },
       orderBy: { created_at: 'desc' },

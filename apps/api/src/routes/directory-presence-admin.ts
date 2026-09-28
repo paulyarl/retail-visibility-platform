@@ -1628,6 +1628,7 @@ router.post('/presence-seeds/:id/campaign-links', requirePlatformAdmin, async (r
       seed_not_found: 404,
       campaign_not_found: 404,
       primary_link_already_exists: 409,
+      non_primary_sibling: 409,
     };
     const status = statusMap[error?.message] || 500;
     if (status === 500) {
@@ -1963,6 +1964,7 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
       identity_mismatch: 409,
       incomplete_nap: 400,
       gate_blocked: 409,
+      non_primary_sibling: 409,
     };
     const status = statusMap[error?.message] || 500;
     if (status === 500) {
@@ -1970,10 +1972,19 @@ router.post('/presence-seeds/from-campaign/:campaignId', requirePlatformAdmin, a
         error: { name: error?.name || 'Error', message: error?.message || String(error) },
       });
     }
-    // gate_blocked carries the gate + vetoes so the UI can render why.
+    // gate_blocked carries the gate + vetoes so the UI can render why;
+    // non_primary_sibling carries the primary sibling's campaign id so the
+    // UI can deep-link to the campaign that owns this prospect's seed.
     res.status(status).json({
       error: error?.message || 'internal_error',
       ...(error?.gate ? { gate: error.gate, vetoes: error.vetoes ?? [] } : {}),
+      ...(error?.message === 'non_primary_sibling'
+        ? {
+            message: 'Directory seeds graduate from the primary sibling campaign — this prospect already has a primary sibling that owns its listing.',
+            primaryCampaignId: error.primaryCampaignId ?? null,
+            primaryCampaignDisplayId: error.primaryCampaignDisplayId ?? null,
+          }
+        : {}),
     });
   }
 });
