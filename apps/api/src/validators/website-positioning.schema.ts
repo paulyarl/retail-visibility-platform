@@ -134,7 +134,6 @@ export const WEBSITE_POSITIONING_SCHEMA_NAME = 'website_positioning_audit' as co
  * OUTPUT_SCHEMA_REGISTRY prompt suffix.
  */
 export const WEBSITE_POSITIONING_PROMPT_SUFFIX = `
-|
 Return your response as JSON matching this exact schema:
 {
   "summary": "<string>",
