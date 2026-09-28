@@ -347,13 +347,6 @@ export default function ResolveVerificationModal({
                   onChange={(e) => setForm((f) => ({ ...f, verifiedName: e.target.value }))}
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                 />
-                <input
-                  type="tel"
-                  placeholder="Phone"
-                  value={form.verifiedPhone}
-                  onChange={(e) => setForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
-                />
                 {/* Smart-paste: a full pasted address ("123 Main St, Kansas
                     City, MO 64124") splits into its fields — same behavior
                     as the campaign form + seed-create page. Suite/unit stays
@@ -415,6 +408,13 @@ export default function ResolveVerificationModal({
                     className="w-24 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
                   />
                 </div>
+                <input
+                  type="tel"
+                  placeholder="Phone"
+                  value={form.verifiedPhone}
+                  onChange={(e) => setForm((f) => ({ ...f, verifiedPhone: e.target.value }))}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                />
               </>
             ) : gateNotice}
           </TabsContent>

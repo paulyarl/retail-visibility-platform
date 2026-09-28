@@ -537,14 +537,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       const observed = vocab.cityStates[v.trim().toLowerCase()];
       const autoState =
         !prev.state.trim() && observed?.length === 1 ? observed[0] : prev.state;
-      return { ...prev, city: v, state: autoState };
+      // Business scope: the market city/state ARE the business's physical
+      // NAP city/state — mirror them onto the address columns so they can
+      // never drift apart.
+      const napMirror =
+        prev.scope === 'business'
+          ? {
+              address_city: v,
+              ...(autoState !== prev.state ? { address_state: autoState } : {}),
+            }
+          : {};
+      return { ...prev, city: v, state: autoState, ...napMirror };
     });
   };
 
   // Smart-paste handler for Address Line 1: if the pasted/typed value looks
   // like a full address (e.g. "123 Main St, Suite 200, Austin, TX 78701"),
   // parse it into all address components at once — mirroring the onboarding
-  // wizard behavior. Otherwise, treat it as a normal single-field update.
+  // wizard behavior. The market City/State dropdowns double as the NAP
+  // city/state for business-scope campaigns, so the paste fills them too
+  // (the physical address_* columns mirror alongside). Otherwise, treat it
+  // as a normal single-field update.
   const handleAddressLine1Change = (value: string) => {
     if (addressParser.canParse(value)) {
       const parsed = addressParser.parse(value);
@@ -552,6 +565,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         ...prev,
         address_line1: parsed.address_line1 ?? value,
         address_line2: parsed.address_line2 ?? prev.address_line2,
+        city: parsed.city ?? prev.city,
+        state: parsed.state ?? prev.state,
         address_city: parsed.city ?? prev.address_city,
         address_state: parsed.state ?? prev.address_state,
         address_zip: parsed.postal_code ?? prev.address_zip,
@@ -823,6 +838,54 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         ? 'National (all markets) — establish the city-agnostic vocabulary floor'
         : 'National (all markets) — sweep all US markets against the national profile';
 
+  // City | State — family pair, rendered twice-positioned by scope: inside
+  // the business NAP cluster (after the street lines — the pair IS the
+  // business's physical city/state there), or mid-section as the market
+  // selector on aggregate lanes. Picking a state on business scope mirrors
+  // it onto address_state (same pairing as handleCityChange/paste).
+  const geoCityStateFields = (
+    <>
+      <FormField label="City" required={geoRequired}>
+        <SuggestiveSelect required={geoRequired} value={form.city} onChange={handleCityChange}
+          options={cityOptions} emptyLabel="-- Select city --" newLabel="+ New city..."
+          newInputPlaceholder="Enter new city" className={inputClass} />
+        {citiesSeenInState && (
+          <p className="text-xs text-gray-400 mt-1">Showing cities observed in {form.state} — use <span className="font-medium">+ New city</span> for a new market.</p>
+        )}
+        {form.campaign_category === 'directory_enrichment' && form.scope === 'category' && (
+          <p className="text-xs text-gray-400 mt-1">Check <strong>Market Scope → National</strong> above for the national category page (writes the <span className="font-mono">__all__</span> market sentinel).</p>
+        )}
+        {form.campaign_category === 'directory_enrichment' && form.scope === 'city' && (
+          <p className="text-xs text-gray-400 mt-1">Check <strong>Market Scope → National</strong> above for the national location narrative — composes the platform-wide coverage packet (writes <span className="font-mono">__all__</span> for city + state).</p>
+        )}
+        {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
+          <p className="text-xs text-gray-400 mt-1">Leave blank for the nationwide bar; fill city + state for a market-scoped gold standard.</p>
+        )}
+      </FormField>
+      <FormField label="State" required={geoRequired}>
+        <SuggestiveSelect required={geoRequired} value={form.state}
+          onChange={(v) =>
+            setForm((prev) => ({
+              ...prev,
+              state: v,
+              ...(prev.scope === 'business' ? { address_state: v } : {}),
+            }))
+          }
+          options={stateOptions} emptyLabel="-- Select state --" newLabel="+ New state..."
+          newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
+        {cityStateMismatch ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+            &ldquo;{form.city}&rdquo; has only been used with {statesSeenWithCity!.join(', ')} — double-check the city/state pairing.
+          </p>
+        ) : statesSeenWithCity ? (
+          <p className="text-xs text-gray-400 mt-1">Showing states observed with {form.city}.</p>
+        ) : (
+          <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
+        )}
+      </FormField>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1060,6 +1123,43 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 className={inputClass} />
             </FormField>
             )}
+            {/* NAP — the business's canonical Name/Address/Phone, grouped so
+                it reads as one unit. Address Line 1 is the smart-paste
+                target; City/State reuse the market dropdowns (the business's
+                location IS the campaign market) and mirror onto
+                address_city/address_state — see handleAddressLine1Change /
+                handleCityChange / the state onChange in geoCityStateFields. */}
+            {form.scope === 'business' && (
+            <>
+            <FormField label="Address Line 1" className="sm:col-span-2">
+              <input type="text" value={form.address_line1} onChange={(e) => handleAddressLine1Change(e.target.value)}
+                placeholder="123 Main St  —  paste a full address to auto-split into city/state/zip"
+                className={inputClass} />
+            </FormField>
+            <FormField label="Address Line 2" className="sm:col-span-2">
+              <input type="text" value={form.address_line2} onChange={(e) => handleChange('address_line2', e.target.value)}
+                placeholder="Suite 200 (optional)"
+                className={inputClass} />
+            </FormField>
+            {!nationalScopeChecked && geoCityStateFields}
+            <FormField label="ZIP / Postal Code">
+              <input type="text" value={form.address_zip} onChange={(e) => handleChange('address_zip', e.target.value)}
+                placeholder="78701"
+                className={inputClass} />
+            </FormField>
+            <FormField label="Country">
+              <input type="text" value={form.address_country} onChange={(e) => handleChange('address_country', e.target.value)}
+                placeholder="US"
+                maxLength={2}
+                className={inputClass} />
+            </FormField>
+            <FormField label="Primary Phone">
+              <input type="tel" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
+                placeholder="+1 555-0100"
+                className={inputClass} />
+            </FormField>
+            </>
+            )}
             {/* Platform (intelligence) — half width, pairs with Category below */}
             {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
               <FormField label="Platform" required>
@@ -1191,45 +1291,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 </p>
               </FormField>
             )}
-            {/* City | State — family pair. Hidden while the National scope
-                checkbox is checked (intelligence only): the pair is the
-                market selector, and national means no market — showing it
-                would surface the raw '__all__' sentinel as a field value. */}
-            {!nationalScopeChecked && (
-            <FormField label="City" required={geoRequired}>
-              <SuggestiveSelect required={geoRequired} value={form.city} onChange={handleCityChange}
-                options={cityOptions} emptyLabel="-- Select city --" newLabel="+ New city..."
-                newInputPlaceholder="Enter new city" className={inputClass} />
-              {citiesSeenInState && (
-                <p className="text-xs text-gray-400 mt-1">Showing cities observed in {form.state} — use <span className="font-medium">+ New city</span> for a new market.</p>
-              )}
-              {form.campaign_category === 'directory_enrichment' && form.scope === 'category' && (
-                <p className="text-xs text-gray-400 mt-1">Check <strong>Market Scope → National</strong> above for the national category page (writes the <span className="font-mono">__all__</span> market sentinel).</p>
-              )}
-              {form.campaign_category === 'directory_enrichment' && form.scope === 'city' && (
-                <p className="text-xs text-gray-400 mt-1">Check <strong>Market Scope → National</strong> above for the national location narrative — composes the platform-wide coverage packet (writes <span className="font-mono">__all__</span> for city + state).</p>
-              )}
-              {form.scope === 'intelligence' && form.intelligence_focus === 'gold_standards' && (
-                <p className="text-xs text-gray-400 mt-1">Leave blank for the nationwide bar; fill city + state for a market-scoped gold standard.</p>
-              )}
-            </FormField>
-            )}
-            {!nationalScopeChecked && (
-            <FormField label="State" required={geoRequired}>
-              <SuggestiveSelect required={geoRequired} value={form.state} onChange={(v) => handleChange('state', v)}
-                options={stateOptions} emptyLabel="-- Select state --" newLabel="+ New state..."
-                newInputPlaceholder="Enter new state (e.g. IN, Indiana)" className={inputClass} />
-              {cityStateMismatch ? (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  &ldquo;{form.city}&rdquo; has only been used with {statesSeenWithCity!.join(', ')} — double-check the city/state pairing.
-                </p>
-              ) : statesSeenWithCity ? (
-                <p className="text-xs text-gray-400 mt-1">Showing states observed with {form.city}.</p>
-              ) : (
-                <p className="text-xs text-gray-400 mt-1">State or region for the campaign market. Required for intelligence-scope campaigns (used by discovery prompts). Optional for gold-standard and other scopes.</p>
-              )}
-            </FormField>
-            )}
+            {/* City | State — family pair, the market selector on aggregate
+                lanes. Hidden while the National scope checkbox is checked
+                (national means no market — showing it would surface the raw
+                '__all__' sentinel as a field value). Business scope renders
+                the same pair inside the NAP cluster by Business Name. */}
+            {form.scope !== 'business' && !nationalScopeChecked && geoCityStateFields}
             {/* ZIP Codes | Search Radius — intelligence emerging/competitive.
                 Hidden for national ('__all__') campaigns — a nationwide sweep
                 has no ZIP or radius constraint. */}
@@ -1322,11 +1389,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
           {/* Contact & Audit Info */}
           <FormSection title="Contact & GBP Audit">
-            <FormField label="Primary Phone">
-              <input type="tel" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
-                placeholder="+1 555-0100"
-                className={inputClass} />
-            </FormField>
             <FormField label="Email">
               <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="owner@business.com"
@@ -1427,37 +1489,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                   onClick={() => handleChange('owner_names', [...form.owner_names, ''])}
                   className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add owner name</button>
               </div>
-            </FormField>
-            <FormField label="Address Line 1" className="sm:col-span-2">
-              <input type="text" value={form.address_line1} onChange={(e) => handleAddressLine1Change(e.target.value)}
-                placeholder="123 Main St  —  paste a full address to auto-split into city/state/zip"
-                className={inputClass} />
-            </FormField>
-            <FormField label="Address Line 2" className="sm:col-span-2">
-              <input type="text" value={form.address_line2} onChange={(e) => handleChange('address_line2', e.target.value)}
-                placeholder="Suite 200 (optional)"
-                className={inputClass} />
-            </FormField>
-            <FormField label="City">
-              <input type="text" value={form.address_city} onChange={(e) => handleChange('address_city', e.target.value)}
-                placeholder="Austin"
-                className={inputClass} />
-            </FormField>
-            <FormField label="State / Province">
-              <input type="text" value={form.address_state} onChange={(e) => handleChange('address_state', e.target.value)}
-                placeholder="TX"
-                className={inputClass} />
-            </FormField>
-            <FormField label="ZIP / Postal Code">
-              <input type="text" value={form.address_zip} onChange={(e) => handleChange('address_zip', e.target.value)}
-                placeholder="78701"
-                className={inputClass} />
-            </FormField>
-            <FormField label="Country">
-              <input type="text" value={form.address_country} onChange={(e) => handleChange('address_country', e.target.value)}
-                placeholder="US"
-                maxLength={2}
-                className={inputClass} />
             </FormField>
             <FormField label="Business Hours" className="sm:col-span-2">
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
