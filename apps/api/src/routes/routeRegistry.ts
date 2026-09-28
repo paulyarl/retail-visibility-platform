@@ -307,6 +307,7 @@ import directoryEnrichmentPublicRoutes from '../routes/directory-enrichment-publ
 import directoryClaimQrRoutes from '../routes/directory-claim-qr';
 import seedReportQrRoutes from '../routes/seed-report-qr';
 import seedReportPublicRoutes from '../routes/seed-report-public';
+import prospectReportPublicRoutes from '../routes/prospect-report-public';
 import growthEngineAdminRoutes from '../routes/growth-engine-admin';
 import marketIntelPublicRoutes from '../routes/market-intel-public';
 import marketIntelCustomerRoutes from '../routes/market-intel-customer';
@@ -2126,6 +2127,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'public',
     comment: 'Public seed report preview (/marketing/seed/:seedId/report/preview)',
+  },
+  {
+    path: '/api/public',
+    router: prospectReportPublicRoutes,
+    domain: 'directory',
+    authLevel: 'public',
+    comment: 'Public prospect (Business Visibility) report: /marketing/prospect-report/:token{,/pdf} + /r/pr-scan/:code short-link resolve+track',
   },
   {
     path: '/api/public/place',

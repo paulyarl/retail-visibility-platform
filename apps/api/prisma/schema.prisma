@@ -8120,6 +8120,24 @@ model mkt_geography_grids {
   updated_at        DateTime @default(now()) @db.Timestamptz(6)
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_prospect_report_links {
+  id                   String   @id @db.VarChar(60)
+  code                 String   @unique(map: "uq_prl_code") @db.VarChar(8)
+  business_prospect_id String   @db.VarChar(255)
+  campaign_id          String   @db.VarChar(255)
+  token                String   @db.VarChar(255)
+  tier                 String   @db.VarChar(10)
+  chapters             Json
+  channel              String   @db.VarChar(30)
+  created_by           String?  @db.VarChar(255)
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([campaign_id], map: "idx_prl_campaign")
+  @@index([business_prospect_id], map: "idx_prl_prospect")
+}
+
 enum action {
   create
   update

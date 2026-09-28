@@ -145,6 +145,15 @@ class UnifiedConfig {
     return this.env.GALLERY_IP_HASH_SALT;
   }
 
+  // Prospect (Business Visibility) Report — HMAC signing secret for signed
+  // public-report tokens (spec: docs/LocalBiz/WEBSITE_GAP_OWNER_REPORT_SPEC.md
+  // §5.1). REQUIRED in production — returns '' there when unset so
+  // ProspectReportService can warn/refuse on first use; dev falls back to a
+  // fixed value so local mint/verify round-trips without env setup.
+  get prospectReportTokenSecret(): string {
+    return this.env.PROSPECT_REPORT_TOKEN_SECRET || (this.isProduction ? '' : 'dev-prospect-report-secret');
+  }
+
   // Hot-prospect + auto-follow-up config (Sprint 3)
   get marketingOpsHotProspectThreshold(): number {
     const parsed = parseInt(this.env.MARKETING_OPS_HOT_PROSPECT_THRESHOLD || '', 10);

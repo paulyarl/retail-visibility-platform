@@ -8,7 +8,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call' | 'prospect_report_phone' | 'prospect_report_email' | 'prospect_report_social' | 'prospect_report_in_person' | 'prospect_report_text' | 'prospect_report_banner';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 
@@ -105,6 +105,16 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   report_delivery_in_person: 'Report Delivery (In Person)',
   report_delivery_text: 'Report Delivery (Text)',
   report_banner: 'Report Banner',
+  intake_link_sms: 'Intake Link (SMS)',
+  intake_link_email: 'Intake Link (Email)',
+  intake_link_qr: 'Intake Link (QR)',
+  intake_link_call: 'Intake Link (Call)',
+  prospect_report_phone: 'Prospect Report (Phone)',
+  prospect_report_email: 'Prospect Report (Email)',
+  prospect_report_social: 'Prospect Report (Social/DM)',
+  prospect_report_in_person: 'Prospect Report (In Person)',
+  prospect_report_text: 'Prospect Report (Text)',
+  prospect_report_banner: 'Prospect Report (Banner)',
 };
 
 class QrAnalyticsServiceClass extends TenantApiSingleton {

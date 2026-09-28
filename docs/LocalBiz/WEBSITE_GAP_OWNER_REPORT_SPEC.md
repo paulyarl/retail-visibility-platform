@@ -82,11 +82,11 @@ The seed-report pipeline already owns every piece this needs: a public DTO route
 
 ### 5.0 Why prospect-keyed, not campaign-keyed
 
-Sibling campaigns (PB-05 repair, PB-08 website-gap) are the same business. The owner never experiences playbooks — they experience "the people who audited my business." Campaign-keyed links would hand them two unrelated artifacts that look like two vendors; prospect-keyed gives one document, one provenance footer, one claim CTA — and the claim is per-*business* anyway.
+Sibling campaigns (e.g. a website-gap sibling and a repair sibling) are the same business. The owner never experiences playbooks — they experience "the people who audited my business." Campaign-keyed links would hand them two unrelated artifacts that look like two vendors; prospect-keyed gives one document, one provenance footer, one claim CTA — and the claim is per-*business* anyway.
 
 So the model splits:
 
-- **Transform stays campaign-scoped** — each playbook's audit → a **chapter**. `buildWebsiteChapter(auditData, campaign)` for PB-08 today; a repair chapter builder registers when PB-05 gets an owner-safe transform. Chapters are the primitive.
+- **Transform stays campaign-scoped** — each diagnostic's audit → a **chapter**. `buildWebsiteChapter(auditData, campaign)` is the first registered builder (audit source `website_positioning`); a repair chapter builder registers when a repair audit gains an owner-safe transform. Chapters key on the **audit source**, never on a playbook code — the machinery is agnostic to which playbook produced the audit. Chapters are the primitive.
 - **The report is prospect-scoped** — the public URL resolves `business_prospect_id` → all sibling campaigns → whichever chapters have audits on file. A solo campaign is the degenerate one-chapter case (legacy campaigns without a prospect id get one minted on first share via `initializeProspectFromCampaign` — see G-6).
 - **Signed chapter list is a permission set, not a snapshot.** A token signed for `website,repair` shows the repair chapter the moment its audit lands — even if the audit didn't exist when the link was minted. The URL accumulates *within its signed scope*; widening beyond it needs a fresh link (one click). See G-3.
 
@@ -95,10 +95,10 @@ So the model splits:
 The owner-facing report always shows the chapters the operator *chose at share time* — never silently "everything we have." The chapter set is **encoded in the signed token**, not persisted per-prospect:
 
 ```
-token = base64url(prospectId + "." + tier + "." + chapterList) + "." + HMAC-SHA256(payload, REPORT_TOKEN_SECRET)
+token = base64url(prospectId + "." + tier + "." + chapterList + "." + flags) + "." + HMAC-SHA256(payload, REPORT_TOKEN_SECRET)
 ```
 
-`chapterList` is **ordered** — index 0 is the free-visible chapter for `tier=free` (the pitcher's chapter, §5.1a). Consequence: each share action mints a self-contained link for exactly that selection — "send website report" and "send full diagnostic" produce two links to the same prospect's report URL shape, differing in what renders. No DB, no publish state, and stripping/editing the chapter list or tier invalidates the signature (the owner can't upgrade their own link).
+`chapterList` is **ordered** — index 0 is the free-visible chapter for `tier=free` (the pitcher's chapter, §5.1a). `flags` is a compact ordered string (reserves room for future render options without a payload-shape break); its only v1 value is `p` = include the detailed page plan (§2), `-` = omit. The page-plan toggle must ride the token because the public route and PDF assemble from the token alone and have no other channel for the operator's choice. Consequence: each share action mints a self-contained link for exactly that selection — "send website report" and "send full diagnostic" produce two links to the same prospect's report URL shape, differing in what renders. No DB, no publish state, and stripping/editing the chapter list, tier, or flags invalidates the signature (the owner can't upgrade their own link or unlock the page plan).
 
 ### 5.1a Free / full tiering — the report as lead-gen gate
 
@@ -111,13 +111,13 @@ Enforcement is server-side: the public route decodes the token, applies the tier
 
 Two properties worth stating:
 
-- **Chapter 1 is the pitcher's chapter.** The sibling panel that mints a free link puts its own chapter first — the operator sharing from PB-08 leads with the website story, and the locked repair chapter is the upsell that reads "there's more."
+- **Chapter 1 is the pitcher's chapter.** The sibling panel that mints a free link puts its own chapter first — the operator sharing from a website-gap sibling leads with the website story, and the locked repair chapter is the upsell that reads "there's more."
 - **Perceived effort is a feature, not a deception.** The report never claims manual production — its authority comes from cited evidence (the £30 banner, the stale widget date), which is *more* credible than a generic hand-written audit. Copy stays honest ("we reviewed your public web presence on {date}"); the depth is what makes it feel bespoke.
 
 Panel UX — **every sibling owns its chapter, defaults to it, can widen:**
 
 - Each sibling campaign that has a reportable audit surfaces the Owner Report section in its panel.
-- The chapter checkboxes default to **this campaign's chapter only** — the PB-08 panel defaults to the website chapter; a PB-05 panel (when the repair chapter builder lands) defaults to repair. The report an operator shares from a campaign is that playbook's story unless they deliberately widen it.
+- The chapter checkboxes default to **this campaign's chapter only** — the website-gap panel defaults to the website chapter; a repair panel (when the repair chapter builder lands) defaults to repair. The report an operator shares from a campaign is that diagnostic's story unless they deliberately widen it.
 - Widening is one click per additional chapter — "send website" and "send full diagnostic" are the same control with different checkboxes, minting different signed links.
 - The composite preview always shows what the *recipient* will see for the current selection — not the union of everything on file.
 
@@ -130,11 +130,11 @@ This is the same "operator controls leakage" philosophy as the `must_have_pages`
 | `seed-report-dto.schema.ts` + `seed-report-lint.ts` | `prospect-report-dto.schema.ts` — DTO is safe-by-construction (deterministic transform, §3.5), so the schema itself is the lint; no separate publish gate |
 | `GET /api/public/marketing/seed/:seedId/report{,/pdf,/preview}` | `GET /api/public/marketing/prospect-report/:token` + `…/pdf` — no preview/full split; the DTO is already the public-safe subset by design |
 | `SeedReportPdfService` (jsPDF + `loadPlatformBranding`, claim QR embedded) | `ProspectReportPdfService` — same helpers + branding; embeds the delivery/claim QR |
-| `seed-report-qr.ts` `/r/seed/:seedId/:channel` | `prospect-report-qr.ts` `/r/prospect-report/:token/:channel` — records `qr_scan_events` under new `prospect_report_*` surfaces (kept outside `report_delivery_*` so seed funnel rates stay clean), 302 → `/prospect-report/{token}` |
+| `seed-report-qr.ts` `/r/seed/:seedId/:channel` | **Dropped at v1** — every shareable path mints a code (§5.2a); `/r/pr-scan/:code` records `qr_scan_events` under the new `prospect_report_*` surfaces (kept outside `report_delivery_*` so seed funnel rates stay clean) and the `/r/pr/[code]` page 302s → `/prospect-report/{token}`. No token-in-path QR route (the code row already carries the channel — a token route would only add attribution ambiguity) |
 | `/r/report-scan/:shortCode` (claim-token short code) | **Pattern replicated, not reused** — `mkt_prospect_report_links` issues the report's own 6-char codes (`/r/pr/{code}`). Claim codes stay claim-only: a report click must never register as a claim/seed-delivery scan (false attribution). See §5.2a |
 | `/seed-report/[seedId]` public page | `/prospect-report/[token]` public page rendering the shared `ProspectReportView` |
 | `SeedReportDeliveryService.recordViewFromScan` | `qr_scan_events` with `productId = business_prospect_id` for v1; dedicated delivery lifecycle deferred (OQ-4) |
-| *(paid report unlock — `MarketIntelAccessService` + Stripe `/unlock` on `market-intel-surface-customer.ts`)* | `canAccessFull(customerId, 'playbook_report', businessProspectId)` — new surface type on the **existing** entitlement service; the `tier=free` page's locked-chapter CTA routes here when the owner has claimed, to the claim flow when they haven't (see §5.6) |
+| *(paid report unlock — `MarketIntelAccessService` + Stripe `/unlock` on `market-intel-surface-customer.ts`)* | `canAccessFull(customerId, 'prospect_report', businessProspectId)` — new surface type on the **existing** entitlement service; the `tier=free` page's locked-chapter CTA routes here when the owner has claimed, to the claim flow when they haven't (see §5.6) |
 
 ### 5.2a Short links — `mkt_prospect_report_links` (pattern replicated, NOT reused)
 
@@ -159,9 +159,9 @@ mkt_prospect_report_links {
 ### 5.3 Operator API
 
 - `GET /campaigns/:id/prospect-report` → `ProspectReportDto` for the panel preview — assembled over the full sibling set the campaign belongs to.
-- `GET /campaigns/:id/prospect-report/share?chapters=website&tier=free` → `{ url, pdf_url, qr_url }` — mints the signed token for the requested chapter set + tier **and a `mkt_prospect_report_links` row per channel** — each channel gets its own 6-char code (§5.2a), so `{ url }` values are the short `/r/pr/{code}` forms.
+- `GET /campaigns/:id/prospect-report/share?chapters=website&tier=free&channel=email[&includePagePlan=true]` → `{ channel, code, url, pdf_url, qr_url }` — **one call per channel, one code per call** (§5.2a): mints the signed token for the requested chapter set + tier and a single `mkt_prospect_report_links` row for that channel, so `url` is the short `/r/pr/{code}` form and `pdf_url`/`qr_url` reuse the same code (no render-time minting). The panel loops channels for its per-channel share buttons.
 
-Gate: campaign belongs to a `business_prospect_id` group (or is itself addressable) and ≥1 sibling holds a reportable audit → else 404. PB-08 positioning audit is the only chapter type at v1; the endpoint is chapter-agnostic from day one.
+Gate: campaign belongs to a `business_prospect_id` group (or is itself addressable) and ≥1 sibling holds a reportable audit → else 404. The website-positioning audit is the only chapter source at v1; the endpoint is chapter-agnostic from day one.
 
 ### 5.4 Web — panel + public page
 
@@ -190,12 +190,12 @@ Non-goal for this lane: a "diagnostic available" badge on the public `/place` li
 
 Two different surfaces for two different audiences:
 
-- **Operator-facing: the campaign, not the seed.** The Owner Report section lives in each sibling campaign's panel (WebsiteGapBriefingPanel today; the repair panel when its chapter builder lands). Campaigns are self-aware — each one knows its own playbook, its own audit, its own default chapter. Seeds are *not* sibling-aware (`directory_presence_seeds` links to campaigns via `directory_seed_campaign_links`, but a seed row carries no knowledge of the campaign family), so putting the control on the seed page would force sibling resolution onto a surface that has none. The campaign is the natural home.
+- **Operator-facing: the campaign, not the seed.** The Owner Report section lives in each sibling campaign's panel (WebsiteGapBriefingPanel today; the repair panel when its chapter builder lands). Campaigns are self-aware — each one knows its own diagnosis, its own audit, its own default chapter. Seeds are *not* sibling-aware (`directory_presence_seeds` links to campaigns via `directory_seed_campaign_links`, but a seed row carries no knowledge of the campaign family), so putting the control on the seed page would force sibling resolution onto a surface that has none. The campaign is the natural home.
 - **Prospect-facing pull surface: the seed report page** (§5.7) — the one owner-visible page the platform already has. The banner is where the prospect *discovers* the report exists without an operator pitching it.
 
 ### 5.6 The offer ladder — where this report sits
 
-The playbook report joins the platform's existing free→paid ladder rather than inventing a new commercial motion:
+The prospect report joins the platform's existing free→paid ladder rather than inventing a new commercial motion:
 
 | Rung | Mechanism | Status |
 |---|---|---|
@@ -204,18 +204,18 @@ The playbook report joins the platform's existing free→paid ladder rather than
 | Free seed report (with claim) | seed-report public surfaces | existing |
 | Paid category report | `MarketIntelAccessService.canAccessFull` + Stripe `/unlock` | existing |
 | Paid location report | same access service | existing |
-| **Free playbook report** | `tier=free` signed token (§5.1a) | this spec |
-| **Paid full playbook report** | `tier=full` + `canAccessFull('playbook_report', businessProspectId)` + Stripe unlock | this spec — new surface type, not new machinery |
+| **Free prospect report** | `tier=free` signed token (§5.1a) | this spec |
+| **Paid full prospect report** | `tier=full` + `canAccessFull('prospect_report', businessProspectId)` + Stripe unlock | this spec — new surface type, not new machinery |
 
-The `tier=free` locked-chapter CTA resolves by owner state: **unclaimed → claim flow** (the free ladder rungs do the conversion work); **claimed → paid unlock** (`unlock_required` 402 → Stripe PaymentIntent, the `market-intel-surface-customer.ts` pattern). The paid-full tier is a *self-liquidating* lead-gen artifact — it filters tire-kickers and offsets acquisition cost; the revenue destination remains the playbook engagement itself, so pricing should stay nominal.
+The `tier=free` locked-chapter CTA resolves by owner state: **unclaimed → claim flow** (the free ladder rungs do the conversion work); **claimed → paid unlock** (`unlock_required` 402 → Stripe PaymentIntent, the `market-intel-surface-customer.ts` pattern). The paid-full tier is a *self-liquidating* lead-gen artifact — it filters tire-kickers and offsets acquisition cost; the revenue destination remains the engagement itself, so pricing should stay nominal.
 
 ## 6. Report structure (rendered order)
 
-The report is a shell + chapters. The shell is prospect-level; each chapter is one playbook's transform.
+The report is a shell + chapters. The shell is prospect-level; each chapter is one diagnostic's transform.
 
 1. **Header** — "{Business name} — Business Visibility Report · prepared {date} · {website_url}"
 2. **The short version** — chapter count = 1: the website chapter's `summary` verbatim. Multi-chapter: a deterministic composite line ("We reviewed your website and your public profiles — here's what we found.") + each chapter's summary as a bullet.
-3. **Chapters** — in sibling order (playbook priority). The website chapter (PB-08):
+3. **Chapters** — in sibling order (diagnostic priority). The website chapter:
    - **Your website today** — verdict gloss + §3.3 "already working" bullets
    - **What's costing you customers** — tiered issues (§3.1)
    - **What leading {category} businesses do** — `competitive_frame`
@@ -242,14 +242,14 @@ Rules this implies:
 
 API:
 - `database/migrations/3XX_mkt_prospect_report_links.sql` (new — §5.2a table: `code` unique 6-char, `token`, `tier`, `chapters`, `channel`, `business_prospect_id`, `campaign_id`, `created_by`)
-- `apps/api/src/services/ProspectReportService.ts` (new — `assembleReport(prospectId, chapters)` over the sibling set; chapter-builder registry keyed by playbook; website chapter = `buildWebsiteChapter(auditData, campaign)`; token mint/verify per §5.1; short-code mint/resolve per §5.2a)
+- `apps/api/src/services/ProspectReportService.ts` (new — `assembleReport(prospectId, chapters)` over the sibling set; chapter-builder registry keyed by audit source; website chapter = `buildWebsiteChapter(auditData, campaign)`; token mint/verify per §5.1; short-code mint/resolve per §5.2a)
 - `apps/api/src/services/ProspectReportPdfService.ts` (new — jsPDF render, `loadPlatformBranding`, delivery/claim QR embed)
 - `apps/api/src/validators/prospect-report-dto.schema.ts` (new — shell + chapter DTOs)
 - `apps/api/src/routes/marketing-ops.ts` — `GET /:id/prospect-report`, `GET /:id/prospect-report/share?chapters=…` (mints a links row per channel)
 - `apps/api/src/routes/prospect-report-public.ts` (new — `/api/public/marketing/prospect-report/:token{,/pdf}` + `/api/public/r/pr-scan/:code` resolve+track)
-- `apps/api/src/routes/prospect-report-qr.ts` (new — `/api/public/r/prospect-report/:token/:channel`, scan + 302 for QR-encoded links)
+- ~~`apps/api/src/routes/prospect-report-qr.ts`~~ — **dropped at v1**; all shareable paths mint codes (§5.2a), resolved via `/api/public/r/pr-scan/:code`
 - `apps/api/src/services/QrAnalyticsService.ts` — `QrSurfaceType` += `prospect_report_phone|email|social|in_person|text` + labels
-- `apps/api/src/services/MarketIntelAccessService.ts` — `SurfaceType` += `'playbook_report'` (free-form column, no migration)
+- `apps/api/src/services/MarketIntelAccessService.ts` — `SurfaceType` += `'prospect_report'` (free-form column, no migration)
 - `apps/api/src/config/unifiedConfig.ts` — `PROSPECT_REPORT_TOKEN_SECRET` getter (G-5)
 - `apps/api/src/index.ts` — mount the two new routers
 
@@ -270,9 +270,9 @@ Tests: `ProspectReportService.test.ts` (per-section mapping incl. met/unmet spli
 - **OQ-2 — Branding.** Whose name signs the report (operator agency vs. VisibleShelf) — `loadPlatformBranding` already supplies platform name/logo/colors for the PDF; operator-agency co-branding deferred until first operator feedback.
 - **OQ-3 — Stale-evidence dating.** The audit cites a verified-on date; reports generated long after the audit should surface "as of {audit date}" more prominently (or require re-run). Default: always print the audit date in the header; per-chapter dates when chapters diverge in age.
 - **OQ-4 — Delivery lifecycle.** `SeedReportDeliveryService` gives the seeded lane a delivered→viewed funnel for free; unseeded prospect reports only record scans. If operators want sent/opened/replied cadence, add a `mkt_report_deliveries`-style table keyed on `business_prospect_id` later.
-- **OQ-5 — Chapter registry.** PB-08's website chapter is the only builder at v1. When PB-05 repair gets an owner-safe transform it registers a `repair` chapter builder — the composite + selection machinery already supports it, no route/token changes.
+- **OQ-5 — Chapter registry.** The website chapter is the only builder at v1. When a repair audit gains an owner-safe transform it registers a `repair` chapter builder — the composite + selection machinery already supports it, no route/token changes.
 - **OQ-7 — Pull-surface banner.** ~~Open~~ **Deferred, spec'd (§5.7):** claimed-owner-only banner on `/seed-report/[seedId]`, minting a `tier=free` link. v1 ships operator-pitch channels only.
-- **OQ-6 — Unlock mechanism.** ~~Open~~ **Resolved (§5.6):** the report joins the existing free→paid ladder — `tier=free` is the offer, `tier=full` the paid offer, gated on `MarketIntelAccessService` (`'playbook_report'` surface type keyed on `business_prospect_id`) + Stripe `/unlock`, the same mechanism as the paid category/location reports. Unclaimed owners' locked CTA routes to the claim flow (claim is still the conversion); claimed owners see the paid unlock.
+- **OQ-6 — Unlock mechanism.** ~~Open~~ **Resolved (§5.6):** the report joins the existing free→paid ladder — `tier=free` is the offer, `tier=full` the paid offer, gated on `MarketIntelAccessService` (`'prospect_report'` surface type keyed on `business_prospect_id`) + Stripe `/unlock`, the same mechanism as the paid category/location reports. Unclaimed owners' locked CTA routes to the claim flow (claim is still the conversion); claimed owners see the paid unlock.
 
 ---
 
@@ -284,7 +284,7 @@ Pre-implementation sweep of every surface the owner report touches. Verified-cle
 
 - **Prospect plumbing exists.** `BusinessProspectService.listSiblings(businessProspectId)` returns the full sibling set; `initializeProspectFromCampaign` mints a `business_prospect_id` + marks `is_primary_sibling` for legacy campaigns lacking one. The "campaign without a prospect" edge collapses to: call initialize on first share.
 - **`qr_scan_events` is free-form.** `surface VARCHAR(30)` — longest new value `prospect_report_in_person` is 25 chars, fits. `product_id VARCHAR(255)` takes the prospect id. No CHECK constraints.
-- **`market_intel_unlocks` is free-form.** `surface_type`/`unlock_type` are unbounded `String` — `'playbook_report'` extends the TS union only; no migration. The `@@unique([tenant_id, surface_type, surface_key, unlock_type])` constraint is satisfied by the prospect key.
+- **`market_intel_unlocks` is free-form.** `surface_type`/`unlock_type` are unbounded `String` — `'prospect_report'` extends the TS union only; no migration. The `@@unique([tenant_id, surface_type, surface_key, unlock_type])` constraint is satisfied by the prospect key.
 - **Stripe unlock precedent is complete.** `market-intel-surface-customer.ts` shows the whole flow: `canAccessFull` gate → `createOneTimePaymentIntent` → `/unlock/confirm` → `recordUnlock` + `recordMarketingRevenue(source: 'market_intel_unlock')`. Reuse verbatim with a `prospect_report_unlock` source string.
 - **Claim→identity chain exists.** `DirectoryClaimService` sets `campaign.customer_id` and `promoteCustomerToUser` creates the `user_tenants` OWNER row — a claimed owner satisfies `resolveTenantForPurchase`, so the paid unlock is genuinely reachable post-claim.
 - **PDF primitives exist.** jsPDF + `qrcode` (toBuffer→data-uri) + `loadPlatformBranding` (operator_name/logo/color from `mkt_branding_config` — partially resolves OQ-2: the report can sign the operator name today).

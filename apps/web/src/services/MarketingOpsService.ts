@@ -2192,6 +2192,24 @@ export interface BrandingCreateInput {
 // SERVICE
 // ====================
 
+/** Channels the share endpoint mints a code for — maps to
+ * prospect_report_{channel} QR surfaces (spec §5.2a). 'qr' → in_person. */
+export type ProspectReportChannel = 'email' | 'text' | 'phone' | 'social' | 'in_person';
+
+export interface ProspectReportShare {
+  channel: ProspectReportChannel;
+  code: string;
+  url: string;
+  pdf_url: string;
+  qr_url: string;
+}
+
+export interface ProspectReportPreview {
+  report: import('./ProspectReportPublicService').ProspectReport;
+  available_chapters: string[];
+  prospect_id: string;
+}
+
 const BASE_URL = '/api/admin/marketing-ops';
 
 class MarketingOpsService extends AdminApiSingleton {
@@ -4573,6 +4591,54 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to ingest review intake');
     }
     await this.invalidateCachePattern(`mkt-ops-source-material-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  // Owner Report (Business Visibility Report — prospect-scoped composite,
+  // spec docs/LocalBiz/WEBSITE_GAP_OWNER_REPORT_SPEC.md §5.3). The operator
+  // route assembles the report over the campaign's sibling set; the web
+  // panel chooses which chapters sign into the link.
+
+  async getProspectReport(campaignId: string, opts: {
+    chapters?: string[];
+    tier?: 'free' | 'full';
+    includePagePlan?: boolean;
+  } = {}): Promise<ProspectReportPreview | null> {
+    const params = new URLSearchParams();
+    if (opts.chapters?.length) params.set('chapters', opts.chapters.join(','));
+    if (opts.tier) params.set('tier', opts.tier);
+    if (opts.includePagePlan) params.set('includePagePlan', 'true');
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/campaigns/${campaignId}/prospect-report${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      `mkt-ops-prospect-report-${campaignId}-${qs}`,
+      0,
+    );
+    if (!result.success) return null;
+    return result.data?.data ?? result.data ?? null;
+  }
+
+  async getProspectReportShare(campaignId: string, opts: {
+    chapters?: string[];
+    tier?: 'free' | 'full';
+    channel: ProspectReportChannel;
+    includePagePlan?: boolean;
+  }): Promise<ProspectReportShare> {
+    const params = new URLSearchParams();
+    if (opts.chapters?.length) params.set('chapters', opts.chapters.join(','));
+    if (opts.tier) params.set('tier', opts.tier);
+    if (opts.includePagePlan) params.set('includePagePlan', 'true');
+    params.set('channel', opts.channel);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/campaigns/${campaignId}/prospect-report/share?${params.toString()}`,
+      { method: 'GET' },
+      `mkt-ops-prospect-report-share-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create share link');
+    }
     return result.data?.data ?? result.data;
   }
 

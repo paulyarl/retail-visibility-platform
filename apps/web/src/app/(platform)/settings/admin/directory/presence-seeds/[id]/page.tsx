@@ -33,6 +33,7 @@ import {
   formatHoursForDisplay,
 } from '@/lib/business-hours';
 import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
+import { addressParser } from '@/lib/address-parser';
 import {
   ArrowLeft,
   Send,
@@ -875,6 +876,27 @@ function PresenceSeedDetailClient() {
       : listing?.city
         ? getPlaceCityShelfUrl(listing.city, listing.state)
         : null;
+
+  // Smart-paste: a full pasted address ("123 Main St, Kansas City, MO
+  // 64124") splits into its fields — same behavior as the Create Seed
+  // form + Verify record modal. Suite/unit stays on the street line;
+  // parsed components fill their fields when present.
+  const handleEditAddressChange = (value: string) => {
+    if (addressParser.canParse(value)) {
+      const parsed = addressParser.parse(value);
+      setEditAddress(
+        [parsed.address_line1, parsed.address_line2].filter(Boolean).join(', ') ||
+          value,
+      );
+      setEditCity((prev) => parsed.city ?? prev);
+      setEditState((prev) =>
+        parsed.state && US_STATES.includes(parsed.state) ? parsed.state : prev,
+      );
+      setEditZipCode((prev) => parsed.postal_code ?? prev);
+    } else {
+      setEditAddress(value);
+    }
+  };
 
   const handleGetCoordinates = async () => {
     if (!editAddress.trim() || !editCity.trim() || !editZipCode.trim()) {
@@ -3091,7 +3113,8 @@ function PresenceSeedDetailClient() {
                 <input
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   value={editAddress}
-                  onChange={(e) => setEditAddress(e.target.value)}
+                  onChange={(e) => handleEditAddressChange(e.target.value)}
+                  placeholder="123 Main St — paste a full address to split city/state/ZIP"
                 />
               </div>
               <div>

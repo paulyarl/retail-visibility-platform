@@ -190,6 +190,11 @@ import MarketingSignalRegistryService from '../services/MarketingSignalRegistryS
 import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import { BusinessProspectService } from '../services/BusinessProspectService';
+import prospectReportService from '../services/ProspectReportService';
+import type {
+  ProspectReportChapterId,
+  ProspectReportTier,
+} from '../validators/prospect-report-dto.schema';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
 import ProspectCommunicationService from '../services/ProspectCommunicationService';
 import ProvingGroundCadenceService from '../services/ProvingGroundCadenceService';
@@ -1737,6 +1742,125 @@ router.post('/:id/website-gap/confirm-scope', async (req: any, res: Response) =>
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Prospect (Business Visibility) Report ────────────────────────────────
+// Owner-facing report per WEBSITE_GAP_OWNER_REPORT_SPEC §5.3 — the public
+// artifact is keyed on business_prospect_id; each sibling's panel shares
+// its own chapter by default and can widen to the full diagnostic.
+
+const PROSPECT_REPORT_CHANNELS = new Set([
+  'email', 'text', 'social', 'phone', 'in_person', 'banner',
+]);
+
+/**
+ * GET /campaigns/:id/prospect-report[?chapters=…&tier=…&includePagePlan=…]
+ * Panel preview — assembles the recipient view for the requested selection;
+ * defaults to every buildable chapter at tier=full so the panel can render
+ * the complete diagnostic. Response carries available_chapters so the
+ * chapter checkboxes reflect what can actually be shared.
+ */
+router.get('/campaigns/:id/prospect-report', async (req: any, res: Response) => {
+  try {
+    const ctx = getCtx(req);
+    const prospectId = await prospectReportService.resolveProspectIdForCampaign(req.params.id, ctx);
+
+    const available = await prospectReportService.listAvailableChapters(prospectId, ctx);
+    if (available.length === 0) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'No reportable audit on any sibling' });
+    }
+
+    const requested = typeof req.query.chapters === 'string' && req.query.chapters
+      ? (req.query.chapters.split(',') as ProspectReportChapterId[]).filter((c) => available.includes(c))
+      : available;
+    const tier: ProspectReportTier = req.query.tier === 'free' ? 'free' : 'full';
+    const includePagePlan = req.query.includePagePlan === 'true';
+
+    const report = await prospectReportService.assembleReport(
+      prospectId, requested, tier, { includePagePlan }, ctx,
+    );
+    if (!report) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'No reportable audit on any sibling' });
+    }
+
+    res.json({ success: true, data: { report, available_chapters: available, prospect_id: prospectId } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * GET /campaigns/:id/prospect-report/share?chapters=…&tier=…&channel=…[&includePagePlan=true]
+ * Mints ONE signed token + ONE mkt_prospect_report_links row for the
+ * requested channel — one call per share action (§5.2a). The panel loops
+ * channels for its per-channel share buttons.
+ */
+const prospectReportShareSchema = z.object({
+  chapters: z.string().min(1),
+  tier: z.enum(['free', 'full']),
+  channel: z.string().min(1),
+  includePagePlan: z.string().optional(),
+});
+
+router.get('/campaigns/:id/prospect-report/share', async (req: any, res: Response) => {
+  try {
+    const parsed = prospectReportShareSchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const ctx = getCtx(req);
+    const { chapters, tier, channel } = parsed.data;
+
+    if (!PROSPECT_REPORT_CHANNELS.has(channel)) {
+      return res.status(400).json({ success: false, error: 'invalid_channel' });
+    }
+
+    const prospectId = await prospectReportService.resolveProspectIdForCampaign(req.params.id, ctx);
+    const available = await prospectReportService.listAvailableChapters(prospectId, ctx);
+
+    const requested = chapters
+      .split(',')
+      .map((c) => c.trim())
+      .filter((c): c is ProspectReportChapterId => available.includes(c as ProspectReportChapterId));
+    if (requested.length === 0) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'No reportable audit on any sibling' });
+    }
+
+    const includePagePlan = parsed.data.includePagePlan === 'true';
+    const token = prospectReportService.mintToken({
+      prospectId, tier, chapters: requested, includePagePlan,
+    });
+    if (!token) {
+      return res.status(500).json({ success: false, error: 'token_unavailable', message: 'PROSPECT_REPORT_TOKEN_SECRET is not configured' });
+    }
+
+    const code = await prospectReportService.mintLinkCode({
+      prospectId,
+      campaignId: req.params.id,
+      token,
+      tier,
+      chapters: requested,
+      channel,
+      createdBy: req.user?.id ?? null,
+    }, ctx);
+    if (!code) {
+      return res.status(500).json({ success: false, error: 'link_mint_failed' });
+    }
+
+    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
+    res.json({
+      success: true,
+      data: {
+        channel,
+        code,
+        url: `${baseUrl}/r/pr/${code}`,
+        pdf_url: `/api/public/marketing/prospect-report/${token}/pdf?qr=${code}`,
+        qr_url: `${baseUrl}/r/pr/${code}`,
+      },
+    });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

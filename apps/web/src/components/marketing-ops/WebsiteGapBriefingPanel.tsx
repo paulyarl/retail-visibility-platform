@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, ClipboardPaste, Copy, FileText, Globe, Load
 import marketingOpsService, { Audit, CampaignDetail } from '@/services/MarketingOpsService';
 import { isWebsiteGapCampaign } from './repairCampaignGate';
 import WebsitePositioningAuditCard from './WebsitePositioningAuditCard';
+import OwnerReportSection from './OwnerReportSection';
 
 interface WebsiteGapBriefingPanelProps {
   campaign: CampaignDetail;
@@ -450,6 +451,14 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
             identically. */}
         {websiteAudit && (
           <WebsitePositioningAuditCard audit={websiteAudit} campaignId={campaign.id} />
+        )}
+
+        {/* Owner Report — this campaign's report home (§5.5a). The panel is
+            self-aware of its own chapter; seeds are not. Rendered only when
+            a positioning audit is on file — the website chapter is the only
+            registered builder at v1. */}
+        {websiteAudit && (
+          <OwnerReportSection campaign={campaign} />
         )}
       </div>
     </div>

@@ -21,7 +21,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 
-export type SurfaceType = 'place' | 'category' | 'city';
+export type SurfaceType = 'place' | 'category' | 'city' | 'prospect_report';
 export type UnlockType = 'single_report' | 'subscription' | 'owner_claim';
 
 /** Access tiers per spec §6.1. */

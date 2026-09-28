@@ -2276,6 +2276,35 @@ export function generateIntakeShortCode(): string {
   return generateIntakeShortCodeNano();
 }
 
+// ─── Prospect Report Short Codes (mkt_prospect_report_links) ────────────
+// Same curated 32-char alphabet as claim/gallery/intake codes. 6-char codes
+// back the /r/pr/{code} short links for the owner-facing Business
+// Visibility Report — resolved via /api/public/r/pr-scan/:code which records
+// the scan under the channel on the row (prospect_report_{channel} surface).
+// Deliberately a separate namespace from claim codes: a report click must
+// never register as a claim/seed-delivery scan (spec §5.2a, G-2/G-3).
+const PROSPECT_REPORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const generateProspectReportCodeNano = customAlphabet(PROSPECT_REPORT_CODE_ALPHABET, 6);
+
+/**
+ * Generate a 6-char prospect-report link code.
+ * Used in /r/pr/{code} redirects to /prospect-report/{signedToken}.
+ * No prefix — the short code IS the URL segment.
+ */
+export function generateProspectReportCode(): string {
+  return generateProspectReportCodeNano();
+}
+
+/**
+ * Generate a mkt_prospect_report_links ID.
+ * Format: prl-{nanoid12} — global ID (not tenant-keyed), matches the
+ * marketing-ops family.
+ */
+export function generateProspectReportLinkId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `prl-${nanoid()}`;
+}
+
 // ─── Intelligence Profiles (Sprint 1 — Seek Intelligence Scope) ──────────
 // Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
 // Profile IDs are human-readable slugs (e.g. 'auto_repair_us'), not nanoid-based,

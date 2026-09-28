@@ -31,6 +31,12 @@ const SURFACE_OPTIONS: { value: string; label: string }[] = [
   { value: 'claim_invite', label: 'Claim Invite (Mail)' },
   { value: 'claim_invite_walkin', label: 'Claim Invite (Walk-in)' },
   { value: 'claim_invite_social', label: 'Claim Invite (Social/DM)' },
+  { value: 'prospect_report_phone', label: 'Prospect Report (Phone)' },
+  { value: 'prospect_report_email', label: 'Prospect Report (Email)' },
+  { value: 'prospect_report_social', label: 'Prospect Report (Social/DM)' },
+  { value: 'prospect_report_in_person', label: 'Prospect Report (In Person)' },
+  { value: 'prospect_report_text', label: 'Prospect Report (Text)' },
+  { value: 'prospect_report_banner', label: 'Prospect Report (Banner)' },
 ];
 
 export default function AdminQrAnalyticsPage() {
