@@ -26,6 +26,7 @@ import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateProspectQueueId } from '../lib/id-generator';
 import { addressParser } from '../lib/address-parser';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
@@ -51,12 +52,17 @@ export type ProspectSourceKind =
   | 'directory_lead_gen'
   | 'category_identification'
   | 'public_suggestion'
+  | 'owner_submission'
   | 'gold_standard_candidate';
 
 // Migration 262 — 'hold' parks the prospect (touch-cap / nurture; re-enters
 // at next_touch_at) and 'in_thread' marks a live conversation (the ladder is
 // done or interrupted — the thread drives next moves). See spec §4.6.
-export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed' | 'hold' | 'in_thread';
+// Migration 310 — 'intake' is the unvetted public-intake staging lane:
+// directory suggestions + owner-submitted draft seeds land here automatically
+// and are either dismissed or graduated (→ queued / verify_then_outreach) by
+// an operator. Intake entries cannot create campaigns.
+export type ProspectStatus = 'intake' | 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed' | 'hold' | 'in_thread';
 export type ProspectPriority = 'high' | 'normal';
 
 // ─── Verify-then-outreach (Migration 255) ───────────────────────────────
@@ -107,6 +113,15 @@ export function verificationClearsCampaign(outcome: string | null | undefined): 
 
 export interface VerificationRequestInput {
   queueEntryId: string;
+  actingUserId?: string;
+}
+
+// Migration 310 — intake graduation: 'queued' accepts the prospect into the
+// normal queue; 'verify_then_outreach' routes it through the phone gate first.
+export type IntakeGraduateTarget = 'queued' | 'verify_then_outreach';
+export interface IntakeGraduateInput {
+  queueEntryId: string;
+  target: IntakeGraduateTarget;
   actingUserId?: string;
 }
 
@@ -210,8 +225,13 @@ export interface ProspectQueueAddInput {
   // verification state (skipping 'queued'). Used by discovery surfaces where
   // the audit already flagged NAP/digital presence as unable_to_verify and the
   // operator wants to send the prospect straight to phone verification.
+  // 'intake' parks unvetted public-sourced records in the staging lane until
+  // an operator graduates (→ queued/verify) or dismisses them (Migration 310).
   // Defaults to 'queued' (legacy behavior).
-  initial_status?: 'queued' | 'verify_then_outreach';
+  initial_status?: 'intake' | 'queued' | 'verify_then_outreach';
+  // Pre-linked seed (Migration 310) — owner-submission intake mirrors carry
+  // the draft seed they were born from so the funnel reads queue → seed.
+  seed_id?: string;
 }
 
 export type AddToQueueResult =
@@ -336,9 +356,11 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // duplicate listings).
       const initialStatus = input.initial_status === 'verify_then_outreach'
         ? 'verify_then_outreach'
-        : 'queued';
+        : input.initial_status === 'intake'
+          ? 'intake'
+          : 'queued';
       const dedupWhere: any = {
-        status: { in: ['queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'] },
+        status: { in: ['intake', 'queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'] },
       };
       if (businessName) {
         dedupWhere.business_name = { equals: businessName, mode: 'insensitive' };
@@ -436,6 +458,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
           priority: input.priority ?? 'normal',
           note: input.note ?? null,
           queued_by: input.queuedBy ?? null,
+          // Migration 310 — owner-submission intake mirrors arrive pre-linked
+          // to their draft seed.
+          seed_id: input.seed_id ?? null,
           // When created directly in verify_then_outreach (from discovery
           // surfaces), stamp the verification request metadata so the queue
           // card can show who requested it and when.
@@ -473,12 +498,14 @@ class MarketingProspectQueueServiceClass extends BaseService {
   }
 
   /**
-   * List queue entries with filters. `queuedCount` (status='queued' only) is
-   * always returned regardless of filters — it drives the nav badge / widget.
+   * List queue entries with filters. `statusCounts` (per-status row counts)
+   * plus the `queuedCount` / `intakeCount` conveniences are always returned
+   * regardless of filters — they drive the nav badge / widget / per-tab
+   * counts so no lane loiters invisibly.
    * `includeCampaigns` LEFT JOINs processed_campaign_id → mkt_campaigns_list
    * and decorates each entry with campaign stage fields for the board view.
    */
-  async list(filters: ListQueueFilters, ctx?: RequestCtx): Promise<{ entries: any[]; queuedCount: number }> {
+  async list(filters: ListQueueFilters, ctx?: RequestCtx): Promise<{ entries: any[]; queuedCount: number; intakeCount: number; statusCounts: Record<string, number> }> {
     try {
       const statusValues = normalizeStatusFilter(filters.status);
       const where: any = {};
@@ -547,11 +574,17 @@ class MarketingProspectQueueServiceClass extends BaseService {
           : undefined,
       });
 
-      // queuedCount is always the count of status='queued' regardless of the
-      // status filter the caller passed — it drives the nav badge.
-      const queuedCount = await this.prisma.mkt_prospect_queue.count({
-        where: { status: 'queued' },
+      // statusCounts is always a full per-status tally regardless of the
+      // status filter the caller passed — it drives the nav badge and the
+      // queue page's per-tab counts. One groupBy instead of N count queries.
+      const statusGroups = await this.prisma.mkt_prospect_queue.groupBy({
+        by: ['status'],
+        _count: { _all: true },
       });
+      const statusCounts: Record<string, number> = {};
+      for (const g of statusGroups) statusCounts[g.status] = g._count._all;
+      const queuedCount = statusCounts['queued'] ?? 0;
+      const intakeCount = statusCounts['intake'] ?? 0;
 
       // Audit coverage (pre-push tracking): when decorating with campaigns,
       // also flag which processed campaigns already have a business_analysis
@@ -736,7 +769,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         });
       }
 
-      return { entries: decorated, queuedCount };
+      return { entries: decorated, queuedCount, intakeCount, statusCounts };
     } catch (error) {
       logger.error('list failed', ctx, { error: (error as Error).message });
       throw this.handleError(error, ctx);
@@ -760,8 +793,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const onlyEnrichmentPatch =
         (patch.account_family !== undefined || patch.hours !== undefined) &&
         patch.priority === undefined && patch.note === undefined && patch.assigned_to === undefined;
-      const enrichmentEditable = ['queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(existing.status);
-      const open = existing.status === 'queued' || existing.status === 'verify_then_outreach';
+      const enrichmentEditable = ['intake', 'queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(existing.status);
+      // Migration 310 — intake rows are editable (priority/note/assign) while
+      // parked in the staging lane; they still cannot create campaigns.
+      const open = existing.status === 'intake' || existing.status === 'queued' || existing.status === 'verify_then_outreach';
       if (!open && !(onlyEnrichmentPatch && enrichmentEditable)) {
         throw new ConflictError(`Queue entry ${id} is not editable (status=${existing.status})`);
       }
@@ -936,6 +971,15 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (entry.status === 'verify_then_outreach') {
         throw new ConflictError(
           `Queue entry ${input.queueEntryId} is pending verification — resolve verification before creating a campaign`,
+        );
+      }
+
+      // Migration 310 — intake is an unvetted staging lane: the record must be
+      // graduated (→ queued / verify_then_outreach) or dismissed by an
+      // operator before a campaign can be created from it.
+      if (entry.status === 'intake') {
+        throw new ConflictError(
+          `Queue entry ${input.queueEntryId} is unvalidated intake — graduate it to the queue (or verify) before creating a campaign`,
         );
       }
 
@@ -1630,6 +1674,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
             business_snapshot: updatedSnapshot as any,
           },
         });
+        // Migration 310 — a suggestion-sourced entry dismissed here rejects
+        // the linked public suggestion and resolves its intake ticket.
+        await this.syncLinkedSuggestion(existing, 'rejected', null, ctx);
         logger.info('resolveVerification: dismissed (unverified_closed)', ctx, {
           id: input.queueEntryId, outcome: input.outcome,
         });
@@ -1692,6 +1739,102 @@ class MarketingProspectQueueServiceClass extends BaseService {
   }
 
   /**
+   * Graduate an intake entry out of the unvetted staging lane (Migration 310).
+   * 'intake' → 'queued' accepts the prospect into the normal queue; 'intake' →
+   * 'verify_then_outreach' routes it through the phone-verification gate first
+   * (stamps the verification request metadata like requestVerification).
+   * Only callable from 'intake' — graduated rows never move backward. A linked
+   * directory suggestion is flipped to 'under_review' (it left the inbox).
+   */
+  async graduate(input: IntakeGraduateInput, ctx?: RequestCtx): Promise<any> {
+    try {
+      const existing = await this.prisma.mkt_prospect_queue.findUnique({
+        where: { id: input.queueEntryId },
+      });
+      if (!existing) {
+        throw new NotFoundError(`Queue entry ${input.queueEntryId} not found`);
+      }
+      if (existing.status !== 'intake') {
+        throw new ConflictError(
+          `Queue entry ${input.queueEntryId} cannot be graduated (status=${existing.status})`,
+        );
+      }
+
+      const verification: VerificationRecord | undefined =
+        input.target === 'verify_then_outreach'
+          ? {
+              requested_at: new Date().toISOString(),
+              requested_by: input.actingUserId ?? null,
+            }
+          : undefined;
+
+      const updated = await this.prisma.mkt_prospect_queue.update({
+        where: { id: input.queueEntryId },
+        data: {
+          status: input.target,
+          ...(verification ? { verification: verification as any } : {}),
+        },
+      });
+
+      await this.syncLinkedSuggestion(existing, 'under_review', input.actingUserId, ctx);
+
+      logger.info('graduate: intake entry graduated', ctx, {
+        id: input.queueEntryId, target: input.target,
+      });
+      return updated;
+    } catch (error) {
+      logger.error('graduate failed', ctx, {
+        error: (error as Error).message,
+        queueEntryId: input.queueEntryId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Sync a queue decision back to the linked public suggestion
+   * (business_snapshot->>'suggestion_id', Migration 310). Dismissal →
+   * 'rejected'; graduation → 'under_review'. Only pre-terminal suggestion
+   * statuses are touched (approved/duplicate rows are never overwritten) and
+   * the intake Requests-Hub ticket resolves with the operator's decision.
+   * Non-fatal — the queue transition already committed.
+   */
+  private async syncLinkedSuggestion(
+    entry: any,
+    status: 'under_review' | 'rejected',
+    actorId?: string | null,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    const suggestionId = (entry?.business_snapshot as any)?.suggestion_id;
+    if (typeof suggestionId !== 'string' || !suggestionId) return;
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE directory_presence_suggestions
+        SET status = ${status},
+            reviewed_by = COALESCE(reviewed_by, ${actorId ?? 'system'}),
+            reviewed_at = COALESCE(reviewed_at, NOW()),
+            updated_at = NOW()
+        WHERE id = ${suggestionId}
+          AND status IN ('submitted', 'under_review')
+      `;
+      await this.prisma.$executeRaw`
+        UPDATE crm_support_tickets
+        SET status = 'resolved', resolved_at = now(), updated_at = now()
+        WHERE tenant_id = ${PLATFORM_SCOPE}
+          AND inquiry_id = ${suggestionId}
+          AND category = 'directory_suggestion'
+          AND status IN ('open', 'in_progress', 'waiting')
+      `;
+    } catch (err) {
+      logger.error('syncLinkedSuggestion failed (non-fatal)', ctx, {
+        error: (err as Error).message,
+        queueEntryId: entry?.id,
+        suggestionId,
+      });
+    }
+  }
+
+  /**
    * Dismiss a queued entry. Idempotent — dismissing an already-dismissed
    * entry just updates the reason. Re-queueing a dismissed business creates
    * a new row (the partial unique index only covers status='queued').
@@ -1713,6 +1856,11 @@ class MarketingProspectQueueServiceClass extends BaseService {
           processed_at: new Date(),
         },
       });
+
+      // Migration 310 — dismissing a suggestion-sourced entry rejects the
+      // linked public suggestion and resolves its intake ticket.
+      await this.syncLinkedSuggestion(existing, 'rejected', null, ctx);
+
       logger.info('dismiss: entry dismissed', ctx, {
         id: input.queueEntryId, reason: input.reason ?? null,
       });

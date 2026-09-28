@@ -18,6 +18,7 @@ import { generateDirectoryPresenceSubmissionVerificationId } from '../lib/id-gen
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
+import MarketingProspectQueueService from './MarketingProspectQueueService';
 import { describeSourcePage } from './DirectorySuggestionService';
 import { z } from 'zod';
 
@@ -99,6 +100,7 @@ class DirectoryOwnerSubmissionService {
         customerId: ctx.actorId,
       });
       await this.notifyNewSeed(seed, input);
+      await this.mirrorIntoQueue(seed, input);
       return { seed, statusCode: 201 };
     }
 
@@ -164,7 +166,7 @@ class DirectoryOwnerSubmissionService {
 
     // Reconstruct the submission fields for the ticket description — the
     // verified payload is a CreateSeedInput (camelCase keys on seedInput).
-    await this.notifyNewSeed(seed, {
+    const reconstructed = {
       businessName: v.business_name,
       ownerName: seedInput.ownerName,
       ownerEmail: seedInput.ownerEmail,
@@ -172,11 +174,73 @@ class DirectoryOwnerSubmissionService {
       primaryCategory: seedInput.primaryCategory,
       city: seedInput.city,
       state: seedInput.state,
+      address: seedInput.address,
+      zipCode: seedInput.zipCode,
+      phone: seedInput.phone,
+      website: seedInput.website,
+      contactConsent: seedInput.ownerContactConsent,
       submitterComment: seedInput.notes,
       sourcePage: 'email_verify',
-    } as OwnerSubmissionInput);
+    } as OwnerSubmissionInput;
+    await this.notifyNewSeed(seed, reconstructed);
+    await this.mirrorIntoQueue(seed, reconstructed);
 
     return { seed, statusCode: 201 };
+  }
+
+  /**
+   * Mirror the owner-submitted draft seed into the prospect queue's intake
+   * lane (Migration 310) — one intake inbox for all public-sourced prospects.
+   * The queue entry is pre-linked to the seed (seed_id) so the funnel reads
+   * queue → seed; graduating/dismissing the entry is independent of the
+   * seed's own draft → publish lifecycle. Non-fatal.
+   */
+  private async mirrorIntoQueue(seed: any, input: OwnerSubmissionInput): Promise<void> {
+    try {
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: input.businessName.trim(),
+        title: input.businessName.trim(),
+        category: input.primaryCategory?.trim() || undefined,
+        city: input.city?.trim() || undefined,
+        state: input.state?.trim() || undefined,
+        source_kind: 'owner_submission',
+        scope: 'business',
+        seed_id: seed.id,
+        note: `Owner-submitted draft seed ${seed.id} (Add Your Business)${input.sourcePage ? ` (source: ${input.sourcePage})` : ''}${input.submitterComment ? `\nOwner comment: ${input.submitterComment}` : ''}`,
+        business_snapshot: {
+          seed_id: seed.id,
+          owner_submission: true,
+          contact_consent: input.contactConsent === true,
+          phone: input.phone?.trim() || undefined,
+          website: input.website?.trim() || undefined,
+          owner_name: input.ownerName?.trim() || undefined,
+          // Owner identity is collected for the listing; it's an outreach
+          // route only when they opted in.
+          email: input.contactConsent ? input.ownerEmail?.trim().toLowerCase() : undefined,
+          submitter_email: input.ownerEmail?.trim().toLowerCase() || undefined,
+          address: input.address?.trim() || undefined,
+          address_city: input.city?.trim() || undefined,
+          address_state: input.state?.trim() || undefined,
+          address_zip: input.zipCode?.trim() || undefined,
+        },
+        initial_status: 'intake',
+      });
+
+      // Linkage: a matching queue row that already existed (dedup merge) may
+      // lack the seed link — stamp it so the funnel reads queue → seed.
+      const entry = (result as any).entry;
+      if (entry && !entry.seed_id) {
+        await prisma.mkt_prospect_queue.update({
+          where: { id: entry.id },
+          data: { seed_id: seed.id },
+        });
+      }
+    } catch (err) {
+      logger.error('[DirectoryOwnerSubmissionService] Queue mirror failed (non-fatal)', undefined, {
+        error: (err as Error).message,
+        seedId: seed?.id,
+      });
+    }
   }
 
   /**

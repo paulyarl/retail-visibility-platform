@@ -38,6 +38,7 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
   category_identification: 'Category Identification',
   directory_lead_gen: 'Get Listed (Lead Gen)',
   public_suggestion: 'Public Suggestion',
+  owner_submission: 'Owner Submission',
   gold_standard_candidate: 'Gold Standard Discovery',
 };
 
@@ -111,7 +112,11 @@ function rowBorderClass(entry: ProspectQueueEntry): string {
 
 export default function ProspectQueueClient() {
   const [entries, setEntries] = useState<ProspectQueueEntry[]>([]);
-  const [queuedCount, setQueuedCount] = useState(0);
+  // Global per-status tallies (filter-independent) — drive every tab badge so
+  // non-active lanes report real counts, not just the loaded page.
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const queuedCount = statusCounts['queued'] ?? 0;
+  const intakeCount = statusCounts['intake'] ?? 0;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,7 +137,7 @@ export default function ProspectQueueClient() {
   const initialStatus: ProspectStatus = (() => {
     if (typeof window === 'undefined') return 'queued';
     const param = new URLSearchParams(window.location.search).get('status');
-    if (param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed' || param === 'in_thread' || param === 'hold') {
+    if (param === 'intake' || param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed' || param === 'in_thread' || param === 'hold') {
       return param as ProspectStatus;
     }
     return 'queued';
@@ -212,19 +217,20 @@ export default function ProspectQueueClient() {
     setLoading(true);
     setError(null);
     try {
-      // Board view needs both queued + campaign_created entries and the
-      // campaign join (for stage columns). List view uses the active status tab.
+      // Board view needs the intake + queued + verify + campaign_created
+      // entries and the campaign join (for stage columns). List view uses the
+      // active status tab.
       const isBoard = viewMode === 'board';
       const result = await marketingOpsService.listProspectQueue({
-        status: isBoard ? ['queued', 'verify_then_outreach', 'campaign_created'] : statusTab,
-        assigned_to: assignedToMe && (isBoard || statusTab === 'queued' || statusTab === 'verify_then_outreach') ? 'me' : undefined,
+        status: isBoard ? ['intake', 'queued', 'verify_then_outreach', 'campaign_created'] : statusTab,
+        assigned_to: assignedToMe && (isBoard || statusTab === 'intake' || statusTab === 'queued' || statusTab === 'verify_then_outreach') ? 'me' : undefined,
         category: categoryFilter || undefined,
         city: cityFilter || undefined,
         limit: 200,
         includeCampaigns: isBoard,
       });
       setEntries(result.entries);
-      setQueuedCount(result.queuedCount);
+      setStatusCounts(result.statusCounts ?? { queued: result.queuedCount ?? 0, intake: result.intakeCount ?? 0 });
     } catch (err: any) {
       setError(err.message || 'Failed to load prospect queue');
     } finally {
@@ -395,7 +401,7 @@ export default function ProspectQueueClient() {
   };
 
   const handleTogglePriority = async (entry: ProspectQueueEntry) => {
-    if (entry.status !== 'queued' && entry.status !== 'verify_then_outreach') return;
+    if (entry.status !== 'intake' && entry.status !== 'queued' && entry.status !== 'verify_then_outreach') return;
     setTogglingPriorityId(entry.id);
     try {
       const newPriority: ProspectPriority = entry.priority === 'high' ? 'normal' : 'high';
@@ -422,7 +428,7 @@ export default function ProspectQueueClient() {
   };
 
   const handleAssignToMe = async (entry: ProspectQueueEntry) => {
-    if (!currentUserId || (entry.status !== 'queued' && entry.status !== 'verify_then_outreach')) return;
+    if (!currentUserId || (entry.status !== 'intake' && entry.status !== 'queued' && entry.status !== 'verify_then_outreach')) return;
     setAssigningId(entry.id);
     try {
       await marketingOpsService.updateProspectQueue(entry.id, { assigned_to: currentUserId });
@@ -435,7 +441,7 @@ export default function ProspectQueueClient() {
   };
 
   const handleUnassign = async (entry: ProspectQueueEntry) => {
-    if (entry.status !== 'queued' && entry.status !== 'verify_then_outreach') return;
+    if (entry.status !== 'intake' && entry.status !== 'queued' && entry.status !== 'verify_then_outreach') return;
     setAssigningId(entry.id);
     try {
       await marketingOpsService.updateProspectQueue(entry.id, { assigned_to: null });
@@ -498,6 +504,21 @@ export default function ProspectQueueClient() {
       setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, account_family: value } : e));
     } catch (err: any) {
       setError(err.message || 'Failed to set account family');
+    }
+  };
+
+  // Intake graduation (Migration 310) — promote an unvetted public-sourced
+  // record to the queue or verify lane; dismissal uses the shared handler.
+  const handleGraduate = async (id: string, target: 'queued' | 'verify_then_outreach') => {
+    setVerifyingId(id);
+    setError(null);
+    try {
+      await marketingOpsService.graduateProspectQueue(id, target);
+      await fetchQueue();
+    } catch (err: any) {
+      setError(err.message || 'Failed to graduate intake entry');
+    } finally {
+      setVerifyingId(null);
     }
   };
 
@@ -605,12 +626,13 @@ export default function ProspectQueueClient() {
   );
 
   const statusTabs: { key: ProspectStatus; label: string; count: number }[] = [
-    { key: 'queued', label: 'Queued', count: queuedCount },
-    { key: 'verify_then_outreach', label: 'Verify', count: entries.filter((e) => e.status === 'verify_then_outreach').length },
-    { key: 'in_thread', label: 'In Thread', count: entries.filter((e) => e.status === 'in_thread').length },
-    { key: 'hold', label: 'Hold', count: entries.filter((e) => e.status === 'hold').length },
-    { key: 'campaign_created', label: 'Created', count: entries.filter((e) => e.status === 'campaign_created').length },
-    { key: 'dismissed', label: 'Dismissed', count: entries.filter((e) => e.status === 'dismissed').length },
+    { key: 'intake', label: 'Intake', count: statusCounts['intake'] ?? 0 },
+    { key: 'queued', label: 'Queued', count: statusCounts['queued'] ?? 0 },
+    { key: 'verify_then_outreach', label: 'Verify', count: statusCounts['verify_then_outreach'] ?? 0 },
+    { key: 'in_thread', label: 'In Thread', count: statusCounts['in_thread'] ?? 0 },
+    { key: 'hold', label: 'Hold', count: statusCounts['hold'] ?? 0 },
+    { key: 'campaign_created', label: 'Created', count: statusCounts['campaign_created'] ?? 0 },
+    { key: 'dismissed', label: 'Dismissed', count: statusCounts['dismissed'] ?? 0 },
   ];
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -622,6 +644,15 @@ export default function ProspectQueueClient() {
         {/* Header — the shell owns the page title; this is the queue toolbar */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-gray-500 dark:text-gray-400">
+            {intakeCount > 0 && (
+              <button
+                onClick={() => { toggleViewMode('list'); setStatusTab('intake'); }}
+                className="font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+                title="Unvetted public suggestions and owner-submitted businesses awaiting validation — show the Intake list"
+              >
+                {intakeCount} new intake{intakeCount !== 1 ? 's' : ''} ·{' '}
+              </button>
+            )}
             {queuedCount} queued prospect{queuedCount !== 1 ? 's' : ''} awaiting action
           </p>
           <div className="flex items-center gap-2">
@@ -690,8 +721,8 @@ export default function ProspectQueueClient() {
             ))}
           </div>
 
-          {/* Assigned to me toggle (relevant for queued + verify) */}
-          {(statusTab === 'queued' || statusTab === 'verify_then_outreach') && (
+          {/* Assigned to me toggle (relevant for intake + queued + verify) */}
+          {(statusTab === 'intake' || statusTab === 'queued' || statusTab === 'verify_then_outreach') && (
             <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700">
               <input
                 type="checkbox"
@@ -745,7 +776,9 @@ export default function ProspectQueueClient() {
           <div className="text-center py-12">
             <Inbox className="w-12 h-12 mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {statusTab === 'queued'
+              {statusTab === 'intake'
+                ? 'No intake records. Public directory suggestions and owner-submitted businesses land here automatically — validate to graduate, or dismiss.'
+                : statusTab === 'queued'
                 ? 'No queued prospects. Use "Add to Queue" above or "Queue" on any audit card to capture prospects for later.'
                 : statusTab === 'verify_then_outreach'
                   ? 'No prospects pending verification. Move a queued prospect to "Verify" when NAP is unverified and a phone call is needed before outreach.'
@@ -1109,7 +1142,7 @@ export default function ProspectQueueClient() {
 
                         {/* Priority */}
                         <td className="px-3 py-2">
-                          {(entry.status === 'queued' || entry.status === 'verify_then_outreach') ? (
+                          {(entry.status === 'intake' || entry.status === 'queued' || entry.status === 'verify_then_outreach') ? (
                             <button
                               onClick={() => handleTogglePriority(entry)}
                               disabled={togglingPriorityId === entry.id}
@@ -1130,7 +1163,7 @@ export default function ProspectQueueClient() {
 
                         {/* Assigned */}
                         <td className="px-3 py-2 text-xs">
-                          {(entry.status === 'queued' || entry.status === 'verify_then_outreach') ? (
+                          {(entry.status === 'intake' || entry.status === 'queued' || entry.status === 'verify_then_outreach') ? (
                             <div className="flex items-center gap-1">
                               <span className={assigneeLabel ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'}>
                                 {assigneeLabel ?? 'Unassigned'}
@@ -1210,7 +1243,51 @@ export default function ProspectQueueClient() {
                                 Log
                               </button>
                             )}
-                            {entry.status === 'queued' ? (
+                            {entry.status === 'intake' ? (
+                              <>
+                                <button
+                                  onClick={() => handleGraduate(entry.id, 'queued')}
+                                  disabled={verifyingId === entry.id}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700 disabled:opacity-50"
+                                  title="Accept — graduate this intake record into the prospect queue"
+                                >
+                                  {verifyingId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() => handleGraduate(entry.id, 'verify_then_outreach')}
+                                  disabled={verifyingId === entry.id}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-50"
+                                  title="Verify — graduate into the phone-verification gate"
+                                >
+                                  {verifyingId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3" />}
+                                  Verify
+                                </button>
+                                {dismissReasonOpen === entry.id ? (
+                                  <div className="inline-flex items-center gap-1">
+                                    <select
+                                      onChange={(e) => handleDismiss(entry.id, e.target.value as ProspectDismissReason)}
+                                      value=""
+                                      autoFocus
+                                      className="text-xs px-1 py-1 border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+                                    >
+                                      <option value="" disabled>Reason…</option>
+                                      {DISMISS_REASONS.map((r) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+                                    </select>
+                                    <button onClick={() => setDismissReasonOpen(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setDismissReasonOpen(entry.id)}
+                                    disabled={dismissingId === entry.id}
+                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50"
+                                  >
+                                    {dismissingId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                    Dismiss
+                                  </button>
+                                )}
+                              </>
+                            ) : entry.status === 'queued' ? (
                               <>
                                 <button
                                   onClick={() => handleCreateCampaign(entry.id)}

@@ -13,6 +13,7 @@ const {
   mockAudits,
   mockChecklistProgress,
   mockQueryRaw,
+  mockExecuteRaw,
 } = vi.hoisted(() => ({
   mockQueue: {
     findUnique: vi.fn(),
@@ -21,6 +22,7 @@ const {
     create: vi.fn(),
     update: vi.fn(),
     count: vi.fn(),
+    groupBy: vi.fn(),
   },
   mockCampaigns: {
     findUnique: vi.fn(),
@@ -37,6 +39,8 @@ const {
   // queue-promotion placeholder audits in SQL), so $queryRaw is mocked at
   // the client level rather than mkt_audits_list.findMany.
   mockQueryRaw: vi.fn(),
+  // The linked-suggestion sync (Migration 310) writes via $executeRaw.
+  mockExecuteRaw: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -46,6 +50,7 @@ vi.mock('../../prisma', () => ({
     mkt_audits_list: mockAudits,
     mkt_campaign_checklist_progress: mockChecklistProgress,
     $queryRaw: mockQueryRaw,
+    $executeRaw: mockExecuteRaw,
   },
 }));
 
@@ -158,6 +163,7 @@ describe('MarketingProspectQueueService', () => {
     mockCampaigns.findFirst.mockResolvedValue(null);
     mockCampaigns.findUnique.mockResolvedValue(parentCampaign());
     mockQueue.count.mockResolvedValue(0);
+    mockQueue.groupBy.mockResolvedValue([]);
     mockQueryRaw.mockResolvedValue([]);
     mockChecklistProgress.groupBy.mockResolvedValue([]);
   });
@@ -272,7 +278,7 @@ describe('MarketingProspectQueueService', () => {
       // The dedup lookup must consider every live status, not just queued.
       const dedupArg = mockQueue.findFirst.mock.calls[0][0];
       expect(dedupArg.where.status).toEqual({
-        in: ['queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'],
+        in: ['intake', 'queued', 'verify_then_outreach', 'hold', 'in_thread', 'campaign_created'],
       });
     });
 
@@ -518,12 +524,17 @@ describe('MarketingProspectQueueService', () => {
     it('returns entries ordered by status, priority, signal_count, created_at and includes queuedCount', async () => {
       const rows = [queueRow({ id: 'pque-1' }), queueRow({ id: 'pque-2', priority: 'high' })];
       mockQueue.findMany.mockResolvedValue(rows);
-      mockQueue.count.mockResolvedValue(2);
+      mockQueue.groupBy.mockResolvedValue([
+        { status: 'queued', _count: { _all: 2 } },
+        { status: 'intake', _count: { _all: 1 } },
+      ]);
 
       const result = await MarketingProspectQueueService.list({});
 
       expect(result.entries).toHaveLength(2);
       expect(result.queuedCount).toBe(2);
+      expect(result.intakeCount).toBe(1);
+      expect(result.statusCounts).toEqual({ queued: 2, intake: 1 });
       expect(mockQueue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [
@@ -539,12 +550,29 @@ describe('MarketingProspectQueueService', () => {
 
     it('queuedCount reflects only status=queued regardless of the status filter', async () => {
       mockQueue.findMany.mockResolvedValue([]);
-      mockQueue.count.mockResolvedValue(5);
+      mockQueue.groupBy.mockResolvedValue([
+        { status: 'queued', _count: { _all: 5 } },
+      ]);
 
       const result = await MarketingProspectQueueService.list({ status: ['campaign_created'] });
 
       expect(result.queuedCount).toBe(5);
-      expect(mockQueue.count).toHaveBeenCalledWith({ where: { status: 'queued' } });
+      expect(mockQueue.groupBy).toHaveBeenCalledWith({ by: ['status'], _count: { _all: true } });
+    });
+
+    it('statusCounts tallies every status regardless of the status filter', async () => {
+      mockQueue.findMany.mockResolvedValue([]);
+      mockQueue.groupBy.mockResolvedValue([
+        { status: 'queued', _count: { _all: 5 } },
+        { status: 'intake', _count: { _all: 3 } },
+        { status: 'in_thread', _count: { _all: 2 } },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({ status: ['dismissed'] });
+
+      expect(result.queuedCount).toBe(5);
+      expect(result.intakeCount).toBe(3);
+      expect(result.statusCounts).toEqual({ queued: 5, intake: 3, in_thread: 2 });
     });
 
     it('passes includeCampaigns through to the Prisma include when set', async () => {
@@ -588,7 +616,7 @@ describe('MarketingProspectQueueService', () => {
       mockQueue.findMany.mockResolvedValue([
         queueRow({ id: 'pque-audit-001', processed_campaign_id: campaignId }),
       ]);
-      mockQueue.count.mockResolvedValue(1);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
       mockQueryRaw.mockResolvedValue([
         { campaign_id: campaignId, created_at: new Date('2026-09-01T10:00:00Z') },
       ]);
@@ -607,7 +635,7 @@ describe('MarketingProspectQueueService', () => {
       mockQueue.findMany.mockResolvedValue([
         queueRow({ id: 'pque-noaudit-001', processed_campaign_id: campaignId }),
       ]);
-      mockQueue.count.mockResolvedValue(1);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
       mockQueryRaw.mockResolvedValue([]);
 
       const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
@@ -621,7 +649,7 @@ describe('MarketingProspectQueueService', () => {
       mockQueue.findMany.mockResolvedValue([
         queueRow({ id: 'pque-cl-001', processed_campaign_id: campaignId }),
       ]);
-      mockQueue.count.mockResolvedValue(1);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
       mockQueryRaw.mockResolvedValue([]);
       mockChecklistProgress.groupBy.mockResolvedValue([
         { campaign_id: campaignId, _count: { step_id: 4 } },
@@ -640,7 +668,7 @@ describe('MarketingProspectQueueService', () => {
 
     it('leaves audit decoration null for entries without a processed campaign', async () => {
       mockQueue.findMany.mockResolvedValue([queueRow({ id: 'pque-nocamp-001' })]);
-      mockQueue.count.mockResolvedValue(1);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
 
       const result = await MarketingProspectQueueService.list({ includeCampaigns: true });
 
@@ -1276,6 +1304,106 @@ describe('MarketingProspectQueueService', () => {
 
       await expect(
         MarketingProspectQueueService.dismiss({ queueEntryId: 'pque-missing' }),
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it('rejects the linked public suggestion when a suggestion-sourced entry is dismissed (Migration 310)', async () => {
+      mockQueue.findUnique.mockResolvedValue(
+        queueRow({ status: 'intake', business_snapshot: { suggestion_id: 'dsug-001' } }),
+      );
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: where.id })),
+      );
+
+      await MarketingProspectQueueService.dismiss({ queueEntryId: 'pque-test-001', reason: 'bad_fit' });
+
+      // syncLinkedSuggestion issues two raw writes: the suggestion status
+      // flip and the intake-ticket resolve.
+      expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ─── graduate (Migration 310) ──────────────────────────────────────────
+
+  describe('graduate', () => {
+    it('graduates an intake entry to queued without stamping verification', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'intake' }));
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, status: 'queued' })),
+      );
+
+      const result = await MarketingProspectQueueService.graduate({
+        queueEntryId: 'pque-test-001',
+        target: 'queued',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.status).toBe('queued');
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'pque-test-001' },
+          data: expect.objectContaining({ status: 'queued' }),
+        }),
+      );
+      const updateData = mockQueue.update.mock.calls[0][0].data;
+      expect(updateData.verification).toBeUndefined();
+    });
+
+    it('graduates an intake entry to verify_then_outreach and stamps verification.requested_at', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'intake' }));
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, status: 'verify_then_outreach' })),
+      );
+
+      const result = await MarketingProspectQueueService.graduate({
+        queueEntryId: 'pque-test-001',
+        target: 'verify_then_outreach',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.status).toBe('verify_then_outreach');
+      expect(mockQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'verify_then_outreach',
+            verification: expect.objectContaining({
+              requested_by: ACTING_USER_ID,
+              requested_at: expect.any(String),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('flips the linked suggestion to under_review on graduation', async () => {
+      mockQueue.findUnique.mockResolvedValue(
+        queueRow({ status: 'intake', business_snapshot: { suggestion_id: 'dsug-001' } }),
+      );
+      mockQueue.update.mockImplementation(({ data }: any) =>
+        Promise.resolve(queueRow({ ...data, status: 'queued' })),
+      );
+
+      await MarketingProspectQueueService.graduate({
+        queueEntryId: 'pque-test-001',
+        target: 'queued',
+      });
+
+      expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws ConflictError when the entry is not intake', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'queued' }));
+
+      await expect(
+        MarketingProspectQueueService.graduate({ queueEntryId: 'pque-test-001', target: 'queued' }),
+      ).rejects.toThrow(/cannot be graduated/i);
+    });
+
+    it('throws NotFoundError when the entry does not exist', async () => {
+      mockQueue.findUnique.mockResolvedValue(null);
+
+      await expect(
+        MarketingProspectQueueService.graduate({ queueEntryId: 'pque-missing', target: 'queued' }),
       ).rejects.toThrow(/not found/i);
     });
   });

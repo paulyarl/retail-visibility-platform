@@ -1231,8 +1231,8 @@ export interface DeriveAllUnmatchedResult {
 
 // ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
 
-export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek' | 'category_identification' | 'directory_lead_gen' | 'public_suggestion' | 'gold_standard_candidate';
-export type ProspectStatus = 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed'
+export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual' | 'intelligence_seek' | 'category_identification' | 'directory_lead_gen' | 'public_suggestion' | 'owner_submission' | 'gold_standard_candidate';
+export type ProspectStatus = 'intake' | 'queued' | 'verify_then_outreach' | 'campaign_created' | 'dismissed'
   // Migration 262 — proving-ground cadence states
   | 'hold' | 'in_thread';
 export type ProspectPriority = 'high' | 'normal';
@@ -1359,7 +1359,11 @@ export interface AddToQueueInput {
   // When 'verify_then_outreach', the entry is created directly in the
   // verification state (skipping 'queued'). Used by discovery surfaces where
   // the audit already flagged NAP/digital presence as unable_to_verify.
-  initial_status?: 'queued' | 'verify_then_outreach';
+  // 'intake' parks unvetted public-sourced records in the staging lane until
+  // an operator graduates or dismisses them (Migration 310).
+  initial_status?: 'intake' | 'queued' | 'verify_then_outreach';
+  // Pre-linked seed — owner-submission intake mirrors carry the draft seed.
+  seed_id?: string;
 }
 
 export type AddToQueueResult =
@@ -5422,7 +5426,7 @@ class MarketingOpsService extends AdminApiSingleton {
     };
   }
 
-  async listProspectQueue(filters?: ProspectQueueListFilters): Promise<{ entries: ProspectQueueEntry[]; queuedCount: number }> {
+  async listProspectQueue(filters?: ProspectQueueListFilters): Promise<{ entries: ProspectQueueEntry[]; queuedCount: number; intakeCount: number; statusCounts: Record<string, number> }> {
     const params = new URLSearchParams();
     if (filters?.status) {
       const s = Array.isArray(filters.status) ? filters.status.join(',') : filters.status;
@@ -5451,6 +5455,8 @@ class MarketingOpsService extends AdminApiSingleton {
     return {
       entries: Array.isArray(data) ? data : [],
       queuedCount: result.data?.queuedCount ?? 0,
+      intakeCount: result.data?.intakeCount ?? 0,
+      statusCounts: result.data?.statusCounts ?? {},
     };
   }
 
@@ -5564,6 +5570,25 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-prospect-queue');
     await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    return result.data?.data ?? result.data;
+  }
+
+  /**
+   * Graduate an 'intake' queue entry out of the unvetted staging lane
+   * (Migration 310) — 'queued' accepts it into the normal queue,
+   * 'verify_then_outreach' routes it through the phone-verification gate.
+   */
+  async graduateProspectQueue(id: string, target: 'queued' | 'verify_then_outreach'): Promise<ProspectQueueEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}/graduate`,
+      { method: 'POST', body: JSON.stringify({ target }) },
+      `mkt-ops-prospect-queue-graduate-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to graduate queue entry');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
     return result.data?.data ?? result.data;
   }
 

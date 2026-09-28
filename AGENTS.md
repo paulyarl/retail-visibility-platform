@@ -1470,3 +1470,18 @@ The `('__location__','__all__','__all__')` row in `directory_category_enrichment
 **What sync does NOT refresh:** the AI narrative fields (`body_copy`, `shopper_guide`, `faq`, `area_breakdown`, `context.market_gaps` / `metro_dynamics` / `top_categories`) go stale as coverage shape changes — they only update on a `__location__`/`__all__` campaign re-run. Open follow-up: staleness signal comparing stamped `context.national_coverage` vs live `getNationalCoverage()` on the Coverage surface. Also open (sprint plan Phase C.3): the `profile_activated` hook still requires non-null `reference_city`, so national profile activation produces no national packet.
 
 Tests: `directoryEnrichment.apply.category.test.ts` (national resync call), `directoryEnrichment.apply.location.test.ts` (campaign-copy preservation + baseline write), `ProvingGroundShelfSweep.test.ts` (national refresh + error isolation).
+
+## Public Intake → Prospect Queue Draft Lane (Migration 310, added 2026-09-28)
+
+Public-surface intake is a **draft queue record**, not a dead-end CRM message. `mkt_prospect_queue.status` gained `'intake'` (unvetted staging lane) and `source_kind` gained `'owner_submission'`; both are wired via `initial_status='intake'` on `addToQueue`.
+
+- **Suggestions** (`directory_presence_suggestions`): `DirectorySuggestionService.createSuggestion` auto-enqueues every accepted suggestion into `intake` (`autoEnqueueSuggestion`, non-fatal — the admin Queue/Verify buttons remain the manual fallback when `queueEntryId` is null). Suggestion flips `submitted → under_review` on park; the `business_snapshot->>'suggestion_id'` back-link drives the "in queue (status)" badge on the suggestions list.
+- **Owner submissions** (`seed_batch='owner-submitted'`): `DirectoryOwnerSubmissionService` mirrors each created draft seed into `intake` in both paths — authenticated `submit` and email-`verifyToken` — pre-linked via the new `seed_id` addToQueue input + `business_snapshot.seed_id`. Queue lifecycle is independent of the seed's own draft→publish lifecycle.
+- **Graduation**: `POST /api/admin/marketing-ops/prospect-queue/:id/graduate` `{target:'queued'|'verify_then_outreach'}` → `MarketingProspectQueueService.graduate` (intake-only, 409 otherwise; verify target stamps `verification.requested_*` like `requestVerification`). Intake entries **cannot** create campaigns (`createCampaignFromQueue` 409s) — they must graduate or be dismissed first.
+- **Dismissal sync**: `syncLinkedSuggestion` (queue service) flips the linked suggestion to `rejected` on `dismiss()` AND on `resolveVerification nextAction='dismiss'`, and resolves the intake Requests-Hub ticket — guarded to `status IN ('submitted','under_review')` so approved/duplicate rows are never overwritten. Graduate syncs `under_review` the same way.
+- **Editability**: intake rows take priority/note/assigned_to patches (same `open` gate as queued/verify) so operators can annotate before graduating.
+- **Frontend**: Intake column leads `ProspectQueueBoard` (Accept → queued / Verify → verify_then_outreach / Dismiss); list view gained an Intake status tab with the same action trio; `MarketingOpsService.graduateProspectQueue`; `owner_submission` label = "Owner Submission".
+
+CRM tickets still file for both surfaces — they're now the notification + audit trail, resolved when the queue decision lands rather than by a separate suggestions-table action.
+
+Tests: `graduate` + suggestion-sync cases in `MarketingProspectQueueService.test.ts` (76 total) — the prisma mock now includes `$executeRaw` for the raw sync writes.

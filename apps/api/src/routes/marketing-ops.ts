@@ -5406,10 +5406,11 @@ const prospectQueueAddSchema = z.object({
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
-  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion', 'gold_standard_candidate']),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion', 'owner_submission', 'gold_standard_candidate']),
   // source_campaign_id is required for audit-derived entries; optional for
-  // manual + public_suggestion + gold_standard_candidate entries (no parent
-  // campaign — the originating surface is a profile/scan, not a campaign).
+  // manual + public_suggestion + owner_submission + gold_standard_candidate
+  // entries (no parent campaign — the originating surface is a
+  // profile/scan/public form, not a campaign).
   source_campaign_id: z.string().min(1).optional(),
   source_audit_id: z.string().optional(),
   source_execution_id: z.string().optional(),
@@ -5433,11 +5434,15 @@ const prospectQueueAddSchema = z.object({
   // When 'verify_then_outreach', the entry is created directly in the
   // verification state (skipping 'queued'). Used by discovery surfaces where
   // the audit already flagged NAP/digital presence as unable_to_verify.
-  initial_status: z.enum(['queued', 'verify_then_outreach']).optional(),
+  // 'intake' parks unvetted public-sourced records in the staging lane until
+  // an operator graduates or dismisses them (Migration 310).
+  initial_status: z.enum(['intake', 'queued', 'verify_then_outreach']).optional(),
+  // Pre-linked seed — owner-submission intake mirrors carry the draft seed.
+  seed_id: z.string().max(60).optional(),
 }).superRefine((data, ctx) => {
-  // manual + public_suggestion + gold_standard_candidate are parentless
-  // kinds — no source campaign.
-  if (!['manual', 'public_suggestion', 'gold_standard_candidate'].includes(data.source_kind) && !data.source_campaign_id) {
+  // manual + public_suggestion + owner_submission + gold_standard_candidate
+  // are parentless kinds — no source campaign.
+  if (!['manual', 'public_suggestion', 'owner_submission', 'gold_standard_candidate'].includes(data.source_kind) && !data.source_campaign_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['source_campaign_id'],
@@ -5488,6 +5493,7 @@ router.post('/prospect-queue', async (req: any, res: Response) => {
       business_seek_priority: parsed.business_seek_priority,
       intelligence_run_id: parsed.intelligence_run_id,
       initial_status: parsed.initial_status,
+      seed_id: parsed.seed_id,
     }, getCtx(req));
 
     if (result.kind === 'campaign_exists') {
@@ -5571,7 +5577,7 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       mail_scan_outcome: e.seed_id ? (mailOutcomes.get(e.seed_id) ?? null) : null,
     }));
 
-    res.json({ success: true, data: entries, queuedCount: result.queuedCount });
+    res.json({ success: true, data: entries, queuedCount: result.queuedCount, intakeCount: result.intakeCount, statusCounts: result.statusCounts });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
@@ -5703,6 +5709,32 @@ router.post('/prospect-queue/:id/create-campaign', async (req: any, res: Respons
 
 const prospectQueueDismissSchema = z.object({
   reason: z.enum(['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other']).optional(),
+});
+
+const prospectQueueGraduateSchema = z.object({
+  target: z.enum(['queued', 'verify_then_outreach']),
+});
+
+// POST /prospect-queue/:id/graduate — promote an 'intake' entry out of the
+// unvetted staging lane (Migration 310). 'queued' accepts it into the normal
+// queue; 'verify_then_outreach' routes it through the phone-verification
+// gate. 409 on any other current status. A linked directory suggestion flips
+// to 'under_review'.
+router.post('/prospect-queue/:id/graduate', async (req: any, res: Response) => {
+  try {
+    const parsed = prospectQueueGraduateSchema.parse(req.body ?? {});
+    const updated = await MarketingProspectQueueService.graduate({
+      queueEntryId: req.params.id,
+      target: parsed.target,
+      actingUserId: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
 });
 
 // POST /prospect-queue/:id/dismiss — mark entry dismissed (idempotent).

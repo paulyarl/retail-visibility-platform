@@ -14,6 +14,7 @@ import marketingOpsService, { ProspectQueueEntry } from '@/services/MarketingOps
 export default function ProspectQueueWidget() {
   const [entries, setEntries] = useState<ProspectQueueEntry[]>([]);
   const [queuedCount, setQueuedCount] = useState(0);
+  const [intakeCount, setIntakeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +28,7 @@ export default function ProspectQueueWidget() {
         if (cancelled) return;
         setEntries(r.entries);
         setQueuedCount(r.queuedCount);
+        setIntakeCount(r.intakeCount ?? 0);
       })
       .catch((e) => { if (!cancelled) setError(e.message || 'Failed to load prospect queue'); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -49,6 +51,16 @@ export default function ProspectQueueWidget() {
           Work the queue →
         </Link>
       </div>
+
+      {!loading && !error && intakeCount > 0 && (
+        <Link
+          href="/settings/admin/marketing-ops/queue?status=intake"
+          className="mb-3 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/40"
+        >
+          <Inbox className="h-3.5 w-3.5" />
+          {intakeCount} new intake submission{intakeCount !== 1 ? 's' : ''} awaiting review →
+        </Link>
+      )}
 
       {loading ? (
         <div className="flex items-center gap-2 py-4 text-sm text-gray-400">

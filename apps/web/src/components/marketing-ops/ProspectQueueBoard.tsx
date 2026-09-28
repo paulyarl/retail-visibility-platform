@@ -88,9 +88,15 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   const stageColumns = pipelineMode === 'recovery' ? RECOVERY_COLUMNS : REVIEW_COLUMNS;
   const transitions = transitionsForPipeline(pipelineMode);
 
-  // Split entries: queued entries go in the Queued column; campaign_created
-  // entries go in the stage column matching their campaign_stage (filtered by
-  // the current pipeline mode). Dismissed entries are excluded from the board.
+  // Split entries: intake (unvetted public-sourced staging) leads, queued
+  // entries go in the Queued column; campaign_created entries go in the stage
+  // column matching their campaign_stage (filtered by the current pipeline
+  // mode). Dismissed entries are excluded from the board.
+  const intakeEntries = useMemo(
+    () => entries.filter((e) => e.status === 'intake'),
+    [entries],
+  );
+
   const queuedEntries = useMemo(
     () => entries.filter((e) => e.status === 'queued'),
     [entries],
@@ -237,9 +243,24 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
     }
   };
 
+  // Intake graduation (Migration 310) — promote an unvetted public-sourced
+  // record to the queue or verify lane; dismissal uses the shared handler.
+  const handleGraduate = async (id: string, target: 'queued' | 'verify_then_outreach') => {
+    setVerifyingId(id);
+    onError('');
+    try {
+      await marketingOpsService.graduateProspectQueue(id, target);
+      await onRefresh();
+    } catch (err: any) {
+      onError(err.message || 'Failed to graduate intake entry');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
   // ─── Render ────────────────────────────────────────────────────────────
 
-  const allColumns = ['__queued__', '__verify__', ...stageColumns, ...(showClosed ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed') : [])];
+  const allColumns = ['__intake__', '__queued__', '__verify__', ...stageColumns, ...(showClosed ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed') : [])];
 
   return (
     <div>
@@ -269,32 +290,40 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
       <div className="overflow-x-auto pb-4">
         <div className="flex gap-3 min-w-max">
           {allColumns.map((colKey) => {
+            const isIntake = colKey === '__intake__';
             const isQueued = colKey === '__queued__';
             const isVerify = colKey === '__verify__';
-            const colEntries = isQueued
-              ? queuedEntries
-              : isVerify
-                ? verifyEntries
-                : (campaignEntriesByStage[colKey] ?? []);
-            const colLabel = isQueued
-              ? 'Queued'
-              : isVerify
-                ? 'Verify'
-                : (STAGE_LABELS[colKey] ?? colKey);
+            const colEntries = isIntake
+              ? intakeEntries
+              : isQueued
+                ? queuedEntries
+                : isVerify
+                  ? verifyEntries
+                  : (campaignEntriesByStage[colKey] ?? []);
+            const colLabel = isIntake
+              ? 'Intake'
+              : isQueued
+                ? 'Queued'
+                : isVerify
+                  ? 'Verify'
+                  : (STAGE_LABELS[colKey] ?? colKey);
             const isClosedCol = CLOSED_STAGES.includes(colKey);
             return (
               <div key={colKey} className="w-72 flex-shrink-0">
                 {/* Column header */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-b-2 ${
-                  isQueued
-                    ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-400'
-                    : isVerify
-                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400'
-                      : isClosedCol
-                        ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
-                        : 'bg-gray-50 dark:bg-neutral-700/30 border-gray-200 dark:border-neutral-600'
+                  isIntake
+                    ? 'bg-sky-50 dark:bg-sky-900/20 border-sky-400'
+                    : isQueued
+                      ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-400'
+                      : isVerify
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400'
+                        : isClosedCol
+                          ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
+                          : 'bg-gray-50 dark:bg-neutral-700/30 border-gray-200 dark:border-neutral-600'
                 }`}>
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 inline-flex items-center gap-1">
+                    {isIntake && <Inbox className="w-3 h-3 text-sky-600 dark:text-sky-400" />}
                     {isVerify && <Phone className="w-3 h-3 text-amber-600 dark:text-amber-400" />}
                     {colLabel}
                   </span>
@@ -310,6 +339,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                     <BoardCard
                       key={entry.id}
                       entry={entry}
+                      isIntake={isIntake}
                       isQueued={isQueued}
                       isVerify={isVerify}
                       staffUsers={staffUsers}
@@ -322,7 +352,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       menuOpen={openMenuId === entry.id}
                       dismissReasonOpen={dismissReasonOpen === entry.id}
                       verifying={verifyingId === entry.id}
-                      validNextStages={isQueued || isVerify ? [] : (transitions[entry.campaign_stage ?? ''] ?? [])}
+                      validNextStages={isIntake || isQueued || isVerify ? [] : (transitions[entry.campaign_stage ?? ''] ?? [])}
                       onCreate={() => handleCreateCampaign(entry.id)}
                       onDismiss={(reason) => handleDismiss(entry.id, reason)}
                       onTogglePriority={() => handleTogglePriority(entry)}
@@ -332,6 +362,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       onTransition={(toStage) => entry.processed_campaign_id && handleTransition(entry.processed_campaign_id, toStage)}
                       onOpenDismissReason={() => setDismissReasonOpen(dismissReasonOpen === entry.id ? null : entry.id)}
                       onRequestVerify={() => handleRequestVerification(entry.id)}
+                      onGraduate={(target) => handleGraduate(entry.id, target)}
                       onOpenResolve={() => setResolveEntry(entry)}
                     />
                   ))}
@@ -397,6 +428,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
 
 interface BoardCardProps {
   entry: ProspectQueueEntry;
+  isIntake?: boolean;
   isQueued: boolean;
   isVerify?: boolean;
   staffUsers: ReturnType<typeof useStaffUsers>;
@@ -419,15 +451,16 @@ interface BoardCardProps {
   onTransition: (toStage: string) => void;
   onOpenDismissReason: () => void;
   onRequestVerify: () => void;
+  onGraduate: (target: 'queued' | 'verify_then_outreach') => void;
   onOpenResolve: () => void;
 }
 
 function BoardCard({
-  entry, isQueued, isVerify, staffUsers, currentUserId,
+  entry, isIntake, isQueued, isVerify, staffUsers, currentUserId,
   creating, dismissing, togglingPriority, assigning, transitioning,
   menuOpen, dismissReasonOpen, verifying, validNextStages,
   onCreate, onDismiss, onTogglePriority, onAssignToMe, onUnassign, onToggleMenu, onTransition, onOpenDismissReason,
-  onRequestVerify, onOpenResolve,
+  onRequestVerify, onGraduate, onOpenResolve,
 }: BoardCardProps) {
   const signals = entry.detected_signals ?? [];
   const crisis = hasCrisis(signals);
@@ -438,10 +471,10 @@ function BoardCard({
   const stageDays = daysSince(entry.stage_entered_at);
   const isStaleAudit = auditDays != null && auditDays > STALE_AUDIT_DAYS;
   const isStaleStage = stageDays != null && stageDays > 14;
-  // Verify-then-outreach entries are editable (assign, priority, note) — same
-  // as queued. The card renders verify-specific action buttons instead of the
-  // Create/Dismiss pair.
-  const isEditable = isQueued || isVerify;
+  // Verify-then-outreach and intake entries are editable (assign, priority,
+  // note) — same as queued. Intake cards render the graduate/dismiss pair
+  // instead of Create/Dismiss; verify cards render the resolve/dismiss pair.
+  const isEditable = isQueued || isVerify || isIntake;
 
   return (
     <div className={`rounded-lg border p-3 bg-white dark:bg-neutral-800 ${
@@ -453,7 +486,7 @@ function BoardCard({
     }`}>
       {/* Header: name + hot/priority indicators */}
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
-        {isQueued || isVerify ? (
+        {isQueued || isVerify || isIntake ? (
           <span className="font-medium text-sm text-gray-900 dark:text-white truncate inline-flex items-center gap-1">
             {isVerify && <Phone className="w-3 h-3 text-amber-500 flex-shrink-0" />}
             {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
@@ -517,7 +550,7 @@ function BoardCard({
       )}
 
       {/* Stage badge for campaign cards */}
-      {!isQueued && !isVerify && entry.campaign_stage && (
+      {!isQueued && !isVerify && !isIntake && entry.campaign_stage && (
         <div className="mb-1.5">
           <StageBadge stage={entry.campaign_stage} size="sm" />
           {stageDays != null && (
@@ -600,7 +633,51 @@ function BoardCard({
       )}
 
       {/* Actions */}
-      {isQueued ? (
+      {isIntake ? (
+        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-neutral-700">
+          <button
+            onClick={() => onGraduate('queued')}
+            disabled={verifying}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-white bg-violet-600 rounded hover:bg-violet-700 disabled:opacity-50"
+            title="Accept — graduate this intake record into the prospect queue"
+          >
+            {verifying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Plus className="w-2.5 h-2.5" />}
+            Accept
+          </button>
+          <button
+            onClick={() => onGraduate('verify_then_outreach')}
+            disabled={verifying}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-50"
+            title="Verify — graduate into the phone-verification gate (confirm NAP/operational status before outreach)"
+          >
+            {verifying ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Phone className="w-2.5 h-2.5" />}
+            Verify
+          </button>
+          {dismissReasonOpen ? (
+            <div className="inline-flex items-center gap-1">
+              <select
+                onChange={(e) => onDismiss(e.target.value as ProspectDismissReason)}
+                value=""
+                autoFocus
+                className="text-[10px] px-1 py-0.5 border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-gray-900 dark:text-white"
+              >
+                <option value="" disabled>Reason…</option>
+                {DISMISS_REASONS.map((r) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+              </select>
+              <button onClick={onOpenDismissReason} className="text-gray-400 hover:text-gray-600"><X className="w-2.5 h-2.5" /></button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenDismissReason}
+              disabled={dismissing}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50"
+            >
+              {dismissing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : null}
+              Dismiss
+            </button>
+          )}
+        </div>
+      ) : isQueued ? (
         <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-neutral-700">
           <button
             onClick={onCreate}

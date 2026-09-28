@@ -74,14 +74,17 @@ interface MarketingOpsNavPanelProps {
 
 export default function MarketingOpsNavPanel({ counts }: MarketingOpsNavPanelProps) {
   const pathname = usePathname();
-  const [queuedCount, setQueuedCount] = useState<number | null>(null);
+  const [awaitingCount, setAwaitingCount] = useState<number | null>(null);
 
-  // Lightweight fetch of the queued-prospect count for the Queue nav badge.
-  // limit=1 minimizes payload — we only need queuedCount from the response.
+  // Lightweight fetch of the awaiting-action counts for the Queue nav badge.
+  // The response always carries global queuedCount + intakeCount regardless of
+  // the status filter — limit=1 minimizes payload. Intake rows (unvetted
+  // public suggestions / owner submissions) count toward the badge so they
+  // never sit unnoticed.
   useEffect(() => {
     let cancelled = false;
     marketingOpsService.listProspectQueue({ status: 'queued', limit: 1 })
-      .then((r) => { if (!cancelled) setQueuedCount(r.queuedCount); })
+      .then((r) => { if (!cancelled) setAwaitingCount((r.queuedCount ?? 0) + (r.intakeCount ?? 0)); })
       .catch(() => { /* silent — badge just won't show */ });
     return () => { cancelled = true; };
   }, []);
@@ -119,7 +122,7 @@ export default function MarketingOpsNavPanel({ counts }: MarketingOpsNavPanelPro
             item.label === 'Deliverable Templates' ? 'deliverableTemplates' :
             undefined
           ) as keyof NonNullable<typeof counts> | undefined;
-          const count = countKey ? counts?.[countKey] : (item.label === 'Queue' ? queuedCount ?? undefined : undefined);
+          const count = countKey ? counts?.[countKey] : (item.label === 'Queue' ? awaitingCount ?? undefined : undefined);
 
           return (
             <NavLink

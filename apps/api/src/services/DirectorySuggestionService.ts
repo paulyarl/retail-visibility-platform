@@ -17,6 +17,7 @@ import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
 import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
+import MarketingProspectQueueService from './MarketingProspectQueueService';
 import { z } from 'zod';
 
 export const suggestionInputSchema = z.object({
@@ -180,8 +181,71 @@ class DirectorySuggestionService {
     });
 
     await this.notifyNewSuggestion(suggestion);
+    await this.autoEnqueueSuggestion(suggestion);
 
     return { suggestion, statusCode: 201 };
+  }
+
+  /**
+   * Park every accepted suggestion in the prospect queue's intake lane
+   * (Migration 310) — a draft record the operator graduates (→ queued /
+   * verify_then_outreach) or dismisses, instead of a dead-end CRM message.
+   * The suggestion flips to 'under_review' once parked (the queue owns the
+   * workflow; the intake ticket stays open until the operator decides).
+   * Non-fatal: the suggestion row + ticket already exist, and the admin
+   * Queue/Verify buttons remain as the manual fallback.
+   */
+  private async autoEnqueueSuggestion(suggestion: SuggestionRecord): Promise<void> {
+    try {
+      const result = await MarketingProspectQueueService.addToQueue({
+        business_name: suggestion.businessName,
+        title: suggestion.businessName,
+        category: suggestion.primaryCategory ?? undefined,
+        city: suggestion.city ?? undefined,
+        state: suggestion.state ?? undefined,
+        source_kind: 'public_suggestion',
+        scope: 'business',
+        note: `Public directory suggestion ${suggestion.id}${suggestion.sourcePage ? ` (source: ${suggestion.sourcePage})` : ''}${suggestion.submitterComment ? `\nSubmitter: ${suggestion.submitterComment}` : ''}`,
+        business_snapshot: {
+          suggestion_id: suggestion.id,
+          contact_consent: suggestion.contactConsent === true,
+          phone: suggestion.phone ?? undefined,
+          // Submitter email is only an outreach route when they opted in.
+          email: suggestion.contactConsent ? suggestion.submitterEmail ?? undefined : undefined,
+          submitter_email: suggestion.submitterEmail ?? undefined,
+          address: suggestion.address ?? undefined,
+          address_city: suggestion.city ?? undefined,
+          address_state: suggestion.state ?? undefined,
+          address_zip: suggestion.zipCode ?? undefined,
+        },
+        initial_status: 'intake',
+      });
+
+      if (result.kind === 'campaign_exists') {
+        // Already in the pipeline — leave the suggestion 'submitted' so an
+        // operator can Dup/reject it by hand.
+        logger.info('[DirectorySuggestionService] Auto-enqueue skipped — campaign exists', undefined, {
+          suggestionId: suggestion.id,
+          campaignId: result.campaignId,
+        });
+        return;
+      }
+
+      await prisma.$executeRaw`
+        UPDATE directory_presence_suggestions
+        SET status = 'under_review',
+            reviewed_by = COALESCE(reviewed_by, 'system'),
+            reviewed_at = COALESCE(reviewed_at, NOW()),
+            updated_at = NOW()
+        WHERE id = ${suggestion.id}
+          AND status = 'submitted'
+      `;
+    } catch (err) {
+      logger.error('[DirectorySuggestionService] Auto-enqueue failed (non-fatal)', undefined, {
+        error: (err as Error).message,
+        suggestionId: suggestion.id,
+      });
+    }
   }
 
   /**
