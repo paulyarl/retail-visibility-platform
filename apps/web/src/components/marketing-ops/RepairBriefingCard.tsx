@@ -5,10 +5,14 @@ import Link from 'next/link';
 import { Target, TrendingDown, MessageSquare, ShieldAlert, Loader2, Sparkles, CheckCircle, Wrench, ArrowRight } from 'lucide-react';
 import marketingOpsService, { OutreachProblem, PromptExecution } from '@/services/MarketingOpsService';
 import OutreachProblemsSection from './OutreachProblemsSection';
+import CollapsiblePanel from './CollapsiblePanel';
 
 interface RepairBriefingCardProps {
   execution: PromptExecution;
   campaignId: string;
+  /** False when embedded inside another collapsible (ArchetypeBriefingPanel)
+      renders the card with a static header — no nested disclosure. */
+  collapsible?: boolean;
 }
 
 interface RepairAuditOutput {
@@ -60,7 +64,7 @@ function getSeverityBadgeColor(score: number) {
   return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
 }
 
-export default function RepairBriefingCard({ execution, campaignId }: RepairBriefingCardProps) {
+export default function RepairBriefingCard({ execution, campaignId, collapsible = true }: RepairBriefingCardProps) {
   const [creating, setCreating] = useState(false);
   const [openerResult, setOpenerResult] = useState<{ created: boolean; warnings?: string[]; error?: string } | null>(null);
 
@@ -92,20 +96,21 @@ export default function RepairBriefingCard({ execution, campaignId }: RepairBrie
   };
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-blue-500" />
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Repair Briefing</h3>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            ({briefing.issueType.replace(/_/g, ' ')})
-          </span>
-        </div>
+    <CollapsiblePanel
+      icon={<Target className="w-5 h-5 text-blue-500" />}
+      title="Repair Briefing"
+      titleExtra={
+        <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
+          ({briefing.issueType.replace(/_/g, ' ')})
+        </span>
+      }
+      headerRight={
         <span className="text-xs text-gray-400 dark:text-gray-500">
           {new Date(execution.executed_at).toLocaleString()}
         </span>
-      </div>
-
+      }
+      collapsible={collapsible}
+    >
       <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 p-4 space-y-3">
         {/* Header: severity + issue type */}
         <div className="flex items-center justify-between gap-2 border-b border-blue-200/60 dark:border-blue-800/40 pb-2.5">
@@ -267,6 +272,6 @@ export default function RepairBriefingCard({ execution, campaignId }: RepairBrie
           )}
         </div>
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }

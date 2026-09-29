@@ -37,6 +37,7 @@ import marketingOpsService, {
   PromptExecution,
 } from '@/services/MarketingOpsService';
 import RepairBriefingCard from './RepairBriefingCard';
+import CollapsiblePanel from './CollapsiblePanel';
 
 /** Declared archetype → briefing seek template (seeded by seed-archetype-briefing-templates). */
 const ARCHETYPE_TEMPLATES: Record<string, { templateId: string; label: string }> = {
@@ -157,20 +158,11 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
   };
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-indigo-500" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Archetype Briefing
-            </h3>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-              {target.label} — composed from the same extract this sibling&apos;s
-              report chapter renders.
-            </p>
-          </div>
-        </div>
+    <CollapsiblePanel
+      icon={<Target className="w-5 h-5 text-indigo-500" />}
+      title="Archetype Briefing"
+      subtitle={`${target.label} — composed from the same extract this sibling's report chapter renders.`}
+      headerRight={
         <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-neutral-700 p-0.5">
           <button
             onClick={() => setRunMode('ai')}
@@ -193,8 +185,8 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
             External
           </button>
         </div>
-      </div>
-
+      }
+    >
       <div className="space-y-3">
         {runMode === 'ai' ? (
           <button
@@ -257,8 +249,8 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
 
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
 
-        {execution && <RepairBriefingCard execution={execution} campaignId={campaign.id} />}
+        {execution && <RepairBriefingCard execution={execution} campaignId={campaign.id} collapsible={false} />}
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }

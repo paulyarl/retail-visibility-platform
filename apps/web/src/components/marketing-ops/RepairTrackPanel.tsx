@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAlert, Wrench, Target, MessageSquare, TrendingDown, Lightbulb, Copy, ClipboardPaste, FileText } from 'lucide-react';
 import marketingOpsService, { Campaign, RepairTrack, TriageRecommendation } from '@/services/MarketingOpsService';
 import OutreachProblemsSection from './OutreachProblemsSection';
+import CollapsiblePanel from './CollapsiblePanel';
 import { isWebsiteGapCampaign } from './repairCampaignGate';
 
 interface RepairTrackPanelProps {
@@ -37,6 +38,9 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ passed: boolean; errors?: string[] } | null>(null);
   const [copied, setCopied] = useState(false);
+  // Collapsed by default — controlled so the header Switch Track action can
+  // force the panel open when it summons the inline switch dialog.
+  const [panelExpanded, setPanelExpanded] = useState(false);
 
   // Rehydrate the briefing from the campaign row on mount/refresh. The backend
   // persists it at triage execution time (§2), so it survives page refresh and
@@ -227,28 +231,40 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
   };
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <ArrowRightLeft className="w-5 h-5 text-purple-500" />
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Profile Repair Track</h3>
-        </div>
-        {currentTrack && (
+    <CollapsiblePanel
+      icon={<ArrowRightLeft className="w-5 h-5 text-purple-500" />}
+      title="Profile Repair Track"
+      titleExtra={
+        currentTrack ? (
+          <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 capitalize">
+            {currentTrack} track
+          </span>
+        ) : (
+          <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+            track undecided
+          </span>
+        )
+      }
+      headerRight={
+        currentTrack ? (
           <button
             onClick={() => {
               setSwitchTrack(currentTrack === 'standard' ? 'escalated' : 'standard');
               setSwitchReason('');
               setSwitchIssueType(issueType || '');
               setShowSwitchDialog(true);
+              setPanelExpanded(true);
             }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30"
           >
             <ArrowRightLeft className="w-3.5 h-3.5" />
             Switch Track
           </button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+      expanded={panelExpanded}
+      onExpandedChange={setPanelExpanded}
+    >
       {/* Current track status or Triage Workflow */}
       <div className="space-y-4">
         {!currentTrack ? (
@@ -772,7 +788,7 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
           </div>
         </div>
       )}
-    </div>
+    </CollapsiblePanel>
   );
 }
 

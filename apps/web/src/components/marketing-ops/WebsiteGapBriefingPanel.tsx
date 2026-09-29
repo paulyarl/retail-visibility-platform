@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, ClipboardPaste, Copy, FileText, Globe, Load
 import marketingOpsService, { Audit, CampaignDetail } from '@/services/MarketingOpsService';
 import { isWebsiteGapCampaign } from './repairCampaignGate';
 import WebsitePositioningAuditCard from './WebsitePositioningAuditCard';
+import CollapsiblePanel from './CollapsiblePanel';
 
 interface WebsiteGapBriefingPanelProps {
   campaign: CampaignDetail;
@@ -171,19 +172,17 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
   };
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Globe className="w-5 h-5 text-sky-500" />
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Website Gap Briefing</h3>
-          {auditData.build_scope?.recommended && (
-            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
-              build: {String(auditData.build_scope.recommended).replace(/_/g, ' ')}
-            </span>
-          )}
-        </div>
-      </div>
-
+    <CollapsiblePanel
+      icon={<Globe className="w-5 h-5 text-sky-500" />}
+      title="Website Gap Briefing"
+      titleExtra={
+        auditData.build_scope?.recommended ? (
+          <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+            build: {String(auditData.build_scope.recommended).replace(/_/g, ' ')}
+          </span>
+        ) : undefined
+      }
+    >
       <div className="space-y-4">
         {/* Status strip + dual-execution toggle */}
         <div className={`flex items-start justify-between gap-3 p-3.5 rounded-lg border ${
@@ -452,6 +451,6 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
           <WebsitePositioningAuditCard audit={websiteAudit} campaignId={campaign.id} />
         )}
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }

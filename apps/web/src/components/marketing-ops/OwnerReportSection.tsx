@@ -39,6 +39,7 @@ import marketingOpsService, {
 } from '@/services/MarketingOpsService';
 import { ProspectReport } from '@/services/ProspectReportPublicService';
 import ProspectReportView from './ProspectReportView';
+import CollapsiblePanel from './CollapsiblePanel';
 
 interface OwnerReportSectionProps {
   campaign: CampaignDetail;
@@ -170,29 +171,21 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
   if (!preview) return null;
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-sky-500" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Owner Report</h3>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-              The shareable Business Visibility Report — what the owner sees for the selected chapters.
-            </p>
-          </div>
-        </div>
-        {preview && (
-          <button
-            onClick={refreshPreview}
-            disabled={loading}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 rounded-md disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            Refresh preview
-          </button>
-        )}
-      </div>
-
+    <CollapsiblePanel
+      icon={<MessageSquare className="w-5 h-5 text-sky-500" />}
+      title="Owner Report"
+      subtitle="The shareable Business Visibility Report — what the owner sees for the selected chapters."
+      headerRight={
+        <button
+          onClick={refreshPreview}
+          disabled={loading}
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 rounded-md disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          Refresh preview
+        </button>
+      }
+    >
       <div className="space-y-3">
       {/* Selection controls */}
       <div className="flex flex-wrap items-center gap-3">
@@ -310,6 +303,6 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
         </div>
       )}
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }
