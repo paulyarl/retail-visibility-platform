@@ -12,11 +12,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockQueryRaw, mockExecuteRaw, mockExecuteRawUnsafe, mockAudit } = vi.hoisted(() => ({
+const { mockQueryRaw, mockExecuteRaw, mockExecuteRawUnsafe, mockAudit, mockRefreshReport } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
   mockExecuteRaw: vi.fn(),
   mockExecuteRawUnsafe: vi.fn(),
   mockAudit: vi.fn(),
+  mockRefreshReport: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -70,6 +71,14 @@ vi.mock('../directory/SeedSeoComposer', () => ({
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
   default: { getInstance: () => ({}) },
+}));
+
+// The report refresh is a §5.1 trigger — mocked so the suite asserts the
+// call rather than running the builder against stubbed substrate rows.
+vi.mock('../intelligence/SeedIntelligenceReportService.js', () => ({
+  SeedIntelligenceReportService: {
+    getInstance: () => ({ refreshReport: mockRefreshReport }),
+  },
 }));
 
 import DirectoryPresenceSeedService from '../DirectoryPresenceSeedService';
@@ -170,5 +179,85 @@ describe('updateFields — NAP owner-correction capture', () => {
       .map((c: any[]) => sqlOf(c))
       .find((sql: string) => sql.includes('directory_seed_nap_verifications'));
     expect(verificationSql).toBeUndefined();
+  });
+});
+
+// ─── Provenance + report refresh on identity edits ──────────────────────
+//
+// The minted intelligence report renders business_identity from the resolved
+// listing + directory_field_provenance. A seed edit that moves a NAP field
+// must (a) write an operator_override provenance row and (b) re-version the
+// report — otherwise a printed/delivered report stays stale forever
+// (Report QR Kit staleness regression).
+
+describe('updateFields — identity provenance + report refresh', () => {
+  it('writes an operator_override provenance row for a changed NAP field on an unclaimed seed', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...claimedSeedRow, seed_status: 'published' }]);
+
+    await DirectoryPresenceSeedService.updateFields('seed-test', { address: '200 New Ave' });
+
+    const provInserts = mockExecuteRaw.mock.calls.filter((c: any[]) =>
+      sqlOf(c).includes('directory_field_provenance'),
+    );
+    expect(provInserts).toHaveLength(1);
+    const args = provInserts[0].slice(1);
+    expect(args).toContain('address');
+    expect(args).toContain('200 New Ave');
+    expect(args).toContain('operator_override');
+  });
+
+  it('re-versions the report when an unclaimed seed identity field changes', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...claimedSeedRow, seed_status: 'published' }]);
+
+    await DirectoryPresenceSeedService.updateFields('seed-test', { address: '200 New Ave' });
+
+    expect(mockRefreshReport).toHaveBeenCalledTimes(1);
+    expect(mockRefreshReport.mock.calls[0][0]).toBe('seed-test');
+  });
+
+  it('does not refresh the report for non-identity edits', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...claimedSeedRow, seed_status: 'published' }]);
+
+    await DirectoryPresenceSeedService.updateFields('seed-test', { snapEbtReported: true });
+
+    expect(mockRefreshReport).not.toHaveBeenCalled();
+    const provInserts = mockExecuteRaw.mock.calls.filter((c: any[]) =>
+      sqlOf(c).includes('directory_field_provenance'),
+    );
+    expect(provInserts).toHaveLength(0);
+  });
+
+  it('caller-supplied provenance wins over the auto row for the same field', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...claimedSeedRow, seed_status: 'published' }]);
+
+    await DirectoryPresenceSeedService.updateFields(
+      'seed-test',
+      { phone: '555-9999' },
+      [{ fieldKey: 'phone', value: '555-9999', sourceName: 'owner_claim', confidence: 'high' }],
+    );
+
+    const provInserts = mockExecuteRaw.mock.calls.filter((c: any[]) =>
+      sqlOf(c).includes('directory_field_provenance'),
+    );
+    expect(provInserts).toHaveLength(1);
+    expect(provInserts[0].slice(1)).toContain('owner_claim');
+    expect(provInserts[0].slice(1)).not.toContain('operator_override');
+  });
+
+  it('still fires the claimed-seed refresh after provenance writes (ordering)', async () => {
+    mockQueryRaw.mockResolvedValue([claimedSeedRow]);
+
+    await DirectoryPresenceSeedService.updateFields('seed-test', { phone: '555-9999' });
+
+    expect(mockRefreshReport).toHaveBeenCalledTimes(1);
+    // The provenance INSERT must land BEFORE the refresh call reads it back —
+    // cross-mock invocation order is what pins that sequencing.
+    const provIdx = mockExecuteRaw.mock.calls.findIndex((c: any[]) =>
+      sqlOf(c).includes('directory_field_provenance'),
+    );
+    expect(provIdx).toBeGreaterThanOrEqual(0);
+    expect(mockRefreshReport.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockExecuteRaw.mock.invocationCallOrder[provIdx],
+    );
   });
 });

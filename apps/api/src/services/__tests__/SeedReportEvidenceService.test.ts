@@ -346,6 +346,36 @@ describe('SeedReportEvidenceService.buildSubstrateEvidence', () => {
     expect(ic.identity_confidence).toBe('high');
   });
 
+  it('prefers the resolved listing identity over stale provenance values', async () => {
+    // A seed edit updates directory_listings_list columns without touching
+    // provenance — the canonical candidate must read the resolved record
+    // (§9), not the minted provenance values.
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const sql = sqlText(args);
+      if (sql.includes('FROM directory_presence_seeds')) {
+        return Promise.resolve([{
+          ...seedStateRow,
+          listing_business_name: 'Acme Auto & Glass',
+          listing_address: '456 New Ave',
+          listing_phone: '317-555-9999',
+        }]);
+      }
+      if (sql.includes('FROM directory_field_provenance')) {
+        return Promise.resolve([
+          provRow('business_name', 'Acme Auto'),
+          provRow('address', '123 Main St'),
+          provRow('phone', '317-555-0100'),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    const result = await service.buildSubstrateEvidence('seed-1', ctx);
+    const ic = result.evidence.identity_candidates[0];
+    expect(ic.business_name).toBe('Acme Auto & Glass');
+    expect(ic.address).toBe('456 New Ave');
+    expect(ic.phone).toBe('317-555-9999');
+  });
+
   it('maps a city-bearing seed to inside_city (claim-hook eligible geography)', async () => {
     const result = await service.buildSubstrateEvidence('seed-1', ctx);
     expect(result.evidence.geographic_assessment?.location_status).toBe('inside_city');

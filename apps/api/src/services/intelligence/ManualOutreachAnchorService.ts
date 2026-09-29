@@ -664,6 +664,17 @@ export class ManualOutreachAnchorService extends BaseService {
             SET business_name = ${serialized}, updated_at = now()
             WHERE id = ${listingId}
           `;
+          // name_variants ledger mirror — the corrected name becomes the
+          // canonical variant (same fan-out syncFromCampaign performs).
+          await this.prisma.$executeRaw`
+            UPDATE directory_presence_seeds
+            SET name_variants = array_prepend(
+                  ${serialized},
+                  array_remove(COALESCE(name_variants, '{}'::text[]), ${serialized})
+                ),
+                updated_at = now()
+            WHERE id = ${seedId}
+          `;
           break;
         case 'address':
           await this.prisma.$executeRaw`
@@ -678,12 +689,23 @@ export class ManualOutreachAnchorService extends BaseService {
             SET city = ${serialized}, updated_at = now()
             WHERE id = ${listingId}
           `;
+          // dps.city/state are the /place browse index — mirror the listing.
+          await this.prisma.$executeRaw`
+            UPDATE directory_presence_seeds
+            SET city = ${serialized}, updated_at = now()
+            WHERE id = ${seedId}
+          `;
           break;
         case 'state':
           await this.prisma.$executeRaw`
             UPDATE directory_listings_list
             SET state = ${serialized}, updated_at = now()
             WHERE id = ${listingId}
+          `;
+          await this.prisma.$executeRaw`
+            UPDATE directory_presence_seeds
+            SET state = ${serialized}, updated_at = now()
+            WHERE id = ${seedId}
           `;
           break;
         case 'zip_code':

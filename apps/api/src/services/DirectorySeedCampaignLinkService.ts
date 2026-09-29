@@ -1077,6 +1077,25 @@ class DirectorySeedCampaignLinkService {
       WHERE seed_id = ${seedId} AND campaign_id = ${campaignId}
     `;
 
+    // §5.1 report trigger — a projection that moves the seed's identity must
+    // re-version the minted intelligence report (the Report QR Kit otherwise
+    // keeps serving the pre-sync snapshot). Idempotent via the evidence
+    // snapshot hash; best-effort so a lint/build failure never fails the sync.
+    if (projected.length > 0) {
+      try {
+        const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
+        await SeedIntelligenceReportService.getInstance().refreshReport(
+          seedId,
+          ctx ? { region: 'us-east-1', userId: ctx.actorId, ip: ctx.ip, userAgent: ctx.userAgent } : undefined,
+        );
+      } catch (err: any) {
+        logger.warn('DirectorySeedCampaignLinkService: post-sync report refresh failed', undefined, {
+          seedId,
+          error: err?.message,
+        });
+      }
+    }
+
     audit({
       actor: ctx?.actorId,
       actorType: ctx?.actorType,

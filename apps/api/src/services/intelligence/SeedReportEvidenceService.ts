@@ -113,6 +113,18 @@ export interface ResolvedSeedState {
   outreach_state: string;
   claimed_at: string | null;
   status: string;
+  /**
+   * Resolved identity from the seed's directory_listings_list row — the
+   * listing IS the resolved record (spec §9). Provenance explains where a
+   * value came from; these columns carry what the seed currently says.
+   */
+  business_name: string | null;
+  address: string | null;
+  zip_code: string | null;
+  phone: string | null;
+  website: string | null;
+  email: string | null;
+  owner_name: string | null;
 }
 
 /**
@@ -389,12 +401,14 @@ export class SeedReportEvidenceService extends BaseService {
       observations.filter((o) => keys.includes(o.field)).map((o) => o.observation_id!);
 
     const identityCandidate = {
+      // The resolved listing row is the canonical record (§9) — provenance
+      // values are the fallback for fields the listing doesn't carry.
       // 'name' is the canonical provenance key written by the seed write
       // paths; 'business_name' is accepted for operator-authored rows.
-      business_name: provValue('business_name') ?? provValue('name') ?? seedState.name_variants[0] ?? null,
-      address: provValue('address'),
-      phone: provValue('phone'),
-      website: provValue('website'),
+      business_name: seedState.business_name ?? provValue('business_name') ?? provValue('name') ?? seedState.name_variants[0] ?? null,
+      address: seedState.address ?? provValue('address'),
+      phone: seedState.phone ?? provValue('phone'),
+      website: seedState.website ?? provValue('website'),
       city: seedState.city,
       state: seedState.state,
       identity_confidence: (seedState.identity_confidence as 'high' | 'medium' | 'low') ?? 'low',
@@ -963,25 +977,35 @@ export class SeedReportEvidenceService extends BaseService {
     try {
       const rows = await this.prisma.$queryRaw<any[]>`
         SELECT
-          id,
-          identity_confidence,
-          category_fit,
-          category,
-          city,
-          state,
-          name_variants,
-          nap_owner_corrected,
-          nap_verified_at,
-          owner_verified_at,
-          owner_verification,
-          contact_status,
-          outreach_state,
-          status,
+          dps.id,
+          dps.identity_confidence,
+          dps.category_fit,
+          dps.category,
+          dps.city,
+          dps.state,
+          dps.name_variants,
+          dps.nap_owner_corrected,
+          dps.nap_verified_at,
+          dps.owner_verified_at,
+          dps.owner_verification,
+          dps.contact_status,
+          dps.outreach_state,
+          dps.status,
+          dps.owner_name,
+          dl.business_name  AS listing_business_name,
+          dl.address        AS listing_address,
+          dl.city           AS listing_city,
+          dl.state          AS listing_state,
+          dl.zip_code       AS listing_zip_code,
+          dl.phone          AS listing_phone,
+          dl.website        AS listing_website,
+          dl.email          AS listing_email,
           (SELECT claimed_at FROM directory_claim_tokens
-           WHERE seed_id = ${seedId} AND consumed_at IS NOT NULL
+           WHERE seed_id = dps.id AND consumed_at IS NOT NULL
            ORDER BY consumed_at DESC LIMIT 1) AS claimed_at
-        FROM directory_presence_seeds
-        WHERE id = ${seedId}
+        FROM directory_presence_seeds dps
+        LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dps.id = ${seedId}
         LIMIT 1
       `;
 
@@ -993,8 +1017,10 @@ export class SeedReportEvidenceService extends BaseService {
         identity_confidence: row.identity_confidence,
         category_fit: row.category_fit,
         category: row.category,
-        city: row.city,
-        state: row.state,
+        // Listing city/state are the resolved record; dps.city/state are the
+        // browse-index mirror, kept as the fallback when the listing is gone.
+        city: row.listing_city ?? row.city,
+        state: row.listing_state ?? row.state,
         name_variants: Array.isArray(row.name_variants) ? row.name_variants : [],
         nap_owner_corrected: Boolean(row.nap_owner_corrected),
         nap_verified_at: row.nap_verified_at ? row.nap_verified_at.toISOString() : null,
@@ -1004,6 +1030,13 @@ export class SeedReportEvidenceService extends BaseService {
         outreach_state: row.outreach_state,
         claimed_at: row.claimed_at ? row.claimed_at.toISOString() : null,
         status: row.status,
+        business_name: row.listing_business_name ?? null,
+        address: row.listing_address ?? null,
+        zip_code: row.listing_zip_code ?? null,
+        phone: row.listing_phone ?? null,
+        website: row.listing_website ?? null,
+        email: row.listing_email ?? null,
+        owner_name: row.owner_name ?? null,
       };
     } catch (err: any) {
       logger.error('SeedReportEvidenceService: getResolvedSeedState failed', ctx, {

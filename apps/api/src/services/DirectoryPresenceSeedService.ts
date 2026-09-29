@@ -934,7 +934,8 @@ class DirectoryPresenceSeedService {
   ): Promise<void> {
     const seed = await prisma.$queryRaw<any[]>`
       SELECT dps.tenant_id, dps.listing_id, dps.status AS seed_status,
-             dl.phone, dl.address, dl.city, dl.state, dl.zip_code, dl.website
+             dl.phone, dl.address, dl.city, dl.state, dl.zip_code, dl.website,
+             dl.email, dl.primary_category, dl.secondary_categories
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dps.id = ${seedId} LIMIT 1
@@ -964,6 +965,80 @@ class DirectoryPresenceSeedService {
       const after = submitted == null ? null : String(submitted).trim();
       if (before !== after) {
         changedNapFields[column] = { from: before, to: after };
+      }
+    }
+
+    // Auto-provenance — every changed identity/category field gets an
+    // 'operator_override' provenance row so the ledger (and the report's
+    // provenance-derived evidence) reflects the edit. The report's
+    // business_identity section resolves values from the listing, but the
+    // provenance rows still carry the audit trail of who set them. Caller-
+    // supplied provenanceUpdates win per field_key.
+    const autoProvenance: NonNullable<typeof provenanceUpdates> = [];
+    const napSubmittedValues: Record<string, string | null | undefined> = {
+      phone: fields.phone,
+      address: fields.address,
+      city: fields.city,
+      state: fields.state,
+      zip_code: fields.zipCode,
+      website: fields.website,
+    };
+    for (const column of Object.keys(changedNapFields)) {
+      const v = napSubmittedValues[column];
+      autoProvenance.push({
+        fieldKey: column,
+        value: v == null ? undefined : String(v),
+        sourceName: 'operator_override',
+        accessedAt: new Date(),
+        confidence: 'high',
+        showOnPublic: v != null && String(v).trim() !== '',
+      });
+    }
+    if (fields.email !== undefined) {
+      const before = seed[0].email == null ? null : String(seed[0].email).trim();
+      const after = fields.email == null ? null : String(fields.email).trim();
+      if (before !== after) {
+        autoProvenance.push({
+          fieldKey: 'email',
+          value: after ?? undefined,
+          sourceName: 'operator_override',
+          accessedAt: new Date(),
+          confidence: 'high',
+          showOnPublic: !!after,
+        });
+      }
+    }
+    if (fields.primaryCategory !== undefined) {
+      const before = String(seed[0].primary_category ?? '').trim();
+      const after = String(fields.primaryCategory ?? '').trim();
+      if (before !== after) {
+        autoProvenance.push({
+          fieldKey: 'primary_category',
+          value: after || undefined,
+          sourceName: 'operator_override',
+          accessedAt: new Date(),
+          confidence: 'high',
+          showOnPublic: !!after,
+        });
+      }
+    }
+    if (fields.secondaryCategories !== undefined) {
+      const normCats = (arr: any): string[] =>
+        Array.isArray(arr) ? arr.map((s: any) => String(s).trim()).filter(Boolean) : [];
+      const before = normCats(seed[0].secondary_categories).map((s) => s.toLowerCase()).sort();
+      const after = normCats(fields.secondaryCategories);
+      const changed =
+        after.length !== before.length ||
+        after.some((c) => !before.includes(c.toLowerCase()));
+      if (changed) {
+        autoProvenance.push({
+          fieldKey: 'secondary_categories',
+          value: after.join(', ') || undefined,
+          sourceName: 'operator_override',
+          accessedAt: new Date(),
+          confidence: 'high',
+          showOnPublic: after.length > 0,
+        });
       }
     }
 
@@ -1063,7 +1138,10 @@ class DirectoryPresenceSeedService {
     // Owner-correction capture: when a CLAIMED seed's NAP fields change,
     // persist the diff and flag the seed. The claim itself stamped
     // nap_verified_at (owner confirmed the filed NAP); this records every
-    // later correction for the funnel's owner_corrected_nap signal.
+    // later correction for the funnel's owner_corrected_nap signal. The
+    // report refresh that §5.1 requires runs once at the end of this method
+    // for ALL seed statuses — it must read the post-update listing, city/state
+    // mirror, and provenance rows, not the state mid-write.
     if (seed[0].seed_status === 'claimed' && Object.keys(changedNapFields).length > 0) {
       await prisma.$executeRaw`
         INSERT INTO directory_seed_nap_verifications (
@@ -1083,22 +1161,6 @@ class DirectoryPresenceSeedService {
         SET nap_owner_corrected = TRUE, nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
         WHERE id = ${seedId}
       `;
-
-      // §5.1: an owner correction is a report-version trigger. Best-effort —
-      // a refresh failure must not fail the field update, and the last
-      // published version is preserved regardless (§20.4.11).
-      try {
-        const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
-        await SeedIntelligenceReportService.getInstance().refreshReport(
-          seedId,
-          ctx ? { region: 'us-east-1', userId: ctx.actorId, ip: ctx.ip, userAgent: ctx.userAgent } : undefined,
-        );
-      } catch (err: any) {
-        logger.warn('DirectoryPresenceSeedService: post-correction report refresh failed', undefined, {
-          seedId,
-          error: err?.message,
-        });
-      }
     }
 
     // Sync seed hours into the canonical business_hours_list so the public
@@ -1149,9 +1211,15 @@ class DirectoryPresenceSeedService {
       `;
     }
 
-    // Upsert provenance rows
-    if (provenanceUpdates) {
-      for (const p of provenanceUpdates) {
+    // Upsert provenance rows — caller-supplied first, then the auto rows for
+    // changed identity/category fields the caller didn't already cover.
+    const providedKeys = new Set((provenanceUpdates ?? []).map((p) => p.fieldKey));
+    const mergedProvenance = [
+      ...(provenanceUpdates ?? []),
+      ...autoProvenance.filter((p) => !providedKeys.has(p.fieldKey)),
+    ];
+    if (mergedProvenance.length > 0) {
+      for (const p of mergedProvenance) {
         // operator_override and owner_claim both record WHO confirmed the
         // field value — the operator user id or the claiming customer id.
         const stampsOverride = p.sourceName === 'operator_override' || p.sourceName === 'owner_claim';
@@ -1190,6 +1258,28 @@ class DirectoryPresenceSeedService {
             override_at = EXCLUDED.override_at,
             updated_at = now()
         `;
+      }
+    }
+
+    // §5.1 report trigger — a report-visible identity change re-versions the
+    // report for ANY seed status, not just claimed (the minted report
+    // delivered via the QR kit otherwise stays stale until a manual refresh).
+    // Runs after every write above so the snapshot reads the updated listing,
+    // city/state mirror, and provenance rows. Idempotent via the evidence
+    // snapshot hash; best-effort — a build failure must not fail the edit,
+    // and the last published version is preserved regardless (§20.4.11).
+    if (autoProvenance.length > 0) {
+      try {
+        const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
+        await SeedIntelligenceReportService.getInstance().refreshReport(
+          seedId,
+          ctx ? { region: 'us-east-1', userId: ctx.actorId, ip: ctx.ip, userAgent: ctx.userAgent } : undefined,
+        );
+      } catch (err: any) {
+        logger.warn('DirectoryPresenceSeedService: post-update report refresh failed', undefined, {
+          seedId,
+          error: err?.message,
+        });
       }
     }
 

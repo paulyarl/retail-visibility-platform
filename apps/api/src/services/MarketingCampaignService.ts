@@ -2835,6 +2835,44 @@ export class MarketingCampaignService extends BaseService {
               }
             }
 
+            // Seed-row mirrors for corrected identity — the listing UPDATE
+            // above moves the public card; these keep the seed's browse index
+            // (dps.city/state drive /place shelves + seed list filters) and
+            // name_variants ledger in step, matching the mirrors updateFields
+            // and syncFromCampaign perform. city/state only mirror when the
+            // listing was writable (tenantId && listingId) or when no listing
+            // exists at all (dps IS the resolved record then) — otherwise the
+            // browse index would diverge from the listing the report reads.
+            const correctedName = corrected.find(([, k]) => k === 'business_name')?.[0];
+            const correctedCity = corrected.find(([, k]) => k === 'city')?.[0];
+            const correctedState = corrected.find(([, k]) => k === 'state')?.[0];
+            if ((correctedCity || correctedState) && (!listingId || tenantId)) {
+              await this.prisma.$executeRaw`
+                UPDATE directory_presence_seeds
+                SET city = COALESCE(${correctedCity ?? null}, city),
+                    state = COALESCE(${correctedState ?? null}, state),
+                    updated_at = now()
+                WHERE id = ${seedId}`;
+            }
+            if (correctedName) {
+              await this.prisma.$executeRaw`
+                UPDATE directory_presence_seeds
+                SET name_variants = array_prepend(
+                      ${correctedName},
+                      array_remove(COALESCE(name_variants, '{}'::text[]), ${correctedName})
+                    ),
+                    updated_at = now()
+                WHERE id = ${seedId}`;
+              if (tenantId) {
+                await this.prisma.$executeRaw`
+                  UPDATE tenants SET name = ${correctedName}, updated_at = now() WHERE id = ${tenantId}`;
+                await this.prisma.$executeRaw`
+                  UPDATE tenant_business_profiles_list
+                  SET business_name = ${correctedName}, updated_at = now()
+                  WHERE tenant_id = ${tenantId}`;
+              }
+            }
+
             // §5.1: an owner confirmation/correction is a report-version
             // trigger. Best-effort — the seed ledger write must not fail on it.
             try {

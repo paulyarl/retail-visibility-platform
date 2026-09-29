@@ -530,6 +530,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       // campaign's intelligence_platform field so the scan prompt resolves
       // {{platform}} correctly (e.g., "all", "google", "yelp").
       platform: (selectedCampaign as any).intelligence_platform ?? '',
+      // Prospect-scoped evidence must not leak across campaigns — a stale
+      // path would point the analyst at the previous prospect's file.
+      operator_profile_evidence_file: '',
     }));
     setServerRendered(null);
   }, [selectedCampaign]);
@@ -875,6 +878,30 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                   />
                 </div>
               )}
+            </div>
+            {/* Operator profile evidence file — caller-supplied variable.
+                Sends operator_profile_evidence_file in the render payload; it
+                is never a body placeholder, so it works on every template and
+                scope with no seed or whitelist changes. Independent of the
+                interactive-verification toggle. */}
+            <div className="mt-4 rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Directory profile evidence — operator file (optional)
+              </label>
+              <input
+                type="text"
+                value={variables.operator_profile_evidence_file ?? ''}
+                onChange={(e) => setVariables((prev) => ({ ...prev, operator_profile_evidence_file: e.target.value }))}
+                placeholder={'C:\\audits\\acme-plumbing-profiles.md'}
+                className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                Save page copies of the prospect's directory profiles (Google, Yelp, Facebook — including
+                reviews) into a text/markdown file on the analyst's workstation and enter its path here.
+                The rendered prompt directs the analyst to read the file instead of hunting profiles
+                live — label each section with platform, profile URL, and logged-in/out state. Applies on
+                the server render; blank is a normal run.
+              </p>
             </div>
           </div>
 

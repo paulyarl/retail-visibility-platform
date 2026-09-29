@@ -358,6 +358,17 @@ export class SeedIntelligenceReportService extends BaseService {
           status: seedState.status,
           outreach_state: seedState.outreach_state,
           nap_verified_at: seedState.nap_verified_at,
+          // Resolved listing identity is report-visible (business_identity
+          // section + canonical identity candidate) — a listing-level change
+          // must bust the reuse check even when provenance rows didn't move
+          // (seed edit writes listing columns, not provenance).
+          business_name: seedState.business_name,
+          address: seedState.address,
+          zip_code: seedState.zip_code,
+          phone: seedState.phone,
+          website: seedState.website,
+          email: seedState.email,
+          owner_name: seedState.owner_name,
         },
         evidence: normalizedEvidence.evidence,
         provenance_refs: normalizedEvidence.provenance_refs,
@@ -366,7 +377,7 @@ export class SeedIntelligenceReportService extends BaseService {
         report_context: normalizedEvidence.report_context ?? null,
         nap_verification_ids: napVerifications.map((v) => v.id),
         outreach_touch_ids: outreachTouches.map((t) => t.id),
-        substrate_template: 'substrate-2',
+        substrate_template: 'substrate-3',
       }))
       .digest('hex');
 
@@ -760,7 +771,13 @@ export class SeedIntelligenceReportService extends BaseService {
         .map((o) => o.observation_id!)
         .filter(Boolean);
 
-      const resolvedValue = prov?.value ?? value;
+      // §9 precedence: the resolved seed/listing record wins — a write path
+      // that updates the listing without touching provenance (seed edit,
+      // owner correction) must still move the report. Provenance supplies
+      // the evidence state/confidence/attribution and is the fallback for
+      // fields the resolved record doesn't carry (ownership_type).
+      const resolvedValue =
+        (typeof value === 'string' && value.trim() === '' ? null : value) ?? prov?.value;
       // §17.1: a fact with no source observations must carry an explicit
       // derived-value explanation — otherwise lint blocks publication.
       const displayNote = prov?.notes
@@ -784,13 +801,13 @@ export class SeedIntelligenceReportService extends BaseService {
     };
 
     return {
-      business_name: buildFact('business_name', seedState.name_variants[0] ?? null, 'medium'),
-      address: buildFact('address', null, 'medium'),
-      phone: buildFact('phone', null, 'medium'),
-      website: buildFact('website', null, 'low'),
+      business_name: buildFact('business_name', seedState.business_name ?? seedState.name_variants[0] ?? null, 'medium'),
+      address: buildFact('address', seedState.address, 'medium'),
+      phone: buildFact('phone', seedState.phone, 'medium'),
+      website: buildFact('website', seedState.website, 'low'),
       city: buildFact('city', seedState.city, 'high'),
       state: buildFact('state', seedState.state, 'high'),
-      owner_name: buildFact('owner_name', null, 'low'),
+      owner_name: buildFact('owner_name', seedState.owner_name, 'low'),
       ownership_type: buildFact('ownership_type', null, 'low'),
     };
   }

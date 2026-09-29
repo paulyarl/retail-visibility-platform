@@ -23,6 +23,7 @@ import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type IntelligenceProfile, type PromptResolution, type ResolvedSignalWeight } from './intelligence/IntelligenceProfileService';
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
+import { buildOperatorProfileEvidencePreamble, OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION } from './operator-profile-evidence-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
@@ -870,6 +871,10 @@ export class MarketingExecutionService extends BaseService {
     // establishment, gold/bronze scans, repair); the composed intelligence
     // path below gets the same prefix at its own render site.
     const interactivePreamble = buildInteractiveVerificationPreamble(effectiveVariables);
+    // Operator-supplied directory profile evidence file — sibling run-mode
+    // block, independent of the interactive toggle. Emitted whenever the
+    // caller supplies operator_profile_evidence_file; blank is byte-identical.
+    const profileEvidencePreamble = buildOperatorProfileEvidencePreamble(effectiveVariables);
     if (interactivePreamble) {
       logger.info('Interactive verification preamble emitted', ctx, {
         campaignId: input.campaign.id,
@@ -878,6 +883,14 @@ export class MarketingExecutionService extends BaseService {
         hasOperatorObservations: Boolean(String(effectiveVariables.operator_observations ?? '').trim()),
       });
     }
+    if (profileEvidencePreamble) {
+      logger.info('Operator profile evidence block emitted', ctx, {
+        campaignId: input.campaign.id,
+        templateId: input.template.id,
+        operatorProfileEvidenceDirectiveVersion: OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION,
+      });
+    }
+    const runPreamble = interactivePreamble + profileEvidencePreamble;
     // National establishment (sprint: national layer) — a '__all__'
     // establishment campaign renders the national template variant: a
     // city-agnostic §10 body (no geography grid, national-scope signal
@@ -917,7 +930,7 @@ export class MarketingExecutionService extends BaseService {
         });
       }
     }
-    const baseRendered = interactivePreamble + this.renderTemplate(templateBody, effectiveVariables, input.campaign);
+    const baseRendered = runPreamble + this.renderTemplate(templateBody, effectiveVariables, input.campaign);
 
     // 2. Check amplification gates
     const isSeek = promptType === 'seek';
@@ -1390,10 +1403,10 @@ export class MarketingExecutionService extends BaseService {
       // Also strip any unresolved {{#if}}...{{/if}} Handlebars-style conditionals
       // since renderTemplate() only supports simple {{variable}} replacement.
       const cleanedBody = this.stripHandlebarsConditionals(composed.body, discoveryVariables);
-      // Same interactive-verification prefix as baseRendered — the composed
-      // path is the only branch that bypasses baseRendered, so it gets its
-      // own copy of the (possibly empty) preamble.
-      let rendered = interactivePreamble + this.renderTemplate(cleanedBody, discoveryVariables, input.campaign);
+      // Same run-mode prefix as baseRendered — the composed path is the only
+      // branch that bypasses baseRendered, so it gets its own copy of the
+      // (possibly empty) preamble.
+      let rendered = runPreamble + this.renderTemplate(cleanedBody, discoveryVariables, input.campaign);
 
       // National discovery framing — the composed fragments are city-scoped
       // copy; this directive reframes the sweep as nationwide and pins the
