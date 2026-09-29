@@ -305,6 +305,46 @@ export default function ProspectReportView({ report }: { report: ProspectReport 
         </section>
       )}
 
+      {/* Problems annex (§2) — the audit's outreach problem→solution pairs
+          in owner-facing framing: one spoken line (the hook) + the fix.
+          Read as the closing pitch before the honesty footer + CTA. */}
+      {report.problems.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            What this means for you
+          </h2>
+          {report.problems.map((p, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-gray-200 dark:border-neutral-700 p-3.5 space-y-1.5"
+            >
+              {p.line && (
+                <p className="text-sm italic text-gray-800 dark:text-gray-200 leading-relaxed">
+                  &ldquo;{p.line}&rdquo;
+                </p>
+              )}
+              {p.problem && p.problem !== p.line && (
+                <p className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                  {p.problem}
+                </p>
+              )}
+              {p.solution && (
+                <p className="text-xs text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">How we&apos;d fix it: </span>
+                  {p.solution}
+                </p>
+              )}
+              {p.evidence && (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  <span className="font-medium">What we saw: </span>
+                  {p.evidence}
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* How this report was made — the honesty footer (§6.5) */}
       {(report.data_quality.verified.length > 0 ||
         report.data_quality.couldnt_check.length > 0 ||

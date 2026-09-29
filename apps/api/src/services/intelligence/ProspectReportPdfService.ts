@@ -186,9 +186,9 @@ export async function generateProspectReportPdf(
   // ════════════════════════════════════════════════════════════════════════
 
   for (const chapter of report.chapters) {
-    // Every registered chapter emits the same owner-safe shape — render any
-    // known chapter id (website = positioning audit, repair = BA audit).
-    if (chapter.chapter_id !== 'website' && chapter.chapter_id !== 'repair') continue;
+    // Every registered chapter emits the same owner-safe shape — render all
+    // of them (website = positioning audit; repair/drift/cta/reviews/
+    // recovery/products = filtered BA extracts).
     const category = chapter.category ?? 'your category';
 
     sectionHeading(chapter.title);
@@ -274,6 +274,21 @@ export async function generateProspectReportPdf(
         yPos + 10.5,
       );
       yPos += 18;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // PROBLEMS ANNEX (§2 — outreach pairs in owner-facing framing)
+  // ════════════════════════════════════════════════════════════════════════
+
+  if (report.problems.length > 0) {
+    sectionHeading('What this means for you');
+    for (const p of report.problems) {
+      if (p.line) bodyText(`\u201C${p.line}\u201D`);
+      if (p.problem && p.problem !== p.line) bullet(p.problem, 3);
+      if (p.solution) bodyText(`How we'd fix it: ${p.solution}`, 8);
+      if (p.evidence) bodyText(`What we saw: ${p.evidence}`, 8);
+      yPos += 2;
     }
   }
 

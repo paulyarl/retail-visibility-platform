@@ -74,6 +74,18 @@ export interface ProspectReportLockedChapter {
   teaser: string;
 }
 
+/**
+ * §2 annex entry — an outreach problem→solution pair in owner-facing
+ * framing. `line` is the audit's `hook` (or `regular` fallback); the
+ * internal `outreach_use` tactic never crosses the DTO boundary.
+ */
+export interface ProspectReportProblem {
+  problem: string;
+  line: string | null;
+  solution: string | null;
+  evidence: string | null;
+}
+
 export interface ProspectReport {
   report_kind: 'business_visibility';
   business_prospect_id: string;
@@ -84,6 +96,7 @@ export interface ProspectReport {
   short_version: { lead: string | null; bullets: string[] };
   chapters: ProspectReportChapter[];
   locked_chapters: ProspectReportLockedChapter[];
+  problems: ProspectReportProblem[];
   data_quality: {
     verified: string[];
     couldnt_check: string[];

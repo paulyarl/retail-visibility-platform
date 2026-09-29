@@ -15,8 +15,11 @@
  * content) for withheld chapters. Chapter assembly + tier clamp happen
  * server-side in ProspectReportService before this DTO is produced.
  *
- * Owner-safety contract: `detected_signals` (internal WC_* taxonomy) and
- * `outreach_problems` (sales ammunition) never appear anywhere in this DTO.
+ * Owner-safety contract: `detected_signals` (internal WC_* taxonomy) never
+ * appear anywhere in this DTO. `outreach_problems` surfaces only as the
+ * `problems` annex — the owner-addressed framing (the `hook`/`regular` spoken
+ * line + `problem`/`solution`/`evidence`); `outreach_use` and the unchosen
+ * spoken line stay internal (§2 annex exception).
  * `data_quality` is the honesty footer — what was verified, what couldn't be
  * checked, and the audit's own limitations.
  */
@@ -148,6 +151,33 @@ const lockedChapterSchema = z.object({
 
 export type LockedChapterDto = z.infer<typeof lockedChapterSchema>;
 
+// ─── Problems annex (§2 exception — "how we'd fix it") ────────────────────
+
+/**
+ * One outreach problem→solution pair, owner-facing. The audit's
+ * outreach_problems carry two spoken lines (`regular`, `hook`) — the same
+ * problem framed differently — so exactly one crosses into the report:
+ * `line` is the `hook` (the attention framing) with `regular` as fallback.
+ * `outreach_use` (deployment tactics) and the unchosen line never emit.
+ *
+ * Report-level, not per-chapter: every BA-sourced chapter shares the one
+ * business_analysis audit, so the assembler unions the pairs across *visible*
+ * chapters and dedupes on the problem text — a free-tier report never leaks
+ * a withheld chapter's problems.
+ */
+const reportProblemSchema = z.object({
+  /** The consequence-first statement, as the owner experiences it. */
+  problem: z.string(),
+  /** The spoken framing — audit `hook` preferred, `regular` fallback. */
+  line: z.string().nullable(),
+  /** High-level fix summary — what gets done, never a named package. */
+  solution: z.string().nullable(),
+  /** The observed fact grounding the pair (platform + fact). */
+  evidence: z.string().nullable(),
+});
+
+export type ReportProblemDto = z.infer<typeof reportProblemSchema>;
+
 // ─── Shell DTO (§6) ───────────────────────────────────────────────────────
 
 export const prospectReportSchema = z.object({
@@ -167,6 +197,10 @@ export const prospectReportSchema = z.object({
 
   chapters: z.array(reportChapterSchema),
   locked_chapters: z.array(lockedChapterSchema),
+
+  /** §2 annex — the audit's outreach problems in owner-facing framing,
+      unioned across visible chapters, deduped by problem text. */
+  problems: z.array(reportProblemSchema),
 
   /** §6.5 "How this report was made" — unioned across included chapters. */
   data_quality: z.object({

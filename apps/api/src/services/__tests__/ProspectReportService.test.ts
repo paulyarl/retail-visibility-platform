@@ -11,10 +11,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockCampaignFindMany, mockAuditFindMany, mockTriageFindMany, mockLinkFindFirst, mockLinkFindUnique, mockLinkCreate, mockQueryRaw } =
+const { mockCampaignFindMany, mockAuditFindMany, mockExecFindMany, mockTriageFindMany, mockLinkFindFirst, mockLinkFindUnique, mockLinkCreate, mockQueryRaw } =
   vi.hoisted(() => ({
     mockCampaignFindMany: vi.fn(),
     mockAuditFindMany: vi.fn(),
+    mockExecFindMany: vi.fn(),
     mockTriageFindMany: vi.fn(),
     mockLinkFindFirst: vi.fn(),
     mockLinkFindUnique: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('../../prisma', () => ({
   prisma: {
     mkt_campaigns_list: { findMany: mockCampaignFindMany },
     mkt_audits_list: { findMany: mockAuditFindMany },
+    mkt_prompt_executions_list: { findMany: mockExecFindMany },
     mkt_campaign_triage_results: { findMany: mockTriageFindMany },
     mkt_prospect_report_links: {
       findFirst: mockLinkFindFirst,
@@ -390,6 +392,7 @@ describe('buildWebsiteChapter', () => {
       short_version: { lead: null, bullets: [ch.summary!] },
       chapters: [ch],
       locked_chapters: [],
+      problems: [],
       data_quality: prospectReportService.buildChapterDataQuality(RAJA_AUDIT),
       cta: { kind: 'claim', label: 'Claim your listing', url: '/claim/abc' },
     };
@@ -535,6 +538,7 @@ describe('buildRepairChapter (business_analysis → repair chapter)', () => {
       short_version: { lead: null, bullets: [] },
       chapters: [ch],
       locked_chapters: [],
+      problems: [],
       data_quality: prospectReportService.buildChapterDataQuality(RAJA_BA_AUDIT, 'repair'),
       cta: { kind: 'contact', label: 'Talk to us', url: null },
     };
@@ -708,6 +712,9 @@ describe('CHAPTER_BUILDERS registry', () => {
 beforeEach(() => {
   mockCampaignFindMany.mockReset();
   mockAuditFindMany.mockReset();
+  // Briefing-execution lookup — default no executions so the audit
+  // fallback path applies unless a test stages briefing rows.
+  mockExecFindMany.mockReset().mockResolvedValue([]);
   mockTriageFindMany.mockReset().mockResolvedValue([]);
   mockLinkFindFirst.mockReset();
   mockLinkFindUnique.mockReset();
@@ -899,6 +906,272 @@ describe('assembleReport (§5.0, §5.1a)', () => {
     const report = await prospectReportService.assembleReport('bp_raja', ['website'], 'free');
     expect(report!.cta.kind).toBe('contact');
     expect(report!.cta.url).toBeNull();
+  });
+});
+
+describe('problems annex (§2 — outreach pairs in owner-facing framing)', () => {
+  it('surfaces the audit outreach_problems as report problems — hook line preferred', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website'], 'free');
+    expect(report!.problems).toHaveLength(1);
+    expect(report!.problems[0]).toEqual({
+      problem:
+        'The delivery banner prices in pounds, so local shoppers assume it is not for them',
+      line: 'Your own website is quoting customers in British pounds.',
+      solution:
+        'Rebuild the ordering surface with local currency and a live pickup schedule.',
+      evidence: 'rajabazaar.com delivery banner: "£30 minimum"',
+    });
+    // The unchosen spoken line and the deployment tactic never emit.
+    const serialized = JSON.stringify(report);
+    expect(serialized).not.toContain('Milwaukee customers may read that and leave');
+    expect(serialized).not.toContain('cold-call opener');
+    expect(serialized).not.toContain('outreach_use');
+    expect(prospectReportSchema.safeParse(report).success).toBe(true);
+  });
+
+  it('falls back to the regular line when the audit carries no hook', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([
+      {
+        ...AUDIT_ROW,
+        audit_data: {
+          ...RAJA_AUDIT,
+          outreach_problems: [
+            {
+              problem: 'Stale ordering schedule reads as closed',
+              regular: 'The ordering widget is showing last season\u2019s schedule.',
+              hook: '',
+              solution: 'Refresh the widget to a live pickup schedule.',
+              evidence: 'rajabazaar.com ordering widget',
+              outreach_use: 'email hook',
+            },
+          ],
+        },
+      },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website'], 'free');
+    expect(report!.problems).toHaveLength(1);
+    expect(report!.problems[0].line).toBe(
+      'The ordering widget is showing last season\u2019s schedule.',
+    );
+    expect(JSON.stringify(report)).not.toContain('email hook');
+  });
+
+  it('unions + dedupes across visible chapters — the shared BA audit emits once', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport(
+      'bp_raja',
+      ['website', 'repair'],
+      'full',
+    );
+    // 1 website-audit pair + 1 BA-audit pair — the BA pair would repeat per
+    // BA chapter without dedupe (all BA chapters share the one audit row).
+    expect(report!.problems).toHaveLength(2);
+    const baProblem = report!.problems.find((p) =>
+      p.problem.includes('Unanswered negative reviews'),
+    );
+    expect(baProblem?.line).toContain('last bad review');
+  });
+
+  it('dedupes identical problems across BA-sourced chapters (drift + repair share one audit)', async () => {
+    mockCampaignFindMany.mockResolvedValue([
+      ...SIBLINGS,
+      { id: 'cmp-pb01', business_name: 'Raja Bazaar', website_url: 'https://rajabazaar.com', category: 'Middle Eastern Grocery Store' },
+    ]);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue([
+      { campaign_id: 'cmp-repair', is_operator_accepted: true, playbook: { archetype: 'A5' }, overridden_playbook: null },
+      { campaign_id: 'cmp-pb01', is_operator_accepted: true, playbook: { archetype: 'A3' }, overridden_playbook: null },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport(
+      'bp_raja',
+      ['drift', 'repair'],
+      'full',
+    );
+    expect(report!.chapters).toHaveLength(2);
+    // Same audit, same pair — emitted once, not once per chapter.
+    expect(report!.problems).toHaveLength(1);
+    expect(report!.problems[0].problem).toContain('Unanswered negative reviews');
+  });
+
+  it('withheld chapters contribute no problems on tier=free', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport(
+      'bp_raja',
+      ['website', 'repair'],
+      'free',
+    );
+    expect(report!.locked_chapters).toHaveLength(1);
+    // Only the website chapter is visible — the BA pair stays locked away.
+    expect(report!.problems).toHaveLength(1);
+    expect(JSON.stringify(report)).not.toContain('Unanswered negative reviews');
+  });
+
+  it('emits an empty annex when no audit carries outreach_problems', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([
+      {
+        ...AUDIT_ROW,
+        audit_data: { ...RAJA_AUDIT, outreach_problems: undefined },
+      },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website'], 'free');
+    expect(report!.problems).toEqual([]);
+  });
+});
+
+describe('problems annex — briefing precedence over the audit set', () => {
+  const THREE_SIBLINGS = [
+    ...SIBLINGS,
+    { id: 'cmp-pb01', business_name: 'Raja Bazaar', website_url: 'https://rajabazaar.com', category: 'Middle Eastern Grocery Store' },
+  ];
+  const A3_TRIAGE = [
+    { campaign_id: 'cmp-pb01', is_operator_accepted: true, playbook: { archetype: 'A3' }, overridden_playbook: null },
+  ];
+
+  // The service hits mkt_prompt_executions_list twice: a lightweight
+  // projection (no raw_output) to find briefing executions, then a
+  // raw_output fetch for the winners. Dispatch on the select shape.
+  const stageBriefings = (listRows: any[], rawRows: any[]) =>
+    mockExecFindMany.mockImplementation((args: any) =>
+      Promise.resolve(args?.select?.raw_output ? rawRows : listRows),
+    );
+
+  const briefingExec = (id: string, campaignId: string, templateId: string, schemaName: string) => ({
+    id,
+    campaign_id: campaignId,
+    template_id: templateId,
+    mkt_prompt_templates_list: { output_schema: { name: schemaName } },
+  });
+
+  it('prefers the owning sibling\u2019s briefing pairs over the audit\u2019s generic set', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(A3_TRIAGE);
+    stageBriefings(
+      [briefingExec('ex-brief', 'cmp-pb01', 'mpt-archetype-briefing-a3', 'profile_repair_audit')],
+      [{
+        campaign_id: 'cmp-pb01',
+        raw_output: JSON.stringify({
+          profile_repair_audit: {
+            outreach_problems: [{
+              problem: 'Drift-scoped problem from the A3 briefing',
+              regular: 'The plain briefing line.',
+              hook: 'The punchy briefing hook.',
+              solution: 'Tighten the category pages.',
+              evidence: 'briefing evidence',
+              outreach_use: 'email opener',
+            }],
+          },
+        }),
+      }],
+    );
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift'], 'full');
+    expect(report!.problems).toEqual([{
+      problem: 'Drift-scoped problem from the A3 briefing',
+      line: 'The punchy briefing hook.',
+      solution: 'Tighten the category pages.',
+      evidence: 'briefing evidence',
+    }]);
+    // The audit's own pair is displaced — the briefing is the fresher copy,
+    // and the deployment tactic never crosses the boundary.
+    const serialized = JSON.stringify(report);
+    expect(serialized).not.toContain('Unanswered negative reviews');
+    expect(serialized).not.toContain('email opener');
+  });
+
+  it('reads triage briefings too — the regular line serves when the hook is empty', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(A3_TRIAGE);
+    stageBriefings(
+      [briefingExec('ex-triage', 'cmp-pb01', 'mpt-profile-repair-triage-default', 'profile_repair_triage')],
+      [{
+        campaign_id: 'cmp-pb01',
+        raw_output: JSON.stringify({
+          profile_repair_triage: {
+            outreach_problems: [{
+              problem: 'Triage-ranked problem',
+              regular: 'The plain triage line.',
+              hook: '',
+              solution: null,
+              evidence: null,
+              outreach_use: 'internal',
+            }],
+          },
+        }),
+      }],
+    );
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift'], 'full');
+    expect(report!.problems[0].line).toBe('The plain triage line.');
+    expect(JSON.stringify(report)).not.toContain('internal');
+  });
+
+  it('falls back to the audit pairs when the briefing output is malformed', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(A3_TRIAGE);
+    stageBriefings(
+      [briefingExec('ex-brief', 'cmp-pb01', 'mpt-archetype-briefing-a3', 'profile_repair_audit')],
+      [{ campaign_id: 'cmp-pb01', raw_output: '```json\n{"profile_repair_audit": { BROKEN' }],
+    );
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift'], 'full');
+    expect(report!.problems).toHaveLength(1);
+    expect(report!.problems[0].problem).toContain('Unanswered negative reviews');
+  });
+
+  it('a withheld chapter\u2019s briefing never leaks into a free report', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(A3_TRIAGE);
+    stageBriefings(
+      [briefingExec('ex-brief', 'cmp-pb01', 'mpt-archetype-briefing-a3', 'profile_repair_audit')],
+      [{
+        campaign_id: 'cmp-pb01',
+        raw_output: JSON.stringify({
+          profile_repair_audit: {
+            outreach_problems: [{
+              problem: 'LOCKED-ONLY briefing problem',
+              hook: 'This hook belongs to a locked chapter.',
+              regular: 'x',
+              solution: 'x',
+              evidence: 'x',
+              outreach_use: 'internal',
+            }],
+          },
+        }),
+      }],
+    );
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website', 'drift'], 'free');
+    expect(report!.locked_chapters[0]?.chapter_id).toBe('drift');
+    // Only the visible website chapter contributes — the locked sibling's
+    // briefing is never even consulted for the annex.
+    expect(report!.problems).toHaveLength(1);
+    expect(JSON.stringify(report)).not.toContain('LOCKED-ONLY');
   });
 });
 

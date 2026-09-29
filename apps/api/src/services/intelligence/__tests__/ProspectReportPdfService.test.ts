@@ -50,6 +50,14 @@ const report = {
   locked_chapters: [
     { chapter_id: 'repair', title: 'Your public profiles', finding_count: 4, teaser: 'Your public profiles — 4 findings inside' },
   ],
+  problems: [
+    {
+      problem: 'The delivery banner prices in pounds',
+      line: 'Your own website is quoting customers in British pounds.',
+      solution: 'Rebuild the ordering surface with local currency.',
+      evidence: 'rajabazaar.com delivery banner',
+    },
+  ],
   data_quality: {
     verified: ['Site reachable'],
     couldnt_check: ['WhatsApp response time'],
@@ -77,5 +85,27 @@ describe('generateProspectReportPdf', () => {
     // QR-embedded PDF is materially larger than the no-QR render
     const { pdfBuffer: noQr } = await generateProspectReportPdf({ report });
     expect(pdfBuffer.length).toBeGreaterThan(noQr.length);
+  });
+
+  it('renders the problems annex and non-website/repair archetype chapters', async () => {
+    const driftOnly = {
+      ...report,
+      tier: 'full',
+      chapters: [
+        {
+          ...report.chapters[0],
+          chapter_id: 'drift',
+          title: 'Your business details across listings',
+          verdict: 'Your name, address, and phone disagree across listings.',
+        },
+      ],
+      locked_chapters: [],
+    };
+    const { pdfBuffer } = await generateProspectReportPdf({ report: driftOnly });
+    const text = pdfBuffer.toString('latin1');
+    // Chapter content + annex lines survive in the PDF's text stream.
+    expect(text).toContain('business details across listings');
+    expect(text).toContain('What this means for you');
+    expect(text).toContain('quoting customers in British pounds');
   });
 });

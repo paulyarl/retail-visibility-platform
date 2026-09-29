@@ -15,10 +15,15 @@
  * retitle, delivery-mode reframe, and buildWebsiteChapter. Assembly over
  * siblings, token mint/verify, and short-link mint/resolve land in Phase 3.
  *
- * Owner-safety contract (§2): detected_signals (internal WC_* taxonomy) and
- * outreach_problems (sales ammunition) are redacted — they never reach the
- * DTO. No new facts are generated; an audit section with no source rows is
- * omitted, never stubbed.
+ * Owner-safety contract (§2): detected_signals (internal WC_* taxonomy) are
+ * redacted — they never reach the DTO. outreach_problems surface only as the
+ * report-level `problems` annex: the owner-addressed framing (hook/regular
+ * line + problem/solution/evidence) crosses; outreach_use and the unchosen
+ * spoken line stay internal. Annex pairs prefer the owning sibling's
+ * briefing executions (analyst-refined, archetype-scoped) over the chapter
+ * audit's generic set — fallback keeps un-briefed chapters covered. No new
+ * facts are generated; an audit section with no source rows is omitted,
+ * never stubbed.
  */
 
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -46,6 +51,7 @@ import {
   type ProspectReportChapterDto,
   type WebsiteChapterDto,
   type RepairChapterDto,
+  type ReportProblemDto,
 } from '../validators/prospect-report-dto.schema';
 
 // ─── Chapter registry (§0.4 sprint contract) ──────────────────────────────
@@ -525,6 +531,64 @@ function formatValue(v: unknown): string {
   return String(v);
 }
 
+// ─── §2 annex — outreach problems in owner-facing framing ────────────────
+//
+// The audit's outreach_problems each carry two spoken lines (regular/hook —
+// the same problem framed differently), so exactly one crosses the report
+// boundary: `line` prefers the hook (the attention framing), falling back to
+// regular. `outreach_use` (deployment tactics) and the unchosen line never
+// emit. The input audit was already schema-validated by the chapter builder
+// — this is a field pick, not a re-parse.
+
+function ownerFacingProblems(auditData: unknown): ReportProblemDto[] {
+  return mapOutreachProblems((auditData as any)?.outreach_problems);
+}
+
+function mapOutreachProblems(raw: unknown): ReportProblemDto[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ReportProblemDto[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const problem = typeof entry.problem === 'string' ? entry.problem : '';
+    const line =
+      (typeof entry.hook === 'string' && entry.hook) ||
+      (typeof entry.regular === 'string' && entry.regular) ||
+      null;
+    if (!problem && !line) continue;
+    out.push({
+      problem: problem || (line as string),
+      line,
+      solution: typeof entry.solution === 'string' ? entry.solution : null,
+      evidence: typeof entry.evidence === 'string' ? entry.evidence : null,
+    });
+  }
+  return out;
+}
+
+// Briefing executions (archetype briefings, per-issue repair seeks, triage)
+// store their output in raw_output as a JSON document — usually wrapped in
+// a profile_repair_audit / profile_repair_triage envelope and possibly
+// markdown fences (same parse RepairBriefingCard does client-side).
+// A bare-object fallback keeps the parse tolerant; malformed/unfinished
+// outputs simply yield no pairs and the audit fallback applies.
+function briefingProblemsFromRaw(rawOutput: unknown): ReportProblemDto[] {
+  if (typeof rawOutput !== 'string' || !rawOutput.trim()) return [];
+  try {
+    const cleaned = rawOutput
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/i, '')
+      .trim();
+    const parsed = JSON.parse(cleaned);
+    return mapOutreachProblems(
+      parsed?.profile_repair_audit?.outreach_problems ??
+        parsed?.profile_repair_triage?.outreach_problems ??
+        parsed?.outreach_problems,
+    );
+  } catch {
+    return [];
+  }
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────
 
 class ProspectReportService extends BaseService {
@@ -654,11 +718,13 @@ class ProspectReportService extends BaseService {
    * L1 → L3 transform for the `business_analysis` audit (the A5 / PB-05
    * repair track) — the "Your online listings" chapter.
    *
-   * Owner-safety: detected_signals, outreach_problems, alignment_scoring,
-   * recommended_tier label, estimated_monthly_service_fee,
-   * digital_opportunity_score, high_attention, render_controls, and sources
-   * never reach the DTO — the platform's internal sales/scoring machinery
-   * stays internal.
+   * Owner-safety: detected_signals, alignment_scoring, recommended_tier
+   * label, estimated_monthly_service_fee, digital_opportunity_score,
+   * high_attention, render_controls, and sources never reach the DTO — the
+   * platform's internal sales/scoring machinery stays internal.
+   * outreach_problems surface only as the report-level `problems` annex
+   * (sourced per visible chapter from the owning sibling's briefing
+   * executions, audit pairs as fallback — never emitted per chapter).
    */
   buildRepairChapter(
     auditData: unknown,
@@ -1681,6 +1747,8 @@ class ProspectReportService extends BaseService {
       chapter: ProspectReportChapterDto;
       dataQuality: { verified: string[]; couldnt_check: string[]; limitations: string[] };
       auditedAt: Date;
+      auditData: unknown;
+      ownerCampaignId: string;
     }[] = [];
     for (const chapterId of allowedChapters) {
       const builder = CHAPTER_BUILDERS[chapterId];
@@ -1707,6 +1775,8 @@ class ProspectReportService extends BaseService {
         chapter,
         dataQuality: this.buildChapterDataQuality(audit.audit_data, chapterId),
         auditedAt: audit.created_at as Date,
+        auditData: audit.audit_data,
+        ownerCampaignId: ownerId,
       });
     }
     if (built.length === 0) return null;
@@ -1749,6 +1819,40 @@ class ProspectReportService extends BaseService {
       limitations: union(visible.map((b) => b.dataQuality.limitations)),
     };
 
+    // §2 annex — outreach problem→solution pairs of the *visible* chapters,
+    // unioned, deduped on the problem text, and capped at the 1–3 bound the
+    // audits/briefings author to. Source precedence per chapter: the owning
+    // sibling's briefing executions win (analyst-refined, archetype-scoped
+    // copy that can differ from the audit's generic set); the chapter
+    // audit's own outreach_problems are the fallback for un-briefed
+    // chapters. Briefing pairs rank ahead of audit-fallback pairs so the
+    // sharpest framing leads regardless of chapter order. Deduping still
+    // matters — every BA-sourced chapter shares the one business_analysis
+    // audit — and withheld chapters contribute nothing (tier clamp first).
+    const briefingProblems = await this.loadBriefingProblems(
+      [...new Set(visible.map((b) => b.ownerCampaignId))],
+      ctx,
+    );
+    const seenProblems = new Set<string>();
+    const problems: ReportProblemDto[] = [];
+    const pushProblems = (pairs: ReportProblemDto[]) => {
+      for (const p of pairs) {
+        if (problems.length >= 3) return;
+        const key = p.problem.trim().toLowerCase();
+        if (seenProblems.has(key)) continue;
+        seenProblems.add(key);
+        problems.push(p);
+      }
+    };
+    for (const b of visible) {
+      pushProblems(briefingProblems.get(b.ownerCampaignId) ?? []);
+    }
+    for (const b of visible) {
+      if (!briefingProblems.has(b.ownerCampaignId)) {
+        pushProblems(ownerFacingProblems(b.auditData));
+      }
+    }
+
     // §6.6 — footer CTA: claim URL when any sibling is seeded, else contact.
     const cta = await this.resolveClaimCta(campaignIds, ctx);
 
@@ -1766,6 +1870,7 @@ class ProspectReportService extends BaseService {
       short_version: shortVersion,
       chapters: visible.map((b) => b.chapter),
       locked_chapters: lockedChapters,
+      problems,
       data_quality: dataQuality,
       cta,
     };
@@ -1779,6 +1884,72 @@ class ProspectReportService extends BaseService {
     });
 
     return report;
+  }
+
+  /**
+   * Latest briefing-sourced outreach problems per chapter-owner campaign.
+   *
+   * Archetype briefings, per-issue repair seeks, and triage briefings are
+   * identified by their template's output_schema.name
+   * (profile_repair_audit / profile_repair_triage) — the same key the
+   * operator panels use (CampaignDetailClient / ArchetypeBriefingPanel), so
+   * present and future briefing templates are covered without hardcoding
+   * ids. Follows the panels' list→detail pattern: a lightweight projection
+   * filters to briefing executions, then raw_output is fetched only for
+   * the winners.
+   *
+   * Latest run per (campaign, template) wins (§9.1), so a repair sibling
+   * can contribute pairs from each of its issue briefings + triage.
+   * Failures degrade to an empty map — the audit fallback still applies.
+   */
+  private async loadBriefingProblems(
+    campaignIds: string[],
+    ctx?: RequestCtx,
+  ): Promise<Map<string, ReportProblemDto[]>> {
+    const byCampaign = new Map<string, ReportProblemDto[]>();
+    if (campaignIds.length === 0) return byCampaign;
+    try {
+      const execs = (await this.prisma.mkt_prompt_executions_list.findMany({
+        where: { campaign_id: { in: campaignIds } },
+        orderBy: { executed_at: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          campaign_id: true,
+          template_id: true,
+          mkt_prompt_templates_list: { select: { output_schema: true } },
+        },
+      })) as any[];
+
+      const latestPerTemplate = new Map<string, any>();
+      for (const exec of execs) {
+        const schemaName = exec.mkt_prompt_templates_list?.output_schema?.name;
+        if (schemaName !== 'profile_repair_audit' && schemaName !== 'profile_repair_triage') {
+          continue;
+        }
+        const key = `${exec.campaign_id}:${exec.template_id ?? ''}`;
+        if (!latestPerTemplate.has(key)) latestPerTemplate.set(key, exec);
+      }
+      if (latestPerTemplate.size === 0) return byCampaign;
+
+      const rows = (await this.prisma.mkt_prompt_executions_list.findMany({
+        where: { id: { in: [...latestPerTemplate.values()].map((e) => e.id) } },
+        orderBy: { executed_at: 'desc' },
+        select: { campaign_id: true, raw_output: true },
+      })) as any[];
+
+      for (const row of rows) {
+        const pairs = briefingProblemsFromRaw(row.raw_output);
+        if (pairs.length === 0) continue;
+        const list = byCampaign.get(row.campaign_id) ?? [];
+        byCampaign.set(row.campaign_id, list.concat(pairs));
+      }
+    } catch (error) {
+      logger.warn('Prospect report briefing problems resolution failed', ctx, {
+        error: (error as Error).message,
+      });
+    }
+    return byCampaign;
   }
 
   /**

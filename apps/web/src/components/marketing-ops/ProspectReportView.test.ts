@@ -67,6 +67,16 @@ const report: ProspectReport = {
       teaser: 'Your public profiles — 4 findings inside',
     },
   ],
+  problems: [
+    {
+      problem:
+        'The delivery banner prices in pounds, so local shoppers assume it is not for them',
+      line: 'Your own website is quoting customers in British pounds.',
+      solution:
+        'Rebuild the ordering surface with local currency and a live pickup schedule.',
+      evidence: 'rajabazaar.com delivery banner: "£30 minimum"',
+    },
+  ],
   data_quality: {
     verified: ['Site reachable over HTTPS'],
     couldnt_check: [`${TRAP} internal-only field`],
@@ -116,6 +126,26 @@ describe('ProspectReportView', () => {
     expect(html).not.toContain('Departments');
     // the rest of the fix still renders
     expect(html).toContain('A focused refresh of your existing site');
+  });
+
+  it('renders the problems annex — hook line, problem, fix, evidence (§2)', () => {
+    const html = render();
+    expect(html).toContain('What this means for you');
+    expect(html).toContain('Your own website is quoting customers in British pounds.');
+    expect(html).toContain('local shoppers assume it is not for them');
+    expect(html).toContain('Rebuild the ordering surface with local currency');
+    expect(html).toContain('rajabazaar.com delivery banner');
+    // Internal-only fields never render: the unchosen spoken line and the
+    // deployment tactic are absent from the fixture by construction — pin
+    // the labels so a future field rename cannot smuggle them back.
+    expect(html).not.toContain('outreach_use');
+  });
+
+  it('omits the annex entirely when no problems are on file', () => {
+    const bare = structuredClone(report);
+    bare.problems = [];
+    const html = render(bare);
+    expect(html).not.toContain('What this means for you');
   });
 
   it('renders locked chapters as teasers with the claim CTA, no content', () => {
