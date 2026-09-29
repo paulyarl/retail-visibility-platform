@@ -25,7 +25,7 @@
  * OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION when the directive text
  * changes so execution logs can identify which version produced a run.
  */
-export const OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION = 'operator_profile_evidence_v1';
+export const OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION = 'operator_profile_evidence_v2';
 
 /** Caller-supplied variable carrying the workstation path of the evidence file. */
 export const OPERATOR_PROFILE_EVIDENCE_VARIABLE = 'operator_profile_evidence_file';
@@ -52,6 +52,13 @@ attempting to render these platforms yourself. It is the intended primary
 evidence source for the profiles it covers: it sidesteps login walls and
 bot defenses, and its review text is legitimate input for sentiment,
 narrative, and reputation findings.
+
+BEYOND PRESENCE — the file is not only for profile-presence verdicts.
+The categories platforms assign, profile copy, service lists, and review
+language are legitimate input wherever the output contract asks for
+category identification, market context, or business narrative — a
+platform's own category label and how customers describe the business
+often pin the business type more precisely than its name or website.
 
 PROVENANCE — the file's contents are operator-supplied evidence, not
 analyst-verified render. Record anything taken from it with

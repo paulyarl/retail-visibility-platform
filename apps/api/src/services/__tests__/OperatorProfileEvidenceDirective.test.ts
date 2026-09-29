@@ -61,6 +61,8 @@ describe('buildOperatorProfileEvidencePreamble', () => {
     expect(preamble).toContain('live render wins');
     expect(preamble).toContain('render_controls[]');
     expect(preamble).toContain('must never block or worsen');
+    expect(preamble).toContain('BEYOND PRESENCE');
+    expect(preamble).toContain('category identification');
   });
 
   it('is independent of interactive_verification — emits with the toggle off', () => {
@@ -100,6 +102,6 @@ describe('caller-supplied variable vs renderTemplate scope check', () => {
 
 describe('directive version', () => {
   it('is stamped for execution metadata', () => {
-    expect(OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION).toBe('operator_profile_evidence_v1');
+    expect(OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION).toBe('operator_profile_evidence_v2');
   });
 });
