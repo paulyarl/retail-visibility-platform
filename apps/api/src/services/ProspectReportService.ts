@@ -74,26 +74,229 @@ interface ChapterBuilder {
 }
 
 /**
- * Chapter id ↔ audit source ↔ builder. Playbook-agnostic: a new chapter is
- * registered by adding a builder for a new audit source, not by naming a
- * playbook (OQ-5 — `repair` registers when its transform lands).
+ * Chapter id ↔ audit source ↔ display titles. Every chapter except
+ * `website` is a filtered owner-safe extract of the same `business_analysis`
+ * audit — the archetype extract decides which slice the sibling contributes.
  */
-export const CHAPTER_BUILDERS: Partial<
-  Record<ProspectReportChapterId, ChapterBuilder>
-> = {
+export const CHAPTER_BUILDERS: Record<ProspectReportChapterId, ChapterBuilder> = {
   website: {
     source: 'website_positioning',
     title: 'Your website today',
     teaserTitle: 'Your website',
   },
-  // business_analysis — the triage/BA audit behind the A5 multi-signal /
-  // PB-05 repair track. Its sibling campaign defaults to this chapter.
+  // A5 multi-signal / PB-05 — the full-footprint chapter.
   repair: {
     source: 'business_analysis',
     title: 'Your online listings',
     teaserTitle: 'Your public profiles',
   },
+  // A3 listing drift (PB-01 profile repair / PB-06 visual refresh) — NAP
+  // consistency, displayed-name/address/phone drift, unclaimed profiles.
+  drift: {
+    source: 'business_analysis',
+    title: 'Your business details across listings',
+    teaserTitle: 'Listing consistency',
+  },
+  // A4 CTA gap (PB-03) — the website's next-step options.
+  cta: {
+    source: 'business_analysis',
+    title: 'Your website\u2019s next step',
+    teaserTitle: 'Calls to action',
+  },
+  // A1 review gap (PB-02) — volume, ratings, response cadence.
+  reviews: {
+    source: 'business_analysis',
+    title: 'Your customer reviews',
+    teaserTitle: 'Reviews',
+  },
+  // A2 negative recovery (PB-04) — unanswered negative reviews.
+  recovery: {
+    source: 'business_analysis',
+    title: 'Unanswered negative reviews',
+    teaserTitle: 'Review recovery',
+  },
+  // A6 product visibility (PB-07) — browsable shelves, pickup, photos.
+  products: {
+    source: 'business_analysis',
+    title: 'Your products online',
+    teaserTitle: 'Product visibility',
+  },
 };
+
+/**
+ * Declared archetype (from the sibling's operator-accepted triage result) →
+ * the chapter that sibling contributes. A sibling with no accepted triage
+ * declares nothing; `repair`/`website` then fall back to the campaign that
+ * owns the audit row (legacy campaigns report without a declared route).
+ */
+export const ARCHETYPE_CHAPTERS: Record<string, ProspectReportChapterId> = {
+  A1: 'reviews',
+  A2: 'recovery',
+  A3: 'drift',
+  A4: 'cta',
+  A5: 'repair',
+  A6: 'products',
+  A7: 'website',
+};
+
+// ─── Archetype briefing plumbing ──────────────────────────────────────────
+//
+// A routed sibling's briefing is the operator-facing twin of its report
+// chapter: a `profile_repair_audit`-shaped seek execution whose prompt is
+// fed the SAME deterministic fact slice the chapter renders (plus the
+// internal ammunition the owner never sees). The analyst composes the
+// narrative; the extract guarantees the briefing can never disagree with
+// the owner-facing report. A5/A7 keep their own briefing lanes (triage +
+// website positioning audit) — this covers the archetypes that have no
+// dedicated diagnostic.
+
+/** Template id → archetype binding for the per-archetype briefing seeks. */
+export const ARCHETYPE_BRIEFING_TEMPLATES: Record<
+  string,
+  { archetype: string; issueType: string; label: string }
+> = {
+  'mpt-archetype-briefing-a1': {
+    archetype: 'A1',
+    issueType: 'review_gap',
+    label: 'Review Gap & Acceleration',
+  },
+  'mpt-archetype-briefing-a2': {
+    archetype: 'A2',
+    issueType: 'negative_recovery',
+    label: 'Negative Review Recovery',
+  },
+  'mpt-archetype-briefing-a3': {
+    archetype: 'A3',
+    issueType: 'listing_drift',
+    label: 'Listing Drift & Visual Refresh',
+  },
+  'mpt-archetype-briefing-a4': {
+    archetype: 'A4',
+    issueType: 'cta_gap',
+    label: 'CTA & Friction Gap',
+  },
+  'mpt-archetype-briefing-a6': {
+    archetype: 'A6',
+    issueType: 'product_visibility',
+    label: 'Product Visibility',
+  },
+};
+
+/**
+ * The deterministic fact slice an archetype briefing prompt is grounded in —
+ * the same fields its report chapter renders, plus the internal layer the
+ * owner-facing DTO redacts (detected_signals, outreach_problems,
+ * alignment_scoring). Unparsed on purpose: this is prompt input, not a DTO —
+ * schema validation happens in the builders.
+ */
+export function archetypeFactSlice(
+  archetype: string,
+  auditData: unknown,
+): Record<string, unknown> {
+  const audit = (auditData ?? {}) as any;
+  const internal = {
+    detected_signals: audit.detected_signals ?? [],
+    outreach_problems: audit.outreach_problems ?? [],
+    alignment_scoring: audit.alignment_scoring ?? null,
+  };
+  const gapRows = (pattern: RegExp) => gapsMatching(audit, pattern);
+
+  switch (archetype) {
+    case 'A1':
+      return {
+        combined_review_metrics: audit.combined_review_metrics ?? null,
+        platform_reviews: Object.fromEntries(
+          platformEntriesOf(audit).map(([k, p]) => [
+            k,
+            {
+              rating: p.rating ?? null,
+              total_reviews: p.total_reviews ?? null,
+              reviews_with_observable_response:
+                p.reviews_with_observable_response ?? null,
+              observable_unanswered_reviews:
+                p.observable_unanswered_reviews ?? null,
+            },
+          ]),
+        ),
+        gap_rows: gapRows(/review|rating|response/i),
+        ...internal,
+      };
+    case 'A2':
+      return {
+        unanswered_negative_review_examples:
+          audit.unanswered_negative_review_examples ?? [],
+        negative_review_themes: audit.negative_review_themes ?? [],
+        unanswered_negative_reviews:
+          audit.combined_review_metrics
+            ?.observable_unanswered_negative_reviews ?? null,
+        gap_rows: gapRows(/negative|review|rating|response/i),
+        ...internal,
+      };
+    case 'A3':
+      return {
+        nap_consistency: audit.nap_consistency ?? null,
+        platform_statuses: Object.fromEntries(
+          platformEntriesOf(audit).map(([k, p]) => [k, p.profile_status]),
+        ),
+        google_displayed: audit.platforms?.google
+          ? {
+              displayed_name: audit.platforms.google.displayed_name ?? null,
+              displayed_address:
+                audit.platforms.google.displayed_address ?? null,
+              displayed_phone: audit.platforms.google.displayed_phone ?? null,
+              primary_category: audit.platforms.google.primary_category ?? null,
+            }
+          : null,
+        gap_rows: gapRows(/name|address|phone|nap|hours?|photo|image|attribute/i),
+        ...internal,
+      };
+    case 'A4':
+      return {
+        website_cta: {
+          url: audit.website?.url ?? null,
+          status: audit.website?.status ?? null,
+          call_to_action_present: audit.website?.call_to_action_present ?? null,
+          click_to_call_available: audit.website?.click_to_call_available ?? null,
+          contact_information_visible:
+            audit.website?.contact_information_visible ?? null,
+          ordering_or_pickup_info_present:
+            audit.website?.ordering_or_pickup_info_present ?? null,
+          has_pickup_ordering: audit.website?.has_pickup_ordering ?? null,
+          has_delivery_option: audit.website?.has_delivery_option ?? null,
+          has_availability_inquiry:
+            audit.website?.has_availability_inquiry ?? null,
+          conversion_opportunities:
+            audit.website?.conversion_opportunities ?? [],
+          issues: audit.website?.issues ?? [],
+        },
+        gap_rows: gapRows(/cta|call|contact|order|pickup|delivery|inquiry|booking|conversion/i),
+        ...internal,
+      };
+    case 'A6':
+      return {
+        business_type: audit.business_type ?? null,
+        product_visibility: {
+          has_product_browsing: audit.website?.has_product_browsing ?? null,
+          product_categories_visible:
+            audit.website?.product_categories_visible ?? [],
+          has_pickup_ordering: audit.website?.has_pickup_ordering ?? null,
+          has_delivery_option: audit.website?.has_delivery_option ?? null,
+          ordering_or_pickup_info_present:
+            audit.website?.ordering_or_pickup_info_present ?? null,
+        },
+        google_photos: audit.platforms?.google
+          ? {
+              photo_count: audit.platforms.google.photo_count ?? null,
+              photo_types: audit.platforms.google.photo_types ?? [],
+            }
+          : null,
+        gap_rows: gapRows(/product|photo|catalog|browse|pickup|delivery|availability|categor/i),
+        ...internal,
+      };
+    default:
+      return internal;
+  }
+}
 
 // ─── §3.2 Verdict glosses (presence × ownership — all 21 cells + fallback) ──
 
@@ -222,6 +425,98 @@ function humanizeField(field: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+// ─── business_analysis shared extracts ───────────────────────────────────
+//
+// The BA audit is one document read five ways — the archetype extractors
+// below all pull from these shared helpers so the owner-facing vocabulary
+// stays consistent across chapters.
+
+const PRESENT_STATUSES = new Set([
+  'claimed',
+  'likely_claimed',
+  'unclaimed',
+  'likely_unclaimed',
+]);
+
+function platformLabel(key: string): string {
+  return key === 'google'
+    ? 'Google Business Profile'
+    : key === 'yelp'
+      ? 'Yelp'
+      : key === 'facebook'
+        ? 'Facebook'
+        : humanizeField(key);
+}
+
+function platformEntriesOf(audit: {
+  platforms?: Record<string, unknown> | null;
+}): [string, any][] {
+  return Object.entries(audit.platforms ?? {}).filter(
+    ([, p]: [string, any]) => p && typeof p === 'object' && p.profile_status,
+  ) as [string, any][];
+}
+
+function isPresentPlatform(p: any): boolean {
+  return PRESENT_STATUSES.has(p.profile_status);
+}
+
+function isClaimedPlatform(p: any): boolean {
+  return (
+    p.profile_status === 'claimed' || p.profile_status === 'likely_claimed'
+  );
+}
+
+function isUnclaimedPlatform(p: any): boolean {
+  return (
+    p.profile_status === 'unclaimed' ||
+    p.profile_status === 'likely_unclaimed'
+  );
+}
+
+/** Competitive benchmarks rendered as exemplar lines (shared by BA chapters). */
+function competitiveFrameLines(audit: {
+  competitive_benchmarks?: any[] | null;
+}): string[] {
+  return (audit.competitive_benchmarks ?? []).map((b) => {
+    const rating =
+      b.google_rating != null && b.google_review_count != null
+        ? ` — ${b.google_rating}★ across ${b.google_review_count} Google reviews`
+        : '';
+    const format = b.store_format ? `, ${humanizeField(b.store_format)}` : '';
+    return `${b.business_name}${format}${rating}`;
+  });
+}
+
+/**
+ * gap_analysis rows filtered to the field names an archetype owns. The gap
+ * rows are already expected-vs-actual by definition; the filter scopes the
+ * chapter to its slice of the diagnostic.
+ */
+function gapsMatching(
+  audit: { gap_analysis?: { gaps?: any[] | null } | null },
+  pattern: RegExp,
+): any[] {
+  return (audit.gap_analysis?.gaps ?? []).filter((g) =>
+    pattern.test(`${g.platform ?? ''} ${g.field ?? ''}`),
+  );
+}
+
+function gapToExpectation(gap: any): {
+  field: string;
+  expected_text: string;
+  actual_text: string;
+  note: string | null;
+} {
+  return {
+    field: gap.platform
+      ? `${platformLabel(gap.platform)} — ${humanizeField(gap.field)}`
+      : humanizeField(gap.field),
+    expected_text: formatValue(gap.expected),
+    actual_text: formatValue(gap.actual),
+    note: gap.gap_description ?? null,
+  };
+}
+
 function formatValue(v: unknown): string {
   if (v === true) return 'present';
   if (v === false) return 'missing';
@@ -328,7 +623,8 @@ class ProspectReportService extends BaseService {
   }
 
   /**
-   * Dispatch — route an audit row to the registered builder for its chapter.
+   * Dispatch — route an audit row to the builder for its chapter. Every
+   * BA-sourced chapter parses the same audit; the extractor scopes it.
    */
   private buildChapter(
     chapterId: ProspectReportChapterId,
@@ -336,10 +632,22 @@ class ProspectReportService extends BaseService {
     ctx: ChapterContext,
     opts: ChapterBuildOpts,
   ): ProspectReportChapterDto {
-    if (chapterId === 'repair') {
-      return this.buildRepairChapter(auditData, ctx, opts);
+    switch (chapterId) {
+      case 'website':
+        return this.buildWebsiteChapter(auditData, ctx, opts);
+      case 'repair':
+        return this.buildRepairChapter(auditData, ctx, opts);
+      case 'drift':
+        return this.buildDriftChapter(auditData, ctx, opts);
+      case 'cta':
+        return this.buildCtaChapter(auditData, ctx, opts);
+      case 'reviews':
+        return this.buildReviewsChapter(auditData, ctx, opts);
+      case 'recovery':
+        return this.buildRecoveryChapter(auditData, ctx, opts);
+      case 'products':
+        return this.buildProductsChapter(auditData, ctx, opts);
     }
-    return this.buildWebsiteChapter(auditData, ctx, opts);
   }
 
   /**
@@ -360,19 +668,8 @@ class ProspectReportService extends BaseService {
     const audit = businessAnalysisSchema.parse(auditData);
 
     // Verdict — identity confirmation × listing coverage.
-    const platforms = audit.platforms ?? {};
-    const platformEntries = Object.entries(platforms).filter(
-      ([, p]: [string, any]) => p && typeof p === 'object' && p.profile_status,
-    );
-    const PRESENT_STATUSES = new Set([
-      'claimed',
-      'likely_claimed',
-      'unclaimed',
-      'likely_unclaimed',
-    ]);
-    const found = platformEntries.filter(([, p]: [string, any]) =>
-      PRESENT_STATUSES.has(p.profile_status),
-    );
+    const platformEntries = platformEntriesOf(audit);
+    const found = platformEntries.filter(([, p]) => isPresentPlatform(p));
     const unverifiedCount = platformEntries.length - found.length;
 
     const identityLine =
@@ -391,18 +688,9 @@ class ProspectReportService extends BaseService {
 
     // Already working — claimed profiles, consistent NAP, reachable site,
     // answered reviews.
-    const platformLabel = (key: string) =>
-      key === 'google'
-        ? 'Google Business Profile'
-        : key === 'yelp'
-          ? 'Yelp'
-          : key === 'facebook'
-            ? 'Facebook'
-            : humanizeField(key);
-
     const alreadyWorking: string[] = [];
-    for (const [key, p] of platformEntries as [string, any][]) {
-      if (p.profile_status === 'claimed' || p.profile_status === 'likely_claimed') {
+    for (const [key, p] of platformEntries) {
+      if (isClaimedPlatform(p)) {
         const metric =
           p.rating != null && p.total_reviews != null
             ? ` — ${p.rating}★ across ${p.total_reviews} reviews`
@@ -433,12 +721,9 @@ class ProspectReportService extends BaseService {
     // 'worth_fixing' for the rest. Headlines are owner-facing; internal
     // vocab (tier, score, signals) stays out.
     const costing: RepairChapterDto['costing_customers'] = [];
-    for (const [key, p] of platformEntries as [string, any][]) {
+    for (const [key, p] of platformEntries) {
       const label = platformLabel(key);
-      const unclaimed =
-        p.profile_status === 'unclaimed' ||
-        p.profile_status === 'likely_unclaimed';
-      if (unclaimed) {
+      if (isUnclaimedPlatform(p)) {
         costing.push({
           headline: `Your ${label} listing is unclaimed`,
           cost:
@@ -517,24 +802,10 @@ class ProspectReportService extends BaseService {
     // definition (the gold-standard comparison is the audit's job).
     const expectations: RepairChapterDto['expectations'] = (
       audit.gap_analysis?.gaps ?? []
-    ).map((gap) => ({
-      field: gap.platform
-        ? `${platformLabel(gap.platform)} — ${humanizeField(gap.field)}`
-        : humanizeField(gap.field),
-      expected_text: formatValue(gap.expected),
-      actual_text: formatValue(gap.actual),
-      note: gap.gap_description ?? null,
-    }));
+    ).map(gapToExpectation);
 
     // Competitive frame — benchmark businesses as exemplar lines.
-    const competitiveFrame = (audit.competitive_benchmarks ?? []).map((b) => {
-      const rating =
-        b.google_rating != null && b.google_review_count != null
-          ? ` — ${b.google_rating}★ across ${b.google_review_count} Google reviews`
-          : '';
-      const format = b.store_format ? `, ${humanizeField(b.store_format)}` : '';
-      return `${b.business_name}${format}${rating}`;
-    });
+    const competitiveFrame = competitiveFrameLines(audit);
 
     const chapter: RepairChapterDto = {
       chapter_id: 'repair',
@@ -569,6 +840,502 @@ class ProspectReportService extends BaseService {
   }
 
   /**
+   * Shared envelope for the BA-sourced archetype chapters — the extractor
+   * supplies verdict/working/costing/expectations; this fills the common
+   * owner-safe fields. Summary stays null: the verdict IS the lead, and a
+   * chapter shouldn't repeat the audit's one top-level summary five times.
+   */
+  private baChapter(
+    chapterId: ProspectReportChapterId,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts,
+    audit: { summary?: string | null; tier_rationale?: string | null; recommended_services?: string[] },
+    parts: {
+      verdict: string;
+      alreadyWorking: string[];
+      costing: RepairChapterDto['costing_customers'];
+      expectations: RepairChapterDto['expectations'];
+      competitiveFrame: string[];
+      fixHeadline: string;
+    },
+  ): RepairChapterDto {
+    parts.costing.sort((a, b) =>
+      a.tier === b.tier ? 0 : a.tier === 'now' ? -1 : 1,
+    );
+    return {
+      chapter_id: chapterId,
+      title: CHAPTER_BUILDERS[chapterId].title,
+      audited_at: ctx.auditedAt,
+      category: ctx.category,
+      summary: null,
+      verdict: parts.verdict,
+      already_working: parts.alreadyWorking,
+      costing_customers: parts.costing,
+      expectations: parts.expectations,
+      competitive_frame: parts.competitiveFrame,
+      fix: {
+        headline: parts.fixHeadline,
+        scope_notes: audit.tier_rationale ?? null,
+        page_plan: opts.includePagePlan
+          ? (audit.recommended_services ?? [])
+          : null,
+      },
+    };
+  }
+
+  /**
+   * A3 listing drift (PB-01 / PB-06) — "Your business details across
+   * listings": NAP consistency, displayed-name/address/phone drift, and the
+   * unclaimed profiles where anyone can edit the details.
+   */
+  buildDriftChapter(
+    auditData: unknown,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts = {},
+  ): RepairChapterDto {
+    const audit = businessAnalysisSchema.parse(auditData);
+    const nap = audit.nap_consistency;
+    const platformEntries = platformEntriesOf(audit);
+
+    const verdict =
+      nap?.overall_status === 'consistent'
+        ? 'Your business name, address, and phone agree everywhere we could check.'
+        : nap?.overall_status === 'minor_variations'
+          ? 'Your name, address, and phone mostly agree across listings — with small differences that add up.'
+          : nap?.overall_status === 'major_inconsistencies'
+            ? 'Your name, address, or phone disagree across listings — customers can end up at the wrong place.'
+            : 'We could not fully verify how consistently your business details appear across listings.';
+
+    const alreadyWorking: string[] = [];
+    if (nap?.overall_status === 'consistent') {
+      alreadyWorking.push(
+        'Your name, address, and phone are consistent across the listings we checked.',
+      );
+    }
+    const canonical = [
+      nap?.canonical_name,
+      nap?.canonical_address,
+      [nap?.canonical_city, nap?.canonical_state, nap?.canonical_zip]
+        .filter(Boolean)
+        .join(' '),
+      nap?.canonical_phone,
+    ].filter(Boolean);
+    if (canonical.length > 0) {
+      alreadyWorking.push(
+        `The details your listings should all carry: ${canonical.join(' — ')}.`,
+      );
+    }
+    for (const [key, p] of platformEntries) {
+      if (isClaimedPlatform(p)) {
+        alreadyWorking.push(
+          `Your ${platformLabel(key)} listing is claimed — nobody can edit its details but you.`,
+        );
+      }
+    }
+
+    const costing: RepairChapterDto['costing_customers'] = [];
+    const variationCost = (
+      label: string,
+      values: string[] | undefined,
+      tier: 'now' | 'worth_fixing',
+      cost: string,
+    ) => {
+      if (!values?.length) return;
+      costing.push({
+        headline: `Your ${label} appears as ${values.length} different version${values.length === 1 ? '' : 's'}`,
+        cost,
+        evidence: values.join(' vs '),
+        tier,
+      });
+    };
+    variationCost(
+      'business name',
+      nap?.name_variations,
+      nap?.overall_status === 'major_inconsistencies' ? 'now' : 'worth_fixing',
+      'Search engines treat variants as different businesses — reviews and rankings get split.',
+    );
+    variationCost(
+      'address',
+      nap?.address_variations,
+      nap?.overall_status === 'major_inconsistencies' ? 'now' : 'worth_fixing',
+      'Customers following the wrong address never make it to your door.',
+    );
+    variationCost(
+      'phone number',
+      nap?.phone_variations,
+      nap?.overall_status === 'major_inconsistencies' ? 'now' : 'worth_fixing',
+      'Calls to the wrong number are customers you never hear about.',
+    );
+    for (const issue of nap?.material_issues ?? []) {
+      costing.push({ headline: issue, cost: null, evidence: null, tier: 'now' });
+    }
+    for (const [key, p] of platformEntries) {
+      if (isUnclaimedPlatform(p)) {
+        costing.push({
+          headline: `Your ${platformLabel(key)} listing is unclaimed`,
+          cost: 'Unclaimed profiles accept edits from anyone — drift starts here.',
+          evidence: p.profile_url ?? null,
+          tier: 'worth_fixing',
+        });
+      }
+    }
+
+    const expectations = gapsMatching(
+      audit,
+      /name|address|phone|nap|hours?|photo|image|attribute/i,
+    ).map(gapToExpectation);
+
+    return this.baChapter('drift', ctx, opts, audit, {
+      verdict,
+      alreadyWorking,
+      costing,
+      expectations,
+      competitiveFrame: competitiveFrameLines(audit),
+      fixHeadline:
+        'One consistent identity everywhere — the same name, address, phone, and hours on every listing.',
+    });
+  }
+
+  /**
+   * A4 CTA gap (PB-03) — "Your website's next step": whether a visitor can
+   * do something — call, order, get directions — or just bounce.
+   */
+  buildCtaChapter(
+    auditData: unknown,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts = {},
+  ): RepairChapterDto {
+    const audit = businessAnalysisSchema.parse(auditData);
+    const site = audit.website ?? {};
+
+    const flags: { key: keyof typeof site; label: string; missing: string }[] = [
+      {
+        key: 'call_to_action_present',
+        label: 'a clear call to action',
+        missing: 'Your site has no clear call to action',
+      },
+      {
+        key: 'click_to_call_available',
+        label: 'click-to-call',
+        missing: 'Your phone number isn\u2019t tap-to-call on the site',
+      },
+      {
+        key: 'contact_information_visible',
+        label: 'visible contact information',
+        missing: 'Your contact information isn\u2019t visible on the site',
+      },
+      {
+        key: 'ordering_or_pickup_info_present',
+        label: 'ordering or pickup information',
+        missing: 'Customers can\u2019t tell how to order or pick up',
+      },
+      {
+        key: 'has_pickup_ordering',
+        label: 'pickup ordering',
+        missing: 'No way to order for pickup online',
+      },
+      {
+        key: 'has_delivery_option',
+        label: 'a delivery option',
+        missing: 'No delivery option on the site',
+      },
+      {
+        key: 'has_availability_inquiry',
+        label: 'an availability inquiry',
+        missing: 'Customers can\u2019t ask whether something is in stock',
+      },
+    ];
+    const present = flags.filter((f) => site[f.key] === true);
+    const missing = flags.filter((f) => site[f.key] === false);
+
+    const verdict =
+      site.status === 'none_found' || site.status === 'broken'
+        ? 'Without a working site, every visit ends before it starts — there is no next step.'
+        : missing.length === 0 && present.length > 0
+          ? 'Your site gives visitors a clear next step — call, order, or visit.'
+          : `Your site ${present.length > 0 ? `has ${present[0].label} but` : 'gives visitors'} ${missing.length > 0 ? 'missing ways to take the next step.' : 'no obvious next step.'}`;
+
+    const alreadyWorking = present.map(
+      (f) => `Your site offers ${f.label}.`,
+    );
+
+    const costing: RepairChapterDto['costing_customers'] = missing.map((f) => ({
+      headline: f.missing,
+      cost: 'A visitor who can\u2019t act leaves — the next search result is one tap away.',
+      evidence: site.url ?? null,
+      tier:
+        f.key === 'call_to_action_present' ||
+        f.key === 'click_to_call_available' ||
+        f.key === 'contact_information_visible'
+          ? 'now'
+          : 'worth_fixing',
+    }));
+    for (const opportunity of site.conversion_opportunities ?? []) {
+      costing.push({
+        headline: opportunity,
+        cost: null,
+        evidence: null,
+        tier: 'worth_fixing',
+      });
+    }
+
+    const expectations = gapsMatching(
+      audit,
+      /cta|call|contact|order|pickup|delivery|inquiry|booking|conversion/i,
+    ).map(gapToExpectation);
+
+    return this.baChapter('cta', ctx, opts, audit, {
+      verdict,
+      alreadyWorking,
+      costing,
+      expectations,
+      competitiveFrame: [],
+      fixHeadline:
+        'Every page gets one obvious next step — call, order, or get directions.',
+    });
+  }
+
+  /**
+   * A1 review gap (PB-02) — "Your customer reviews": volume, ratings, and
+   * whether reviews get a public reply.
+   */
+  buildReviewsChapter(
+    auditData: unknown,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts = {},
+  ): RepairChapterDto {
+    const audit = businessAnalysisSchema.parse(auditData);
+    const metrics = audit.combined_review_metrics;
+    const platformEntries = platformEntriesOf(audit);
+
+    const rated = platformEntries.filter(
+      ([, p]) => p.rating != null && p.total_reviews != null,
+    );
+    const totalReviews = metrics?.observable_total_reviews ??
+      rated.reduce((sum, [, p]) => sum + (p.total_reviews ?? 0), 0);
+    const weighted = rated.reduce((sum, [, p]) => sum + p.rating * p.total_reviews, 0);
+    const ratedCount = rated.reduce((sum, [, p]) => sum + p.total_reviews, 0);
+    const avg = ratedCount > 0 ? Math.round((weighted / ratedCount) * 10) / 10 : null;
+
+    const verdict =
+      totalReviews > 0
+        ? `We found ${totalReviews} review${totalReviews === 1 ? '' : 's'} across your listings${avg != null ? ` averaging ${avg}★` : ''}.`
+        : 'We could not find customer reviews on your listings.';
+
+    const alreadyWorking: string[] = [];
+    for (const [key, p] of platformEntries) {
+      if (p.rating != null && p.total_reviews != null && p.rating >= 4) {
+        alreadyWorking.push(
+          `Your ${platformLabel(key)} rating is ${p.rating}★ across ${p.total_reviews} reviews.`,
+        );
+      }
+    }
+    if ((metrics?.observable_reviews_with_response ?? 0) > 0) {
+      alreadyWorking.push(
+        'You\u2019ve replied to some of your reviews — customers can see you answer.',
+      );
+    }
+
+    const costing: RepairChapterDto['costing_customers'] = [];
+    if ((metrics?.observable_unanswered_negative_reviews ?? 0) > 0) {
+      costing.push({
+        headline: `${metrics!.observable_unanswered_negative_reviews} negative review${metrics!.observable_unanswered_negative_reviews === 1 ? '' : 's'} with no public reply`,
+        cost: 'A shopper reading those reviews sees silence — one answered complaint is worth more than five stars.',
+        evidence: null,
+        tier: 'now',
+      });
+    }
+    if (
+      (metrics?.observable_unanswered_reviews ?? 0) > 0 &&
+      !(metrics?.observable_unanswered_negative_reviews ?? 0)
+    ) {
+      costing.push({
+        headline: `${metrics!.observable_unanswered_reviews} review${metrics!.observable_unanswered_reviews === 1 ? '' : 's'} with no public reply`,
+        cost: 'Unanswered reviews — even positive ones — read as a business that isn\u2019t paying attention.',
+        evidence: null,
+        tier: 'worth_fixing',
+      });
+    }
+    for (const theme of audit.negative_review_themes ?? []) {
+      costing.push({
+        headline: `Customers mention: ${theme.theme}`,
+        cost: theme.summary ?? null,
+        evidence:
+          theme.supporting_review_count != null
+            ? `${theme.supporting_review_count} reviews`
+            : null,
+        tier: 'worth_fixing',
+      });
+    }
+
+    const expectations = gapsMatching(
+      audit,
+      /review|rating|response/i,
+    ).map(gapToExpectation);
+
+    return this.baChapter('reviews', ctx, opts, audit, {
+      verdict,
+      alreadyWorking,
+      costing,
+      expectations,
+      competitiveFrame: competitiveFrameLines(audit),
+      fixHeadline:
+        'A steady stream of fresh reviews — and a public reply on every one.',
+    });
+  }
+
+  /**
+   * A2 negative recovery (PB-04) — "Unanswered negative reviews": the
+   * complaints sitting public with no reply, and the themes behind them.
+   */
+  buildRecoveryChapter(
+    auditData: unknown,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts = {},
+  ): RepairChapterDto {
+    const audit = businessAnalysisSchema.parse(auditData);
+    const metrics = audit.combined_review_metrics;
+    const unansweredNeg = metrics?.observable_unanswered_negative_reviews ?? 0;
+
+    const verdict =
+      unansweredNeg > 0
+        ? `${unansweredNeg} negative review${unansweredNeg === 1 ? ' sits' : 's sit'} publicly unanswered.`
+        : 'We found no negative reviews sitting publicly unanswered.';
+
+    const alreadyWorking: string[] = [];
+    if ((metrics?.observable_reviews_with_response ?? 0) > 0) {
+      alreadyWorking.push(
+        'You\u2019ve replied to reviews in the past — the habit exists, it just needs to reach the complaints.',
+      );
+    }
+
+    const costing: RepairChapterDto['costing_customers'] = [];
+    for (const example of audit.unanswered_negative_review_examples ?? []) {
+      costing.push({
+        headline: `${platformLabel(example.platform)} review${example.rating != null ? ` (${example.rating}★)` : ''}: ${example.complaint_summary}`,
+        cost: 'The next hundred readers see the complaint and the silence — not the resolution.',
+        evidence: example.date ?? null,
+        tier: 'now',
+      });
+    }
+    for (const theme of audit.negative_review_themes ?? []) {
+      costing.push({
+        headline: `A pattern in negative reviews: ${theme.theme}`,
+        cost: theme.summary ?? null,
+        evidence:
+          theme.supporting_review_count != null
+            ? `${theme.supporting_review_count} reviews`
+            : null,
+        tier: 'worth_fixing',
+      });
+    }
+
+    const expectations = gapsMatching(
+      audit,
+      /negative|review|rating|response/i,
+    ).map(gapToExpectation);
+
+    return this.baChapter('recovery', ctx, opts, audit, {
+      verdict,
+      alreadyWorking,
+      costing,
+      expectations,
+      competitiveFrame: [],
+      fixHeadline:
+        'Every negative review answered publicly and professionally — the reply is for the next hundred readers.',
+    });
+  }
+
+  /**
+   * A6 product visibility (PB-07) — "Your products online": can customers
+   * browse the shelves before they walk in — the platform's core question.
+   */
+  buildProductsChapter(
+    auditData: unknown,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts = {},
+  ): RepairChapterDto {
+    const audit = businessAnalysisSchema.parse(auditData);
+    const site = audit.website ?? {};
+    const google = (audit.platforms as any)?.google;
+    const isProductBusiness =
+      audit.business_type === 'product' || audit.business_type === 'hybrid';
+
+    const verdict = site.has_product_browsing
+      ? 'Customers can browse what you sell before they walk in.'
+      : isProductBusiness
+        ? 'Your shelves are invisible online — customers can\u2019t see what you sell until they walk in.'
+        : 'What you offer isn\u2019t listed online — customers can\u2019t see it until they ask.';
+
+    const alreadyWorking: string[] = [];
+    if (site.has_product_browsing) {
+      alreadyWorking.push('Your products are browsable online.');
+    }
+    if ((site.product_categories_visible ?? []).length > 0) {
+      alreadyWorking.push(
+        `Your site shows ${site.product_categories_visible!.length} product categor${site.product_categories_visible!.length === 1 ? 'y' : 'ies'}: ${site.product_categories_visible!.slice(0, 5).join(', ')}${site.product_categories_visible!.length > 5 ? '…' : ''}.`,
+      );
+    }
+    if (google?.photo_count != null && google.photo_count > 0) {
+      alreadyWorking.push(
+        `Your Google listing shows ${google.photo_count} photo${google.photo_count === 1 ? '' : 's'}.`,
+      );
+    }
+    if (site.has_pickup_ordering === true) {
+      alreadyWorking.push('Customers can order for pickup online.');
+    }
+    if (site.has_delivery_option === true) {
+      alreadyWorking.push('Your site offers a delivery option.');
+    }
+
+    const costing: RepairChapterDto['costing_customers'] = [];
+    if (site.has_product_browsing === false) {
+      costing.push({
+        headline: isProductBusiness
+          ? 'Your products aren\u2019t browsable online'
+          : 'What you offer isn\u2019t listed online',
+        cost: 'A customer who can\u2019t check first picks the store they can check.',
+        evidence: site.url ?? null,
+        tier: 'now',
+      });
+    }
+    if (
+      site.ordering_or_pickup_info_present === false &&
+      site.has_pickup_ordering !== true
+    ) {
+      costing.push({
+        headline: 'No pickup or ordering information online',
+        cost: 'Customers who shop on their phone first go where ordering is clear.',
+        evidence: null,
+        tier: 'worth_fixing',
+      });
+    }
+    if (google?.photo_count === 0) {
+      costing.push({
+        headline: 'No photos on your Google listing',
+        cost: 'Shelves people can\u2019t see are shelves people don\u2019t walk in for.',
+        evidence: null,
+        tier: 'worth_fixing',
+      });
+    }
+
+    const expectations = gapsMatching(
+      audit,
+      /product|photo|catalog|browse|pickup|delivery|availability|categor/i,
+    ).map(gapToExpectation);
+
+    return this.baChapter('products', ctx, opts, audit, {
+      verdict,
+      alreadyWorking,
+      costing,
+      expectations,
+      competitiveFrame: competitiveFrameLines(audit),
+      fixHeadline:
+        'Your real shelves, online — browsable products, clear pickup, photos that show what\u2019s in stock.',
+    });
+  }
+
+  /**
    * §3.4 — the audit's data_quality is the honesty footer, minus internal
    * lane-plumbing lines. Unioned across chapters by the assembler (Phase 3).
    * Dispatches on the chapter's audit source — BA audits carry the same
@@ -582,7 +1349,7 @@ class ProspectReportService extends BaseService {
     couldnt_check: string[];
     limitations: string[];
   } {
-    if (chapterId === 'repair') {
+    if (CHAPTER_BUILDERS[chapterId]?.source === 'business_analysis') {
       const audit = businessAnalysisSchema.parse(auditData);
       const dq = audit.data_quality ?? {};
       return {
@@ -778,6 +1545,81 @@ class ProspectReportService extends BaseService {
   // ─── Assembly (§5.0, §5.1a) ─────────────────────────────────────────────
 
   /**
+   * Declared archetype per campaign — the effective playbook (override ??
+   * recommendation) of its operator-accepted triage result. Mirrors
+   * MarketingCampaignService.resolveDeclaredArchetypes: campaigns with no
+   * accepted triage are simply absent, and failure degrades to empty rather
+   * than failing the report.
+   */
+  private async resolveSiblingArchetypes(
+    campaignIds: string[],
+    ctx?: RequestCtx,
+  ): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (campaignIds.length === 0) return result;
+    try {
+      const rows = await this.prisma.mkt_campaign_triage_results.findMany({
+        where: { campaign_id: { in: campaignIds } },
+        include: {
+          playbook: { select: { archetype: true } },
+          overridden_playbook: { select: { archetype: true } },
+        },
+      });
+      for (const row of rows as any[]) {
+        if (row.is_operator_accepted !== true) continue;
+        const archetype =
+          row.overridden_playbook?.archetype ?? row.playbook?.archetype;
+        if (archetype) result.set(row.campaign_id, archetype);
+      }
+    } catch (error) {
+      logger.warn('Prospect report archetype resolution failed', ctx, {
+        error: (error as Error).message,
+        campaignCount: campaignIds.length,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Chapter → owning campaign. Each sibling contributes the chapter its
+   * declared archetype maps to — provided that chapter's audit source exists
+   * in the sibling set (first sibling wins when two share an archetype, e.g.
+   * PB-01 and PB-06 both A3). Unclaimed `repair`/`website` chapters fall
+   * back to the campaign that owns the audit row so legacy campaigns with no
+   * accepted triage still report.
+   */
+  private resolveChapterOwners(
+    campaigns: { id: string }[],
+    audits: { campaign_id: string; platform: string }[],
+    archetypes: Map<string, string>,
+  ): Map<ProspectReportChapterId, string> {
+    const owners = new Map<ProspectReportChapterId, string>();
+    const sourcePresent = (source: string) =>
+      audits.some((a) => a.platform === source);
+
+    for (const campaign of campaigns) {
+      const archetype = archetypes.get(campaign.id);
+      const chapterId = archetype ? ARCHETYPE_CHAPTERS[archetype] : undefined;
+      if (
+        chapterId &&
+        !owners.has(chapterId) &&
+        sourcePresent(CHAPTER_BUILDERS[chapterId].source)
+      ) {
+        owners.set(chapterId, campaign.id);
+      }
+    }
+    // Legacy fallback — audits on campaigns with no declared archetype.
+    for (const id of ['repair', 'website'] as const) {
+      if (owners.has(id)) continue;
+      const audit = audits.find(
+        (a) => a.platform === CHAPTER_BUILDERS[id].source,
+      );
+      if (audit) owners.set(id, audit.campaign_id);
+    }
+    return owners;
+  }
+
+  /**
    * Assemble the prospect-level report DTO over the sibling set.
    *
    * - allowedChapters is the signed permission scope (ordered — index 0 is
@@ -811,9 +1653,13 @@ class ProspectReportService extends BaseService {
 
     // Latest audit per registered chapter source across the sibling set —
     // same-column accumulation means reruns append rows (§9.1: latest wins).
-    const sources = allowedChapters
-      .map((c) => CHAPTER_BUILDERS[c]?.source)
-      .filter((s): s is string => !!s);
+    const sources = [
+      ...new Set(
+        allowedChapters
+          .map((c) => CHAPTER_BUILDERS[c]?.source)
+          .filter((s): s is string => !!s),
+      ),
+    ];
     if (sources.length === 0) return null;
 
     const audits = (await this.prisma.mkt_audits_list.findMany({
@@ -822,7 +1668,14 @@ class ProspectReportService extends BaseService {
       select: { campaign_id: true, platform: true, audit_data: true, created_at: true },
     })) as any[];
 
-    // Build permitted chapters in signed order; skip chapters with no audit.
+    // Chapter ownership — each sibling contributes the chapter its declared
+    // archetype maps to; the chapter renders under that sibling's name.
+    const archetypes = await this.resolveSiblingArchetypes(campaignIds, ctx);
+    const owners = this.resolveChapterOwners(campaigns, audits, archetypes);
+
+    // Build permitted chapters in signed order; skip chapters no sibling
+    // claimed (archetype chapters need their sibling; repair/website fall
+    // back to the audit's own campaign).
     const built: {
       id: ProspectReportChapterId;
       chapter: ProspectReportChapterDto;
@@ -832,10 +1685,12 @@ class ProspectReportService extends BaseService {
     for (const chapterId of allowedChapters) {
       const builder = CHAPTER_BUILDERS[chapterId];
       if (!builder) continue;
+      const ownerId = owners.get(chapterId);
+      if (!ownerId) continue;
+      const campaign = campaignById.get(ownerId);
+      if (!campaign) continue;
       const audit = audits.find((a) => a.platform === builder.source);
       if (!audit) continue;
-      const campaign = campaignById.get(audit.campaign_id);
-      if (!campaign) continue;
       const chapter = this.buildChapter(
         chapterId,
         audit.audit_data,
@@ -872,7 +1727,10 @@ class ProspectReportService extends BaseService {
     );
     const shortVersion =
       visible.length === 1
-        ? { lead: visible[0].chapter.summary, bullets: [] as string[] }
+        ? {
+            lead: visible[0].chapter.summary ?? visible[0].chapter.verdict,
+            bullets: [] as string[],
+          }
         : {
             lead: `We reviewed ${teaserTitles
               .map((t) => t.toLowerCase())
@@ -962,66 +1820,55 @@ class ProspectReportService extends BaseService {
   }
 
   /**
-   * Chapter ids that can actually be built for this prospect (audit on file
-   * for the chapter's registered source). Drives the panel's chapter
-   * checkboxes — a chapter that can't be built is never offered.
+   * Chapter ids that can actually be built for this prospect — one per
+   * sibling whose declared archetype maps to a chapter whose audit source is
+   * on file, plus the legacy repair/website fallback. Drives the panel's
+   * chapter checkboxes — a chapter no sibling can own is never offered.
    */
   async listAvailableChapters(
     businessProspectId: string,
     ctx?: RequestCtx,
   ): Promise<ProspectReportChapterId[]> {
-    const campaigns = await this.prisma.mkt_campaigns_list.findMany({
-      where: { business_prospect_id: businessProspectId, scope: 'business' } as any,
-      select: { id: true },
-    });
-    const ids = campaigns.map((c) => c.id as string);
-    if (ids.length === 0) return [];
-    const sources = Object.values(CHAPTER_BUILDERS)
-      .filter((b): b is ChapterBuilder => !!b)
-      .map((b) => b.source);
-    const audits = await this.prisma.mkt_audits_list.findMany({
-      where: { campaign_id: { in: ids }, platform: { in: sources } },
-      select: { platform: true },
-      distinct: ['platform'],
-    });
-    const present = new Set(audits.map((a) => a.platform as string));
-    return PROSPECT_REPORT_CHAPTER_IDS.filter((id) => {
-      const builder = CHAPTER_BUILDERS[id];
-      return !!builder && present.has(builder.source);
-    });
+    const owners = await this.resolveProspectChapterOwners(businessProspectId, ctx);
+    return PROSPECT_REPORT_CHAPTER_IDS.filter((id) => owners.has(id));
   }
 
   /**
-   * Chapter → owning campaign attribution (§5.5a): which sibling's audit
-   * would build each available chapter (latest audit per source wins — same
-   * rule as assembleReport). The panel uses it to default each sibling's
-   * selection to ITS OWN chapter — an inherited audit on a sibling does not
-   * make that chapter "its own".
+   * Chapter → owning campaign attribution (§5.5a): which sibling contributes
+   * each chapter. The panel uses it to default each sibling's selection to
+   * ITS OWN chapter — a PB-01 sibling defaults to `drift`, a PB-08 to
+   * `website`, an A5 to `repair`; inherited audits never count as "its own".
    */
   async listChapterSources(
     businessProspectId: string,
     ctx?: RequestCtx,
   ): Promise<Record<string, string>> {
-    const campaigns = await this.prisma.mkt_campaigns_list.findMany({
+    const owners = await this.resolveProspectChapterOwners(businessProspectId, ctx);
+    return Object.fromEntries(owners);
+  }
+
+  /** Shared context loader for the two listing methods above. */
+  private async resolveProspectChapterOwners(
+    businessProspectId: string,
+    ctx?: RequestCtx,
+  ): Promise<Map<ProspectReportChapterId, string>> {
+    const campaigns = (await this.prisma.mkt_campaigns_list.findMany({
       where: { business_prospect_id: businessProspectId, scope: 'business' } as any,
+      orderBy: { created_at: 'asc' },
       select: { id: true },
-    });
+    })) as any[];
     const ids = campaigns.map((c) => c.id as string);
-    if (ids.length === 0) return {};
-    const sources = Object.values(CHAPTER_BUILDERS)
-      .filter((b): b is ChapterBuilder => !!b)
-      .map((b) => b.source);
-    const audits = await this.prisma.mkt_audits_list.findMany({
+    if (ids.length === 0) return new Map();
+    const sources = [...new Set(
+      Object.values(CHAPTER_BUILDERS).map((b) => b.source),
+    )];
+    const audits = (await this.prisma.mkt_audits_list.findMany({
       where: { campaign_id: { in: ids }, platform: { in: sources } },
       orderBy: { created_at: 'desc' },
       select: { campaign_id: true, platform: true },
-    });
-    const attribution: Record<string, string> = {};
-    for (const [id, builder] of Object.entries(CHAPTER_BUILDERS)) {
-      const audit = audits.find((a) => a.platform === builder!.source);
-      if (audit) attribution[id] = audit.campaign_id as string;
-    }
-    return attribution;
+    })) as any[];
+    const archetypes = await this.resolveSiblingArchetypes(ids, ctx);
+    return this.resolveChapterOwners(campaigns, audits, archetypes);
   }
 
   /**

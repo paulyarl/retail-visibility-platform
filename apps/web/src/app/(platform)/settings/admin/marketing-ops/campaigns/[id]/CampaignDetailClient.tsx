@@ -20,6 +20,7 @@ import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditC
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import WebsitePositioningAuditCard from '@/components/marketing-ops/WebsitePositioningAuditCard';
 import WebsiteGapBriefingPanel from '@/components/marketing-ops/WebsiteGapBriefingPanel';
+import ArchetypeBriefingPanel from '@/components/marketing-ops/ArchetypeBriefingPanel';
 import OwnerReportSection from '@/components/marketing-ops/OwnerReportSection';
 import { isWebsiteGapCampaign } from '@/components/marketing-ops/repairCampaignGate';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
@@ -506,7 +507,11 @@ export default function CampaignDetailClient({
       .listExecutions({ campaignId })
       .then(async (execs) => {
         const latest = execs
-          .filter((e) => e.output_schema?.name === 'profile_repair_audit')
+          .filter(
+            (e) =>
+              e.output_schema?.name === 'profile_repair_audit' &&
+              !(e.template_id || '').startsWith('mpt-archetype-briefing-'),
+          )
           .sort((a, b) => (b.executed_at || '').localeCompare(a.executed_at || ''))[0];
         if (!latest) {
           setRepairExecution(null);
@@ -1573,6 +1578,14 @@ export default function CampaignDetailClient({
                     PB-08 shares campaign_category='profile_repair' but has no
                     repair track. */}
                 <WebsiteGapBriefingPanel campaign={campaign} onRefresh={fetchCampaign} />
+                {/* Archetype Briefing — the routed sibling's briefing home.
+                    Composes a profile_repair_audit-shaped seek from the
+                    deterministic archetype extract of the shared
+                    business_analysis audit (the same facts this sibling's
+                    report chapter renders). Self-silences unless the declared
+                    archetype maps to a briefing template — A5/A7 keep
+                    RepairTrackPanel / WebsiteGapBriefingPanel. */}
+                <ArchetypeBriefingPanel campaign={campaign} onRefresh={fetchCampaign} />
                 {/* Owner Report — the shareable Business Visibility Report
                     home (§5.5a). Standalone on the overview so EVERY business
                     sibling gets it regardless of stage — a Seed-stage A5 with

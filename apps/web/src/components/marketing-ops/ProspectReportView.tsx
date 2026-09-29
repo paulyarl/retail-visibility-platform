@@ -25,15 +25,15 @@ import {
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import type {
   ProspectReport,
-  ProspectReportWebsiteChapter,
+  ProspectReportChapter,
 } from '@/services/ProspectReportPublicService';
 
 /**
  * Chapter body — every registered chapter renders this same shape (verdict /
  * already working / costing customers / expectations / competitive frame /
- * fix); only the title and content differ by audit source.
+ * fix); only the title and content differ by contributing sibling.
  */
-function ReportChapter({ chapter }: { chapter: ProspectReportWebsiteChapter }) {
+function ReportChapter({ chapter }: { chapter: ProspectReportChapter }) {
   const now = chapter.costing_customers.filter((i) => i.tier === 'now');
   const worthFixing = chapter.costing_customers.filter((i) => i.tier === 'worth_fixing');
   const category = chapter.category ?? 'your category';
@@ -170,7 +170,7 @@ function IssueCard({
   issue,
   urgent,
 }: {
-  issue: ProspectReportWebsiteChapter['costing_customers'][number];
+  issue: ProspectReportChapter['costing_customers'][number];
   urgent?: boolean;
 }) {
   return (

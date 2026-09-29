@@ -47,6 +47,11 @@ interface OwnerReportSectionProps {
 const CHAPTER_LABELS: Record<string, string> = {
   website: 'Website story',
   repair: 'Public profiles',
+  drift: 'Listing consistency',
+  cta: 'Calls to action',
+  reviews: 'Reviews',
+  recovery: 'Review recovery',
+  products: 'Product visibility',
 };
 
 

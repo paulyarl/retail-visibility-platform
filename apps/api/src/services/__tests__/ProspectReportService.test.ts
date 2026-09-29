@@ -11,10 +11,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockCampaignFindMany, mockAuditFindMany, mockLinkFindFirst, mockLinkFindUnique, mockLinkCreate, mockQueryRaw } =
+const { mockCampaignFindMany, mockAuditFindMany, mockTriageFindMany, mockLinkFindFirst, mockLinkFindUnique, mockLinkCreate, mockQueryRaw } =
   vi.hoisted(() => ({
     mockCampaignFindMany: vi.fn(),
     mockAuditFindMany: vi.fn(),
+    mockTriageFindMany: vi.fn(),
     mockLinkFindFirst: vi.fn(),
     mockLinkFindUnique: vi.fn(),
     mockLinkCreate: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('../../prisma', () => ({
   prisma: {
     mkt_campaigns_list: { findMany: mockCampaignFindMany },
     mkt_audits_list: { findMany: mockAuditFindMany },
+    mkt_campaign_triage_results: { findMany: mockTriageFindMany },
     mkt_prospect_report_links: {
       findFirst: mockLinkFindFirst,
       findUnique: mockLinkFindUnique,
@@ -51,6 +53,9 @@ import prospectReportService, {
   gapIsMet,
   isInternalLine,
   CHAPTER_BUILDERS,
+  ARCHETYPE_CHAPTERS,
+  ARCHETYPE_BRIEFING_TEMPLATES,
+  archetypeFactSlice,
 } from '../ProspectReportService';
 import { prospectReportSchema } from '../../validators/prospect-report-dto.schema';
 
@@ -537,12 +542,164 @@ describe('buildRepairChapter (business_analysis → repair chapter)', () => {
   });
 });
 
+describe('archetype chapters (BA audit → sibling-scoped extracts)', () => {
+  const DRIFT_AUDIT = {
+    ...RAJA_BA_AUDIT,
+    nap_consistency: {
+      overall_status: 'major_inconsistencies',
+      canonical_name: 'Raja Bazaar',
+      canonical_address: '1234 W National Ave',
+      canonical_phone: '(414) 555-0100',
+      name_variations: ['Raja Bazaar', 'Raja Bazar', 'Raja Bazaar Milwaukee'],
+      address_variations: ['1234 W National Ave', '1234 National Avenue'],
+      phone_variations: [],
+      material_issues: ['Yelp address conflicts with Google'],
+    },
+  };
+
+  it('drift (A3): verdict on inconsistency + variation findings + canonical baseline', () => {
+    const ch = prospectReportService.buildDriftChapter(DRIFT_AUDIT, CTX);
+    expect(ch.chapter_id).toBe('drift');
+    expect(ch.verdict).toContain('disagree across listings');
+    expect(ch.already_working.some((l) => l.includes('1234 W National Ave'))).toBe(true);
+    expect(ch.costing_customers.some((i) => i.headline.includes('business name appears as 3'))).toBe(true);
+    expect(ch.costing_customers[0].tier).toBe('now');
+    // Unclaimed profile feeds drift — anyone can edit it.
+    expect(ch.costing_customers.some((i) => i.headline.includes('Yelp listing is unclaimed'))).toBe(true);
+  });
+
+  it('drift (A3): consistent NAP reads as the positive verdict', () => {
+    const ch = prospectReportService.buildDriftChapter(RAJA_BA_AUDIT, CTX);
+    expect(ch.verdict).toContain('agree everywhere');
+  });
+
+  it('cta (A4): missing call-to-action flags become findings', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        call_to_action_present: false,
+        click_to_call_available: true,
+        contact_information_visible: true,
+        conversion_opportunities: ['Add a visible order-ahead button on the homepage'],
+      },
+    };
+    const ch = prospectReportService.buildCtaChapter(audit, CTX);
+    expect(ch.chapter_id).toBe('cta');
+    expect(ch.already_working).toContain('Your site offers click-to-call.');
+    const missing = ch.costing_customers.find((i) => i.headline.includes('no clear call to action'));
+    expect(missing?.tier).toBe('now');
+    expect(ch.costing_customers.some((i) => i.headline.includes('order-ahead button'))).toBe(true);
+  });
+
+  it('reviews (A1): volume × rating verdict, unanswered reviews as findings', () => {
+    const ch = prospectReportService.buildReviewsChapter(RAJA_BA_AUDIT, CTX);
+    expect(ch.chapter_id).toBe('reviews');
+    expect(ch.verdict).toContain('44 reviews');
+    expect(ch.already_working.some((l) => l.includes('4.6★'))).toBe(true);
+    expect(ch.costing_customers.some((i) => i.headline.includes('2 negative reviews'))).toBe(true);
+  });
+
+  it('recovery (A2): unanswered negative examples become now-findings', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      unanswered_negative_review_examples: [
+        {
+          platform: 'google',
+          rating: 1,
+          date: '2026-08-14',
+          complaint_summary: 'Ordered for pickup and the order was never prepared',
+        },
+      ],
+      negative_review_themes: [
+        { theme: 'order readiness', supporting_review_count: 3, summary: 'Multiple reviews mention pickup orders not ready on arrival' },
+      ],
+    };
+    const ch = prospectReportService.buildRecoveryChapter(audit, CTX);
+    expect(ch.chapter_id).toBe('recovery');
+    expect(ch.verdict).toContain('2 negative reviews sit publicly unanswered');
+    const ex = ch.costing_customers.find((i) => i.headline.includes('order was never prepared'));
+    expect(ex?.tier).toBe('now');
+    expect(ch.costing_customers.some((i) => i.headline.includes('order readiness'))).toBe(true);
+  });
+
+  it('products (A6): invisible shelves verdict for a product business', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      business_type: 'product',
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_product_browsing: false,
+        ordering_or_pickup_info_present: false,
+      },
+      platforms: {
+        ...RAJA_BA_AUDIT.platforms,
+        google: { ...RAJA_BA_AUDIT.platforms.google, photo_count: 0 },
+      },
+    };
+    const ch = prospectReportService.buildProductsChapter(audit, CTX);
+    expect(ch.chapter_id).toBe('products');
+    expect(ch.verdict).toContain('invisible online');
+    const browsing = ch.costing_customers.find((i) => i.headline.includes('aren\u2019t browsable'));
+    expect(browsing?.tier).toBe('now');
+    expect(ch.costing_customers.some((i) => i.headline.includes('No photos'))).toBe(true);
+  });
+
+  it('products (A6): browsable shelves read as the positive verdict', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      business_type: 'product',
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_product_browsing: true,
+        product_categories_visible: ['Halal meats', 'Spices'],
+      },
+    };
+    const ch = prospectReportService.buildProductsChapter(audit, CTX);
+    expect(ch.verdict).toContain('browse what you sell');
+    expect(ch.already_working.some((l) => l.includes('Halal meats'))).toBe(true);
+  });
+
+  it('redacts internal machinery across every archetype chapter', () => {
+    for (const builder of [
+      'buildDriftChapter',
+      'buildCtaChapter',
+      'buildReviewsChapter',
+      'buildRecoveryChapter',
+      'buildProductsChapter',
+    ] as const) {
+      const serialized = JSON.stringify(
+        (prospectReportService as any)[builder](RAJA_BA_AUDIT, CTX),
+      );
+      expect(serialized).not.toContain('WC_STALE_WEBSITE');
+      expect(serialized).not.toContain('cold-call opener');
+      expect(serialized).not.toContain('HIGH_PRIORITY_OUTREACH');
+      expect(serialized).not.toContain('tier_2');
+    }
+  });
+});
+
 describe('CHAPTER_BUILDERS registry', () => {
-  it('registers website on website_positioning and repair on business_analysis', () => {
+  it('registers website on website_positioning; every other chapter on business_analysis', () => {
     expect(CHAPTER_BUILDERS.website?.source).toBe('website_positioning');
     expect(CHAPTER_BUILDERS.website?.title).toBe('Your website today');
-    expect(CHAPTER_BUILDERS.repair?.source).toBe('business_analysis');
+    for (const id of ['repair', 'drift', 'cta', 'reviews', 'recovery', 'products'] as const) {
+      expect(CHAPTER_BUILDERS[id]?.source).toBe('business_analysis');
+    }
     expect(CHAPTER_BUILDERS.repair?.teaserTitle).toBe('Your public profiles');
+  });
+
+  it('maps every declared archetype to its chapter', () => {
+    expect(ARCHETYPE_CHAPTERS.A5).toBe('repair');
+    expect(ARCHETYPE_CHAPTERS.A7).toBe('website');
+    expect(ARCHETYPE_CHAPTERS.A3).toBe('drift');
+    expect(ARCHETYPE_CHAPTERS.A4).toBe('cta');
+    expect(ARCHETYPE_CHAPTERS.A1).toBe('reviews');
+    expect(ARCHETYPE_CHAPTERS.A2).toBe('recovery');
+    expect(ARCHETYPE_CHAPTERS.A6).toBe('products');
   });
 });
 
@@ -551,6 +708,7 @@ describe('CHAPTER_BUILDERS registry', () => {
 beforeEach(() => {
   mockCampaignFindMany.mockReset();
   mockAuditFindMany.mockReset();
+  mockTriageFindMany.mockReset().mockResolvedValue([]);
   mockLinkFindFirst.mockReset();
   mockLinkFindUnique.mockReset();
   mockLinkCreate.mockReset();
@@ -744,6 +902,73 @@ describe('assembleReport (§5.0, §5.1a)', () => {
   });
 });
 
+describe('archetype-scoped assembly — each sibling contributes its chapter', () => {
+  const THREE_SIBLINGS = [
+    ...SIBLINGS,
+    { id: 'cmp-pb01', business_name: 'Raja Bazaar', website_url: 'https://rajabazaar.com', category: 'Middle Eastern Grocery Store' },
+  ];
+  const TRIAGE_ROWS = [
+    { campaign_id: 'cmp-web', is_operator_accepted: true, playbook: { archetype: 'A7' }, overridden_playbook: null },
+    { campaign_id: 'cmp-repair', is_operator_accepted: true, playbook: { archetype: 'A5' }, overridden_playbook: null },
+    { campaign_id: 'cmp-pb01', is_operator_accepted: true, playbook: { archetype: 'A3' }, overridden_playbook: null },
+  ];
+
+  it('an A3 sibling contributes the drift chapter from the shared BA audit', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(TRIAGE_ROWS);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift', 'repair', 'website'], 'full');
+    expect(report!.chapters.map((c) => c.chapter_id)).toEqual(['drift', 'repair', 'website']);
+    expect(report!.chapters[0].verdict).toContain('agree everywhere');
+    expect(prospectReportSchema.safeParse(report).success).toBe(true);
+  });
+
+  it('chapter ownership attributes drift to the A3 sibling — not the audit row', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW, AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(TRIAGE_ROWS);
+
+    const owners = await prospectReportService.listChapterSources('bp_raja');
+    expect(owners.drift).toBe('cmp-pb01');
+    expect(owners.repair).toBe('cmp-repair');
+    expect(owners.website).toBe('cmp-web');
+  });
+
+  it('an override playbook supplies the archetype', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue([
+      { campaign_id: 'cmp-pb01', is_operator_accepted: true, playbook: { archetype: 'A5' }, overridden_playbook: { archetype: 'A3' } },
+    ]);
+    const available = await prospectReportService.listAvailableChapters('bp_raja');
+    expect(available).toContain('drift');
+    // A5 never declared (overridden) — repair still offered via the legacy
+    // audit-owner fallback since the audit exists.
+    expect(available).toContain('repair');
+  });
+
+  it('archetype chapters are not offered when their audit source is absent', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW]); // website only, no BA
+    mockTriageFindMany.mockResolvedValue(TRIAGE_ROWS);
+    const available = await prospectReportService.listAvailableChapters('bp_raja');
+    expect(available).toEqual(['website']);
+  });
+
+  it('an unaccepted triage row declares nothing — legacy fallback owns the chapter', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue([
+      { campaign_id: 'cmp-pb01', is_operator_accepted: false, playbook: { archetype: 'A3' }, overridden_playbook: null },
+    ]);
+    const owners = await prospectReportService.listChapterSources('bp_raja');
+    expect(owners.drift).toBeUndefined();
+    expect(owners.repair).toBe('cmp-repair'); // audit's own campaign
+  });
+});
+
 describe('short links (§5.2a)', () => {
   const MINT_INPUT = {
     prospectId: 'bp_raja',
@@ -800,5 +1025,65 @@ describe('short links (§5.2a)', () => {
   it('returns null for an unknown code (revoked link)', async () => {
     mockLinkFindUnique.mockResolvedValue(null);
     expect(await prospectReportService.resolveLinkCode('ZZZZZZ')).toBeNull();
+  });
+});
+
+// ─── archetypeFactSlice — the briefing prompt's evidence slice ───────────
+// Operator-facing slice: same facts the chapter renders PLUS the internal
+// layer the owner DTO redacts. Pinned so the briefing never goes blind.
+
+describe('archetypeFactSlice', () => {
+  it('carries the internal layer the owner-facing DTO redacts', () => {
+    const slice = archetypeFactSlice('A3', RAJA_BA_AUDIT);
+    expect(slice.detected_signals).toContain('WC_STALE_WEBSITE');
+    expect(slice.outreach_problems).toHaveLength(1);
+    expect(slice.alignment_scoring?.action_classification).toBe('ADMIN_NEGLECT');
+  });
+
+  it('A1 slice carries the review picture', () => {
+    const slice = archetypeFactSlice('A1', RAJA_BA_AUDIT);
+    expect(slice.combined_review_metrics.observable_total_reviews).toBe(44);
+    expect(slice.platform_reviews.google.rating).toBe(4.6);
+  });
+
+  it('A2 slice carries the unanswered-negative examples and count', () => {
+    const slice = archetypeFactSlice('A2', RAJA_BA_AUDIT);
+    expect(slice.unanswered_negative_reviews).toBe(2);
+    expect(Array.isArray(slice.negative_review_themes)).toBe(true);
+  });
+
+  it('A3 slice carries NAP + platform claim statuses', () => {
+    const slice = archetypeFactSlice('A3', RAJA_BA_AUDIT);
+    expect(slice.nap_consistency.overall_status).toBe('consistent');
+    expect(slice.platform_statuses.yelp).toBe('unclaimed');
+    expect(slice.gap_rows.map((g: any) => g.field)).toContain('special_hours');
+  });
+
+  it('A4 slice carries the website CTA flags', () => {
+    const slice = archetypeFactSlice('A4', RAJA_BA_AUDIT);
+    expect(slice.website_cta.status).toBe('working');
+    expect(slice.website_cta.issues).toContain('No online ordering for prepared foods');
+  });
+
+  it('A6 slice carries the shelf-visibility flags', () => {
+    const slice = archetypeFactSlice('A6', RAJA_BA_AUDIT);
+    expect(slice.business_type).toBeDefined();
+    expect(slice.gap_rows.map((g: any) => g.field)).toContain('photo_count');
+  });
+
+  it('unknown archetype degrades to the internal layer only', () => {
+    const slice = archetypeFactSlice('A9', RAJA_BA_AUDIT);
+    expect(slice.detected_signals).toBeDefined();
+    expect(slice.nap_consistency).toBeUndefined();
+  });
+
+  it('every seeded briefing template has a binding', () => {
+    for (const id of Object.keys(ARCHETYPE_BRIEFING_TEMPLATES)) {
+      expect(id).toMatch(/^mpt-archetype-briefing-a[1-9]$/);
+    }
+    const archetypes = Object.values(ARCHETYPE_BRIEFING_TEMPLATES).map(
+      (t) => t.archetype,
+    );
+    expect(archetypes.sort()).toEqual(['A1', 'A2', 'A3', 'A4', 'A6']);
   });
 });

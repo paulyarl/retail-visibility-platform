@@ -30,12 +30,30 @@ export type ProspectReportTier = (typeof PROSPECT_REPORT_TIERS)[number];
 export const prospectReportTierSchema = z.enum(PROSPECT_REPORT_TIERS);
 
 /**
- * Chapter ids key on the audit source, never a playbook code. `website`
- * builds from `website_positioning` audits; `repair` builds from
- * `business_analysis` audits (the triage/BA audit behind the A5 repair
- * track — its id was reserved at v1 so signed tokens stay valid).
+ * Chapter ids key on the diagnostic the sibling campaign contributed, never
+ * a playbook code. `website` builds from `website_positioning` audits; every
+ * other chapter is a filtered owner-safe extract of the same
+ * `business_analysis` audit — the archetype the sibling's accepted triage
+ * declared decides which extract it contributes:
+ *
+ *   A1 review gap → `reviews`    A2 negative recovery → `recovery`
+ *   A3 listing drift → `drift`   A4 CTA gap → `cta`
+ *   A5 multi-signal → `repair`   A6 product visibility → `products`
+ *   A7 website gap → `website`
+ *
+ * A sibling with no declared archetype claims nothing; `repair`/`website`
+ * additionally fall back to the audit's own campaign so legacy campaigns
+ * still report.
  */
-export const PROSPECT_REPORT_CHAPTER_IDS = ['website', 'repair'] as const;
+export const PROSPECT_REPORT_CHAPTER_IDS = [
+  'website',
+  'repair',
+  'drift',
+  'cta',
+  'reviews',
+  'recovery',
+  'products',
+] as const;
 export type ProspectReportChapterId = (typeof PROSPECT_REPORT_CHAPTER_IDS)[number];
 
 // ─── Website chapter (§2 field map, §6 structure) ─────────────────────────
@@ -99,25 +117,20 @@ const reportChapterFields = {
   }),
 };
 
-const websiteChapterSchema = z.object({
-  chapter_id: z.literal('website'),
-  ...reportChapterFields,
-});
-
-export type WebsiteChapterDto = z.infer<typeof websiteChapterSchema>;
-
 /**
- * Repair chapter — the `business_analysis` audit (the triage/BA audit behind
- * the PB-05 / A5 repair track) rendered owner-safe. Same shape as website;
- * the builder redacts detected_signals, outreach_problems, alignment_scoring,
- * tier/fee recommendations, and the opportunity score.
+ * Every chapter — website, repair, and the archetype-scoped extracts — is
+ * the same owner-safe shape; chapter_id records which diagnostic produced
+ * it. BA-sourced builders redact detected_signals, outreach_problems,
+ * alignment_scoring, tier/fee recommendations, and the opportunity score.
  */
-const repairChapterSchema = z.object({
-  chapter_id: z.literal('repair'),
+const reportChapterSchema = z.object({
+  chapter_id: z.enum(PROSPECT_REPORT_CHAPTER_IDS),
   ...reportChapterFields,
 });
 
-export type RepairChapterDto = z.infer<typeof repairChapterSchema>;
+export type ProspectReportChapterDto = z.infer<typeof reportChapterSchema>;
+export type WebsiteChapterDto = ProspectReportChapterDto;
+export type RepairChapterDto = ProspectReportChapterDto;
 
 // ─── Locked teaser (§5.1a, G-4) ────────────────────────────────────────────
 
@@ -152,9 +165,7 @@ export const prospectReportSchema = z.object({
     bullets: z.array(z.string()),
   }),
 
-  chapters: z.array(
-    z.discriminatedUnion('chapter_id', [websiteChapterSchema, repairChapterSchema]),
-  ),
+  chapters: z.array(reportChapterSchema),
   locked_chapters: z.array(lockedChapterSchema),
 
   /** §6.5 "How this report was made" — unioned across included chapters. */
@@ -173,4 +184,3 @@ export const prospectReportSchema = z.object({
 });
 
 export type ProspectReportDto = z.infer<typeof prospectReportSchema>;
-export type ProspectReportChapterDto = ProspectReportDto['chapters'][number];

@@ -32,13 +32,25 @@ export interface ProspectReportExpectation {
 }
 
 /**
- * Shared chapter body — every chapter renders the same owner-safe shape;
- * chapter_id discriminates which audit source produced it ('website' =
- * website_positioning audit; 'repair' = business_analysis audit on the A5 /
- * PB-05 sibling).
+ * Chapter ids — one per archetype a sibling campaign can contribute.
+ * 'website' reads the website_positioning audit; the rest are filtered
+ * owner-safe extracts of the shared business_analysis audit.
  */
-export interface ProspectReportWebsiteChapter {
-  chapter_id: 'website' | 'repair';
+export type ProspectReportChapterId =
+  | 'website'
+  | 'repair'
+  | 'drift'
+  | 'cta'
+  | 'reviews'
+  | 'recovery'
+  | 'products';
+
+/**
+ * Shared chapter body — every chapter renders the same owner-safe shape;
+ * chapter_id records which sibling's diagnostic produced it.
+ */
+export interface ProspectReportChapter {
+  chapter_id: ProspectReportChapterId;
   title: string;
   audited_at: string;
   category: string | null;
@@ -54,8 +66,6 @@ export interface ProspectReportWebsiteChapter {
     page_plan: string[] | null;
   };
 }
-
-export type ProspectReportChapter = ProspectReportWebsiteChapter;
 
 export interface ProspectReportLockedChapter {
   chapter_id: string;

@@ -694,6 +694,35 @@ export class MarketingExecutionService extends BaseService {
         }
         seekAuditData = audit?.audit_data ?? null;
 
+        // 0. Archetype briefing seeks (routed siblings — A1/A2/A3/A4/A6).
+        //    The template id binds the archetype; the injected
+        //    archetype_extract is the SAME deterministic fact slice the
+        //    owner-facing report chapter renders (ProspectReportService) —
+        //    plus the internal ammunition it redacts — so the operator's
+        //    briefing can never disagree with the report the owner reads.
+        //    Inherited sibling audits are already resolved above (the audit
+        //    read spans campaign.audits, which carries inheritance merges).
+        const { ARCHETYPE_BRIEFING_TEMPLATES, archetypeFactSlice } = await import('./ProspectReportService');
+        const archetypeBriefing = ARCHETYPE_BRIEFING_TEMPLATES[input.template.id];
+        if (archetypeBriefing && audit) {
+          if (!effectiveVariables.archetype || !String(effectiveVariables.archetype).trim()) {
+            effectiveVariables.archetype = archetypeBriefing.archetype;
+          }
+          if (!effectiveVariables.archetype_label || !String(effectiveVariables.archetype_label).trim()) {
+            effectiveVariables.archetype_label = archetypeBriefing.label;
+          }
+          if (!effectiveVariables.issue_type || !String(effectiveVariables.issue_type).trim()) {
+            effectiveVariables.issue_type = archetypeBriefing.issueType;
+          }
+          if (!effectiveVariables.archetype_extract || !String(effectiveVariables.archetype_extract).trim()) {
+            effectiveVariables.archetype_extract = JSON.stringify(
+              archetypeFactSlice(archetypeBriefing.archetype, audit.audit_data),
+              null,
+              2,
+            );
+          }
+        }
+
         // 1. Profile Repair templates
         if (isProfileRepair) {
           const { default: repairService } = await import('./ProfileRepairPromptService');
