@@ -22,6 +22,11 @@ import { audit } from '../audit';
 import { generateDirectorySeedCampaignLinkId } from '../lib/id-generator';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import {
+  resolveCampaignNap,
+  formatNapAddress,
+  type ResolvedNap,
+} from '../lib/canonical-nap';
+import {
   buildSeedSeoPacket,
   buildSeoEnrichmentJson,
 } from './directory/SeedSeoComposer';
@@ -39,6 +44,9 @@ export type NapConfidence = 'high' | 'medium' | 'low' | 'none';
 
 /** Fields the operator can choose to project from campaign → seed. */
 export type ProjectionField =
+  | 'name'
+  | 'address'
+  | 'hours'
   | 'phone'
   | 'website'
   | 'primaryCategory'
@@ -131,18 +139,13 @@ class DirectorySeedCampaignLinkService {
       };
     }
     const r = rows[0];
-    const norm = (s: string | null | undefined): string =>
-      (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-    const normAddr = (s: string | null | undefined): string =>
-      (s ?? '').toLowerCase().replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pl|place)\b/g, '').replace(/[^a-z0-9]/g, '').trim();
-
-    const businessNameMatch = !!r.seed_name && !!r.camp_name && norm(r.seed_name) === norm(r.camp_name);
-    const addressMatch = !!r.seed_address && !!r.camp_address && normAddr(r.seed_address) === normAddr(r.camp_address);
-    const cityMatch = !!r.seed_city && !!r.camp_city && norm(r.seed_city) === norm(r.camp_city);
+    const businessNameMatch = !!r.seed_name && !!r.camp_name && this.norm(r.seed_name) === this.norm(r.camp_name);
+    const addressMatch = !!r.seed_address && !!r.camp_address && this.normAddr(r.seed_address) === this.normAddr(r.camp_address);
+    const cityMatch = !!r.seed_city && !!r.camp_city && this.norm(r.seed_city) === this.norm(r.camp_city);
 
     // Phone match: direct or any of campaign.phones[]
-    const seedPhone = norm((r.seed_phone ?? '').replace(/[^0-9]/g, '')).slice(-10);
-    const campPhone = norm((r.camp_phone ?? '').replace(/[^0-9]/g, '')).slice(-10);
+    const seedPhone = this.norm((r.seed_phone ?? '').replace(/[^0-9]/g, '')).slice(-10);
+    const campPhone = this.norm((r.camp_phone ?? '').replace(/[^0-9]/g, '')).slice(-10);
     let phoneMatch = false;
     if (seedPhone && seedPhone.length >= 10) {
       if (campPhone && campPhone === seedPhone) phoneMatch = true;
@@ -432,7 +435,17 @@ class DirectorySeedCampaignLinkService {
       SELECT
         dl.phone, dl.website, dl.primary_category, dl.secondary_categories,
         dl.description, dl.keywords,
+        dl.business_name AS seed_business_name,
+        dl.address AS seed_address, dl.city AS seed_city,
+        dl.state AS seed_state, dl.zip_code AS seed_zip,
+        dl.business_hours AS seed_hours,
         mc.phone AS camp_phone, mc.website_url AS camp_website,
+        mc.business_name AS camp_business_name,
+        mc.address_line1 AS camp_address_line1,
+        mc.address_line2 AS camp_address_line2,
+        mc.address_city AS camp_city, mc.address_state AS camp_state,
+        mc.address_zip AS camp_address_zip,
+        mc.business_hours AS camp_hours,
         mc.category AS camp_category,
         mc.secondary_categories AS camp_secondary_categories,
         mc.neighborhood AS camp_neighborhood,
@@ -447,6 +460,24 @@ class DirectorySeedCampaignLinkService {
     if (!rows[0]) return [];
     const r = rows[0];
 
+    // Canonical campaign NAP — same resolution createFromCampaign uses, so
+    // the diff shows exactly what "Add to place listing" would write.
+    const audit = await this.getLatestBusinessAnalysisAudit(campaignId);
+    const nap = this.resolveNap(r, audit?.audit_data ?? null);
+    const street = [nap.address, nap.address2].filter(Boolean).join(', ') || null;
+    const seedAddressDisplay =
+      [r.seed_address, r.seed_city, [r.seed_state, r.seed_zip].filter(Boolean).join(' ')]
+        .filter(Boolean)
+        .join(', ') || null;
+    const addressChanged =
+      (!!street && this.normAddr(street) !== this.normAddr(r.seed_address)) ||
+      (!!nap.city && this.norm(nap.city) !== this.norm(r.seed_city)) ||
+      (!!nap.state && this.norm(nap.state) !== this.norm(r.seed_state)) ||
+      (!!nap.zip && this.norm(nap.zip) !== this.norm(r.seed_zip));
+
+    const campHoursCanon = this.canonicalHoursJson(r.camp_hours);
+    const seedHoursCanon = this.canonicalHoursJson(r.seed_hours);
+
     const normalizeCatArray = (v: any): string[] =>
       Array.isArray(v) ? v.map((s: any) => String(s).trim()).filter(Boolean) : [];
 
@@ -457,6 +488,24 @@ class DirectorySeedCampaignLinkService {
       campSecondary.some((c: string) => !seedSecondary.some((s: string) => s.toLowerCase() === c.toLowerCase()));
 
     const entries: DiffEntry[] = [
+      {
+        field: 'name',
+        campaignValue: nap.name ?? null,
+        seedValue: r.seed_business_name ?? null,
+        changed: !!nap.name && this.norm(nap.name) !== this.norm(r.seed_business_name),
+      },
+      {
+        field: 'address',
+        campaignValue: formatNapAddress(nap, { includeZip: true }),
+        seedValue: seedAddressDisplay,
+        changed: addressChanged,
+      },
+      {
+        field: 'hours',
+        campaignValue: this.summarizeHours(r.camp_hours),
+        seedValue: this.summarizeHours(r.seed_hours),
+        changed: !!campHoursCanon && campHoursCanon !== seedHoursCanon,
+      },
       {
         field: 'phone',
         campaignValue: r.camp_phone ?? null,
@@ -539,6 +588,10 @@ class DirectorySeedCampaignLinkService {
         dl.keywords, dl.business_name,
         mc.phone AS camp_phone, mc.website_url AS camp_website,
         mc.business_name AS camp_business_name,
+        mc.address_line1 AS camp_address_line1,
+        mc.address_line2 AS camp_address_line2,
+        mc.address_zip AS camp_address_zip,
+        mc.business_hours AS camp_hours,
         mc.category AS camp_category,
         mc.secondary_categories AS camp_secondary_categories,
         mc.neighborhood AS camp_neighborhood,
@@ -577,13 +630,94 @@ class DirectorySeedCampaignLinkService {
     const projected: ProjectionField[] = [];
     const skipped: ProjectionField[] = [];
 
-    const addSet = (col: string, value: any) => {
-      setClauses.push(`${col} = $${params.length + 1}`);
+    const addSet = (col: string, value: any, cast?: string) => {
+      setClauses.push(`${col} = $${params.length + 1}${cast ? `::${cast}` : ''}`);
       params.push(value);
     };
 
+    // Lazily resolved once — the canonical campaign NAP (same contract as
+    // createFromCampaign) backs the name/address projections, and the
+    // description projection needs the same audit row.
+    let auditCache: any = undefined;
+    const loadAudit = async (): Promise<any | null> => {
+      if (auditCache === undefined) {
+        auditCache = await this.getLatestBusinessAnalysisAudit(campaignId);
+      }
+      return auditCache;
+    };
+    let napCache: ResolvedNap | null = null;
+    const loadNap = async (): Promise<ResolvedNap> => {
+      if (!napCache) {
+        napCache = this.resolveNap(r, (await loadAudit())?.audit_data ?? null);
+      }
+      return napCache;
+    };
+
+    // Post-update mirrors — the listing isn't the only surface carrying NAP;
+    // these ride along after the UPDATE below (same writes createSeed and
+    // the seed edit form make).
+    let nameToSync: string | null = null;
+    let addressToSync: {
+      line1: string | null;
+      line2: string | null;
+      city: string | null;
+      state: string | null;
+      zip: string | null;
+    } | null = null;
+    let hoursToSync: Record<string, any> | null = null;
+
     for (const field of fields) {
       switch (field) {
+        case 'name': {
+          const nap = await loadNap();
+          if (nap.name) {
+            addSet('business_name', nap.name);
+            provenanceRows.push({ fieldKey: 'name', value: nap.name });
+            nameToSync = nap.name;
+            projected.push(field);
+          } else skipped.push(field);
+          break;
+        }
+        case 'address': {
+          const nap = await loadNap();
+          const street = [nap.address, nap.address2].filter(Boolean).join(', ') || null;
+          if (!street && !nap.city && !nap.state && !nap.zip) {
+            skipped.push(field);
+            break;
+          }
+          // Only the parts the resolution produced are written — a missing
+          // component (e.g. unverified zip) never nulls out seed data.
+          if (street) addSet('address', street);
+          if (nap.city) addSet('city', nap.city);
+          if (nap.state) addSet('state', nap.state);
+          if (nap.zip) addSet('zip_code', nap.zip);
+          addressToSync = {
+            line1: nap.address,
+            line2: nap.address2,
+            city: nap.city,
+            state: nap.state,
+            zip: nap.zip,
+          };
+          provenanceRows.push({
+            fieldKey: 'address',
+            value: formatNapAddress(nap, { includeZip: true }),
+          });
+          projected.push(field);
+          break;
+        }
+        case 'hours': {
+          const hours = r.camp_hours;
+          if (hours && typeof hours === 'object' && !Array.isArray(hours)) {
+            addSet('business_hours', JSON.stringify(hours), 'jsonb');
+            hoursToSync = hours;
+            provenanceRows.push({
+              fieldKey: 'hours',
+              value: this.summarizeHours(hours) || JSON.stringify(hours).substring(0, 400),
+            });
+            projected.push(field);
+          } else skipped.push(field);
+          break;
+        }
         case 'phone':
           if (r.camp_phone) {
             addSet('phone', r.camp_phone);
@@ -660,14 +794,7 @@ class DirectorySeedCampaignLinkService {
           const keywordsOverridden = isOverridden('keywords');
           const sameAsOverridden = isOverridden('same_as');
 
-          const auditRows = await (prisma as any).mkt_audits_list.findMany({
-            where: { campaign_id: campaignId, platform: 'business_analysis' },
-            orderBy: { created_at: 'desc' },
-            take: 10,
-          }).catch(() => null);
-          const auditRow = (Array.isArray(auditRows) ? auditRows : []).find(
-            (a: any) => !isStubBusinessAnalysisAudit(a),
-          ) ?? null;
+          const auditRow = await loadAudit();
 
           if (auditRow) {
             const ad = (auditRow.audit_data ?? {}) as any;
@@ -831,6 +958,92 @@ class DirectorySeedCampaignLinkService {
         UPDATE directory_presence_seeds SET category = ${r.camp_category}, updated_at = now()
         WHERE id = ${seedId}
       `;
+    }
+
+    // Name mirror — the tenant record + business profile carry the same
+    // display name, and the seed's name_variants ledger gets the new
+    // canonical name prepended (the superseded name stays as a variant for
+    // dedup/report identity matching).
+    if (nameToSync) {
+      await prisma.$executeRaw`
+        UPDATE tenants SET name = ${nameToSync}, updated_at = now() WHERE id = ${tenantId}
+      `;
+      await prisma.$executeRaw`
+        UPDATE tenant_business_profiles_list
+        SET business_name = ${nameToSync}, updated_at = now()
+        WHERE tenant_id = ${tenantId}
+      `;
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET name_variants = array_prepend(
+              ${nameToSync},
+              array_remove(COALESCE(name_variants, '{}'::text[]), ${nameToSync})
+            ),
+            updated_at = now()
+        WHERE id = ${seedId}
+      `;
+    }
+
+    // Address mirror — seed city/state (drives /place browse + seed list
+    // filters) and the business profile's structured address columns. Only
+    // resolved components are written.
+    if (addressToSync) {
+      const { line1, line2, city, state, zip } = addressToSync;
+      if (city || state) {
+        await prisma.$executeRaw`
+          UPDATE directory_presence_seeds
+          SET city = COALESCE(${city}, city),
+              state = COALESCE(${state}, state),
+              updated_at = now()
+          WHERE id = ${seedId}
+        `;
+      }
+      const profSets: string[] = ['updated_at = now()'];
+      const profParams: any[] = [];
+      const profSet = (col: string, v: string) => {
+        profSets.push(`${col} = $${profParams.length + 1}`);
+        profParams.push(v);
+      };
+      if (line1) profSet('address_line1', line1);
+      if (line2) profSet('address_line2', line2);
+      if (city) profSet('city', city);
+      if (state) profSet('state', state);
+      if (zip) profSet('postal_code', zip);
+      if (profSets.length > 1) {
+        profParams.push(tenantId);
+        await prisma.$executeRawUnsafe(
+          `UPDATE tenant_business_profiles_list SET ${profSets.join(', ')} WHERE tenant_id = $${profParams.length}`,
+          ...profParams,
+        );
+      }
+    }
+
+    // Hours mirror — same fan-out the seed edit form performs: the canonical
+    // business_hours_list (public hours/status endpoints read it) plus the
+    // legacy business profile hours blob.
+    if (hoursToSync) {
+      const tz = hoursToSync.timezone || 'America/New_York';
+      const periods: any[] = [];
+      const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      for (const day of dayOrder) {
+        const h = hoursToSync[day];
+        if (h && typeof h === 'object' && !h.closed && h.open && h.close) {
+          periods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
+        }
+      }
+      await prisma.business_hours_list.upsert({
+        where: { tenant_id: tenantId },
+        update: { timezone: tz, periods: periods as any, updated_at: new Date() },
+        create: {
+          id: `${tenantId}_hours`,
+          tenant_id: tenantId,
+          timezone: tz,
+          periods: periods as any,
+          updated_at: new Date(),
+        },
+      });
+      const { updateBusinessProfileHours } = await import('../utils/business-hours-utils');
+      await updateBusinessProfileHours(tenantId);
     }
 
     // Write provenance rows (upsert by seed_id + field_key)
@@ -1013,6 +1226,9 @@ class DirectorySeedCampaignLinkService {
   /** Default fields to auto-project when NAP confidence is high. */
   defaultProjectionFields(): ProjectionField[] {
     return [
+      'name',
+      'address',
+      'hours',
       'phone',
       'website',
       'primaryCategory',
@@ -1021,6 +1237,78 @@ class DirectorySeedCampaignLinkService {
       'originRegion',
       'neighborhood',
     ];
+  }
+
+  private norm(s: string | null | undefined): string {
+    return (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+  }
+
+  private normAddr(s: string | null | undefined): string {
+    return (s ?? '')
+      .toLowerCase()
+      .replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pl|place)\b/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  }
+
+  /** Latest non-stub business_analysis audit for a campaign (null when none). */
+  private async getLatestBusinessAnalysisAudit(campaignId: string): Promise<any | null> {
+    const auditRows = await (prisma as any).mkt_audits_list.findMany({
+      where: { campaign_id: campaignId, platform: 'business_analysis' },
+      orderBy: { created_at: 'desc' },
+      take: 10,
+    }).catch(() => null);
+    return (Array.isArray(auditRows) ? auditRows : []).find(
+      (a: any) => !isStubBusinessAnalysisAudit(a),
+    ) ?? null;
+  }
+
+  /**
+   * Canonical campaign NAP from a sync/diff query row — the same resolution
+   * contract createFromCampaign uses (lib/canonical-nap). No market-scope
+   * fallback: a guessed city must never land on the public listing.
+   */
+  private resolveNap(r: any, auditData: any): ResolvedNap {
+    return resolveCampaignNap(
+      {
+        business_name: r.camp_business_name,
+        phone: r.camp_phone,
+        website_url: r.camp_website,
+        address_line1: r.camp_address_line1,
+        address_line2: r.camp_address_line2,
+        address_city: r.camp_city,
+        address_state: r.camp_state,
+        address_zip: r.camp_address_zip,
+      },
+      auditData,
+    );
+  }
+
+  /** Canonical JSON for change detection — key order + missing days ignored. */
+  private canonicalHoursJson(hours: any): string | null {
+    if (!hours || typeof hours !== 'object' || Array.isArray(hours)) return null;
+    const canon: Record<string, any> = {};
+    for (const day of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']) {
+      const h = hours[day];
+      if (!h || typeof h !== 'object') continue;
+      canon[day] = { open: h.open ?? null, close: h.close ?? null, closed: !!h.closed };
+    }
+    if (hours.timezone) canon.timezone = String(hours.timezone);
+    return Object.keys(canon).length > 0 ? JSON.stringify(canon) : null;
+  }
+
+  /** Compact operator-facing summary — "Mon 09:00–17:00 · Sun closed". */
+  private summarizeHours(hours: any): string | null {
+    if (!hours || typeof hours !== 'object' || Array.isArray(hours)) return null;
+    const parts: string[] = [];
+    for (const day of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']) {
+      const h = hours[day];
+      if (!h || typeof h !== 'object') continue;
+      const label = day[0].toUpperCase() + day.slice(1, 3);
+      if (h.closed) parts.push(`${label} closed`);
+      else if (h.open && h.close) parts.push(`${label} ${h.open}–${h.close}`);
+    }
+    return parts.length > 0 ? parts.join(' · ') : null;
   }
 
   private mergeKeyword(existing: string[] | null, newKw: string): string[] {

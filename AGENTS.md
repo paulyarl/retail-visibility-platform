@@ -924,8 +924,9 @@ Bridges `directory_presence_seeds` (unclaimed public listings) with `mkt_campaig
 - `apps/api/src/lib/id-generator.ts` — `generateDirectorySeedCampaignLinkId(tenantId)` (`dscl-` prefix)
 
 ### Projection policy
-- **Auto-projection on link**: only when `nap_match_confidence = 'high'`. Default projected fields: phone, website, primaryCategory, originCountry, originRegion, neighborhood.
+- **Auto-projection on link**: only when `nap_match_confidence = 'high'`. Default projected fields: name, address, hours, phone, website, primaryCategory, secondaryCategories, originCountry, originRegion, neighborhood.
 - **Manual sync**: operator opens diff modal, picks fields explicitly. Overwrites operator-entered seed values; provenance row preserves the audit trail.
+- **Name/address/hours** (operator-verified on the campaign via Verify Record → `business_name`, `address_line1/2`, `address_city/state/zip`, `business_hours`) resolve through `resolveCampaignNap` (lib/canonical-nap) — the same contract `createFromCampaign` uses, so the diff shows exactly what "Add to place listing" would write. No market-scope fallback. Name also mirrors to `tenants.name`, `tenant_business_profiles_list.business_name`, and prepends into `dps.name_variants` (superseded name stays as a variant). Address mirrors to `dps.city/state` and the business profile's structured columns; only resolved components write (a missing campaign zip never nulls seed data). Hours mirror to `business_hours_list` + legacy profile hours exactly like `updateFields` (public hours endpoints read that table, not `dl.business_hours`).
 - **Origin country/region/neighborhood** → merged into `directory_listings_list.keywords[]` as prefixed tokens (`origin_country:Senegal`, `neighborhood:Broad Ripple`) for SEO.
 - **Primary category** projection also mirrors to `directory_presence_seeds.category` so `/place` browse pages stay consistent.
 - **Directory profiles** (JSON) → provenance row only (not flattened onto listing).
@@ -940,7 +941,7 @@ Bridges `directory_presence_seeds` (unclaimed public listings) with `mkt_campaig
 - Mounted on seed detail page after the Outreach & Enrichment section
 
 ### Provenance field keys (new, campaign-sourced)
-- `origin_country`, `origin_region`, `neighborhood`, `description`, `directory_profile`
+- `origin_country`, `origin_region`, `neighborhood`, `description`, `directory_profile`, plus the shared NAP keys `name`, `address`, `hours` when projected via sync
 - All campaign-sourced provenance: `source_name = 'linked_campaign'`, `source_url = /settings/admin/marketing-ops/recovery/:campaignId`, `confidence = 'high'`, `show_on_public = true`
 
 ## V3.1 Entry Presence Tier (Migration 231)

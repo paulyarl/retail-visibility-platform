@@ -34,6 +34,9 @@ const LINK_ROLE_COLORS: Record<string, string> = {
 };
 
 const ALL_PROJECTION_FIELDS = [
+  { key: 'name', label: 'Business name' },
+  { key: 'address', label: 'Address (street, city, state, zip)' },
+  { key: 'hours', label: 'Business hours' },
   { key: 'phone', label: 'Phone' },
   { key: 'website', label: 'Website' },
   { key: 'primaryCategory', label: 'Primary category' },

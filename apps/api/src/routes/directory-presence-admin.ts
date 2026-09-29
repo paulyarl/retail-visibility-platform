@@ -1540,6 +1540,9 @@ const linkCampaignSchema = z.object({
 
 const syncFieldsSchema = z.object({
   fields: z.array(z.enum([
+    'name',
+    'address',
+    'hours',
     'phone',
     'website',
     'primaryCategory',
