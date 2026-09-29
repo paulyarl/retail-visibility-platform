@@ -20,6 +20,7 @@ import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditC
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import WebsitePositioningAuditCard from '@/components/marketing-ops/WebsitePositioningAuditCard';
 import WebsiteGapBriefingPanel from '@/components/marketing-ops/WebsiteGapBriefingPanel';
+import OwnerReportSection from '@/components/marketing-ops/OwnerReportSection';
 import { isWebsiteGapCampaign } from '@/components/marketing-ops/repairCampaignGate';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import EnrichmentAuditCard from '@/components/marketing-ops/EnrichmentAuditCard';
@@ -1572,6 +1573,15 @@ export default function CampaignDetailClient({
                     PB-08 shares campaign_category='profile_repair' but has no
                     repair track. */}
                 <WebsiteGapBriefingPanel campaign={campaign} onRefresh={fetchCampaign} />
+                {/* Owner Report — the shareable Business Visibility Report
+                    home (§5.5a). Standalone on the overview so EVERY business
+                    sibling gets it regardless of stage — a Seed-stage A5 with
+                    no visible triage UI still has its report. Self-silences
+                    when no sibling audit can produce a chapter; defaults to
+                    this campaign's own chapter via chapter_campaigns. */}
+                {campaign.scope === 'business' && (
+                  <OwnerReportSection campaign={campaign} />
+                )}
                 {/* Website Positioning Briefing — the PB-08 / A7 audit rendered
                     as a briefing (presence verdict, conversion-framed issues,
                     recommended build, outreach ammunition). Reuses the same

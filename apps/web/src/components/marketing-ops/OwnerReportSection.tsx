@@ -46,8 +46,10 @@ interface OwnerReportSectionProps {
 
 const CHAPTER_LABELS: Record<string, string> = {
   website: 'Website story',
-  repair: 'Profile repair',
+  repair: 'Public profiles',
 };
+
+
 
 const CHANNEL_BUTTONS: { channel: ProspectReportChannel; label: string; icon: typeof Mail }[] = [
   { channel: 'email', label: 'Email', icon: Mail },
@@ -93,12 +95,16 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
       const res = await marketingOpsService.getProspectReport(campaign.id, { tier });
       if (res) {
         setPreview({ report: res.report, available: res.available_chapters });
-        // Default = this campaign's chapter; include it even if a sibling
-        // audit landed first (§5.1a — each sibling leads with its own story).
-        setChapters((prev) => prev.filter((c) => res.available_chapters.includes(c)));
-      } else {
-        setError('No reportable audit on file yet — run the positioning audit first.');
+        // Default = THIS campaign's own chapter(s) — the audit rows it
+        // produced (chapter_campaigns attribution; §5.5a). A campaign with
+        // no chapter-owning audit (e.g. a derived sibling) falls back to
+        // every available chapter so the section is still useful.
+        const own = res.available_chapters.filter(
+          (c) => res.chapter_campaigns[c] === campaign.id,
+        );
+        setChapters(own.length > 0 ? own : res.available_chapters);
       }
+      // No reportable audit → section renders nothing (silent).
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,13 +158,24 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
   const emailShare = shares.email;
   const qrShare = shares.in_person;
 
+  // Silent when nothing reportable exists yet — the card appears on the
+  // overview the moment any sibling audit can produce a chapter (§5.5a —
+  // mounted stage-independently; a Seed-stage A5 with no visible triage UI
+  // still has its report home here).
+  if (!preview) return null;
+
   return (
-    <div className="space-y-3 rounded-lg border border-sky-200 dark:border-sky-800/60 bg-sky-50/30 dark:bg-sky-950/10 p-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-1.5">
-          <MessageSquare className="w-3.5 h-3.5" />
-          Owner Report
-        </p>
+    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-sky-500" />
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Owner Report</h3>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+              The shareable Business Visibility Report — what the owner sees for the selected chapters.
+            </p>
+          </div>
+        </div>
         {preview && (
           <button
             onClick={refreshPreview}
@@ -171,6 +188,7 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
         )}
       </div>
 
+      <div className="space-y-3">
       {/* Selection controls */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
@@ -286,6 +304,7 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
           <ProspectReportView report={preview.report} />
         </div>
       )}
+      </div>
     </div>
   );
 }

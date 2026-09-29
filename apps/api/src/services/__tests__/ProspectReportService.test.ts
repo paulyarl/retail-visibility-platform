@@ -156,6 +156,150 @@ const CTX = {
   auditedAt: '2026-09-22T14:00:00.000Z',
 };
 
+/**
+ * Raja-shaped business_analysis audit (the A5 sibling's chapter source) —
+ * internal machinery fields present to prove they never reach the DTO.
+ */
+const RAJA_BA_AUDIT = {
+  audit_metadata: {
+    audit_date: '2026-09-21',
+    requested_business: {
+      business_name: 'Raja Bazaar',
+      city: 'Milwaukee',
+      state: 'WI',
+      category: 'Middle Eastern Grocery Store',
+    },
+    identity_status: 'confirmed',
+    identity_confidence: 'high',
+    limitations: ['No login-level checks performed'],
+  },
+  summary:
+    'Raja Bazaar is confirmed across public sources — claimed on Google with strong reviews, but Yelp is unclaimed and two negative reviews sit unanswered.',
+  detected_signals: ['WC_STALE_WEBSITE', 'RC_UNANSWERED_NEGATIVE'],
+  platforms: {
+    google: {
+      profile_status: 'claimed',
+      rating: 4.6,
+      total_reviews: 38,
+      reviews_with_observable_response: 5,
+      observable_unanswered_reviews: null,
+      observable_unanswered_negative_reviews: null,
+      observable_unanswered_positive_reviews: null,
+      observable_response_rate_percent: null,
+      data_status: 'complete',
+      profile_url: 'https://maps.google.com/rajabazaar',
+    },
+    yelp: {
+      profile_status: 'unclaimed',
+      rating: 4.0,
+      total_reviews: 6,
+      reviews_with_observable_response: null,
+      observable_unanswered_reviews: null,
+      observable_unanswered_negative_reviews: null,
+      observable_unanswered_positive_reviews: null,
+      observable_response_rate_percent: null,
+      data_status: 'partial',
+    },
+    facebook: {
+      profile_status: 'unable_to_verify',
+      rating: null,
+      total_reviews: null,
+      reviews_with_observable_response: null,
+      observable_unanswered_reviews: null,
+      observable_unanswered_negative_reviews: null,
+      observable_unanswered_positive_reviews: null,
+      observable_response_rate_percent: null,
+      data_status: 'unable_to_verify',
+    },
+  },
+  website: {
+    url: 'https://rajabazaar.com',
+    status: 'working',
+    issues: ['No online ordering for prepared foods'],
+  },
+  nap_consistency: {
+    overall_status: 'consistent',
+    canonical_name: 'Raja Bazaar',
+  },
+  combined_review_metrics: {
+    observable_total_reviews: 44,
+    observable_reviews_with_response: 5,
+    observable_unanswered_reviews: 3,
+    observable_unanswered_negative_reviews: 2,
+    observable_unanswered_positive_reviews: 1,
+  },
+  gap_analysis: {
+    gaps: [
+      {
+        platform: 'google',
+        field: 'photo_count',
+        expected: 12,
+        actual: 4,
+        gap_description: 'Only 4 photos observed vs the 12-photo benchmark',
+        severity: 'non_negotiable',
+      },
+      {
+        platform: 'google',
+        field: 'special_hours',
+        expected: true,
+        actual: false,
+        gap_description: 'No holiday or special hours posted',
+        severity: 'recommended',
+      },
+    ],
+    summary: 'Profile depth is below the category benchmark.',
+  },
+  competitive_benchmarks: [
+    {
+      business_name: 'Sharaf Market',
+      store_format: 'grocery_plus_prepared_foods',
+      google_rating: 4.8,
+      google_review_count: 210,
+    },
+  ],
+  alignment_scoring: {
+    misalignment_index: 41,
+    action_classification: 'ADMIN_NEGLECT',
+    lead_disposition: 'HIGH_PRIORITY_OUTREACH',
+    primary_outreach_hook: 'Two negative reviews sit unanswered while competitors answer every one.',
+  },
+  recommended_tier: 'tier_2',
+  tier_rationale: 'Claimed Google profile with unanswered negative reviews and a thin Yelp presence — a profile cleanup, not a rebuild.',
+  estimated_monthly_service_fee: { minimum: 250, maximum: 450, currency: 'USD' },
+  recommended_services: ['Claim the Yelp listing', 'Respond to unanswered reviews', 'Expand Google profile photos'],
+  digital_opportunity_score: { score: 62, classification: 'moderate' },
+  high_attention: true,
+  high_attention_reasons: ['unanswered negative reviews'],
+  outreach_problems: [
+    {
+      problem: 'Unanswered negative reviews suppress walk-in traffic',
+      regular: 'Two negative reviews have no reply.',
+      hook: 'The last bad review on your Google profile has been sitting unanswered.',
+      solution: 'Answer the reviews and claim the Yelp listing.',
+      evidence: 'yelp listing unclaimed; 2 unanswered negative Google reviews',
+      outreach_use: 'cold-call opener',
+    },
+  ],
+  data_quality: {
+    confidence: 'high',
+    verified_fields: [
+      'google profile reached and rendered',
+      'DISCOVERY — sourced via category scan',
+      'nap.cross_platform — consistent',
+    ],
+    unavailable_fields: ['facebook page owner confirmation'],
+    conflicts: ['yelp displayed hours conflict with Google hours'],
+    limitations: ['No purchase flow exercised'],
+  },
+};
+
+const BA_AUDIT_ROW = {
+  campaign_id: 'cmp-repair',
+  platform: 'business_analysis',
+  audit_data: RAJA_BA_AUDIT,
+  created_at: new Date('2026-09-23T14:00:00.000Z'),
+};
+
 describe('buildWebsiteChapter', () => {
   it('produces the owner-facing verdict for present × owned_domain', () => {
     const ch = prospectReportService.buildWebsiteChapter(RAJA_AUDIT, CTX);
@@ -292,11 +436,113 @@ describe('isInternalLine (§3.4)', () => {
   });
 });
 
+describe('buildRepairChapter (business_analysis → repair chapter)', () => {
+  it('produces the identity × coverage verdict', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    expect(ch.chapter_id).toBe('repair');
+    expect(ch.title).toBe('Your online listings');
+    expect(ch.verdict).toContain('confirmed this business is Raja Bazaar');
+    expect(ch.verdict).toContain('2 major listing platforms');
+    expect(ch.verdict).toContain('1 more we could not verify');
+  });
+
+  it('leads with what already works — claimed profile, NAP, site, replies', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    expect(ch.already_working.some((l) => l.includes('Google Business Profile listing is claimed') && l.includes('4.6★'))).toBe(true);
+    expect(ch.already_working.some((l) => l.includes('name, address, and phone are consistent'))).toBe(true);
+    expect(ch.already_working.some((l) => l.includes('website loads'))).toBe(true);
+    expect(ch.already_working.some((l) => l.includes('replied to some of your reviews'))).toBe(true);
+  });
+
+  it('surfaces unclaimed listings and unanswered negative reviews as findings', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    const yelp = ch.costing_customers.find((i) => i.headline.includes('Yelp'));
+    expect(yelp?.tier).toBe('worth_fixing');
+    const neg = ch.costing_customers.find((i) => i.headline.includes('negative review'));
+    expect(neg?.headline).toContain('2 negative reviews');
+    expect(neg?.tier).toBe('now');
+    // 'now' findings sort first
+    expect(ch.costing_customers[0].tier).toBe('now');
+  });
+
+  it('maps gap_analysis rows to expected-vs-actual expectations', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    expect(ch.expectations).toHaveLength(2);
+    expect(ch.expectations[0].field).toBe('Google Business Profile — Photo count');
+    expect(ch.expectations[0].expected_text).toBe('12');
+    expect(ch.expectations[0].actual_text).toBe('4');
+    // gap_analysis does not double-emit into costing_customers
+    expect(ch.costing_customers.every((i) => !i.headline.includes('photo'))).toBe(true);
+  });
+
+  it('renders benchmarks as owner-facing exemplar lines', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    expect(ch.competitive_frame[0]).toContain('Sharaf Market');
+    expect(ch.competitive_frame[0]).toContain('4.8★');
+  });
+
+  it('gates recommended_services behind includePagePlan', () => {
+    const off = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    const on = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX, { includePagePlan: true });
+    expect(off.fix.page_plan).toBeNull();
+    expect(on.fix.page_plan).toContain('Claim the Yelp listing');
+  });
+
+  it('redacts internal machinery — signals, outreach, scoring, fees', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    const serialized = JSON.stringify(ch);
+    expect(serialized).not.toContain('WC_STALE_WEBSITE');
+    expect(serialized).not.toContain('RC_UNANSWERED_NEGATIVE');
+    expect(serialized).not.toContain('cold-call opener');
+    expect(serialized).not.toContain('HIGH_PRIORITY_OUTREACH');
+    expect(serialized).not.toContain('ADMIN_NEGLECT');
+    expect(serialized).not.toContain('tier_2');
+    expect(serialized).not.toContain('62');
+    expect(serialized).not.toContain('450');
+    expect(serialized).not.toContain('outreach_hook');
+  });
+
+  it('unions BA data_quality + audit_metadata limitations for the honesty footer', () => {
+    const dq = prospectReportService.buildChapterDataQuality(RAJA_BA_AUDIT, 'repair');
+    expect(dq.verified).toEqual([
+      'google profile reached and rendered',
+      'nap.cross_platform — consistent',
+    ]);
+    expect(dq.couldnt_check).toEqual([
+      'facebook page owner confirmation',
+      'yelp displayed hours conflict with Google hours',
+    ]);
+    expect(dq.limitations).toEqual([
+      'No purchase flow exercised',
+      'No login-level checks performed',
+    ]);
+  });
+
+  it('passes the DTO schema — safe-by-construction', () => {
+    const ch = prospectReportService.buildRepairChapter(RAJA_BA_AUDIT, CTX);
+    const report = {
+      report_kind: 'business_visibility',
+      business_prospect_id: 'bp_test',
+      business_name: CTX.businessName,
+      prepared_at: CTX.auditedAt,
+      website_url: CTX.websiteUrl,
+      tier: 'full',
+      short_version: { lead: null, bullets: [] },
+      chapters: [ch],
+      locked_chapters: [],
+      data_quality: prospectReportService.buildChapterDataQuality(RAJA_BA_AUDIT, 'repair'),
+      cta: { kind: 'contact', label: 'Talk to us', url: null },
+    };
+    expect(prospectReportSchema.safeParse(report).success).toBe(true);
+  });
+});
+
 describe('CHAPTER_BUILDERS registry', () => {
-  it('registers website on the website_positioning audit source', () => {
+  it('registers website on website_positioning and repair on business_analysis', () => {
     expect(CHAPTER_BUILDERS.website?.source).toBe('website_positioning');
     expect(CHAPTER_BUILDERS.website?.title).toBe('Your website today');
-    expect(CHAPTER_BUILDERS.repair).toBeUndefined(); // registers when ready (OQ-5)
+    expect(CHAPTER_BUILDERS.repair?.source).toBe('business_analysis');
+    expect(CHAPTER_BUILDERS.repair?.teaserTitle).toBe('Your public profiles');
   });
 });
 
@@ -408,70 +654,61 @@ describe('assembleReport (§5.0, §5.1a)', () => {
   });
 
   it('tier=free clamps to chapter 1 and emits locked teasers for withheld chapters', async () => {
-    // Register a temporary 'repair' chapter on a stub audit source so the
-    // clamp/teaser path is genuinely exercised; clean up after.
-    (CHAPTER_BUILDERS as any).repair = {
-      source: 'repair_audit',
-      title: 'Your public profiles',
-      teaserTitle: 'Your public profiles',
-    };
-    try {
-      mockCampaignFindMany.mockResolvedValue(SIBLINGS);
-      mockAuditFindMany.mockResolvedValue([
-        AUDIT_ROW,
-        {
-          campaign_id: 'cmp-repair',
-          platform: 'repair_audit',
-          audit_data: RAJA_AUDIT,
-          created_at: new Date('2026-09-23T14:00:00.000Z'),
-        },
-      ]);
-      mockQueryRaw.mockResolvedValue([]);
+    // The real 'repair' builder over a real business_analysis row — the
+    // A5 sibling's audit — exercises the clamp/teaser path end-to-end.
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
 
-      const report = await prospectReportService.assembleReport('bp_raja', ['website', 'repair'], 'free');
-      expect(report!.tier).toBe('free');
-      expect(report!.chapters).toHaveLength(1);
-      expect(report!.chapters[0].chapter_id).toBe('website');
-      expect(report!.locked_chapters).toHaveLength(1);
-      expect(report!.locked_chapters[0].chapter_id).toBe('repair');
-      expect(report!.locked_chapters[0].finding_count).toBeGreaterThan(0);
-      // The teaser carries title + count — never content.
-      expect(report!.locked_chapters[0].teaser).toContain('Your public profiles');
-      // And the withheld chapter's internals never enter the DTO.
-      expect(JSON.stringify(report!.locked_chapters)).not.toContain('£30');
-    } finally {
-      delete (CHAPTER_BUILDERS as any).repair;
-    }
+    const report = await prospectReportService.assembleReport('bp_raja', ['website', 'repair'], 'free');
+    expect(report!.tier).toBe('free');
+    expect(report!.chapters).toHaveLength(1);
+    expect(report!.chapters[0].chapter_id).toBe('website');
+    expect(report!.locked_chapters).toHaveLength(1);
+    expect(report!.locked_chapters[0].chapter_id).toBe('repair');
+    expect(report!.locked_chapters[0].finding_count).toBeGreaterThan(0);
+    // The teaser carries title + count — never content.
+    expect(report!.locked_chapters[0].teaser).toContain('Your public profiles');
+    // And the withheld chapter's internals never enter the DTO.
+    expect(JSON.stringify(report!.locked_chapters)).not.toContain('£30');
+    expect(JSON.stringify(report!.locked_chapters)).not.toContain('unclaimed');
   });
 
   it('tier=full renders every assembled chapter with no teasers', async () => {
-    (CHAPTER_BUILDERS as any).repair = {
-      source: 'repair_audit',
-      title: 'Your public profiles',
-      teaserTitle: 'Your public profiles',
-    };
-    try {
-      mockCampaignFindMany.mockResolvedValue(SIBLINGS);
-      mockAuditFindMany.mockResolvedValue([
-        AUDIT_ROW,
-        {
-          campaign_id: 'cmp-repair',
-          platform: 'repair_audit',
-          audit_data: RAJA_AUDIT,
-          created_at: new Date('2026-09-23T14:00:00.000Z'),
-        },
-      ]);
-      mockQueryRaw.mockResolvedValue([]);
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
 
-      const report = await prospectReportService.assembleReport('bp_raja', ['website', 'repair'], 'full');
-      expect(report!.chapters).toHaveLength(2);
-      expect(report!.locked_chapters).toHaveLength(0);
-      // Multi-chapter short version is the composite lead + per-chapter bullets.
-      expect(report!.short_version.lead).toContain('We reviewed');
-      expect(report!.short_version.bullets.length).toBe(2);
-    } finally {
-      delete (CHAPTER_BUILDERS as any).repair;
-    }
+    const report = await prospectReportService.assembleReport('bp_raja', ['website', 'repair'], 'full');
+    expect(report!.chapters).toHaveLength(2);
+    expect(report!.chapters.map((c) => c.chapter_id)).toEqual(['website', 'repair']);
+    expect(report!.locked_chapters).toHaveLength(0);
+    // Multi-chapter short version is the composite lead + per-chapter bullets.
+    expect(report!.short_version.lead).toContain('We reviewed');
+    expect(report!.short_version.bullets.length).toBe(2);
+    expect(prospectReportSchema.safeParse(report).success).toBe(true);
+  });
+
+  it('the A5 sibling alone assembles a single-chapter repair report', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair'], 'free');
+    expect(report!.chapters).toHaveLength(1);
+    expect(report!.chapters[0].chapter_id).toBe('repair');
+    expect(report!.locked_chapters).toHaveLength(0);
+    expect(report!.short_version.lead).toContain('Raja Bazaar is confirmed');
+  });
+
+  it('a repair-first selection leads with the repair chapter on free tier', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair', 'website'], 'free');
+    expect(report!.chapters[0].chapter_id).toBe('repair');
+    expect(report!.locked_chapters[0].chapter_id).toBe('website');
   });
 
   it('a permitted chapter with no audit is simply absent (G-3 accumulation)', async () => {

@@ -139,6 +139,38 @@ describe('ProspectReportView', () => {
     expect(html).toContain('Audit reflects public storefront only');
   });
 
+  it('renders the repair (business_analysis) chapter with the same shape', () => {
+    const withRepair = structuredClone(report);
+    withRepair.tier = 'full';
+    withRepair.chapters = [
+      {
+        chapter_id: 'repair',
+        title: 'Your online listings',
+        audited_at: '2026-09-21T00:00:00Z',
+        category: 'Middle Eastern Grocery Store',
+        summary: 'Confirmed across public sources.',
+        verdict: 'We confirmed this business is Raja Bazaar across public sources. We found your business on 2 major listing platforms.',
+        already_working: ['Your Google Business Profile listing is claimed — 4.6★ across 38 reviews.'],
+        costing_customers: [
+          { headline: 'Your Yelp listing is unclaimed', cost: 'Customers see a profile nobody is managing.', evidence: null, tier: 'worth_fixing' },
+        ],
+        expectations: [
+          { field: 'Google Business Profile — Photo count', expected_text: '12', actual_text: '4', note: 'Only 4 photos observed' },
+        ],
+        competitive_frame: ['Sharaf Market — 4.8★ across 210 Google reviews'],
+        fix: { headline: 'A cleanup of your public listings — claimed, consistent, and every review answered.', scope_notes: null, page_plan: null },
+      },
+    ];
+    withRepair.locked_chapters = [];
+    const html = render(withRepair);
+    expect(html).toContain('Your online listings');
+    expect(html).toContain('Google Business Profile listing is claimed');
+    expect(html).toContain('Your Yelp listing is unclaimed');
+    expect(html).toContain('Photo count');
+    expect(html).toContain('Sharaf Market');
+    expect(html).toContain('A cleanup of your public listings');
+  });
+
   it('never renders internal-field trap strings', () => {
     // couldnt_check legitimately renders (owner-safe list) — but a trap
     // string smuggled into it would surface; the DTO contract forbids it.

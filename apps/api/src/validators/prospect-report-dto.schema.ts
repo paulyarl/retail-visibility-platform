@@ -30,9 +30,10 @@ export type ProspectReportTier = (typeof PROSPECT_REPORT_TIERS)[number];
 export const prospectReportTierSchema = z.enum(PROSPECT_REPORT_TIERS);
 
 /**
- * Chapter ids key on the audit source, never a playbook code. `website` is
- * the only registered builder at v1; `repair` reserves its id so signed
- * tokens minted today stay valid when its builder lands (OQ-5).
+ * Chapter ids key on the audit source, never a playbook code. `website`
+ * builds from `website_positioning` audits; `repair` builds from
+ * `business_analysis` audits (the triage/BA audit behind the A5 repair
+ * track — its id was reserved at v1 so signed tokens stay valid).
  */
 export const PROSPECT_REPORT_CHAPTER_IDS = ['website', 'repair'] as const;
 export type ProspectReportChapterId = (typeof PROSPECT_REPORT_CHAPTER_IDS)[number];
@@ -59,39 +60,64 @@ const reportExpectationSchema = z.object({
   note: z.string().nullable(),
 });
 
-const websiteChapterSchema = z.object({
-  chapter_id: z.literal('website'),
+/**
+ * Shared chapter body — every chapter is the same owner-safe shape
+ * (verdict / already working / costing customers / expectations /
+ * competitive frame / fix); builders differ only in which audit source
+ * feeds it. The discriminated union on chapter_id keeps the schema lint.
+ */
+const reportChapterFields = {
   title: z.string(),
   audited_at: z.string(),
   /** Category label for interpolated section titles ("leading {category}…"). */
   category: z.string().nullable(),
   summary: z.string().nullable(),
 
-  /** presence × ownership gloss (§3.2) — the verdict sentence. */
+  /** The verdict sentence — presence × ownership gloss (website, §3.2) or
+      identity × coverage line (repair). */
   verdict: z.string(),
 
-  /** "Already working" — met positioning_gaps (§3.3), credibility first. */
+  /** "Already working" — met expectations, credibility first (§3.3). */
   already_working: z.array(z.string()),
 
   /** "What's costing you customers" — issues sorted non_negotiable first. */
   costing_customers: z.array(reportIssueSchema),
 
-  /** "What {category} customers expect" — unmet positioning_gaps (§3.3). */
+  /** "What {category} customers expect" — unmet expected-vs-actual rows. */
   expectations: z.array(reportExpectationSchema),
 
-  /** "What leading {category} businesses do" — competitive_frame verbatim. */
+  /** "What leading {category} businesses do" — exemplar lines verbatim. */
   competitive_frame: z.array(z.string()),
 
-  /** "The fix" — delivery-mode reframe (§4) + scope notes + gated page plan. */
+  /** "The fix" — delivery-mode reframe (§4) + scope notes + gated plan. */
   fix: z.object({
     headline: z.string(),
     scope_notes: z.string().nullable(),
-    /** must_have_pages — null unless the operator's page-plan flag signed in. */
+    /** must_have_pages / recommended_services — null unless the operator's
+        detail flag signed into the token. */
     page_plan: z.array(z.string()).nullable(),
   }),
+};
+
+const websiteChapterSchema = z.object({
+  chapter_id: z.literal('website'),
+  ...reportChapterFields,
 });
 
 export type WebsiteChapterDto = z.infer<typeof websiteChapterSchema>;
+
+/**
+ * Repair chapter — the `business_analysis` audit (the triage/BA audit behind
+ * the PB-05 / A5 repair track) rendered owner-safe. Same shape as website;
+ * the builder redacts detected_signals, outreach_problems, alignment_scoring,
+ * tier/fee recommendations, and the opportunity score.
+ */
+const repairChapterSchema = z.object({
+  chapter_id: z.literal('repair'),
+  ...reportChapterFields,
+});
+
+export type RepairChapterDto = z.infer<typeof repairChapterSchema>;
 
 // ─── Locked teaser (§5.1a, G-4) ────────────────────────────────────────────
 
@@ -126,7 +152,9 @@ export const prospectReportSchema = z.object({
     bullets: z.array(z.string()),
   }),
 
-  chapters: z.array(z.discriminatedUnion('chapter_id', [websiteChapterSchema])),
+  chapters: z.array(
+    z.discriminatedUnion('chapter_id', [websiteChapterSchema, repairChapterSchema]),
+  ),
   locked_chapters: z.array(lockedChapterSchema),
 
   /** §6.5 "How this report was made" — unioned across included chapters. */

@@ -186,7 +186,9 @@ export async function generateProspectReportPdf(
   // ════════════════════════════════════════════════════════════════════════
 
   for (const chapter of report.chapters) {
-    if (chapter.chapter_id !== 'website') continue;
+    // Every registered chapter emits the same owner-safe shape — render any
+    // known chapter id (website = positioning audit, repair = BA audit).
+    if (chapter.chapter_id !== 'website' && chapter.chapter_id !== 'repair') continue;
     const category = chapter.category ?? 'your category';
 
     sectionHeading(chapter.title);

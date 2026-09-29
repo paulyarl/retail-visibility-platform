@@ -27,7 +27,12 @@ import type {
   ProspectReportWebsiteChapter,
 } from '@/services/ProspectReportPublicService';
 
-function WebsiteChapter({ chapter }: { chapter: ProspectReportWebsiteChapter }) {
+/**
+ * Chapter body — every registered chapter renders this same shape (verdict /
+ * already working / costing customers / expectations / competitive frame /
+ * fix); only the title and content differ by audit source.
+ */
+function ReportChapter({ chapter }: { chapter: ProspectReportWebsiteChapter }) {
   const now = chapter.costing_customers.filter((i) => i.tier === 'now');
   const worthFixing = chapter.costing_customers.filter((i) => i.tier === 'worth_fixing');
   const category = chapter.category ?? 'your category';
@@ -240,12 +245,10 @@ export default function ProspectReportView({ report }: { report: ProspectReport 
         </section>
       )}
 
-      {/* Chapters */}
-      {report.chapters.map((chapter) =>
-        chapter.chapter_id === 'website' ? (
-          <WebsiteChapter key={chapter.chapter_id} chapter={chapter} />
-        ) : null,
-      )}
+      {/* Chapters — all registered builders emit the same chapter shape */}
+      {report.chapters.map((chapter) => (
+        <ReportChapter key={chapter.chapter_id} chapter={chapter} />
+      ))}
 
       {/* Locked chapters — teaser cards; the upsell surface (§5.1a). At v1
           every locked CTA resolves to the claim path (paid unlock is

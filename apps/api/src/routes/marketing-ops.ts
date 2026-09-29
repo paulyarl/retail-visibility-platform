@@ -1785,7 +1785,9 @@ router.get('/campaigns/:id/prospect-report', async (req: any, res: Response) => 
       return res.status(404).json({ success: false, error: 'not_found', message: 'No reportable audit on any sibling' });
     }
 
-    res.json({ success: true, data: { report, available_chapters: available, prospect_id: prospectId } });
+    const chapterCampaigns = await prospectReportService.listChapterSources(prospectId, ctx);
+
+    res.json({ success: true, data: { report, available_chapters: available, chapter_campaigns: chapterCampaigns, prospect_id: prospectId } });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

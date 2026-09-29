@@ -2207,6 +2207,9 @@ export interface ProspectReportShare {
 export interface ProspectReportPreview {
   report: import('./ProspectReportPublicService').ProspectReport;
   available_chapters: string[];
+  /** chapter_id → owning campaign id (§5.5a — each sibling defaults to its
+      own chapter; an inherited audit on a sibling is not "its own"). */
+  chapter_campaigns: Record<string, string>;
   prospect_id: string;
 }
 

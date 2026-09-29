@@ -31,8 +31,14 @@ export interface ProspectReportExpectation {
   note: string | null;
 }
 
+/**
+ * Shared chapter body — every chapter renders the same owner-safe shape;
+ * chapter_id discriminates which audit source produced it ('website' =
+ * website_positioning audit; 'repair' = business_analysis audit on the A5 /
+ * PB-05 sibling).
+ */
 export interface ProspectReportWebsiteChapter {
-  chapter_id: 'website';
+  chapter_id: 'website' | 'repair';
   title: string;
   audited_at: string;
   category: string | null;
