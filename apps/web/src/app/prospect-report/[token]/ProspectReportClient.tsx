@@ -4,9 +4,9 @@
  * ProspectReportClient — public owner-facing report page.
  *
  * The signed token in the URL IS the capability: fetch the public DTO and
- * render the shared ProspectReportView. Mirrors SeedReportClient's
- * fetch-then-render shape without the seed-report header/footer chrome —
- * the report carries its own provenance footer and CTA.
+ * render the shared ProspectReportView. The view carries the platform
+ * masthead/branding (same source as the PDF receipts); this page adds the
+ * public PoweredByFooter chrome under the report card.
  */
 
 import { useParams } from 'next/navigation';
@@ -15,6 +15,7 @@ import prospectReportPublicService, {
   ProspectReport,
 } from '@/services/ProspectReportPublicService';
 import ProspectReportView from '@/components/marketing-ops/ProspectReportView';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 export default function ProspectReportClient() {
   const params = useParams();
@@ -70,10 +71,13 @@ export default function ProspectReportClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-neutral-950 py-8">
-      <div className="mx-auto max-w-3xl rounded-xl border border-gray-200 dark:border-neutral-800 overflow-hidden shadow-sm">
-        <ProspectReportView report={report} />
+    <div className="min-h-screen bg-gray-50 dark:bg-neutral-950 flex flex-col">
+      <div className="flex-1 py-8">
+        <div className="mx-auto max-w-3xl rounded-xl border border-gray-200 dark:border-neutral-800 overflow-hidden shadow-sm">
+          <ProspectReportView report={report} />
+        </div>
       </div>
+      <PoweredByFooter />
     </div>
   );
 }

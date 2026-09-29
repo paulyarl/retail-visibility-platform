@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import type {
   ProspectReport,
   ProspectReportWebsiteChapter,
@@ -198,6 +199,7 @@ function IssueCard({
 }
 
 export default function ProspectReportView({ report }: { report: ProspectReport }) {
+  const { settings: platform } = usePlatformSettings();
   const prepared = new Date(report.prepared_at).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -206,12 +208,31 @@ export default function ProspectReportView({ report }: { report: ProspectReport 
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6 bg-white dark:bg-neutral-900 text-left">
-      {/* Header */}
-      <header className="space-y-1 border-b border-gray-200 dark:border-neutral-700 pb-4">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
-          <Globe className="w-3.5 h-3.5" />
-          Business Visibility Report
-        </p>
+      {/* Header — platform masthead first (mirrors the PDF receipt/report
+          header: logo + platform name left, document title right), then the
+          business identity block */}
+      <header className="border-b border-gray-200 dark:border-neutral-700 pb-4">
+        <div className="flex items-center justify-between gap-3 pb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {platform?.logoUrl && (
+              <img
+                src={platform.logoUrl}
+                alt={platform.platformName || 'Platform logo'}
+                className="h-7 w-auto max-w-[140px] object-contain"
+              />
+            )}
+            <span
+              className="text-base font-bold text-gray-900 dark:text-white truncate"
+              style={platform?.primaryColor ? { color: platform.primaryColor } : undefined}
+            >
+              {platform?.platformName || 'VisibleShelf'}
+            </span>
+          </div>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-sky-600 dark:text-sky-400 flex items-center gap-1.5 shrink-0">
+            <Globe className="w-3.5 h-3.5" />
+            Business Visibility Report
+          </p>
+        </div>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">
           {report.business_name}
         </h1>
@@ -347,6 +368,12 @@ export default function ProspectReportView({ report }: { report: ProspectReport 
         ) : (
           <p className="text-sm text-gray-700 dark:text-gray-300">{report.cta.label}</p>
         )}
+        {/* Platform attribution — mirrors the PDF footer line */}
+        <p className="mt-3 text-[11px] text-gray-400 dark:text-gray-500">
+          {platform?.platformName || 'VisibleShelf'} — Business Visibility Report
+          {platform?.contactWebsite ? ` · ${platform.contactWebsite}` : ''}
+          {platform?.contactEmail ? ` · ${platform.contactEmail}` : ''}
+        </p>
       </footer>
     </div>
   );

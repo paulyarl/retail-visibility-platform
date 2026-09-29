@@ -83,6 +83,9 @@ describe('ProspectReportView', () => {
   it('renders header, short version, and website chapter content', () => {
     const html = render();
     expect(html).toContain('Business Visibility Report');
+    // Platform masthead — usePlatformSettings falls back to 'VisibleShelf'
+    // when no provider wraps the render.
+    expect(html).toContain('VisibleShelf');
     expect(html).toContain('Raja Bazaar');
     expect(html).toContain('The short version');
     expect(html).toContain('Reachable storefront');

@@ -11,6 +11,11 @@ interface PlatformSettings {
   platformDescription: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  // Contact + theme (public branding — same source as the PDF receipt header)
+  contactEmail?: string;
+  contactPhone?: string;
+  contactWebsite?: string;
+  primaryColor?: string;
   // Payment settings
   minimumPaymentAmount?: {
     amount: number; // in cents
@@ -69,6 +74,10 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
           platformDescription: settingsData.platformDescription || 'Manage your retail operations with ease',
           logoUrl: settingsData.logoUrl || null,
           faviconUrl: settingsData.faviconUrl || null,
+          contactEmail: settingsData.contactEmail || undefined,
+          contactPhone: settingsData.contactPhone || undefined,
+          contactWebsite: settingsData.contactWebsite || undefined,
+          primaryColor: settingsData.themeColors?.primary || undefined,
           // Use payment settings from API or fallback to defaults
           minimumPaymentAmount: paymentSettings || {
             amount: 200, // $2.00 in cents
