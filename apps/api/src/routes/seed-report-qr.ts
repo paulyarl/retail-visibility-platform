@@ -49,7 +49,14 @@ type ReportDeliveryChannel = 'phone' | 'email' | 'social' | 'in_person' | 'text'
  * prefix) so banner scans never inflate the delivered → scanned funnel rate,
  * and it writes no `report_viewed` delivery touch (see DELIVERY_CHANNELS).
  */
-type ReportChannel = ReportDeliveryChannel | 'banner';
+/**
+ * `claimed` is the post-claim sibling of `banner`: the report CTA rendered on
+ * the claimed business's /directory/{slug} listing. Its own surface
+ * (`report_claimed`) keeps post-claim organic traffic separate from both the
+ * pre-claim banner and the operator-delivery funnel — and writes no
+ * `report_viewed` delivery touch.
+ */
+type ReportChannel = ReportDeliveryChannel | 'banner' | 'claimed';
 
 const VALID_CHANNELS = new Set<ReportChannel>([
   'phone',
@@ -58,6 +65,7 @@ const VALID_CHANNELS = new Set<ReportChannel>([
   'in_person',
   'text',
   'banner',
+  'claimed',
 ]);
 
 /** Channels that represent an operator delivery — only these write the
@@ -71,6 +79,7 @@ const SURFACE_MAP: Record<ReportChannel, QrSurfaceType> = {
   in_person: 'report_delivery_in_person',
   text: 'report_delivery_text',
   banner: 'report_banner',
+  claimed: 'report_claimed',
 };
 
 /**
@@ -178,6 +187,7 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
     social: 'report_delivery_social',
     phone: 'report_delivery_phone',
     banner: 'report_banner',
+    claimed: 'report_claimed',
   };
   const resolvedSurface = validSurfaces[surface as string] || 'report_delivery_in_person';
 

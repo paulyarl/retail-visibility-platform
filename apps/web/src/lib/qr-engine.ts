@@ -27,7 +27,9 @@ export type QrTemplateName =
   | 'merchant-promo'
   | 'coupon-flash'
   | 'coupon-free-ship'
-  | 'coupon-bogo';
+  | 'coupon-bogo'
+  | 'report-audit'
+  | 'claim-invite';
 
 export interface QrTemplate {
   name: QrTemplateName;
@@ -205,6 +207,47 @@ export const QR_TEMPLATES: Record<QrTemplateName, QrTemplate> = {
       gradientEnabled: false,
       gradientStart: '#7c3aed',
       gradientEnd: '#1a56db',
+      logoShape: 'square',
+    },
+  },
+  // Seed/directory surfaces — the seed QR kits (claim invite + report
+  // delivery + on-page banner) pick from these per-surface, like the coupon
+  // dialog's COUPON_TEMPLATES subset.
+  'report-audit': {
+    name: 'report-audit',
+    label: 'Report',
+    description: 'Business report links & banners',
+    defaults: {
+      styled: true,
+      dotType: 'classy-rounded',
+      cornerType: 'extra-rounded',
+      cornerDotType: 'dot',
+      dotColor: '#0f3a5f',
+      cornerColor: '#0f3a5f',
+      cornerDotColor: '#ffffff',
+      bgColor: '#f0f9ff',
+      gradientEnabled: true,
+      gradientStart: '#0f3a5f',
+      gradientEnd: '#0284c7',
+      logoShape: 'square',
+    },
+  },
+  'claim-invite': {
+    name: 'claim-invite',
+    label: 'Claim Invite',
+    description: 'Business claim links & cards',
+    defaults: {
+      styled: true,
+      dotType: 'rounded',
+      cornerType: 'extra-rounded',
+      cornerDotType: 'dot',
+      dotColor: '#047857',
+      cornerColor: '#047857',
+      cornerDotColor: '#ffffff',
+      bgColor: '#ecfdf5',
+      gradientEnabled: false,
+      gradientStart: '#047857',
+      gradientEnd: '#10b981',
       logoShape: 'square',
     },
   },

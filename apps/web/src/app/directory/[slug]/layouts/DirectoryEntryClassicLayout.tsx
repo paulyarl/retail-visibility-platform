@@ -21,6 +21,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { ClaimedReportCta } from '@/components/directory/ClaimedReportCta';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
@@ -394,6 +395,18 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                 <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
                   downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
                   size={200} showDownload={true} className="mt-4" pageType="directory" isPublic />
+              )}
+              {/* Post-claim report CTA — see editorial layout; a seedId on this
+                  surface means the listing came from a claimed seed. */}
+              {!showStatusPanel && canShowQr && listing.seedId && (
+                <div className="bg-white rounded-lg shadow-sm p-4 mt-4">
+                  <ClaimedReportCta
+                    seedId={listing.seedId}
+                    tenantId={listing.tenantId}
+                    baseUrl={baseUrl}
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                  />
+                </div>
               )}
 
               {/* FAQ */}

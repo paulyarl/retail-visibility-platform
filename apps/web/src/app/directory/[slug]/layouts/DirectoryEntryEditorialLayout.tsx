@@ -19,6 +19,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { ClaimedReportCta } from '@/components/directory/ClaimedReportCta';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
@@ -336,6 +337,20 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                 <div className="bg-neutral-50 rounded-xl p-6 flex flex-col items-center">
                   <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
                     downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={160} showDownload={true} pageType="directory" isPublic />
+                </div>
+              )}
+
+              {/* Post-claim report CTA — the prospect's second report surface.
+                  Seed listings never reach this layout (directory_seed renders
+                  DirectoryNotAvailable), so a seedId here means a claimed seed. */}
+              {canShowQr && listing.seedId && (
+                <div className="bg-neutral-50 rounded-xl p-6">
+                  <ClaimedReportCta
+                    seedId={listing.seedId}
+                    tenantId={listing.tenantId}
+                    baseUrl={baseUrl}
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                  />
                 </div>
               )}
 

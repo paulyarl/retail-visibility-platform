@@ -23,6 +23,7 @@
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
  *   GET    /api/admin/directory/presence-seeds/:id/banner-qr-style — read the on-page banner QR design
  *   PUT    /api/admin/directory/presence-seeds/:id/banner-qr-style — save the on-page banner QR design
+ *   POST   /api/admin/directory/presence-seeds/:id/logo — upload the seed tenant's logo
  *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
  *   DELETE /api/admin/directory/presence-seeds/:id — permanently delete a seed and its tenant
  *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
@@ -1040,6 +1041,12 @@ router.post('/presence-seeds/:id/approve', requirePlatformAdmin, async (req: Req
 // tenant_storefront_qr_settings (the storefront_qr capability module's
 // per-tenant style row; no tier gate — operator-authored platform styling).
 const bannerQrStyleSchema = z.object({
+  // Enable flags — applying a banner design activates styled QR on the
+  // tenant's row so it survives claim; tier resolution still governs
+  // what renders post-claim.
+  qr_enabled: z.boolean().optional(),
+  qr_styled_enabled: z.boolean().optional(),
+  qr_directory: z.boolean().optional(),
   qr_dot_type: z.string().max(30).optional(),
   qr_corner_type: z.string().max(30).optional(),
   qr_corner_dot_type: z.string().max(30).optional(),
@@ -1056,6 +1063,45 @@ const bannerQrStyleSchema = z.object({
   qr_gradient_on_corner_dots: z.boolean().optional(),
   qr_logo: z.boolean().optional(),
   qr_logo_shape: z.string().max(20).optional(),
+});
+
+const seedLogoSchema = z.object({
+  dataUrl: z.string().min(1),
+  contentType: z.string().min(1),
+});
+
+/** POST /api/admin/directory/presence-seeds/:id/logo — upload the seed tenant's
+ *  logo (same storage + profile write as the tenant-facing logo endpoint). The
+ *  uploaded logo becomes the business logo everywhere — place page, banner QR,
+ *  and post-claim QR surfaces. */
+router.post('/presence-seeds/:id/logo', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = seedLogoSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    const { dataUrl, contentType } = validation.data;
+    const result = await DirectoryPresenceSeedService.uploadSeedLogo(
+      req.params.id,
+      dataUrl,
+      contentType,
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      } as any,
+    );
+    res.json({ success: true, url: result.logoUrl });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    if (error?.message === 'invalid_content_type') return res.status(400).json({ error: 'invalid_content_type' });
+    if (error?.message === 'file_too_large') return res.status(400).json({ error: 'file_too_large' });
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/logo] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
 });
 
 /** GET /api/admin/directory/presence-seeds/:id/banner-qr-style — designer prefill */

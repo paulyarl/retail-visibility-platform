@@ -43,6 +43,11 @@ export interface ClaimQrDesignerModalProps {
   url: string;
   /** Whether this variant has a postcard artifact (mail + walkin). */
   allowPostcard?: boolean;
+  /** Surface-scoped template subset (the COUPON_TEMPLATES pattern) — when set,
+   *  the picker only offers these. */
+  templates?: QrTemplateName[];
+  /** Template applied on open. Defaults to 'default'. */
+  defaultTemplate?: QrTemplateName;
 }
 
 export default function ClaimQrDesignerModal({
@@ -53,8 +58,10 @@ export default function ClaimQrDesignerModal({
   title,
   url,
   allowPostcard = false,
+  templates,
+  defaultTemplate = 'default',
 }: ClaimQrDesignerModalProps) {
-  const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>('default');
+  const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>(defaultTemplate);
   const [dotType, setDotType] = useState('rounded');
   const [cornerType, setCornerType] = useState('extra-rounded');
   const [cornerDotType, setCornerDotType] = useState('dot');
@@ -165,6 +172,14 @@ export default function ClaimQrDesignerModal({
       cancelled = true;
     };
   }, [open]);
+
+  // Apply the surface's default template on open so its concrete values land
+  // in state (resolveOptions alone never overrides always-defined fields).
+  useEffect(() => {
+    if (!open) return;
+    applyTemplate(defaultTemplate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultTemplate]);
 
   // Live preview — always via generateQrDataUrl so the logo overlay shows.
   useEffect(() => {
@@ -307,7 +322,7 @@ export default function ClaimQrDesignerModal({
           <div>
             <label className="text-xs font-medium text-neutral-600 mb-1.5 block">Template</label>
             <div className="grid grid-cols-3 gap-2">
-              {QR_TEMPLATE_LIST.map((t) => (
+              {(templates ? QR_TEMPLATE_LIST.filter((t) => templates.includes(t.name)) : QR_TEMPLATE_LIST).map((t) => (
                 <button
                   key={t.name}
                   onClick={() => applyTemplate(t.name)}

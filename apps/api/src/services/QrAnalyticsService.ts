@@ -19,7 +19,7 @@ import { generateQrAnalyticsId, generateQrScanEventId } from '../lib/id-generato
 // TYPES
 // ====================
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call' | 'prospect_report_phone' | 'prospect_report_email' | 'prospect_report_social' | 'prospect_report_in_person' | 'prospect_report_text' | 'prospect_report_banner';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner' | 'report_claimed' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call' | 'prospect_report_phone' | 'prospect_report_email' | 'prospect_report_social' | 'prospect_report_in_person' | 'prospect_report_text' | 'prospect_report_banner';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
@@ -150,6 +150,10 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   // outside the report_delivery_* prefix so it can't inflate the
   // delivered → scanned funnel rate.
   report_banner: 'Report Banner QR',
+  // Post-claim sibling of report_banner — the report CTA on the claimed
+  // business's /directory/{slug} listing. Organic claimed-surface traffic,
+  // still outside the delivered → viewed funnel.
+  report_claimed: 'Report QR (Claimed Listing)',
   intake_link_sms: 'Intake Link (SMS)',
   intake_link_email: 'Intake Link (Email)',
   intake_link_qr: 'Intake Link (QR)',

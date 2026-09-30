@@ -51,6 +51,12 @@ export interface ReportQrDesignerModalProps {
   /** Banner mode only — the listing's business logo, used for preview parity
    *  with what the public page embeds (falls back to the platform logo). */
   businessLogoUrl?: string | null;
+  /** Surface-scoped template subset (the COUPON_TEMPLATES pattern) — when set,
+   *  the picker only offers these. */
+  templates?: QrTemplateName[];
+  /** Template applied on open when no persisted design exists (banner mode)
+   *  or always (delivery channels). Defaults to 'default'. */
+  defaultTemplate?: QrTemplateName;
 }
 
 export default function ReportQrDesignerModal({
@@ -62,9 +68,11 @@ export default function ReportQrDesignerModal({
   url,
   allowPostcard = false,
   businessLogoUrl = null,
+  templates,
+  defaultTemplate = 'default',
 }: ReportQrDesignerModalProps) {
   const isBanner = channel === 'banner';
-  const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>('default');
+  const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>(defaultTemplate);
   const [dotType, setDotType] = useState('rounded');
   const [cornerType, setCornerType] = useState('extra-rounded');
   const [cornerDotType, setCornerDotType] = useState('dot');
@@ -85,6 +93,10 @@ export default function ReportQrDesignerModal({
   const [logoLoading, setLogoLoading] = useState(false);
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [customLogoDataUrl, setCustomLogoDataUrl] = useState<string | null>(null);
+  // Banner mode: the seed tenant's persisted profile logo — set after a
+  // successful upload through the tenant-logo endpoint.
+  const [persistedLogoUrl, setPersistedLogoUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
   const [size, setSize] = useState(512);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -130,23 +142,37 @@ export default function ReportQrDesignerModal({
     gradientOnDots,
     gradientOnCorners,
     gradientOnCornerDots,
-    // Banner mode: logo resolves like the public page — the listing's business
-    // logo first, then the platform logo (the qr_logo row only stores the
-    // toggle, so a one-off upload can't be persisted for the page).
+    // Banner mode: logo resolves like the public page — the tenant profile's
+    // business logo (uploaded via the tenant-logo endpoint) first, then the
+    // platform logo. Delivery surfaces use the one-off prospect-logo upload.
     logoUrl: logoEnabled
-      ? (isBanner ? (businessLogoUrl ?? platformLogoUrl) : (customLogoDataUrl ?? platformLogoUrl))
+      ? (isBanner ? (persistedLogoUrl ?? businessLogoUrl ?? platformLogoUrl) : (customLogoDataUrl ?? platformLogoUrl))
       : null,
     logoShape,
   });
 
+  // Delivery channels: apply the surface's default template on open so its
+  // concrete values land in state (resolveOptions alone never overrides the
+  // always-defined option fields).
+  useEffect(() => {
+    if (!open || isBanner) return;
+    applyTemplate(defaultTemplate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isBanner, defaultTemplate]);
+
   // Banner mode: prefill the designer from the persisted tenant_storefront_qr_settings
   // row so the operator edits the live on-page design rather than starting over.
+  // No persisted design → fall back to the surface's default template.
   useEffect(() => {
     if (!open || !isBanner) return;
     let cancelled = false;
     setSaved(false);
     directoryPresenceAdminService.getBannerQrStyle(seedId).then((style) => {
-      if (!style || cancelled) return;
+      if (cancelled) return;
+      if (!style) {
+        applyTemplate(defaultTemplate);
+        return;
+      }
       if (style.qr_dot_type) setDotType(style.qr_dot_type);
       if (style.qr_corner_type) setCornerType(style.qr_corner_type);
       if (style.qr_corner_dot_type) setCornerDotType(style.qr_corner_dot_type);
@@ -163,10 +189,13 @@ export default function ReportQrDesignerModal({
       if (style.qr_gradient_on_corner_dots !== undefined) setGradientOnCornerDots(style.qr_gradient_on_corner_dots);
       if (style.qr_logo !== undefined) setLogoEnabled(style.qr_logo);
       if (style.qr_logo_shape) setLogoShape(style.qr_logo_shape);
-      setSelectedTemplate('default');
+      // Persisted designs are concrete — no template identity survives the
+      // save, so keep the surface default selected as a display label only.
+      setSelectedTemplate(defaultTemplate);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [open, isBanner, seedId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isBanner, seedId, defaultTemplate]);
 
   useEffect(() => {
     if (!open) return;
@@ -224,6 +253,7 @@ export default function ReportQrDesignerModal({
     gradientEnabled, gradientStart, gradientEnd,
     gradientOnDots, gradientOnCorners, gradientOnCornerDots,
     logoEnabled, logoShape, platformLogoUrl, customLogoDataUrl, businessLogoUrl,
+    persistedLogoUrl,
   ]);
 
   const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,9 +265,33 @@ export default function ReportQrDesignerModal({
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
-      setCustomLogoDataUrl(typeof reader.result === 'string' ? reader.result : null);
-      setError(null);
+    reader.onload = async () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : null;
+      if (!dataUrl) return;
+      if (!isBanner) {
+        setCustomLogoDataUrl(dataUrl);
+        setError(null);
+        return;
+      }
+      // Banner mode: persist through the tenant-logo path — the same write a
+      // tenant's own logo upload performs — so the live page QR and every
+      // tenant-logo surface (incl. post-claim) render it.
+      try {
+        setLogoUploading(true);
+        setError(null);
+        const uploadedUrl = await directoryPresenceAdminService.uploadSeedLogo(
+          seedId,
+          dataUrl,
+          file.type,
+        );
+        if (!uploadedUrl) throw new Error('upload failed');
+        setPersistedLogoUrl(uploadedUrl);
+        setSaved(false);
+      } catch {
+        setError('Failed to upload the logo');
+      } finally {
+        setLogoUploading(false);
+      }
     };
     reader.onerror = () => setError('Failed to read logo file');
     reader.readAsDataURL(file);
@@ -286,6 +340,12 @@ export default function ReportQrDesignerModal({
       setSaving(true);
       setSaved(false);
       const ok = await directoryPresenceAdminService.updateBannerQrStyle(seedId, {
+        // Activating a banner design also flips the module's enable flags so
+        // the style survives claim — post-claim the claimed tenant's tier
+        // capability resolution still governs what actually renders.
+        qr_enabled: true,
+        qr_styled_enabled: true,
+        qr_directory: true,
         qr_dot_type: dotType,
         qr_corner_type: cornerType,
         qr_corner_dot_type: cornerDotType,
@@ -359,7 +419,7 @@ export default function ReportQrDesignerModal({
         <div className="mb-4">
           <label className="mb-2 block text-sm font-medium text-gray-700">Template</label>
           <div className="flex flex-wrap gap-2">
-            {QR_TEMPLATE_LIST.map((t) => (
+            {(templates ? QR_TEMPLATE_LIST.filter((t) => templates.includes(t.name)) : QR_TEMPLATE_LIST).map((t) => (
               <button
                 key={t.name}
                 onClick={() => applyTemplate(t.name)}
@@ -549,10 +609,33 @@ export default function ReportQrDesignerModal({
             </label>
           </div>
           {logoEnabled && isBanner && (
-            <p className="text-[11px] text-gray-500 mt-1">
-              The on-page banner embeds the listing's business logo
-              {businessLogoUrl ? '' : ' — none is set, so the platform logo is used'}.
-            </p>
+            <div className="mt-2 space-y-2">
+              <p className="text-[11px] text-gray-500">
+                The banner embeds the business logo saved on the tenant profile —
+                uploading also sets the listing logo shown on the page
+                {persistedLogoUrl || businessLogoUrl ? '' : ' — none is set, so the platform logo is used'}.
+              </p>
+              <div className="flex items-center gap-2">
+                {(persistedLogoUrl ?? businessLogoUrl) && (
+                  <img
+                    src={(persistedLogoUrl ?? businessLogoUrl) as string}
+                    alt="Business logo"
+                    className="h-8 w-8 object-contain rounded border border-gray-200 bg-white"
+                  />
+                )}
+                <button
+                  onClick={() => logoFileRef.current?.click()}
+                  disabled={logoUploading}
+                  className="text-[11px] text-blue-600 hover:underline disabled:opacity-50"
+                >
+                  {logoUploading
+                    ? 'Uploading…'
+                    : persistedLogoUrl || businessLogoUrl
+                      ? 'Replace business logo…'
+                      : 'Upload business logo…'}
+                </button>
+              </div>
+            </div>
           )}
           {logoEnabled && !isBanner && (
             <div className="mt-2 space-y-2">
@@ -579,14 +662,16 @@ export default function ReportQrDesignerModal({
                   Upload prospect logo instead
                 </button>
               )}
-              <input
-                ref={logoFileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                onChange={handleLogoFile}
-                className="hidden"
-              />
             </div>
+          )}
+          {logoEnabled && (
+            <input
+              ref={logoFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              onChange={handleLogoFile}
+              className="hidden"
+            />
           )}
           {logoEnabled && !customLogoDataUrl && !isBanner && !logoLoading && !platformLogoUrl && (
             <p className="text-[11px] text-amber-600 mt-1">

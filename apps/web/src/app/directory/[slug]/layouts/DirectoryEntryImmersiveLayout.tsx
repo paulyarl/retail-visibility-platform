@@ -19,6 +19,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
+import { ClaimedReportCta } from '@/components/directory/ClaimedReportCta';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
@@ -330,6 +331,18 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 flex flex-col items-center">
                   <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Share"
                     downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={160} showDownload={true} pageType="directory" isPublic />
+                </div>
+              )}
+              {/* Post-claim report CTA — a seedId here means a claimed seed. */}
+              {canShowQr && listing.seedId && (
+                <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
+                  <ClaimedReportCta
+                    seedId={listing.seedId}
+                    tenantId={listing.tenantId}
+                    baseUrl={baseUrl}
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                    dark
+                  />
                 </div>
               )}
               {crmFlags?.crm_enabled && crmFlags?.crm_inquiry_directory_enabled && !showStatusPanel && tenantId && (

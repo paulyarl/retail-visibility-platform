@@ -22,7 +22,7 @@ import directoryPresenceAdminService, {
   ReportDeliveryQrKitMeta,
 } from '@/services/DirectoryPresenceAdminService';
 import { clientLogger } from '@/lib/client-logger';
-import { generateQrDataUrl } from '@/lib/qr-engine';
+import { generateQrDataUrl, type QrTemplateName } from '@/lib/qr-engine';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import {
   DAYS,
@@ -126,6 +126,12 @@ const STATUS_COLORS: Record<string, string> = {
   claimed: 'bg-green-100 text-green-700',
   suppressed: 'bg-red-100 text-red-700',
 };
+
+/** Per-surface QR template subsets for the seed designers (the coupon
+ *  dialog's COUPON_TEMPLATES pattern) — claim surfaces get the invite-flavored
+ *  set, report surfaces the report-flavored set. */
+const CLAIM_QR_TEMPLATES: QrTemplateName[] = ['claim-invite', 'default', 'promo', 'private-grant'];
+const REPORT_QR_TEMPLATES: QrTemplateName[] = ['report-audit', 'default', 'promo', 'private-grant'];
 
 function stripDisclosure(text: string | null | undefined): string {
   if (!text) return '';
@@ -767,6 +773,7 @@ function PresenceSeedDetailClient() {
           desc: 'Mailed 4×6 invite — scans record as claim_invite.',
           url: qrKit.qrUrl,
           postcard: true,
+          defaultTemplate: 'claim-invite' as QrTemplateName,
         },
         {
           variant: 'walkin' as const,
@@ -774,6 +781,7 @@ function PresenceSeedDetailClient() {
           desc: 'Hand-delivered card — scans record as claim_invite_walkin.',
           url: qrKit.qrUrlWalkin,
           postcard: true,
+          defaultTemplate: 'claim-invite' as QrTemplateName,
         },
         {
           variant: 'social' as const,
@@ -781,6 +789,7 @@ function PresenceSeedDetailClient() {
           desc: 'Send the tracked link in a DM or post — taps record as claim_invite_social.',
           url: qrKit.qrUrlSocial,
           postcard: false,
+          defaultTemplate: 'claim-invite' as QrTemplateName,
         },
         {
           variant: 'email' as const,
@@ -788,6 +797,7 @@ function PresenceSeedDetailClient() {
           desc: 'Embed the tracked link in an outreach email — taps record as claim_invite_email.',
           url: qrKit.qrUrlEmail,
           postcard: false,
+          defaultTemplate: 'claim-invite' as QrTemplateName,
         },
       ]
     : [];
@@ -797,6 +807,8 @@ function PresenceSeedDetailClient() {
 
   // Report QR kit channels — one tracked redirect URL per delivery channel.
   // Mirrors the claim QR kit but for report delivery (spec §13.6).
+  // Each surface carries a template subset + default (the coupon dialog's
+  // COUPON_TEMPLATES pattern — per-surface clickable templates).
   const reportQrChannels = reportQrKit
     ? [
         {
@@ -805,6 +817,7 @@ function PresenceSeedDetailClient() {
           desc: 'Printed card QR handed to the owner — scans record as report_delivery_in_person.',
           url: reportQrKit.qrUrlInPerson,
           postcard: true,
+          defaultTemplate: 'private-grant' as QrTemplateName,
         },
         {
           channel: 'text' as const,
@@ -812,6 +825,7 @@ function PresenceSeedDetailClient() {
           desc: 'Text the tracked link — taps record as report_delivery_text.',
           url: reportQrKit.qrUrlText,
           postcard: false,
+          defaultTemplate: 'report-audit' as QrTemplateName,
         },
         {
           channel: 'email' as const,
@@ -819,6 +833,7 @@ function PresenceSeedDetailClient() {
           desc: 'Embed the tracked link in an outreach email — taps record as report_delivery_email.',
           url: reportQrKit.qrUrlEmail,
           postcard: false,
+          defaultTemplate: 'report-audit' as QrTemplateName,
         },
         {
           channel: 'social' as const,
@@ -826,6 +841,7 @@ function PresenceSeedDetailClient() {
           desc: 'Send the tracked link in a DM or post — taps record as report_delivery_social.',
           url: reportQrKit.qrUrlSocial,
           postcard: false,
+          defaultTemplate: 'promo' as QrTemplateName,
         },
         {
           channel: 'phone' as const,
@@ -833,17 +849,19 @@ function PresenceSeedDetailClient() {
           desc: 'Send the tracked link after a call — taps record as report_delivery_phone.',
           url: reportQrKit.qrUrlPhone,
           postcard: false,
+          defaultTemplate: 'report-audit' as QrTemplateName,
         },
         {
           channel: 'banner' as const,
           title: 'On-page banner',
-          desc: 'The tracked link the public listing\'s report banner encodes — reference only (nothing to deliver); scans record as report_banner, outside the delivery funnel.',
+          desc: 'The tracked link the public listing\'s report banner encodes — "Apply to on-page banner" persists the design to the listing. Scans record as report_banner, outside the delivery funnel.',
           url: typeof window !== 'undefined'
             ? (bannerShortCode
                 ? `${window.location.origin}/rb/${bannerShortCode}`
                 : `${window.location.origin}/api/public/r/seed/${seedId}/banner`)
             : (bannerShortCode ? `/rb/${bannerShortCode}` : ''),
           postcard: false,
+          defaultTemplate: 'report-audit' as QrTemplateName,
         },
       ]
     : [];
@@ -2116,6 +2134,8 @@ function PresenceSeedDetailClient() {
           title={qrDesignerConfig.title}
           url={qrDesignerConfig.url}
           allowPostcard={qrDesignerConfig.postcard}
+          templates={CLAIM_QR_TEMPLATES}
+          defaultTemplate={qrDesignerConfig.defaultTemplate}
         />
       )}
 
@@ -2361,6 +2381,8 @@ function PresenceSeedDetailClient() {
           url={reportQrDesignerConfig.url}
           allowPostcard={reportQrDesignerConfig.postcard}
           businessLogoUrl={listing?.logo_url ?? null}
+          templates={REPORT_QR_TEMPLATES}
+          defaultTemplate={reportQrDesignerConfig.defaultTemplate}
         />
       )}
 

@@ -365,6 +365,11 @@ export interface DirectoryAttributeSuggestion {
  *  read back as designer prefill. The public listing carries the camelCase
  *  PersistedQrStyle projection (@/lib/qr-engine). */
 export interface BannerQrStyleUpdate {
+  /** Enable flags — applying a banner design also activates styled QR on the
+   *  tenant row so the design survives claim (tier gates apply post-claim). */
+  qr_enabled?: boolean;
+  qr_styled_enabled?: boolean;
+  qr_directory?: boolean;
   qr_dot_type?: string;
   qr_corner_type?: string;
   qr_corner_dot_type?: string;
@@ -1495,6 +1500,21 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       0,
     );
     return !!result.success;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/logo — upload the
+   *  seed tenant's logo (same tenant_business_profiles_list.logo_url write a
+   *  tenant's own logo upload performs). Returns the stored public URL — QR
+   *  surfaces and the listing pick it up from there. */
+  async uploadSeedLogo(seedId: string, dataUrl: string, contentType: string): Promise<string | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/logo`,
+      { method: 'POST', body: JSON.stringify({ dataUrl, contentType }) },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.url ?? null) as string | null;
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/:id/report-pdf — downloadable report PDF (spec §14.2).

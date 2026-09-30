@@ -864,6 +864,98 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Upload a logo for a seed tenant — the same write a tenant's own logo
+   * upload performs (tenant_business_profiles_list.logo_url), so every QR
+   * surface that resolves the tenant profile logo picks it up: the seeded
+   * listing's banner QR, and post-claim the tenant's storefront/directory
+   * QRs (TenantQRCode/QrPreviewPane read the same field). Also syncs
+   * directory_listings_list.logo_url so the public place page + banner QR
+   * use it without an extra fetch.
+   */
+  async uploadSeedLogo(
+    seedId: string,
+    dataUrl: string,
+    contentType: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ logoUrl: string }> {
+    const seed = await prisma.$queryRaw<
+      Array<{ tenant_id: string; listing_id: string }>
+    >`
+      SELECT tenant_id, listing_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+    const { tenant_id: tenantId, listing_id: listingId } = seed[0];
+
+    if (!contentType.startsWith('image/')) throw new Error('invalid_content_type');
+    const base64 = dataUrl.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
+    const buffer = Buffer.from(base64, 'base64');
+    if (buffer.length > 5 * 1024 * 1024) throw new Error('file_too_large');
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const { unifiedConfig } = await import('../config/unifiedConfig');
+    const { StorageBuckets } = await import('../storage-config');
+    if (!unifiedConfig.supabaseUrl || !unifiedConfig.supabaseServiceRoleKey) {
+      throw new Error('storage_not_configured');
+    }
+    const supabase = createClient(unifiedConfig.supabaseUrl, unifiedConfig.supabaseServiceRoleKey);
+
+    // Same bucket/path convention as POST /api/tenant/:tenantId/logo
+    const ext = contentType.split('/')[1] || 'png';
+    const pathKey = `logos/${tenantId}/tenant-logo-${tenantId}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from(StorageBuckets.TENANTS.name)
+      .upload(pathKey, buffer, { contentType, upsert: false, cacheControl: '3600' });
+    if (uploadError) throw new Error(`storage_upload_failed: ${uploadError.message}`);
+    const { data: pub } = supabase.storage
+      .from(StorageBuckets.TENANTS.name)
+      .getPublicUrl(pathKey);
+    const logoUrl = pub.publicUrl;
+
+    // Tenant profile — the field QR surfaces resolve as the tenant's logo.
+    // On create, seed the profile from the listing rather than empty strings.
+    const listing = await prisma.$queryRaw<any[]>`
+      SELECT business_name, address, city, state, zip_code, phone, website, description
+      FROM directory_listings_list WHERE id = ${listingId} LIMIT 1
+    `;
+    const l = listing[0] || {};
+    await prisma.tenant_business_profiles_list.upsert({
+      where: { tenant_id: tenantId },
+      update: { logo_url: logoUrl },
+      create: {
+        tenant_id: tenantId,
+        logo_url: logoUrl,
+        business_name: l.business_name || '',
+        address_line1: l.address || '',
+        city: l.city || '',
+        state: l.state || '',
+        postal_code: l.zip_code || '',
+        country_code: 'US',
+        phone_number: l.phone || '',
+        email: '',
+        website: l.website || '',
+        business_description: l.description || '',
+        updated_at: new Date(),
+      },
+    });
+
+    // The listing's own logo column feeds /place/{slug} (header + banner QR).
+    await prisma.$executeRaw`
+      UPDATE directory_listings_list SET logo_url = ${logoUrl}, updated_at = now()
+      WHERE id = ${listingId}
+    `;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.logo_upload',
+      payload: { seedId, tenantId, listingId, logoUrl },
+    });
+
+    logger.info('DirectoryPresenceSeedService.uploadSeedLogo', undefined, { seedId, tenantId });
+    return { logoUrl };
+  }
+
+  /**
    * Lazily backfill a short_code on a legacy claim token that doesn't have one.
    * Called when an admin fetches the seed detail / QR kit and finds a token
    * missing a short code. Returns the updated short_code (or null on failure).
