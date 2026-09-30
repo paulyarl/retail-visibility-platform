@@ -587,11 +587,15 @@ export class DeliverableSourceService extends BaseService {
       const existing = await resolveClaimUrlForSeed(seedId);
       if (existing) return existing;
 
-      // Already claimed → there is no claim path left to offer.
+      // Already claimed → there is no claim path left to offer. Minting
+      // flips the seed to 'invited', so it is gated on a public-facing
+      // status — a draft (still in operator QC) or suppressed seed gets the
+      // link-less CTA variant instead of a premature claim link.
       const seed = await this.prisma.$queryRaw<any[]>`
         SELECT status, claimed_at FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
       `;
-      if (!seed[0] || seed[0].status === 'claimed' || seed[0].claimed_at) return null;
+      if (!seed[0] || seed[0].claimed_at) return null;
+      if (seed[0].status !== 'published' && seed[0].status !== 'invited') return null;
 
       const { default: seedService } = await import('../DirectoryPresenceSeedService.js');
       await seedService.inviteSeed(seedId, 90, {

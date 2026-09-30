@@ -1664,6 +1664,7 @@ Rules:
 - The claim page must preserve the report context and return the user to the claimed seed/report after completion.
 - The mobile path must work without requiring the operator to copy a URL manually.
 - Claim-token issuance and owner-report access must be idempotent.
+- Token issuance is gated on a public-facing seed (`directory_presence_seeds.status` is `published` or `invited`). A `draft` seed is still in operator QC and a `suppressed` seed is off every public surface — minting would flip the seed to `invited` without a publish decision and hand out a claim link whose listing 404s. The mint happens at the publish boundary instead (`SeedOutreachTriggerService.onSeedCreated`, when the courtesy outreach resolves no active claim URL).
 - The report CTA must be disabled for `insufficient_evidence` and `requires_identity_review` reports.
 
 ### 13.6 Report delivery by outreach channel

@@ -280,9 +280,13 @@ export class SeedIntelligenceReportService extends BaseService {
     // 13. Claim handoff (§13.5): a CTA-eligible unclaimed seed needs a live
     //     claim token for the report CTA/QR. Mint one when none is active so
     //     the published report always carries a working claim path. Minting
-    //     flips the seed to 'invited' (claim invited state). Best-effort —
-    //     a mint failure must not fail report generation.
-    if (eligibility.eligible && !seedState.claimed_at) {
+    //     flips the seed to 'invited' (claim invited state), so it is gated
+    //     on a public-facing seed — a draft is still in operator QC (publish
+    //     is a separate human step) and a suppressed seed is off every public
+    //     surface; minting there would hand out a claim link whose listing
+    //     404s. Best-effort — a mint failure must not fail report generation.
+    const seedIsPublicFacing = seedState.status === 'published' || seedState.status === 'invited';
+    if (eligibility.eligible && !seedState.claimed_at && seedIsPublicFacing) {
       try {
         const activeTokens = await this.prisma.$queryRaw<any[]>`
           SELECT 1 FROM directory_claim_tokens

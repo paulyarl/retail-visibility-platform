@@ -25,6 +25,7 @@ const {
   mockTransaction,
   mockResolveClaimUrl,
   mockSuggestForCampaign,
+  mockInviteSeed,
   mockAudit,
   mockDisableSeedOutreachTrigger,
   mockSeedOutreachNoResponseDays,
@@ -34,6 +35,7 @@ const {
   mockTransaction: vi.fn(),
   mockResolveClaimUrl: vi.fn(),
   mockSuggestForCampaign: vi.fn(),
+  mockInviteSeed: vi.fn(),
   mockAudit: vi.fn(),
   mockDisableSeedOutreachTrigger: vi.fn(() => false),
   mockSeedOutreachNoResponseDays: vi.fn(() => 14),
@@ -75,6 +77,12 @@ vi.mock('../MarketingOutreachService', () => ({
   MarketingOutreachService: { getInstance: () => ({}) },
 }));
 
+// The service imports DirectoryPresenceSeedService lazily (static import would
+// cycle — the seed service statically imports this trigger).
+vi.mock('../DirectoryPresenceSeedService.js', () => ({
+  default: { inviteSeed: mockInviteSeed },
+}));
+
 // Import after mocks
 import { SeedOutreachTriggerService } from '../SeedOutreachTriggerService';
 
@@ -99,6 +107,8 @@ function makeSeed(overrides: Partial<any> = {}) {
     owner_email: 'owner@example.com',
     owner_phone: '317-555-0100',
     owner_name: 'Test Owner',
+    status: 'published',
+    claimed_at: null,
     ...overrides,
   }];
 }
@@ -149,6 +159,7 @@ beforeEach(() => {
 
   mockResolveClaimUrl.mockResolvedValue('https://example.com/place/claim/TOKEN123');
   mockSuggestForCampaign.mockResolvedValue(makeHookSuggestion());
+  mockInviteSeed.mockResolvedValue({ token: 'NEW_TOKEN', expiresAt: new Date(), shortCode: 'ABC123' });
   mockAudit.mockResolvedValue(undefined);
 });
 
@@ -320,6 +331,83 @@ describe('SeedOutreachTriggerService', () => {
       });
       // Should still complete the transaction
       expect(mockTransaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('claim token mint (publish boundary)', () => {
+    it('mints a claim token for a published seed when no URL resolves', async () => {
+      mockResolveClaimUrl
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce('https://example.com/place/claim/NEW_TOKEN');
+
+      await SeedOutreachTriggerService.getInstance().onSeedCreated({
+        campaignId: 'camp-001',
+        seedId: 'seed-001',
+      });
+
+      expect(mockInviteSeed).toHaveBeenCalledWith(
+        'seed-001',
+        90,
+        expect.objectContaining({ actorType: 'system' }),
+      );
+      expect(mockResolveClaimUrl).toHaveBeenCalledTimes(2);
+      expect(mockAudit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            claimUrl: 'https://example.com/place/claim/NEW_TOKEN',
+          }),
+        }),
+      );
+    });
+
+    it('does not mint for a draft seed — push parks the seed, publish is the boundary', async () => {
+      mockResolveClaimUrl.mockResolvedValue(null);
+      mockQueryRaw.mockImplementation((sql: any) => {
+        const sqlStr = typeof sql === 'string' ? sql : (sql?.[0] || '');
+        if (sqlStr.includes('mkt_campaigns_list')) return Promise.resolve(makeCampaign());
+        if (sqlStr.includes('directory_presence_seeds')) return Promise.resolve(makeSeed({ status: 'draft' }));
+        if (sqlStr.includes('mkt_outreach_log')) return Promise.resolve([]);
+        if (sqlStr.includes('directory_listings_list')) return Promise.resolve(makeListing());
+        if (sqlStr.includes('mkt_audits_list')) return Promise.resolve(makeAuditPayload());
+        return Promise.resolve([]);
+      });
+
+      await SeedOutreachTriggerService.getInstance().onSeedCreated({
+        campaignId: 'camp-001',
+        seedId: 'seed-001',
+      });
+
+      expect(mockInviteSeed).not.toHaveBeenCalled();
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not mint when a claim URL already resolves', async () => {
+      await SeedOutreachTriggerService.getInstance().onSeedCreated({
+        campaignId: 'camp-001',
+        seedId: 'seed-001',
+      });
+      expect(mockInviteSeed).not.toHaveBeenCalled();
+    });
+
+    it('does not mint for a claimed seed', async () => {
+      mockResolveClaimUrl.mockResolvedValue(null);
+      mockQueryRaw.mockImplementation((sql: any) => {
+        const sqlStr = typeof sql === 'string' ? sql : (sql?.[0] || '');
+        if (sqlStr.includes('mkt_campaigns_list')) return Promise.resolve(makeCampaign());
+        if (sqlStr.includes('directory_presence_seeds'))
+          return Promise.resolve(makeSeed({ status: 'claimed', claimed_at: '2026-09-01' }));
+        if (sqlStr.includes('mkt_outreach_log')) return Promise.resolve([]);
+        if (sqlStr.includes('directory_listings_list')) return Promise.resolve(makeListing());
+        if (sqlStr.includes('mkt_audits_list')) return Promise.resolve(makeAuditPayload());
+        return Promise.resolve([]);
+      });
+
+      await SeedOutreachTriggerService.getInstance().onSeedCreated({
+        campaignId: 'camp-001',
+        seedId: 'seed-001',
+      });
+
+      expect(mockInviteSeed).not.toHaveBeenCalled();
     });
   });
 

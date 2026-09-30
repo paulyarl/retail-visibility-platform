@@ -9,7 +9,9 @@
  * 1. Load campaign + linked seed + audit
  * 2. Check idempotency: skip if a seed_outreach log already exists for this seed
  * 3. Resolve best contact channel (phone → email → other)
- * 4. Resolve claim URL via HookSuggestionService.resolveClaimUrl (public)
+ * 4. Resolve claim URL via HookSuggestionService.resolveClaimUrl — minting a
+ *    claim token when none is active (this trigger only fires post-publish, so
+ *    the mint lands the seed in 'invited' exactly when a claim link goes out)
  * 5. Resolve top hook via HookSuggestionService.suggestForCampaign (suggestions[0])
  * 6. Compose outreach message (hook body + claim URL + place page URL)
  * 7. ATOMIC: log outreach contact + set outreach_state in a single transaction
@@ -77,7 +79,8 @@ export class SeedOutreachTriggerService extends BaseService {
     }
 
     const seed = await prisma.$queryRaw<any[]>`
-      SELECT id, tenant_id, listing_id, owner_email, owner_phone, owner_name
+      SELECT id, tenant_id, listing_id, owner_email, owner_phone, owner_name,
+             status, claimed_at
       FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
     if (!seed[0]) {
@@ -114,10 +117,27 @@ export class SeedOutreachTriggerService extends BaseService {
       notes = 'No phone or email on file — operator must find contact channel manually';
     }
 
-    // 4. Resolve claim URL
+    // 4. Resolve claim URL — mint a token when none is active so the outreach
+    //    message carries a working claim link. This trigger only fires
+    //    post-publish, so the mint is gated on a public-facing seed: it lands
+    //    the seed in 'invited' at the moment a claim link actually goes out,
+    //    and a draft can never reach 'invited' through a side effect.
     let claimUrl: string | null = null;
     try {
       claimUrl = await HookSuggestionService.getInstance().resolveClaimUrl(campaignId);
+      const publicFacing = seed[0].status === 'published' || seed[0].status === 'invited';
+      if (!claimUrl && publicFacing && !seed[0].claimed_at) {
+        // Dynamic import — DirectoryPresenceSeedService statically imports
+        // this service, so a static import would cycle.
+        const { default: seedService } = await import('./DirectoryPresenceSeedService.js');
+        await seedService.inviteSeed(seedId, 90, {
+          actorType: ctx?.actorType ?? 'system',
+          actorId: ctx?.actorId ?? 'system',
+          ip: ctx?.ip,
+          userAgent: ctx?.userAgent,
+        });
+        claimUrl = await HookSuggestionService.getInstance().resolveClaimUrl(campaignId);
+      }
     } catch (err) {
       logger.warn('SeedOutreachTriggerService: resolveClaimUrl failed', undefined, {
         campaignId,
