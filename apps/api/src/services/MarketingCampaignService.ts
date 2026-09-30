@@ -2695,8 +2695,7 @@ export class MarketingCampaignService extends BaseService {
     // boundary; explicit verifiedCity/verifiedState/verifiedZip inputs still
     // win over parsed components.
     const rawAddress = input.verifiedAddress?.trim() || '';
-    const parsedAddress =
-      rawAddress && addressParser.canParse(rawAddress) ? addressParser.parse(rawAddress) : null;
+    const parsedAddress = rawAddress ? addressParser.parseComponents(rawAddress) : null;
     if (rawAddress) {
       napPatch.addressLine1 = parsedAddress?.address_line1?.trim() || rawAddress;
       if (parsedAddress?.address_line2?.trim()) napPatch.addressLine2 = parsedAddress.address_line2.trim();

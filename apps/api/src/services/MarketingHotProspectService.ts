@@ -67,6 +67,9 @@ interface BusinessJson {
     canonical_name?: string | null;
     canonical_phone?: string | null;
     canonical_address?: string | null;
+    canonical_city?: string | null;
+    canonical_state?: string | null;
+    canonical_zip?: string | null;
   };
   audit_metadata?: {
     matched_business?: {
@@ -74,6 +77,9 @@ interface BusinessJson {
       category?: string | null;
       phone?: string | null;
       address?: string | null;
+      city?: string | null;
+      state?: string | null;
+      zip?: string | null;
       website?: string | null;
     };
     requested_business?: {
@@ -81,6 +87,8 @@ interface BusinessJson {
       category?: string | null;
       phone?: string | null;
       address?: string | null;
+      city?: string | null;
+      state?: string | null;
     };
   };
   digital_opportunity_score?: { score?: number; classification?: string; components?: any; rationale?: string };
@@ -532,7 +540,13 @@ export class MarketingHotProspectService extends BaseService {
     const dq = business.data_quality ?? {};
     const verified = new Set((dq.verified_fields ?? []).map((f) => f.toLowerCase()));
     const isVerified = (keyword: string): boolean =>
-      Array.from(verified).some((f) => f.includes(keyword));
+      Array.from(verified).some((f) => {
+        if (!f.includes(keyword)) return false;
+        // "email address" / "website address" entries must not arm the
+        // physical-address overwrite.
+        if (keyword === 'address' && (f.includes('email') || f.includes('website'))) return false;
+        return true;
+      });
 
     const data: any = {};
 
@@ -573,12 +587,25 @@ export class MarketingHotProspectService extends BaseService {
       }
     }
 
-    // ── address (parsed into structured fields) ─────────────────────────
-    const canonicalAddress = business.nap_consistency?.canonical_address ?? null;
+    // ── address ─────────────────────────────────────────────────────────
+    // Structured components the audit carries explicitly win (canonical_nap
+    // precedence — same order as lib/canonical-nap's audit tier); the combined
+    // single-line string is only trusted when it actually decomposes. A
+    // combined string the parser can't split ("…, United States", missing
+    // ZIP, spelled-out state) must never land whole in address_line1, and a
+    // loose-country parse (street number read as a foreign postcode) must
+    // never write at all — both corrupt an otherwise-valid campaign NAP.
+    const nap = business.nap_consistency;
+    const matched = business.audit_metadata?.matched_business;
+    const canonicalAddress = nap?.canonical_address ?? null;
     const googleAddress = business.platforms?.google?.displayed_address ?? null;
-    const matchedAddress = business.audit_metadata?.matched_business?.address ?? null;
+    const matchedAddress = matched?.address ?? null;
     const scanAddress = business.address ?? null;
-    const addressStr = canonicalAddress ?? googleAddress ?? matchedAddress ?? scanAddress ?? null;
+    const rawAddressStr = canonicalAddress ?? googleAddress ?? matchedAddress ?? scanAddress ?? null;
+    // Audit payloads are loose JSON — a non-string address (object/array)
+    // would throw below and fail the whole sync; skip instead.
+    const addressStr =
+      typeof rawAddressStr === 'string' && rawAddressStr.trim() ? rawAddressStr.trim() : null;
     if (addressStr) {
       const canOverwrite = isVerified('address');
       // Only sync address components if we're allowed to overwrite, OR if the
@@ -586,14 +613,26 @@ export class MarketingHotProspectService extends BaseService {
       // would risk creating half-populated addresses, so we treat address as
       // an all-or-nothing unit.
       if (canOverwrite || !campaign.address_line1) {
-        const parsed = addressParser.parse(addressStr);
-        if (parsed.address_line1) {
-          data.address_line1 = parsed.address_line1;
-          if (parsed.address_line2) data.address_line2 = parsed.address_line2;
-          if (parsed.city) data.address_city = parsed.city;
-          if (parsed.state) data.address_state = parsed.state;
-          if (parsed.postal_code) data.address_zip = parsed.postal_code;
-          if (parsed.country_code) data.address_country = parsed.country_code;
+        const parsed = addressParser.parseComponents(addressStr);
+        const firstSegment = addressStr.split(',')[0]?.trim() ?? '';
+        // Street fallback: the first comma segment — but only when it still
+        // looks like a street line (carries a number); a bare label like
+        // "Not publicly listed" writes nothing.
+        const street =
+          parsed?.address_line1?.trim() || (/\d/.test(firstSegment) ? firstSegment : null);
+        if (street) {
+          // Only audit-derived sources feed the write — requested_business
+          // is operator input context, not evidence (and commonly carries a
+          // spelled-out state that would overwrite the two-letter column).
+          const city = nap?.canonical_city ?? matched?.city ?? parsed?.city ?? null;
+          const state = nap?.canonical_state ?? matched?.state ?? parsed?.state ?? null;
+          const zip = nap?.canonical_zip ?? matched?.zip ?? parsed?.postal_code ?? null;
+          data.address_line1 = street;
+          if (parsed?.address_line2) data.address_line2 = parsed.address_line2;
+          if (city) data.address_city = city;
+          if (state) data.address_state = state;
+          if (zip) data.address_zip = zip;
+          if (parsed?.country_code) data.address_country = parsed.country_code;
         }
       }
     }

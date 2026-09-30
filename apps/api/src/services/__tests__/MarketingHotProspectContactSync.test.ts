@@ -390,4 +390,145 @@ describe('MarketingHotProspectService.syncFromAudit — contact sync', () => {
       address_country: 'US',
     });
   });
+
+  it('decomposes a GBP-style canonical_address with a ", United States" suffix', async () => {
+    const auditData = buildAuditData({
+      nap_consistency: {
+        overall_status: 'major_inconsistencies',
+        canonical_name: 'YB Enterprise African Market',
+        canonical_phone: '(317) 734-3827',
+        canonical_address: '711 E Thompson Rd, Indianapolis, IN 46227, United States',
+      },
+    });
+    const initial = buildCampaign();
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const contactUpdate = updates.find((u) => u.data.address_line1);
+    // The whole string must NOT land in address_line1 — the regression this
+    // test guards wrote the entire blob there.
+    expect(contactUpdate.data).toMatchObject({
+      address_line1: '711 E Thompson Rd',
+      address_city: 'Indianapolis',
+      address_state: 'IN',
+      address_zip: '46227',
+      address_country: 'US',
+    });
+  });
+
+  it('does not write the Iceland street-number misfire for a spelled-out state', async () => {
+    const auditData = buildAuditData({
+      nap_consistency: {
+        overall_status: 'major_inconsistencies',
+        canonical_name: 'YB Enterprise African Market',
+        canonical_phone: '(317) 734-3827',
+        canonical_address: '711 E Thompson Rd, Indianapolis, Indiana',
+      },
+    });
+    const initial = buildCampaign({
+      address_line1: '711 E Thompson Rd',
+      address_city: 'Indianapolis',
+      address_state: 'IN',
+      address_zip: '46227',
+      address_country: 'US',
+    });
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const contactUpdate = updates.find((u) => u.data.address_line1);
+    // Street survives as the first comma segment; the EU parser's Iceland
+    // misfire (postal='711', line1='E Thompson Rd', city='Indiana',
+    // country='IS') must never write.
+    expect(contactUpdate?.data.address_line1).toBe('711 E Thompson Rd');
+    for (const u of updates) {
+      expect(u.data.address_city).not.toBe('Indiana');
+      expect(u.data.address_zip).not.toBe('711');
+      expect(u.data.address_country).not.toBe('IS');
+    }
+  });
+
+  it('writes only the street segment for a street+city string with no state/ZIP', async () => {
+    const auditData = buildAuditData({
+      nap_consistency: {
+        overall_status: 'major_inconsistencies',
+        canonical_name: 'YB Enterprise African Market',
+        canonical_phone: '(317) 734-3827',
+        canonical_address: '711 E Thompson Rd, Indianapolis',
+      },
+    });
+    const initial = buildCampaign();
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const contactUpdate = updates.find((u) => u.data.address_line1);
+    expect(contactUpdate?.data.address_line1).toBe('711 E Thompson Rd');
+    for (const u of updates) {
+      expect(u.data.address_zip).not.toBe('711');
+      expect(u.data.address_country).not.toBe('IS');
+    }
+  });
+
+  it('prefers structured canonical components over a combined string', async () => {
+    const auditData = buildAuditData({
+      nap_consistency: {
+        overall_status: 'major_inconsistencies',
+        canonical_name: 'YB Enterprise African Market',
+        canonical_phone: '(317) 734-3827',
+        canonical_address: '711 E Thompson Rd, Indianapolis, Indiana',
+        canonical_city: 'Indianapolis',
+        canonical_state: 'IN',
+        canonical_zip: '46227',
+      },
+    });
+    const initial = buildCampaign();
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const contactUpdate = updates.find((u) => u.data.address_line1);
+    expect(contactUpdate?.data).toMatchObject({
+      address_line1: '711 E Thompson Rd',
+      address_city: 'Indianapolis',
+      address_state: 'IN',
+      address_zip: '46227',
+    });
+  });
+
+  it('writes nothing when canonical_address is a non-address label', async () => {
+    const auditData = buildAuditData({
+      nap_consistency: {
+        overall_status: 'unavailable',
+        canonical_name: 'YB Enterprise African Market',
+        canonical_phone: '(317) 734-3827',
+        canonical_address: 'Not publicly listed',
+      },
+    });
+    const initial = buildCampaign();
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const contactUpdate = updates.find((u) => u.data.address_line1);
+    expect(contactUpdate).toBeUndefined();
+  });
+
+  it('does not treat an "email address" verified_fields entry as address verification', async () => {
+    const auditData = buildAuditData({
+      data_quality: {
+        confidence: 'medium',
+        verified_fields: ['Business name', 'Email address'],
+        unavailable_fields: [],
+      },
+    });
+    const initial = buildCampaign({ address_line1: '711 E Thompson Rd' });
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const contactUpdate = updates.find((u) => u.data.address_line1);
+    expect(contactUpdate).toBeUndefined();
+  });
 });

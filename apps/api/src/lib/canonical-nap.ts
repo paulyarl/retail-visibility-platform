@@ -130,9 +130,7 @@ export function resolveCampaignNap(
   const combinedAddress =
     clean(nap.canonical_address) ?? clean(matched.address) ?? clean(requested.address);
   const parsed =
-    combinedAddress && addressParser.canParse(combinedAddress)
-      ? addressParser.parse(combinedAddress)
-      : null;
+    combinedAddress ? addressParser.parseComponents(combinedAddress) : null;
   // Unparseable combined strings still carry the street before the first
   // comma (same heuristic the seed path used before this module existed).
   const streetFromCombined = combinedAddress

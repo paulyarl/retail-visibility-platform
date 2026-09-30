@@ -1561,8 +1561,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // the write boundary; explicit verifiedCity/verifiedState/verifiedZip
       // inputs still win over parsed components.
       const rawAddress = input.verifiedAddress?.trim() || '';
-      const parsedAddress =
-        rawAddress && addressParser.canParse(rawAddress) ? addressParser.parse(rawAddress) : null;
+      const parsedAddress = rawAddress ? addressParser.parseComponents(rawAddress) : null;
       const verifiedCity = input.verifiedCity?.trim() || parsedAddress?.city?.trim() || undefined;
       const verifiedState = input.verifiedState?.trim() || parsedAddress?.state?.trim() || undefined;
       const verifiedZip = input.verifiedZip?.trim() || parsedAddress?.postal_code?.trim() || undefined;
