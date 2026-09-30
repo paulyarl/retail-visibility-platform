@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { clientLogger } from '@/lib/client-logger';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import directoryClaimPublicService, {
@@ -139,6 +139,13 @@ export default function DirectoryClaimListingEditor({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Business logo — uploads immediately on pick (the claim token is the
+  // capability; same write as the tenant logo endpoint: tenant profile +
+  // listing logo_url).
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setEditAddress(summary.address ?? '');
     setEditCity(summary.city ?? '');
@@ -156,7 +163,43 @@ export default function DirectoryClaimListingEditor({
     setEditHours(parseHours(summary.businessHours));
     setEditTimezone(summary.businessHours?.timezone || 'America/New_York');
     setEditSlug(summary.slug ?? '');
+    setLogoUrl(summary.logoUrl ?? null);
   }, [summary]);
+
+  const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Logo must be an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo must be under 5 MB.');
+      return;
+    }
+    const dataUrl = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+    if (!dataUrl) {
+      setError('Failed to read the logo file.');
+      return;
+    }
+    setLogoUploading(true);
+    setError(null);
+    setSuccess(null);
+    const result = await directoryClaimPublicService.uploadClaimLogo(token, dataUrl, file.type);
+    setLogoUploading(false);
+    if (result.success && result.url) {
+      setLogoUrl(result.url);
+      setSuccess('Logo updated.');
+    } else {
+      setError(result.error === 'file_too_large' ? 'Logo must be under 5 MB.' : 'Failed to upload the logo.');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -288,6 +331,38 @@ export default function DirectoryClaimListingEditor({
               disabled={false}
             />
           )}
+          <div className="flex items-center gap-3">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Business logo"
+                className="h-12 w-12 object-contain rounded border border-gray-200 bg-white"
+              />
+            ) : (
+              <div className="h-12 w-12 rounded border border-dashed border-gray-300 bg-gray-50" />
+            )}
+            <div>
+              <Text size="sm">Logo</Text>
+              <Text size="xs" c="dimmed">
+                Shown on your public listing and QR codes. Saves on upload.
+              </Text>
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={() => logoFileRef.current?.click()}
+                loading={logoUploading}
+              >
+                {logoUrl ? 'Replace logo' : 'Upload logo'}
+              </Button>
+            </div>
+            <input
+              ref={logoFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              onChange={handleLogoFile}
+              className="hidden"
+            />
+          </div>
         </Stack>
 
         <Divider />

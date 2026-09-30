@@ -23,6 +23,8 @@ export interface DirectoryClaimSummary {
   phone: string | null;
   website: string | null;
   email: string | null;
+  /** Listing logo — the tenant profile's logo_url; owner can replace it during claim. */
+  logoUrl?: string | null;
   notes: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -186,6 +188,36 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
         return { success: false, error };
       }
       return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'unknown' };
+    }
+  }
+
+  /** POST /api/public/directory/claim/:token/logo — owner logo upload.
+   *  Writes tenant_business_profiles_list.logo_url (the tenant-logo
+   *  destination) + the listing's logo_url via the same service path the
+   *  operator seed-logo upload uses. */
+  async uploadClaimLogo(
+    token: string,
+    dataUrl: string,
+    contentType: string,
+  ): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/claim/${encodeURIComponent(token)}/logo`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ dataUrl, contentType }),
+          headers: this.getCustomerAuthHeaders(),
+        },
+        undefined,
+        0,
+      );
+      if (!result.success) {
+        const error = typeof result.error === 'string' ? result.error : 'unknown';
+        return { success: false, error };
+      }
+      return { success: true, url: (result.data?.url ?? undefined) as string | undefined };
     } catch (err: any) {
       return { success: false, error: err?.message || 'unknown' };
     }

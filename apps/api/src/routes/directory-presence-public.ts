@@ -1749,6 +1749,48 @@ router.put('/claim/:token/listing', optionalAuth, optionalCustomerAuth, async (r
   }
 });
 
+const claimLogoUploadSchema = z.object({
+  dataUrl: z.string().min(1),
+  contentType: z.string().min(1),
+});
+
+/** POST /api/public/directory/claim/:token/logo — owner logo upload (token auth).
+ *  Same trust level as the /listing PUT: the claim token is the capability, so
+ *  the write lands on the tenant business profile + listing immediately —
+ *  exactly the destination the tenant-facing logo endpoint uses. */
+router.post('/claim/:token/logo', optionalAuth, optionalCustomerAuth, async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const summary = await DirectoryClaimService.getTokenSummary(token);
+    if (!summary) return res.status(404).json({ error: 'token_not_found' });
+    if (summary.isExpired) return res.status(410).json({ error: 'token_expired' });
+    if (summary.isConsumed) return res.status(409).json({ error: 'already_claimed' });
+
+    const validation = claimLogoUploadSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+
+    const { dataUrl, contentType } = validation.data;
+    const result = await DirectoryPresenceSeedService.uploadSeedLogo(summary.seedId, dataUrl, contentType, {
+      actorType: 'customer',
+      actorId: (req as any).customer?.id || (req as any).user?.id || undefined,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    res.json({ success: true, url: result.logoUrl });
+  } catch (error: any) {
+    if (error?.message === 'invalid_content_type') return res.status(400).json({ error: 'invalid_content_type' });
+    if (error?.message === 'file_too_large') return res.status(400).json({ error: 'file_too_large' });
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    logger.error('[POST /api/public/directory/claim/:token/logo] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/public/directory/claim/:token/slug-patterns — available slug patterns */
 router.get('/claim/:token/slug-patterns', async (req: Request, res: Response) => {
   try {

@@ -61,6 +61,8 @@ export interface ClaimTokenSummary {
   phone: string | null;
   website: string | null;
   email: string | null;
+  /** Listing logo — shown on the claim page and offered for owner upload. */
+  logoUrl: string | null;
   notes: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -178,6 +180,7 @@ class DirectoryClaimService {
         dl.phone,
         dl.website,
         dl.email,
+        dl.logo_url,
         dl.latitude,
         dl.longitude,
         dl.primary_category,
@@ -217,6 +220,7 @@ class DirectoryClaimService {
       phone: r.phone,
       website: r.website,
       email: r.email,
+      logoUrl: r.logo_url ?? null,
       latitude: r.latitude,
       longitude: r.longitude,
       primaryCategory: r.primary_category,
