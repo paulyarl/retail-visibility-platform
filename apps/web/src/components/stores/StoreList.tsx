@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { StoreCard, StoreData, StoreStats, ViewMode, LinkType } from './StoreCard';
 import { fetchMultipleStoreStats } from '@/utils/storeStatsCalculator';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import type { DirectoryShelfIndexEntry } from '@/lib/directory-shelves';
 
 // ==================== TYPES ====================
 
@@ -18,6 +20,10 @@ export interface StoreListProps {
   gridClassName?: string;
   /** Shelf→entry attribution ref forwarded to each StoreCard (see StoreCard). */
   shelfRef?: string;
+  /** Live directory shelf index forwarded to each StoreCard so primary
+   *  categories render as shelf links. When omitted, the list lazy-fetches
+   *  the MV-backed index itself (post-hydration upgrade). */
+  shelfIndex?: DirectoryShelfIndexEntry[];
 }
 
 // ==================== SKELETON COMPONENTS ====================
@@ -108,9 +114,20 @@ export function StoreList({
   className = '',
   gridClassName = '',
   shelfRef,
+  shelfIndex,
 }: StoreListProps) {
   const [storeStats, setStoreStats] = useState<Record<string, StoreStats>>({});
   const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
+  // null = not fetched yet; callers that already hold the index (server pages)
+  // pass it so links render in the SSR HTML.
+  const [fetchedShelfIndex, setFetchedShelfIndex] = useState<DirectoryShelfIndexEntry[] | null>(null);
+  const effectiveShelfIndex = shelfIndex ?? fetchedShelfIndex ?? undefined;
+
+  // gridClassName replaces the default responsive columns when provided —
+  // surfaces that want a different card shape (e.g. wider, square-ish cards
+  // next to a sidebar rail) pass their own column spec.
+  const gridClasses =
+    gridClassName || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
 
   // Fetch store stats for all stores
   useEffect(() => {
@@ -142,11 +159,31 @@ export function StoreList({
     }
   }, [stores, loading]);
 
+  // Lazy shelf-index fetch — only when the caller didn't supply one. Lets the
+  // category label hot-link on every surface without prop-drilling the index
+  // through pages that never needed it.
+  useEffect(() => {
+    if (shelfIndex !== undefined || fetchedShelfIndex !== null || stores.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    recommendationsService.getDirectoryMVCategories()
+      .then((data) => {
+        if (!cancelled) setFetchedShelfIndex(data?.categories ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedShelfIndex([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shelfIndex, fetchedShelfIndex, stores.length]);
+
   // Loading state
   if (loading) {
     if (viewMode === 'grid') {
       return (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${gridClassName}`}>
+        <div className={`grid ${gridClasses} gap-6`}>
           {Array.from({ length: 8 }).map((_, i) => (
             <GridSkeleton key={i} />
           ))}
@@ -181,7 +218,7 @@ export function StoreList({
   // Grid view
   if (viewMode === 'grid') {
     return (
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${gridClassName}`}>
+      <div className={`grid ${gridClasses} gap-6`}>
         {stores.map((store) => (
           <StoreCard
             key={store.tenantId}
@@ -194,6 +231,7 @@ export function StoreList({
             stats={storeStats[store.tenantId] || null}
             statsLoading={statsLoading[store.tenantId]}
             shelfRef={shelfRef}
+            shelfIndex={effectiveShelfIndex}
           />
         ))}
       </div>
@@ -216,6 +254,7 @@ export function StoreList({
             stats={storeStats[store.tenantId] || null}
             statsLoading={statsLoading[store.tenantId]}
             shelfRef={shelfRef}
+            shelfIndex={effectiveShelfIndex}
           />
         ))}
       </div>
@@ -238,6 +277,7 @@ export function StoreList({
             stats={storeStats[store.tenantId] || null}
             statsLoading={statsLoading[store.tenantId]}
             shelfRef={shelfRef}
+            shelfIndex={effectiveShelfIndex}
           />
         ))}
       </div>

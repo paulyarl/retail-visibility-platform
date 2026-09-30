@@ -10,6 +10,11 @@ import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 import { getDirectoryListingUrl } from '@/utils/slug';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
+import {
+  resolveDirectoryShelfForLabel,
+  directoryShelfHrefFor,
+  type DirectoryShelfIndexEntry,
+} from '@/lib/directory-shelves';
 
 // ==================== TYPES ====================
 
@@ -88,6 +93,10 @@ export interface StoreCardProps {
    *  Appended as `?shelf=` to internal entry links so the entry view can be
    *  attributed back to its referring shelf. Ignored for external links. */
   shelfRef?: string;
+  /** Live directory shelf index — when present, the card's primary category
+   *  resolves to its shelf and renders as a hot link; unresolved labels fall
+   *  back to plain (non-link) text. */
+  shelfIndex?: DirectoryShelfIndexEntry[];
 }
 
 // ==================== STORE CARD COMPONENT ====================
@@ -103,6 +112,7 @@ export function StoreCard({
   statsLoading = false,
   className = '',
   shelfRef,
+  shelfIndex,
 }: StoreCardProps) {
   // Get business hours status
   const { status: hoursStatus } = useStoreStatus(store.tenantId, true);
@@ -147,6 +157,13 @@ export function StoreCard({
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ')
     : 'General Store';
+
+  // Resolve the display label against live shelves — the formatted label is
+  // what shoppers see, and the resolver lowercases/trims so title-casing and
+  // underscore normalization line up with shelf names.
+  const categoryShelf = store.primaryCategory
+    ? resolveDirectoryShelfForLabel(formattedCategory, shelfIndex ?? [])
+    : null;
 
   // Format address
   const formattedAddress = [
@@ -242,12 +259,23 @@ export function StoreCard({
               {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
             </Link>
             
-            {/* Store Category/Type */}
+            {/* Store Category/Type — hot link to the live shelf when the
+                label resolves; plain text otherwise (blue is reserved for
+                real links so the affordance stays honest). */}
             {store.primaryCategory && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                  {formattedCategory}
-                </span>
+                {categoryShelf ? (
+                  <Link
+                    href={directoryShelfHrefFor(categoryShelf.slug)}
+                    className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors"
+                  >
+                    {formattedCategory}
+                  </Link>
+                ) : (
+                  <span className="text-sm text-neutral-600 dark:text-neutral-400 font-medium">
+                    {formattedCategory}
+                  </span>
+                )}
               </div>
             )}
             

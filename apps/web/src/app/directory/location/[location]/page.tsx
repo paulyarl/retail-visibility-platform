@@ -302,6 +302,10 @@ export default async function LocationPage({ params, searchParams }: LocationPag
               baseUrl="/directory/location"
               categorySlug={location}
               shelfRef={`directory/location/${location}`}
+              // The market-intel rail shrinks the grid to ~850px; capping at 2
+              // columns keeps cards roughly square instead of 4 narrow columns.
+              gridClassName="grid-cols-1 sm:grid-cols-2"
+              shelfIndex={shelfIndex}
             />
           )}
             </div>

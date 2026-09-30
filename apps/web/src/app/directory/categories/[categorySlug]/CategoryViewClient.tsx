@@ -363,6 +363,7 @@ export default function CategoryViewClient({
             baseUrl="/directory/categories"
             categorySlug={categorySlug}
             shelfRef={`directory/category/${categorySlug}`}
+            shelfIndex={shelfIndex}
           />
         )}
 

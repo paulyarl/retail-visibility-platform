@@ -2,6 +2,7 @@
 
 import { StoreList, StoreData } from '@/components/stores';
 import { LinkType } from '../stores/StoreCard';
+import type { DirectoryShelfIndexEntry } from '@/lib/directory-shelves';
 
 
 interface DirectoryListing {
@@ -57,6 +58,11 @@ interface DirectoryGridProps {
   categorySlug?: string;
   /** Shelf→entry attribution ref forwarded to each card (see StoreCard). */
   shelfRef?: string;
+  /** Overrides the default responsive grid columns (see StoreList). */
+  gridClassName?: string;
+  /** Live directory shelf index — card primary categories hot-link to their
+   *  shelf when the label resolves (see StoreCard). */
+  shelfIndex?: DirectoryShelfIndexEntry[];
 }
 
 
@@ -99,6 +105,8 @@ export default function DirectoryGrid({
   baseUrl = '', 
   categorySlug = '',
   shelfRef,
+  gridClassName,
+  shelfIndex,
 }: DirectoryGridProps) {
   // Transform listings to store data format
   const stores = listings.map(transformListing);
@@ -118,6 +126,8 @@ export default function DirectoryGrid({
         maxCategories={3}
         loading={showLoading}
         shelfRef={shelfRef}
+        gridClassName={gridClassName}
+        shelfIndex={shelfIndex}
       />
 
       {/* Pagination */}
