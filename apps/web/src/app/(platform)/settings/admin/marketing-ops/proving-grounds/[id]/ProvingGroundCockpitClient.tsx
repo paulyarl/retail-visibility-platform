@@ -279,6 +279,18 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   // member_geos) — drives the ID card and the per-slot profile chips.
   const pgDomain = useMemo(() => pgDomainOf(campaign), [campaign]);
 
+  // One card per attached campaign: only its latest discovery run renders.
+  // Audits arrive newest-first per child, so the first entry per childId is
+  // the latest run — older runs would re-list the same businesses.
+  const latestDiscoveryRuns = useMemo(() => {
+    const seen = new Set<string>();
+    return discoveryAudits.filter((d) => {
+      if (seen.has(d.childId)) return false;
+      seen.add(d.childId);
+      return true;
+    });
+  }, [discoveryAudits]);
+
   // Tree-scoped queue refresh — fetches the PG's prospect queue and derives
   // due-today, the promote panel, and the discovery-list queue awareness.
   // Called by load() and by the discovery-prospects reload so "Reload
@@ -796,7 +808,10 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   // Load the businesses the attached intelligence (discovery) campaigns found.
   // Discovery results live on the child campaign as intelligence_discovery
   // audits (audit_data.discovered_businesses) — fetch each child's detail and
-  // collect those audits, newest first.
+  // collect those audits, newest first. Every run stays loaded (the card's
+  // focus-parity siblingAudits lookup scans a campaign's prior runs for the
+  // opposite-focus ledger), but the panel renders only the latest run per
+  // campaign via latestDiscoveryRuns — re-runs supersede, not accumulate.
   const loadDiscoveryProspects = useCallback(async () => {
     if (children.length === 0) return;
     setProspectsLoading(true);
@@ -1980,9 +1995,9 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             </p>
           ) : (
             <div className="space-y-4">
-              {discoveryAudits.map(({ childId, childTitle, audit }) => (
+              {latestDiscoveryRuns.map(({ childId, childTitle, audit }) => (
                 <div key={audit.id}>
-                  {discoveryAudits.length > 1 && (
+                  {latestDiscoveryRuns.length > 1 && (
                     <p className="text-[10px] text-gray-400 mb-1">
                       from{' '}
                       <Link href={`/settings/admin/marketing-ops/campaigns/${childId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
