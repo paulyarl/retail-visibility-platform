@@ -1,0 +1,74 @@
+# Docker build context ignore for apps/api/Dockerfile (context = repo root).
+# dockerignore semantics: unanchored patterns like `scripts` or `*.md` only match
+# at the context root, so nested dirs such as apps/api/scripts and
+# apps/api/migrations/*.sql are NOT affected.
+
+.git
+.github
+.vercel
+.agents
+.devin
+.windsurf
+.claude
+
+# ~181MB: checked-in supabase CLI binary + CSV migration dumps
+scripts
+
+# Root-level ops/doc dirs irrelevant to the API image
+errors
+docs
+specs
+tests
+prompts
+database
+supabase
+plugins
+production_backup_*
+
+# Root-level scratch artifacts
+*.md
+*.sql
+*.csv
+*.dump
+*.log
+*.pdf
+*.ps1
+*.bat
+*.sh
+*.ts
+*.html
+master-test-report.json
+test-results-*.json
+african_grocery_store_*.json
+milwaukee-*.json
+skills-lock.json
+vercel.json
+.cache-bust
+.vercel-build-id
+
+# Web app source — only its manifest is needed for the pnpm workspace install
+apps/web/**
+!apps/web/package.json
+
+# Local DB dumps / stale copies / scratch inside the API workspace
+apps/api/*.dump
+apps/api/prisma/dev.db*
+apps/api/temp-index.*
+apps/api/tests
+apps/api/src/tests
+**/*.bak
+
+# Dependency / build artifacts
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+
+# Env files — never bake secrets into the image
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example

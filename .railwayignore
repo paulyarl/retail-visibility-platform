@@ -1,0 +1,77 @@
+# Railway deploy snapshot ignore (gitignore-style syntax, anchored to repo root).
+# The API image builds from apps/api/Dockerfile with the repo root as context —
+# only the API workspace, shared packages, root manifests and patches/ are needed.
+# Root-anchored (`/`) patterns are used everywhere so nested dirs like
+# apps/api/scripts, apps/api/database and apps/api/**/*.sql are never touched.
+
+# ~181MB of migration tooling: checked-in supabase CLI binary + CSV dumps
+/scripts/
+
+# Root-level ops/doc dirs irrelevant to the API build
+/errors/
+/docs/
+/specs/
+/tests/
+/prompts/
+/database/
+/supabase/
+/plugins/
+/production_backup_*/
+
+# Agent / IDE / CI metadata
+/.agents/
+/.devin/
+/.windsurf/
+/.github/
+/.vercel/
+
+# Root-level scratch artifacts (never nested — anchoring keeps apps/api intact)
+/*.md
+/*.sql
+/*.csv
+/*.dump
+/*.log
+/*.pdf
+/*.ps1
+/*.bat
+/*.sh
+/*.ts
+/*.html
+/*.json.bak
+/master-test-report.json
+/test-results-*.json
+/african_grocery_store_*.json
+/milwaukee-*.json
+/skills-lock.json
+/vercel.json
+/.cache-bust
+/.vercel-build-id
+
+# Web app source — only its package.json is needed so pnpm can resolve the
+# workspace (no code in this image imports apps/web)
+/apps/web/**
+!/apps/web/package.json
+
+# Local DB dumps / stale copies / scratch inside the API workspace
+/apps/api/*.dump
+/apps/api/prisma/dev.db*
+/apps/api/temp-index.*
+/apps/api/tests/
+/apps/api/src/tests/
+**/*.bak
+
+# Dependency / build artifacts
+node_modules/
+**/node_modules/
+**/dist/
+**/.next/
+**/coverage/
+*.tsbuildinfo
+*.tsbuildinfo.*
+
+# Env files — never ship in the image
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example

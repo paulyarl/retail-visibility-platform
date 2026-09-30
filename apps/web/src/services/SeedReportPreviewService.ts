@@ -19,6 +19,12 @@ export interface ReportPreviewData {
   version: number;
   status: string;
   generated_at: string;
+  /** Report lane — 'full' only when a real (non-stub) business_analysis
+   *  audit backs the seed's campaign chain; 'partial' = discovery/cat-id
+   *  only (the free-report banner stays hidden until the BA lands).
+   *  Absent on responses cached before the field shipped → treated as
+   *  'partial' by seedReportPromotable. */
+  audit_lane?: 'full' | 'partial';
   business_identity: {
     business_name: { value: string; state: string };
     address: { value: string; state: string };
@@ -86,6 +92,16 @@ export interface ReportPreviewData {
     cta_eligible: boolean;
     cta_disabled_reason: string | null;
   };
+}
+
+/**
+ * The free-report banner gate — the promotion is reserved for the full
+ * lane: a published report exists AND the seed's campaign chain carries a
+ * real business_analysis audit. Partial-lane seeds (discovery signals /
+ * cat-id only) never display the banner or its report CTA.
+ */
+export function seedReportPromotable(data: ReportPreviewData | null): boolean {
+  return data != null && data.audit_lane === 'full';
 }
 
 class SeedReportPreviewService extends PublicApiSingleton {

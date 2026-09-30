@@ -488,6 +488,18 @@ describe('SeedReportEvidenceService.getSeedReportContext', () => {
     created_at: new Date('2026-09-01'),
   };
 
+  // Partial-lane stub — the discovery/queue/derive carrier. Newer than
+  // baAuditRow so it arrives first under created_at DESC.
+  const stubBaAuditRow = {
+    id: 'audit-stub-1',
+    platform: 'business_analysis',
+    audit_data: {
+      audit_metadata: { source: 'derived_from_parent' },
+      detected_signals: [{ code: 'DS_MISSING_WEBSITE', basis: 'no website observed' }],
+    },
+    created_at: new Date('2026-09-15'),
+  };
+
   const catAuditRow = {
     id: 'audit-cat-1',
     platform: 'category_identification',
@@ -575,6 +587,31 @@ describe('SeedReportEvidenceService.getSeedReportContext', () => {
     expect(rctx.business_analysis_audit_id).toBe('audit-ba-1');
     expect(rctx.category_identification_audit_id).toBe('audit-cat-1');
     expect(rctx.audit_ids).toEqual(['audit-ba-1', 'audit-cat-1']);
+  });
+
+  it('skips stub business_analysis rows — a newer stub cannot shadow an older real audit', async () => {
+    wireFragmentRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ discovery_context: null }],
+      audits: [stubBaAuditRow, baAuditRow, catAuditRow],
+    });
+    const rctx = await service.getSeedReportContext('seed-1', dims, ctx);
+    // The stub arrives first under created_at DESC and must not win.
+    expect(rctx.business_analysis_audit_id).toBe('audit-ba-1');
+    expect(rctx.public_narrative).toBe('A neighborhood auto shop on the east side.');
+    expect(rctx.audit_ids).toEqual(['audit-ba-1', 'audit-cat-1']);
+  });
+
+  it('treats a stub-only business_analysis row as absent — cat-id stays the narrative source', async () => {
+    wireFragmentRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ discovery_context: null }],
+      audits: [stubBaAuditRow, catAuditRow],
+    });
+    const rctx = await service.getSeedReportContext('seed-1', dims, ctx);
+    expect(rctx.business_analysis_audit_id).toBeNull();
+    expect(rctx.public_narrative).toBe('Fallback narrative from the category audit.');
+    expect(rctx.audit_ids).toEqual(['audit-cat-1']);
   });
 
   it('falls back to the category_identification narrative', async () => {
@@ -700,6 +737,108 @@ describe('SeedReportEvidenceService.getSeedReportContext', () => {
     const rctx = await service.getSeedReportContext('seed-1', dims, ctx);
     expect(rctx.campaign_id).toBe('cmp-1');
     expect(rctx.public_narrative).toBeNull();
+  });
+});
+
+// ─── resolveSeedAuditLane — the free-report banner boundary ────────────
+//
+// 'full' requires a real (non-stub) business_analysis audit reachable on
+// the primary-linked campaign or its parent. Stub audits, cat-id only, and
+// unlinked seeds resolve 'partial' — the free-report banner stays hidden.
+
+describe('SeedReportEvidenceService.resolveSeedAuditLane', () => {
+  const service = SeedReportEvidenceService.getInstance();
+
+  const wireLaneRows = (overrides: {
+    links?: any[];
+    campaigns?: any[];
+    audits?: any[];
+  }) => {
+    mockQueryRaw.mockImplementation((...args: any[]) => {
+      const sql = sqlText(args);
+      if (sql.includes('FROM directory_seed_campaign_links')) return Promise.resolve(overrides.links ?? []);
+      if (sql.includes('FROM mkt_campaigns_list')) return Promise.resolve(overrides.campaigns ?? []);
+      if (sql.includes('FROM mkt_audits_list')) return Promise.resolve(overrides.audits ?? []);
+      return Promise.resolve([]);
+    });
+  };
+
+  const stubRow = {
+    id: 'audit-stub-1',
+    platform: 'business_analysis',
+    audit_data: {
+      audit_metadata: { source: 'queue_promotion' },
+      detected_signals: [],
+    },
+  };
+
+  const realBaRow = {
+    id: 'audit-ba-1',
+    platform: 'business_analysis',
+    audit_data: { public_narrative: 'A neighborhood auto shop.' },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    wireLaneRows({});
+  });
+
+  it('resolves partial for an unlinked seed', async () => {
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('partial');
+  });
+
+  it('resolves full when a real business_analysis audit exists on the linked campaign', async () => {
+    wireLaneRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ parent_campaign_id: null }],
+      audits: [realBaRow],
+    });
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('full');
+  });
+
+  it('resolves full when the real audit lives on the parent (scan) campaign', async () => {
+    wireLaneRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ parent_campaign_id: 'cmp-scan' }],
+      audits: [realBaRow],
+    });
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('full');
+  });
+
+  it('resolves partial when only stub business_analysis rows exist', async () => {
+    wireLaneRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ parent_campaign_id: null }],
+      audits: [stubRow],
+    });
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('partial');
+  });
+
+  it('resolves full when a newer stub sits beside an older real audit', async () => {
+    wireLaneRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ parent_campaign_id: null }],
+      audits: [stubRow, realBaRow],
+    });
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('full');
+  });
+
+  it('resolves partial for cat-id only — the partial fast path is not a BA', async () => {
+    wireLaneRows({
+      links: [{ campaign_id: 'cmp-1' }],
+      campaigns: [{ parent_campaign_id: null }],
+      audits: [{
+        id: 'audit-cat-1',
+        platform: 'category_identification',
+        audit_data: { public_narrative: 'Category scan narrative.' },
+      }],
+    });
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('partial');
+  });
+
+  it('fails closed — a broken chain resolves partial, never full', async () => {
+    mockQueryRaw.mockImplementation(() => Promise.reject(new Error('db down')));
+    expect(await service.resolveSeedAuditLane('seed-1', ctx)).toBe('partial');
   });
 });
 

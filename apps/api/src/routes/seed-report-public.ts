@@ -19,11 +19,13 @@
 
 import { Router, Request, Response } from 'express';
 import { SeedIntelligenceReportService } from '../services/intelligence/SeedIntelligenceReportService';
+import { SeedReportEvidenceService } from '../services/intelligence/SeedReportEvidenceService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
 const router = Router();
 const reportService = SeedIntelligenceReportService.getInstance();
+const evidenceService = SeedReportEvidenceService.getInstance();
 const PUBLIC_REPORT_STATUSES = new Set(['provisional', 'complete', 'claimed']);
 
 function isPubliclyEligibleReport(report: { status: string }): boolean {
@@ -139,6 +141,12 @@ router.get('/marketing/seed/:seedId/report/preview', async (req: Request, res: R
       ? await resolveClaimToken(seedId)
       : { token: null, shortCode: null };
 
+    // Audit lane — computed live (not persisted) so the banner boundary
+    // flips the moment a full business_analysis audit lands; 'partial'
+    // (stub audits / cat-id only / unlinked) suppresses the free-report
+    // banner. Report promotion is reserved for the full BA lane.
+    const auditLane = await evidenceService.resolveSeedAuditLane(seedId);
+
     // Preview shape — subset of the full DTO for public consumption.
     // Strips internal fields (source observation IDs, lint findings,
     // unresolved details) that are operator-only.
@@ -150,6 +158,7 @@ router.get('/marketing/seed/:seedId/report/preview', async (req: Request, res: R
       generated_at: report.generated_at,
       claim_token: claimToken,
       claim_short_code: claimShortCode,
+      audit_lane: auditLane,
       business_identity: {
         business_name: report.business_identity.business_name,
         address: report.business_identity.address,

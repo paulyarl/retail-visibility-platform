@@ -40,6 +40,7 @@ import {
   type EvidenceConfidence,
 } from '../../validators/seed-report-evidence.schema';
 import { MarketContextLoader } from './MarketContextLoader';
+import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
 import {
   getSignalRegistryCache,
   setSignalRegistryCache,
@@ -613,9 +614,16 @@ export class SeedReportEvidenceService extends BaseService {
           const data =
             row.audit_data && typeof row.audit_data === 'object' ? row.audit_data : null;
           if (!data) continue;
-          if (row.platform === 'business_analysis' && !context.business_analysis_audit_id) {
-            context.business_analysis_audit_id = row.id;
-            baData = data;
+          if (row.platform === 'business_analysis') {
+            // Partial-lane stubs carry detected_signals, not analyst facts —
+            // skip them so a newer stub can't shadow an older real BA's
+            // narrative + platform evidence. The report reflects a full
+            // audit only.
+            if (isStubBusinessAnalysisAudit(row)) continue;
+            if (!context.business_analysis_audit_id) {
+              context.business_analysis_audit_id = row.id;
+              baData = data;
+            }
           } else if (row.platform === 'category_identification' && !context.category_identification_audit_id) {
             context.category_identification_audit_id = row.id;
             catData = data;
@@ -738,6 +746,70 @@ export class SeedReportEvidenceService extends BaseService {
     }
 
     return context;
+  }
+
+  /**
+   * Resolve which audit lane the seed's campaign chain is on — the boundary
+   * the free-report banner honors:
+   *
+   *   'full'    — a real (non-stub) business_analysis audit is reachable via
+   *               the primary-linked campaign or its parent. Report
+   *               generation/promotion is reserved for this lane.
+   *   'partial' — stub audits / cat-id only / unlinked seed. The published
+   *               report itself may exist (provenance is lane-agnostic) but
+   *               the banner must not display.
+   *
+   * Fails closed — an unresolvable chain returns 'partial' so a broken
+   * check can never light the banner.
+   */
+  async resolveSeedAuditLane(
+    seedId: string,
+    ctx?: RequestCtx,
+  ): Promise<'full' | 'partial'> {
+    try {
+      const linkRows = await this.prisma.$queryRaw<any[]>`
+        SELECT campaign_id
+        FROM directory_seed_campaign_links
+        WHERE seed_id = ${seedId}
+        ORDER BY link_role ASC
+        LIMIT 1
+      `;
+      const campaignId = linkRows?.[0]?.campaign_id ?? null;
+      if (!campaignId) return 'partial';
+
+      // Audits resolve on the linked campaign AND its parent — the BA can
+      // live on the scan campaign that produced the seed.
+      const campaignRows = await this.prisma.$queryRaw<any[]>`
+        SELECT parent_campaign_id
+        FROM mkt_campaigns_list
+        WHERE id = ${campaignId}
+        LIMIT 1
+      `;
+      const parentCampaignId = campaignRows?.[0]?.parent_campaign_id ?? null;
+
+      // Fetch BA payloads for stub detection — the marker lives at
+      // audit_metadata.source, so the check stays anchored to
+      // isStubBusinessAnalysisAudit rather than a duplicated SQL literal.
+      const auditRows = await this.prisma.$queryRaw<any[]>`
+        SELECT id, platform, audit_data
+        FROM mkt_audits_list
+        WHERE campaign_id = ANY(${[campaignId, parentCampaignId].filter(Boolean)})
+          AND platform = 'business_analysis'
+          AND audit_data IS NOT NULL
+      `;
+
+      return (auditRows ?? []).some(
+        (row) => row.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(row),
+      )
+        ? 'full'
+        : 'partial';
+    } catch (err: any) {
+      logger.warn('SeedReportEvidenceService: audit lane resolution failed (non-fatal)', ctx, {
+        error: err?.message,
+        seedId,
+      });
+      return 'partial';
+    }
   }
 
   // ─── Signal validation against mkt_signal_registry (§6.7) ──────────────

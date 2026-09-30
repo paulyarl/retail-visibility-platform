@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MarketIntelBanner, bannerQrOptions } from './MarketIntelBanner';
+import { seedReportPromotable } from '@/services/SeedReportPreviewService';
 
 const cityTeaser = {
   surfaceType: 'city',
@@ -104,6 +105,7 @@ describe('MarketIntelBanner', () => {
         surfaceType: 'seed',
         teaser: seedTeaser,
         seedId: 'seed-1',
+        seedReportReady: true,
       }),
     );
 
@@ -121,6 +123,7 @@ describe('MarketIntelBanner', () => {
         surfaceType: 'seed',
         teaser: seedTeaser,
         seedId: 'seed-1',
+        seedReportReady: true,
       }),
     );
 
@@ -138,6 +141,7 @@ describe('MarketIntelBanner', () => {
         surfaceType: 'seed',
         teaser: seedTeaser,
         seedId: 'seed-1',
+        seedReportReady: true,
         reportShortCode: 'KUAKTH',
       }),
     );
@@ -155,25 +159,59 @@ describe('MarketIntelBanner', () => {
         surfaceType: 'seed',
         teaser: seedTeaser,
         seedId: 'seed-1',
+        seedReportReady: true,
       }),
     );
     expect(square).not.toContain('Scan to open the report');
   });
 
-  it('falls back to an unlinked offer when the seed id is unknown', () => {
+  it('renders nothing while the report lane is unresolved', () => {
     const html = renderToStaticMarkup(
       createElement(MarketIntelBanner, {
         variant: 'tall',
         surfaceType: 'seed',
         teaser: seedTeaser,
+        seedId: 'seed-1',
       }),
     );
 
-    // No dead link, no fabricated tracked URL — the offer degrades in place.
+    // The lane check hasn't resolved yet (SSR never runs the effect) — the
+    // boundary renders nothing rather than a CTA that could point at a
+    // report the lane hasn't earned.
+    expect(html).toBe('');
+    expect(html).not.toContain('See the report');
+    expect(html).not.toContain('/api/public/r/seed/');
+  });
+
+  it('renders nothing on the partial lane — report promotion is full-BA only', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'tall',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+        seedId: 'seed-1',
+        seedReportReady: false,
+      }),
+    );
+
+    // The whole promo is suppressed, not just the CTA.
+    expect(html).toBe('');
+  });
+
+  it('suppresses the seed promo when no seed id resolves', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'tall',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+        seedReportReady: true,
+      }),
+    );
+
+    // No seed id → no lane to resolve → nothing renders, no dead link.
+    expect(html).toBe('');
     expect(html).not.toContain('/api/public/r/seed/');
     expect(html).not.toContain('<a');
-    expect(html).toContain('See the report');
-    expect(html).toContain('Coming soon');
   });
 
   it('renders the aggregate directory promo with no teaser and no QR', () => {
@@ -224,6 +262,17 @@ describe('MarketIntelBanner', () => {
       }),
     );
     expect(available).not.toContain('Coming soon');
+  });
+});
+
+describe('seedReportPromotable', () => {
+  it('requires a published preview on the full audit lane', () => {
+    expect(seedReportPromotable(null)).toBe(false);
+    expect(seedReportPromotable({ audit_lane: 'partial' } as any)).toBe(false);
+    // Responses cached before audit_lane shipped carry no flag — they
+    // resolve to partial (the safe side of the boundary).
+    expect(seedReportPromotable({} as any)).toBe(false);
+    expect(seedReportPromotable({ audit_lane: 'full' } as any)).toBe(true);
   });
 });
 

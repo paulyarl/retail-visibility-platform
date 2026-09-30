@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { BannerSlot, type BannerVariant } from './BannerSlot';
 import { generateQrDataUrl, type PersistedQrStyle, type QrEngineOptions } from '@/lib/qr-engine';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import seedReportPreviewService, { seedReportPromotable } from '@/services/SeedReportPreviewService';
 import type { CategoryMarketIntelTeaser, CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
 
@@ -104,9 +105,15 @@ export interface MarketIntelBannerProps {
   surfaceType: MarketIntelSurfaceType;
   /** The surface's market-intel teaser — supplies the report teaser + availability. */
   teaser?: BannerTeaser | null;
-  /** Seed surface only — the report this banner promotes. Without it the seed
-   *  banner falls back to a non-linked offer rather than a dead link. */
+  /** Seed surface only — the report this banner promotes. Without it the
+   *  banner can't resolve a promotable report and renders nothing. */
   seedId?: string | null;
+  /** Seed surface only — whether a promotable published report exists for
+   *  the seed (full audit lane: a real business_analysis audit backs the
+   *  seed's campaign chain). Omit to let the banner resolve it itself via
+   *  the cached preview service; pass it when the caller already checked
+   *  (MarketIntelSidebar's own preview fetch). */
+  seedReportReady?: boolean;
   /** Seed surface only — the seed's active claim-token short code. When present
    *  the CTA/QR use the /rb/{code} short path instead of the seed-id API path. */
   reportShortCode?: string | null;
@@ -124,23 +131,50 @@ export interface MarketIntelBannerProps {
  * BannerSlot; renders fallback copy without a teaser so the reserved box is
  * never empty.
  *
- * On the seed surface the tall variant also carries the report QR. The QR and
- * the CTA both encode the tracked redirect — never the destination — so a
- * banner scan is attributable to its own channel.
+ * On the seed surface the banner exists only to promote the free report,
+ * and report promotion is reserved for the full audit lane — a partial-lane
+ * seed (discovery signals / cat-id only, no real business_analysis audit)
+ * renders nothing, and so does an unresolved one. The tall variant also
+ * carries the report QR. The QR and the CTA both encode the tracked
+ * redirect — never the destination — so a banner scan is attributable to
+ * its own channel.
  */
 export function MarketIntelBanner({
   variant,
   surfaceType,
   teaser = null,
   seedId = null,
+  seedReportReady,
   reportShortCode = null,
   qrStyle = null,
   logoUrl = null,
   className = '',
 }: MarketIntelBannerProps) {
   const isSeed = surfaceType === 'seed';
-  const trackedPath = isSeed && seedId ? bannerReportTrackedPath(seedId, reportShortCode) : null;
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [selfCheckedReady, setSelfCheckedReady] = useState<boolean | null>(null);
+  // Undefined prop → the banner resolves the lane itself via the cached
+  // preview; a boolean means the caller already resolved it.
+  const seedReady = isSeed ? (seedReportReady ?? selfCheckedReady) : null;
+  const trackedPath = isSeed && seedId && seedReady === true
+    ? bannerReportTrackedPath(seedId, reportShortCode)
+    : null;
+
+  // Seed surface only — resolve the report lane when the caller didn't.
+  // Fails closed: a 404/error/unparseable payload leaves the banner hidden.
+  useEffect(() => {
+    if (!isSeed || !seedId || seedReportReady !== undefined) return;
+    let cancelled = false;
+    seedReportPreviewService
+      .getReportPreview(seedId)
+      .then((data) => {
+        if (!cancelled) setSelfCheckedReady(seedReportPromotable(data));
+      })
+      .catch(() => {
+        if (!cancelled) setSelfCheckedReady(false);
+      });
+    return () => { cancelled = true; };
+  }, [isSeed, seedId, seedReportReady]);
 
   // Tall seed banner only: the square has no room for a legible QR.
   useEffect(() => {
@@ -183,7 +217,13 @@ export function MarketIntelBanner({
   // The seed surface promotes the free report, so its copy is not the paid
   // report card's teaser.
   const teaserText = (isSeed ? null : report?.teaser?.trim()) || promo.fallbackTeaser;
-  const available = isSeed ? !!trackedPath : (report?.available ?? false);
+  const available = isSeed ? seedReady === true : (report?.available ?? false);
+
+  // Partial-lane seeds never display the free-report promo — the banner is
+  // downstream of the same boundary that reserves report generation for the
+  // full BA lane. An unresolved check or a missing seed id renders nothing
+  // rather than a CTA that could point at a report the lane hasn't earned.
+  if (isSeed && (!seedId || seedReady !== true)) return null;
   // The free report isn't an unlock — keep the verb honest per surface.
   const ctaLabel = isSeed
     ? 'See the report'

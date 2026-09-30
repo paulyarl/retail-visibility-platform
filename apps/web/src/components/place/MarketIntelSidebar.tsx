@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown, Check, X, Lock, Download } from 'lucide-react';
 import marketIntelPublicService, { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
-import seedReportPreviewService from '@/services/SeedReportPreviewService';
+import seedReportPreviewService, { seedReportPromotable } from '@/services/SeedReportPreviewService';
 import marketIntelCustomerService, {
   MarketIntelPartialContent,
   MarketIntelFullContent,
@@ -56,19 +56,22 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
   const [unlockRequired, setUnlockRequired] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [open, setOpen] = useState(false);
-  const [hasSeedReport, setHasSeedReport] = useState(false);
+  const [reportPromotable, setReportPromotable] = useState(false);
 
-  // Seed-report existence check on mount — the "How We Found" card sits
-  // outside the collapsible as its always-visible teaser, so it can't
-  // wait for the panel to open.
+  // Seed-report check on mount — the "How We Found" card sits outside the
+  // collapsible as its always-visible teaser, so it can't wait for the
+  // panel to open. The free-report promotion is reserved for the full
+  // audit lane: a published report must exist AND the seed's campaign
+  // chain must carry a real business_analysis audit (audit_lane='full') —
+  // partial-lane seeds never display it.
   useEffect(() => {
-    if (!seedId || hasSeedReport) return;
+    if (!seedId || reportPromotable) return;
     let cancelled = false;
     seedReportPreviewService.getReportPreview(seedId).then((data) => {
-      if (!cancelled && data) setHasSeedReport(true);
+      if (!cancelled && seedReportPromotable(data)) setReportPromotable(true);
     });
     return () => { cancelled = true; };
-  }, [seedId, hasSeedReport]);
+  }, [seedId, reportPromotable]);
 
   // Refresh teaser client-side (ttl: 0 — no cache).
   useEffect(() => {
@@ -140,10 +143,10 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
     <aside className="w-full">
       {/* How We Found This Business — the seed-report provenance card sits
           OUTSIDE the collapsible as the always-visible teaser for the intel
-          below; the report page carries the claim CTA itself. Renders
-          independently of audit availability — the report predates the
-          intel audit. */}
-      {hasSeedReport && seedId && (
+          below; the report page carries the claim CTA itself. Gated on the
+          full audit lane — partial-lane seeds (no real business_analysis
+          audit) don't promote the report. */}
+      {reportPromotable && seedId && (
         <div className="mb-2">
           <MarketIntelCard
             icon="🔍"
@@ -181,13 +184,16 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
       {open && (
         <div id="market-intel-panel" className="mt-2 space-y-3">
           {/* Tall banner slot (300x600) — reserved seed banner inventory at the
-              top of the panel, filled with this seed's free-report offer + QR. */}
+              top of the panel, filled with this seed's free-report offer + QR.
+              seedReportReady carries the lane gate — the banner self-hides
+              while the seed is on the partial lane. */}
           <div className="flex justify-center">
             <MarketIntelBanner
               variant="tall"
               surfaceType="seed"
               teaser={teaser}
               seedId={seedId}
+              seedReportReady={reportPromotable}
               reportShortCode={reportShortCode}
               qrStyle={qrStyle}
               logoUrl={logoUrl}
