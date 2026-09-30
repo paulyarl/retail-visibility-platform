@@ -104,7 +104,13 @@ export default function PlaceEntryEditorialLayout({
 
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
   const hasClaimToken = !!claimToken;
-  const claimHref = hasClaimToken ? `/place/claim/${claimToken}` : '#claim-inquiry';
+  // Prefer the /c/{code} short path — it resolves to the seed's live token,
+  // so the link survives token reissue; raw token URL is the fallback.
+  const claimHref = listing.claimShortCode
+    ? `/c/${listing.claimShortCode}`
+    : hasClaimToken
+      ? `/place/claim/${claimToken}`
+      : '#claim-inquiry';
   const disclaimer = publicDisclaimer ||
     `${listing.businessName} is listed from public information (address and phone). This is not a claimed profile and may be incomplete.`;
 
@@ -181,13 +187,13 @@ export default function PlaceEntryEditorialLayout({
               </div>
               <div className="flex flex-wrap items-center gap-4">
                 {hasClaimToken ? (
-                  <Link
+                  <a
                     href={claimHref}
                     onClick={trackClaimClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-white text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors font-semibold"
                   >
                     <ShieldCheck className="w-5 h-5" /> Claim this listing
-                  </Link>
+                  </a>
                 ) : (
                   <a
                     href={claimHref}
@@ -300,13 +306,13 @@ export default function PlaceEntryEditorialLayout({
               </div>
               <div className="flex flex-col items-center lg:items-end gap-3">
                 {hasClaimToken ? (
-                  <Link
+                  <a
                     href={claimHref}
                     onClick={trackClaimClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold w-full lg:w-auto justify-center"
                   >
                     <ShieldCheck className="w-5 h-5" /> Claim this listing
-                  </Link>
+                  </a>
                 ) : (
                   <a
                     href={claimHref}

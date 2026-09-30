@@ -11,7 +11,7 @@ import marketIntelCustomerService, {
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { MarketIntelCard } from './MarketIntelCard';
 import { MarketIntelPaywall } from './MarketIntelPaywall';
-import { MarketIntelBanner } from './MarketIntelBanner';
+import { MarketIntelBanner, bannerReportTrackedPath } from './MarketIntelBanner';
 import type { PersistedQrStyle } from '@/lib/qr-engine';
 
 interface MarketIntelSidebarProps {
@@ -120,10 +120,13 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
     if (fullResult.content) setFull(fullResult.content);
   };
 
-  // Claim card CTA: prefer the live token, fall back to #claim-inquiry (§3.4).
-  const claimHref = activeClaimToken
-    ? `/place/claim/${activeClaimToken}`
-    : '#claim-inquiry';
+  // Claim card CTA: prefer the /c/{code} short path (resolves to the live
+  // token — survives reissue), then the raw token URL, then #claim-inquiry.
+  const claimHref = reportShortCode
+    ? `/c/${reportShortCode}`
+    : activeClaimToken
+      ? `/place/claim/${activeClaimToken}`
+      : '#claim-inquiry';
   const claimCtaLabel = 'Claim this listing →';
 
   // Determine the content tier to render.
@@ -148,7 +151,7 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
             teaser="Where this listing came from — the sources checked, identity confidence, and signals behind it."
             available={true}
             ctaLabel="Read the free report →"
-            ctaHref={`/seed-report/${seedId}`}
+            ctaHref={bannerReportTrackedPath(seedId, reportShortCode)}
           />
         </div>
       )}
