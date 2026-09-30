@@ -209,9 +209,9 @@ describe('assembleIdentityPacket', () => {
 
   it('carries the linked seed into the packet', () => {
     const p = assembleIdentityPacket(
-      base({ seed: { id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market' } }),
+      base({ seed: { id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market', isPublished: false } }),
     );
-    expect(p.seed).toEqual({ id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market' });
+    expect(p.seed).toEqual({ id: 'dps-1', status: 'draft', publicUrl: '/place/arsema-market', isPublished: false });
   });
 
   it('resolves addressCity/addressState/addressZip for the Verify record prefill', () => {

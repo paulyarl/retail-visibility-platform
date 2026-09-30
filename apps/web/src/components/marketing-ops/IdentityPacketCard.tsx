@@ -615,7 +615,7 @@ export default function IdentityPacketCard({
             >
               View seed <ArrowUpRight className="h-3 w-3" />
             </Link>
-            {seed.publicUrl && ['published', 'invited', 'claimed'].includes(seed.status) && (
+            {seed.publicUrl && seed.isPublished && (
               <a
                 href={seed.publicUrl}
                 target="_blank"

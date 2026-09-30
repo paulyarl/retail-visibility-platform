@@ -199,7 +199,7 @@ export interface IdentityPacket {
       }>;
     };
   };
-  seed: { id: string; status: string; publicUrl: string | null } | null;
+  seed: { id: string; status: string; publicUrl: string | null; isPublished: boolean } | null;
   /** Persisted operator seed decision ('wait'), or null when none recorded. */
   seedDecision: { decision: string; at: string; by: string | null } | null;
   /**
@@ -2156,6 +2156,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     linkRole: 'primary' | 'sibling' | 'recovery';
     napMatchConfidence: string;
     publicUrl: string | null;
+    isPublished: boolean;
     claimedAt: string | null;
     publishedAt: string | null;
     createdAt: string;

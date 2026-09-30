@@ -1127,6 +1127,8 @@ class DirectorySeedCampaignLinkService {
     linkRole: LinkRole;
     napMatchConfidence: NapConfidence;
     publicUrl: string | null;
+    /** Whether the listing's public /place page resolves (dl.is_published). */
+    isPublished: boolean;
     claimedAt: Date | null;
     publishedAt: Date | null;
     createdAt: Date;
@@ -1142,6 +1144,7 @@ class DirectorySeedCampaignLinkService {
         dps.created_at,
         dl.slug,
         dl.business_name,
+        dl.is_published,
         dscl.link_role,
         dscl.nap_match_confidence
       FROM directory_seed_campaign_links dscl
@@ -1162,6 +1165,7 @@ class DirectorySeedCampaignLinkService {
       linkRole: r.link_role as LinkRole,
       napMatchConfidence: (r.nap_match_confidence ?? 'none') as NapConfidence,
       publicUrl: r.slug ? `/place/${r.slug}` : null,
+      isPublished: !!r.is_published,
       claimedAt: r.claimed_at ? new Date(r.claimed_at) : null,
       publishedAt: r.published_at ? new Date(r.published_at) : null,
       createdAt: new Date(r.created_at),

@@ -745,6 +745,15 @@ function PresenceSeedDetailClient() {
   // Claimed seeds have been promoted to a real customer relationship — refuse
   // to delete them from the UI to prevent destroying customer data.
   const canDelete = status !== 'claimed';
+  // The claim-link banner mirrors the live token, not just a session-fresh
+  // mint — publish auto-mints for the courtesy outreach, so the banner stays
+  // up even after the "Generate Claim Invite" button retires itself.
+  const activeClaimToken =
+    claimTokens.find(
+      (t) => !t.consumedAt && (!t.expiresAt || new Date(t.expiresAt).getTime() > Date.now()),
+    ) ?? null;
+  const bannerToken = inviteToken ?? activeClaimToken?.token ?? null;
+  const bannerShortCode = inviteToken ? inviteShortCode : (activeClaimToken?.shortCode ?? null);
 
   // Claim QR kit variants — one tracked redirect URL per delivery channel.
   // Shared by the artifact cards and the QR designer modal.
@@ -1306,23 +1315,23 @@ function PresenceSeedDetailClient() {
           {actionSuccess}
         </div>
       )}
-      {inviteToken && listing?.slug && (
+      {bannerToken && listing?.slug && (
         <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg space-y-3">
           <div>
             <p className="text-sm font-medium text-blue-900 mb-1">Claim Link</p>
-            {inviteShortCode && (
+            {bannerShortCode && (
               <div className="mb-2">
                 <p className="text-xs text-blue-600 mb-0.5">Short link (preferred for SMS / DM)</p>
                 <p className="text-sm text-blue-700 break-all font-mono">
                   {typeof window !== 'undefined'
-                    ? `${window.location.origin}/c/${inviteShortCode}`
-                    : `/c/${inviteShortCode}`}
+                    ? `${window.location.origin}/c/${bannerShortCode}`
+                    : `/c/${bannerShortCode}`}
                 </p>
                 <button
                   className="mt-1 text-xs text-blue-600 underline"
                   onClick={() => {
                     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                      const link = `${window.location.origin}/c/${inviteShortCode}`;
+                      const link = `${window.location.origin}/c/${bannerShortCode}`;
                       navigator.clipboard.writeText(link);
                     }
                   }}
@@ -1334,14 +1343,14 @@ function PresenceSeedDetailClient() {
             <p className="text-xs text-blue-600 mb-0.5">Full link</p>
             <p className="text-sm text-blue-700 break-all font-mono">
               {typeof window !== 'undefined'
-                ? `${window.location.origin}/place/claim/${inviteToken}`
-                : `/place/claim/${inviteToken}`}
+                ? `${window.location.origin}/place/claim/${bannerToken}`
+                : `/place/claim/${bannerToken}`}
             </p>
             <button
               className="mt-2 text-xs text-blue-600 underline"
               onClick={() => {
                 if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                  const link = `${window.location.origin}/place/claim/${inviteToken}`;
+                  const link = `${window.location.origin}/place/claim/${bannerToken}`;
                   navigator.clipboard.writeText(link);
                 }
               }}
@@ -1356,14 +1365,14 @@ function PresenceSeedDetailClient() {
             </p>
             <p className="text-sm text-blue-700 break-all font-mono">
               {typeof window !== 'undefined'
-                ? `${window.location.origin}/retail/${listing.slug}?preview=${inviteToken}`
-                : `/retail/${listing.slug}?preview=${inviteToken}`}
+                ? `${window.location.origin}/retail/${listing.slug}?preview=${bannerToken}`
+                : `/retail/${listing.slug}?preview=${bannerToken}`}
             </p>
             <button
               className="mt-2 text-xs text-blue-600 underline"
               onClick={() => {
                 if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                  const link = `${window.location.origin}/retail/${listing.slug}?preview=${inviteToken}`;
+                  const link = `${window.location.origin}/retail/${listing.slug}?preview=${bannerToken}`;
                   navigator.clipboard.writeText(link);
                 }
               }}
@@ -1392,7 +1401,7 @@ function PresenceSeedDetailClient() {
             <Send className="w-4 h-4" /> Generate Claim Invite
           </button>
         )}
-        {listing?.slug && status === 'published' ? (
+        {listing?.slug && listing.is_published ? (
           <Link
             href={`/place/${listing.slug}`}
             target="_blank"

@@ -125,7 +125,7 @@ export interface IdentityPacket {
   /** Newest captured owner contact, or null when none has been captured. */
   ownerContact: OwnerContact | null;
   score: IdentityPacketScore;
-  seed: { id: string; status: string; publicUrl: string | null } | null;
+  seed: { id: string; status: string; publicUrl: string | null; isPublished: boolean } | null;
   /**
    * Persisted operator seed decision (mkt_campaigns_list.seed_decision*), or
    * null when none was recorded / the columns do not exist yet. 'wait' means
@@ -176,7 +176,7 @@ export interface AssembleInput {
    * the Identity tab can list and retract them.
    */
   manualEvidence?: IdentityEvidenceRow[];
-  seed?: { id: string; status: string; publicUrl: string | null } | null;
+  seed?: { id: string; status: string; publicUrl: string | null; isPublished: boolean } | null;
   /** Persisted operator seed decision (see IdentityPacket.seedDecision). */
   seedDecision?: IdentityPacket['seedDecision'];
   /**
@@ -707,7 +707,7 @@ class IdentityPacketService {
     let provenance: AssembleInput['provenance'] = [];
     try {
       const linkRows = await prisma.$queryRaw<any[]>`
-        SELECT dps.id, dps.status, dl.slug
+        SELECT dps.id, dps.status, dl.slug, dl.is_published
         FROM directory_seed_campaign_links dscl
         JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
         JOIN directory_listings_list dl ON dl.id = dps.listing_id
@@ -716,7 +716,12 @@ class IdentityPacketService {
       `;
       const link = Array.isArray(linkRows) ? linkRows[0] : null;
       if (link) {
-        seed = { id: link.id, status: link.status, publicUrl: link.slug ? `/place/${link.slug}` : null };
+        seed = {
+          id: link.id,
+          status: link.status,
+          publicUrl: link.slug ? `/place/${link.slug}` : null,
+          isPublished: !!link.is_published,
+        };
         provenance = await (prisma as any).directory_field_provenance.findMany({
           where: { seed_id: link.id },
           select: {

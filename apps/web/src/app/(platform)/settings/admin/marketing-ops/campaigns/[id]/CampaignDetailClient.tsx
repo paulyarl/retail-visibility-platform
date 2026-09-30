@@ -431,6 +431,7 @@ export default function CampaignDetailClient({
     linkRole: 'primary' | 'sibling' | 'recovery';
     napMatchConfidence: string;
     publicUrl: string | null;
+    isPublished: boolean;
     claimedAt: string | null;
     publishedAt: string | null;
     createdAt: string;
@@ -2041,9 +2042,9 @@ export default function CampaignDetailClient({
                                     seed
                                   </Link>
                                   {/* Public preview only for live seeds — a
-                                      suppressed (retired) child's /place page
-                                      is off every public surface. */}
-                                  {seed.publicUrl && seed.status !== 'suppressed' && (
+                                      suppressed (retired) child is kept off,
+                                      and an unpublished listing 404s. */}
+                                  {seed.publicUrl && seed.isPublished && seed.status !== 'suppressed' && (
                                     <>
                                       <span className="text-gray-300 dark:text-neutral-600">·</span>
                                       <a
