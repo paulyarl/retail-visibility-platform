@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { BannerSlot, type BannerVariant } from './BannerSlot';
 import { generateQrDataUrl } from '@/lib/qr-engine';
 import type { CategoryMarketIntelTeaser, CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
@@ -153,12 +152,16 @@ export function MarketIntelBanner({
 
         <div className="mt-auto pt-3">
           {available && trackedPath ? (
-            <Link
+            // Plain anchor, not next/link — trackedPath is an API redirect
+            // endpoint, not an app route. Link would issue an RSC prefetch/navigation
+            // request (?_rsc) that misses the route and 404s, and prefetches could
+            // record phantom report_banner scans.
+            <a
               href={trackedPath}
               className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline"
             >
               {ctaLabel} →
-            </Link>
+            </a>
           ) : available ? (
             <span className="inline-flex items-center text-sm font-medium text-blue-600">
               {ctaLabel} →
