@@ -159,19 +159,25 @@ router.get('/r/seed/:seedId/:channel', async (req: Request, res: Response) => {
  *
  * The short code is the same `directory_claim_tokens.short_code` used by
  * the claim invite — the report is delivered alongside the claim token.
+ * The code→seed mapping is permanent, so resolution ignores token expiry/
+ * consumption: a printed report card keeps landing on /seed-report/{seedId}
+ * even after the claim token dies or is re-issued.
  * The scan is recorded even if the code is invalid (warm-lead analytics).
  */
 router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
   const { shortCode } = req.params;
   const { surface } = req.query;
 
-  // Validate surface — fall back to in_person for unrecognized values
+  // Validate surface — fall back to in_person for unrecognized values.
+  // 'banner' maps to the standalone report_banner surface (not report_delivery_*)
+  // so banner scans never inflate the delivered → viewed funnel.
   const validSurfaces: Record<string, QrSurfaceType> = {
     in_person: 'report_delivery_in_person',
     text: 'report_delivery_text',
     email: 'report_delivery_email',
     social: 'report_delivery_social',
     phone: 'report_delivery_phone',
+    banner: 'report_banner',
   };
   const resolvedSurface = validSurfaces[surface as string] || 'report_delivery_in_person';
 
@@ -184,8 +190,6 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
       FROM directory_claim_tokens dct
       JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
       WHERE dct.short_code = ${shortCode}
-        AND dct.consumed_at IS NULL
-        AND (dct.expires_at IS NULL OR dct.expires_at > now())
       LIMIT 1
     `;
     if (rows[0]) {
@@ -218,15 +222,16 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
   }
 
   // §5.3.2 lifecycle: write the view side of the delivery (best-effort).
+  // Delivery channels only — a banner scan has no delivery to mark as viewed.
   try {
-    const channel = (Object.keys(validSurfaces) as ReportDeliveryChannel[]).find(
+    const channel = (Object.keys(validSurfaces) as ReportChannel[]).find(
       (c) => validSurfaces[c] === resolvedSurface,
     );
-    if (channel) {
+    if (channel && DELIVERY_CHANNELS.has(channel)) {
       const { default: reportDelivery } = await import(
         '../services/intelligence/SeedReportDeliveryService'
       );
-      await reportDelivery.recordViewFromScan(seedId, channel);
+      await reportDelivery.recordViewFromScan(seedId, channel as ReportDeliveryChannel);
     }
   } catch {
     // View write-back failure — the scan row is still recorded

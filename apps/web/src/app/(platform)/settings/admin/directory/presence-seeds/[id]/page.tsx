@@ -740,7 +740,9 @@ function PresenceSeedDetailClient() {
   const canPublish = status === 'draft';
   const canInvite =
     (status === 'published' || status === 'invited') &&
-    !claimTokens.some((t) => !t.consumedAt);
+    !claimTokens.some(
+      (t) => !t.consumedAt && (!t.expiresAt || new Date(t.expiresAt).getTime() > Date.now()),
+    );
   const canEdit = status !== 'claimed';
   // Claimed seeds have been promoted to a real customer relationship — refuse
   // to delete them from the UI to prevent destroying customer data.

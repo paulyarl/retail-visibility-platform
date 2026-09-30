@@ -252,6 +252,7 @@ export default function PlaceEntryEditorialLayout({
                     surfaceType="seed"
                     teaser={marketIntelTeaser}
                     seedId={listing.seedId}
+                    reportShortCode={listing.claimShortCode}
                   />
                 </div>
               )}
@@ -381,6 +382,7 @@ export default function PlaceEntryEditorialLayout({
               initialTeaser={marketIntelTeaser}
               activeClaimToken={claimToken}
               seedId={listing.seedId}
+              reportShortCode={listing.claimShortCode}
             />
           </div>
         )}

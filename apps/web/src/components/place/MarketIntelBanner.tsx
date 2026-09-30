@@ -52,10 +52,15 @@ const SEED_PROMO = {
     'We found this business across public directories and local sources, and documented the work in a free report.',
 };
 
-/** Tracked redirect for a banner-served report QR. Records a `report_banner`
- *  scan (its own surface — never a delivery channel), then 302s to the report. */
-export function bannerReportTrackedPath(seedId: string): string {
-  return `/api/public/r/seed/${seedId}/banner`;
+/** Tracked redirect for a banner-served report link/QR. Records a
+ *  `report_banner` scan (its own surface — never a delivery channel), then
+ *  redirects to /seed-report/{seedId}. Prefers the claim-token short code
+ *  (/rb/{code} — same resolve+track+redirect pattern as /r/, /rt/ & co.);
+ *  falls back to the seed-id API path when no claim token is active. */
+export function bannerReportTrackedPath(seedId: string, shortCode?: string | null): string {
+  return shortCode
+    ? `/rb/${shortCode}`
+    : `/api/public/r/seed/${seedId}/banner`;
 }
 
 export interface MarketIntelBannerProps {
@@ -66,6 +71,9 @@ export interface MarketIntelBannerProps {
   /** Seed surface only — the report this banner promotes. Without it the seed
    *  banner falls back to a non-linked offer rather than a dead link. */
   seedId?: string | null;
+  /** Seed surface only — the seed's active claim-token short code. When present
+   *  the CTA/QR use the /rb/{code} short path instead of the seed-id API path. */
+  reportShortCode?: string | null;
   className?: string;
 }
 
@@ -83,10 +91,11 @@ export function MarketIntelBanner({
   surfaceType,
   teaser = null,
   seedId = null,
+  reportShortCode = null,
   className = '',
 }: MarketIntelBannerProps) {
   const isSeed = surfaceType === 'seed';
-  const trackedPath = isSeed && seedId ? bannerReportTrackedPath(seedId) : null;
+  const trackedPath = isSeed && seedId ? bannerReportTrackedPath(seedId, reportShortCode) : null;
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   // Tall seed banner only: the square has no room for a legible QR.

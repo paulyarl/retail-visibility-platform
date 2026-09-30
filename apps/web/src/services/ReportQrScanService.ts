@@ -1,7 +1,7 @@
 /**
  * Report QR Scan Service
  *
- * Dedicated service for the /r/, /rt/, /re/, /rs/, /rp/ short-URL redirect
+ * Dedicated service for the /r/, /rt/, /re/, /rs/, /rp/, /rb/ short-URL redirect
  * pages. Calls the combined resolve + track API endpoint (GET
  * /api/public/r/report-scan/{shortCode}?surface={surface}) which resolves the
  * 6-char short code to the seed_id AND records a qr_scan_events row in one
@@ -15,7 +15,9 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { clientLogger } from '@/lib/client-logger';
 
-export type ReportQrSurface = 'in_person' | 'text' | 'email' | 'social' | 'phone';
+// 'banner' is a report-QR surface but NOT a delivery channel — it records
+// 'report_banner' scans and never writes a delivered → viewed touch.
+export type ReportQrSurface = 'in_person' | 'text' | 'email' | 'social' | 'phone' | 'banner';
 
 export class ReportQrScanService extends PublicApiSingleton {
   protected defaultContext: AppContext = AppContext.SHOP;
@@ -38,7 +40,7 @@ export class ReportQrScanService extends PublicApiSingleton {
    * Resolve a 6-char short code to the seed_id, recording a QR scan event
    * for the given report delivery surface in the same request.
    * @param shortCode - The 6-char alphanumeric short code (e.g., "H7FZQJ")
-   * @param surface - Delivery channel: 'in_person' | 'text' | 'email' | 'social' | 'phone'
+   * @param surface - Report QR surface: 'in_person' | 'text' | 'email' | 'social' | 'phone' | 'banner'
    * @returns the seed_id string or null if not found / expired
    */
   async resolveAndTrack(shortCode: string, surface: ReportQrSurface): Promise<string | null> {

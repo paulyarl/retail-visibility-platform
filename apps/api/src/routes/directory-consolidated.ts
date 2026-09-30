@@ -92,10 +92,11 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dps.id AS seed_id,
           dps.seo_enrichment->>'meta_title' as meta_title,
           dps.seo_enrichment->>'schema_type_hint' as schema_type_hint,
-          (SELECT dct.token FROM directory_claim_tokens dct
+          (SELECT json_build_object('token', dct.token, 'short_code', dct.short_code)
+           FROM directory_claim_tokens dct
            JOIN directory_presence_seeds dps2 ON dps2.id = dct.seed_id
            WHERE dps2.listing_id = dll.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
-           LIMIT 1) as active_claim_token
+           LIMIT 1) as active_claim
          FROM directory_listings_list dll
          LEFT JOIN tenants t ON t.id = dll.tenant_id
          LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
@@ -392,7 +393,8 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       listingOrigin: (listing as any).listing_origin || null,
       publicDisclaimer: (listing as any).public_disclaimer || null,
       attributes: Array.isArray((listing as any).attributes) ? (listing as any).attributes : [],
-      activeClaimToken: (listing as any).active_claim_token || null,
+      activeClaimToken: (listing as any).active_claim?.token || null,
+      claimShortCode: (listing as any).active_claim?.short_code || null,
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,
       keywords: listing.keywords,

@@ -131,6 +131,23 @@ describe('MarketIntelBanner', () => {
     expect(html).not.toContain('/seed-report/seed-1"');
   });
 
+  it('prefers the /rb/{shortCode} short path when a claim code is active', () => {
+    const html = renderToStaticMarkup(
+      createElement(MarketIntelBanner, {
+        variant: 'square',
+        surfaceType: 'seed',
+        teaser: seedTeaser,
+        seedId: 'seed-1',
+        reportShortCode: 'KUAKTH',
+      }),
+    );
+
+    // Same resolve+track+redirect pattern as /r/, /rt/ & co. — surface
+    // 'banner' records report_banner, outside the delivery funnel.
+    expect(html).toContain('href="/rb/KUAKTH"');
+    expect(html).not.toContain('/api/public/r/seed/');
+  });
+
   it('renders no QR in the square variant (tall only)', () => {
     const square = renderToStaticMarkup(
       createElement(MarketIntelBanner, {

@@ -784,22 +784,30 @@ class DirectoryPresenceSeedService {
    * resolve + track endpoint /api/public/qr/claim-scan/:shortCode that
    * backs the /q/, /qw/, /qs/ frontend redirect pages.
    *
-   * Returns null for expired or consumed tokens (do not leak existence).
+   * Short codes survive token reissue (same pattern as intake short codes):
+   * the code→seed mapping is permanent, so an expired or consumed code
+   * resolves to the seed's CURRENT live token when one exists — printed
+   * cards and shared links keep working after a re-invite.
+   *
+   * Returns null only when the code is unknown or the seed has no live token.
    */
   async resolveClaimShortCode(shortCode: string): Promise<{ token: string; tenantId: string } | null> {
     const normalized = shortCode.toUpperCase();
     const rows = await prisma.$queryRaw<
-      Array<{ token: string; tenant_id: string; expires_at: Date | null; consumed_at: Date | null }>
+      Array<{ token: string | null; tenant_id: string }>
     >`
-      SELECT t.token, t.tenant_id, t.expires_at, t.consumed_at
-      FROM directory_claim_tokens t
-      WHERE t.short_code = ${normalized}
+      SELECT t2.token, dps.tenant_id
+      FROM directory_claim_tokens t1
+      JOIN directory_presence_seeds dps ON dps.id = t1.seed_id
+      LEFT JOIN directory_claim_tokens t2
+        ON t2.seed_id = t1.seed_id
+        AND t2.consumed_at IS NULL
+        AND (t2.expires_at IS NULL OR t2.expires_at > now())
+      WHERE t1.short_code = ${normalized}
+      ORDER BY t2.created_at DESC
       LIMIT 1
     `;
-    if (!rows[0]) return null;
-    // Expired or consumed tokens are not resolvable via short code.
-    if (rows[0].consumed_at) return null;
-    if (rows[0].expires_at && new Date(rows[0].expires_at) < new Date()) return null;
+    if (!rows[0]?.token) return null;
     return { token: rows[0].token, tenantId: rows[0].tenant_id };
   }
 
