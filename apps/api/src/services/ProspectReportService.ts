@@ -37,6 +37,7 @@ import {
   generateProspectReportCode,
   generateProspectReportLinkId,
 } from '../lib/id-generator';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import {
   websitePositioningAuditSchema,
   type WebsitePositioningAudit,
@@ -529,6 +530,47 @@ function formatValue(v: unknown): string {
   if (v == null) return 'not found';
   if (Array.isArray(v)) return v.map(String).join(', ');
   return String(v);
+}
+
+// ─── Reportability gate ─────────────────────────────────────────────────
+//
+// Boundary: the partial lane exists for accelerated seed creation and
+// partial-lane prompt serialization — NOT report generation. Report
+// chapters build only from the full diagnostic audits (business_analysis,
+// website_positioning) whose payloads satisfy their output schema — the
+// BA run is where the analyst narrative lives (summary, public_narrative,
+// outreach_problems, tier_rationale). A discovery stub carries only
+// detected_signals (internal codes the owner DTO redacts anyway) and a
+// machine summary, so there is literally no narrative material for a
+// report to render.
+//
+// Not reportable:
+//   - stub business_analysis rows (queue-promotion / campaign-derivation
+//     signal carriers — isStubBusinessAnalysisAudit): triage signals, not
+//     audit facts;
+//   - category_identification rows and anything else outside the chapter
+//     sources — real audits of a different kind, owned by the seed lane;
+//   - malformed payloads (null blob, manual import that bypassed schema
+//     validation).
+//
+// Without this gate the chapter builders' schema.parse throws and the
+// whole report 500s — the prospect simply has no reportable audit yet
+// (route → 404, panel self-silences).
+function auditIsReportable(a: {
+  platform?: string | null;
+  audit_data?: unknown;
+}): boolean {
+  if (!a?.platform || a.audit_data == null || typeof a.audit_data !== 'object') {
+    return false;
+  }
+  if (isStubBusinessAnalysisAudit(a)) return false;
+  if (a.platform === 'business_analysis') {
+    return businessAnalysisSchema.safeParse(a.audit_data).success;
+  }
+  if (a.platform === 'website_positioning') {
+    return websitePositioningAuditSchema.safeParse(a.audit_data).success;
+  }
+  return false;
 }
 
 // ─── §2 annex — outreach problems in owner-facing framing ────────────────
@@ -1719,6 +1761,9 @@ class ProspectReportService extends BaseService {
 
     // Latest audit per registered chapter source across the sibling set —
     // same-column accumulation means reruns append rows (§9.1: latest wins).
+    // Stub/malformed rows are not audits — filtered before ownership so a
+    // signal-stub-only prospect resolves to "no reportable audit" (404),
+    // not a schema-parse 500.
     const sources = [
       ...new Set(
         allowedChapters
@@ -1728,11 +1773,13 @@ class ProspectReportService extends BaseService {
     ];
     if (sources.length === 0) return null;
 
-    const audits = (await this.prisma.mkt_audits_list.findMany({
-      where: { campaign_id: { in: campaignIds }, platform: { in: sources } },
-      orderBy: { created_at: 'desc' },
-      select: { campaign_id: true, platform: true, audit_data: true, created_at: true },
-    })) as any[];
+    const audits = (
+      (await this.prisma.mkt_audits_list.findMany({
+        where: { campaign_id: { in: campaignIds }, platform: { in: sources } },
+        orderBy: { created_at: 'desc' },
+        select: { campaign_id: true, platform: true, audit_data: true, created_at: true },
+      })) as any[]
+    ).filter(auditIsReportable);
 
     // Chapter ownership — each sibling contributes the chapter its declared
     // archetype maps to; the chapter renders under that sibling's name.
@@ -1759,25 +1806,35 @@ class ProspectReportService extends BaseService {
       if (!campaign) continue;
       const audit = audits.find((a) => a.platform === builder.source);
       if (!audit) continue;
-      const chapter = this.buildChapter(
-        chapterId,
-        audit.audit_data,
-        {
-          businessName: campaign.business_name ?? 'Your business',
-          websiteUrl: campaign.website_url ?? null,
-          category: campaign.category ?? null,
-          auditedAt: (audit.created_at as Date).toISOString(),
-        },
-        opts,
-      );
-      built.push({
-        id: chapterId,
-        chapter,
-        dataQuality: this.buildChapterDataQuality(audit.audit_data, chapterId),
-        auditedAt: audit.created_at as Date,
-        auditData: audit.audit_data,
-        ownerCampaignId: ownerId,
-      });
+      try {
+        const chapter = this.buildChapter(
+          chapterId,
+          audit.audit_data,
+          {
+            businessName: campaign.business_name ?? 'Your business',
+            websiteUrl: campaign.website_url ?? null,
+            category: campaign.category ?? null,
+            auditedAt: (audit.created_at as Date).toISOString(),
+          },
+          opts,
+        );
+        built.push({
+          id: chapterId,
+          chapter,
+          dataQuality: this.buildChapterDataQuality(audit.audit_data, chapterId),
+          auditedAt: audit.created_at as Date,
+          auditData: audit.audit_data,
+          ownerCampaignId: ownerId,
+        });
+      } catch (error) {
+        // A chapter that can't build is omitted, never fatal — same contract
+        // as a missing audit: built.length === 0 → route 404.
+        logger.warn('Prospect report chapter build failed — chapter omitted', ctx, {
+          chapterId,
+          campaignId: ownerId,
+          error: (error as Error).message,
+        });
+      }
     }
     if (built.length === 0) return null;
 
@@ -2033,11 +2090,13 @@ class ProspectReportService extends BaseService {
     const sources = [...new Set(
       Object.values(CHAPTER_BUILDERS).map((b) => b.source),
     )];
-    const audits = (await this.prisma.mkt_audits_list.findMany({
-      where: { campaign_id: { in: ids }, platform: { in: sources } },
-      orderBy: { created_at: 'desc' },
-      select: { campaign_id: true, platform: true },
-    })) as any[];
+    const audits = (
+      (await this.prisma.mkt_audits_list.findMany({
+        where: { campaign_id: { in: ids }, platform: { in: sources } },
+        orderBy: { created_at: 'desc' },
+        select: { campaign_id: true, platform: true, audit_data: true },
+      })) as any[]
+    ).filter(auditIsReportable);
     const archetypes = await this.resolveSiblingArchetypes(ids, ctx);
     return this.resolveChapterOwners(campaigns, audits, archetypes);
   }

@@ -307,6 +307,27 @@ const BA_AUDIT_ROW = {
   created_at: new Date('2026-09-23T14:00:00.000Z'),
 };
 
+/**
+ * The stub row queue-promotion / campaign-derivation plants so triage has
+ * signals before a real audit runs — audit_metadata.source + detected_signals
+ * only, NOT the business_analysis output-schema contract. Shaped on
+ * MarketingCampaignService.deriveBusinessCampaign / MarketingProspectQueueService.
+ */
+const BA_STUB_ROW = {
+  campaign_id: 'cmp-repair',
+  platform: 'business_analysis',
+  audit_data: {
+    audit_metadata: {
+      business_name: 'Raja Bazaar',
+      source: 'derived_from_parent',
+      parent_campaign_id: 'cmp-scan',
+    },
+    detected_signals: ['WC_MISSING_WEBSITE'],
+    summary: 'Derived from parent campaign with 1 detected signals.',
+  },
+  created_at: new Date('2026-09-23T15:00:00.000Z'),
+};
+
 describe('buildWebsiteChapter', () => {
   it('produces the owner-facing verdict for present × owned_domain', () => {
     const ch = prospectReportService.buildWebsiteChapter(RAJA_AUDIT, CTX);
@@ -893,6 +914,64 @@ describe('assembleReport (§5.0, §5.1a)', () => {
     expect(report).toBeNull();
   });
 
+  it('a stub BA row is not a reportable audit — returns null instead of a schema 500', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_STUB_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair'], 'free');
+    expect(report).toBeNull();
+  });
+
+  it('a null audit_data row is not reportable either', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([{ ...BA_AUDIT_ROW, audit_data: null }]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair'], 'free');
+    expect(report).toBeNull();
+  });
+
+  it('a malformed non-stub BA payload is not reportable — the lane boundary holds', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([
+      { ...BA_AUDIT_ROW, audit_data: { summary: 'freeform manual note' } },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair'], 'free');
+    expect(report).toBeNull();
+  });
+
+  it('a category_identification row never feeds the report — partial lane is seed-only', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([
+      {
+        campaign_id: 'cmp-repair',
+        platform: 'category_identification',
+        audit_data: { business_summary: 'x', candidate_categories: [] },
+        created_at: new Date('2026-09-23T15:00:00.000Z'),
+      },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair'], 'free');
+    expect(report).toBeNull();
+    expect(await prospectReportService.listAvailableChapters('bp_raja')).toEqual([]);
+  });
+
+  it('a newer stub never shadows an older real audit (latest real wins)', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    // Rows arrive created_at desc — the stub is newer than the real audit.
+    mockAuditFindMany.mockResolvedValue([BA_STUB_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['repair'], 'free');
+    expect(report).not.toBeNull();
+    expect(report!.chapters[0].chapter_id).toBe('repair');
+    expect(report!.prepared_at).toBe(BA_AUDIT_ROW.created_at.toISOString());
+  });
+
   it('returns null for an unknown prospect (no campaigns)', async () => {
     mockCampaignFindMany.mockResolvedValue([]);
     const report = await prospectReportService.assembleReport('bp_nope', ['website'], 'free');
@@ -1228,6 +1307,16 @@ describe('archetype-scoped assembly — each sibling contributes its chapter', (
     mockTriageFindMany.mockResolvedValue(TRIAGE_ROWS);
     const available = await prospectReportService.listAvailableChapters('bp_raja');
     expect(available).toEqual(['website']);
+  });
+
+  it('a stub BA row offers no chapters — the prospect has no reportable audit', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_STUB_ROW]);
+    mockTriageFindMany.mockResolvedValue(TRIAGE_ROWS);
+    const available = await prospectReportService.listAvailableChapters('bp_raja');
+    expect(available).toEqual([]);
+    const owners = await prospectReportService.listChapterSources('bp_raja');
+    expect(owners).toEqual({});
   });
 
   it('an unaccepted triage row declares nothing — legacy fallback owns the chapter', async () => {
