@@ -212,6 +212,33 @@ export const QR_TEMPLATES: Record<QrTemplateName, QrTemplate> = {
 
 export const QR_TEMPLATE_LIST = Object.values(QR_TEMPLATES);
 
+/**
+ * Persisted QR design — the camelCase projection of a
+ * tenant_storefront_qr_settings row (the storefront_qr capability module's
+ * per-tenant style storage). Used for surfaces that render an
+ * operator/merchant-authored design rather than a live template —
+ * e.g. the directory-seed report banner on /place/[slug].
+ */
+export interface PersistedQrStyle {
+  dotType?: string;
+  cornerType?: string;
+  cornerDotType?: string;
+  dotColor?: string;
+  cornerColor?: string;
+  cornerDotColor?: string;
+  bgColor?: string;
+  customColorsEnabled?: boolean;
+  gradientEnabled?: boolean;
+  gradientStart?: string;
+  gradientEnd?: string;
+  gradientOnDots?: boolean;
+  gradientOnCorners?: boolean;
+  gradientOnCornerDots?: boolean;
+  /** Embed a logo in the QR center. */
+  logo?: boolean;
+  logoShape?: string;
+}
+
 // ── Options ────────────────────────────────────────────────────────────
 
 export interface QrEngineOptions {

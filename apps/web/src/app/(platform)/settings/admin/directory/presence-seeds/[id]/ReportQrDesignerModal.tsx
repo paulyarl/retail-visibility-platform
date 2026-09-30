@@ -11,10 +11,17 @@
  *
  * The QR always encodes the channel's tracked redirect URL — scans still
  * record as report_delivery_{channel} regardless of styling.
+ *
+ * Banner mode (channel === 'banner'): the design is PERSISTED — "Apply to
+ * on-page banner" writes the style to the seed tenant's
+ * tenant_storefront_qr_settings row (the storefront_qr capability module's
+ * persistence), and the public place page renders the banner QR from that
+ * row. The logo is the listing's business logo (tenant's own logo), falling
+ * back to the platform logo — same resolution as the storefront module.
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Download, QrCode, FileText, Image as ImageIcon } from 'lucide-react';
+import { X, Download, QrCode, FileText, Image as ImageIcon, Save } from 'lucide-react';
 import {
   QR_TEMPLATE_LIST,
   generateQrInstance,
@@ -35,12 +42,15 @@ export interface ReportQrDesignerModalProps {
   open: boolean;
   onClose: () => void;
   seedId: string;
-  channel: 'phone' | 'email' | 'social' | 'in_person' | 'text';
+  channel: 'phone' | 'email' | 'social' | 'in_person' | 'text' | 'banner';
   title: string;
   /** The channel's tracked redirect URL — what the QR encodes. */
   url: string;
   /** Whether this channel has a postcard artifact. */
   allowPostcard?: boolean;
+  /** Banner mode only — the listing's business logo, used for preview parity
+   *  with what the public page embeds (falls back to the platform logo). */
+  businessLogoUrl?: string | null;
 }
 
 export default function ReportQrDesignerModal({
@@ -51,7 +61,9 @@ export default function ReportQrDesignerModal({
   title,
   url,
   allowPostcard = false,
+  businessLogoUrl = null,
 }: ReportQrDesignerModalProps) {
+  const isBanner = channel === 'banner';
   const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>('default');
   const [dotType, setDotType] = useState('rounded');
   const [cornerType, setCornerType] = useState('extra-rounded');
@@ -77,6 +89,8 @@ export default function ReportQrDesignerModal({
   const [size, setSize] = useState(512);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const qrInstanceRef = useRef<any>(null);
 
@@ -116,9 +130,43 @@ export default function ReportQrDesignerModal({
     gradientOnDots,
     gradientOnCorners,
     gradientOnCornerDots,
-    logoUrl: logoEnabled ? (customLogoDataUrl ?? platformLogoUrl) : null,
+    // Banner mode: logo resolves like the public page — the listing's business
+    // logo first, then the platform logo (the qr_logo row only stores the
+    // toggle, so a one-off upload can't be persisted for the page).
+    logoUrl: logoEnabled
+      ? (isBanner ? (businessLogoUrl ?? platformLogoUrl) : (customLogoDataUrl ?? platformLogoUrl))
+      : null,
     logoShape,
   });
+
+  // Banner mode: prefill the designer from the persisted tenant_storefront_qr_settings
+  // row so the operator edits the live on-page design rather than starting over.
+  useEffect(() => {
+    if (!open || !isBanner) return;
+    let cancelled = false;
+    setSaved(false);
+    directoryPresenceAdminService.getBannerQrStyle(seedId).then((style) => {
+      if (!style || cancelled) return;
+      if (style.qr_dot_type) setDotType(style.qr_dot_type);
+      if (style.qr_corner_type) setCornerType(style.qr_corner_type);
+      if (style.qr_corner_dot_type) setCornerDotType(style.qr_corner_dot_type);
+      if (style.qr_custom_colors_enabled !== undefined) setCustomColorsEnabled(style.qr_custom_colors_enabled);
+      if (style.qr_dot_color) setDotColor(style.qr_dot_color);
+      if (style.qr_corner_color) setCornerColor(style.qr_corner_color);
+      if (style.qr_corner_dot_color) setCornerDotColor(style.qr_corner_dot_color);
+      if (style.qr_bg_color) setBgColor(style.qr_bg_color);
+      if (style.qr_gradient_enabled !== undefined) setGradientEnabled(style.qr_gradient_enabled);
+      if (style.qr_gradient_start) setGradientStart(style.qr_gradient_start);
+      if (style.qr_gradient_end) setGradientEnd(style.qr_gradient_end);
+      if (style.qr_gradient_on_dots !== undefined) setGradientOnDots(style.qr_gradient_on_dots);
+      if (style.qr_gradient_on_corners !== undefined) setGradientOnCorners(style.qr_gradient_on_corners);
+      if (style.qr_gradient_on_corner_dots !== undefined) setGradientOnCornerDots(style.qr_gradient_on_corner_dots);
+      if (style.qr_logo !== undefined) setLogoEnabled(style.qr_logo);
+      if (style.qr_logo_shape) setLogoShape(style.qr_logo_shape);
+      setSelectedTemplate('default');
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, isBanner, seedId]);
 
   useEffect(() => {
     if (!open) return;
@@ -175,7 +223,7 @@ export default function ReportQrDesignerModal({
     customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor,
     gradientEnabled, gradientStart, gradientEnd,
     gradientOnDots, gradientOnCorners, gradientOnCornerDots,
-    logoEnabled, logoShape, platformLogoUrl, customLogoDataUrl,
+    logoEnabled, logoShape, platformLogoUrl, customLogoDataUrl, businessLogoUrl,
   ]);
 
   const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,7 +277,44 @@ export default function ReportQrDesignerModal({
     }
   };
 
+  // Banner mode only: persist the design to the seed tenant's
+  // tenant_storefront_qr_settings row — the public listing renders the banner
+  // QR from these concrete fields (no template name, same resolution rules as
+  // the storefront_qr renderer).
+  const handleApplyToBanner = async () => {
+    try {
+      setSaving(true);
+      setSaved(false);
+      const ok = await directoryPresenceAdminService.updateBannerQrStyle(seedId, {
+        qr_dot_type: dotType,
+        qr_corner_type: cornerType,
+        qr_corner_dot_type: cornerDotType,
+        qr_custom_colors_enabled: customColorsEnabled,
+        qr_dot_color: dotColor,
+        qr_corner_color: cornerColor,
+        qr_corner_dot_color: cornerDotColor,
+        qr_bg_color: bgColor,
+        qr_gradient_enabled: gradientEnabled,
+        qr_gradient_start: gradientStart,
+        qr_gradient_end: gradientEnd,
+        qr_gradient_on_dots: gradientOnDots,
+        qr_gradient_on_corners: gradientOnCorners,
+        qr_gradient_on_corner_dots: gradientOnCornerDots,
+        qr_logo: logoEnabled,
+        qr_logo_shape: logoShape,
+      });
+      if (!ok) throw new Error('Save failed');
+      setSaved(true);
+      setError(null);
+    } catch {
+      setError('Failed to save the banner design');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleStyledPostcard = async () => {
+    if (isBanner) return; // banner has no postcard artifact
     try {
       setDownloading('postcard');
       const dataUrl = await generateQrDataUrl(buildOpts(1024));
@@ -463,7 +548,13 @@ export default function ReportQrDesignerModal({
               Center logo
             </label>
           </div>
-          {logoEnabled && (
+          {logoEnabled && isBanner && (
+            <p className="text-[11px] text-gray-500 mt-1">
+              The on-page banner embeds the listing's business logo
+              {businessLogoUrl ? '' : ' — none is set, so the platform logo is used'}.
+            </p>
+          )}
+          {logoEnabled && !isBanner && (
             <div className="mt-2 space-y-2">
               {customLogoDataUrl ? (
                 <div className="flex items-center gap-2">
@@ -497,7 +588,7 @@ export default function ReportQrDesignerModal({
               />
             </div>
           )}
-          {logoEnabled && !customLogoDataUrl && !logoLoading && !platformLogoUrl && (
+          {logoEnabled && !customLogoDataUrl && !isBanner && !logoLoading && !platformLogoUrl && (
             <p className="text-[11px] text-amber-600 mt-1">
               {logoLoadFailed
                 ? 'The configured platform logo could not be loaded (CORS or unreachable URL) — the QR renders without one.'
@@ -542,7 +633,23 @@ export default function ReportQrDesignerModal({
         </div>
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isBanner && (
+            <>
+              <button
+                onClick={handleApplyToBanner}
+                disabled={saving}
+                className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+                title="Persist this design — the public listing's banner QR renders it"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saving ? 'Saving…' : 'Apply to on-page banner'}
+              </button>
+              {saved && (
+                <span className="text-xs text-emerald-600">Saved — the page renders this design</span>
+              )}
+            </>
+          )}
           <button
             onClick={handleDownloadPng}
             disabled={downloading === 'png'}

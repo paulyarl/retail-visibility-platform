@@ -142,6 +142,9 @@ export interface DirectoryConsolidated {
     publicDisclaimer?: string | null;
     activeClaimToken?: string | null;
     claimShortCode?: string | null;
+    /** Operator-authored banner QR design (PersistedQrStyle, camelCase
+     *  projection of tenant_storefront_qr_settings). */
+    qrStyle?: import('@/lib/qr-engine').PersistedQrStyle | null;
     seedId?: string | null;
   };
   storeTypes: any[];

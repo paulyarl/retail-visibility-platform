@@ -253,6 +253,8 @@ export default function PlaceEntryEditorialLayout({
                     teaser={marketIntelTeaser}
                     seedId={listing.seedId}
                     reportShortCode={listing.claimShortCode}
+                    qrStyle={listing.qrStyle}
+                    logoUrl={listing.logoUrl}
                   />
                 </div>
               )}
@@ -383,6 +385,8 @@ export default function PlaceEntryEditorialLayout({
               activeClaimToken={claimToken}
               seedId={listing.seedId}
               reportShortCode={listing.claimShortCode}
+              qrStyle={listing.qrStyle}
+              logoUrl={listing.logoUrl}
             />
           </div>
         )}

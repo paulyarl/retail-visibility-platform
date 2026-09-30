@@ -260,7 +260,7 @@ function PresenceSeedDetailClient() {
   const [scriptLoading, setScriptLoading] = useState(false);
   const [reportQrDownloading, setReportQrDownloading] = useState<string | null>(null);
   const [reportQrDesignerChannel, setReportQrDesignerChannel] = useState<
-    'in_person' | 'text' | 'email' | 'social' | 'phone' | null
+    'in_person' | 'text' | 'email' | 'social' | 'phone' | 'banner' | null
   >(null);
   const [touches, setTouches] = useState<OutreachTouch[]>([]);
   const [touchChannel, setTouchChannel] = useState<
@@ -832,6 +832,17 @@ function PresenceSeedDetailClient() {
           title: 'Phone follow-up',
           desc: 'Send the tracked link after a call — taps record as report_delivery_phone.',
           url: reportQrKit.qrUrlPhone,
+          postcard: false,
+        },
+        {
+          channel: 'banner' as const,
+          title: 'On-page banner',
+          desc: 'The tracked link the public listing\'s report banner encodes — reference only (nothing to deliver); scans record as report_banner, outside the delivery funnel.',
+          url: typeof window !== 'undefined'
+            ? (bannerShortCode
+                ? `${window.location.origin}/rb/${bannerShortCode}`
+                : `${window.location.origin}/api/public/r/seed/${seedId}/banner`)
+            : (bannerShortCode ? `/rb/${bannerShortCode}` : ''),
           postcard: false,
         },
       ]
@@ -2118,7 +2129,9 @@ function PresenceSeedDetailClient() {
               report, so scans are recorded before the owner lands on the report
               preview. Print the in-person variant on leave-behind cards, text the
               tracked link directly, and use email/social/phone variants for
-              remote outreach — all five stay separate in QR analytics.
+              remote outreach — all five stay separate in QR analytics. The
+              sixth card is the on-page banner link the public listing renders
+              itself (report_banner surface — tracked, not a delivery touch).
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -2225,7 +2238,7 @@ function PresenceSeedDetailClient() {
                   {c.url}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {(c.channel === 'text' || c.channel === 'social' || c.channel === 'email') && (
+                  {(c.channel === 'text' || c.channel === 'social' || c.channel === 'email' || c.channel === 'banner') && (
                     <button
                       onClick={() => {
                         if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -2242,30 +2255,36 @@ function PresenceSeedDetailClient() {
                   <button
                     onClick={() => setReportQrDesignerChannel(c.channel)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
-                    title="Open the styled QR designer — templates, colors, platform logo"
+                    title={c.channel === 'banner'
+                      ? 'Design the on-page banner QR — the saved style is persisted and rendered on the public listing'
+                      : 'Open the styled QR designer — templates, colors, platform logo'}
                   >
                     <Palette className="w-3.5 h-3.5" />
                     Design
                   </button>
-                  <button
-                    onClick={() => handleReportQrDownload(c.channel, 'png')}
-                    disabled={reportQrDownloading !== null}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {reportQrDownloading === `report-${c.channel}-png` ? 'Downloading…' : 'QR PNG'}
-                  </button>
-                  {c.postcard && (
-                    <button
-                      onClick={() => handleReportQrDownload(c.channel, 'postcard')}
-                      disabled={reportQrDownloading !== null}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      {reportQrDownloading === `report-${c.channel}-postcard`
-                        ? 'Downloading…'
-                        : 'Postcard PDF'}
-                    </button>
+                  {c.channel !== 'banner' && (
+                    <>
+                      <button
+                        onClick={() => handleReportQrDownload(c.channel, 'png')}
+                        disabled={reportQrDownloading !== null}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {reportQrDownloading === `report-${c.channel}-png` ? 'Downloading…' : 'QR PNG'}
+                      </button>
+                      {c.postcard && (
+                        <button
+                          onClick={() => handleReportQrDownload(c.channel, 'postcard')}
+                          disabled={reportQrDownloading !== null}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          {reportQrDownloading === `report-${c.channel}-postcard`
+                            ? 'Downloading…'
+                            : 'Postcard PDF'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -2332,15 +2351,16 @@ function PresenceSeedDetailClient() {
         )}
       </section>
 
-      {reportQrDesignerConfig && (
+      {reportQrDesignerConfig && reportQrDesignerChannel && (
         <ReportQrDesignerModal
           open
           onClose={() => setReportQrDesignerChannel(null)}
           seedId={seedId}
-          channel={reportQrDesignerConfig.channel}
+          channel={reportQrDesignerChannel}
           title={reportQrDesignerConfig.title}
           url={reportQrDesignerConfig.url}
           allowPostcard={reportQrDesignerConfig.postcard}
+          businessLogoUrl={listing?.logo_url ?? null}
         />
       )}
 

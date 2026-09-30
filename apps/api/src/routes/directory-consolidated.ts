@@ -96,11 +96,18 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
            FROM directory_claim_tokens dct
            JOIN directory_presence_seeds dps2 ON dps2.id = dct.seed_id
            WHERE dps2.listing_id = dll.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
-           LIMIT 1) as active_claim
+           LIMIT 1) as active_claim,
+          tsqs.qr_dot_type, tsqs.qr_corner_type, tsqs.qr_corner_dot_type,
+          tsqs.qr_dot_color, tsqs.qr_corner_color, tsqs.qr_corner_dot_color,
+          tsqs.qr_bg_color, tsqs.qr_custom_colors_enabled,
+          tsqs.qr_gradient_enabled, tsqs.qr_gradient_start, tsqs.qr_gradient_end,
+          tsqs.qr_gradient_on_dots, tsqs.qr_gradient_on_corners, tsqs.qr_gradient_on_corner_dots,
+          tsqs.qr_logo, tsqs.qr_logo_shape
          FROM directory_listings_list dll
          LEFT JOIN tenants t ON t.id = dll.tenant_id
          LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
          LEFT JOIN directory_presence_seeds dps ON dps.listing_id = dll.id
+         LEFT JOIN tenant_storefront_qr_settings tsqs ON tsqs.tenant_id = dll.tenant_id
          WHERE dll.slug = $1 AND dll.is_published = true
          LIMIT 1`,
         [slug]
@@ -395,6 +402,26 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       attributes: Array.isArray((listing as any).attributes) ? (listing as any).attributes : [],
       activeClaimToken: (listing as any).active_claim?.token || null,
       claimShortCode: (listing as any).active_claim?.short_code || null,
+      // On-page report-banner QR design — the seed tenant's storefront_qr
+      // style row (operator-authored; seed-scoped surface only).
+      qrStyle: (listing as any).seed_id && (listing as any).qr_dot_type ? {
+        dotType: (listing as any).qr_dot_type,
+        cornerType: (listing as any).qr_corner_type,
+        cornerDotType: (listing as any).qr_corner_dot_type,
+        dotColor: (listing as any).qr_dot_color,
+        cornerColor: (listing as any).qr_corner_color,
+        cornerDotColor: (listing as any).qr_corner_dot_color,
+        bgColor: (listing as any).qr_bg_color,
+        customColorsEnabled: !!(listing as any).qr_custom_colors_enabled,
+        gradientEnabled: !!(listing as any).qr_gradient_enabled,
+        gradientStart: (listing as any).qr_gradient_start,
+        gradientEnd: (listing as any).qr_gradient_end,
+        gradientOnDots: (listing as any).qr_gradient_on_dots !== false,
+        gradientOnCorners: (listing as any).qr_gradient_on_corners !== false,
+        gradientOnCornerDots: (listing as any).qr_gradient_on_corner_dots !== false,
+        logo: !!(listing as any).qr_logo,
+        logoShape: (listing as any).qr_logo_shape || 'square',
+      } : null,
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,
       keywords: listing.keywords,

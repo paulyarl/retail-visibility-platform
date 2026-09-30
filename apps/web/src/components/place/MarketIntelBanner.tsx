@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { BannerSlot, type BannerVariant } from './BannerSlot';
-import { generateQrDataUrl } from '@/lib/qr-engine';
+import { generateQrDataUrl, type PersistedQrStyle, type QrEngineOptions } from '@/lib/qr-engine';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import type { CategoryMarketIntelTeaser, CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
 import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
 
@@ -63,6 +64,41 @@ export function bannerReportTrackedPath(seedId: string, shortCode?: string | nul
     : `/api/public/r/seed/${seedId}/banner`;
 }
 
+/**
+ * Map the operator-authored banner design (the seed tenant's
+ * tenant_storefront_qr_settings row) onto qr-engine options. Same resolution
+ * rules as StyledTenantQR / the storefront-QR preview pane: persisted style
+ * fields win, colors only apply when custom colors are enabled, and the
+ * persisted row is concrete — no template merge once a design exists.
+ */
+export function bannerQrOptions(
+  absoluteTrackedUrl: string,
+  qrStyle?: PersistedQrStyle | null,
+  resolvedLogo?: string | null,
+): QrEngineOptions {
+  return {
+    data: absoluteTrackedUrl,
+    exportSize: 256,
+    styled: true,
+    template: qrStyle ? undefined : 'default',
+    dotType: qrStyle?.dotType,
+    cornerType: qrStyle?.cornerType,
+    cornerDotType: qrStyle?.cornerDotType,
+    dotColor: qrStyle?.customColorsEnabled ? qrStyle.dotColor : undefined,
+    cornerColor: qrStyle?.customColorsEnabled ? qrStyle.cornerColor : undefined,
+    cornerDotColor: qrStyle?.customColorsEnabled ? qrStyle.cornerDotColor : undefined,
+    bgColor: qrStyle?.customColorsEnabled ? qrStyle.bgColor : undefined,
+    gradientEnabled: qrStyle?.gradientEnabled,
+    gradientStart: qrStyle?.gradientStart,
+    gradientEnd: qrStyle?.gradientEnd,
+    gradientOnDots: qrStyle?.gradientOnDots,
+    gradientOnCorners: qrStyle?.gradientOnCorners,
+    gradientOnCornerDots: qrStyle?.gradientOnCornerDots,
+    logoUrl: qrStyle?.logo ? (resolvedLogo ?? null) : null,
+    logoShape: qrStyle?.logoShape,
+  };
+}
+
 export interface MarketIntelBannerProps {
   variant: BannerVariant;
   surfaceType: MarketIntelSurfaceType;
@@ -74,6 +110,12 @@ export interface MarketIntelBannerProps {
   /** Seed surface only — the seed's active claim-token short code. When present
    *  the CTA/QR use the /rb/{code} short path instead of the seed-id API path. */
   reportShortCode?: string | null;
+  /** Seed surface only — the operator-authored QR design persisted on the
+   *  seed's tenant (tenant_storefront_qr_settings). Null = default template. */
+  qrStyle?: PersistedQrStyle | null;
+  /** Seed surface only — the business logo used when qrStyle.logo is set
+   *  (the listing's logoUrl). */
+  logoUrl?: string | null;
   className?: string;
 }
 
@@ -92,6 +134,8 @@ export function MarketIntelBanner({
   teaser = null,
   seedId = null,
   reportShortCode = null,
+  qrStyle = null,
+  logoUrl = null,
   className = '',
 }: MarketIntelBannerProps) {
   const isSeed = surfaceType === 'seed';
@@ -103,21 +147,35 @@ export function MarketIntelBanner({
     if (!trackedPath || variant !== 'tall' || typeof window === 'undefined') return;
     let cancelled = false;
 
-    generateQrDataUrl({
-      data: `${window.location.origin}${trackedPath}`,
-      exportSize: 256,
-      styled: true,
-      template: 'default',
-    })
+    // Logo mirrors the storefront pattern — the tenant's own logo (the
+    // listing's business logo), falling back to the platform logo when the
+    // listing has none.
+    const resolveLogo = async (): Promise<string | null> => {
+      if (!qrStyle?.logo) return null;
+      if (logoUrl) return logoUrl;
+      try {
+        const s = await platformSettingsService.getPlatformSettings();
+        return s?.logoUrl ?? null;
+      } catch {
+        return null;
+      }
+    };
+
+    resolveLogo()
+      .then((resolved) =>
+        cancelled ? null : generateQrDataUrl(
+          bannerQrOptions(`${window.location.origin}${trackedPath}`, qrStyle, resolved),
+        ),
+      )
       .then((url) => {
-        if (!cancelled) setQrDataUrl(url);
+        if (url && !cancelled) setQrDataUrl(url);
       })
       .catch(() => {
         // QR is additive — the CTA link still works.
       });
 
     return () => { cancelled = true; };
-  }, [trackedPath, variant]);
+  }, [trackedPath, variant, qrStyle, logoUrl]);
 
   const promo = isSeed ? SEED_PROMO : SURFACE_PROMO[surfaceType];
   const alsoInside: string[] = isSeed ? [] : SURFACE_PROMO[surfaceType].alsoInside;

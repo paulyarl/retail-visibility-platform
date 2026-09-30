@@ -21,6 +21,8 @@
  *   POST   /api/admin/directory/presence-seeds/:id/invite — mint claim token
  *   POST   /api/admin/directory/presence-seeds/:id/approve — publish + mint + email claim token
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
+ *   GET    /api/admin/directory/presence-seeds/:id/banner-qr-style — read the on-page banner QR design
+ *   PUT    /api/admin/directory/presence-seeds/:id/banner-qr-style — save the on-page banner QR design
  *   PATCH  /api/admin/directory/presence-seeds/:id/status — change seed status
  *   DELETE /api/admin/directory/presence-seeds/:id — permanently delete a seed and its tenant
  *   POST   /api/admin/directory/presence-seeds/:id/tokens/:tokenId/revoke — revoke claim token
@@ -1028,6 +1030,64 @@ router.post('/presence-seeds/:id/approve', requirePlatformAdmin, async (req: Req
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'seed_already_claimed') return res.status(409).json({ error: 'seed_already_claimed' });
     logger.error('[POST /api/admin/directory/presence-seeds/:id/approve] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// On-page banner QR design — stored on the seed's tenant in
+// tenant_storefront_qr_settings (the storefront_qr capability module's
+// per-tenant style row; no tier gate — operator-authored platform styling).
+const bannerQrStyleSchema = z.object({
+  qr_dot_type: z.string().max(30).optional(),
+  qr_corner_type: z.string().max(30).optional(),
+  qr_corner_dot_type: z.string().max(30).optional(),
+  qr_dot_color: z.string().max(20).optional(),
+  qr_corner_color: z.string().max(20).optional(),
+  qr_corner_dot_color: z.string().max(20).optional(),
+  qr_bg_color: z.string().max(20).optional(),
+  qr_custom_colors_enabled: z.boolean().optional(),
+  qr_gradient_enabled: z.boolean().optional(),
+  qr_gradient_start: z.string().max(20).optional(),
+  qr_gradient_end: z.string().max(20).optional(),
+  qr_gradient_on_dots: z.boolean().optional(),
+  qr_gradient_on_corners: z.boolean().optional(),
+  qr_gradient_on_corner_dots: z.boolean().optional(),
+  qr_logo: z.boolean().optional(),
+  qr_logo_shape: z.string().max(20).optional(),
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/banner-qr-style — designer prefill */
+router.get('/presence-seeds/:id/banner-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const style = await DirectoryPresenceSeedService.getBannerQrStyle(req.params.id);
+    res.json({ success: true, style });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/banner-qr-style] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** PUT /api/admin/directory/presence-seeds/:id/banner-qr-style — save banner QR design */
+router.put('/presence-seeds/:id/banner-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = bannerQrStyleSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    await DirectoryPresenceSeedService.updateBannerQrStyle(req.params.id, validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    logger.error('[PUT /api/admin/directory/presence-seeds/:id/banner-qr-style] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

@@ -12,6 +12,7 @@ import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { MarketIntelCard } from './MarketIntelCard';
 import { MarketIntelPaywall } from './MarketIntelPaywall';
 import { MarketIntelBanner } from './MarketIntelBanner';
+import type { PersistedQrStyle } from '@/lib/qr-engine';
 
 interface MarketIntelSidebarProps {
   slug: string;
@@ -24,6 +25,11 @@ interface MarketIntelSidebarProps {
   /** Active claim-token short code — the banner's tracked link uses the
    *  /rb/{code} short path when present (seed-id API fallback otherwise). */
   reportShortCode?: string | null;
+  /** Operator-authored banner QR design (seed tenant's storefront_qr
+   *  settings row). Null = default template. */
+  qrStyle?: PersistedQrStyle | null;
+  /** Business logo used when qrStyle.logo is set. */
+  logoUrl?: string | null;
 }
 
 /**
@@ -42,7 +48,7 @@ interface MarketIntelSidebarProps {
  * Spec: §2.1 (surface model), §3 (cards), §4.2 (partial), §4.3 (full),
  *       §6.2 (paywall), §7.1 (component tree).
  */
-export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seedId, reportShortCode }: MarketIntelSidebarProps) {
+export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seedId, reportShortCode, qrStyle, logoUrl }: MarketIntelSidebarProps) {
   const { isAuthenticated } = useCustomerAuth();
   const [teaser, setTeaser] = useState<MarketIntelTeaserSummary | null>(initialTeaser ?? null);
   const [partial, setPartial] = useState<MarketIntelPartialContent | null>(null);
@@ -180,6 +186,8 @@ export function MarketIntelSidebar({ slug, initialTeaser, activeClaimToken, seed
               teaser={teaser}
               seedId={seedId}
               reportShortCode={reportShortCode}
+              qrStyle={qrStyle}
+              logoUrl={logoUrl}
             />
           </div>
 

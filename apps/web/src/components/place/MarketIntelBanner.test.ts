@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MarketIntelBanner } from './MarketIntelBanner';
+import { MarketIntelBanner, bannerQrOptions } from './MarketIntelBanner';
 
 const cityTeaser = {
   surfaceType: 'city',
@@ -224,5 +224,72 @@ describe('MarketIntelBanner', () => {
       }),
     );
     expect(available).not.toContain('Coming soon');
+  });
+});
+
+describe('bannerQrOptions', () => {
+  const url = 'https://visibleshelf.com/rb/KUAKTH';
+
+  it('falls back to the default template when no design is persisted', () => {
+    const opts = bannerQrOptions(url, null, null);
+    expect(opts.template).toBe('default');
+    expect(opts.data).toBe(url);
+    expect(opts.logoUrl).toBeNull();
+  });
+
+  it('maps persisted storefront-QR style fields to engine options', () => {
+    const opts = bannerQrOptions(url, {
+      dotType: 'classy',
+      cornerType: 'square',
+      cornerDotType: 'square',
+      customColorsEnabled: true,
+      dotColor: '#111111',
+      cornerColor: '#222222',
+      cornerDotColor: '#333333',
+      bgColor: '#fafafa',
+      gradientEnabled: true,
+      gradientStart: '#aa0000',
+      gradientEnd: '#0000aa',
+      gradientOnDots: true,
+      gradientOnCorners: false,
+      gradientOnCornerDots: false,
+      logo: true,
+      logoShape: 'circle',
+    }, 'https://cdn.example.com/logo.png');
+
+    // A persisted design is concrete — no template merge.
+    expect(opts.template).toBeUndefined();
+    expect(opts.dotType).toBe('classy');
+    expect(opts.cornerType).toBe('square');
+    expect(opts.cornerDotType).toBe('square');
+    expect(opts.dotColor).toBe('#111111');
+    expect(opts.cornerColor).toBe('#222222');
+    expect(opts.cornerDotColor).toBe('#333333');
+    expect(opts.bgColor).toBe('#fafafa');
+    expect(opts.gradientEnabled).toBe(true);
+    expect(opts.gradientStart).toBe('#aa0000');
+    expect(opts.gradientEnd).toBe('#0000aa');
+    expect(opts.gradientOnCorners).toBe(false);
+    expect(opts.logoUrl).toBe('https://cdn.example.com/logo.png');
+    expect(opts.logoShape).toBe('circle');
+  });
+
+  it('ignores persisted colors when custom colors are disabled', () => {
+    const opts = bannerQrOptions(url, {
+      dotType: 'dots',
+      customColorsEnabled: false,
+      dotColor: '#ff0000',
+      bgColor: '#000000',
+    }, null);
+
+    // Same rule as the storefront preview pane — the toggle gates the colors.
+    expect(opts.dotType).toBe('dots');
+    expect(opts.dotColor).toBeUndefined();
+    expect(opts.bgColor).toBeUndefined();
+  });
+
+  it('embeds no logo when the persisted design disables it', () => {
+    const opts = bannerQrOptions(url, { logo: false }, 'https://cdn.example.com/logo.png');
+    expect(opts.logoUrl).toBeNull();
   });
 });

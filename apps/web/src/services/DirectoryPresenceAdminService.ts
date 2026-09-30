@@ -360,6 +360,29 @@ export interface DirectoryAttributeSuggestion {
   matchedDefinitionKey: string | null;
 }
 
+/** On-page report-banner QR design — the snake_case projection of a
+ *  tenant_storefront_qr_settings row, written by the operator designer and
+ *  read back as designer prefill. The public listing carries the camelCase
+ *  PersistedQrStyle projection (@/lib/qr-engine). */
+export interface BannerQrStyleUpdate {
+  qr_dot_type?: string;
+  qr_corner_type?: string;
+  qr_corner_dot_type?: string;
+  qr_dot_color?: string;
+  qr_corner_color?: string;
+  qr_corner_dot_color?: string;
+  qr_bg_color?: string;
+  qr_custom_colors_enabled?: boolean;
+  qr_gradient_enabled?: boolean;
+  qr_gradient_start?: string;
+  qr_gradient_end?: string;
+  qr_gradient_on_dots?: boolean;
+  qr_gradient_on_corners?: boolean;
+  qr_gradient_on_corner_dots?: boolean;
+  qr_logo?: boolean;
+  qr_logo_shape?: string;
+}
+
 /** An advisory attribute recommendation from a business audit's
  *  recommended_attributes — NOT a sourced observation (no evidence). */
 export interface DirectoryAttributeRecommendation {
@@ -1446,6 +1469,32 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     );
     if (!result.success) return null;
     return (result.data as unknown as Blob) ?? null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/banner-qr-style
+   *  The on-page banner QR design — persisted on the seed's tenant in
+   *  tenant_storefront_qr_settings (same row the tenant storefront-QR
+   *  designer writes). */
+  async getBannerQrStyle(seedId: string): Promise<BannerQrStyleUpdate | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/banner-qr-style`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.style ?? null) as BannerQrStyleUpdate | null;
+  }
+
+  /** PUT /api/admin/directory-presence/presence-seeds/:id/banner-qr-style */
+  async updateBannerQrStyle(seedId: string, style: BannerQrStyleUpdate): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/banner-qr-style`,
+      { method: 'PUT', body: JSON.stringify(style) },
+      undefined,
+      0,
+    );
+    return !!result.success;
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/:id/report-pdf — downloadable report PDF (spec §14.2).

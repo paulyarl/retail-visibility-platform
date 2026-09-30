@@ -38,6 +38,7 @@ import {
   generateDirectoryEnrichmentTokenString,
   generateTenantId,
   generateClaimShortCode,
+  generateStorefrontQrSettingsId,
 } from '../lib/id-generator';
 import {
   buildSeedSeoPacket,
@@ -809,6 +810,57 @@ class DirectoryPresenceSeedService {
     `;
     if (!rows[0]?.token) return null;
     return { token: rows[0].token, tenantId: rows[0].tenant_id };
+  }
+
+  // ─── On-page banner QR style ─────────────────────────────────────────────
+  //
+  // The public listing banner's QR design persists on the seed's tenant in
+  // tenant_storefront_qr_settings — the storefront_qr capability module's
+  // per-tenant style row. Tier gates don't apply: this is operator-authored
+  // platform styling for the report banner, not a tenant entitlement. The row
+  // survives claim — the claimed tenant keeps its QR style.
+
+  async getBannerQrStyle(seedId: string): Promise<Record<string, unknown> | null> {
+    const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+      SELECT tsqs.*
+      FROM tenant_storefront_qr_settings tsqs
+      JOIN directory_presence_seeds dps ON dps.tenant_id = tsqs.tenant_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  }
+
+  async updateBannerQrStyle(
+    seedId: string,
+    style: Record<string, unknown>,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ tenantId: string }> {
+    const seed = await prisma.$queryRaw<Array<{ tenant_id: string }>>`
+      SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+    const tenantId = seed[0].tenant_id;
+
+    await prisma.tenant_storefront_qr_settings.upsert({
+      where: { tenant_id: tenantId },
+      create: {
+        id: generateStorefrontQrSettingsId(tenantId),
+        tenant_id: tenantId,
+        ...style,
+      },
+      update: { ...style, updated_at: new Date() },
+    });
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.banner_qr_style_update',
+      payload: { seedId, tenantId, fields: Object.keys(style) },
+    });
+
+    logger.info('DirectoryPresenceSeedService.updateBannerQrStyle', undefined, { seedId, tenantId });
+    return { tenantId };
   }
 
   /**
