@@ -45,6 +45,57 @@ interface OwnerReportSectionProps {
   campaign: CampaignDetail;
 }
 
+// Reportable-audit gate — mirrors the server's auditIsReportable:
+// only business_analysis / website_positioning rows can produce chapters,
+// and derivation/queue stubs (audit_metadata.source) are triage signal
+// carriers, not audits. The detail payload's `audits` already covers the
+// visible surface — getCampaign includes this campaign's own rows plus the
+// primary sibling's (inherited) for empty secondary siblings.
+const REPORTABLE_AUDIT_PLATFORMS = new Set(['business_analysis', 'website_positioning']);
+const STUB_AUDIT_SOURCES = new Set([
+  'manual_queue',
+  'queue_promotion',
+  'derived_from_parent',
+  'derived_from_city_scan',
+  'discovery_scan',
+]);
+
+export function surfaceHasReportableAudit(
+  audits: CampaignDetail['audits'],
+): boolean {
+  return (audits ?? []).some(
+    (a) =>
+      REPORTABLE_AUDIT_PLATFORMS.has(a.platform) &&
+      a.audit_data != null &&
+      typeof a.audit_data === 'object' &&
+      !STUB_AUDIT_SOURCES.has(a.audit_data?.audit_metadata?.source),
+  );
+}
+
+/**
+ * Fetch gate — the /prospect-report probe is only skippable when the payload
+ * proves no chapter can be produced. The server-stamped flags are decisive:
+ * a reportable audit ANYWHERE in the prospect group (hasAudit own rows,
+ * siblingHasAudit group-wide) means a sibling can produce a chapter → probe
+ * regardless of which sibling it lives on; both explicitly false → the 404
+ * is certain → skip. When the flags are absent (older payload, probe
+ * failure, non-business scope) fall back to the visible audit rows: stub-only
+ * + a complete surface (no prospect group or hasSiblings === false) → skip,
+ * otherwise probe.
+ */
+export function canSkipProspectReportProbe(
+  campaign: Pick<
+    CampaignDetail,
+    'audits' | 'businessProspectId' | 'hasSiblings' | 'hasAudit' | 'siblingHasAudit'
+  >,
+): boolean {
+  if (campaign.hasAudit === true || campaign.siblingHasAudit === true) return false;
+  if (campaign.hasAudit === false && campaign.siblingHasAudit === false) return true;
+  if (campaign.audits === undefined) return false;
+  if (surfaceHasReportableAudit(campaign.audits)) return false;
+  return !campaign.businessProspectId || campaign.hasSiblings === false;
+}
+
 const CHAPTER_LABELS: Record<string, string> = {
   website: 'Website story',
   repair: 'Public profiles',
@@ -97,6 +148,13 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
   // Initial load — defaults reflect what CAN be shared (available_chapters).
   useEffect(() => {
     void (async () => {
+      // The detail payload usually knows the answer already — a stub-only /
+      // audit-less surface with no sibling blind spot means /prospect-report
+      // 404s by design, so skip the doomed probe (see canSkipProspectReportProbe).
+      if (canSkipProspectReportProbe(campaign)) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const res = await marketingOpsService.getProspectReport(campaign.id, { tier });
       if (res) {
@@ -114,7 +172,7 @@ export default function OwnerReportSection({ campaign }: OwnerReportSectionProps
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign.id]);
+  }, [campaign.id, campaign.audits, campaign.hasSiblings, campaign.hasAudit, campaign.siblingHasAudit]);
 
   // Selection changes re-render the recipient view — the preview always
   // shows exactly what the signed link will render (§5.4).

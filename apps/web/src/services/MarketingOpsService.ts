@@ -272,6 +272,23 @@ export interface Campaign {
   // playbook (null when no accepted triage exists yet).
   businessProspectId?: string | null;
   isPrimarySibling?: boolean;
+  // Sibling + audit-surface flags (detail responses, business scope only) —
+  // they let sibling-scoped panels (Owner Report) skip a doomed probe.
+  // isPrimarySibling alone doesn't imply siblings exist — a lone primary is
+  // common for single-campaign prospects.
+  //   hasSiblings      — at least one OTHER business-scope campaign shares
+  //                      this prospect group;
+  //   hasAudit         — THIS campaign's own audit rows carry a reportable
+  //                      audit (full business_analysis / website_positioning
+  //                      only — discovery_scan/queue stubs and cat-id rows
+  //                      never count; inherited audits don't count either);
+  //   siblingHasAudit  — ANY campaign in the prospect group (self included)
+  //                      carries a reportable audit.
+  // Absent on non-business scopes, older payloads, or probe failure → the
+  // client falls back to inspecting `audits` / probing anyway.
+  hasSiblings?: boolean;
+  hasAudit?: boolean;
+  siblingHasAudit?: boolean;
   engagementCycle?: number;
   archetype?: string | null;
   archetypeLabel?: string | null;

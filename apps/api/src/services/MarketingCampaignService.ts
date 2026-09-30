@@ -1587,6 +1587,61 @@ export class MarketingCampaignService extends BaseService {
         ? await this.resolveBusinessProvingGround(rest.id, ctx)
         : null;
 
+      // Sibling/audit-surface awareness for the Owner Report panel.
+      // isPrimarySibling only marks the first-created sibling — it doesn't
+      // say whether OTHERS exist (a lone primary is common, e.g. a
+      // discovery-derived prospect). The three flags let the panel skip its
+      // /prospect-report probe only when NO campaign in the prospect group
+      // can produce a chapter:
+      //   hasAudit        — THIS campaign's own audit rows carry a reportable
+      //                     audit (full business_analysis / website_positioning
+      //                     only — stub sources like discovery_scan and
+      //                     other platforms like cat-id never count; read
+      //                     off mkt_audits_list BEFORE inheritance so an
+      //                     inherited primary audit doesn't mark a sibling);
+      //   siblingHasAudit — ANY business-scope campaign in the prospect
+      //                     group (self included) carries one;
+      //   hasSiblings     — at least one OTHER sibling exists.
+      // Probe failure leaves the flags undefined → the client falls back to
+      // inspecting `audits` or probes anyway (fetch beats a wrong silence).
+      let hasAudit: boolean | undefined;
+      let siblingHasAudit: boolean | undefined;
+      let hasSiblings: boolean | undefined;
+      if (rest.scope === 'business') {
+        try {
+          const { auditIsReportable, REPORTABLE_AUDIT_SOURCES } =
+            await import('./ProspectReportService');
+          hasAudit = (mkt_audits_list ?? []).some(auditIsReportable);
+          if (rest.business_prospect_id) {
+            const siblings = await this.prisma.mkt_campaigns_list.findMany({
+              where: {
+                business_prospect_id: rest.business_prospect_id,
+                scope: 'business',
+              } as any,
+              select: { id: true },
+            });
+            hasSiblings = siblings.some((s: any) => s.id !== rest.id);
+            const siblingAudits = await this.prisma.mkt_audits_list.findMany({
+              where: {
+                campaign_id: { in: siblings.map((s: any) => s.id as string) },
+                platform: { in: REPORTABLE_AUDIT_SOURCES },
+              },
+              select: { platform: true, audit_data: true },
+            });
+            siblingHasAudit = siblingAudits.some(auditIsReportable);
+          } else {
+            // No prospect group — this campaign IS the whole sibling set.
+            hasSiblings = false;
+            siblingHasAudit = hasAudit;
+          }
+        } catch (probeError) {
+          logger.warn('Owner-report audit-surface probe failed', ctx, {
+            error: (probeError as Error).message,
+            campaignId: rest.id,
+          });
+        }
+      }
+
       return {
         ...rest,
         audits,
@@ -1604,6 +1659,9 @@ export class MarketingCampaignService extends BaseService {
         // page header can disambiguate siblings (matches listCampaigns).
         businessProspectId: rest.business_prospect_id ?? null,
         isPrimarySibling: rest.is_primary_sibling ?? false,
+        hasSiblings,
+        hasAudit,
+        siblingHasAudit,
         engagementCycle: rest.engagement_cycle ?? 1,
         archetype: archetypeInfo?.archetype ?? null,
         archetypeLabel: archetypeInfo?.archetypeLabel ?? null,

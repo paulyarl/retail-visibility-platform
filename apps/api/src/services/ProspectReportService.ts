@@ -556,7 +556,7 @@ function formatValue(v: unknown): string {
 // Without this gate the chapter builders' schema.parse throws and the
 // whole report 500s — the prospect simply has no reportable audit yet
 // (route → 404, panel self-silences).
-function auditIsReportable(a: {
+export function auditIsReportable(a: {
   platform?: string | null;
   audit_data?: unknown;
 }): boolean {
@@ -572,6 +572,12 @@ function auditIsReportable(a: {
   }
   return false;
 }
+
+/** Audit platforms that can produce a chapter — the `mkt_audits_list.platform`
+ * values auditIsReportable can accept (business_analysis + website_positioning). */
+export const REPORTABLE_AUDIT_SOURCES: string[] = [
+  ...new Set(Object.values(CHAPTER_BUILDERS).map((b) => b.source)),
+];
 
 // ─── §2 annex — outreach problems in owner-facing framing ────────────────
 //
@@ -1114,7 +1120,7 @@ class ProspectReportService extends BaseService {
     opts: ChapterBuildOpts = {},
   ): RepairChapterDto {
     const audit = businessAnalysisSchema.parse(auditData);
-    const site = audit.website ?? {};
+    const site = audit.website;
 
     const flags: { key: keyof typeof site; label: string; missing: string }[] = [
       {
@@ -1364,7 +1370,7 @@ class ProspectReportService extends BaseService {
     opts: ChapterBuildOpts = {},
   ): RepairChapterDto {
     const audit = businessAnalysisSchema.parse(auditData);
-    const site = audit.website ?? {};
+    const site = audit.website;
     const google = (audit.platforms as any)?.google;
     const isProductBusiness =
       audit.business_type === 'product' || audit.business_type === 'hybrid';
@@ -1459,7 +1465,7 @@ class ProspectReportService extends BaseService {
   } {
     if (CHAPTER_BUILDERS[chapterId]?.source === 'business_analysis') {
       const audit = businessAnalysisSchema.parse(auditData);
-      const dq = audit.data_quality ?? {};
+      const dq = audit.data_quality;
       return {
         verified: (dq.verified_fields ?? []).filter((l) => !isInternalLine(l)),
         couldnt_check: [
