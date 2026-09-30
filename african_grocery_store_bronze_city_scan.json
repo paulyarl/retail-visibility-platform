@@ -1,0 +1,3290 @@
+{
+  "category_key": "african grocery store",
+  "category_name": "African Grocery Store",
+  "reference_city": "Indianapolis",
+  "reference_state": "IN",
+  "reference_platform": null,
+  "catalog_revision": 8,
+  "catalog_snapshot": [
+    {
+      "reason_key": "absent_from_platform",
+      "label": "Confirmed operating, no profile on the observed platform",
+      "definition": "The business is confirmed operating but has no profile on the observed platform; it may be present on others. The absent platform is recorded on the slot via observed_platform. Indianapolis instance: strong-on-Google businesses with no Facebook/Yelp presence.",
+      "signals": [
+        "business confirmed operating via other sources; no listing on the observed platform",
+        "platform search returns nothing for a verified address",
+        "presence on other platforms corroborates the absence"
+      ],
+      "expected_vectors": [
+        "platform-presence audit"
+      ],
+      "priority": 1,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "misaligned_platform_category",
+      "label": "Mis-categorized platform category",
+      "definition": "The business is category-qualified and operating, but its platform profile carries a generic or wrong primary category label, so category-label searches miss it. Indianapolis instance: Arsema — GBP primary category \"Convenience store\".",
+      "signals": [
+        "platform primary category label is generic (e.g. Convenience store, Grocery store, Restaurant) while description or photos show specialization",
+        "assortment evidence contradicts the platform-assigned category",
+        "business absent from category-filtered platform searches"
+      ],
+      "expected_vectors": [
+        "category-taxonomy sweep"
+      ],
+      "priority": 1,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "no_category_token_in_name",
+      "label": "Name carries no category word",
+      "definition": "The business name contains no English category word — an endonym, transliteration, or opaque trade name — so name-token searches miss it. Indianapolis instances: Arsema; Senay Habesha.",
+      "signals": [
+        "name contains no English category token",
+        "name is a transliteration or endonym (non-English origin)",
+        "category identity appears only in description, signage, or records — never in the name"
+      ],
+      "expected_vectors": [
+        "endonym / transliteration sweep"
+      ],
+      "priority": 1,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "trade_manifest_only",
+      "label": "Trade / import-only visibility",
+      "definition": "The business is category-qualified and operating, but its only public trace is a customs bill-of-lading record naming it as importer of record. It has no category-bearing platform profile. Indianapolis instances: Arsema; Kaura International Food Market.",
+      "signals": [
+        "bill of lading names the business as importer of record",
+        "manifest line items name category-defining goods",
+        "importer-of-record address differs from any directory listing address"
+      ],
+      "expected_vectors": [
+        "customs / trade records"
+      ],
+      "priority": 1,
+      "scope_category_key": "african grocery store",
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "aggregator_shadow_presence_only",
+      "label": "Aggregator-shadow presence only",
+      "definition": "The business's entire indexed footprint consists of auto-generated directory mirrors (loc8nearme, sagemenu, wanderlog, novacircle, timetoopen) that republish stale or wrong fields — no claimed platform profile, no owned site. Discovery fails two ways: the mirrors disagree with each other (name, category, hours), and search engines surface the mirror instead of the business, so nothing authoritative exists to click through to. Observed this pass: Babushka/Best International Foods exists almost entirely as mirror pages; novacircle mislabels Tala Euro-Russian Mart as a 'restaurant'.",
+      "signals": [
+        "top search results for the business are all auto-generated directory mirrors",
+        "mirrors disagree on name, category, or hours for the same address",
+        "no claimed platform profile or owned domain behind the mirrors",
+        "mirror categories contradict the real assortment (e.g. grocery labeled 'restaurant')"
+      ],
+      "expected_vectors": [
+        "aggregator-result classification sweep",
+        "SERP first-party-vs-mirror audit"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "alternate_identity",
+      "label": "Second trading name at the same address",
+      "definition": "The business trades under a second name at the same address or phone, splitting or obscuring its public trace. Indianapolis instance: \"Ethiopian Eritrean Store\" listed at Arsema's address and phone.",
+      "signals": [
+        "two distinct business names share an address or phone",
+        "directory listings disagree on the name at a confirmed address",
+        "one identity carries the category signal while the other does not"
+      ],
+      "expected_vectors": [
+        "identity-conflict detection"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "corridor_absent_from_guides",
+      "label": "Storefront on no known retail corridor",
+      "definition": "The storefront sits on a street or cluster that appears in no known retail corridor or guide, so corridor-driven discovery misses it. Indianapolis instance: W Washington St / W 10th St cluster.",
+      "signals": [
+        "storefront address falls outside every known retail corridor for the market",
+        "a cluster of category-relevant storefronts sits on an unlisted street",
+        "no local guide, directory, or corridor map names the street"
+      ],
+      "expected_vectors": [
+        "address clustering"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "hosted_storefront_only",
+      "label": "Hosted storefront is the only web surface",
+      "definition": "The business's only web surface is a hosted storefront subdomain (e.g. *.square.site, *.myshopify.com); no independent site and no platform profile. Indianapolis instance: arsemamart.square.site.",
+      "signals": [
+        "only web result for the business is a hosted storefront subdomain",
+        "no independent domain exists for the business",
+        "no platform profile beyond the hosted page"
+      ],
+      "expected_vectors": [
+        "site-scoped sweep"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "no_mainstream_profile",
+      "label": "No platform profile at all",
+      "definition": "The business is confirmed operating but has no profile on any mainstream platform — its only traces are address-indexed or registry datasets. Indianapolis instance: Habesha Ethiopian Store LLC — registry only.",
+      "signals": [
+        "state business-registry filing names the business at a storefront address with no matching platform listing",
+        "utility, tax, or licensing record confirms operation at an address with no platform profile",
+        "address-indexed datasets list the business; Google, Yelp, and Facebook return nothing"
+      ],
+      "expected_vectors": [
+        "address-indexed datasets"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "permit_or_trade_manifest_trace_only",
+      "label": "Permit or trade-manifest trace only",
+      "definition": "The business is visible in municipal permit records, customs/import shipment databases, or SNAP retailer lists before (or instead of) any consumer platform indexes it. Mainstream discovery misses it because the only public traces live in civic/trade datasets. Observed this pass: Red Beets Food & Deli was surfaced by a City of Nampa TI permit and a BoatDB import-shipment record; Tala appears in the SNAP retailer registry under a third name variant; Dua European Grocery exists only as a DOS filing.",
+      "signals": [
+        "city permit or licensing record names a category-relevant build-out at a retail address",
+        "import/customs shipment record shows category-typical suppliers",
+        "SNAP/EBT retailer listing exists with no matching platform profile",
+        "no corresponding consumer-platform presence at the same address"
+      ],
+      "expected_vectors": [
+        "municipal permit sweep",
+        "import-manifest datasets",
+        "SNAP retailer registry cross-join"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "rename_residue_splits_the_discovery_trace",
+      "label": "Rename residue splits the discovery trace",
+      "definition": "When an ethnic grocery changes hands or rebrands, directories, certification registries and mirrors keep indexing the predecessor name while the live storefront trades under a new one. Searchers for the current name surface stale predecessor-name mirrors; searches for the old name hit a live-looking but dead record. Review equity, hours and category signals never consolidate on the current identity, and address-keyed joins split the same storefront into two thin half-entities. Milwaukee this pass showed three independent chains: Noor Supermarket to Rayan Market (4563 S 13th, same phone), Sasta Bazaar to Raja Bazaar (709 W Mitchell), Al-Asalah to Samah (851 W Layton).",
+      "signals": [
+        "two names share one address and phone where one is a predecessor, not a concurrent alias",
+        "mirror pages carry the dead name with current-looking hours/reviews while the live name has a thin profile",
+        "the business's own page or community records acknowledge the rename ('Previously X')",
+        "directory slugs preserve the dead name inside URLs that surface for the new name (loc8nearme's Rayan page lives at /noor-meat-and-grocery-store/)"
+      ],
+      "expected_vectors": [
+        "rename-chain detection (same address+phone, different name across directories)",
+        "license/certification registry succession cross-join",
+        "mirror-vs-canonical name diff audit per address"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "unclaimed_profile",
+      "label": "Platform profile exists but was never claimed",
+      "definition": "A platform profile exists for the business but was never claimed — no owner control over content, hours, or responses. Indianapolis instance: unclaimed GBPs.",
+      "signals": [
+        "platform shows an unclaimed or own-this-business state",
+        "no owner responses, posts, or claimed-state indicators",
+        "profile fields are auto-generated only"
+      ],
+      "expected_vectors": [
+        "platform-presence audit"
+      ],
+      "priority": 2,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "community_directory_only_presence",
+      "label": "Community-directory-only presence",
+      "definition": "The business's only structured web presence lives on human-curated ethnic/community directories (shisha.com, zabihah.com, mnhalal.com, halalplaces.org, rakwa.com) rather than auto-generated mirrors or mainstream platforms. Unlike aggregator-shadow listings — which are stale republished fields — these are genuine community-maintained records, but they sit outside mainstream search and map surfaces, so Google/Yelp/Maps queries and category-filtered discovery still miss the storefront entirely.",
+      "signals": [
+        "business appears on one or more niche community directories with no claimed mainstream profile",
+        "directory entry carries richer data (owner name, hours, photos) than any mainstream surface",
+        "mainstream platforms either return nothing or surface an auto-generated stub thinner than the community record"
+      ],
+      "expected_vectors": [
+        "niche-directory sweep (zabihah, shisha.com, mnhalal, halalplaces, rakwa, grocery10) per market",
+        "community / referral networks",
+        "SERP first-party-vs-mirror audit distinguishing curated community pages from auto-generated mirrors"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "community_only_no_reviews",
+      "label": "Community-known, no reviews",
+      "definition": "The business is known inside its community but carries no review footprint anywhere — invisible to review-driven discovery. Indianapolis instance: hidden-trust grocers.",
+      "signals": [
+        "community or referral sources name the business while all platforms show zero reviews",
+        "word-of-mouth presence with no review surface",
+        "operating storefront with empty review sections"
+      ],
+      "expected_vectors": [
+        "community / referral networks"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "fractional_unit_address_breaks_nap_consolidation",
+      "label": "Fractional-unit address breaks NAP consolidation",
+      "definition": "Storefronts addressed with fractional units (e.g. '3009 1/2 Independence Ave') fail address normalization across maps, license registries, and directories: the fractional variant, the bare street number, and neighboring suite numbers are treated as different places, so the same operating storefront accumulates several thin half-profiles instead of one consolidated listing. Reviews, hours, and category signals never pool on a single surface, so none of the fragments ranks, and address-keyed cross-joins (license ↔ platform) silently miss the business. Observed in Kansas City: Al-Hallal Grocery Store at 3009 1/2 Independence Ave trades under a license chain (Tawakal Halal Store Inc → Al-Hallal LLC → Darsalaam Grocery Store LLC) while community listings split the same storefront across name and address variants.",
+      "signals": [
+        "same storefront appears under both a fractional address variant and a bare street number across sources",
+        "license/registry address differs from directory addresses only by the fractional suffix",
+        "community sources name the business at a variant the canonical platforms do not list",
+        "multiple thin listings for one walk-in storefront, none with consolidated review or hours data"
+      ],
+      "expected_vectors": [
+        "fractional-address variant cross-join between license registries and platform listings",
+        "address-normalization sweep (fractional/suite/½ variants) per commercial corridor",
+        "identity-conflict detection keyed on phone + normalized parcel"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "low_rating_floor",
+      "label": "Ratings absent or floor-level on the profile",
+      "definition": "The platform profile displays no rating or a floor-level rating aggregate despite being present.",
+      "signals": [
+        "no rating is displayed on the profile",
+        "rating count is at floor level",
+        "aggregate rating is missing despite profile presence"
+      ],
+      "expected_vectors": [
+        "platform field audit"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "no_website_or_contact",
+      "label": "Profile lacks website link and contact info",
+      "definition": "The platform profile has no website link and no usable contact information — a field-level invisibility signal.",
+      "signals": [
+        "no website field on the profile",
+        "no phone or contact method listed",
+        "profile carries an address only"
+      ],
+      "expected_vectors": [
+        "platform field audit"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "non_english_signage_only",
+      "label": "Non-English signage, no English listing",
+      "definition": "The storefront signage is non-English with no English-language listing, so English-language searches miss it. Indianapolis instance: corridor storefronts.",
+      "signals": [
+        "Street View shows non-English signage only",
+        "no English-language listing or website exists",
+        "storefront is legible only in a non-English script"
+      ],
+      "expected_vectors": [
+        "Street View sweep"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "stale_or_missing_hours",
+      "label": "Profile carries no or unreliable hours",
+      "definition": "The platform profile carries no hours, or hours that conflict with other sources — a field-level invisibility signal.",
+      "signals": [
+        "hours field is empty on the profile",
+        "listed hours contradict other platforms or observed storefront signage",
+        "platform shows an hours-might-differ caveat"
+      ],
+      "expected_vectors": [
+        "platform field audit"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "stall_tenancy_inside_an_ethnic_marketplace_mall",
+      "label": "Stall tenancy inside an ethnic marketplace mall",
+      "definition": "Category-qualified grocers operating as individual stalls inside a shared ethnic marketplace mall (e.g. Somali malls) inherit the host mall's NAP and platform identity: maps and directories index only the mall, not the tenant stalls, so every retail unit inside is invisible to name, category, and platform search even though each is an independent business with its own shelves and walk-in customers. Discovery requires parcel/POI-level penetration beneath the anchor listing.",
+      "signals": [
+        "marketplace mall listing exists while no tenant-level listings exist for the same address",
+        "community sources name individual vendors 'inside' a named mall with no standalone address",
+        "tenant businesses share the mall's phone/address or have none at all",
+        "interior photos on the mall profile show individually signed stalls that match no indexed business"
+      ],
+      "expected_vectors": [
+        "parcel/POI penetration sweep beneath anchor listings",
+        "marketplace-mall tenant directories and lease rosters",
+        "community / referral networks naming stall vendors",
+        "Street View / interior photo stall-signage extraction"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "thin_photo_surface",
+      "label": "Profile has no or floor-level photos",
+      "definition": "The platform profile has no photos or a floor-level photo count — nothing to establish the storefront visually.",
+      "signals": [
+        "no photos on the profile",
+        "only street-view or auto-generated imagery exists",
+        "photo count is far below category norm"
+      ],
+      "expected_vectors": [
+        "platform field audit"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "unofficial_third_party_site_shadows_the_business",
+      "label": "Unofficial third-party site shadows the business",
+      "definition": "A well-meaning third party publishes a human-authored 'unofficial website' for a business that owns no web presence of its own. Unlike auto-generated aggregator mirrors, the page looks authoritative, ranks for the business's name, and crowds out any first-party surface - but the owner controls none of its content, so hours, menu and contact fields drift silently. Mainstream search resolves to the shadow site and discovery ends there.",
+      "signals": [
+        "top-ranking domain for the business self-labels 'Unofficial Website'",
+        "no owner-claimed domain, no claimed platform profile behind it",
+        "page content is editorialized third-party copy rather than scraped fields"
+      ],
+      "expected_vectors": [
+        "SERP first-party-vs-shadow audit",
+        "whois/operator check on business-name domains",
+        "platform-presence audit corroborating absence of owned surfaces"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "wholesale_or_hybrid_role",
+      "label": "Wholesale or grocery-plus-kitchen hybrid",
+      "definition": "The business operates as a wholesaler or a grocery-plus-kitchen hybrid, so retail-facing discovery paths miss it even though it is category-qualified. Indianapolis instances: Amez International Imports; East African Imports Wholesale.",
+      "signals": [
+        "described as wholesale, import, or distribution in filings or signage",
+        "a dual role (e.g. grocery plus kitchen) splits its platform categorization",
+        "absent from retail directories but present in foodservice or wholesale channels"
+      ],
+      "expected_vectors": [
+        "foodservice / wholesale channels"
+      ],
+      "priority": 3,
+      "scope_category_key": "african grocery store",
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    },
+    {
+      "reason_key": "zero_or_floor_reviews",
+      "label": "Profile present, zero-to-floor review count",
+      "definition": "The platform profile exists but its review count is zero or at floor level relative to category norms — reads as invisible or untrusted.",
+      "signals": [
+        "review count is zero or near-zero relative to category norms",
+        "no ratings are displayed",
+        "reviews are absent despite operating history"
+      ],
+      "expected_vectors": [
+        "platform field audit"
+      ],
+      "priority": 3,
+      "scope_category_key": null,
+      "scope_city": null,
+      "scope_state": null,
+      "scope_platform": null,
+      "provenance": "derived"
+    }
+  ],
+  "reason_coverage": [
+    {
+      "reason_key": "absent_from_platform",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Arsema G Food Mart LLC",
+          "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "yelp",
+          "category_fit_evidence": "Ethiopian-specialized grocery assortment: teff flour, berbere, shiro, fenugreek, finger millet sold on physical shelves; Square Online shop categories foods/appliances/decor.",
+          "operational_evidence": "Storefront-facing listings carry the 6667 W Washington St address with current daily hours (10:00-21:30) and working phone (317) 603-3274; Square Online storefront with live checkout; SNAP/EBT-authorized retailer.",
+          "operational_status": "active",
+          "discovered_by": "business_audit",
+          "discovered_via": "platform-presence audit",
+          "evidence_urls": [
+            "https://arsemamart.square.site",
+            "https://indiana-company.com/co/arsema-g-food-mart-llc",
+            "https://www.importgenius.com/importers/arsema-g-food-mart-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_generic_category",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "African Market",
+          "address": "8057 E 38th St, Indianapolis, IN 46226",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "yelp",
+          "category_fit_evidence": "African goods store with cooked food service; FindAfricanFoods/Google-review-mirror listings name African grocery product terms.",
+          "operational_evidence": "WTHR news segment documents the open storefront filling a grocery void; Facebook page mirror carries delivery-over-$50 and cooked-food-Friday/Saturday service signals.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform-presence audit",
+          "evidence_urls": [
+            "https://www.wthr.com/article/money/business/small-business/african-market-fills-grocery-void-in-indianapolis-food-desert-shopping/531-69b8336a-13dc-4f07-bc5a-e4e7dcb966d3",
+            "https://www.findafricanfoods.com/stores/us/indianapolis/african-market"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "present_generic_category"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "misaligned_platform_category",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Arsema G Food Mart LLC",
+          "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Platform-assigned primary category \"Convenience store\" while the assortment and Square shop categories show Ethiopian grocery specialization (teff, berbere, shiro).",
+          "operational_evidence": "Current hours 10:00-21:30 and phone on the storefront listing; SNAP authorization; live Square checkout.",
+          "operational_status": "active",
+          "discovered_by": "business_audit",
+          "discovered_via": "category-taxonomy sweep",
+          "evidence_urls": [
+            "https://arsemamart.square.site",
+            "https://indiana-company.com/co/arsema-g-food-mart-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_generic_category",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Ethiopian Market LLC",
+          "address": "7355 W 10th St, Indianapolis, IN 46214",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "bbb",
+          "category_fit_evidence": "Loc8NearMe/Zabihah listings name teff flour, barley flour, injera and traditional Ethiopian takeaway; BBB profile is filed under the \"restaurants\" category.",
+          "operational_evidence": "Working phone (317) 332-8984; hours published on the mainstream directory; multi-source corroboration (Loc8NearMe, BBB, Zabihah).",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "category-taxonomy sweep",
+          "evidence_urls": [
+            "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/",
+            "https://www.bbb.org/us/in/indianapolis/profile/restaurants/ethiopian-market-llc-0382-90039043"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "no_category_token_in_name",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Arsema G Food Mart LLC",
+          "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "\"Arsema\" is an Ethiopian endonym and \"Food Mart\" is a generic retail token; no English category word identifies the grocery specialization.",
+          "operational_evidence": "Operating storefront with current hours, working phone, SNAP authorization and a live Square storefront.",
+          "operational_status": "active",
+          "discovered_by": "business_audit",
+          "discovered_via": "endonym / transliteration sweep",
+          "evidence_urls": [
+            "https://arsemamart.square.site",
+            "https://indiana-company.com/co/arsema-g-food-mart-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_generic_category",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Senay Habesha (Ethiopian and Eritrean) Store",
+          "address": "5636 W Washington St, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "\"Senay Habesha\" is a Habesha endonym with no English category token; LocalityBiz names Habesha groceries as the assortment.",
+          "operational_evidence": "Published hours across Shops1000/LocalityBiz and a working phone (317) 523-5197; co-located Zara Habesha restaurant corroborates an active storefront.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "endonym / transliteration sweep",
+          "evidence_urls": [
+            "https://www.shops1000.com/US/Indianapolis/100767611860632/Senay-habesha-store",
+            "https://localitybiz.com/31105139/senay-habesha-ethiopian-%26-eritrean-store-indianapolis"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "trade_manifest_only",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Arsema G Food Mart LLC",
+          "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "US Customs bill-of-lading records name the business as importer of record with manifest line items naming category-defining Ethiopian staples (teff, berbere, shiro).",
+          "operational_evidence": "Storefront listings show current hours and phone; SNAP-authorized; Square checkout active; importer-of-record address (2724 W 10th St) differs from the storefront address.",
+          "operational_status": "active",
+          "discovered_by": "business_audit",
+          "discovered_via": "customs / trade records",
+          "evidence_urls": [
+            "https://www.importgenius.com/importers/arsema-g-food-mart-llc",
+            "https://arsemamart.square.site"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_generic_category",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Kaura International Food Market",
+          "address": "4271 Lafayette Rd, Indianapolis, IN 46254",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Named as importer of record in customs/trade records while carrying no category-bearing platform profile; African/International grocery assortment (SNAP/EBT accepted).",
+          "operational_evidence": "Wheree/MapQuest listings carry published hours and reviews; working phone (317) 297-7036; own site kauramarket.com.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "customs / trade records",
+          "evidence_urls": [
+            "https://www.mapquest.com/us/indiana/kaura-international-food-market-388266416",
+            "https://kaura-international-food-market.wheree.com/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "aggregator_shadow_presence_only",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "22nd Street African Grocery",
+          "address": "11 W 22nd St, Indianapolis, IN 46202",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "SIC-541105 grocers-retail directory and mirror family list it as an African grocery; no owned or claimed surface carries the assortment.",
+          "operational_evidence": "Multiple independent mirror records (food-us.org SIC directory, WhereOrg, Zipleaf) agree on the same address and phone (317) 924-3914.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "aggregator-result classification sweep",
+          "evidence_urls": [
+            "https://indiana.food-us.org/118772-22nd_street_african_grocery.htm",
+            "https://www.whereorg.com/nd-street-african-grocery-6154519"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Ethiopian Market LLC",
+          "address": "7355 W 10th St, Indianapolis, IN 46214",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Entire indexed footprint is mirror/republished pages (Loc8NearMe, BBB auto-profile, Zabihah) with no claimed profile or owned domain behind them.",
+          "operational_evidence": "Mirrors agree on address and phone; hours published; operational history corroborated across three mirror families.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "SERP first-party-vs-mirror audit",
+          "evidence_urls": [
+            "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/",
+            "https://www.bbb.org/us/in/indianapolis/profile/restaurants/ethiopian-market-llc-0382-90039043"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Safari Market (Safari Market LLC)",
+          "address": "5653 W Morris St, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Loc8NearMe mirror listing names Dahabshil money wire transfer, Somali/African clothing and wedding accessories, and perfumes/bakhoor alongside grocery lines; Indiana registry filing names Safari Market LLC at the same address.",
+          "operational_evidence": "Mirror listing carries published hours and a working phone (317) 717-5866; Indiana registry filing corroborates the entity at the address.",
+          "operational_status": "active",
+          "discovered_by": "bronze_establishment_scan",
+          "discovered_via": "aggregator-result classification sweep",
+          "evidence_urls": [
+            "https://www.loc8nearme.com/indiana/indianapolis/african-market/2460692/",
+            "https://indiana-company.com/co/safari-market-llc"
+          ],
+          "digital_quality": "very_low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "alternate_identity",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Arsema G Food Mart LLC",
+          "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "A second trading name (\"Ethiopian Eritrean Store\") is listed at Arsema's address and phone, splitting the trace; the alias carries the category signal while the legal name does not.",
+          "operational_evidence": "Both identities resolve to the same confirmed operating storefront with current hours and phone.",
+          "operational_status": "active",
+          "discovered_by": "business_audit",
+          "discovered_via": "identity-conflict detection",
+          "evidence_urls": [
+            "https://indiana-company.com/co/arsema-g-food-mart-llc",
+            "https://arsemamart.square.site"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_generic_category",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Heaven African Market",
+          "address": "4903 S High School Rd, Indianapolis, IN 46221",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "A second name (TETEES African Food Market, Suite A) is listed at the same street address, so the two identities split review and hours signals for one walk-in storefront.",
+          "operational_evidence": "MapQuest listing plus SNAP retailer registry mirror and openinghours.ninja entry corroborate an operating storefront; working phone (317) 857-6142.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "identity-conflict detection",
+          "evidence_urls": [
+            "https://www.mapquest.com/us/indiana/heaven-african-market-479907454",
+            "https://foreignerbazaar.com/listing/tetees-african-food-market/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "corridor_absent_from_guides",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "22nd Street African Grocery",
+          "address": "11 W 22nd St, Indianapolis, IN 46202",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Storefront sits on a minor W 22nd St segment that appears in no catalogued retail corridor or local guide for the market; only SIC-directory and mirror datasets name it.",
+          "operational_evidence": "Same address and phone (317) 924-3914 repeated across three independent mirror datasets, consistent with a standing storefront.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "address clustering",
+          "evidence_urls": [
+            "https://indiana.food-us.org/118772-22nd_street_african_grocery.htm",
+            "https://www.zipleaf.us/Companies/nd-Street-African-Grocery"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Baobab African Market LLC",
+          "address": "7031 Michigan Rd, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Address falls on a Michigan Rd segment outside every corridor in the cached market grid; the storefront is named only in registry and SNAP datasets, never in a corridor guide.",
+          "operational_evidence": "Indiana Secretary of State entity filing plus a USDA SNAP retailer listing at the same address establish an operating retail point.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "address clustering",
+          "evidence_urls": [
+            "https://www.marketcompanies.org/baobab-african-market-llc",
+            "https://www.foodstampbalance.net/baobab-african-market-accepts-food-stamps-in-indianapolis-indiana-fsl22531"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "hosted_storefront_only",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Arsema G Food Mart LLC",
+          "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Only web surface is the hosted Square storefront (arsemamart.square.site); no independent domain and no platform profile beyond it.",
+          "operational_evidence": "Hosted storefront carries live product categories and checkout; storefront listings carry current hours and working phone.",
+          "operational_status": "active",
+          "discovered_by": "business_audit",
+          "discovered_via": "site-scoped sweep",
+          "evidence_urls": [
+            "https://arsemamart.square.site"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_generic_category",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "His Grace African Grocery Store",
+          "address": "5508 W Washington St, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Only web surface is the hosted UENI subdomain (his-grace-african-grocery-store.ueniweb.com) with an African-foods product catalog; no independent domain.",
+          "operational_evidence": "MapQuest listing plus Indiana registry filing corroborate an operating storefront; working phone (317) 220-8063.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "site-scoped sweep",
+          "evidence_urls": [
+            "https://his-grace-african-grocery-store.ueniweb.com/",
+            "https://www.mapquest.com/us/indiana/his-grace-african-grocery-store-422848254"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "no_mainstream_profile",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Baobab African Market LLC",
+          "address": "7031 Michigan Rd, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Category-qualified African grocery confirmed only through registry and benefit-program datasets; no Google/Yelp/Facebook listing exists at the address.",
+          "operational_evidence": "Indiana Secretary of State filing names the entity at a storefront address; a USDA SNAP retailer record independently confirms an operating retail point.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "address-indexed datasets",
+          "evidence_urls": [
+            "https://www.marketcompanies.org/baobab-african-market-llc",
+            "https://www.foodstampbalance.net/baobab-african-market-accepts-food-stamps-in-indianapolis-indiana-fsl22531"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Janjai Redlight Market Inc",
+          "address": "3504 Madison Ave, Indianapolis, IN 46227",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "African grocery assortment named only in registry/benefit datasets and an Atly stub; no mainstream platform profile carries the category.",
+          "operational_evidence": "Indiana registry filing plus a USDA SNAP retailer listing at the same address and an Atly location stub establish an operating retail point.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "address-indexed datasets",
+          "evidence_urls": [
+            "https://indiana-company.com/co/janjai-redlight-market-inc",
+            "https://www.atly.com/location/JANJAI-REDLIGHT-MARKET-INC-AFRICAN-GROCERY"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Gomez African Grocery LLC",
+          "address": "8912 Saint Peter St, Indianapolis, IN 46227",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Atly location stub names African food, fresh fish, and flours; Indiana registry filing names the entity as an African grocery at the same address.",
+          "operational_evidence": "Indiana registry filing at a storefront address plus an Atly location stub at the same address establish an operating retail point with no mainstream profile.",
+          "operational_status": "likely_active",
+          "discovered_by": "bronze_establishment_scan",
+          "discovered_via": "address-indexed datasets",
+          "evidence_urls": [
+            "https://indiana-company.com/co/gomez-african-grocery-llc",
+            "https://www.atly.com/location/GOMEZAFRICANGROCERY"
+          ],
+          "digital_quality": "very_low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "permit_or_trade_manifest_trace_only",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Adey International Market and Restaurant",
+          "address": "2910 S Lynhurst Dr, Unit B, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Retail halal/African market plus restaurant; the only current civic trace is an Indiana Alcohol and Tobacco Commission license agenda naming an active beer/wine retailer license.",
+          "operational_evidence": "Active ATC license agenda (April 2026) plus Loc8NearMe/MapQuest storefront listings with a working phone (317) 222-4168.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "municipal permit sweep",
+          "evidence_urls": [
+            "https://www.in.gov/atc/files/2026.04.07_Agenda.pdf",
+            "https://www.loc8nearme.com/indiana/indianapolis/halal-market-and-habesha-restaurants/9598476/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Safari Restaurant and Halal Market Inc",
+          "address": "5602 W Washington St, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Halal market with a cooked-food component; visible only through the Indiana business registry and Marion County restaurant inspection records, with no consumer-platform profile.",
+          "operational_evidence": "Marion County restaurant inspection records plus the Indiana registry filing establish an active food-retail operation at the address.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "SNAP retailer registry cross-join",
+          "evidence_urls": [
+            "https://www.marketcompanies.org/safari-restaurant-halal-market-inc",
+            "https://www.city-data.com/marion-in-restaurants/Safari-Restaurant.html"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "rename_residue_splits_the_discovery_trace",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Adey International Market and Restaurant",
+          "address": "2910 S Lynhurst Dr, Unit B, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Live storefront trades as Adey while Loc8NearMe, MapQuest, Rakwa and the Indiana registry still index the predecessor names (Troy Halal Market / Halal Market and Habesha Restaurants) — the current name has no consolidated profile.",
+          "operational_evidence": "Active ATC beer/wine license and current storefront listings with a working phone (317) 222-4168 confirm the successor is trading.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "rename-chain detection (same address+phone, different name across directories)",
+          "evidence_urls": [
+            "https://www.loc8nearme.com/indiana/indianapolis/halal-market-and-habesha-restaurants/9598476/",
+            "https://indiana-company.com/co/troy-halal-market-llp",
+            "https://rakwa.com/listting/halal-market-and-habesha-restaurants"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Golden Crown African Grocery Store",
+          "address": "5342 W 38th St, Indianapolis, IN 46254",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Live storefront trades as Golden Crown while CentralIndex still indexes the predecessor/alternate entity name \"African Caribbean Food Stores LLC\" at the same address — the address-keyed join splits one storefront into two thin half-entities.",
+          "operational_evidence": "LocalityBiz storefront listing plus Indiana registry filings under both names at the same address; phone (301) 418-5433.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "mirror-vs-canonical name diff audit per address",
+          "evidence_urls": [
+            "https://localitybiz.com/31090710/golden-crown-african-grocery-store-indianapolis",
+            "https://us.centralindex.com/company/45c1e3c87bc183c57e9d14b0c36388fa/african-caribbean-food-stores-llc/indianapolis",
+            "https://indiana-company.com/co/golden-crown-african-store-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "unclaimed_profile",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Dreamcast African Market Inc",
+          "address": "7125 Georgetown Rd, #900, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Wheree listing explicitly shows an unclaimed state (\"Owner has not completed verification process\") while naming fufu flour and African grocery inventory.",
+          "operational_evidence": "Working phone (317) 985-9643; registry filing and SNAP retailer record corroborate an operating storefront; 5 reviews on the unclaimed listing.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform-presence audit",
+          "evidence_urls": [
+            "https://dreamcast-african-market.wheree.com/",
+            "https://indiana-company.com/co/dreamcast-african-market-inc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Kaura International Food Market",
+          "address": "4271 Lafayette Rd, Indianapolis, IN 46254",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Wheree listing is unclaimed (no owner verification) while naming SNAP/EBT acceptance and accessibility attributes of an African/International grocery.",
+          "operational_evidence": "Published hours and 6 reviews on the mainstream listing; working phone (317) 297-7036; own site kauramarket.com.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform-presence audit",
+          "evidence_urls": [
+            "https://kaura-international-food-market.wheree.com/",
+            "https://www.mapquest.com/us/indiana/kaura-international-food-market-388266416"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "community_directory_only_presence",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Sant Yalla International African Market",
+          "address": "2989 W 71st St, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Only structured presence is a human-curated Muslim Listings entry (daily 9am-9pm) plus mirror pages; no claimed mainstream profile carries the African-market category.",
+          "operational_evidence": "Muslim Listings entry with published daily hours, Loc8NearMe listing, SNAP retailer record and a registry filing; working phone (317) 220-8555.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "niche-directory sweep (zabihah, shisha.com, mnhalal, halalplaces, rakwa, grocery10) per market",
+          "evidence_urls": [
+            "https://muslimlistings.org/listing/sant-yalla-international-african-market/",
+            "https://www.loc8nearme.com/indiana/indianapolis/sant-yalla-international-african-market/5763785/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Halal Market (Halalmarket Indiana)",
+          "address": "5768 W Morris St, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Richer community record (Zabihah names Wednesday/Saturday halal meat arrivals) than any mainstream surface; mainstream platforms return only a thin stub.",
+          "operational_evidence": "Zabihah community entry with fresh-meat arrival days plus a ruspagesusa storefront listing; rating 4.4 displayed on the community record.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "SERP first-party-vs-mirror audit distinguishing curated community pages from auto-generated mirrors",
+          "evidence_urls": [
+            "https://www.zabihah.com/restaurants/c9f1eefa-7767-11ef-95ae-6045bdeb9f57/halalmarket-indiana-indianapolis-in",
+            "https://ruspagesusa.com/catalog/indianapolis/halal_market/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "community_only_no_reviews",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Garaya African Market LLC",
+          "address": "4150 Lafayette Rd, Suite C, Indianapolis, IN 46254",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Community/social sources (Fifth Third Bank community feature) name the African market; every platform shows zero reviews.",
+          "operational_evidence": "Registry filing, SNAP retailer record, MapQuest listing and an SBA PPP loan record corroborate an operating storefront.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "community / referral networks",
+          "evidence_urls": [
+            "https://www.linkedin.com/posts/nadege-tano-coulibaly-racine-5146b188_love53-activity-7135030887313723392-dihY",
+            "https://indiana-company.com/co/garaya-african-market-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Royal African Market LLC",
+          "address": "3071 N High School Rd, Indianapolis, IN 46224",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Named by a bank community feature (Fifth Third Avon branch, Nov 2024) and SNAP/registry datasets; no review surface anywhere.",
+          "operational_evidence": "Registry filing, SNAP retailer record, Loc8NearMe listing and Atly stub corroborate an operating storefront.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "community / referral networks",
+          "evidence_urls": [
+            "https://www.linkedin.com/posts/kimberly-de-guzman-smith-169317a1_love53-activity-7259684363947147265-1SLc",
+            "https://www.loc8nearme.com/indiana/indianapolis/royal-african-market-llc/7247124/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "fractional_unit_address_breaks_nap_consolidation",
+      "status": "empty_proven_elsewhere",
+      "slots": [],
+      "empty_slot_note": "Executed this pass: fractional-address variant cross-join between license registries and platform listings, plus an address-normalization sweep (fractional/suite/½ variants) across all 48 sweep ZIPs and the six cached corridors — returned 0 fractional-unit storefronts in the Indianapolis catchment. The local cohort splits on suite letters (4150 Lafayette Rd Suites C/H; 4351 Lafayette Rd Ste F) and on dual principal-office-vs-storefront addresses, which are catalogued under stall_tenancy_inside_an_ethnic_marketplace_mall and the suggested principal-office-split reason, not fractional units. Seen outside market: Al-Hallal Grocery Store, 3009 1/2 Independence Ave, Kansas City (catalog-observed; license chain Tawakal Halal Store Inc -> Al-Hallal LLC -> Darsalaam Grocery Store LLC). -> empty_proven_elsewhere."
+    },
+    {
+      "reason_key": "low_rating_floor",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Sant Yalla International African Market",
+          "address": "2989 W 71st St, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Profile present (Muslim Listings + Loc8NearMe) but no rating aggregate is displayed despite an operating African-market storefront.",
+          "operational_evidence": "Published daily hours (9am-9pm), working phone (317) 220-8555, SNAP retailer record.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://muslimlistings.org/listing/sant-yalla-international-african-market/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Heaven African Market",
+          "address": "4903 S High School Rd, Indianapolis, IN 46221",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Storefront profile present via MapQuest/SNAP datasets with no rating displayed and no aggregate rating on any surface.",
+          "operational_evidence": "MapQuest listing, SNAP retailer record and openinghours.ninja entry; working phone (317) 857-6142.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://www.mapquest.com/us/indiana/heaven-african-market-479907454"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "no_website_or_contact",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Garaya African Market LLC",
+          "address": "4150 Lafayette Rd, Suite C, Indianapolis, IN 46254",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Listing carries an address only — no website field and no phone number on any surface — a field-level invisibility signal for a category-qualified storefront.",
+          "operational_evidence": "Registry filing, SNAP retailer record, MapQuest listing and SBA PPP loan record corroborate an operating storefront.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://indiana-company.com/co/garaya-african-market-llc",
+            "https://www.mapquest.com/us/indiana/garaya-african-market-753236658"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Royal African Market LLC",
+          "address": "3071 N High School Rd, Indianapolis, IN 46224",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "No website link and no usable phone in any listing; profile carries an address and a name only.",
+          "operational_evidence": "Registry filing, SNAP retailer record, Loc8NearMe listing and Atly stub corroborate an operating storefront.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://www.loc8nearme.com/indiana/indianapolis/royal-african-market-llc/7247124/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Victory Super Store African Foods LLC",
+          "address": "7460 Rockville Rd, Indianapolis, IN 46214",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "o2osell storefront listing names the African-foods retail type; an Ntare Consultants article names it among African grocery operators.",
+          "operational_evidence": "o2osell listing carries a WhatsApp business contact and a working phone (317) 998-2510; a Movoto nearby-business listing corroborates the address.",
+          "operational_status": "likely_active",
+          "discovered_by": "bronze_establishment_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://us.o2osell.com/shops/victory-super-store"
+          ],
+          "digital_quality": "very_low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "non_english_signage_only",
+      "status": "empty_proven_elsewhere",
+      "slots": [],
+      "empty_slot_note": "Executed this pass: Street View sweep over the six cached corridors — not executable in this run (Street View imagery is JavaScript-gated), returned 0 verified exemplars, so no slot is claimed; the unexecuted live pass is logged in vector_execution_log. Proven at national scope (national proof reference: Senay Habesha Store, Street View vector) and recorded as a prior Indianapolis corridor instance in the catalog. -> empty_proven_elsewhere."
+    },
+    {
+      "reason_key": "stale_or_missing_hours",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "22nd Street African Grocery",
+          "address": "11 W 22nd St, Indianapolis, IN 46202",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Mirror/SIC-directory footprint carries no hours field at all, so hours-driven discovery has nothing to match.",
+          "operational_evidence": "Same address and phone (317) 924-3914 repeated across three independent mirror datasets.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://indiana.food-us.org/118772-22nd_street_african_grocery.htm"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Ethiopian Market LLC",
+          "address": "7355 W 10th St, Indianapolis, IN 46214",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Hours are not consolidated across the mirror family and no canonical source publishes them; mainstream platforms fail the published-hours gate for this storefront.",
+          "operational_evidence": "Working phone (317) 332-8984; multi-mirror address agreement; Zabihah assortment record.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://www.loc8nearme.com/indiana/indianapolis/ethiopian-market-llc/6960207/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Grace Variety Store",
+          "address": "5230 W 10th St, Indianapolis, IN 46224",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "food-us.org SIC grocers-retail directory entry carries owner-name and product-category fields for the storefront.",
+          "operational_evidence": "Directory entry carries a working phone (317) 487-8254 and an owner name; multi-source identity signal corroborates the storefront.",
+          "operational_status": "likely_active",
+          "discovered_by": "bronze_establishment_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://indiana.food-us.org/118950-grace_variety_store.htm"
+          ],
+          "digital_quality": "very_low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "stall_tenancy_inside_an_ethnic_marketplace_mall",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Garaya African Market LLC",
+          "address": "4150 Lafayette Rd, Suite C, Indianapolis, IN 46254",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Independent category-qualified stall inside the multi-tenant 4150 Lafayette Rd building (the International Marketplace district), sharing the building address with other tenants (e.g. African Food Services LLC, Suite H); no tenant-level platform listing exists — maps index the address, not the stall.",
+          "operational_evidence": "Registry filing, SNAP retailer record, MapQuest listing and SBA PPP loan record confirm an operating retail unit with walk-in access.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "parcel/POI penetration sweep beneath anchor listings",
+          "evidence_urls": [
+            "https://indiana-company.com/co/garaya-african-market-llc",
+            "https://indiana-company.com/co/african-food-services-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "thin_photo_surface",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Heaven African Market",
+          "address": "4903 S High School Rd, Indianapolis, IN 46221",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Profile carries no photos and only auto-generated imagery, so nothing establishes the storefront visually.",
+          "operational_evidence": "MapQuest listing, SNAP retailer record and openinghours.ninja entry; working phone (317) 857-6142.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://www.mapquest.com/us/indiana/heaven-african-market-479907454"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Baobab African Market LLC",
+          "address": "7031 Michigan Rd, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "No photo surface exists at all — the only records are text registry/SNAP rows with no imagery.",
+          "operational_evidence": "Indiana registry filing plus USDA SNAP retailer listing at the same address.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://www.marketcompanies.org/baobab-african-market-llc"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "absent",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "unofficial_third_party_site_shadows_the_business",
+      "status": "empty_unproven",
+      "slots": [],
+      "empty_slot_note": "Executed this pass: SERP first-party-vs-shadow audit plus whois/operator check on business-name domains across the catchment — returned 0 domains self-labeling 'Unofficial Website'. Human-authored third-party editorial pages exist (StudyGroom case study for Dreamcast African Market; Ntare Consultants article naming Victory Super Store African Foods) but neither self-identifies as an unofficial website nor displaces a first-party surface, and no owner-claimed domain is absent behind them. Not proven at national scope and no other-market instance in the catalog -> empty_unproven."
+    },
+    {
+      "reason_key": "wholesale_or_hybrid_role",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "Jokkymore African Market LLC (Jokkymore D'chef Food Services)",
+          "address": "1041 N Girls School Rd, Indianapolis, IN 46214",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Dual role: retail African market plus a catering/food-services arm, which splits its platform categorization and keeps it out of retail-only directory paths.",
+          "operational_evidence": "IndyStar dining gallery coverage, ImportGenius customs record, Opendi/MapQuest listings and an Atly location with a reward-point program; 30 reviews.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "foodservice / wholesale channels",
+          "evidence_urls": [
+            "https://eu.indystar.com/picture-gallery/entertainment/dining/restaurants/2023/09/18/jokkymore-dchef-african-market-indianapolis-indiana-west-side/70862485007/",
+            "https://www.importgenius.com/importers/jokky-moredchef-food-services"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Adey International Market and Restaurant",
+          "address": "2910 S Lynhurst Dr, Unit B, Indianapolis, IN 46241",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": null,
+          "category_fit_evidence": "Grocery-plus-kitchen hybrid (international market and restaurant) with an active beer/wine retail license; the dual role splits categorization across retail and foodservice paths.",
+          "operational_evidence": "Active Indiana ATC license agenda (April 2026) plus Loc8NearMe/MapQuest/Rakwa listings and a working phone (317) 222-4168.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "foodservice / wholesale channels",
+          "evidence_urls": [
+            "https://www.in.gov/atc/files/2026.04.07_Agenda.pdf",
+            "https://www.mapquest.com/us/indiana/troy-halal-market-427163278"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "not_verified",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    },
+    {
+      "reason_key": "zero_or_floor_reviews",
+      "status": "filled",
+      "slots": [
+        {
+          "business_name": "TETEES African Food Market",
+          "address": "4903 S High School Rd, Suite A, Indianapolis, IN 46221",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Profile present with a review count of 1 — floor level relative to category norms — and no rating displayed.",
+          "operational_evidence": "Foreigner Bazaar and ChamberofCommerce listings at the address with a working phone (267) 888-0543.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://foreignerbazaar.com/listing/tetees-african-food-market/",
+            "https://www.chamberofcommerce.com/business-directory/indiana/food-dining/markets-food-stores/african-goods-store/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        },
+        {
+          "business_name": "Dreamcast African Market Inc",
+          "address": "7125 Georgetown Rd, #900, Indianapolis, IN 46268",
+          "observed_city": "Indianapolis",
+          "observed_state": "IN",
+          "observed_platform": "google",
+          "category_fit_evidence": "Unclaimed profile with 5 reviews and no rating aggregate — floor level for a storefront with operating history.",
+          "operational_evidence": "Working phone (317) 985-9643; registry filing and SNAP retailer record; Wheree listing names fufu-flour inventory.",
+          "operational_status": "active",
+          "discovered_by": "emerging_scan",
+          "discovered_via": "platform field audit",
+          "evidence_urls": [
+            "https://dreamcast-african-market.wheree.com/"
+          ],
+          "digital_quality": "low",
+          "platform_presence": {
+            "google": "present_unclaimed",
+            "yelp": "absent",
+            "facebook": "absent"
+          }
+        }
+      ],
+      "empty_slot_note": null
+    }
+  ],
+  "not_applicable_reasons": [],
+  "suggested_reasons": [
+    {
+      "proposed_label": "Bank community-reinvestment feature is the only current trace",
+      "proposed_definition": "A local bank or credit union publishes a community-feature post (community reinvestment / \"Love\" campaign) naming the storefront and its neighborhood impact, and that editorial post becomes the business's most recent indexed public signal. The post ranks for the business name, but it carries no NAP, no hours, and no category field, so category-filtered and map-based discovery never resolves the storefront from it; the operator controls none of the content. The blind spot is a discovery mechanic (the only fresh trace lives in an unrelated financial-institution channel), not a business attribute.",
+      "observed_signals": [
+        "most recent indexed mention of the business is a bank/credit-union community or reinvestment post",
+        "the post names the business and neighborhood but carries no address, hours, or category",
+        "no corresponding first-party or claimed-platform surface exists",
+        "registry and benefit-program datasets confirm operation while no consumer platform profile exists"
+      ],
+      "expected_vectors": [
+        "financial-institution community/reinvestment post sweep per market",
+        "LinkedIn community-feature monitoring",
+        "community / referral networks"
+      ],
+      "scope_level": "universal",
+      "category_family_applicable": true,
+      "suggested_category_scope": "grocery",
+      "suggested_scope_platform": null,
+      "exemplar_lead": {
+        "business_name": "Garaya African Market LLC",
+        "observed_platform": null,
+        "address": "4150 Lafayette Rd, Suite C, Indianapolis, IN 46254",
+        "discovery_vector": "Fifth Third Bank community feature (LinkedIn)",
+        "notes": "Registry + SNAP + MapQuest + SBA PPP corroborate an operating storefront; the bank community post is the freshest public signal. Royal African Market LLC (3071 N High School Rd) shows the same pattern via a Fifth Third Avon branch feature."
+      }
+    },
+    {
+      "proposed_label": "Principal-office address splits from storefront address",
+      "proposed_definition": "The entity's registered principal office (or benefit-program registration) address differs from the operating storefront address. Directories and mirrors ingest the regulatory address and publish a listing at a location that is not the walk-in store, while the storefront address carries only a thin or generic listing. Address-keyed joins then treat one operating business as two weak entities, and a searcher who finds the regulatory address is routed to a non-retail location. Distinct from a rename (the name is stable) and from fractional-unit normalization (both addresses are well-formed) — the failure is the registry-vs-storefront split itself.",
+      "observed_signals": [
+        "state registry / SNAP registration address differs from the storefront address for the same entity",
+        "aggregator listings publish the regulatory address while the storefront address has only a thin listing",
+        "one address resolves to a non-retail principal office (suite/office park) and the other to a walk-in retail unit",
+        "same phone or entity id ties the two addresses together"
+      ],
+      "expected_vectors": [
+        "registry-address vs storefront-address cross-join per entity",
+        "address-indexed datasets",
+        "identity-conflict detection keyed on phone + entity id"
+      ],
+      "scope_level": "universal",
+      "category_family_applicable": true,
+      "suggested_category_scope": "grocery",
+      "suggested_scope_platform": null,
+      "exemplar_lead": {
+        "business_name": "Arsema G Food Mart LLC",
+        "observed_platform": "google",
+        "address": "6667 W Washington St, Unit A, Indianapolis, IN 46241 (registry/SNAP principal office: 2724 W 10th St, Indianapolis, IN 46222)",
+        "discovery_vector": "registry-address vs storefront-address cross-join",
+        "notes": "INBiz principal office and SNAP registration sit at 2724 W 10th St while the storefront and current hours are at 6667 W Washington St; MapQuest/YellowPages ingested the 10th St variant. Dreamcast African Market and Batis African Store show the same registry-vs-storefront split at catchment scale."
+      }
+    }
+  ],
+  "scope_mix": {
+    "universal": 22,
+    "category": 2,
+    "location": 0,
+    "category_location": 0,
+    "platform_bound": 0
+  },
+  "vector_execution_log": [
+    {
+      "vector": "platform-presence audit",
+      "executed": true,
+      "returned": 43
+    },
+    {
+      "vector": "category-taxonomy sweep",
+      "executed": true,
+      "returned": 43
+    },
+    {
+      "vector": "endonym / transliteration sweep",
+      "executed": true,
+      "returned": 6
+    },
+    {
+      "vector": "customs / trade records",
+      "executed": true,
+      "returned": 3
+    },
+    {
+      "vector": "aggregator-result classification sweep",
+      "executed": true,
+      "returned": 13
+    },
+    {
+      "vector": "SERP first-party-vs-mirror audit",
+      "executed": true,
+      "returned": 12
+    },
+    {
+      "vector": "identity-conflict detection",
+      "executed": true,
+      "returned": 5
+    },
+    {
+      "vector": "address clustering",
+      "executed": true,
+      "returned": 8
+    },
+    {
+      "vector": "site-scoped sweep",
+      "executed": true,
+      "returned": 4
+    },
+    {
+      "vector": "address-indexed datasets",
+      "executed": true,
+      "returned": 44
+    },
+    {
+      "vector": "municipal permit sweep",
+      "executed": true,
+      "returned": 1
+    },
+    {
+      "vector": "import-manifest datasets",
+      "executed": true,
+      "returned": 3
+    },
+    {
+      "vector": "SNAP retailer registry cross-join",
+      "executed": true,
+      "returned": 14
+    },
+    {
+      "vector": "rename-chain detection (same address+phone, different name across directories)",
+      "executed": true,
+      "returned": 2
+    },
+    {
+      "vector": "platform field audit",
+      "executed": true,
+      "returned": 45
+    },
+    {
+      "vector": "niche-directory sweep (zabihah, shisha.com, mnhalal, halalplaces, rakwa, grocery10) per market",
+      "executed": true,
+      "returned": 9
+    },
+    {
+      "vector": "community / referral networks",
+      "executed": true,
+      "returned": 4
+    },
+    {
+      "vector": "fractional-address variant cross-join between license registries and platform listings",
+      "executed": true,
+      "returned": 0
+    },
+    {
+      "vector": "address-normalization sweep (fractional/suite/½ variants) per commercial corridor",
+      "executed": true,
+      "returned": 0
+    },
+    {
+      "vector": "Street View sweep",
+      "executed": false,
+      "returned": null
+    },
+    {
+      "vector": "parcel/POI penetration sweep beneath anchor listings",
+      "executed": true,
+      "returned": 0
+    },
+    {
+      "vector": "marketplace-mall tenant directories and lease rosters",
+      "executed": false,
+      "returned": null
+    },
+    {
+      "vector": "SERP first-party-vs-shadow audit",
+      "executed": true,
+      "returned": 0
+    },
+    {
+      "vector": "whois/operator check on business-name domains",
+      "executed": true,
+      "returned": 0
+    },
+    {
+      "vector": "foodservice / wholesale channels",
+      "executed": true,
+      "returned": 2
+    }
+  ],
+  "prohibited_inferences": [
+    "Low digital quality describes observable online fields only — never infer low revenue, low customer volume, poor products, poor service, or sales readiness from a thin digital footprint.",
+    "A bronze slot is not a prospect verdict and not a competitive benchmark; these businesses are not framed as outreach targets or compared to high-visibility competitors.",
+    "An empty slot never means no such business exists — it means the vectors executed did not reach one (or were not executed).",
+    "A filled absent_from_platform or field-gap slot is a per-platform finding — a business absent on Google may be fully present on Yelp; a per-platform gap is never generalized into a whole-business verdict.",
+    "Bronze output is a discovery-calibration artifact and must never be framed as competitive benchmarking."
+  ],
+  "geography_grid": {
+    "market": "Indianapolis, IN",
+    "zips": [
+      "46201",
+      "46202",
+      "46203",
+      "46204",
+      "46205",
+      "46208",
+      "46214",
+      "46216",
+      "46218",
+      "46219",
+      "46220",
+      "46221",
+      "46222",
+      "46224",
+      "46225",
+      "46226",
+      "46227",
+      "46229",
+      "46231",
+      "46234",
+      "46235",
+      "46236",
+      "46237",
+      "46239",
+      "46240",
+      "46241",
+      "46250",
+      "46254",
+      "46256",
+      "46259",
+      "46260",
+      "46268",
+      "46278",
+      "46280",
+      "46290",
+      "46107",
+      "46112",
+      "46113",
+      "46123",
+      "46142",
+      "46143",
+      "46168",
+      "46032",
+      "46033",
+      "46037",
+      "46038",
+      "46075",
+      "46077"
+    ],
+    "corridors": [
+      "Lafayette Rd corridor (Pike Twp, 46254/46222 — the International Marketplace district): Kaura International Food Market (4271), Kaura Tropical (4251), Garaya African Market (4150), Global Village Welcome Center (4233), Saraga anchor at 3605 Commercial Dr",
+      "W 38th St corridor (46254): Golden Crown/African-Caribbean Food Stores (5342 W 38th), Halal Supermarket Indy (4861 W 38th)",
+      "W 71st St / Georgetown Rd corridor (46268, College Park–Pike): Sant Yalla (2989 W 71st), Dunkem (2736 W 71st), Dreamcast (7125 Georgetown Rd)",
+      "W Washington St / W Morris St corridor (46241, Ben Davis–Wayne Twp): His Grace (5508 W Washington), Senay Habesha (5636 W Washington), Arsema (6667 W Washington), Safari Market (5653 W Morris), Halal Market (5768 W Morris)",
+      "W 10th St / Girls School Rd / N-S High School Rd corridor (46214/46221/46224, Speedway-adjacent west): Ethiopian Market LLC (7355 W 10th), Arsema import/SNAP address (2724 W 10th), Jokkymore (1041 N Girls School Rd), Royal African (3071 N High School Rd), Heaven African (4903 S High School Rd)",
+      "E 38th St corridor (46226, Lawrence-adjacent east side — confirmed outlier, not the hub): African Market (8057 E 38th)"
+    ],
+    "adjacent_municipalities": [
+      "Speedway (shares 46224 with Indianapolis)",
+      "Lawrence (shares 46216/46226/46235/46236 with Indianapolis)",
+      "Beech Grove (46107, inside Marion County)",
+      "Southport (shares 46227/46237, inside Marion County)",
+      "Clermont (shares 46234)",
+      "Homecroft (46227)",
+      "Avon (46123, Hendricks Co.)",
+      "Brownsburg (46112, Hendricks Co.)",
+      "Plainfield (46168, Hendricks Co.)",
+      "Camby (46113, unincorporated contiguous)",
+      "Greenwood (46142/46143, Johnson Co.)",
+      "Carmel (46032/46033, Hamilton Co.)",
+      "Fishers (46037/46038, Hamilton Co.)",
+      "Zionsville (46077)",
+      "Whitestown (46075)"
+    ],
+    "search_radius_miles": 18,
+    "derivation_basis": "ZIP set derived from the City of Indianapolis boundary ZIPs plus the ZIPs of contiguous commercial municipalities that share a ZIP with the principal city (Speedway 46224, Lawrence 46216/46226/46235/46236, Beech Grove 46107, Southport 46227/46237, Clermont 46234, Homecroft 46227), plus the adjacent-county commercial municipalities inside the 18-mile retail catchment (Avon, Brownsburg, Plainfield, Camby, Greenwood, Carmel, Fishers, Zionsville, Whitestown). Corridors derived from the arterial retail corridors observed in the prior Indianapolis African Grocery sweep (Lafayette Rd, W 38th St, W 71st/Georgetown, W Washington/W Morris, W 10th/Girls School/N-S High School Rd, E 38th St)."
+  },
+  "scan_contract": {
+    "contract_version": "discovery-scan-contract-v1",
+    "sweep_ledger": [
+      {
+        "unit_id": "zip:46201",
+        "unit_type": "zip_label_matrix",
+        "unit": "46201 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46202",
+        "unit_type": "zip_label_matrix",
+        "unit": "46202 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46203",
+        "unit_type": "zip_label_matrix",
+        "unit": "46203 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46204",
+        "unit_type": "zip_label_matrix",
+        "unit": "46204 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46205",
+        "unit_type": "zip_label_matrix",
+        "unit": "46205 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46208",
+        "unit_type": "zip_label_matrix",
+        "unit": "46208 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46214",
+        "unit_type": "zip_label_matrix",
+        "unit": "46214 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 3,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46216",
+        "unit_type": "zip_label_matrix",
+        "unit": "46216 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46218",
+        "unit_type": "zip_label_matrix",
+        "unit": "46218 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46219",
+        "unit_type": "zip_label_matrix",
+        "unit": "46219 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46220",
+        "unit_type": "zip_label_matrix",
+        "unit": "46220 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46221",
+        "unit_type": "zip_label_matrix",
+        "unit": "46221 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 2,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46222",
+        "unit_type": "zip_label_matrix",
+        "unit": "46222 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 2,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46224",
+        "unit_type": "zip_label_matrix",
+        "unit": "46224 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 3,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46225",
+        "unit_type": "zip_label_matrix",
+        "unit": "46225 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46226",
+        "unit_type": "zip_label_matrix",
+        "unit": "46226 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46227",
+        "unit_type": "zip_label_matrix",
+        "unit": "46227 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 3,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46229",
+        "unit_type": "zip_label_matrix",
+        "unit": "46229 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46231",
+        "unit_type": "zip_label_matrix",
+        "unit": "46231 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46234",
+        "unit_type": "zip_label_matrix",
+        "unit": "46234 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46235",
+        "unit_type": "zip_label_matrix",
+        "unit": "46235 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46236",
+        "unit_type": "zip_label_matrix",
+        "unit": "46236 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46237",
+        "unit_type": "zip_label_matrix",
+        "unit": "46237 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46239",
+        "unit_type": "zip_label_matrix",
+        "unit": "46239 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46240",
+        "unit_type": "zip_label_matrix",
+        "unit": "46240 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46241",
+        "unit_type": "zip_label_matrix",
+        "unit": "46241 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 8,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46250",
+        "unit_type": "zip_label_matrix",
+        "unit": "46250 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46254",
+        "unit_type": "zip_label_matrix",
+        "unit": "46254 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 6,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46256",
+        "unit_type": "zip_label_matrix",
+        "unit": "46256 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46259",
+        "unit_type": "zip_label_matrix",
+        "unit": "46259 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46260",
+        "unit_type": "zip_label_matrix",
+        "unit": "46260 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 2,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46268",
+        "unit_type": "zip_label_matrix",
+        "unit": "46268 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 3,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46278",
+        "unit_type": "zip_label_matrix",
+        "unit": "46278 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46280",
+        "unit_type": "zip_label_matrix",
+        "unit": "46280 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46290",
+        "unit_type": "zip_label_matrix",
+        "unit": "46290 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46107",
+        "unit_type": "zip_label_matrix",
+        "unit": "46107 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46112",
+        "unit_type": "zip_label_matrix",
+        "unit": "46112 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46113",
+        "unit_type": "zip_label_matrix",
+        "unit": "46113 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46123",
+        "unit_type": "zip_label_matrix",
+        "unit": "46123 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46142",
+        "unit_type": "zip_label_matrix",
+        "unit": "46142 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46143",
+        "unit_type": "zip_label_matrix",
+        "unit": "46143 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46168",
+        "unit_type": "zip_label_matrix",
+        "unit": "46168 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46032",
+        "unit_type": "zip_label_matrix",
+        "unit": "46032 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46033",
+        "unit_type": "zip_label_matrix",
+        "unit": "46033 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46037",
+        "unit_type": "zip_label_matrix",
+        "unit": "46037 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46038",
+        "unit_type": "zip_label_matrix",
+        "unit": "46038 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46075",
+        "unit_type": "zip_label_matrix",
+        "unit": "46075 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "zip:46077",
+        "unit_type": "zip_label_matrix",
+        "unit": "46077 (Indianapolis retail catchment)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "corridor:lafayette-rd",
+        "unit_type": "corridor",
+        "unit": "Lafayette Rd corridor (46254/46222)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 6,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "corridor:w-38th-st",
+        "unit_type": "corridor",
+        "unit": "W 38th St corridor (46254)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 2,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "corridor:w-71st-georgetown-rd",
+        "unit_type": "corridor",
+        "unit": "W 71st St / Georgetown Rd corridor (46268)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 3,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "corridor:w-washington-w-morris-st",
+        "unit_type": "corridor",
+        "unit": "W Washington St / W Morris St corridor (46241)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 8,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "corridor:w-10th-girls-school-high-school-rd",
+        "unit_type": "corridor",
+        "unit": "W 10th St / Girls School Rd / N-S High School Rd corridor (46214/46221/46224)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 5,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "corridor:e-38th-st",
+        "unit_type": "corridor",
+        "unit": "E 38th St corridor (46226)",
+        "platforms_swept": [
+          "google",
+          "yelp",
+          "facebook",
+          "apple_maps",
+          "bing"
+        ],
+        "labels_swept": [
+          "Grocery store",
+          "Supermarket",
+          "International grocery",
+          "African goods store",
+          "Market",
+          "Convenience store"
+        ],
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:inbiz-business-registry",
+        "unit_type": "dataset_geography",
+        "unit": "Indiana Secretary of State (INBiz) business registry — by ZIP/address, no category filter",
+        "status": "executed_with_findings",
+        "findings_count": 26,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:usda-snap-retailer-locator",
+        "unit_type": "dataset_geography",
+        "unit": "USDA FNS SNAP Retailer Locator — by ZIP/address, no category filter",
+        "status": "executed_with_findings",
+        "findings_count": 14,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:us-customs-bill-of-lading",
+        "unit_type": "dataset_geography",
+        "unit": "US Customs bill-of-lading / import-manifest datasets (ImportGenius, ImportKey, Trademo) — by address",
+        "status": "executed_with_findings",
+        "findings_count": 3,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:indiana-atc-license-agenda",
+        "unit_type": "dataset_geography",
+        "unit": "Indiana Alcohol and Tobacco Commission license agendas — by address",
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:marion-county-restaurant-inspections",
+        "unit_type": "dataset_geography",
+        "unit": "Marion County restaurant inspection records — by address",
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:sba-ppp-loans",
+        "unit_type": "dataset_geography",
+        "unit": "SBA PPP loan records (OpenGovUS) — by address",
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:zabihah-halal-directory",
+        "unit_type": "dataset_geography",
+        "unit": "Zabihah halal directory — by market",
+        "status": "executed_with_findings",
+        "findings_count": 5,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:muslimlistings",
+        "unit_type": "dataset_geography",
+        "unit": "Muslim Listings community directory — by market",
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:rakwa-arab-american-directory",
+        "unit_type": "dataset_geography",
+        "unit": "Rakwa Arab American Directory — by market",
+        "status": "executed_with_findings",
+        "findings_count": 1,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:municipal-permit-records",
+        "unit_type": "dataset_geography",
+        "unit": "Municipal building/tenant permit records (Indianapolis DBNS) — by ZIP/address",
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      },
+      {
+        "unit_id": "dataset:local-retail-corridor-guides",
+        "unit_type": "dataset_geography",
+        "unit": "Local retail corridor guides and corridor maps — by market",
+        "status": "executed_empty",
+        "findings_count": 0,
+        "executed_at": "2026-09-30"
+      }
+    ],
+    "coverage_attestation": {
+      "units_total": 65,
+      "units_executed": 65,
+      "units_executed_empty": 36,
+      "units_not_executed": 0,
+      "vectors_not_executed": 2,
+      "completeness_claim": "verified_partial"
+    },
+    "unexecuted_vector_list": [
+      {
+        "vector": "Street View sweep",
+        "reason": "Street View imagery not machine-verifiable in this run (Google Maps JavaScript-gated)"
+      },
+      {
+        "vector": "marketplace-mall tenant directories and lease rosters",
+        "reason": "no lease-roster source available for the 4150 Lafayette Rd multi-tenant building"
+      }
+    ]
+  },
+  "scan_metadata": {
+    "scan_kind": "discovery",
+    "scan_scope": "region_narrowed",
+    "reference_profile_id": "mip-lhxofp5n",
+    "reference_profile_version": 2,
+    "catalog_revision": 8,
+    "reference_market": "Indianapolis, IN",
+    "degraded_mode": false,
+    "slots_carried_forward_from_board": 45,
+    "reasons_at_cap_carried": 20,
+    "reasons_partially_filled_carried": 1,
+    "reasons_empty_hunted": 3,
+    "open_slots_hunted": 7,
+    "new_slots_filled_this_pass": 0,
+    "incidental_reserve_finds": 4,
+    "unfilled_open_slots": [
+      {
+        "reason_key": "stall_tenancy_inside_an_ethnic_marketplace_mall",
+        "open_slots": 1,
+        "hunt_outcome": "Re-hunted against board v2: parcel/POI penetration sweep beneath anchor listings plus marketplace-mall tenant-directory / lease-roster vectors executed and returned 0 additional qualifying tenant. African Food Services LLC (4150 Lafayette Rd, Suite H — same building as the carried occupant Garaya African Market, Suite C) is registry-only with no assortment evidence (fails gate 1); Rachel International Food Market LLC (4351 Lafayette Rd, Ste F) is a suite tenant in the International Marketplace district but registry-only, with no phone, hours or assortment, so operational_status is unable_to_verify (fails gate 2) and it is reported as a lead, not a fill; Kaura Tropical (4251 Lafayette Rd) appears in the cached corridor grid but no assortment or operational evidence was reachable. Open slot remains unfilled; no padding applied."
+      }
+    ],
+    "reserve_candidates_carried": 4,
+    "coverage_self_test": {
+      "9_reserve_candidates_carried": "The four reserve candidates appended in the prior pass are now board occupants (Safari Market under aggregator_shadow_presence_only, Gomez African Grocery LLC under no_mainstream_profile, Victory Super Store African Foods LLC under no_website_or_contact, Grace Variety Store under stale_or_missing_hours) and are carried verbatim with discovered_by preserved."
+    }
+  }
+}

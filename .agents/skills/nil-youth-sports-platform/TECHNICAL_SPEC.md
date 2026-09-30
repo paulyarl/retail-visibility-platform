@@ -14,14 +14,16 @@ This platform is already a **multi-tenant marketplace with a two-tier singleton 
 | Functional Concept (Spec §) | Existing Architecture Primitive | Reference Skill |
 |---|---|---|
 | Two-Tier Architecture (§3) | `PublicApiSingleton` (cached) vs private mutation pipeline via `proxy.ts` + authenticated singletons (0-TTL) | `deploy-service-extending-base-singleton.md` |
-| State-driven DB firewall (§3) | `pending`/`approved`/`archived` status columns + `approved`-gated public read routes | `capability-data-flow-rules.md` (R13 pattern), RLS |
+| State-driven DB firewall (§3) | `pending`/`approved`/`archived` status columns + `approved`-gated public read routes | `capability-data-flow-rules.md` (R13 pattern) |
 | Persona portals (§2) | Auth0 roles + domain singleton bases (`Tenant`, `Customer`, `Admin`, `Public`, `Authenticated`) | `deploy-service-extending-base-singleton.md` §1.1 |
 | Phased feature rollout (§4) | Capability types + tier/merchant gates + 8-phase deployment pipeline | `capability-deployment-flow.md` |
 | Master Data Tracks (§5) | Tenant-scoped entity tables with tenant-traceable IDs + flexible JSON metadata columns | `tenant-scoped-id-generation.md` |
-| RLS isolation per athlete (§4 P4) | Postgres RLS + explicit `WHERE tenant_id = $1` keyed to the **athlete-tenant** + tenant-scoped IDs | `tenant-scoped-id-generation.md` §8 |
+| Per-athlete isolation (§4 P4) | Explicit `WHERE tenant_id = $1` keyed to the **athlete-tenant**, enforced by a repository-level tenant guard; tenant-scoped IDs. Postgres RLS is Phase-4 hardening, **not** a Phase-2 control | `tenant-scoped-id-generation.md` §8; `EXECUTION_PLAN.md` §4 S4.1 |
 | Centralized service manager (§6) | `UniversalSingleton` hierarchy + **NIL context-specific base singletons** (§13) — no raw `fetch` | `deploy-service-extending-base-singleton.md` §3 |
 
-**Core tenancy model — the Athlete IS the tenant.** This is the single most important architectural decision in this spec: **each Student-Athlete is a `tenant`** (`tid-{nanoid}`, `tenant_type='athlete'`). The athlete-tenant is the **data-isolation root** and **every relationship revolves around it**. RLS keyed to the athlete-tenant makes it *structurally impossible* for one athlete's data to leak into another's — the strongest possible privacy guarantee for minors.
+**Core tenancy model — the Athlete IS the tenant.** This is the single most important architectural decision in this spec: **each Student-Athlete is a `tenant`** (`tid-{nanoid}`, `tenant_type='athlete'`). The athlete-tenant is the **data-isolation root** and **every relationship revolves around it**. Per-athlete query scoping — enforced by a repository-level tenant guard, plus per-athlete cache namespacing, capability gating, and tenant-scoped IDs — makes it *structurally difficult* for one athlete's data to leak into another's: the strongest minor-privacy guarantee available at this phase.
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D1 / §4 S4.1 (finding F1): the original text claimed "RLS keyed to the athlete-tenant makes it *structurally impossible* for one athlete's data to leak into another's". **The source platform has no RLS.** Verified: 3 `CREATE POLICY` statements across 2 migration files (one a `.sql.backup`) against 343 Prisma models; the only `set_config` reference in application code is commented out in `queue-routes.ts` — a commerce file on the DROP list. Phase-2 isolation is therefore the **repository-level tenant guard**; Postgres RLS is Phase-4 hardening to be **designed, not inherited** (see §14.10). Until it is built, do not describe the platform as having database-enforced isolation.
 
 All other actors are tenants or accounts that form **explicit relationships with the athlete-tenant**:
 
@@ -34,7 +36,7 @@ All other actors are tenants or accounts that form **explicit relationships with
 | **Coach / Scout** | account within an institution-tenant | follows/rates athlete-tenants (guardian-gated contact) |
 | **Fan** | authenticated account | follows athlete-tenants (public-only) |
 
-> **Why athlete-as-tenant (supersedes the earlier "global identity" idea, see §12.3):** The platform's entire isolation, capability, RLS, cache-namespacing, and tenant-scoped-ID machinery is keyed to `tenant`. Making the athlete a tenant means the athlete inherits all of it for free: per-athlete RLS, per-athlete cache eviction, per-athlete capability gating, and an athlete tenant key (`atk = generateTenantKey(athleteTenantId)`) that prefixes every athlete-owned entity for instant traceability. Multiplicity (an athlete in a school **and** a travel club) is handled by cross-tenant membership rows — the athlete-tenant is the stable root; memberships come and go on transfer.
+> **Why athlete-as-tenant (supersedes the earlier "global identity" idea, see §12.3):** The platform's entire isolation, capability, tenant-scoping, cache-namespacing, and tenant-scoped-ID machinery is keyed to `tenant`. Making the athlete a tenant means the athlete inherits all of it for free: per-athlete query scoping, per-athlete cache eviction, per-athlete capability gating, and an athlete tenant key (`atk = generateTenantKey(athleteTenantId)`) that prefixes every athlete-owned entity for instant traceability. Multiplicity (an athlete in a school **and** a travel club) is handled by cross-tenant membership rows — the athlete-tenant is the stable root; memberships come and go on transfer.
 
 ---
 
@@ -56,7 +58,7 @@ Map each persona to an Auth0 role + the **NIL context-specific base singleton** 
 **Rules**
 - The `GUARDIAN` role MUST NOT have any `/api/public/*` projection. Guardian data is served exclusively through `GuardianApiSingleton` (JWT + `X-Guardian-ID`) with `cacheTTL = 0`.
 - All writes to an athlete-tenant (visibility, media, NIL acceptance, financial routing) MUST be authorized against `guardian_athlete_links_list` — i.e. the caller is a consent-authority guardian of that athlete-tenant (or the athlete themselves after age-out, §12.3). The minor cannot self-publish.
-- `AthleteApiSingleton` sets `X-Tenant-ID` to the **athlete-tenant**; all athlete-owned rows are RLS-scoped to it.
+- `AthleteApiSingleton` sets `X-Tenant-ID` to the **athlete-tenant**; all athlete-owned rows are tenant-scoped to it (Phase 2: repository tenant guard; Phase 4: RLS).
 - Admin/compliance actions emit an `X-Audit-ID` via `ComplianceApiSingleton` for the legal audit trail.
 - Adult roles (`COACH`, `SPONSOR`, `SCOUT`) require identity verification before any contact-adjacent surface (§12.2).
 
@@ -144,12 +146,17 @@ draft ──> pending ──> approved ──> archived
 ### 3.2 Enforcement Layers (defense in depth)
 
 1. **API route guard:** Public roster route returns zero records unless `visibility_status = 'approved'`. (Verification §10 item 2.)
-2. **RLS policy:** Postgres row-level security on all athlete-owned tables, enforced via `WHERE tenant_id = $1` keyed to the **athlete-tenant**, so one athlete's data can never leak into another's even on a query bug. Cross-tenant relationship rows (memberships, deals) are the *only* rows visible to a second tenant, and only to the explicitly-related one (§12.4).
-3. **Consent guard:** Public DTO mappers project a field only if the matching scoped consent is granted (§12.6) and strip all PII regardless of status.
+2. **Repository tenant guard (Phase 2):** a Prisma middleware/wrapper that rejects any query against an athlete-owned table that carries no tenant predicate. This is the Phase-2 substitute for RLS — it catches the same class of bug (a query that forgets its tenant scope) at the data-access layer rather than in the database. Cross-tenant relationship rows (memberships, deals) are the *only* rows visible to a second tenant, and only to the explicitly-related one (§12.4). See `EXECUTION_PLAN.md` §4 S4.1.
+3. **RLS policy (Phase 4 hardening):** Postgres row-level security on all athlete-owned tables, keyed to the athlete-tenant, as an independent second layer. **This does not exist in the source platform and must be built** — see §14.10 and `EXECUTION_PLAN.md` §1 D1. Until it is built, do not describe the platform as having database-enforced isolation.
+4. **Consent guard:** Public DTO mappers project a field only if the matching scoped consent is granted (§12.6) and strip all PII regardless of status.
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D1 (finding F1): the original item 2 conflated RLS with `WHERE tenant_id = $1` — different controls with different failure modes — and asserted an "even on a query bug" guarantee that is only true of RLS, which is absent. The layers are now separated by phase.
 
 ### 3.3 Cache Eviction on State Change
 
 When an admin or guardian toggles visibility/consent, the mutating service calls `invalidateServiceCaches(athleteTenantId)` (the `AthleteApiSingleton` cache contract) → evicts **every** athlete-namespaced key (`nil-roster-*`, `nil-profile-{atk}-*`, `nil-feed-*`, sponsor-portfolio). Partial eviction = stale minor data live = a safety incident (§12.11). On the API, the backend invalidates the effective-capabilities + roster cache keys.
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §7.2 (P0 test 3), §4 S4.4: eviction completeness is a **release-blocking** P0 test, not a best-effort behavior. The enumerated namespace list is a contract with a test, not a comment. A stage cannot ship with this test red, even if the feature otherwise works.
 
 ---
 
@@ -225,7 +232,7 @@ Three structural data groups. Logic is fixed; UI layout stays flexible via JSON 
 ### 5.2 The Financial Track (Private Pipeline only — 0-TTL)
 - Tables: `nil_offers_list` (base offer), `escrow_milestones_list` (lock states), `payout_schedules_list`, `nonprofit_allocation_pools_list` (double-entry, §12.5), `sponsor_spend_limits_list` (ROI cap).
 - IDs: `generateNilOfferId(athleteTenantId)` → `niloffer-{atk}-{nanoid}`, `generateEscrowId(athleteTenantId)` → `escrow-{atk}-{nanoid}`, reuse `generatePaymentId`.
-- Pattern: never cached; never public; RLS-enforced; payout routes to the **guardian's** KYC'd account (§12.5).
+- Pattern: never cached; never public; tenant-guard-enforced; payout routes to the **guardian's** KYC'd account (§12.5).
 
 ### 5.3 The Media & Metrics Track
 - Tables: `athlete_metrics_list` (sport-agnostic `stats_blob jsonb` — passing yards, PPG, etc.), `highlight_media_list` (allowlisted third-party stream URLs + moderation state), `fan_badges_list` (badge arrays).
@@ -260,7 +267,7 @@ Add to `apps/api/src/lib/id-generator.ts` (follow `tenant-scoped-id-generation.m
 | `generateNilInvitationId()` | `nilinv` | `nilinv-{nanoid}` | Bidirectional actor invitation (§18) |
 | `generateOnboardingSessionId()` | `onboard` | `onboard-{actorType}-{nanoid}` | Actor onboarding wizard session (§18) |
 
-**Rules:** DB columns `@db.VarChar(255)` (not `@db.Uuid`); pass ID explicitly from the service layer (no `gen_random_uuid()` default); never use the tenant key as a security boundary. The athlete-tenant uses the standard `generateTenantId()` primitive so it inherits all platform tenant infra (RLS, capabilities, `checkTenantAccess`).
+**Rules:** DB columns `@db.VarChar(255)` (not `@db.Uuid`); pass ID explicitly from the service layer (no `gen_random_uuid()` default); never use the tenant key as a security boundary. The athlete-tenant uses the standard `generateTenantId()` primitive so it inherits all platform tenant infra (capabilities, `checkTenantAccess`, cache namespacing).
 
 ---
 
@@ -268,7 +275,9 @@ Add to `apps/api/src/lib/id-generator.ts` (follow `tenant-scoped-id-generation.m
 
 Each NIL capability follows the 8-phase pipeline (`capability-deployment-flow.md`). Per capability, deliver:
 
-1. **Define:** feature key(s) in `canonical-features.ts` + tier assignment in `tier-hierarchies.ts` (`snake_case`, domain-prefixed e.g. `nil_roster_export`).
+1. **Define:** feature key(s) + tier assignment in the **seed scripts** — `apps/api/prisma/seed-nil-capabilities.ts` (one orchestrator, mirroring `seed-{barcode,chatbot,crm,faq,product-layout,product-types,storefront-layout}-capabilities.ts`) plus `apps/api/prisma/seed-tiers.ts` for tier assignment. Keys are `snake_case`, domain-prefixed (e.g. `nil_roster_export`).
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §2.3 (finding F4): the original text named `canonical-features.ts` and `tier-hierarchies.ts`. **Neither file exists** — `packages/` contains only `shared`, and no such file exists anywhere in the tree. Feature/tier definition is done via seed scripts.
 2. **Seed DB:** `features_list` → `capability_features_list` → `tier_features_list`.
 3. **Store prefs:** `tenant_nil_*_options_settings` table + Prisma model (`generate*OptionsSettingsId`).
 4. **Resolve:** `resolveNilXxx(features, merchantPrefs)` in `apps/api/src/services/resolvers/NilXxxResolver.ts` + wire into `EffectiveCapabilityResolver.ts` + add disabled entry to `buildExpiredCapabilitiesResponse`.
@@ -281,15 +290,17 @@ Each NIL capability follows the 8-phase pipeline (`capability-deployment-flow.md
 |---|---|---|---|
 | `nil_landing` | 1 | tier-only | — |
 | `nil_roster` | 2 | master toggle | `tenant_nil_roster_options_settings` |
-| `nil_guardian` | 3 | per-feature | `tenant_nil_guardian_options_settings` |
+| `nil_guardian` | 3 | **platform-default (always-on)** | — |
 | `nil_recruiting` | 3 | per-feature | `tenant_nil_recruiting_options_settings` |
 | `nil_sponsorship` | 3 | per-feature | `tenant_nil_sponsorship_options_settings` |
 | `nil_achievements` | 3 | master toggle | `tenant_nil_achievements_options_settings` |
-| `nil_fan_network` | 3 | per-feature | `tenant_nil_fan_options_settings` |
+| `nil_fan_network` | 3 | **platform-default (always-on)** | — |
 | `nil_compliance` | 4 | tier-only (hard) | — |
 | `nil_finance` | 4 | per-feature | `tenant_nil_finance_options_settings` |
 | `nil_crm` | 3 | per-feature | `tenant_nil_crm_options_settings` (mirrors `crm-options`, §16) |
 | `nil_bot` | 3 | per-feature | `tenant_nil_bot_options_settings` (mirrors `chatbot-options`, §17) |
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D6 (finding F6d): the registry is **9 gated capabilities + 2 platform-default features**, not 11 gated capabilities. `nil_guardian` and `nil_fan_network` are **not** capability-gated — they are the trust/safety and engagement layer and must never be paywalled (§12.9). They therefore have **no** resolver, **no** options-settings table, and **no** tier row. Access is authorized by role + consent at the route layer. See §12.9 and `FRONTEND_SPEC.md` §13a.1 / §13a.11.
 
 ### 7.1 Capability Equivalency Map (Commerce ⇄ NIL)
 
@@ -307,7 +318,7 @@ The commerce platform and the NIL platform optimize the **same two goals: visibi
 | `faq_options` | Conversion support | `nil_bot` KB | FAQ knowledge base → eligibility/onboarding KB (RAG over `nil_eligibility_rules_list`) |
 | `chatbot_options` | Conversion | `nil_bot` personas (§17) | RAG chatbot → guardian/compliance/recruiting bots |
 | `alerts-and-notifications` | Retention/engagement | `nil_crm` alerts | Engagement nudges → guardian approval nudges, deal alerts |
-| Subscription tiers (`tier-hierarchies.ts`) | Revenue | Payer-keyed NIL tiers | Merchant tier breadth → institution/sponsor tier breadth (§12.10 #2) |
+| Subscription tiers (`seed-tiers.ts`) | Revenue | Payer-keyed NIL tiers | Merchant tier breadth → institution/sponsor tier breadth (§12.10 #2) |
 | Analytics | Measure conversion | `nil_sponsorship` analytics | Merchant analytics → sponsor ROI + athlete visibility metrics |
 
 **Rule for the junior agent:** when building any `nil_*` capability, open its commerce counterpart first and copy the structure. The NIL-specific work is the **child-safety/consent overlay** (§12), not the capability plumbing — that already exists.
@@ -368,7 +379,10 @@ Translated from Functional Spec §6 into testable backend/infra assertions.
 - [ ] **Cache TTL split:** Public roster service TTL is 5–15 min; all private (guardian/escrow/contract) services TTL is 0. *(Assert `cacheTTL` per service.)*
 - [ ] **Cache eviction:** Admin status toggle evicts `nil-roster-{tenantId}-*`. *(Test: approve → public roster reflects within one request.)*
 - [ ] **PII projection:** No public route projects DOB, parent contact, or financial routing. *(Schema/DTO snapshot test.)*
-- [ ] **RLS (Phase 4):** Cross-tenant query returns zero rows under RLS even without explicit `tenant_id` filter. *(DB policy test.)*
+- [ ] **Tenant guard (Phase 2):** a query against an athlete-owned table with **no** tenant predicate is **rejected at runtime**, not silently widened. *(Integration test.)*
+- [ ] **RLS (Phase 4):** Cross-tenant query returns zero rows under RLS even without explicit `tenant_id` filter. *(DB policy test.)* **The test must be non-vacuous** — it must first prove that rows *are* visible with the correct tenant set. A policy that returns zero rows in all cases passes the naive test and provides no isolation.
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D1 (finding F6a): §3.2 originally claimed RLS enforces Phase 2 while this checklist scheduled it in Phase 4 — both cannot be true. Phase 2 enforcement is the repository tenant guard; RLS is Phase-4 hardening. See §14.10.
 - [ ] **Tenant-scoped IDs:** All new NIL entities use generators from `id-generator.ts` (no `randomUUID`/`Date.now()`). *(Grep gate.)*
 - [ ] **Capability gates:** Each `nil_*` capability returns `tierState`, tier-filters settings, and returns 200 disabled manifest for expired tenants (R13). *(Per-capability route test.)*
 - [ ] **Type safety:** `pnpm checkapi` and `pnpm checkweb` pass with zero TS errors.
@@ -391,7 +405,10 @@ Translated from Functional Spec §6 into testable backend/infra assertions.
 | Hooks | `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts` |
 | Dashboard display | `PlanSummaryPanel.tsx`, `CapabilityShowcase.tsx` |
 | Routing/proxy | `apps/web/src/proxy.ts` |
-| Feature defs | `packages/feature-definitions/src/definitions/{canonical-features,tier-hierarchies}.ts` |
+| Feature defs | `apps/api/prisma/seed-nil-capabilities.ts` + `apps/api/prisma/seed-tiers.ts` |
+| Web base singletons | `apps/web/src/providers/base/` — **NOT** `apps/web/src/services/base/` |
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §0 S0 (finding F4): `packages/feature-definitions/` **does not exist** (`packages/` contains only `shared`), and the base-singleton directory is `apps/web/src/providers/base/`. Every other row in this table was verified present in the tree. Re-verify this section in full before using it as a task input.
 
 ---
 
@@ -414,6 +431,8 @@ The functional spec mentions "compliance" only as contract-vs-bylaw vetting (Pha
 
 **New capability:** `nil_compliance` is promoted from a Phase-4 "nice to have" to a **Phase-2 hard prerequisite** — no profile may reach `approved` without a compliance verdict, even in MVP (initially a manual admin verdict, automated in Phase 4).
 
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D7, §2 S2.7 (finding F9, risk R7): **erasure vs. immutable audit reconciliation.** §12.1 requires full deletion of a minor's data; §12.11 requires an append-only audit log. An audit row containing a minor's DOB is a permanent retention problem that erasure cannot satisfy, and the original spec never reconciled the two. Resolution: **audit rows carry pseudonymous references only — never PII.** Erasure rewrites the reference, not the log, so the audit trail remains complete and tamper-evident while no personal data survives in it. This is a **schema-time** decision; retrofitting it is a data migration.
+
 ### 12.2 Child-Safety & Anti-Predator Controls — missing entirely **[P0]**
 
 The spec exposes searchable minor profiles to "Coaches / Talent Scouts" and a public "Fan Network," yet defines **no controls preventing adults from contacting minors**. This is the single most dangerous omission.
@@ -432,7 +451,7 @@ The domain requires: an athlete in a **school AND a travel club** at once; an at
 
 **Resolution — athlete-as-tenant** (the model adopted across this spec; supersedes the interim "global identity" idea):
 
-- **The athlete IS a `tenant`** (`tid-{nanoid}`, `tenant_type='athlete'`). It is the data-isolation root; every athlete-owned row is RLS-scoped to it and prefixed by its tenant key `atk`. This gives the strongest minor-privacy guarantee and reuses 100% of the platform's tenant infra (RLS, capabilities, cache namespacing, `checkTenantAccess`).
+- **The athlete IS a `tenant`** (`tid-{nanoid}`, `tenant_type='athlete'`). It is the data-isolation root; every athlete-owned row is tenant-scoped to it and prefixed by its tenant key `atk`. This gives the strongest minor-privacy guarantee available at this phase and reuses 100% of the platform's tenant infra (capabilities, cache namespacing, `checkTenantAccess` — plus Phase-4 RLS).
 - **`guardian_athlete_links_list`** is **many-to-many** (guardian global account ↔ athlete-tenant) with `relationship_type` (`parent`, `legal_guardian`, `custodial`) and a `consent_authority` flag (which guardian may grant public-consent / financial routing under split custody). Conflicting guardians resolve **most-restrictive-wins** — any owner can veto/revoke publication.
 - **`athlete_tenant_memberships_list`** links the athlete-tenant to each **institution-tenant** (school/club) as a cross-tenant row, mirroring `customer_tenant_relationships`. Transferring schools adds/retires a membership; profile, metrics, media, achievements, and NIL history stay on the **athlete-tenant** and are never orphaned.
 - **Age-out transition.** When an athlete turns 18, a scheduled job transfers control of the athlete-tenant from guardian to the athlete account (`ATHLETE` gains financial scope), retaining the full consent + audit ledger.
@@ -442,6 +461,8 @@ The domain requires: an athlete in a **school AND a travel club** at once; an at
 §4 Phase 4 mandates "zero data cross-contamination between competing schools, clubs, or external sponsors." But an NIL deal is **inherently cross-tenant**: a sponsor (tenant A) sponsors an athlete who participates in school (tenant B). Strict per-tenant RLS would make deals impossible.
 
 **Resolution:** NIL deals are modeled as **explicit dual-key relationship rows** (`generateSponsorshipDealId(athleteTenantId, sponsorTenantId)` → `deal-{atk}-{sponsorTk}-{nanoid}`), exactly like the platform's `customer_tenant_relationships` (`ctr-{tk}-{ck}`). The RLS policy on `sponsorship_deals_list` allows a row to be visible to **both** the athlete-tenant (its guardian) and the sponsor-tenant — never to unrelated tenants. The "no cross-contamination" rule applies to *bulk roster/PII data*, not to explicitly-consented bilateral deal rows. This distinction MUST be documented in the RLS policy comments.
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D1 (finding F1): this section is written in terms of RLS, but **RLS does not exist yet** and is Phase-4 hardening. The dual-visibility *rule* applies at **both** phases: Phase 2 enforces it through the repository tenant guard plus explicit `WHERE athlete_tenant_id = $1 OR sponsor_tenant_id = $1`; Phase 4 adds the RLS policy as an independent layer. Do not wait for RLS to implement dual-visibility scoping.
 
 ### 12.5 Financial Infrastructure — KYC/AML & escrow correctness **[P1]**
 
@@ -488,6 +509,8 @@ The capability system gates by **tenant tier**, but Guardians, Athletes, and Fan
 - **Guardian & Fan features are platform-level, always-on** (free) — they are the trust/safety and engagement layer and must never be paywalled. They are NOT capability-gated; they are governed by consent + role only.
 - Document this in each resolver: `nil_guardian` and `nil_fan_network` resolve from a **platform default**, not from `tier_features_list`.
 
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D6, §4 S4: **implementation consequence of this resolution.** Because guardian and fan features are not gated, they must not be routed through the capability resolver at all. Do not create resolvers, options-settings tables, or tier rows for them. The registry is **9 gated capabilities + 2 platform-default features** (§7), and the aggregate `useNilCapabilities()` returns **9** states, not 11 (`FRONTEND_SPEC.md` §13a.11). This also resolves the §7-vs-§12.9 contradiction recorded as finding F6d.
+
 ### 12.10 Monetization Model — RESOLVED: Transaction Fees on Deals **[P1, RESOLVED]**
 
 **Decision: an NIL deal is a commerce transaction, and the platform monetizes exactly like it monetizes a product sale.** A sponsor buying an athlete's NIL is structurally the same as a customer purchasing a product: the **sponsor is the buyer**, the **athlete-tenant is the storefront/product**, the **guardian is the payee** (KYC'd account, §12.5), and the **platform collects a transaction fee** on settlement. This reuses the existing payment/checkout + **BSaaS purchase-flow** infrastructure rather than inventing a billing model.
@@ -495,7 +518,7 @@ The capability system gates by **tenant tier**, but Guardians, Athletes, and Fan
 **Revenue streams (in priority order):**
 
 1. **Transaction fee (primary).** On each settled deal, the platform takes a configurable percentage; the remainder routes to the guardian payout, and a slice routes to the `nonprofit_allocation_pools_list` (§12.5). Mirrors `bsaas-purchase-flow.md` + the existing payment gateway / escrow patterns — a deal moves through the same `proposed → funded → … → settled` machine, with the fee deducted at `settled`.
-2. **Institution / Sponsor subscription tiers (secondary).** Tier hierarchy in `tier-hierarchies.ts` is keyed to the **tenant payer** (school/club or sponsor) and gates *capability breadth* (roster size, analytics depth, CRM/bot access) — identical to how commerce tiers gate the merchant. Consistent with §12.9.
+2. **Institution / Sponsor subscription tiers (secondary).** Tier hierarchy in `seed-tiers.ts` is keyed to the **tenant payer** (school/club or sponsor) and gates *capability breadth* (roster size, analytics depth, CRM/bot access) — identical to how commerce tiers gate the merchant. Consistent with §12.9.
 3. **Always-free actors.** Athletes, guardians, and fans never pay and are never paywalled (§12.9). The non-profit motivation is satisfied by the allocation-pool slice on every transaction, not by charging families.
 
 > **Why this fits like a glove:** both the commerce platform and the NIL platform optimize the same two things — **visibility** (get the product/athlete discovered) and **conversion** (turn discovery into a paid transaction). So each commerce capability has a direct NIL analog (see **§7.1**), and the deal-as-purchase model means the financial track (§5.2, §14.8) is largely a re-skin of existing checkout/escrow rather than net-new.
@@ -508,6 +531,8 @@ The capability system gates by **tenant tier**, but Guardians, Athletes, and Fan
 - **Cache-eviction completeness:** every consent/visibility/media mutation must enumerate ALL cache namespaces to evict (roster, profile, feed, sponsor portfolio). Partial eviction = stale minor data live publicly = a safety incident.
 - **i18n & state localization:** the workspace enforces FE i18n (PR template `pr-fe-i18n.md`); compliance copy and bylaw messaging must be localizable per state/region.
 
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §4 S4.8, §1 D7 (finding F9): the audit trail requirement above is now constrained by the erasure requirement in §12.1 — see the reconciliation note in §12.1. **Audit rows carry pseudonymous references only, never PII.** Every status/consent/deal/payout transition still emits an `X-Audit-ID`; what changes is that the row it points at contains no personal data.
+
 ### 12.12 Testing & Verification Gaps **[P1]**
 
 §10 covers happy-path infra checks but not the safety-critical negative paths. **Added acceptance criteria:**
@@ -518,9 +543,11 @@ The capability system gates by **tenant tier**, but Guardians, Athletes, and Fan
 - [ ] **[P0]** Deal creation is blocked where `nil_eligibility_rules_list.deals_allowed=false` for the athlete's state/association. *(Per-state matrix test.)*
 - [ ] **[P0]** Media cannot publish without moderation clearance; non-allowlisted video hosts are rejected. *(Moderation gate test.)*
 - [ ] **[P1]** Conflicting guardians: any guardian veto blocks publication ("most restrictive wins"). *(Joint-custody test.)*
-- [ ] **[P1]** Cross-tenant deal row is visible to sponsor + guardian only, not to unrelated tenants (RLS). *(Isolation test.)*
+- [ ] **[P1]** Cross-tenant deal row is visible to sponsor + guardian only, not to unrelated tenants (Phase 2: tenant guard; Phase 4: RLS). *(Isolation test.)*
 - [ ] **[P1]** Payout KYC/W-9 on the guardian is required before first settlement. *(Finance gate test.)*
 - [ ] **[P1]** Age-out at 18 transfers financial control to the athlete and preserves the consent ledger. *(Lifecycle test.)*
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §4 S4.7, §7.1 (finding F10): every negative-path test must be **non-vacuous** — it must fail if the control is removed — and must run against a **harness built before the feature it guards**, not after. A test asserting "zero rows returned" passes trivially when the query is broken; assert the *specific* rejection or the *specific* absence, with a positive control in the same test.
 
 ### 12.13 Gap Summary — Severity Rollup
 
@@ -548,6 +575,12 @@ The capability system gates by **tenant tier**, but Guardians, Athletes, and Fan
 Mirroring the platform pattern (`FlexibleApiSingleton > {Public, Tenant, Customer, Admin, Authenticated}`), the NIL vertical adds a thin layer of **context-specific base singletons**. Each pre-configures request type, cache TTL, isolation, and headers so concrete services (and the junior agent) never re-decide these. **Concrete services extend the NIL base, not the platform base directly.**
 
 ### 13.1 Hierarchy
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D3 / §0 S0.4 (finding F5): **this hierarchy is canonical.** The source repo contains **three coexisting chains** — `FlexibleApiSingletonV2` and `FlexibleApiSingletonStable` both extend `UniversalSingleton` **directly**, bypassing `EnhancedFlexibleApiSingleton` (and `PublicApiSingletonStable` extends the latter). 114 files reference `FlexibleApiSingleton` in some form; 8 services extend it directly, 6 use the V2/Enhanced variants.
+>
+> The abandoned variants (`FlexibleApiSingletonV2`, `FlexibleApiSingletonStable`, `PublicApiSingletonStable`) and the alignment scaffolding (`BASE_CLASS_ALIGNMENT.ts`, `FINAL_ALIGNMENT_REPORT.ts`, `TARGET_SYSTEM_DEMO.ts`) are **deleted from the fork**. Do not extend them, do not port them, do not treat them as an alternative.
+>
+> A CI check enforces that concrete NIL services extend a NIL base and never `UniversalSingleton` directly — the source repo demonstrates that this rule does not hold by convention alone.
 
 ```
 FlexibleApiSingleton                         (platform root)
@@ -580,7 +613,7 @@ FlexibleApiSingleton                         (platform root)
 ### 13.3 Reference Implementation (each base)
 
 ```ts
-// apps/web/src/services/base/NilPublicApiSingleton.ts
+// apps/web/src/providers/base/NilPublicApiSingleton.ts
 export abstract class NilPublicApiSingleton extends PublicApiSingleton {
   protected defaultContext = AppContext.STORE;
   protected defaultIsolation = CacheIsolation.STORE;
@@ -589,7 +622,7 @@ export abstract class NilPublicApiSingleton extends PublicApiSingleton {
   }
 }
 
-// apps/web/src/services/base/AthleteApiSingleton.ts
+// apps/web/src/providers/base/AthleteApiSingleton.ts
 // The athlete IS the tenant → reuse TenantApiSingleton, force 0-TTL + cache contract.
 export abstract class AthleteApiSingleton extends TenantApiSingleton {
   protected constructor(serviceName: string) {
@@ -600,7 +633,7 @@ export abstract class AthleteApiSingleton extends TenantApiSingleton {
   // so a visibility/consent change evicts public roster + profile per atk (§3.3).
 }
 
-// apps/web/src/services/base/GuardianApiSingleton.ts
+// apps/web/src/providers/base/GuardianApiSingleton.ts
 export abstract class GuardianApiSingleton extends CustomerApiSingleton {
   protected constructor(serviceName: string) {
     super(serviceName, { ttl: 0 }); // never cache PII/consent/financial state
@@ -609,7 +642,7 @@ export abstract class GuardianApiSingleton extends CustomerApiSingleton {
   // guardian_athlete_links_list (consent_authority). MUST NOT expose /api/public/*.
 }
 
-// apps/web/src/services/base/ComplianceApiSingleton.ts
+// apps/web/src/providers/base/ComplianceApiSingleton.ts
 export abstract class ComplianceApiSingleton extends AdminApiSingleton {
   protected constructor(serviceName: string) { super(serviceName, { ttl: 0 }); }
   // Every mutation emits X-Audit-ID into the append-only audit log (§12.11).
@@ -627,7 +660,7 @@ export abstract class ComplianceApiSingleton extends AdminApiSingleton {
 
 ## 14. Database Schema Sketch (DDL)
 
-Implementation-ready sketch for a junior agent. Conventions: table names end in `_list` (platform convention); all IDs are `VARCHAR(255)` (never `uuid`), passed explicitly from the service layer; every athlete-owned table carries `tenant_id` = **athlete-tenant** and an RLS policy keyed to it; timestamps are `timestamptz` UTC. Adjust enum names to match the existing migration style before applying.
+Implementation-ready sketch for a junior agent. Conventions: table names end in `_list` (platform convention); all IDs are `VARCHAR(255)` (never `uuid`), passed explicitly from the service layer; every athlete-owned table carries `tenant_id` = **athlete-tenant** and explicit tenant scoping (Phase 2: repository tenant guard; Phase 4: an RLS policy keyed to it); timestamps are `timestamptz` UTC. Adjust enum names to match the existing migration style before applying.
 
 > **Apply order:** enums → athlete-tenant extension → guardianship → memberships → consent → profile/media/metrics → achievements → recruiting → sponsorship/finance → moderation/messaging → fan → leads → RLS policies. Wrap in a single migration per phase (Phase 2 covers profile/media/roster; Phase 3 adds guardian/recruiting/sponsorship/fan; Phase 4 adds finance/compliance).
 
@@ -953,7 +986,13 @@ CREATE TABLE data_erasure_requests_list (
 );
 ```
 
-### 14.10 RLS Policy Pattern (per athlete-tenant)
+### 14.10 RLS Policy Pattern (per athlete-tenant) — **Phase 4 reference sketch**
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §2 S2.8 (finding F12): the two policies shown below are **illustrative, not complete**. A Phase-4 RLS implementation covers **all** athlete-owned tables (~24) plus dual-visibility policies on the cross-tenant tables (`sponsorship_deals_list`, `athlete_tenant_memberships_list`). Count the tables from §14 directly before estimating — §14 contains 23 `CREATE TABLE` statements, and the plan's own model list undercounts them.
+>
+> The preamble below correctly says "apply to every athlete-owned table (profile, media, metrics, achievements, consent, escrow, moderation, threads, fan, erasure)". The two policies that follow demonstrate the two *shapes* (single-tenant isolation, and dual-visibility for cross-tenant rows) — they are not the full set.
+>
+> **This section is Phase-4 hardening.** Phase-2 isolation is the repository-level tenant guard — see the note at the end of this section.
 
 ```sql
 -- Apply to every athlete-owned table (profile, media, metrics, achievements,
@@ -973,11 +1012,33 @@ CREATE POLICY deal_dual_visibility ON sponsorship_deals_list
   );
 ```
 
-> **Note for the junior agent:** match `current_setting('app.current_tenant', ...)` to however the existing codebase sets the RLS tenant GUC (grep for `set_config`/`app.current_tenant` — see `ProductQueueService.ts` / `queue-routes.ts`). Do not invent a new mechanism. RLS is **defense in depth**, not a substitute for explicit `WHERE tenant_id = $1` in queries.
+> **Note — RLS status in the source platform (amended 2026-09-30, `EXECUTION_PLAN.md` §1 D1 / §4 S4.1; finding F1):**
+>
+> **There is no working RLS tenant-context mechanism in the source platform. The original note above told the implementer to grep for `set_config`/`app.current_tenant` in `ProductQueueService.ts` / `queue-routes.ts` and to "not invent a new mechanism". That instruction leads to a dead end:**
+>
+> - The repository contains **3 `CREATE POLICY` statements across 2 migration files** (one of which is a `.sql.backup`) against **343 Prisma models**.
+> - The only `set_config` reference in application code is **commented out**:
+>   ```ts
+>   // apps/api/src/routes/queue-routes.ts:38-39
+>       // Set tenant context for RLS
+>       // process.env.POSTGRES_OPTIONS = `-c app.current_tenant_id=${tenantId}`;
+>   ```
+> - It uses a **different setting name** (`app.current_tenant_id`) than the policies above expect (`app.current_tenant`), so even uncommented it would not satisfy them.
+> - Both referenced files are commerce-specific and on the DROP list.
+>
+> **There is nothing to copy.** The Phase-2 isolation control is the **repository-level tenant guard** (`EXECUTION_PLAN.md` §4 S4.1), not RLS.
+>
+> If RLS is built later as Phase-4 hardening, the GUC mechanism must be **designed, not inherited** — and it must solve the Supabase pooler problem: the pooler defaults to **transaction mode**, which does not preserve a session-level `set_config` across pooled queries. Budget ≈3–6 ew for ~24 tables plus the pooling workaround; this is a workstream, not a schema detail.
+>
+> **Non-vacuous test requirement:** an RLS isolation test that passes because *no* rows are visible proves nothing. Every isolation test must first demonstrate that rows **are** visible with the correct tenant set.
+>
+> The policy SQL above is retained as a **Phase-4 reference sketch**. The dual-visibility policy on `sponsorship_deals_list` remains a correct design for when RLS is built. The Phase-2 intent of "defense in depth, not a substitute for explicit `WHERE tenant_id = $1`" stands — it is simply delivered by the tenant guard rather than by the database.
 
 ### 14.11 CRM Engagement Tables (delta over existing `crm_*`)
 
-**Good news — minimal work.** The existing CRM tables (`crm_support_tickets`, `crm_inquiries`, `crm_contacts`, `crm_tasks`, `crm_activities`, `crm_alerts`) already use `tenant_id VARCHAR(255)`, explicit `VARCHAR` ids, and RLS. So the NIL CRM (§16) **reuses them directly** with `tenant_id` = the relevant tenant (athlete / institution / sponsor). `actor_type` is a `VARCHAR` (app-level enum), so the new values need no schema change. Only two things to add: athlete/guardian linkage columns + the guardian-required invariant + the options table.
+**Good news — minimal work.** The existing CRM tables (`crm_support_tickets`, `crm_inquiries`, `crm_contacts`, `crm_tasks`, `crm_activities`, `crm_alerts`) already use `tenant_id VARCHAR(255)`, explicit `VARCHAR` ids, and explicit tenant scoping. So the NIL CRM (§16) **reuses them directly** with `tenant_id` = the relevant tenant (athlete / institution / sponsor). `actor_type` is a `VARCHAR` (app-level enum), so the new values need no schema change. Only two things to add: athlete/guardian linkage columns + the guardian-required invariant + the options table.
+
+> **Amended 2026-09-30** — (finding F1): the original text read "…explicit `VARCHAR` ids, **and RLS**". The platform has no RLS. Tenant scoping on these tables is explicit `tenant_id` filtering. Everything else in this section was verified accurate.
 
 ```sql
 -- Link CRM records to an athlete-tenant + required guardian (child-safety, §16.3).
@@ -1024,7 +1085,13 @@ CREATE INDEX ix_crm_inquiry_athlete ON crm_inquiries(athlete_tenant_id);
 
 ### 14.12 Bot Tables (delta over existing `bot_*`)
 
-The existing bot stack (`bot_conversations`, `bot_messages`, `bot_faq_embeddings`, `bot_guardrail_rules`, `bot_configurations`) is already tenant-scoped (`tenant_id VARCHAR(255)`) with RLS, and **`bot_guardrail_rules` already exists for exactly the child-safety constraints in §17.2**. Reuse all of it. Deltas: athlete/guardian scoping on conversations + a minor-safety flag + the options table. (Note: existing bot ids are `@db.Uuid` with `gen_random_uuid()` — keep that convention for bot tables; do not switch to VARCHAR here.)
+The existing bot stack (`bot_conversations`, `bot_messages`, `bot_faq_embeddings`, `bot_guardrail_rules`, `bot_configurations`) is already tenant-scoped (`tenant_id VARCHAR(255)`) with explicit `tenant_id` filtering, and **`bot_guardrail_rules` already exists for exactly the child-safety constraints in §17.2**. Reuse all of it. Deltas: athlete/guardian scoping on conversations + a minor-safety flag + the options table. (Note: existing bot ids are `@db.Uuid` with `gen_random_uuid()` — keep that convention for bot tables; do not switch to VARCHAR here.)
+
+> **Amended 2026-09-30** — (findings F1, F6c):
+>
+> **(a) RLS:** the original text said the bot stack is tenant-scoped "with RLS". The platform has no RLS; scoping is explicit `tenant_id` filtering.
+>
+> **(b) Definition-of-Done exception (explicit):** the bot UUID convention above is an **explicit, documented exception** to the "no `randomUUID`/`Date.now()` IDs" rule. The CI grep gate must whitelist the bot service and bot route directories, or it fails on compliant code. See `EXECUTION_PLAN.md` §2.3.
 
 ```sql
 -- Scope a conversation to an athlete-tenant + guardian; flag minor-safe sessions.

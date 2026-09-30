@@ -218,7 +218,7 @@ Settings
 
 | Section | Component | Notes |
 |---|---|---|
-| **Deal List** | Table with status chips | From `sponsorship_deals_list`; dual-visibility RLS |
+| **Deal List** | Table with status chips | From `sponsorship_deals_list`; dual-visibility scoping (RLS policy in Phase 4) |
 | **Deal Detail** | Drawer/modal | Sponsor, amount, milestones, escrow state, guardian payout split |
 | **Approve/Reject** | Action buttons | Guardian approval required for minor athlete deals |
 
@@ -1434,6 +1434,11 @@ Displayed below each asset in the highlights tab and in the athlete dashboard.
 ('admin', 'Settings', '/admin/nil/settings', 'admin', 11);
 ```
 
+> **Amended 2026-09-30** — (`EXECUTION_PLAN.md` §6 S6.5; finding F9): navigation is **data**, and data can drift from the route layer. Two consequences:
+>
+> 1. The athlete and institution nav entries reference `{tenantId}` placeholders — these must resolve to the **athlete-tenant** and **institution-tenant** respectively, and must **never** resolve a guardian or fan into a tenant-scoped route.
+> 2. Reseeding nav is part of the **PII surface review**, not a cosmetic step. A stale link can point at an athlete surface that the route layer no longer gates.
+
 ---
 
 ## 9. State Design (Every User-Visible State)
@@ -1510,6 +1515,19 @@ These are **P0 blocking** constraints that affect the frontend directly:
 | Consent revocation cascade | Guardian consent toggle → confirmation modal → "This will remove [Athlete]'s profile, media, and achievements from public view" → revoke → visual confirmation |
 | Media moderation gate | Unmoderated media shows "Pending Review" badge; never appears on public profile |
 | Bot child-safety | Bot widget shows "This is a moderated conversation" banner for minor-related threads; no PII in bot responses |
+
+> **Amended 2026-09-30 — surfaces beyond the route layer** (`EXECUTION_PLAN.md` §4 S4.6, §1 D5/D7; finding F9). The constraints above cover route-level gating. The following are **additional PII projection paths** that route gating does not reach, and each must be constrained explicitly:
+>
+> | Surface | Constraint |
+> |---|---|
+> | Tenant directory / discovery | **Athlete-tenants are never eligible.** `directory_visible = false` for `tenant_type='athlete'` (D5) |
+> | `mv_athlete_discovery` materialized view | Must exclude non-`approved` and `directory_visible=false` rows — **proven by test**, not by inspection. A saved copy is a second place data lives |
+> | Database-driven navigation links | Nav is **data**. A stale link can point at an athlete surface the route layer no longer gates. Reseed and verify (`EXECUTION_PLAN.md` §6 S6.5) |
+> | Email templates (incl. the 6 invitation templates) | Guardian/athlete identity, deal amounts, and claim tokens transit email. Review every template |
+> | Social previews / sitemap / crawler surfaces | Athlete profiles are public routes; previews and crawlers are a projection path |
+> | Error reporting (Sentry) | Verify `sendDefaultPii` is off — stack traces and request payloads are a classic leak |
+>
+> `EXECUTION_PLAN.md` §4 S4.6 automates the enumeration as a CI gate, so this list cannot silently go stale.
 
 ---
 
@@ -1773,7 +1791,9 @@ If user left onboarding incomplete, dashboard shows a persistent banner:
 
 The existing platform's capability-gating system is the backbone of feature access control. **Every NIL surface inherits this architecture unchanged** — the same 8-phase deployment pipeline, the same tier + merchant resolution, the same `requireFeature` / `requireLimit` gates, the same `UnifiedCapabilityService` mapping, and the same `CapabilityShowcase` display. The only difference is the domain: commerce capability keys become NIL capability keys, commerce resolvers become NIL resolvers, commerce merchant-pref tables become NIL options-settings tables.
 
-### 13a.1 Capability Registry (11 NIL Capabilities)
+### 13a.1 Capability Registry (9 gated capabilities + 2 platform-default features)
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D6 (finding F6d): the heading previously read "11 NIL Capabilities". Two of the eleven — `nil_guardian` and `nil_fan_network` — are **not capability-gated** (see the rows below and `TECHNICAL_SPEC.md` §12.9). They must never be paywalled: they are the trust/safety and engagement layer. Gated registry: `nil_landing`, `nil_roster`, `nil_recruiting`, `nil_sponsorship`, `nil_achievements`, `nil_compliance`, `nil_finance`, `nil_crm`, `nil_bot`.
 
 From TECHNICAL_SPEC §7, every NIL capability follows the full 8-phase pipeline (`capability-deployment-flow.md`):
 
@@ -1781,11 +1801,11 @@ From TECHNICAL_SPEC §7, every NIL capability follows the full 8-phase pipeline 
 |---|---|---|---|---|---|
 | `nil_landing` | 1 | tier-only | — | All | Static marketing + leads; enabled at all tiers |
 | `nil_roster` | 2 | master toggle | `tenant_nil_roster_options_settings` | Institution | Tier-gated row caps; `resolveNilRoster` returns `{ enabled, allowed_row_count, ... }` |
-| `nil_guardian` | 3 | per-feature | `tenant_nil_guardian_options_settings` | Guardian | **Platform-default, not tier-gated** (§12.9); consent + role governed |
+| `nil_guardian` | — | **platform-default (always-on)** | — | Guardian | **Not capability-gated** (§12.9, D6); consent + role governed. No resolver, no options table, never in upsell surfaces |
 | `nil_recruiting` | 3 | per-feature | `tenant_nil_recruiting_options_settings` | Institution/Coach | Tier-gated by institution tenant |
 | `nil_sponsorship` | 3 | per-feature | `tenant_nil_sponsorship_options_settings` | Sponsor | Tier-gated by sponsor tenant; deal volume caps |
 | `nil_achievements` | 3 | master toggle | `tenant_nil_achievements_options_settings` | Institution | Tier-gated by institution tenant |
-| `nil_fan_network` | 3 | per-feature | `tenant_nil_fan_options_settings` | Fan | **Platform-default, not tier-gated** (§12.9); always-free |
+| `nil_fan_network` | — | **platform-default (always-on)** | — | Fan | **Not capability-gated** (§12.9, D6); always-free. No resolver, no options table, never in upsell surfaces |
 | `nil_compliance` | 4 | tier-only (hard) | — | Compliance | Highest tier; hard gate; expired → 200 disabled manifest (R13) |
 | `nil_finance` | 4 | per-feature | `tenant_nil_finance_options_settings` | Sponsor/Guardian | Highest tier; escrow + payouts + KYC gate |
 | `nil_crm` | 3 | per-feature | `tenant_nil_crm_options_settings` | Institution/Sponsor/Guardian | Mirrors `crm-options`; three CRM surfaces |
@@ -1810,7 +1830,7 @@ Every NIL capability goes through all 8 phases (per `capability-deployment-flow.
 
 | Phase | Deliverable | File Location |
 |---|---|---|
-| **1. Define** | Feature key(s) in `canonical-features.ts` + tier assignment in `tier-hierarchies.ts` | `apps/api/src/config/canonical-features.ts`, `apps/api/src/config/tier-hierarchies.ts` |
+| **1. Define** | Feature key(s) + tier assignment in the **seed scripts** | `apps/api/prisma/seed-nil-capabilities.ts`, `apps/api/prisma/seed-tiers.ts` |
 | **2. Seed DB** | `features_list` → `capability_features_list` → `tier_features_list` rows | Seed SQL in migration |
 | **3. Store prefs** | `tenant_nil_xxx_options_settings` table + Prisma model + `generateNilXxxOptionsSettingsId` | `apps/api/prisma/schema.prisma`, `apps/api/src/lib/id-generator.ts` |
 | **4. Resolve** | `resolveNilXxx(features, merchantPrefs)` resolver + wire into `EffectiveCapabilityResolver.ts` + disabled entry in `buildExpiredCapabilitiesResponse` | `apps/api/src/services/resolvers/NilXxxResolver.ts`, `apps/api/src/services/EffectiveCapabilityResolver.ts` |
@@ -1818,6 +1838,10 @@ Every NIL capability goes through all 8 phases (per `capability-deployment-flow.
 | **6. Map** | `UnifiedCapabilityService.mapNilXxx()` + state interface in `CapabilityResolutionService.ts` + `useNilXxxCapability` hook | `apps/web/src/services/UnifiedCapabilityService.ts`, `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts` |
 | **7. Display** | `PlanSummaryPanel` entry + `CapabilityShowcase` row (correct group-level `merchantGated` counting) | `apps/web/src/components/dashboard/` |
 | **8. Verify** | `pnpm checkapi` + `pnpm checkweb` (zero TS errors) + `verify-capability-deployment.md` checklist | — |
+
+> **Amended 2026-09-30** — (finding F4): Phase 1 originally named `canonical-features.ts` / `tier-hierarchies.ts` at `apps/api/src/config/`. **Neither file exists anywhere in the tree**, and this section gave a *different* (also incorrect) path than `TECHNICAL_SPEC.md` §7 — which is itself a symptom of the stale-reference problem. Feature and tier definition is done via the seed scripts above.
+>
+> Also note Phase 3 does **not** apply to `nil_guardian` / `nil_fan_network` — they are platform-default and have no options-settings table (`EXECUTION_PLAN.md` §1 D6).
 
 ### 13a.4 Capability Gates in Frontend Services
 
@@ -1940,6 +1964,8 @@ When a capability is disabled (tier-gated off or merchant-pref off), the UI show
 
 **Component:** `CapabilityUpsellCard` (reuses `FeatureCard` pattern)
 
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D6: **platform-default features never appear in upsell surfaces.** `nil_guardian` and `nil_fan_network` are always-on and free; there is nothing to upgrade to. Any upsell card, locked-feature row, or `PlanSummaryPanel` entry referencing them is a defect.
+
 | Prop | Type | Notes |
 |---|---|---|
 | `capability` | `string` | e.g., `'nil_finance'` |
@@ -1995,17 +2021,17 @@ Per `capability-data-flow-rules.md` R13, when a tenant's subscription is expired
 |---|---|---|---|
 | `useNilLandingCapability` | `nil_landing` | `{ enabled, tierState }` | Marketing landing (lead form visibility) |
 | `useNilRosterCapability` | `nil_roster` | `{ enabled, allowedRowCount, tierState }` | Institution roster, athlete profile submit |
-| `useNilGuardianCapability` | `nil_guardian` | `{ enabled, tierState }` (always-on) | Guardian consent management |
 | `useNilRecruitingCapability` | `nil_recruiting` | `{ enabled, tierState }` | Coach recruiting board |
 | `useNilSponsorshipCapability` | `nil_sponsorship` | `{ enabled, dealVolumeCap, tierState }` | Sponsor deal pipeline |
 | `useNilAchievementsCapability` | `nil_achievements` | `{ enabled, tierState }` | Institution achievement verification |
-| `useNilFanNetworkCapability` | `nil_fan_network` | `{ enabled, tierState }` (always-on) | Fan dashboard, social feed |
 | `useNilComplianceCapability` | `nil_compliance` | `{ enabled, tierState }` | Compliance review queue |
 | `useNilFinanceCapability` | `nil_finance` | `{ enabled, tierState }` | Sponsor escrow, guardian payouts |
 | `useNilCrmCapability` | `nil_crm` | `{ enabled, tierState }` | All CRM surfaces |
 | `useNilBotCapability` | `nil_bot` | `{ enabled, tierState }` | Bot widget rendering |
 
-**Aggregate hook:** `useNilCapabilities(tenantId)` — returns all 11 capability states in one call (cached by React Query, `staleTime: 60s`).
+**Aggregate hook:** `useNilCapabilities(tenantId)` — returns all **9** gated capability states in one call (cached by React Query, `staleTime: 60s`).
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D6, `TECHNICAL_SPEC.md` §12.9 (finding F6d): `useNilGuardianCapability` and `useNilFanNetworkCapability` have been **removed**. `nil_guardian` and `nil_fan_network` are **platform-default, always-on features — not tier-gated**. They have no capability hook, no resolver, and no options-settings table. Access is authorized by **role + consent** at the route layer. The registry is **9 gated capabilities + 2 platform-default features**, so the aggregate hook returns **9** states, not 11.
 
 ### 13a.12 Capability Display in Plan Summary
 
@@ -2033,6 +2059,15 @@ The `CapabilityShowcase` component (reused from platform) renders the detailed f
 ---
 
 ## 14. Frontend Skill Compliance Checklist
+
+> **Amended 2026-09-30 — verification constraint** (`EXECUTION_PLAN.md` §7.3, §1 D8; finding F10).
+>
+> `apps/web` has **no jsdom and no testing-library** (per `AGENTS.md`). Component tests server-render via `renderToStaticMarkup`; `useEffect` never runs; Radix `Accordion` / `Tabs` panels unmount when inactive. Consequences for the checklists below:
+>
+> - **Automatable:** serialized-markup assertions (prefilled `value="…"`, collapsed/expanded copy, status chips, and empty/error/loading states reachable without interaction), plus pure-helper unit tests extracted from components.
+> - **NOT automatable:** layout, page-level overflow, responsive breakpoints at 320px/1440px, hover/focus behavior, and any interaction requiring a real DOM.
+>
+> The not-automatable items become a **signed manual review checklist** at `EXECUTION_PLAN.md` §4 S7.4 — recorded as evidence, **not** claimed as a passing test. If automated interaction/layout testing is wanted, that is a deliberate dependency decision (D8) made once, not discovered per component.
 
 ### saas-navigation
 

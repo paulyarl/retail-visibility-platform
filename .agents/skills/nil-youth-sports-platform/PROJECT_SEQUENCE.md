@@ -3,10 +3,29 @@
 **Document Version:** 1.0
 **Purpose:** Merges `MIGRATION_DESIGN.md` (M0–M4) and `IMPLEMENTATION_PLAN.md` (Phase 0–4) into a single, non-redundant execution timeline. This is the master build order — every task appears exactly once, in dependency order.
 
+---
+
+> ## ⚠️ SUPERSEDED — 2026-09-30
+>
+> **This document's build order is superseded by `EXECUTION_PLAN.md`.** The MVP is now delivered **API-first (hybrid)**: extract API + schema, validate a vertical slice, then complete web extraction and feature breadth.
+>
+> **Retained value:** the **stage → source traceability map** (§"Stage-to-Source Mapping") and the task enumeration, which remain useful references.
+>
+> **Retained caveats — do not execute this document as written:**
+> - The RLS premise in Stage B.2.5 is **false** (see §B.2.5 below and `SPEC_AMENDMENTS.md` MD-4). The platform has no RLS.
+> - The day-level estimates are superseded (`EXECUTION_PLAN.md` §6).
+> - The Definition of Done needs the bot-UUID exception (see below).
+> - Stage C.3's "no API-side action needed" is misleading (see below).
+>
+> **Execute `EXECUTION_PLAN.md` §4 instead.**
+
+---
+
 **Guiding rules (from `IMPLEMENTATION_PLAN.md` §0):**
 - Work top-to-bottom; stages gate on each other.
 - Every task points to a skill in `.devin/skills/`. Do not improvise a pattern that a skill already defines.
 - **Definition of Done:** `pnpm checkapi` + `pnpm checkweb` pass (zero TS errors), skill checklist passes, no raw `fetch` / no `randomUUID` / no `Date.now()` IDs.
+  - **Amended 2026-09-30 — documented exception:** `bot_*` tables retain `@db.Uuid` + `gen_random_uuid()` per `TECHNICAL_SPEC.md` §14.12. The CI grep gate whitelists the bot service and bot route directories, or it fails on compliant code. See `EXECUTION_PLAN.md` §2.3.
 - **P0 safety/legal gates are blocking.** A stage cannot ship if any P0 acceptance check is red.
 
 ---
@@ -18,7 +37,7 @@ Stage A (infra)          ──►  Stage B (schema)         ──►  Stage C 
   M0 infra setup              M1 schema transform          M2 API cleanup + bases        M3 web cleanup + bases     Impl Phase 1
   new git/supabase/           strip commerce models        delete commerce routes        delete commerce routes     landing + leads
   auth0/vercel/railway/       add NIL models               add NIL ID generators         add NIL web singletons     nil_landing capability
-  doppler                     RLS + triggers               add NIL base singletons       rebrand UI
+  doppler                     scoping + triggers           add NIL base singletons       rebrand UI
                               seed base data               replace resolvers             update proxy/auth
                                                            repurpose checkout→deals
 
@@ -53,14 +72,16 @@ Stage A (infra)          ──►  Stage B (schema)         ──►  Stage C 
 
 ## Stage B — Database Schema Transform (Migration M1 + Impl Phase 0 decisions)
 
-**Objective:** Clean Prisma schema with NIL-only models, RLS policies, triggers, seeded base data. This stage absorbs Implementation Plan Phase 0 decisions (0.2–0.4) since they're schema-configuration questions.
+**Objective:** Clean Prisma schema with NIL-only models, tenant scoping, triggers, seeded base data. This stage absorbs Implementation Plan Phase 0 decisions (0.2–0.4) since they're schema-configuration questions.
+
+> **Amended 2026-09-30** — (finding F1): the original objective said "**RLS policies**". The platform has no RLS; Phase 2 ships the **repository tenant guard** and RLS is Phase 4. See §B.2.5.
 
 ### B.1 Pre-flight decisions (blocking)
 
 | # | Task | Skill | Deliverables | Acceptance |
 |---|---|---|---|---|
 | B.1.1 | Confirm `tenants.tenant_type` is alterable (athlete/institution/sponsor). If not, design side-table fallback. | `database-navigation-system.md` | Decision note. | No assumption left open. |
-| B.1.2 | Map RLS GUC mechanism — confirm how `app.current_tenant` is set in this codebase. | `database-navigation-system.md` | Note confirming exact `set_config` call site. | Reference query runs under RLS with athlete-tenant set. |
+| B.1.2 | ~~Map RLS GUC mechanism — confirm how `app.current_tenant` is set in this codebase.~~ **RESOLVED 2026-09-30 → decision D1: it is not set; there is no working mechanism.** The only `set_config` reference is commented out in `queue-routes.ts` (a DROP-list file). Phase-2 enforcement is the repository tenant guard; RLS is Phase 4. | `database-navigation-system.md` | Decision recorded in `EXECUTION_PLAN.md` §1 D1. | Tenant-guard rejection test passes; no policy is written against an unset session variable. |
 | B.1.3 | Legal review of P0 constraints (COPPA/FERPA/state-NIL/erasure). | — | Compliance sign-off doc. | Legal confirms §12.1/§12.2 design is sufficient for MVP. |
 | B.1.4 | Confirm fee parameters (§12.10): platform transaction fee %, guardian-payout split, non-profit pool slice, payer-keyed tier matrix. | `bsaas-purchase-flow.md` | Fee config values recorded. | Numbers signed off; tier payer matrix confirmed. |
 
@@ -72,7 +93,7 @@ Stage A (infra)          ──►  Stage B (schema)         ──►  Stage C 
 | B.2.2 | Rename/repurpose models (MIGRATION_DESIGN §3.2: orders→nil_deals, order_items→nil_deal_milestones, payments→nil_payments, bot_product_embeddings→bot_athlete_embeddings, mv_storefront_discovery→mv_athlete_discovery). Add `tenant_type` column to `tenants`. | — | Renamed `schema.prisma`. | `prisma validate` passes. |
 | B.2.3 | Add all NIL models from TECHNICAL_SPEC §14 (athlete_profiles_list, guardians_list, guardian_athlete_links_list, athlete_tenant_memberships_list, consent_records_list, highlight_media_list, athlete_metrics_list, athlete_achievements_list, recruiting_boards_list, scout_ratings_list, sponsorship_deals_list, escrow_milestones_list, nonprofit_allocation_pools_list, nil_eligibility_rules_list, moderation_cases_list, message_threads_list, fan_badges_list, nil_leads_list, data_erasure_requests_list, payout_schedules_list, sponsor_spend_limits_list, nil_offers_list, nil_events_list, tenant_nil_*_options_settings tables, **nil_invitations_list**, **nil_onboarding_sessions_list** (§18 invitation + onboarding tables)). | `tenant-scoped-id-generation.md`, `database-navigation-system.md` | Full NIL schema. | `prisma validate` passes. |
 | B.2.4 | Generate + run initial migration on new Supabase. | — | Migration `nil_initial_schema`. | `prisma migrate dev` succeeds; all tables created. |
-| B.2.5 | Create RLS policies per athlete-tenant (TECHNICAL_SPEC §14.10) + dual-visibility policies for cross-tenant tables (sponsorship_deals_list). | `database-navigation-system.md` | RLS policies applied. | Cross-athlete query returns 0 rows; deal visible to sponsor+guardian only. |
+| B.2.5 | ~~Create RLS policies per athlete-tenant (TECHNICAL_SPEC §14.10) + dual-visibility policies for cross-tenant tables (sponsorship_deals_list).~~ **Amended 2026-09-30 — Phase 2:** build the **repository-level tenant guard** (`EXECUTION_PLAN.md` §4 S4.1). The platform has **no RLS to extend** — see `SPEC_AMENDMENTS.md` MD-4. **Phase 4:** RLS policies per athlete-tenant + dual-visibility policies, designed from scratch including the Supabase pooler workaround. | `database-navigation-system.md` | Phase 2: tenant guard rejects an athlete-owned query with no tenant predicate. Phase 4: RLS policies applied. | Tenant-guard rejection test passes (Phase 2); cross-athlete query returns 0 rows **non-vacuously** and deal visible to sponsor+guardian only (Phase 4). |
 | B.2.6 | Create guardian-required trigger (`nil_require_guardian_for_minor`) on CRM tables. | `database-navigation-system.md` | Trigger applied. | Minor-subject CRM record without guardian → DB error. |
 | B.2.7 | Create `mv_athlete_discovery` materialized view (replaces `mv_storefront_discovery`). | — | Materialized view + refresh function. | View queryable; returns athlete profiles. |
 | B.2.8 | Seed base data: tiers (payer-keyed), features (NIL keys), capability types (nil_landing/roster/guardian/recruiting/sponsorship/achievements/fan_network/compliance/finance/crm/bot), eligibility rules, navigation links, bot guardrails (child-safety). | — | Seed scripts. | All base data present in DB. |
@@ -102,7 +123,17 @@ Stage A (infra)          ──►  Stage B (schema)         ──►  Stage C 
 
 ### C.3 NIL base singleton classes (API side — no API-side bases needed; these are web-only)
 
-> Note: The NIL base singleton classes (§13 of TECHNICAL_SPEC) are web-side only. The API side uses `UniversalSingleton` directly for backend services. No API-side action needed here.
+> **Amended 2026-09-30 — "no API-side action needed" is misleading** (`EXECUTION_PLAN.md` §2.3, `SPEC_AMENDMENTS.md` PS-2; finding F6e).
+>
+> The NIL *context-specific* bases (§13) are indeed web-only. But the API side has its own base hierarchy that the 14 services in `TECHNICAL_SPEC.md` §9 depend on, and it must be used **deliberately**:
+>
+> | API base | Path | Used by |
+> |---|---|---|
+> | `BaseService` | `apps/api/src/services/BaseService.ts` | `GuardianConsentService`, `AthleteMembershipService`, `RecruitingBoardService`, `EscrowLedgerService`, `MediaModerationService`, `MessagingService`, `FanNetworkService`, `DataErasureService`, `InvitationService`, `OnboardingService`, `NilLeadService` |
+> | `PermissionEnhancedBaseService` | `apps/api/src/services/permissions/PermissionEnhancedBaseService.ts` | `AthleteProfileService`, `SponsorshipService` — capability-gated: call `requireFeature(tenantId, 'nil_xxx')` / `requireLimit(...)` before mutating |
+> | `UniversalSingleton` | `apps/api/src/lib/UniversalSingleton.ts` | `NilRosterService`, `ComplianceVettingService` (cached reads) |
+>
+> Capability-gated services **must** be the `PermissionEnhanced` ones, and the `tenantId` they gate on is the **athlete-tenant** for athlete-owned features or the **institution/sponsor tenant** for theirs (`TECHNICAL_SPEC.md` §12.9).
 
 ### C.4 Replace commerce resolvers with NIL resolvers
 
@@ -235,10 +266,10 @@ Stage A (infra)          ──►  Stage B (schema)         ──►  Stage C 
 
 | # | Task | Skill | Deliverables | Acceptance |
 |---|---|---|---|---|
-| F.1.1 | Verify enums + athlete-tenant extension (`tenant_type`, `athlete_profiles_list`) from Stage B.2.3 are correct. | `tenant-scoped-id-generation.md`, `database-navigation-system.md` | Verification note. | Athlete provisions as a `tenant`; RLS enabled. |
+| F.1.1 | Verify enums + athlete-tenant extension (`tenant_type`, `athlete_profiles_list`) from Stage B.2.3 are correct. | `tenant-scoped-id-generation.md`, `database-navigation-system.md` | Verification note. | Athlete provisions as a `tenant`; tenant guard active. |
 | F.1.2 | Verify guardianship + consent tables from Stage B.2.3 are correct. | `database-navigation-system.md` | Verification note. | Versioned/scoped consent ledger writable. |
 | F.1.3 | Verify media/metrics/achievement tables from Stage B.2.3 are correct. | `product-video.md` (facade), `database-navigation-system.md` | Verification note. | Media defaults `pending`; allowlist column present. |
-| F.1.4 | Verify RLS policies from Stage B.2.5 are correct. | `database-navigation-system.md` | Verification note. | Cross-athlete query returns zero rows (spec §10 RLS test). |
+| F.1.4 | Verify the tenant guard from Stage B.2.5 is correct. | `database-navigation-system.md` | Verification note. | Tenant guard rejects an athlete-owned query with no tenant predicate (spec §10). |
 
 ### F.2 Services (already created in Stage C.5 — verify + wire)
 
@@ -286,7 +317,7 @@ Stage A (infra)          ──►  Stage B (schema)         ──►  Stage C 
 |---|---|---|---|---|
 | G.2.1 | `nil_guardian` (dashboard, scoped consent, financial routing). | `add-capability-feature.md`, `capability-deployment-flow.md` | Full capability. | `verify-capability-deployment.md` passes. |
 | G.2.2 | `nil_recruiting` (boards, ratings) — guardian-gated contact. | `add-capability-feature.md` | Full capability. | Adult→minor contact impossible (spec §12.2). |
-| G.2.3 | `nil_sponsorship` (cross-tenant deals). | `add-capability-feature.md`, `add-org-capability.md` | Full capability + deal RLS (spec §12.4). | Deal visible to sponsor+guardian only. |
+| G.2.3 | `nil_sponsorship` (cross-tenant deals). | `add-capability-feature.md`, `add-org-capability.md` | Full capability + dual-visibility scoping (spec §12.4). | Deal visible to sponsor+guardian only. |
 | G.2.4 | `nil_achievements` (verified milestones). | `add-capability-feature.md` | Full capability. | Achievements feed profile only when `approved`. |
 | G.2.5 | `nil_fan_network` (**always-free, not tier-gated**, spec §12.9). | `add-capability-feature.md` | Platform-default resolver. | Resolves from platform default, never `tier_features_list`. |
 
@@ -367,7 +398,7 @@ Translated from `TECHNICAL_SPEC.md` §10 + §12.12. **All P0 negative-path tests
 - **Build gates (every task):** `pnpm checkapi`, `pnpm checkweb` → zero TS errors.
 - **P0 negative paths (Stage F+):** under-13 self-register → 403; no adult↔minor thread without guardian; consent revocation cascade; deal blocked by state rule; media moderation gate.
 - **P1 paths (Stage G+):** conflicting-guardian most-restrictive-wins; cross-tenant deal isolation; payout KYC gate; age-out lifecycle; invitation guardian consent gate (minor cannot self-accept); re-invitation 30-day block after rejection; onboarding step completion advances state correctly per actor type.
-- **Infra:** RLS cross-athlete isolation; cache TTL split (public 5–15m, private 0); cache eviction on approve; tenant-scoped-id grep gate.
+- **Infra:** tenant-guard cross-athlete isolation (Phase 2) and RLS (Phase 4); cache TTL split (public 5–15m, private 0); cache eviction on approve; tenant-scoped-id grep gate.
 - **Capability:** per-capability `tierState` + R13 expired manifest via `verify-capability-deployment.md`.
 
 ---
@@ -382,7 +413,7 @@ Translated from `TECHNICAL_SPEC.md` §10 + §12.12. **All P0 negative-path tests
 | Partial cache eviction leaks minor data | High (safety) | `cross-context-cache-invalidation.md` + enumerate-all-namespaces rule (§3.3). |
 | Bot reveals non-consented data | High (safety) | Guardrails at RAG retrieval filter (§17.2), not just prompt; seeded in G.5.3. |
 | Auth0 role mapping breaks | Medium | Test all NIL roles end-to-end in Stage D.4.2. |
-| RLS policies not applied correctly on new Supabase | High | Run RLS isolation test in B.2.5 before any code deployment. |
+| Tenant isolation not enforced on the new Supabase | High | Phase 2: tenant-guard rejection test (B.2.5 / S4.1) before any code deployment. Phase 4: non-vacuous RLS isolation test. |
 | CRM guardian-required trigger blocks legitimate operations | Medium | Test with both minor and adult athlete-tenants in G.4.1. |
 | Missing env vars on new infrastructure | Medium | Use Doppler checklist from Stage A.6; verify all vars present before deployment. |
 | Dashboard request storms | Medium | `fix-tenant-dashboard-load-loop.md` + server-resolved context. |
@@ -393,7 +424,7 @@ Translated from `TECHNICAL_SPEC.md` §10 + §12.12. **All P0 negative-path tests
 
 The smallest end-to-end vertical that proves the architecture (recommended first build target after Stage E):
 
-1. `generateAthleteTenantId` + `athlete_profiles_list` + RLS (Stage B.2.3 + B.2.5 — verify).
+1. `generateAthleteTenantId` + `athlete_profiles_list` + tenant guard (Stage B.2.3 + B.2.5 — verify).
 2. `AthleteApiSingleton` + `GuardianApiSingleton` + `GuardianConsentService` (Stage D.2.2–D.2.3 + Stage C.5.1–C.5.2 — verify).
 3. `nil_roster` capability + public roster route with consent filtering (Stage F.3.1 + F.2.3).
 4. P0 tests F.4.1–F.4.3.

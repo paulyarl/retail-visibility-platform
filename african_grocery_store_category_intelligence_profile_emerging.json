@@ -1,0 +1,853 @@
+{
+  "category_key": "african grocery store",
+  "category_name": "African Grocery Store",
+  "terminology": {
+    "African grocery store": "An independent walk-in retail storefront selling African pantry staples (fufu/poundo flour, gari, egusi, ogbono, teff flour, injera, berbere, suya spice, red palm oil, stockfish, bitter leaf, malt drinks), fresh/frozen tropical produce and proteins (yams, plantains, cassava leaves, halal goat/mutton/cow foot), and African health-and-beauty goods. Product-first retail is the defining format; a cooked-food or butchery counter may be attached but does not define the category.",
+    "African goods store": "The platform-taxonomy term of art (Google, Yelp) for the category. It is the closest mainstream label and the reveal label for qualification, but most Indianapolis businesses carry a generic grocery or convenience label instead, so the label alone is not evidence of specialization.",
+    "International grocery": "The bucket label that swallows this category on every mainstream platform in Indianapolis. Saraga International Grocery (3605 Commercial Dr) is filed here, and so are most African specialists that got labeled at all — it is the single most important hide label in this market.",
+    "Habesha": "The endonym Ethiopian and Eritrean people use for themselves (Amharic/Tigrinya). In Indianapolis it is the highest-yield discovery token for East African groceries and restaurants (Senay Habesha store, Zara Habesha restaurant) and is absent from English directory taxonomies.",
+    "Halal market": "A grocery whose defining credential is halal meat and grocery compliance, often Somali- or Habesha-owned in Indianapolis (Safari Market, Halal Market at 5768 W Morris, Chingitti Halal Market). The halal credential frequently substitutes for the grocery label on community directories.",
+    "International Marketplace district": "Indianapolis' west-side Lafayette Rd / Pike Township retail district — the category's true hub, anchored by Saraga International Grocery at 3605 Commercial Dr, with Kaura International Food Market (4271), Kaura Tropical (4251), Garaya African Market (4150) and the Global Village Welcome Center (4233) in the same stretch.",
+    "Importer of record": "The entity named on a US Customs bill of lading. For this category it is often the grocery LLC itself (Arsema G Food Mart LLC, Kaura International Food Market, Jokkymore D/B/A D'chef Food Services) and is frequently the only public trace of a direct-import supply chain.",
+    "SNAP/EBT authorized retailer": "A retail food point authorized by USDA FNS to accept SNAP benefits. In this category it is an operational-credential signal that a licensed retail food point exists at the address — it is not a quality, volume, or specialization signal.",
+    "Remittance / money-transfer counter": "A service desk inside the grocery (Dahabshil at Safari Market, MoneyGram at Saraga) common to Somali and Habesha markets. It appears in directory copy and storefront signage but in no platform category field, so it is invisible to label-driven discovery.",
+    "Marketplace anchor": "A shared multi-tenant retail building whose street address absorbs its tenant businesses' listings — e.g. 4150 Lafayette Rd (Garaya African Market Suite C; African Food Services LLC Suite H) and 4903 S High School Rd (TETEES Suite A; Heaven African Market). Maps index the building, not the stalls.",
+    "Fufu / gari / egusi / teff": "The staple product tokens customers actually type. Product long-tail queries are the highest-yield discovery shape for this category because these words almost never appear in a business name or a platform category field."
+  },
+  "synonyms": [
+    "African grocery store [English]",
+    "African grocery [English]",
+    "African market [English]",
+    "African food store [English]",
+    "African supermarket [English]",
+    "African goods store [English]",
+    "African shop [English]",
+    "African import grocery [English]",
+    "African provisions [English]",
+    "pan-African market [English]",
+    "Caribbean-African grocery [English]",
+    "international grocery [English]",
+    "international food market [English]",
+    "ethnic grocery [English]",
+    "specialty food store [English]",
+    "halal market [English]",
+    "halal grocery [English]",
+    "Habesha store [endonym — Amharic/Tigrinya]",
+    "Habesha market [endonym — Amharic/Tigrinya]",
+    "Habesha grocery [endonym — Amharic/Tigrinya]",
+    "suq / souk [endonym — Arabic]",
+    "duka [endonym — Swahili]",
+    "supermarché [endonym — Francophone West African]",
+    "boutique africaine [endonym — French]",
+    "tienda africana [endonym — Spanish]",
+    "Yoruba market [endonym — Yoruba]",
+    "Igbo market [endonym — Igbo]",
+    "Hausa store [endonym — Hausa]",
+    "Wolof market [endonym — Wolof]",
+    "Somali market [endonym — Somali]",
+    "Ethiopian market [English + endonym]",
+    "Eritrean store [English + endonym]",
+    "injera market [endonym — Amharic]",
+    "teff store [endonym — Amharic]",
+    "fufu shop [endonym — West African]",
+    "egusi market [endonym — Igbo/Yoruba]",
+    "gari store [endonym — West African]",
+    "African-Caribbean food store [English]"
+  ],
+  "subcategories": [
+    "West African (Nigerian/Ghanaian/Senegalese/Liberian) grocery: fufu and poundo flour, gari, egusi, ogbono, red palm oil, stockfish, bitter leaf, malt drinks, African textiles. Indianapolis instances: Golden Crown African Grocery Store (5342 W 38th), KB International Inc (5425 N Keystone Ave), Royal African Market (3071 N High School Rd), Garaya African Market (4150 Lafayette Rd).",
+    "East African / Habesha (Ethiopian/Eritrean) grocery: teff and barley flour, injera, berbere, shiro, fenugreek, finger millet; often co-located with a Habesha restaurant. Indianapolis instances: Ethiopian Market LLC (7355 W 10th St), Senay Habesha store (5636 W Washington St), Arsema G Food Mart (6667 W Washington St).",
+    "Somali / East African halal market with a remittance counter: halal goat/lamb/beef, Somali and African clothing and wedding accessories, perfumes and bakhoor, Dahabshil money transfer. Indianapolis instances: Safari Market (5653 W Morris St), Halal Market / Halalmarket Indiana (5768 W Morris St).",
+    "Pan-African / Caribbean hybrid grocery: mixed African and Caribbean lines in one storefront. Indianapolis instances: African Caribbean Market (4251 Lafayette Rd / 5154 W Pike Plaza Rd — status contested), Nhyira International Market (Greenwood, 1001 N State Rd 135).",
+    "Halal butchery-led grocery with an in-house butcher: zabiha halal meat cut on premises as the primary draw, with grocery aisles attached. Indianapolis instances: Halal Supermarket / International Foods (4861 W 38th St), Chingitti Halal Market (711 E Thompson Rd), Mecca Market (1205 S High School Rd).",
+    "Grocery-plus-kitchen hybrid: a retail grocery with an attached cooked-food counter or catering arm. Indianapolis instances: Jokkymore African Market / D'chef Food Services (1041 N Girls School Rd), Adey International Market and Restaurant (2910 S Lynhurst Dr), Mecca Market (1205 S High School Rd).",
+    "Large international supermarket with a substantial African section (probable category fit only): the African assortment is a department, not the identity. Indianapolis instance: Saraga International Grocery (3605 Commercial Dr, with Castleton and Greenwood locations).",
+    "Wholesale / import grocer with a retail counter: distribution-led operators whose retail-facing discovery path is weak. Indianapolis instances: Amez International Imports; East African Imports Wholesale; African Food Services LLC (4150 Lafayette Rd Suite H).",
+    "African health-and-beauty and textile add-on: African soaps, shea, hair products and textiles sold alongside groceries; a specialization signal rather than a standalone category in this market."
+  ],
+  "specialized_sources": [
+    {
+      "name": "Indiana Secretary of State Business Registry (INBiz)",
+      "type": "certification",
+      "url": "https://bsd.sos.in.gov/publicbusinesssearch",
+      "priority": 1,
+      "capabilities": [
+        "Address-indexed entity record: legal name, entity type, formation date, principal office address — the highest-yield source for businesses with no consumer platform profile at all (Arsema G Food Mart LLC, Baobab African Market LLC, Garaya African Market LLC, Royal African Market LLC, Janjai Redlight Market Inc, Rachel International Food Market LLC)."
+      ],
+      "limitations": [
+        "A registration is NOT evidence of trading: an entity can be formed and never open, and a principal office address is frequently not the storefront (Arsema G Food Mart registers at 2724 W 10th St but trades at 6667 W Washington St).",
+        "The registry carries no assortment, hours, phone, or category-specialization data — category fit must be established from assortment evidence elsewhere."
+      ]
+    },
+    {
+      "name": "US Customs bill-of-lading / import-manifest databases (ImportGenius, ImportKey, Trademo)",
+      "type": "service_history",
+      "url": "https://www.importgenius.com",
+      "priority": 1,
+      "capabilities": [
+        "Names the importer of record, supplier country and the exact product line imported — the strongest category-specialization evidence available for this market (Arsema G Food Mart: teff, berbere, shiro, fenugreek, finger millet; Kaura International Food Market; Jokkymore / D'chef Food Services).",
+        "Surfaces direct-import grocers whose only public trace is a customs record."
+      ],
+      "limitations": [
+        "An import record proves a shipment, NOT a retail storefront: wholesalers, distributors and 3PL consignees appear in the same data.",
+        "The importer-of-record address frequently differs from the storefront address, so address-keyed joins silently miss the business.",
+        "Manifest data is sparse for small operators and covers only ocean/air imports — domestic-supplied grocers are invisible to it."
+      ]
+    },
+    {
+      "name": "USDA FNS SNAP Retailer Locator",
+      "type": "certification",
+      "url": "https://www.fns.usda.gov/snap/retailer-locator",
+      "priority": 1,
+      "capabilities": [
+        "Address-keyed list of SNAP/EBT-authorized retail food points. This is the single most productive dataset for this category in Indianapolis — it surfaced Arsema G Food Mart, Garaya African Market, Royal African Market, Heaven African Market, Sant Yalla, Dreamcast African Market, Janjai Redlight Market and Baobab African Market."
+      ],
+      "limitations": [
+        "Authorization is an operational credential (a licensed retail food point exists), NOT a quality signal, NOT a specialization signal, and NOT a measure of customer volume.",
+        "The list is stale between refreshes and does not confirm the storefront is currently open; it also includes convenience stores and gas stations that are not category-fit.",
+        "Third-party mirrors of the list (affordablehousing411.com, foodstampbalance.net) restate USDA data and add no independent evidence."
+      ]
+    },
+    {
+      "name": "Find African Foods",
+      "type": "vertical_directory",
+      "url": "https://www.findafricanfoods.com",
+      "priority": 2,
+      "capabilities": [
+        "African-store directory organized by US city with product terms — the Indianapolis index names African Market (8057 E 38th St) and AIM Mart / AIMMART International Super Mercado (1435 W 86th St) with cooked-food and halal-meat attributes."
+      ],
+      "limitations": [
+        "Thin and uneven coverage; most Indianapolis African grocers found in this market are absent from it.",
+        "Directory entries are not operational proof — a listed store may be closed or relocated."
+      ]
+    },
+    {
+      "name": "Global Village Welcome Center",
+      "type": "professional_network",
+      "url": "https://www.globalvillageindy.org",
+      "priority": 2,
+      "capabilities": [
+        "International Marketplace district anchor at 4233 Lafayette Rd that convenes the immigrant-business community; the practical referral node for tenant and vendor rosters on the west side."
+      ],
+      "limitations": [
+        "Programming and welcome-center membership are NOT a retail roster — presence says nothing about whether a given business trades at a storefront."
+      ]
+    },
+    {
+      "name": "Hosted storefront platforms (Square Online, UENI, Wix, Shopify, GoDaddy, Weebly, WordPress.com)",
+      "type": "other",
+      "url": "https://squareup.com/online-store",
+      "priority": 2,
+      "capabilities": [
+        "Site-scoped enumeration of low-cost storefront subdomains that stay publicly indexed even when the platform category is generic or wrong — Arsema G Food Mart trades on arsemamart.square.site; His Grace African Grocery Store on his-grace-african-grocery-store.ueniweb.com.",
+        "The hosted catalog often reveals assortment the platform category hides (Square shop categories foods/appliances/decor for an Ethiopian grocer)."
+      ],
+      "limitations": [
+        "Presence proves the operator adopted a storefront tool, NOT that the business is trading, licensed, or accepting orders. Hosted pages frequently display \"not currently accepting online orders\", and a storefront can outlive a closed business or precede an opening.",
+        "The sweep surfaces only operators who adopted that host, so it carries selection bias toward slightly more digitized businesses — absence from the sweep means nothing.",
+        "Hosted pages are typically client-side rendered, so a search-index hit proves the URL exists, not that it renders for an ordinary visitor.",
+        "Hosts are discontinued and rebranded regularly (e.g. UENI subdomains); verify a host is live before sweeping it."
+      ]
+    },
+    {
+      "name": "Indianapolis African-food wholesalers and importers (Amez International Imports; East African Imports Wholesale; African Food Services LLC)",
+      "type": "other",
+      "priority": 2,
+      "capabilities": [
+        "Wholesale importers whose retail customers include this category's storefronts — a supply-side referral path to retail grocers that carry no consumer-facing profile."
+      ],
+      "limitations": [
+        "A wholesale relationship is NOT a retail storefront: many customers of these importers are restaurants, churches, caterers or non-storefront resellers.",
+        "These operators have no published customer roster; the path is a referral conversation, not a dataset."
+      ]
+    },
+    {
+      "name": "International Marketplace Coalition",
+      "type": "professional_network",
+      "url": "https://www.indyinternationalmarketplace.org",
+      "priority": 2,
+      "capabilities": [
+        "Corridor coalition for the Lafayette Rd / International Marketplace district; publishes member and event listings that name immigrant-owned storefronts."
+      ],
+      "limitations": [
+        "Membership is opt-in and partial — most category businesses in the district are not members."
+      ]
+    },
+    {
+      "name": "Zabihah halal directory",
+      "type": "vertical_directory",
+      "url": "https://www.zabihah.com",
+      "priority": 2,
+      "capabilities": [
+        "Halal-market and halal-grocery entries with richer operational detail than any mainstream surface — Zabihah names Wednesday/Saturday fresh-meat arrival days for Halal Market (5768 W Morris St) and \"daily fresh goat, lamb and beef, 100% halal, no alcohol\" for Chingitti Halal Market.",
+        "Ratings and address/phone for halal specialists that carry no claimable mainstream profile."
+      ],
+      "limitations": [
+        "Halal-scope only: it indexes no non-halal African grocery (Golden Crown, KB International, Ethiopian Market LLC are absent).",
+        "It is not a grocery taxonomy — a Zabihah listing proves halal compliance, not African assortment breadth."
+      ]
+    },
+    {
+      "name": "Aggregator mirror family (Loc8NearMe, Wheree, MapQuest, LocalityBiz, CentralIndex, Opendi, Restaurantji, Foodbevg, Shops1000, Zipleaf, WhereOrg, food-us.org)",
+      "type": "mainstream_directory",
+      "url": "https://www.loc8nearme.com/indiana/indianapolis/",
+      "priority": 3,
+      "capabilities": [
+        "Often the entire indexed footprint of a thin-footprint grocer — e.g. 22nd Street African Grocery exists only as food-us.org / WhereOrg / Zipleaf pages.",
+        "Mirrors frequently expose attributes the first party never published (SNAP/EBT acceptance, wheelchair access, Dahabshil money transfer, Somali clothing) and mirror review aggregates.",
+        "Mirror disagreement is itself diagnostic: Loc8NearMe indexes Safari Market (5653 W Morris St) under the slug /african-market/2460692/, and CentralIndex files Golden Crown at 5342 W 38th St under the entity name \"African Caribbean Food Stores LLC\"."
+      ],
+      "limitations": [
+        "Auto-generated and stale: mirrors disagree with each other on name, category and hours for the same address.",
+        "No mirror is a first-party surface — none can be cited as the operator's own claim, and none proves the storefront is currently trading.",
+        "Mirror review counts are re-published Google data, NOT an independent review population."
+      ]
+    },
+    {
+      "name": "Foreigner Bazaar",
+      "type": "vertical_directory",
+      "url": "https://foreignerbazaar.com",
+      "priority": 3,
+      "capabilities": [
+        "Ethnic-grocery directory that surfaces suite-level tenants mainstream search misses (TETEES African Food Market, 4903 S High School Rd Suite A)."
+      ],
+      "limitations": [
+        "Sparse Indianapolis coverage and no review system; it is a listing surface, not an operational record."
+      ]
+    },
+    {
+      "name": "Indiana Alcohol and Tobacco Commission (ATC) license registry and agendas",
+      "type": "certification",
+      "url": "https://www.in.gov/atc/licensing/",
+      "priority": 3,
+      "capabilities": [
+        "Licensed-premises registry and published agendas naming the licensee and address — surfaced Adey International Market and Restaurant (2910 S Lynhurst Dr Unit B) via an active beer/wine retailer license in the April 2026 agenda."
+      ],
+      "limitations": [
+        "A permit proves a license exists at an address, NOT that a retail storefront is trading or category-fit.",
+        "Most African grocers in this market hold no ATC license at all, so absence from ATC is uninformative."
+      ]
+    },
+    {
+      "name": "Indiana registry mirrors (indiana-company.com, marketcompanies.org)",
+      "type": "certification",
+      "url": "https://indiana-company.com",
+      "priority": 3,
+      "capabilities": [
+        "Free, scrape-friendly mirrors of INBiz filings that surface entity names and registered addresses without a session wall — the practical entry point for ZIP-keyed registry sweeps."
+      ],
+      "limitations": [
+        "Mirrors lag and sometimes drop or mangle filings; they are not authoritative and must be reconciled against INBiz.",
+        "Mirror coverage is name-and-address only — it adds no assortment or operational evidence."
+      ]
+    },
+    {
+      "name": "Indiana State Department of Health food-establishment licensing",
+      "type": "certification",
+      "url": "https://www.in.gov/health/",
+      "priority": 3,
+      "capabilities": [
+        "Statewide retail-food licensing layer that reaches the non-Marion catchment municipalities (Avon, Brownsburg, Plainfield, Greenwood, Carmel, Fishers, Zionsville, Whitestown)."
+      ],
+      "limitations": [
+        "State-level records are less granular than county records and are not consistently published by address for every municipality.",
+        "A license is not evidence of trading, assortment, or customer volume."
+      ]
+    },
+    {
+      "name": "Indianapolis DBNS permit and business-license records (Open Data Indy)",
+      "type": "certification",
+      "url": "https://data.indy.gov",
+      "priority": 3,
+      "capabilities": [
+        "City permit, zoning and license records keyed to parcel/address inside Indianapolis — useful for detecting a build-out at a retail address before any consumer platform indexes it."
+      ],
+      "limitations": [
+        "Indianapolis-only: it does not reach Speedway, Lawrence, Beech Grove, Southport, Homecroft or any adjacent-county municipality.",
+        "A permit is not a business: it proves construction or licensing activity at an address, not an operating storefront."
+      ]
+    },
+    {
+      "name": "IndyStar dining and small-business coverage",
+      "type": "mainstream_directory",
+      "url": "https://www.indystar.com",
+      "priority": 3,
+      "capabilities": [
+        "News coverage naming storefronts and their neighborhoods — IndyStar documented Jokkymore / D'chef African Market (1041 N Girls School Rd) and the AIM Mart move into the former Marsh at 86th and Ditch."
+      ],
+      "limitations": [
+        "News coverage is episodic and biased toward openings, expansions and human-interest angles — it is NOT a directory and does not track closures."
+      ]
+    },
+    {
+      "name": "Marion County Public Health Department food-establishment licensing and inspections",
+      "type": "service_history",
+      "url": "https://www.marionhealth.org",
+      "priority": 3,
+      "capabilities": [
+        "Food-establishment license and inspection records keyed to the premises address — surfaced Safari Restaurant and Halal Market Inc (5602 W Washington St) and corroborates grocery-plus-kitchen hybrids."
+      ],
+      "limitations": [
+        "An inspection record is NOT a review system and NOT a quality signal; it records regulatory compliance at a point in time.",
+        "Coverage stops at the Marion County line — it does not reach Avon, Brownsburg, Plainfield, Greenwood, Carmel, Fishers, Zionsville or Whitestown."
+      ]
+    },
+    {
+      "name": "Muslim Listings",
+      "type": "vertical_directory",
+      "url": "https://muslimlistings.org",
+      "priority": 3,
+      "capabilities": [
+        "Community-maintained listings with published hours — Sant Yalla International African Market (2989 W 71st St) is carried here with \"daily 9am-9pm\"."
+      ],
+      "limitations": [
+        "Community-scoped and Muslim-business-only; it does not cover West African non-halal grocers.",
+        "Listings are human-maintained and can lag a closure or a relocation."
+      ]
+    },
+    {
+      "name": "Rakwa Arab American Directory",
+      "type": "vertical_directory",
+      "url": "https://rakwa.com",
+      "priority": 3,
+      "capabilities": [
+        "Carries Halal Market and Habesha Restaurants (now Adey International Market and Restaurant, 2910 S Lynhurst Dr) — useful for detecting rename residue where a community directory keeps a dead name."
+      ],
+      "limitations": [
+        "Arab-American scope; African-specific grocers are largely absent.",
+        "Entries preserve predecessor names, so a Rakwa hit may name a business that no longer trades under that name."
+      ]
+    },
+    {
+      "name": "SBA PPP loan records (OpenGovUS)",
+      "type": "service_history",
+      "url": "https://opengovus.com/sba-ppp-loan/",
+      "priority": 3,
+      "capabilities": [
+        "Address-keyed federal loan records that corroborate an operating business at a storefront address — Garaya African Market LLC (4150 Lafayette Rd Suite C) appears here."
+      ],
+      "limitations": [
+        "A loan record is a historical financial event, NOT current operational evidence and NOT a quality signal.",
+        "Coverage is limited to the PPP program window; businesses formed after it are absent."
+      ]
+    },
+    {
+      "name": "Better Business Bureau (BBB) Indianapolis",
+      "type": "certification",
+      "url": "https://www.bbb.org/search?find_country=USA&find_text=African+Grocery&find_loc=Indianapolis%2C+IN",
+      "priority": 4,
+      "capabilities": [
+        "Occasional profile for a category business, useful as an independent NAP corroboration."
+      ],
+      "limitations": [
+        "BBB mis-files grocers under unrelated categories — Ethiopian Market LLC (7355 W 10th St) carries a BBB profile under \"restaurants\" while selling teff, barley flour and injera. A BBB category label is NOT assortment evidence.",
+        "BBB accreditation is a membership/verification program, NOT a review system and NOT a measure of trading volume."
+      ]
+    },
+    {
+      "name": "Facebook Pages",
+      "type": "social_platform",
+      "url": "https://www.facebook.com/search/top?q=african%20grocery%20indianapolis",
+      "priority": 4,
+      "capabilities": [
+        "Occasional first-party pages for storefront operators (African Market at 8057 E 38th St runs a page carrying delivery-over-$50 and cooked-food-Friday/Saturday service signals).",
+        "Community-group referral traffic (Indianapolis African, Nigerian, Ghanaian, Ethiopian/Eritrean and Somali groups) is where word-of-mouth recommendations happen."
+      ],
+      "limitations": [
+        "Facebook page content is frequently republished by third-party mirrors (Foodbevg) that misattribute fields; a mirror page is NOT the operator's page.",
+        "A page existing does not prove the storefront is trading, and 0/55 observed businesses carried a claimable Facebook profile in this market."
+      ]
+    },
+    {
+      "name": "Google Business Profile / Google Maps",
+      "type": "mainstream_directory",
+      "url": "https://www.google.com/maps",
+      "priority": 4,
+      "capabilities": [
+        "Primary discovery and competitive-benchmark surface for this category in Indianapolis — the only platform where category businesses show material customer-facing activity.",
+        "Carries the GBP primary category label (the hide-label evidence: Arsema G Food Mart is filed as \"Convenience store\"), hours, phone, photos, review aggregates and claim state.",
+        "Google-derived review aggregates surface on mirrors even when the GBP itself is JavaScript-gated: KB International 4.4/111, Chingitti Halal Market 4.8/50, Kaura International Food Market 8.4/6."
+      ],
+      "limitations": [
+        "The GBP category label is NOT assortment evidence — a business filed as \"Convenience store\" or \"Restaurant\" may be a full African grocery, and a business filed correctly may carry no African assortment.",
+        "Google Maps and GBP are JavaScript-gated for automated reads; rating, review count, photo count and claim status frequently cannot be verified directly and must be corroborated through mirrors.",
+        "Review count and rating are engagement measures, NOT revenue, customer volume, or business quality."
+      ]
+    },
+    {
+      "name": "Indy Chamber (international and minority business programs)",
+      "type": "professional_network",
+      "url": "https://www.indychamber.com",
+      "priority": 4,
+      "capabilities": [
+        "Regional business network whose member directories and international-business programming occasionally name category operators."
+      ],
+      "limitations": [
+        "Chamber membership skews toward larger, more digitized operators; the category's thin-footprint majority is absent."
+      ]
+    },
+    {
+      "name": "Apple Maps place cards",
+      "type": "mainstream_directory",
+      "url": "https://maps.apple.com",
+      "priority": 5,
+      "capabilities": [
+        "Independent place card for some businesses with hours and phone (Halal Supermarket / International Foods carries an Apple Maps place card: place-id I1AFDAB74022B99A8)."
+      ],
+      "limitations": [
+        "Sparse coverage: 0/55 observed businesses had an Apple Maps presence in the emerging cohort.",
+        "Apple Maps carries no category-specialization evidence and no review depth for this category in Indianapolis."
+      ]
+    },
+    {
+      "name": "Atly and o2osell storefront listings",
+      "type": "vertical_directory",
+      "url": "https://www.atly.com",
+      "priority": 5,
+      "capabilities": [
+        "Long-tail storefront stubs that name category assortment the business never published (Atly: \"African food, fresh fish, and flours\" for Gomez African Grocery; o2osell names Victory Super Store African Foods and its WhatsApp contact)."
+      ],
+      "limitations": [
+        "User-contributed and unverified; a stub is not an operator claim and does not prove trading."
+      ]
+    },
+    {
+      "name": "WTHR / local TV business features",
+      "type": "mainstream_directory",
+      "url": "https://www.wthr.com",
+      "priority": 5,
+      "capabilities": [
+        "Occasional segment documenting an operating storefront and its customer base — WTHR covered African Market (8057 E 38th St) filling a grocery void in an east-side food desert."
+      ],
+      "limitations": [
+        "Coverage is not a directory, not a review, and not a measure of customer volume."
+      ]
+    },
+    {
+      "name": "Yelp Indianapolis",
+      "type": "mainstream_directory",
+      "url": "https://www.yelp.com/search?find_desc=African+Grocery&find_loc=Indianapolis%2C+IN",
+      "priority": 5,
+      "capabilities": [
+        "Category-taxonomy browse for the \"International Grocery\" and \"Specialty Food\" buckets that swallow this category.",
+        "Occasional review aggregates for the mainstream-visible leaders (Saraga, Mecca Market)."
+      ],
+      "limitations": [
+        "Near-zero coverage for this category in Indianapolis: across 55 observed category businesses, 0 carried a Yelp presence. Yelp absence is the norm here, NOT a quality signal.",
+        "Yelp is NOT a proxy for the category's customer base in this market — the community does not review African grocers on Yelp."
+      ]
+    }
+  ],
+  "geography_grid": {
+    "city": "Indianapolis",
+    "state": "IN",
+    "zips": [
+      "46201",
+      "46202",
+      "46203",
+      "46204",
+      "46205",
+      "46208",
+      "46214",
+      "46216",
+      "46218",
+      "46219",
+      "46220",
+      "46221",
+      "46222",
+      "46224",
+      "46225",
+      "46226",
+      "46227",
+      "46229",
+      "46231",
+      "46234",
+      "46235",
+      "46236",
+      "46237",
+      "46239",
+      "46240",
+      "46241",
+      "46250",
+      "46254",
+      "46256",
+      "46259",
+      "46260",
+      "46268",
+      "46278",
+      "46280",
+      "46290",
+      "46107",
+      "46112",
+      "46113",
+      "46123",
+      "46142",
+      "46143",
+      "46168",
+      "46032",
+      "46033",
+      "46037",
+      "46038",
+      "46075",
+      "46077"
+    ],
+    "corridors": [
+      "Lafayette Rd corridor (Pike Twp, 46254/46222 — the International Marketplace district): Kaura International Food Market (4271), Kaura Tropical (4251), Garaya African Market (4150), Global Village Welcome Center (4233), Saraga anchor at 3605 Commercial Dr",
+      "W 38th St corridor (46254): Golden Crown/African-Caribbean Food Stores (5342 W 38th), Halal Supermarket Indy (4861 W 38th)",
+      "W 71st St / Georgetown Rd corridor (46268, College Park–Pike): Sant Yalla (2989 W 71st), Dunkem (2736 W 71st), Dreamcast (7125 Georgetown Rd)",
+      "W Washington St / W Morris St corridor (46241, Ben Davis–Wayne Twp): His Grace (5508 W Washington), Senay Habesha (5636 W Washington), Arsema (6667 W Washington), Safari Market (5653 W Morris), Halal Market (5768 W Morris)",
+      "W 10th St / Girls School Rd / N-S High School Rd corridor (46214/46221/46224, Speedway-adjacent west): Ethiopian Market LLC (7355 W 10th), Arsema import/SNAP address (2724 W 10th), Jokkymore (1041 N Girls School Rd), Royal African (3071 N High School Rd), Heaven African (4903 S High School Rd)",
+      "E 38th St corridor (46226, Lawrence-adjacent east side — confirmed outlier, not the hub): African Market (8057 E 38th)"
+    ],
+    "adjacent_municipalities": [
+      "Speedway (shares 46224 with Indianapolis)",
+      "Lawrence (shares 46216/46226/46235/46236 with Indianapolis)",
+      "Beech Grove (46107, inside Marion County)",
+      "Southport (shares 46227/46237, inside Marion County)",
+      "Clermont (shares 46234)",
+      "Homecroft (46227)",
+      "Avon (46123, Hendricks Co.)",
+      "Brownsburg (46112, Hendricks Co.)",
+      "Plainfield (46168, Hendricks Co.)",
+      "Camby (46113, unincorporated contiguous)",
+      "Greenwood (46142/46143, Johnson Co.)",
+      "Carmel (46032/46033, Hamilton Co.)",
+      "Fishers (46037/46038, Hamilton Co.)",
+      "Zionsville (46077)",
+      "Whitestown (46075)"
+    ],
+    "uncovered_municipalities": [],
+    "corridor_zips": {
+      "Lafayette Rd corridor (Pike Twp, 46254/46222 — the International Marketplace district): Kaura International Food Market (4271), Kaura Tropical (4251), Garaya African Market (4150), Global Village Welcome Center (4233), Saraga anchor at 3605 Commercial Dr": [
+        "46254",
+        "46222"
+      ],
+      "W 38th St corridor (46254): Golden Crown/African-Caribbean Food Stores (5342 W 38th), Halal Supermarket Indy (4861 W 38th)": [
+        "46254"
+      ],
+      "W 71st St / Georgetown Rd corridor (46268, College Park–Pike): Sant Yalla (2989 W 71st), Dunkem (2736 W 71st), Dreamcast (7125 Georgetown Rd)": [
+        "46268"
+      ],
+      "W Washington St / W Morris St corridor (46241, Ben Davis–Wayne Twp): His Grace (5508 W Washington), Senay Habesha (5636 W Washington), Arsema (6667 W Washington), Safari Market (5653 W Morris), Halal Market (5768 W Morris)": [
+        "46241"
+      ],
+      "W 10th St / Girls School Rd / N-S High School Rd corridor (46214/46221/46224, Speedway-adjacent west): Ethiopian Market LLC (7355 W 10th), Arsema import/SNAP address (2724 W 10th), Jokkymore (1041 N Girls School Rd), Royal African (3071 N High School Rd), Heaven African (4903 S High School Rd)": [
+        "46214",
+        "46221",
+        "46224"
+      ],
+      "E 38th St corridor (46226, Lawrence-adjacent east side — confirmed outlier, not the hub): African Market (8057 E 38th)": [
+        "46226"
+      ]
+    },
+    "radius_miles": 18,
+    "derivation_basis": "ZIP set derived from the City of Indianapolis boundary ZIPs plus the ZIPs of contiguous commercial municipalities that share a ZIP with the principal city (Speedway 46224, Lawrence 46216/46226/46235/46236, Beech Grove 46107, Southport 46227/46237, Clermont 46234, Homecroft 46227), plus the adjacent-county commercial municipalities inside the 18-mile retail catchment (Avon, Brownsburg, Plainfield, Camby, Greenwood, Carmel, Fishers, Zionsville, Whitestown). Corridors derived from the street addresses of 40+ African grocery businesses found in this market — clustered, not assumed. ASSUMPTION CORRECTED: an analyst would assume the category concentrates in the well-known retail districts (downtown / Mass Ave / Broad Ripple / the Castleton mall ring). The address evidence places it instead on the west-side Lafayette Rd International Marketplace strip (46254/46222) and the Ben Davis–Wayne Township W Washington St / W Morris St stretch (46241), with secondary nodes on W 38th St, W 71st/Georgetown and the W 10th/Girls School/N-S High School Rd cluster — industrial and arterial stretches that no general Indianapolis city guide lists as a grocery district. The only east-side node (8057 E 38th St, Lawrence-adjacent) is a confirmed outlier, not the hub."
+  },
+  "generic_label_set": [
+    {
+      "platform": "google",
+      "labels": [
+        "Grocery store",
+        "Convenience store",
+        "Supermarket",
+        "International grocery store",
+        "Market",
+        "Ethnic grocery store",
+        "Food store",
+        "Restaurant",
+        "African goods store"
+      ],
+      "reveal_labels": [
+        "African goods store",
+        "International grocery store",
+        "African grocery store"
+      ]
+    },
+    {
+      "platform": "yelp",
+      "labels": [
+        "Grocery",
+        "Convenience Stores",
+        "International Grocery",
+        "Specialty Food",
+        "Ethnic Food",
+        "Meat Shops",
+        "Halal",
+        "Restaurants"
+      ],
+      "reveal_labels": [
+        "International Grocery",
+        "Specialty Food",
+        "African Grocery"
+      ]
+    },
+    {
+      "platform": "facebook",
+      "labels": [
+        "Grocery Store",
+        "Convenience Store",
+        "Market",
+        "Food & Beverage",
+        "Restaurant"
+      ],
+      "reveal_labels": [
+        "African Grocery Store",
+        "International Grocery",
+        "African Market"
+      ]
+    },
+    {
+      "platform": "apple_maps",
+      "labels": [
+        "Grocery Store",
+        "Convenience Store",
+        "International Grocery",
+        "Food Market",
+        "Restaurant"
+      ],
+      "reveal_labels": [
+        "African Grocery Store",
+        "International Grocery Store"
+      ]
+    },
+    {
+      "platform": "bing",
+      "labels": [
+        "Grocery",
+        "Convenience Store",
+        "Supermarket",
+        "Restaurant",
+        "Market"
+      ],
+      "reveal_labels": [
+        "African Grocery",
+        "International Grocery"
+      ]
+    },
+    {
+      "platform": "bbb",
+      "labels": [
+        "Restaurants",
+        "Grocery Stores",
+        "Convenience Stores",
+        "Food & Beverage"
+      ],
+      "reveal_labels": [
+        "Grocery Stores",
+        "African Grocery Store",
+        "International Grocery"
+      ]
+    }
+  ],
+  "label_independent_sweeps": [
+    {
+      "dataset": "Indiana Secretary of State Business Registry (INBiz)",
+      "url": "https://bsd.sos.in.gov/publicbusinesssearch",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Statewide entity registry — enumerate by registered ZIP/address with no name token, then filter to category fit by assortment evidence from any other source."
+    },
+    {
+      "dataset": "USDA FNS SNAP Retailer Locator",
+      "url": "https://www.fns.usda.gov/snap/retailer-locator",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Highest-yield address-keyed dataset for this category in Indianapolis; enumerate by ZIP, then discard non-category retail food points (gas stations, convenience stores) by assortment."
+    },
+    {
+      "dataset": "US Customs bill-of-lading / import-manifest databases (ImportGenius, ImportKey, Trademo)",
+      "url": "https://www.importgenius.com",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Enumerate consignee/importer-of-record addresses in the catchment ZIPs, then filter by imported product line (teff, berbere, egusi, gari, palm oil, stockfish)."
+    },
+    {
+      "dataset": "Indiana Alcohol and Tobacco Commission (ATC) license registry and agendas",
+      "url": "https://www.in.gov/atc/licensing/",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Licensee addresses statewide; enumerate by ZIP and filter to category fit by assortment."
+    },
+    {
+      "dataset": "Indiana State Department of Health food-establishment licensing",
+      "url": "https://www.in.gov/health/",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Statewide retail-food licensing layer — the coverage that reaches the non-Marion catchment municipalities."
+    },
+    {
+      "dataset": "SBA PPP loan records (OpenGovUS)",
+      "url": "https://opengovus.com/sba-ppp-loan/",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Address-keyed federal loan records; enumerate by borrower address, then filter by category fit."
+    },
+    {
+      "dataset": "Indiana registry mirrors (indiana-company.com, marketcompanies.org)",
+      "url": "https://indiana-company.com",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "*"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Scrape-friendly INBiz mirror — enumerate by ZIP to bypass the session wall, then reconcile against authoritative INBiz."
+    },
+    {
+      "dataset": "Marion County Public Health Department food-establishment licensing and inspections",
+      "url": "https://www.marionhealth.org",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "Indianapolis",
+        "Speedway",
+        "Lawrence",
+        "Beech Grove",
+        "Southport",
+        "Homecroft",
+        "Clermont"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "County-level premises records for the Marion County municipalities; does NOT reach the adjacent-county suburbs."
+    },
+    {
+      "dataset": "Indianapolis DBNS permit and business-license records (Open Data Indy)",
+      "url": "https://data.indy.gov",
+      "sweep_key": "geography",
+      "covers_municipalities": [
+        "Indianapolis"
+      ],
+      "filter": "none",
+      "post_filter": "assortment",
+      "note": "Parcel/address permit and license records inside Indianapolis only — surfaces a build-out before any consumer platform indexes it."
+    }
+  ],
+  "platform_signal_weights": [
+    {
+      "platform": "google",
+      "weight": 0.82,
+      "basis": "The only platform with material customer-facing activity for this category in Indianapolis. Google-derived review aggregates are the sole review signal observed (KB International Inc 4.4/111, Chingitti Halal Market 4.8/50, Kaura International Food Market 8.4/6), and GBP category labels are the primary hide-label evidence (Arsema G Food Mart filed as \"Convenience store\"). The thin-footprint cohort shows 42/43 businesses absent from Google's qualifying profile set, which pulls the depth term down — but that cohort is deliberately the invisible tail, so the weight is driven by the mainstream-visible leaders.",
+      "confidence": 0.6,
+      "observations": 55
+    },
+    {
+      "platform": "yelp",
+      "weight": 0.07,
+      "basis": "Zero Yelp presence across 55 observed category businesses in this market. No Yelp review depth exists for the category; Yelp appears only as a category-taxonomy browse surface, not as a place where this market's customers engage.",
+      "confidence": 0.75,
+      "observations": 55
+    },
+    {
+      "platform": "facebook",
+      "weight": 0.18,
+      "basis": "One first-party Facebook page observed (African Market, 8057 E 38th St — cooked-food Fridays/Saturdays, delivery over $50) plus Facebook-group referral traffic. No claimable Facebook profiles across the rest of the cohort, and Facebook content is frequently encountered only through third-party mirrors (Foodbevg).",
+      "confidence": 0.55,
+      "observations": 55
+    },
+    {
+      "platform": "apple_maps",
+      "weight": 0.1,
+      "basis": "One Apple Maps place card observed for the category (Halal Supermarket / International Foods, place-id I1AFDAB74022B99A8). Coverage is sparse and carries no review depth in this market.",
+      "confidence": 0.5,
+      "observations": 55
+    },
+    {
+      "platform": "bbb",
+      "weight": 0.06,
+      "basis": "One BBB profile observed (Ethiopian Market LLC) and it is mis-filed under \"restaurants\". BBB is a sporadic corroboration surface for this category, not a discovery or engagement platform.",
+      "confidence": 0.6,
+      "observations": 55
+    },
+    {
+      "platform": "bing",
+      "weight": 0.04,
+      "basis": "No Bing listing or Bing-derived signal observed for any category business in this market. Included only to record the near-zero local weight honestly.",
+      "confidence": 0.5,
+      "observations": 55
+    }
+  ],
+  "discovery_patterns": {
+    "absence_first_enumerate_then_interpret": "Work the enumeration floor before judging relevance. For this market that means opening all 48 grid ZIPs against the hide-label matrix AND running all nine label-independent datasets by geography, THEN interpreting. Indianapolis evidence: the two businesses with the least consumer-facing presence in the whole market — Baobab African Market LLC (7031 Michigan Rd) and Janjai Redlight Market Inc (3504 Madison Ave) — are reachable ONLY through the registry/SNAP geography sweep. No name, endonym or product query finds either one. A pattern set that starts from category words never reaches them.",
+    "category_taxonomy_queries": "Sweep the platform labels that SWALLOW this category, not the correct one. On Google Maps/GBP issue hide labels per grid ZIP: \"Grocery store 46254\", \"Convenience store 46241\", \"Supermarket 46222\", \"International grocery 46268\", \"Market 46214\", \"Ethnic grocery store 46241\", and \"Restaurant 46214\" (which is how Ethiopian Market LLC surfaces — a grocery with a BBB profile filed under food service). On Yelp browse \"International Grocery\" / \"Specialty Food\" in Indianapolis; on Facebook browse \"Grocery Store\" pages; on BBB search category \"Restaurants\" in Indianapolis, which is exactly where Ethiopian Market LLC is mis-filed. EMERGING posture: the label is a bucket to enumerate, never a qualification test — Arsema G Food Mart is a full Ethiopian grocery filed as \"Convenience store\".",
+    "name_token_queries": "Search endonyms, transliterations and personal names — the tokens with no English category word. Indianapolis-yielding tokens observed: Arsema, Senay Habesha, Habesha, Kaura, Kaura Tropical, Garaya, Baobab, Sant Yalla, Jokkymore, D'chef, TETEES, Nhyira, Dunkem, Hana, Janjai, Golden Crown, His Grace, Godbless, Rachel, Grace Variety. Anchor each with geography: \"Arsema Indianapolis\", \"Senay Habesha Indianapolis\", \"Garaya Lafayette Rd\", \"Kaura 46254\". Add diaspora-language tokens: \"Habesha store Indianapolis\", \"supermarché Indianapolis\", \"duka Indianapolis\", \"Somali market Indianapolis\", \"injera Indianapolis\". These are highest-yield because the name is often the ONLY place the category appears.",
+    "product_longtail_queries": "Type the goods a customer would actually type, in the community's own product vocabulary: \"fufu flour Indianapolis\", \"pounded yam flour Indianapolis\", \"gari Indianapolis\", \"egusi Indianapolis\", \"ogbono Indianapolis\", \"stockfish Indianapolis\", \"red palm oil Indianapolis\", \"bitter leaf Indianapolis\", \"teff flour Indianapolis\", \"injera Indianapolis\", \"berbere Indianapolis\", \"shiro Indianapolis\", \"suya spice Indianapolis\", \"halal goat meat Indianapolis\", \"cow foot Indianapolis\", \"malt drinks Indianapolis\", \"Dahabshil money transfer Indianapolis\". Product words surface storefronts whose platform category is generic or absent, because the token appears only in mirror copy, a community listing, or an import manifest.",
+    "site_scoped_sweeps": "Restrict the engine to a host or directory domain to enumerate a whole population at once: site:square.site Indianapolis (yields arsemamart.square.site), site:ueniweb.com Indianapolis (yields his-grace-african-grocery-store.ueniweb.com and nigerlink-business-resources.ueniweb.com), site:myshopify.com Indianapolis, site:wixsite.com Indianapolis, site:godaddysites.com Indianapolis, site:weebly.com Indianapolis, site:wordpress.com Indianapolis. Directory-scoped: site:loc8nearme.com/indiana/indianapolis, site:foreignerbazaar.com, site:findafricanfoods.com, site:zabihah.com, site:muslimlistings.org, site:rakwa.com, site:indiana.food-us.org. Verify a host is still live before sweeping — hosted-site platforms are discontinued and rebranded regularly.",
+    "geographic_cluster_queries": "Derive corridors from found addresses, never assume them. The Indianapolis evidence clusters on the west side: Lafayette Rd (4150, 4251, 4271, 4351 and the Saraga anchor at 3605 Commercial Dr), W 38th St (4861, 5342), W Washington St / W Morris St (5508, 5636, 6667 W Washington; 5653, 5768 W Morris), the W 10th St / Girls School Rd / N-S High School Rd cluster (7355 W 10th, 2724 W 10th, 1041 N Girls School Rd, 3071 N High School Rd, 4903 S High School Rd, 5230 W 10th, 7460 Rockville Rd), and W 71st St / Georgetown Rd / Michigan Rd (2989 W 71st, 7125 Georgetown Rd, 7031 Michigan Rd). ASSUMPTION CORRECTED: an analyst would assume downtown / Mass Ave / Broad Ripple / Castleton — every one of those assumptions returns a near-empty sweep. The only east-side node is 8057 E 38th St (Lawrence-adjacent), an outlier, not a hub. Re-cluster after every sweep so newly-found addresses can open corridors the grid does not yet name.",
+    "community_referral_queries": "Ask the community, not the index. Indianapolis nodes: Global Village Welcome Center (4233 Lafayette Rd) and the International Marketplace Coalition for the west-side immigrant-business network; Ethiopian/Eritrean (Habesha) community and Orthodox church networks; Somali community and mosque networks around the W Morris St / Lynhurst stretch; Nigerian, Ghanaian, Liberian and Senegalese associations. Bank community-reinvestment features are a genuinely productive surface here — Fifth Third Bank posts naming Garaya African Market and Royal African Market were, for those two businesses, the freshest public signal anywhere. Community directories in this market: Zabihah, Muslim Listings, Rakwa, Find African Foods, Foreigner Bazaar. Local media: IndyStar dining coverage (Jokkymore), WTHR (African Market, 8057 E 38th).",
+    "uncatalogued_blind_spot_check": "Before finalising, ask whether any found business is hidden by a mechanic no reason covers. Two Indianapolis candidates: (a) the bank community-reinvestment post as the only fresh trace (Garaya African Market, Royal African Market); (b) the registered principal-office address diverging from the storefront address (Arsema G Food Mart registers at 2724 W 10th St and trades at 6667 W Washington St; Dreamcast African Market; Batis African Store). Propose such mechanics rather than force-fitting them into an existing reason.",
+    "coverage_self_test": {
+      "1_generic_or_wrong_platform_category": "Covered by category_taxonomy_queries: the hide-label × ZIP matrix enumerates \"Convenience store\", \"Grocery store\", \"Restaurant\", \"International grocery\" across all 48 ZIPs. Calibration cases: Arsema G Food Mart (GBP \"Convenience store\"), Ethiopian Market LLC (BBB \"restaurants\").",
+      "2_no_english_category_word_in_name": "Covered by name_token_queries (Arsema, Senay Habesha, Garaya, Baobab, Sant Yalla, Jokkymore, TETEES, Nhyira, Janjai, Hana) and by product_longtail_queries, which need no category word in the name.",
+      "3_no_website_and_no_claimed_profile": "Covered by the label-independent datasets (INBiz, USDA SNAP, customs manifests) which enumerate by geography and reach businesses with no web surface at all: Baobab African Market LLC, Janjai Redlight Market Inc, Gomez African Grocery LLC, Royal African Market LLC.",
+      "4_storefront_not_on_any_listed_corridor": "Covered by per-ZIP sweeps rather than per-corridor sweeps: every one of the 48 ZIPs is opened independently, so an unlisted street still surfaces (8912 Saint Peter St; 3504 Madison Ave; 7031 Michigan Rd; 5425 N Keystone Ave; 11 W 22nd St). geographic_cluster_queries re-clusters after each sweep so the corridor list grows from evidence.",
+      "5_community_known_but_no_reviews": "Covered by community_referral_queries (Global Village Welcome Center, International Marketplace Coalition, diaspora associations, Fifth Third bank features) and by the niche-directory sweeps (Zabihah, Muslim Listings, Rakwa, Foreigner Bazaar) which carry community knowledge no review platform has.",
+      "6_generic_name_with_no_category_token_and_no_endonym": "Covered WITHOUT relying on the name: generic_label_set × geography_grid (hide labels \"Grocery store\"/\"Convenience store\"/\"Market\" across all 48 ZIPs) plus label_independent_sweeps, none of which key on the business name. Exemplars: Grace Variety Store, His Grace African Grocery Store, Golden Crown African Grocery Store.",
+      "7_reachable_only_by_ZIP_x_label_matrix_or_address_dataset": "Covered by the ZIP × hide-label matrix and by the nine geography-keyed datasets: Baobab African Market LLC (7031 Michigan Rd) and Janjai Redlight Market Inc (3504 Madison Ave) are reachable only through INBiz/SNAP geography enumeration — invisible to every name, endonym and product query.",
+      "8_adjacent_municipality_reachable_only_by_a_label_independent_dataset": "Covered: every adjacent_municipalities entry maps to at least one label-independent sweep — the statewide datasets carry covers_municipalities [\"*\"] and the county/city datasets name theirs explicitly. Greenwood (46142/46143) yielded Nhyira International Market; the other 14 municipalities returned executed_empty under the label-independent sweeps and are recorded as covered-with-zero-findings, not silently skipped. uncovered_municipalities is empty because every catchment municipality is reached by at least one statewide dataset. Every corridor resolves to a ZIP via corridor_zips and every corridor ZIP is present in geography_grid.zips."
+    }
+  },
+  "category_evidence_rules": {
+    "absence_handling": "Record what was found and what could not be verified as SEPARATE observations. \"Website not found during discovery\" is NOT \"no website exists\". \"Not on Google during this pass\" is NOT \"absent from Google\". A field that was not checked is not_found_during_discovery or not_checked — never a negative finding. In this category absence is the norm, not the signal: 0 of 55 observed category businesses carried a Yelp presence, so Yelp absence is uninformative and must never be scored against a business.",
+    "physical_storefront_gate": "A business qualifies only with evidence of a walk-in retail outlet: a street address with a storefront listing, published store hours, a working telephone, shelf or product photography, or a counter-level service a customer walks in for (halal butchery, remittance desk). Delivery-app-only listings, ghost kitchens, dark stores, warehouses, home-based sellers and online-only merchants are disqualified regardless of assortment strength — a customs record or a hosted catalog alone never establishes a storefront.",
+    "assortment_evidence_over_label": "Establish category fit from observable assortment, NEVER from the platform category label. Positive evidence in this market: named African staples (teff, berbere, injera, fufu/poundo flour, gari, egusi, ogbono, red palm oil, stockfish, bitter leaf), halal goat/lamb/beef cut on premises, imported product lines on a bill of lading, or African health-and-beauty and textile lines. A business labeled \"Convenience store\" or \"Restaurant\" may be a full specialist (Arsema G Food Mart; Ethiopian Market LLC); a business labeled \"International grocery\" may carry almost no African assortment.",
+    "operational_verification": "Require at least one current operational signal: recent customer reviews naming in-person service, posted store hours consistent across sources, fresh storefront or shelf photography, a working telephone, owner posts, or a current licensing/authorization record at the premises address. operational_status \"unable_to_verify\" never fills a slot — report the lead in the empty-slot note instead.",
+    "multi_source_nap_consistency": "Treat NAP agreement across at least two independent sources as the identity test — and treat disagreement as diagnostic rather than disqualifying. Common in this market: dual principal-office vs storefront addresses (Arsema G Food Mart, 2724 W 10th St vs 6667 W Washington St), alternate trading names at one address (Ethiopian Eritrean Store at Arsema's address; TETEES at Heaven African Market's address), rename residue (Troy Halal Market → Adey International Market and Restaurant), and mirror name drift (Loc8NearMe files Safari Market under the slug /african-market/).",
+    "import_record_corroboration": "A US customs bill of lading naming the business as importer of record with category-defining line items is strong SPECIALIZATION evidence and should be cited as such — but it is not storefront evidence, and the importer-of-record address frequently differs from the storefront address.",
+    "snap_authorization_as_credential": "SNAP/EBT authorization is an operational credential (a licensed retail food point exists at the address) and a category-typical attribute in this market. It corroborates operation and must never be scored as quality, specialization, or customer volume.",
+    "corridor_membership_as_corroboration": "Membership in an observed corridor (Lafayette Rd International Marketplace, W Washington/W Morris, W 38th St, W 71st/Georgetown, W 10th/Girls School/N-S High School Rd) corroborates category fit and is a useful clustering prior — but it is NOT a qualification gate and NOT a quality signal, and the E 38th St outlier proves the category exists off-corridor.",
+    "hosted_storefront_interpretation": "A hosted storefront subdomain (Square Online, UENI) proves the operator adopted a storefront tool. It does not prove trading, licensing, or that orders are being accepted — hosted pages frequently show \"not currently accepting online orders\", and a storefront page can outlive a closed business or precede an opening.",
+    "review_depth_interpretation": "Where reviews exist they are thin and uneven: the observed range in this market is 1 review (TETEES African Food Market) to 111 (KB International Inc), with the majority of category businesses at zero. Treat review count as an engagement observation only — never as a ranking of the business, revenue, or customer volume."
+  },
+  "prohibited_inferences": [
+    "A thin or absent digital footprint does NOT indicate inactivity, low customer volume, or poor quality. The category's most-established west-side grocers (Garaya African Market, Royal African Market) carry no review surface at all and are demonstrably operating.",
+    "Low or zero review count does NOT mean few customers. TETEES African Food Market (1 review) and KB International Inc (111 reviews) are not evidence of relative customer volume in either direction.",
+    "No website does NOT mean no customers, and \"website not found during discovery\" is NOT \"no website exists\" — record it as not_found_during_discovery.",
+    "Absence from a platform does NOT mean the business is inactive or absent everywhere. Zero Yelp presence is the NORM here (0/55 observed), so Yelp absence carries no negative information.",
+    "Absence from INBiz, SNAP, customs or any address-indexed dataset does NOT mean the business does not exist — it means the dataset did not reach it. A registration is also not evidence of trading, and trading is not evidence of registration.",
+    "A US customs bill-of-lading record does NOT prove a retail storefront: wholesalers, distributors and consignees appear in the same data.",
+    "SNAP/EBT authorization is NOT a quality signal, NOT a specialization signal, and NOT a measure of customer volume.",
+    "A platform category label is NOT assortment evidence in either direction: a business labeled \"Convenience store\" may be a full African grocery (Arsema G Food Mart), and one labeled \"International grocery\" may carry almost no African assortment.",
+    "A hosted storefront subdomain does NOT prove the business is trading, licensed, or accepting orders.",
+    "A registration, license, or permit record count is NOT a count of customers, and a premises inspection is NOT a review system.",
+    "Aggregator mirror content is NOT a first-party claim: mirrors republish stale fields and disagree with each other (Loc8NearMe files Safari Market under /african-market/; CentralIndex files Golden Crown under \"African Caribbean Food Stores LLC\").",
+    "Low digital quality describes observable online fields ONLY — never low revenue, low customer volume, poor products, poor service, or sales readiness. A bronze or emerging slot is a discovery-calibration artifact, NOT a prospect verdict and NOT a competitive benchmark.",
+    "Absence from the corridors listed in this profile does NOT mean a business is off-market or non-qualifying — the corridors are derived from found addresses and will drift as the dataset grows."
+  ],
+  "category_signals": [
+    "INT_LOW_VISIBILITY",
+    "INT_WEAK_MAINSTREAM_INDEXING",
+    "INT_SINGLE_SOURCE",
+    "INT_HIDDEN_TRUST",
+    "INT_RECENT_BUSINESS_EVIDENCE",
+    "INT_POSSIBLE_CATEGORY_MISALIGNMENT",
+    "INT_VERTICAL_SOURCE_DISCOVERY",
+    "INT_MULTISOURCE_IDENTITY",
+    "INT_ACTIVE_OPERATIONAL_EVIDENCE",
+    "INT_CATEGORY_SPECIALIZATION",
+    "INT_UNDEREXPOSED_CREDENTIAL"
+  ]
+}

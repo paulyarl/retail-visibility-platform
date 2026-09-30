@@ -11,7 +11,9 @@
 
 ## 0. Executive Summary
 
-The existing `retail-visibility-platform` is a mature multi-tenant commerce platform with battle-tested infrastructure: Auth0 authentication, Prisma + PostgreSQL, a two-tier singleton hierarchy (cached public / 0-TTL private), a capability-gating system with tier/merchant resolvers, RLS-enforced tenant isolation, CRM, RAG chatbot, and a Next.js 16 frontend. The NIL Youth Sports platform needs every one of these primitives — just re-skinned for the NIL domain.
+The existing `retail-visibility-platform` is a mature multi-tenant commerce platform with battle-tested infrastructure: Auth0 authentication, Prisma + PostgreSQL, a two-tier singleton hierarchy (cached public / 0-TTL private), a capability-gating system with tier/merchant resolvers, explicit-tenant-scoped query isolation, CRM, RAG chatbot, and a Next.js 16 frontend. The NIL Youth Sports platform needs every one of these primitives — just re-skinned for the NIL domain.
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §1 D1 (finding F1): the original text said "**RLS-enforced** tenant isolation". **The platform does not have RLS.** Tenant isolation today is application-level (`WHERE tenant_id = $1` per query). This materially affects the extraction plan — see §3.4, which has been rewritten, and `EXECUTION_PLAN.md` §1 D1 / §4 S4.1.
 
 **The migration is a fork-and-transform:**
 
@@ -22,7 +24,7 @@ The existing `retail-visibility-platform` is a mature multi-tenant commerce plat
 5. Reconfigure for new infrastructure (new Vercel, new Supabase, new Railway, new Auth0 tenant)
 6. Rebrand UI from "VisibleShelf" to NIL brand
 
-**Why this works:** The TECHNICAL_SPEC §7.1 already established that every commerce capability has a direct NIL analog. The deal-as-purchase model (§12.10) means the financial track is a re-skin of checkout/escrow. The athlete-as-tenant model (§0) means the entire tenant infra is reused as-is. The capability system, singleton hierarchy, proxy, auth, and RLS patterns carry over without architectural changes.
+**Why this works:** The TECHNICAL_SPEC §7.1 already established that every commerce capability has a direct NIL analog. The deal-as-purchase model (§12.10) means the financial track is a re-skin of checkout/escrow. The athlete-as-tenant model (§0) means the entire tenant infra is reused as-is. The capability system, singleton hierarchy, proxy, and auth patterns carry over without architectural changes. *(The RLS pattern does **not** — see the note above and §3.4.)*
 
 ---
 
@@ -54,12 +56,12 @@ git commit -m "Initial: platform extraction from retail-visibility-platform"
 | Project name | `nil-youth-sports` |
 | Database password | (strong password, store in Doppler) |
 | Region | Same as Vercel deployment region |
-| Plan | Pro (for RLS, pgvector, point-in-time recovery) |
+| Plan | Pro (for pgvector, point-in-time recovery, connection headroom) |
 
 **Post-setup:**
 1. Enable pgvector extension: `CREATE EXTENSION IF NOT EXISTS vector;`
 2. Run Prisma migrations (after schema cleanup — see §3)
-3. Configure RLS policies (see §3.4)
+3. Configure tenant isolation — **Phase 2:** repository tenant guard; **Phase 4:** RLS policies (see §3.4)
 4. Save connection strings to Doppler:
    - `DATABASE_URL` — pooled connection (via Supabase pooler)
    - `DIRECT_URL` — direct connection (for migrations)
@@ -151,7 +153,7 @@ Create three Doppler configs:
 
 | Layer | Files/Patterns | Action |
 |---|---|---|
-| **Singleton hierarchy (web)** | `FlexibleApiSingleton`, `PublicApiSingleton`, `TenantApiSingleton`, `CustomerApiSingleton`, `AuthenticatedApiSingleton`, `AdminApiSingleton` | Keep as-is; add NIL bases on top (§4.1) |
+| **Singleton hierarchy (web)** | `FlexibleApiSingleton`, `PublicApiSingleton`, `TenantApiSingleton`, `CustomerApiSingleton`, `AuthenticatedApiSingleton`, `AdminApiSingleton` | Keep the **canonical chain** (`UniversalSingleton → EnhancedFlexibleApiSingleton → FlexibleApiSingleton → {Public, Tenant, Customer, Admin, Authenticated}`); **delete** `FlexibleApiSingletonV2`, `FlexibleApiSingletonStable`, `PublicApiSingletonStable` and the alignment scaffolding (`BASE_CLASS_ALIGNMENT.ts`, `FINAL_ALIGNMENT_REPORT.ts`, `TARGET_SYSTEM_DEMO.ts`). Add NIL bases on top (§4.1). See `EXECUTION_PLAN.md` §1 D3 |
 | **UniversalSingleton (api)** | `apps/api/src/lib/UniversalSingleton.ts` | Keep as-is |
 | **ID generators** | `apps/api/src/lib/id-generator.ts` — `generateTenantId`, `generateTenantKey`, `generateUserId`, nanoid pattern | Keep core generators; add NIL-specific generators (§4.2) |
 | **Auth middleware** | `apps/api/src/middleware/auth.ts` (authenticateToken, checkTenantAccess), `role-validation.ts`, `permissions.ts` | Keep; add NIL roles to validation |
@@ -215,6 +217,10 @@ Create three Doppler configs:
 | **Performance monitor/tester** | `ShopsPerformanceMonitor.ts`, `ShopsPerformanceTester.ts` | Commerce-specific; drop |
 | **Clone tool** | `clone.ts` | Commerce tenant cloning; drop |
 
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §6 item 10 (finding F7): **a second DROP pass is required.** Several §2.1 KEEP entries are semantically commerce-shaped and will re-import the coupling the strip just removed. Before closing the extraction, re-evaluate each of these explicitly rather than carrying it by default:
+>
+> `promotion.ts` · `quick-start.ts` / `QuickstartOptionsService.ts` / `quickstart-options-settings.ts` · `recommendationService.ts` / `recommendation-singleton.ts` / `RecommendationSingletonService.ts` · `GlobalCatalogService.ts` / `catalog-adoption.ts` / `catalog-slugs.ts` · `slug-generation.ts` / `SlugSingletonService.ts` · `SocialPixelService.ts` / `social-pixels.ts` / `social-commerce-options-settings.ts` · `business-profile-validation.ts` · `OverrideAnalyticsService.ts` / `OverrideCacheService.ts`
+
 ### 2.3 EVALUATE (Keep or Drop Based on NIL Needs)
 
 | File | Decision Criteria |
@@ -266,9 +272,9 @@ The existing `schema.prisma` has ~200+ models. The migration transforms it in th
 | `bot_faq_embeddings` | `bot_faq_embeddings` (unchanged) | Re-seed with NIL eligibility/consent KB |
 | `bot_guardrail_rules` | `bot_guardrail_rules` (unchanged) | Re-seed with child-safety guardrails |
 | `bot_product_embeddings` | `bot_athlete_embeddings` | Rename; re-index from athlete profiles instead of products |
-| `orders` | `nil_deals` | Rename; repurpose columns (order → deal, buyer → sponsor, seller → athlete-tenant) |
-| `order_items` | `nil_deal_milestones` | Rename; repurpose for escrow milestones |
-| `payments` | `nil_payments` | Rename; repurpose for deal payouts (guardian payee) |
+| `orders` | (DROP) → define `nil_deals` fresh from TECHNICAL_SPEC §14.8 | **Recreate, do not rename.** Reuse the checkout/order *service* logic, not the model shape |
+| `order_items` | (DROP) → define `nil_deal_milestones` fresh | Milestones are escrow **states**, not line items — not a 1:1 rename |
+| `payments` | (DROP) → define `nil_payments` fresh | Reuse the payment-gateway abstraction; do not inherit order-payment columns |
 | `payment_gateways` | `payment_gateways` (unchanged) | Keep for Stripe; drop Clover/Square initially |
 | `stripe_*` models | `stripe_*` (unchanged) | Keep for subscription billing + deal payments |
 | `subscription_*` models | `subscription_*` (unchanged) | Keep for institution/sponsor tier subscriptions |
@@ -295,7 +301,7 @@ The existing `schema.prisma` has ~200+ models. The migration transforms it in th
 
 ### 3.3 New NIL Models to Add (from TECHNICAL_SPEC §14)
 
-All new models follow platform conventions: `*_list` table names, `VARCHAR(255)` IDs, explicit IDs from service layer, `timestamptz` UTC, RLS policies.
+All new models follow platform conventions: `*_list` table names, `VARCHAR(255)` IDs, explicit IDs from service layer, `timestamptz` UTC, and explicit tenant scoping (`tenant_id` + the Phase-2 tenant guard; RLS policies in Phase 4).
 
 **Enums (§14.1):**
 - `nil_tenant_type` — athlete, institution, sponsor
@@ -318,7 +324,7 @@ All new models follow platform conventions: `*_list` table names, `VARCHAR(255)`
 - `athlete_achievements_list` — verified milestones
 - `recruiting_boards_list` — coach boards (institution-scoped)
 - `scout_ratings_list` — private star ratings
-- `sponsorship_deals_list` — cross-tenant deals (dual-visibility RLS)
+- `sponsorship_deals_list` — cross-tenant deals (dual-visibility scoping; RLS policy in Phase 4)
 - `escrow_milestones_list` — deal escrow state machine
 - `nonprofit_allocation_pools_list` — double-entry ledger
 - `nil_eligibility_rules_list` — state/association/bylaw rules
@@ -336,16 +342,53 @@ All new models follow platform conventions: `*_list` table names, `VARCHAR(255)`
 
 **Options settings tables (per capability, §7):**
 - `tenant_nil_roster_options_settings`
-- `tenant_nil_guardian_options_settings`
+- ~~`tenant_nil_guardian_options_settings`~~
 - `tenant_nil_recruiting_options_settings`
 - `tenant_nil_sponsorship_options_settings`
 - `tenant_nil_achievements_options_settings`
-- `tenant_nil_fan_options_settings`
+- ~~`tenant_nil_fan_options_settings`~~
 - `tenant_nil_finance_options_settings`
 
-### 3.4 RLS Policy Migration
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §2 S2.2 (finding F12): **the three model lists in this spec set disagree — reconcile before writing the migration.** This list has 25 tables + 7 options tables; `PROJECT_SEQUENCE.md` §B.2.3 lists 22; `TECHNICAL_SPEC.md` §14 contains 23 `CREATE TABLE` statements. **Count the tables directly from `TECHNICAL_SPEC.md` §14 and treat that as authoritative.**
+>
+> Also: `nil_invitations_list` and `nil_onboarding_sessions_list` (§18 / `TECHNICAL_SPEC.md` §14.4a and §14.4b) are **absent from this list but required**.
+>
+> And two rows above are now removed by decision: `tenant_nil_guardian_options_settings` and `tenant_nil_fan_options_settings` **do not exist** — guardian and fan features are platform-default, not capability-gated (`EXECUTION_PLAN.md` §1 D6; `TECHNICAL_SPEC.md` §7, §12.9). Result: **5** capability options-settings tables, not 7.
 
-The existing platform uses `current_setting('app.current_tenant', true)` for RLS. This mechanism carries over unchanged.
+### 3.4 Tenant Isolation Strategy
+
+> **Amended 2026-09-30 — full rewrite.** `EXECUTION_PLAN.md` §1 D1 / §4 S4.1 (finding F1).
+>
+> **Correction:** the original text here read *"The existing platform uses `current_setting('app.current_tenant', true)` for RLS. This mechanism carries over unchanged."* **That is false, and it was the root cause of finding F1.** Verified against the repo:
+>
+> ```
+> $ grep -rh "CREATE POLICY" apps/api/prisma/migrations | wc -l   → 3
+> $ grep -rl "ROW LEVEL SECURITY" apps/api/prisma/migrations      → 2 files
+>     (one is 003_create_product_queue.sql.backup)
+> $ grep -c "^model " apps/api/prisma/schema.prisma              → 343
+> $ grep -rlE "current_setting|app\.current_tenant|set_config" apps/api/src
+>     routes/queue-routes.ts          ← occurrence is COMMENTED OUT
+>     routes/queue-routes.ts.bak
+>     lib/services/ProductQueueService.ts
+>     lib/services/ProductQueueService.ts.bak
+>     app/api/queue/[tenantId]/route.ts.backup
+> ```
+>
+> The only `set_config` line in the codebase is `// process.env.POSTGRES_OPTIONS = ...` at `queue-routes.ts:39` — commented out, using a **different setting name** (`app.current_tenant_id`) than the policies below expect (`app.current_tenant`), in a commerce file on the §2.2 DROP list. **There is no mechanism to carry over.**
+>
+> **The isolation strategy is therefore:**
+
+| Control | Phase | Status |
+|---|---|---|
+| Explicit `WHERE tenant_id = $1` per query | Phase 2 | **Exists today** — application convention |
+| Repository-level tenant guard (rejects any athlete-owned query with no tenant predicate) | Phase 2 | **To be built** — `EXECUTION_PLAN.md` §4 S4.1 |
+| Postgres RLS + tenant GUC | Phase 4 | **To be built from scratch** — design required, not inherited |
+
+> If RLS is implemented in Phase 4, two things must be **designed rather than copied**: (1) the GUC propagation mechanism, and (2) a workaround for Supabase's pooler, which defaults to **transaction mode** and does not preserve a session-level `set_config` across pooled queries. Budget ≈3–6 ew for ~24 tables plus the pooling workaround — this is a workstream, not a schema detail.
+>
+> **Test requirement:** an isolation test that passes because *no* rows are visible proves nothing. Every RLS test must first prove that rows **are** visible with the correct tenant set.
+>
+> **The policy SQL below is retained as a Phase-4 reference sketch.** The dual-visibility policy on `sponsorship_deals_list` remains a correct design for when RLS is built.
 
 **Athlete-owned tables (§14.10):**
 ```sql
@@ -381,17 +424,21 @@ END; $$ LANGUAGE plpgsql;
 
 ### 3.5 Migration Execution Order
 
-1. **Create new Supabase project** (empty database)
-2. **Strip commerce models from `schema.prisma`** — remove all DROP models from §3.2
-3. **Rename repurposed models** — apply renames from §3.2
-4. **Add NIL models** — add all §3.3 models to `schema.prisma`
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §2.2, §3 S3.6 (findings F3, F7): the original order stripped commerce models (step 2) and renamed repurposed models (step 3) **in the same pass** as the code extraction, producing one entangled cascade of type errors from both directions. The corrected rule is **additive-then-subtractive:**
+>
+> **Never delete a Prisma model before the code that references it is gone.** Add → delete code → drop models. Three ordered, independently-verifiable repairs instead of one entangled pass.
+
+1. **Enumerate DB objects from the live database** — triggers, policies, views, materialized views, extensions. `schema.prisma` is **not** a complete record: `prisma db push` scripts coexist with 28 migrations, so out-of-band objects would be silently lost. (`EXECUTION_PLAN.md` §0 S0.5)
+2. **Create new Supabase project** (empty database)
+3. **Add NIL models** (additive — breaks nothing). `prisma validate` green.
+4. **Defer all model removal to the API extraction stage.** Commerce models are dropped only after `grep` proves no code references them (`EXECUTION_PLAN.md` §3 S3.6).
 5. **Generate initial migration** — `prisma migrate dev --name nil_initial_schema`
 6. **Run migration** on new Supabase
 7. **Enable pgvector** — `CREATE EXTENSION IF NOT EXISTS vector;`
-8. **Create RLS policies** — apply all §3.4 policies
+8. **Phase 2 isolation** — build the repository-level tenant guard (`EXECUTION_PLAN.md` §4 S4.1). **Phase 4:** RLS policies per §3.4, designed from scratch.
 9. **Create triggers** — guardian-required trigger on CRM tables
-10. **Create materialized view** — `mv_athlete_discovery` (replaces `mv_storefront_discovery`)
-11. **Seed base data** — tiers, features, capability types, eligibility rules, nav links, bot guardrails
+10. **Create materialized view** — `mv_athlete_discovery` (replaces `mv_storefront_discovery`), **with its scoping test**: it must exclude non-`approved` and `directory_visible=false` rows
+11. **Seed base data** — tiers (payer-keyed, including a `platform_default` row), NIL features/capabilities via `seed-nil-capabilities.ts`, `nil_eligibility_rules_list`, navigation links, bot guardrails
 
 ---
 
@@ -399,7 +446,9 @@ END; $$ LANGUAGE plpgsql;
 
 ### 4.1 NIL Base Singleton Classes (TECHNICAL_SPEC §13)
 
-Add to `apps/web/src/services/base/`:
+Add to `apps/web/src/providers/base/`:
+
+> **Amended 2026-09-30** — (finding F4): the original text said `apps/web/src/services/base/`. The real directory is **`apps/web/src/providers/base/`** (`apps/web/src/services/base/` does not exist). Also: all seven bases extend the **canonical** chain — see `EXECUTION_PLAN.md` §1 D3. `FlexibleApiSingletonV2` / `FlexibleApiSingletonStable` are deleted in S0.4 and must **not** be used as parents.
 
 | NIL Base | Extends | File | TTL | Header |
 |---|---|---|---|---|
@@ -434,8 +483,16 @@ Add to `apps/api/src/lib/id-generator.ts`:
 | `generateModerationCaseId(athleteTenantId)` | `mod` | `mod-{atk}-{nanoid}` |
 | `generateRecruitingBoardId(institutionTenantId)` | `board` | `board-{instTk}-{nanoid}` |
 | `generateNilLeadId()` | `nillead` | `nillead-{nanoid}` |
+| `generateNilInvitationId()` | `nilinv` | `nilinv-{nanoid}` |
+| `generateOnboardingSessionId()` | `onboard` | `onboard-{actorType}-{nanoid}` |
+
+> **Amended 2026-09-30** — (finding F4): the original table listed 17 generators and **omitted the last two**. `TECHNICAL_SPEC.md` §6 and `PROJECT_SEQUENCE.md` §C.2.1 both list **19**. That table is authoritative — verify against it before implementing.
 
 ### 4.3 Capability Resolvers (Replace Commerce → NIL)
+
+> **Amended 2026-09-30** — (finding F4): **enumerate `apps/api/src/services/resolvers/` (44 files) and map each to its keep/replace/drop decision by actual filename before starting this task.** The names in the lists below are *capability keys*, not verified filenames — e.g. `CommerceResolver.ts`, `CrmOptionsResolver.ts` and `ChatbotOptionsResolver.ts` may not match the real files. Do not begin until the mapping table is complete.
+>
+> Also note the registry is **9 gated capabilities + 2 platform-default features** (`EXECUTION_PLAN.md` §1 D6): `nil_guardian` and `nil_fan_network` get **no resolver** — they are authorized by role + consent at the route layer.
 
 **Remove (commerce resolvers):**
 - `CommerceResolver.ts` → replaced by `NilRosterResolver.ts`
@@ -606,6 +663,16 @@ The bot/RAG stack is reused with NIL-specific configuration:
 
 ## 5. Phased Migration Execution
 
+> **Amended 2026-09-30 — effort figures superseded** (`EXECUTION_PLAN.md` §6; finding F11).
+>
+> The day estimates in this section (M0 1–2 d · M1 2–3 d · M2 3–5 d · M3 3–5 d · M4 2–3 d = **11–18 working days**) are **~7–10× low** for the extraction, and this section gives **no estimate at all** for Implementation Phases 1–3 — which are the majority of the work.
+>
+> **Current figures:** extraction (S0–S3, S6) is **18.5–36.5 ew**; the full MVP (S0–S9) is **39.5–73 ew, most likely ~56** (an engineer-week = one person × 5 focused days, inclusive of design, review, and the acceptance gate). Backend is ~⅔ of the total. See `EXECUTION_PLAN.md` §6.1 for the per-stage breakdown and §6.4 for calendar scenarios.
+>
+> **The day figures below are retained only as the historical v1 estimate and must not be used for planning.** The stage *content* in this section remains a useful reference; the *order* is superseded by `EXECUTION_PLAN.md` §2 (API-first hybrid).
+>
+> Also superseded here: M1.1 ("strip commerce models") and M1.2 ("rename repurposed models") now happen in a different order — see the amended §3.5.
+
 ### Phase M0: Infrastructure Setup (1–2 days)
 
 | Step | Action | Verification |
@@ -627,7 +694,7 @@ The bot/RAG stack is reused with NIL-specific configuration:
 | M1.2 | Rename repurposed models (§3.2 rename map) | `prisma validate` passes |
 | M1.3 | Add all NIL models from TECHNICAL_SPEC §14 | `prisma validate` passes |
 | M1.4 | Generate + run initial migration on Supabase | `prisma migrate dev --name nil_initial_schema` succeeds |
-| M1.5 | Create RLS policies (§3.4) | RLS test: cross-athlete query returns 0 rows |
+| M1.5 | ~~Create RLS policies (§3.4)~~ **Phase 2: build the repository tenant guard (§3.4)** | Tenant-guard rejection test passes; RLS isolation test deferred to Phase 4 |
 | M1.6 | Create guardian-required trigger | Trigger test: minor CRM record without guardian → error |
 | M1.7 | Create `mv_athlete_discovery` materialized view | View queryable |
 | M1.8 | Seed base data (tiers, features, capabilities, eligibility rules, nav links, bot guardrails) | Seed scripts complete |
@@ -689,6 +756,24 @@ Once the platform extraction is complete and stable (M0–M4), follow the existi
 ---
 
 ## 6. File Inventory — What Gets Copied vs. Deleted
+
+### 6.0 Hygiene Purge (do this before extraction)
+
+> **Amended 2026-09-30** — `EXECUTION_PLAN.md` §0 S0.4 (finding F8): the fork carries substantial dead weight that must be removed **before** extraction, or it pollutes every subsequent grep gate and leaves duplicate-looking models in the schema for a junior agent to mistake for the real ones.
+
+```
+$ git ls-files | grep -cE "\.(bak|backup)$"   → 509
+```
+
+Remove, in one pass:
+
+- **509** tracked `.bak` / `.backup` files
+- Backup Prisma models: `subscription_tiers_list_v1_backup`, `tier_features_list_v1_backup`, `tenants_metadata_backup_gbp`
+- Abandoned singleton variants + alignment scaffolding: `FlexibleApiSingletonV2`, `FlexibleApiSingletonStable`, `PublicApiSingletonStable`, `BASE_CLASS_ALIGNMENT.ts`, `FINAL_ALIGNMENT_REPORT.ts`, `TARGET_SYSTEM_DEMO.ts` (`EXECUTION_PLAN.md` §1 D3)
+- Stray baseline-metric text dumps in `apps/api/`
+- `UniversalSingleton.ts.bak`
+
+≈0.5–1.0 ew. Acceptance: `grep -cE "\.(bak|backup)$"` → 0, `prisma validate` green, and both `checkapi` / `checkweb` still green.
 
 ### 6.1 API Files — KEEP (count: ~80 files)
 
@@ -887,7 +972,7 @@ All files from §2.2 DROP list. Key categories:
 | Prisma schema breaks after stripping 100+ models | High | Do schema cleanup in one pass; run `prisma validate` after each batch of removals |
 | Broken imports after deleting commerce routes/services | High | Delete in dependency order (routes → services → models); run `pnpm checkapi`/`checkweb` after each batch |
 | Auth0 role mapping breaks | Medium | Test all NIL roles end-to-end in M4.4 |
-| RLS policies not applied correctly on new Supabase | High | Run RLS isolation test in M1.5 before any code deployment |
+| Tenant isolation not enforced on the new Supabase | High | **Phase 2:** tenant-guard rejection test (S4.1) before any code deployment. **Phase 4:** non-vacuous RLS isolation test |
 | Materialized view `mv_athlete_discovery` query is wrong | Medium | Build and test view in M1.7 before building services on top |
 | Stripe webhook signature validation fails on new domain | Medium | Update webhook endpoints in Stripe dashboard for new Railway API URL |
 | Cache namespace collisions between old and new code | Low | New project = clean cache; no collision possible |
@@ -908,7 +993,7 @@ The migration is complete when:
 - [ ] New Railway API service deploys successfully
 - [ ] Doppler has all three configs (local, dev, prd) with all required secrets
 - [ ] `prisma migrate dev` succeeds on new Supabase with NIL-only schema
-- [ ] RLS policies are applied and tested (cross-athlete isolation)
+- [ ] **Phase 2:** the repository tenant guard rejects an athlete-owned query with no tenant predicate. **Phase 4:** RLS policies applied and tested **non-vacuously** (cross-athlete isolation)
 - [ ] Guardian-required trigger is applied and tested
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors

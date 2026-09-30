@@ -1,6 +1,22 @@
 # NIL Youth Sports Platform — Implementation Plan
 
 > **Status:** Execution playbook derived from `TECHNICAL_SPEC.md` (analysis/design complete). This document turns the spec into an ordered, skill-anchored backlog a junior agent can execute one task at a time.
+
+---
+
+> ## ⚠️ SUPERSEDED AS TASK BACKLOG — 2026-09-30
+>
+> **The task backlog is superseded by `EXECUTION_PLAN.md` §4**, which re-sequences the work API-first (hybrid) and adds two stages this plan lacks: the **Safety Substrate** (S4) and the **Vertical Slice** (S5).
+>
+> **Retained and still authoritative:**
+> - **§0 Definition of Done** — incorporated into `EXECUTION_PLAN.md` §2.3, with the bot-UUID exception
+> - **§0.1 Skill index** — **verified: every referenced playbook in `.devin/skills/` exists** (80 `.md` playbooks). This is a genuine asset — copy `.devin/skills/` into the new repo
+> - **§0.1 "Capability build shortcut"** — the "open the commerce analog first" rule. Made a checklist item in `EXECUTION_PLAN.md` §2.4 and the basis of optimization **O2 (template-first capability)**
+> - **§9 Risk register** — merged into `EXECUTION_PLAN.md` §10
+>
+> **Superseded or corrected here:** the Phase 0 decisions (now closed — see below), the P0 gate placement (now earlier), and the RLS references throughout.
+
+---
 >
 > **Guiding force:** Every task points to an existing project skill in `.devin/skills/`. **Do not improvise a pattern that a skill already defines.** When a step says "follow `X.md`", read that skill first and mirror it exactly.
 >
@@ -34,6 +50,10 @@
 | Observability | `structured-logging.md`, `correlation-id-troubleshooting.md` |
 | DB exploration | `database-navigation-system.md` |
 | Media facade | `product-video.md` |
+| Manual SQL (triggers, views, MVs, RLS policies) | `manual-sql-migration-policy.md` |
+| Capability resolution + MV | `capability-resolution-mv.md` |
+
+> **Amended 2026-09-30** — (finding F4): the two rows above were missing from the original index. Both were **verified present** in `.devin/skills/` and are needed by Stage 2 of `EXECUTION_PLAN.md` (materialized view, triggers, and RLS policies are all manual SQL rather than Prisma-native). Every other playbook named in this index was also verified present — 80 `.md` playbooks in total.
 
 ---
 
@@ -44,8 +64,8 @@ Blocking prerequisites before any feature code.
 | # | Task | Skill | Deliverables | Acceptance |
 |---|---|---|---|---|
 | 0.1 | **Confirm fee parameters** (`TECHNICAL_SPEC.md` §12.10 — model RESOLVED: deal = purchase, platform transaction fee). Set the fee %, guardian-payout split, and non-profit pool slice; confirm payer-keyed tier matrix. | `bsaas-purchase-flow.md` | Fee config values recorded in spec §12.10. | Numbers signed off; tier payer matrix confirmed (model itself is settled). |
-| 0.2 | **Confirm `tenants.tenant_type` is alterable** (athlete/institution/sponsor). If not, design the side-table fallback. | `database-navigation-system.md` | Decision note in spec §14.2. | Migration approach chosen; no assumption left open. |
-| 0.3 | **Map RLS GUC mechanism** — confirm how `app.current_tenant` is set in this codebase. | `database-navigation-system.md` | Note in spec §14.10 confirming the exact `set_config` call site. | A reference query runs under RLS with the athlete-tenant set. |
+| 0.2 | ~~**Confirm `tenants.tenant_type` is alterable** (athlete/institution/sponsor). If not, design the side-table fallback.~~ **RESOLVED 2026-09-30 → decision D2.** There is **no `tenant_type` column** today. Answer: add `tenant_type` + a `nil_tenant_profile` side table; seed a `platform_default` tier; force `directory_visible = false` for `tenant_type='athlete'`. | `database-navigation-system.md` | Decision recorded in `EXECUTION_PLAN.md` §1 D2. | `tenants` is not widened with athlete-specific commerce columns; athlete-tenants are never publicly discoverable. |
+| 0.3 | ~~**Map RLS GUC mechanism** — confirm how `app.current_tenant` is set in this codebase.~~ **RESOLVED 2026-09-30 → decision D1. It is not set — there is no working mechanism.** The only `set_config` reference is commented out in `queue-routes.ts` (a file on the DROP list), and uses a different setting name than the spec's policies expect. Answer: Phase-2 enforcement is the **repository-level tenant guard**; RLS is Phase-4 hardening built from scratch. | `database-navigation-system.md` | Decision recorded in `EXECUTION_PLAN.md` §1 D1; `SPEC_AMENDMENTS.md` MD-4. | Tenant-guard rejection test passes; no policy is written against an unset session variable. |
 | 0.4 | **Legal review of P0 constraints** (COPPA/FERPA/state-NIL/erasure). | — | Compliance sign-off doc. | Legal confirms §12.1/§12.2 design is sufficient for MVP. |
 
 > **Gate:** Phase 1 does not start until 0.2–0.4 are green (0.4 is a hard legal gate). 0.1 is now a parameter-tuning task, not a blocker — the monetization *model* is resolved (§12.10).
@@ -77,11 +97,11 @@ Blocking prerequisites before any feature code.
 
 | # | Task | Skill | Deliverables | Acceptance |
 |---|---|---|---|---|
-| 2.1 | Enums + athlete-tenant extension (`tenant_type`, `athlete_profiles_list`). | `tenant-scoped-id-generation.md`, `database-navigation-system.md` | Migration from spec §14.1–14.2. | Athlete provisions as a `tenant`; RLS enabled. |
+| 2.1 | Enums + athlete-tenant extension (`tenant_type`, `athlete_profiles_list`). | `tenant-scoped-id-generation.md`, `database-navigation-system.md` | Migration from spec §14.1–14.2. | Athlete provisions as a `tenant`; tenant guard active. |
 | 2.2 | `generateAthleteTenantId`, `generateGuardianId`, `generateGuardianAthleteLinkId`, `generateConsentRecordId`, `generateHighlightId`, `generateAthleteMetricsId`, `generateModerationCaseId`. | `tenant-scoped-id-generation.md` | `id-generator.ts` entries. | All formats match spec §6; collision check done. |
 | 2.3 | Guardianship + consent tables (`guardians_list`, `guardian_athlete_links_list`, `consent_records_list`). | `database-navigation-system.md` | Migrations from spec §14.3, §14.5. | Versioned/scoped consent ledger writable. |
 | 2.4 | Media/metrics/achievement tables (`highlight_media_list`, `athlete_metrics_list`, `athlete_achievements_list`, `moderation_cases_list`). | `product-video.md` (facade), `database-navigation-system.md` | Migrations from spec §14.6, §14.9. | Media defaults `pending`; allowlist column present. |
-| 2.5 | RLS policies per athlete-tenant. | `database-navigation-system.md` | Policies from spec §14.10. | Cross-athlete query returns zero rows (spec §10 RLS test). |
+| 2.5 | **Repository tenant guard** (Phase 2). RLS policies are **Phase 4** — the platform has none today (finding F1). | `database-navigation-system.md`, `manual-sql-migration-policy.md` | Tenant guard per `EXECUTION_PLAN.md` §4 S4.1; RLS sketch from spec §14.10 retained for Phase 4. | Tenant guard rejects an athlete-owned query with no tenant predicate. |
 
 ### 3.2 Services & singleton bases
 
@@ -108,6 +128,16 @@ Blocking prerequisites before any feature code.
 | 2.14 | Consent revocation cascade → `archived` + full cache eviction. | `cross-context-cache-invalidation.md` | Revocation flow. | Revoke removes profile+media within one request. |
 | 2.15 | Media moderation gate + host allowlist. | — | Moderation enforcement. | Unmoderated/non-allowlisted media never public. |
 
+> **Amended 2026-09-30 — these three P0 gates move earlier** (`EXECUTION_PLAN.md` §4 S4/S5). They are controls that features must be built **on**, not features delivered alongside. Building them here means each Phase-2 feature re-implements tenant scoping, consent checks, and cache eviction — and subtly mis-implements them.
+>
+> | Original | New home |
+> |---|---|
+> | 2.13 COPPA guardian-initiated intake | **S4.2** (consent engine) + **S5.1** (age-band gate) |
+> | 2.14 Consent revocation cascade | **S4.4** (cache contract) + **S5.7** (P0 test) |
+> | 2.15 Media moderation gate + allowlist | **S4.5** (moderation core) + **S5.7** (P0 test) |
+>
+> The P0 test harness is built at **S4.7** — *before* the features it guards, not after (`EXECUTION_PLAN.md` §7.1, finding F10).
+
 **Milestone M2:** A guardian can create an athlete-tenant, grant scoped consent, pass moderation+compliance, and see the athlete on the public roster — with every P0 negative-path test green.
 
 ---
@@ -129,7 +159,7 @@ Blocking prerequisites before any feature code.
 |---|---|---|---|---|
 | 3.3 | `nil_guardian` (dashboard, scoped consent, financial routing). | `add-capability-feature.md`, `capability-deployment-flow.md` | Full capability. | `verify-capability-deployment.md` passes. |
 | 3.4 | `nil_recruiting` (boards, ratings) — guardian-gated contact. | `add-capability-feature.md` | Full capability. | Adult→minor contact impossible (spec §12.2). |
-| 3.5 | `nil_sponsorship` (cross-tenant deals). | `add-capability-feature.md`, `add-org-capability.md` | Full capability + deal RLS (spec §12.4). | Deal visible to sponsor+guardian only. |
+| 3.5 | `nil_sponsorship` (cross-tenant deals). | `add-capability-feature.md`, `add-org-capability.md` | Full capability + dual-visibility scoping (spec §12.4). | Deal visible to sponsor+guardian only. |
 | 3.6 | `nil_achievements` (verified milestones). | `add-capability-feature.md` | Full capability. | Achievements feed profile only when `approved`. |
 | 3.7 | `nil_fan_network` (**always-free, not tier-gated**, spec §12.9). | `add-capability-feature.md` | Platform-default resolver. | Resolves from platform default, never `tier_features_list`. |
 
@@ -197,7 +227,7 @@ Translated from `TECHNICAL_SPEC.md` §10 + §12.12. **All P0 negative-path tests
 - **Build gates (every task):** `pnpm checkapi`, `pnpm checkweb` → zero TS errors.
 - **P0 negative paths (Phase 2+):** under-13 self-register → 403; no adult↔minor thread without guardian; consent revocation cascade; deal blocked by state rule; media moderation gate.
 - **P1 paths (Phase 3+):** conflicting-guardian most-restrictive-wins; cross-tenant deal isolation; payout KYC gate; age-out lifecycle.
-- **Infra:** RLS cross-athlete isolation; cache TTL split (public 5–15m, private 0); cache eviction on approve; tenant-scoped-id grep gate.
+- **Infra:** tenant-guard cross-athlete isolation (Phase 2) and RLS (Phase 4); cache TTL split (public 5–15m, private 0); cache eviction on approve; tenant-scoped-id grep gate.
 - **Capability:** per-capability `tierState` + R13 expired manifest via `verify-capability-deployment.md`.
 
 ---
@@ -236,7 +266,7 @@ Phase 4 ── 4.1 RLS audit ─► 4.2 compliance ─► 4.3 finance ─► 4.4
 
 The smallest end-to-end vertical that proves the architecture (recommended first build target after Phase 0):
 
-1. `generateAthleteTenantId` + `athlete_profiles_list` + RLS (tasks 2.1–2.2, 2.5).
+1. `generateAthleteTenantId` + `athlete_profiles_list` + tenant guard (tasks 2.1–2.2, 2.5).
 2. `AthleteApiSingleton` + `GuardianApiSingleton` + `GuardianConsentService` (tasks 2.6–2.7).
 3. `nil_roster` capability + public roster route with consent filtering (tasks 2.9–2.10).
 4. P0 tests 2.13–2.15.
