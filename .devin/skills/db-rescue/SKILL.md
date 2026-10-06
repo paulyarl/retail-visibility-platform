@@ -4,7 +4,7 @@
 
 `apps/api/scripts/db-rescue.cjs` is the emergency diagnostics and cleanup tool for Supabase database-size/quota incidents. It answers "why is the database huge and what do I delete" in one command, then provides the surgical fixes: purge runaway log tables, install a circuit-breaker trigger against write spam, trim pg_cron history, dedupe runaway schedules, and vacuum-reclaim disk space.
 
-Written in plain Node + `@prisma/client` with **no build step** — it works even when the TypeScript app won't compile, which is exactly when you need it.
+Written in plain Node + `pg` (node-postgres) with **no build step** — works even when the TypeScript app won't compile. `pg` uses the simple query protocol: no prepared statements (pgbouncer-safe) and no implicit transaction wrapping (VACUUM-safe). It prefers `DIRECT_URL` and falls back to `DATABASE_URL`; no `psql` install needed.
 
 Use this skill whenever: a Supabase "Database Size" quota warning appears, a table is growing abnormally fast, an error log is being spammed, or pg_cron jobs/history need auditing.
 
@@ -23,7 +23,7 @@ doppler run --config local -- node scripts/db-rescue.cjs report
 # or: doppler run --config <env> -- pnpm db:rescue <cmd>
 ```
 
-**Prisma must be generated** (`pnpm prisma:generate`) — the script uses the generated client, not the app's TS code.
+No prerequisites beyond `node_modules` — the script talks to Postgres directly via `pg`, not the app's Prisma client.
 
 ## Incident workflow
 

@@ -2,9 +2,10 @@
 /**
  * db-rescue — emergency database diagnostics & cleanup utility.
  *
- * Plain Node + @prisma/client on purpose: must work when the TS build is
- * broken. Reads DATABASE_URL/DIRECT_URL from the environment, so run it
- * through doppler:
+ * Plain Node + node-postgres on purpose: must work when the TS build is
+ * broken, when Prisma's engine wraps statements in a transaction (VACUUM),
+ * and through Supabase's pgbouncer (no prepared statements). Reads
+ * DIRECT_URL/DATABASE_URL from the environment — run through doppler:
  *
  *   doppler run --config prd -- node scripts/db-rescue.cjs report
  *   doppler run --config local -- node scripts/db-rescue.cjs report
@@ -14,6 +15,8 @@
  *   errors top [--days N]         Most frequent error messages (default 7d)
  *   errors purge --days N         Delete application_error_log older than N days
  *          [--like 'prefix%']     ...optionally only rows matching a LIKE pattern
+ *          [--all]                all ages (requires --like)
+ *   errors retention [--days N]   Nightly error-log purge job (default 14d)
  *   guard install --like P [--like P2...]   BEFORE INSERT trigger that silently
  *                                           drops matching rows (spam circuit breaker)
  *   guard status | drop           Inspect / remove the guard trigger
@@ -28,11 +31,17 @@
  * (monthly-fee-summary loop → 717K rows / 400MB). See git history.
  */
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
-const q = (sql) => prisma.$queryRawUnsafe(sql);
-const e = (sql) => prisma.$executeRawUnsafe(sql);
+// Plain node-postgres, not Prisma: the simple query protocol has no prepared
+// statements (pgbouncer-safe) and no implicit transaction (VACUUM-safe).
+// DIRECT_URL first — on Supabase it bypasses the transaction-mode pooler.
+const { Client } = require('pg');
+const dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+const client = new Client({
+  connectionString: dbUrl,
+  ssl: /localhost|127\.0\.0\.1/.test(dbUrl || '') ? false : { rejectUnauthorized: false },
+});
+const q = async (sql) => (await client.query(sql)).rows;
+const e = async (sql) => (await client.query(sql)).rowCount;
 const out = (rows) => console.log(JSON.stringify(rows, (_k, v) => (typeof v === 'bigint' ? Number(v) : v), 2));
 
 // ── arg helpers ────────────────────────────────────────────────────────────
@@ -100,9 +109,11 @@ async function errorsTop() {
 
 async function errorsPurge() {
   const days = Number(flag('days', 0));
-  if (!(days > 0)) throw new Error('errors purge requires --days N (N > 0). Refusing to delete everything.');
+  const all = has('all');
   const likes = flags('like');
-  let where = `occurred_at < now() - interval '${days | 0} days'`;
+  if (!all && !(days > 0)) throw new Error('errors purge requires --days N (N > 0), or --all with --like. Refusing to delete everything.');
+  if (all && !likes.length) throw new Error('errors purge --all requires at least one --like pattern. Refusing to delete everything.');
+  let where = all ? 'true' : `occurred_at < now() - interval '${days | 0} days'`;
   if (likes.length) where += ` and (${likes.map((p) => `message like ${sqlStr(p)}`).join(' or ')})`;
   const n = await e(`DELETE FROM public.application_error_log WHERE ${where}`);
   console.log(`deleted ${n} rows`);
@@ -156,6 +167,19 @@ async function cronTrim() {
   out(await q(`select count(*) as rows, pg_size_pretty(pg_total_relation_size('cron.job_run_details')) as size from cron.job_run_details`));
 }
 
+async function errorsRetention() {
+  const days = Number(flag('days', 14));
+  const name = 'purge-application-error-log';
+  const existing = await q(`select jobid from cron.job where jobname = ${sqlStr(name)}`);
+  if (existing.length) {
+    console.log(`${name} already exists (jobid ${existing[0].jobid}) — updating command`);
+    await e(`update cron.job set command = 'DELETE FROM public.application_error_log WHERE occurred_at < now() - interval ''${days | 0} days''' where jobname = ${sqlStr(name)}`);
+  } else {
+    out(await q(`select cron.schedule(${sqlStr(name)}, '20 4 * * *',
+      $$DELETE FROM public.application_error_log WHERE occurred_at < now() - interval '${days | 0} days'$$) as jobid`));
+  }
+}
+
 async function cronRetention() {
   const days = Number(flag('days', 3));
   const name = 'purge-cron-run-history';
@@ -198,6 +222,8 @@ usage: node scripts/db-rescue.cjs <command> [opts]   (wrap with doppler run --co
   report                                  full health report (run this first)
   errors top [--days N]                   top error messages (default 7)
   errors purge --days N [--like 'pat%']   delete error-log rows (repeatable --like)
+       [--all]                            all ages — requires --like
+  errors retention [--days N]             install nightly error-log purge cron (def 14d)
   guard install --like 'pat%' [...]       install spam circuit-breaker trigger
   guard status | drop                     inspect / remove the guard
   cron list | dupes                       pg_cron jobs / duplicate commands
@@ -210,12 +236,15 @@ usage: node scripts/db-rescue.cjs <command> [opts]   (wrap with doppler run --co
 
 (async () => {
   try {
+    if (!dbUrl) throw new Error('No DATABASE_URL/DIRECT_URL — run via doppler run --config <env>');
+    await client.connect();
     switch (cmd) {
       case 'report': await report(); break;
       case 'errors':
         if (sub === 'top') await errorsTop();
         else if (sub === 'purge') await errorsPurge();
-        else throw new Error('errors top | errors purge --days N [--like pat]');
+        else if (sub === 'retention') await errorsRetention();
+        else throw new Error('errors top | purge --days N [--like pat] [--all] | retention [--days N]');
         break;
       case 'guard':
         if (sub === 'install') await guardInstall();
@@ -240,6 +269,6 @@ usage: node scripts/db-rescue.cjs <command> [opts]   (wrap with doppler run --co
     console.error(`\nerror: ${err.message}`);
     process.exitCode = 1;
   } finally {
-    await prisma.$disconnect();
+    await client.end().catch(() => {});
   }
 })();
