@@ -11,6 +11,7 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import type { BusinessContextFields } from './prompts';
+import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
 
 export class BusinessContextService extends BaseService {
   private static instance: BusinessContextService;
@@ -108,7 +109,41 @@ export class BusinessContextService extends BaseService {
       });
 
       if (!campaign) return null;
-      const latest = campaign.mkt_audits_list?.[0];
+      let latest = campaign.mkt_audits_list?.[0] ?? null;
+
+      // Sibling audit fallback (mirrors getCampaign's audit inheritance):
+      // a non-primary sibling's business_analysis audit lives on the
+      // primary sibling — the sibling may carry only its own non-BA audits
+      // (e.g. a PB-08 website_positioning) or a stub. A stub is a
+      // placeholder, not real coverage, so fall through to the primary's
+      // audit when the sibling has no real BA of its own.
+      const isNonPrimarySibling =
+        (campaign as any).business_prospect_id &&
+        (campaign as any).is_primary_sibling === false;
+      if (isNonPrimarySibling && (!latest || isStubBusinessAnalysisAudit(latest))) {
+        const siblings = await this.prisma.mkt_campaigns_list.findMany({
+          where: {
+            business_prospect_id: (campaign as any).business_prospect_id,
+            scope: 'business',
+          } as any,
+          select: { id: true, is_primary_sibling: true, created_at: true },
+          orderBy: { created_at: 'asc' },
+        }) as any[];
+        const primary =
+          siblings.find((s) => s.is_primary_sibling === true && s.id !== campaignId) ??
+          siblings.find((s) => s.id !== campaignId);
+        if (primary) {
+          const rows = await this.prisma.mkt_audits_list.findMany({
+            where: { campaign_id: primary.id, platform: 'business_analysis' },
+            orderBy: { created_at: 'desc' },
+            take: 5,
+          });
+          const inherited =
+            rows.find((a) => !isStubBusinessAnalysisAudit(a)) ?? rows[0];
+          if (inherited) latest = inherited;
+        }
+      }
+
       if (!latest) return null;
 
       return {

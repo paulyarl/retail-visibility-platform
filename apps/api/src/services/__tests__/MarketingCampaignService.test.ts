@@ -5,11 +5,15 @@ const {
   mockStageHistory,
   mockPreviewTokens,
   mockProspectQueue,
+  mockAuditsList,
+  mockTriageResults,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
   mockStageHistory: { create: vi.fn() },
   mockPreviewTokens: { findMany: vi.fn() },
-  mockProspectQueue: { updateMany: vi.fn(), create: vi.fn() },
+  mockProspectQueue: { updateMany: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
+  mockAuditsList: { findMany: vi.fn() },
+  mockTriageResults: { findMany: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -18,6 +22,8 @@ vi.mock('../../prisma', () => ({
     mkt_stage_history_list: mockStageHistory,
     mkt_deliverable_preview_tokens: mockPreviewTokens,
     mkt_prospect_queue: mockProspectQueue,
+    mkt_audits_list: mockAuditsList,
+    mkt_campaign_triage_results: mockTriageResults,
   },
 }));
 
@@ -41,6 +47,15 @@ vi.mock('../MarketingServiceCategoryService', () => ({
   default: {
     getLabel: vi.fn().mockResolvedValue(null),
   },
+}));
+
+// getCampaign's audit-surface probe dynamically imports these; a light mock
+// keeps the heavy report service out of the unit test while preserving the
+// real reportable-platform semantics (business_analysis + website_positioning).
+vi.mock('../ProspectReportService', () => ({
+  auditIsReportable: (a: any) =>
+    a?.platform === 'business_analysis' || a?.platform === 'website_positioning',
+  REPORTABLE_AUDIT_SOURCES: ['business_analysis', 'website_positioning'],
 }));
 
 import MarketingCampaignService from '../MarketingCampaignService';
@@ -723,5 +738,140 @@ describe('promoteIdentifiedCategory', () => {
     expect(call.data.secondary_categories).toHaveLength(9);
     expect(call.data.secondary_categories[0]).toBe('Middle Eastern Grocery Store');
     expect(call.data.secondary_categories).not.toContain('Halal Grocery Store');
+  });
+});
+
+// ====================
+// getCampaign — sibling audit inheritance
+// ====================
+//
+// A non-primary sibling's business_analysis audit lives on the primary
+// sibling. The merge is per-platform: the sibling's own audit wins for any
+// platform it covers with a REAL audit (a stub is a placeholder, not
+// coverage); platforms it lacks are inherited tagged `inherited: true`.
+// Regression: a PB-08 sibling carries its own website_positioning audit, so
+// the old `audits.length === 0` gate never fired — opener/header/closer
+// readers then found no business_analysis and 400'd.
+
+const siblingCampaignFixture = (overrides: any = {}) => ({
+  id: 'mcamp-sibling',
+  scope: 'business',
+  business_name: 'Gomez African Grocery',
+  business_prospect_id: 'bp-1',
+  is_primary_sibling: false,
+  parent_campaign_id: null,
+  service_category: null,
+  mkt_audits_list: [],
+  mkt_files_list: [],
+  mkt_stage_history_list: [],
+  mkt_outreach_log: [],
+  parent: null,
+  mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list: [],
+  ...overrides,
+});
+
+const realBa = {
+  id: 'maud-ba',
+  platform: 'business_analysis',
+  created_at: '2026-10-03T03:22:28.000Z',
+  audit_data: { summary: 'verified audit' },
+};
+const catId = {
+  id: 'maud-catid',
+  platform: 'category_identification',
+  created_at: '2026-10-03T03:19:05.000Z',
+  audit_data: {},
+};
+const stubBa = {
+  id: 'maud-stub',
+  platform: 'business_analysis',
+  created_at: '2026-09-11T00:27:23.000Z',
+  audit_data: { audit_metadata: { source: 'queue_promotion' }, detected_signals: [] },
+};
+const wpAudit = {
+  id: 'maud-wp',
+  platform: 'website_positioning',
+  created_at: '2026-10-03T03:35:58.000Z',
+  audit_data: {},
+};
+
+const prospectSiblings = (primaryAudits: any[], siblingAudits: any[] = []) => ([
+  {
+    id: 'mcamp-primary',
+    is_primary_sibling: true,
+    created_at: new Date('2026-09-01'),
+    mkt_audits_list: primaryAudits,
+  },
+  {
+    id: 'mcamp-sibling',
+    is_primary_sibling: false,
+    created_at: new Date('2026-10-01'),
+    mkt_audits_list: siblingAudits,
+  },
+]);
+
+describe('getCampaign — sibling audit inheritance', () => {
+  const setupGetCampaign = (campaign: any, siblings: any[] = []) => {
+    vi.clearAllMocks();
+    mockCampaignsList.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.id === campaign.id ? campaign : null));
+    mockCampaignsList.findMany.mockResolvedValue(siblings);
+    mockTriageResults.findMany.mockResolvedValue([]);
+    mockProspectQueue.findFirst.mockResolvedValue(null);
+    mockAuditsList.findMany.mockResolvedValue([]);
+  };
+
+  it('merges primary audits for platforms the sibling lacks (own WP + inherited BA)', async () => {
+    const campaign = siblingCampaignFixture({ mkt_audits_list: [wpAudit] });
+    setupGetCampaign(campaign, prospectSiblings([realBa, catId, stubBa], [wpAudit]));
+
+    const result = await MarketingCampaignService.getCampaign('mcamp-sibling');
+
+    const own = result.audits.filter((a: any) => !a.inherited);
+    const inherited = result.audits.filter((a: any) => a.inherited === true);
+    expect(own.map((a: any) => a.id)).toEqual(['maud-wp']);
+    expect(inherited.map((a: any) => a.id).sort()).toEqual(['maud-ba', 'maud-catid', 'maud-stub'].sort());
+    // Newest-first ordering — the sibling's own WP is the newest audit.
+    expect(result.audits[0].id).toBe('maud-wp');
+  });
+
+  it('does not inherit a platform the sibling already covers with a real audit', async () => {
+    const ownBa = { ...realBa, id: 'maud-own-ba', created_at: '2026-10-04T00:00:00.000Z' };
+    const campaign = siblingCampaignFixture({ mkt_audits_list: [ownBa] });
+    setupGetCampaign(campaign, prospectSiblings([realBa, catId]));
+
+    const result = await MarketingCampaignService.getCampaign('mcamp-sibling');
+
+    const bas = result.audits.filter((a: any) => a.platform === 'business_analysis');
+    expect(bas).toHaveLength(1);
+    expect(bas[0].id).toBe('maud-own-ba');
+    expect(bas[0].inherited).toBeUndefined();
+    // Missing platform still inherited.
+    expect(result.audits.find((a: any) => a.id === 'maud-catid').inherited).toBe(true);
+  });
+
+  it('a business_analysis stub on the sibling does not block inheriting the real BA', async () => {
+    const campaign = siblingCampaignFixture({ mkt_audits_list: [stubBa] });
+    setupGetCampaign(campaign, prospectSiblings([realBa]));
+
+    const result = await MarketingCampaignService.getCampaign('mcamp-sibling');
+
+    const inherited = result.audits.find((a: any) => a.id === 'maud-ba');
+    expect(inherited?.inherited).toBe(true);
+    expect(result.audits.some((a: any) => a.id === 'maud-stub' && !a.inherited)).toBe(true);
+  });
+
+  it('leaves standalone campaigns untouched (no prospect group)', async () => {
+    const campaign = siblingCampaignFixture({
+      business_prospect_id: null,
+      is_primary_sibling: false,
+      mkt_audits_list: [wpAudit],
+    });
+    setupGetCampaign(campaign);
+
+    const result = await MarketingCampaignService.getCampaign('mcamp-sibling');
+
+    expect(result.audits).toHaveLength(1);
+    expect(result.audits[0].inherited).toBeUndefined();
   });
 });

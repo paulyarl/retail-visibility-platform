@@ -29,6 +29,7 @@ import { isNationalSentinel } from './intelligence/geography-grid.js';
 import type { DiscoveryContext } from '../validators/intelligence-discovery.schema';
 import { deriveDiscoverySignals } from './triage/discovery-verdict';
 import type { IdentityFieldKey } from './directory/identityScoring';
+import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 
 /** Call outcome — mirrors the queue's VerificationOutcome. */
 export type CampaignVerificationOutcome =
@@ -1550,22 +1551,40 @@ export class MarketingCampaignService extends BaseService {
 
       // Sibling audit inheritance: a non-primary sibling shares the same
       // business prospect as the primary, but the business_analysis audit
-      // (and category/city audits) live on the primary's row — the sibling's
-      // own mkt_audits_list is empty until it generates its own. Without
-      // this fallback the secondary sibling's Audits tab is blank and the
-      // operator cannot see the diagnostic that motivated the sibling. We
-      // pull the primary sibling's audits and tag each as inherited so the
-      // UI can distinguish them from audits generated on this campaign.
+      // (and category/city audits) live on the primary's row. This is a
+      // per-platform merge — the sibling CAN carry audits of its own (a
+      // PB-08 sibling's website_positioning audit, queue stubs), so the old
+      // audits.length===0 gate blocked inheritance for exactly the siblings
+      // that need it: the opener/header/closer readers all gate on a real
+      // business_analysis audit that only the primary holds. The sibling's
+      // own audit wins for any platform it covers with a REAL audit (a
+      // business_analysis stub is a placeholder, not coverage); platforms
+      // it lacks are inherited from the primary sibling and tagged
+      // `inherited: true` so the UI can distinguish them.
       const isNonPrimarySibling =
         rest.business_prospect_id && rest.is_primary_sibling === false;
-      if (isNonPrimarySibling && audits.length === 0) {
-        const inherited = await this.loadPrimarySiblingAudits(
+      if (isNonPrimarySibling) {
+        const coveredPlatforms = new Set(
+          audits
+            .filter((a: any) => !isStubBusinessAnalysisAudit(a))
+            .map((a: any) => a.platform),
+        );
+        const inherited = (await this.loadPrimarySiblingAudits(
           rest.business_prospect_id,
           rest.id,
           ctx,
-        );
+        )).filter((a: any) => !coveredPlatforms.has(a.platform));
         if (inherited.length > 0) {
-          audits = inherited.map((a: any) => ({ ...a, inherited: true }));
+          audits = [
+            ...audits,
+            ...inherited.map((a: any) => ({ ...a, inherited: true })),
+          ];
+          // Newest-first so .find(platform) consumers pick the freshest
+          // audit of each platform and the Audits tab reads chronologically.
+          audits.sort(
+            (a: any, b: any) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          );
         }
       }
 

@@ -2094,9 +2094,9 @@ export default function CampaignDetailClient({
                 {(campaign.audits ?? []).some((a: Audit) => a.inherited) && (
                   <div className="mb-4 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 p-3">
                     <p className="text-xs text-purple-700 dark:text-purple-300">
-                      This is a non-primary sibling. The audits below are inherited from the primary
-                      sibling campaign — they share the same business prospect. Run a new analysis on
-                      this campaign to generate its own audit.
+                      This is a non-primary sibling. Audits marked &ldquo;inherited&rdquo; come from
+                      the primary sibling campaign — both share the same business prospect. Audits
+                      without the mark were generated on this campaign.
                     </p>
                   </div>
                 )}
@@ -2104,8 +2104,14 @@ export default function CampaignDetailClient({
                   <p className="text-center text-gray-400 py-8">No audits recorded yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {(campaign.audits ?? []).map((audit: Audit) =>
-                      audit.platform === 'city_category_analysis' && audit.audit_data ? (
+                    {(campaign.audits ?? []).map((audit: Audit) => (
+                      <div key={audit.id}>
+                        {audit.inherited && (
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400">
+                            Inherited from primary sibling
+                          </p>
+                        )}
+                        {audit.platform === 'city_category_analysis' && audit.audit_data ? (
                         <CityCategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'category_analysis' && audit.audit_data ? (
                         <CategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
@@ -2214,8 +2220,9 @@ export default function CampaignDetailClient({
                             {audit.photo_count != null && <DetailField label="Photos" value={audit.photo_count.toString()} />}
                           </div>
                         </div>
-                      ),
-                    )}
+                      )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
