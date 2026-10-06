@@ -158,7 +158,12 @@ router.get('/suppressions', requirePlatformAdmin, async (req: Request, res: Resp
              COUNT(*) FILTER (WHERE last_suppressed_at > now() - interval '1 hour')::bigint AS active_last_hour
       FROM public.error_log_dedupe_stats`;
 
-    res.json({ suppressions: rows, summary: summary[0] ?? {} });
+    // bigint columns come back as BigInt — res.json can't serialize those
+    const num = (v: any) => (typeof v === 'bigint' ? Number(v) : v);
+    res.json({
+      suppressions: rows.map((r) => ({ ...r, suppressed_count: num(r.suppressed_count) })),
+      summary: Object.fromEntries(Object.entries(summary[0] ?? {}).map(([k, v]) => [k, num(v)])),
+    });
   } catch (error: any) {
     logger.error('[Admin Errors] Suppressions failed', undefined, {
       error: { name: error.name, message: error.message, stack: error.stack },
