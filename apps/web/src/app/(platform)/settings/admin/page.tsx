@@ -1111,6 +1111,19 @@ export default function AdminDashboardPage() {
       description: 'Platform monitoring, notification logs, and review moderation',
       sections: [
         {
+          title: 'Scheduled Jobs',
+          description: 'Background job registry — status, run history, failures, logs, and kill switches',
+          href: '/settings/admin/jobs',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          color: 'bg-teal-600',
+          stats: 'Run tracking & controls',
+          badge: 'NEW',
+        },
+        {
           title: 'Notification Logs',
           description: 'View sent notification logs and delivery status across the platform',
           href: '/settings/admin/notification-logs',

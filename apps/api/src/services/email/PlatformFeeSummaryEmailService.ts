@@ -159,16 +159,20 @@ class PlatformFeeSummaryEmailService {
         },
       });
 
-      console.log(`[PlatformFeeSummary] Sending monthly summaries to ${connections.length} merchants`);
+      // A tenant can have multiple Stripe connection rows — dedupe so each
+      // merchant receives exactly one summary per run.
+      const tenantIds = [...new Set(connections.map(c => c.tenant_id))];
 
-      for (const connection of connections) {
-        const summaryResult = await this.sendMonthlyFeeSummary(connection.tenant_id);
+      console.log(`[PlatformFeeSummary] Sending monthly summaries to ${tenantIds.length} merchants`);
+
+      for (const tenantId of tenantIds) {
+        const summaryResult = await this.sendMonthlyFeeSummary(tenantId);
         
         if (summaryResult.success) {
           result.sent++;
         } else {
           result.failed++;
-          result.errors.push(`${connection.tenant_id}: ${summaryResult.error}`);
+          result.errors.push(`${tenantId}: ${summaryResult.error}`);
         }
       }
 

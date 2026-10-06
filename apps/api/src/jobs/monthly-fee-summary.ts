@@ -1,14 +1,19 @@
 /**
  * Monthly Fee Summary Job
- * 
+ *
  * Scheduled job that runs on the 1st of each month to send
  * fee summary emails to all merchants with Stripe Connect.
- * 
+ *
  * Run schedule: 1st of each month at 00:05 UTC
+ *
+ * Scheduling/execution is owned by the JobRegistry (./registry.ts) — runs are
+ * recorded in scheduled_job_runs and the job can be killed from the admin
+ * Scheduled Jobs UI. The period guard below additionally prevents a second
+ * send for the same month within one process.
  */
 
 import { getPlatformFeeSummaryEmailService } from '../services/email/PlatformFeeSummaryEmailService';
-import { logger } from '../logger';
+import { scheduleJob, stopJob, runJobNow } from './registry';
 
 export interface MonthlyFeeSummaryResult {
   sent: number;
@@ -16,85 +21,72 @@ export interface MonthlyFeeSummaryResult {
   errors: string[];
 }
 
+const JOB_NAME = 'monthly-fee-summary';
+
+let lastRunPeriod: string | null = null;
+
+function getSummaryPeriodKey(): string {
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return `${periodStart.getUTCFullYear()}-${periodStart.getUTCMonth()}`;
+}
+
 /**
  * Send monthly fee summaries to all merchants
  */
 export async function sendMonthlyFeeSummaries(): Promise<MonthlyFeeSummaryResult> {
+  const periodKey = getSummaryPeriodKey();
+  if (lastRunPeriod === periodKey) {
+    console.log(`[MonthlyFeeSummaryJob] Skipping — summaries for period ${periodKey} already sent by this process`);
+    return { sent: 0, failed: 0, errors: [] };
+  }
+  lastRunPeriod = periodKey;
+
   console.log('[MonthlyFeeSummaryJob] Starting monthly fee summary send...');
-  
+
   const service = getPlatformFeeSummaryEmailService();
   const result = await service.sendAllMonthlySummaries();
-  
+
   console.log(`[MonthlyFeeSummaryJob] Complete. Sent: ${result.sent}, Failed: ${result.failed}`);
-  
+
   return result;
+}
+
+/**
+ * ms until the next 1st-of-month 00:05 UTC — always a future delay.
+ */
+function nextFirstOfMonthDelay(): number {
+  const now = new Date();
+  let next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 5, 0, 0));
+
+  if (next.getTime() <= now.getTime()) {
+    next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 5, 0, 0));
+  }
+
+  return next.getTime() - now.getTime();
 }
 
 /**
  * Start the scheduled job
  * Runs on the 1st of each month at 00:05 UTC
  */
-let jobInterval: NodeJS.Timeout | null = null;
-
 export function startMonthlyFeeSummaryJob(): void {
-  if (process.env.DISABLE_MONTHLY_FEE_SUMMARY_JOB === 'true') {
-    logger.info('[MonthlyFeeSummaryJob] Disabled by env var');
-    return;
-  }
-
-  if (jobInterval) {
-    console.log('[MonthlyFeeSummaryJob] Job already running');
-    return;
-  }
-
-  // Calculate time until next run (1st of next month at 00:05 UTC)
-  const getNextRunTime = (): number => {
-    const now = new Date();
-    const next = new Date();
-    
-    // Set to 1st of next month at 00:05 UTC
-    if (now.getUTCDate() === 1 && now.getUTCHours() < 1) {
-      // Today is the 1st and before 1am, run today at 00:05
-      next.setUTCHours(0, 5, 0, 0);
-    } else {
-      // Run on the 1st of next month
-      next.setUTCMonth(next.getUTCMonth() + 1, 1);
-      next.setUTCHours(0, 5, 0, 0);
-    }
-    
-    return next.getTime() - now.getTime();
-  };
-
-  const scheduleNext = () => {
-    const delay = getNextRunTime();
-    
-    console.log(`[MonthlyFeeSummaryJob] Next run in ${Math.round(delay / 1000 / 60 / 60)} hours`);
-    
-    jobInterval = setTimeout(async () => {
-      try {
-        await sendMonthlyFeeSummaries();
-      } catch (error) {
-        logger.error('[MonthlyFeeSummaryJob] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-      }
-      
-      // Schedule next run
-      scheduleNext();
-    }, delay);
-  };
-
-  scheduleNext();
-  console.log('[MonthlyFeeSummaryJob] Started');
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Sends Stripe Connect fee summaries to all onboarded merchants',
+    scheduleLabel: '1st of each month at 00:05 UTC',
+    envDisableVar: 'DISABLE_MONTHLY_FEE_SUMMARY_JOB',
+    computeNextDelay: nextFirstOfMonthDelay,
+    handler: async () => sendMonthlyFeeSummaries(),
+  });
 }
 
 /**
  * Stop the scheduled job
  */
 export function stopMonthlyFeeSummaryJob(): void {
-  if (jobInterval) {
-    clearTimeout(jobInterval);
-    jobInterval = null;
-    console.log('[MonthlyFeeSummaryJob] Stopped');
-  }
+  stopJob(JOB_NAME);
+  console.log('[MonthlyFeeSummaryJob] Stopped');
 }
 
 /**
@@ -102,5 +94,7 @@ export function stopMonthlyFeeSummaryJob(): void {
  */
 export async function triggerMonthlyFeeSummary(): Promise<MonthlyFeeSummaryResult> {
   console.log('[MonthlyFeeSummaryJob] Manual trigger');
-  return sendMonthlyFeeSummaries();
+  const { result, skipped } = await runJobNow(JOB_NAME, 'manual');
+  if (skipped) return { sent: 0, failed: 0, errors: [skipped] };
+  return (result as MonthlyFeeSummaryResult) ?? { sent: 0, failed: 0, errors: [] };
 }

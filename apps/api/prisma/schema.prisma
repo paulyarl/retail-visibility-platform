@@ -6249,6 +6249,38 @@ model sync_jobs {
   @@index([tenant_id, status, updated_at])
 }
 
+/// Scheduled job registry — backs the admin Scheduled Jobs UI.
+/// Rows are upserted by the JobRegistry at boot; `enabled` is the
+/// admin kill switch (a disabled job's handler never executes).
+model scheduled_jobs {
+  name           String   @id
+  description    String?
+  schedule_label String?
+  enabled        Boolean  @default(true)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// Per-execution history for scheduled jobs: status, timing, error,
+/// handler result, and captured console logs.
+model scheduled_job_runs {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job_name       String    @db.VarChar(100)
+  status         String    @default("running") @db.VarChar(20)
+  trigger_source String    @default("schedule") @db.VarChar(20)
+  started_at     DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at    DateTime? @db.Timestamptz(6)
+  duration_ms    Int?
+  error          String?
+  result         Json?
+  logs           String?
+  hostname       String?   @db.VarChar(255)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([job_name, started_at(sort: Desc)], map: "idx_sjr_job_started")
+  @@index([status, started_at(sort: Desc)], map: "idx_sjr_status_started")
+}
+
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model table_count {
   count BigInt?

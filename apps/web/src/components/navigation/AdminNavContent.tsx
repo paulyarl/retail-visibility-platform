@@ -354,6 +354,7 @@ const buildAdminNavItems = (): NavItem[] => [
     prefetch: false,
     dividerBefore: true,
     children: [
+      { label: 'Scheduled Jobs',    href: '/settings/admin/jobs' },
       { label: 'Notification Logs', href: '/settings/admin/notification-logs' },
       { label: 'Sentry Monitoring', href: '/settings/admin/sentry' },
     ],

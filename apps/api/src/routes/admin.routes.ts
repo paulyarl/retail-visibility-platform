@@ -94,6 +94,7 @@ import supplierAdminRoutes from './admin/suppliers';
 import adminPlatformSettingsRoutes from './admin/platform-settings';
 import adminWholesaleMatchingRoutes from './admin/wholesale-matching';
 import adminBrandPartnersRoutes from './admin/brand-partners';
+import adminJobsRoutes from './admin/jobs';
 
 // Generic root-mounted routers (mounted at bare /api/admin)
 import tenantFlagsRoutes from './tenant-flags';
@@ -160,6 +161,7 @@ router.use('/suppliers', authenticateToken, requireAdmin, supplierAdminRoutes);
 router.use('/wholesale', authenticateToken, requireAdmin, adminWholesaleMatchingRoutes);
 router.use('/brand-partners', authenticateToken, requireAdmin, adminBrandPartnersRoutes);
 router.use('/platform-settings', authenticateToken, requireAdmin, adminPlatformSettingsRoutes);
+router.use('/jobs', authenticateToken, requireAdmin, adminJobsRoutes);
 
 // ── 2. Generic root-mounted routers LAST ──────────────────────────────────
 // These use specific sub-paths internally (/tenant-flags, /platform-flags, /effective-flags, /users, /tools)

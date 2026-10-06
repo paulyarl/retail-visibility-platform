@@ -111,6 +111,57 @@ if (process.env.NODE_ENV !== "test") {
       logger.info(`API server running → http://localhost:${port}/health`);
       logger.info(`View all routes → http://localhost:${port}/__routes`);
 
+      // Register the scheduled-job catalog with the JobRegistry so every job is
+      // visible in the admin Scheduled Jobs UI. Jobs migrated to scheduleJob()
+      // get full run tracking; the rest show as declared (not instrumented).
+      try {
+        const { declareJobs } = await import('./jobs/registry');
+        declareJobs([
+          { name: 'gmc-scheduled-sync', scheduleLabel: 'every 6 hours', description: 'Google Merchant Center product sync' },
+          { name: 'gmc-sync-retry', scheduleLabel: 'every 2 hours', description: 'Retries failed GMC syncs' },
+          { name: 'oauth-token-refresh', scheduleLabel: 'every hour', description: 'Refreshes expiring OAuth tokens' },
+          { name: 'subscription-grace-period', scheduleLabel: 'daily at midnight', description: 'Expires grace-period subscriptions' },
+          { name: 'bsaas-renewal', scheduleLabel: 'daily at midnight', description: 'BSaaS feature renewals' },
+          { name: 'monthly-fee-summary', scheduleLabel: '1st of each month at 00:05 UTC', description: 'Sends Stripe Connect fee summaries to merchants' },
+          { name: 'featured-products-expiry-monitor', scheduleLabel: 'daily at 00:05', description: 'Deactivates expired featured products' },
+          { name: 'featured-expiration-enforcer', scheduleLabel: 'every 5 minutes', description: 'Enforces featured product expirations' },
+          { name: 'featured-placement-renewal', scheduleLabel: 'daily', description: 'Featured placement auto-renewals, grace periods, trials' },
+          { name: 'promotion-renewal', scheduleLabel: 'daily', description: 'Directory promotion auto-renewals and expirations' },
+          { name: 'bot-product-embedding-sync', scheduleLabel: 'every 12 hours', description: 'Product embedding sync for the bot platform (platform-settings gated)' },
+          { name: 'platform-badge-sync', scheduleLabel: 'every 6 hours', description: 'Syncs trending/bestseller/recommended badges to featured products' },
+          { name: 'badge-rule-sync', scheduleLabel: 'every 4 hours', description: 'Evaluates sale/new_arrival/clearance badge rules' },
+          { name: 'badge-analytics-sync', scheduleLabel: 'every 6 hours', description: 'Aggregates badge_events into badge_analytics' },
+          { name: 'qr-analytics-sync', scheduleLabel: 'every 6 hours', description: 'Aggregates qr_scan_events into qr_analytics' },
+          { name: 'coupon-analytics-sync', scheduleLabel: 'every 6 hours', description: 'Aggregates coupon_events into coupon_analytics' },
+          { name: 'growth-engine-aggregation', scheduleLabel: 'daily', description: 'Populates growth_engine_daily_metrics' },
+          { name: 'log-purge', scheduleLabel: 'daily at 2 AM UTC', description: 'Purges old application logs' },
+          { name: 'gallery-analytics-sync', scheduleLabel: 'daily at 2 AM UTC', description: 'Gallery analytics aggregation' },
+          { name: 'gallery-events-purge', scheduleLabel: 'daily at 2:30 AM UTC', description: 'Purges gallery events past 90-day retention' },
+          { name: 'abandoned-cart-recovery', scheduleLabel: 'every 30 minutes', description: 'Sends abandoned cart recovery emails' },
+          { name: 'meta-catalog-sync', scheduleLabel: 'every 6 hours', description: 'Meta/Facebook catalog sync' },
+          { name: 'tiktok-catalog-sync', scheduleLabel: 'every 6 hours', description: 'TikTok catalog sync' },
+          { name: 'supplier-csv-sync', scheduleLabel: 'every 6 hours', description: 'Supplier CSV feed sync' },
+          { name: 'supplier-opensource-sync', scheduleLabel: 'hourly incremental + nightly backfill', description: 'Open-source supplier data sync' },
+          { name: 'supplier-commercial-sync', scheduleLabel: 'nightly backfill', description: 'Commercial supplier sync + Kroger token refresh' },
+          { name: 'supplier-auto-sync', scheduleLabel: 'every hour', description: 'Automatic supplier sync' },
+          { name: 'flag-expiry-cleanup', scheduleLabel: 'daily', description: 'Removes stale tenant flag overrides' },
+          { name: 'demo-tenant-expiry', scheduleLabel: 'every hour', description: 'Expires demo tenants past their demo_expires_at' },
+          { name: 'affiliate-click-expiry', scheduleLabel: 'daily', description: 'Marks pending affiliate clicks expired after 30 days' },
+          { name: 'marketing-ops-stage-autoadvance', scheduleLabel: 'daily', description: 'Advances stale shown campaigns to lost' },
+          { name: 'marketing-ops-auto-followup', scheduleLabel: 'every 6 hours', description: 'Schedules follow-ups for no-response hot prospects' },
+          { name: 'proving-ground-hold-release', scheduleLabel: 'hourly', description: 'Re-enters hold prospects into the queued worklist' },
+          { name: 'seed-outreach-no-response', scheduleLabel: 'daily', description: 'Marks stale outreach seeds as no_response' },
+          { name: 'seed-report-backfill', scheduleLabel: 'daily', description: 'Generates first report version for live seeds' },
+          { name: 'review-response-scheduler', scheduleLabel: 'every 6 hours', description: 'Review pipeline gates, auto-advance, thread closing' },
+          { name: 'recovery-resolution', scheduleLabel: 'every 5 minutes', description: 'Runs pending recovery_resolution prompt executions' },
+          { name: 'recovery-delivery-retry', scheduleLabel: 'every 15 minutes', description: 'Retries failed deliveries with backoff' },
+          { name: 'gbp-review-ingestion', scheduleLabel: 'hourly', description: 'Polls Google reviews, refreshes ratings, fires CRM alerts' },
+          { name: 'gbp-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled GBP posts' },
+        ]);
+      } catch (err) {
+        logger.error('Failed to declare job catalog', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start GMC scheduled sync (every 6 hours)
       try {
         const { startGMCScheduledSync } = await import('./jobs/gmc-scheduled-sync');
