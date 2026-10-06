@@ -425,7 +425,9 @@ export interface JobListEntry {
 }
 
 export async function listJobs(): Promise<JobListEntry[]> {
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  // Matches the purge-scheduled-job-runs retention window (migration 315) —
+  // history beyond 7 days is deleted nightly, so stats past that read zero.
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const [dbJobs, recentRuns] = await Promise.all([
     withJobDb(() => prisma.scheduled_jobs.findMany()),

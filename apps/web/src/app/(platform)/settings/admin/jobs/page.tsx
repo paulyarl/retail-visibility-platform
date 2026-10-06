@@ -396,7 +396,7 @@ export default function AdminJobsPage() {
                   <Table.Th>Schedule</Table.Th>
                   <Table.Th>Status</Table.Th>
                   <Table.Th>Last Run</Table.Th>
-                  <Table.Th>30d</Table.Th>
+                  <Table.Th>7d</Table.Th>
                   <Table.Th>Next Run</Table.Th>
                   <Table.Th>Enabled</Table.Th>
                   <Table.Th>Actions</Table.Th>
