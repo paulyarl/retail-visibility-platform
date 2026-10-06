@@ -17,6 +17,10 @@
  *          [--like 'prefix%']     ...optionally only rows matching a LIKE pattern
  *          [--all]                all ages (requires --like)
  *   errors retention [--days N]   Nightly error-log purge job (default 14d)
+ *   errors dedupe [--minutes N]   Trigger dropping repeat inserts of an
+ *                                 identical message within N min (default 60) —
+ *                                 generic circuit breaker, no --like needed.
+ *                                 Companions: dedupe-status, dedupe-drop
  *   guard install --like P [--like P2...]   BEFORE INSERT trigger that silently
  *                                           drops matching rows (spam circuit breaker)
  *   guard status | drop           Inspect / remove the guard trigger
@@ -167,6 +171,53 @@ async function cronTrim() {
   out(await q(`select count(*) as rows, pg_size_pretty(pg_total_relation_size('cron.job_run_details')) as size from cron.job_run_details`));
 }
 
+// ── generic dedupe trigger — drops an insert when the same message was
+//    persisted within the window (pattern-agnostic circuit breaker) ──────────
+const DEDUPE_FN = 'public.rvp_error_log_dedupe';
+const DEDUPE_TRG = 'trg_rvp_error_log_dedupe';
+
+async function dedupeInstall() {
+  const minutes = Number(flag('minutes', 60));
+  // stats table so suppressed volume stays visible (migration 314)
+  await e(`CREATE TABLE IF NOT EXISTS public.error_log_dedupe_stats (
+    message_md5 text PRIMARY KEY, message text NOT NULL,
+    source varchar(20) NOT NULL DEFAULT 'db-trigger',
+    suppressed_count bigint NOT NULL DEFAULT 0,
+    first_suppressed_at timestamptz NOT NULL DEFAULT now(),
+    last_suppressed_at timestamptz NOT NULL DEFAULT now())`);
+  await e(`CREATE INDEX IF NOT EXISTS idx_ael_message_md5 ON public.application_error_log (md5(message))`);
+  await e(`CREATE OR REPLACE FUNCTION ${DEDUPE_FN}() RETURNS trigger AS $f$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM public.application_error_log
+                 WHERE md5(message) = md5(NEW.message)
+                   AND occurred_at > now() - make_interval(mins => ${minutes | 0}))
+      THEN
+        INSERT INTO public.error_log_dedupe_stats (message_md5, message, source, suppressed_count)
+        VALUES (md5(NEW.message), left(NEW.message, 500), 'db-trigger', 1)
+        ON CONFLICT (message_md5) DO UPDATE SET
+          suppressed_count = error_log_dedupe_stats.suppressed_count + 1,
+          last_suppressed_at = now();
+        RETURN NULL;
+      END IF;
+      RETURN NEW;
+    END; $f$ LANGUAGE plpgsql`);
+  await e(`DROP TRIGGER IF EXISTS ${DEDUPE_TRG} ON public.application_error_log`);
+  await e(`CREATE TRIGGER ${DEDUPE_TRG} BEFORE INSERT ON public.application_error_log
+    FOR EACH ROW EXECUTE FUNCTION ${DEDUPE_FN}()`);
+  console.log(`dedupe trigger installed — identical messages within ${minutes}min are dropped (≥1 row/message/window kept)`);
+}
+
+async function dedupeStatus() {
+  out(await q(`select tgname from pg_trigger where tgname = ${sqlStr(DEDUPE_TRG)}`));
+  out(await q(`select prosrc from pg_proc where proname = 'rvp_error_log_dedupe'`));
+}
+
+async function dedupeDrop() {
+  await e(`DROP TRIGGER IF EXISTS ${DEDUPE_TRG} ON public.application_error_log`);
+  await e(`DROP FUNCTION IF EXISTS ${DEDUPE_FN}`);
+  console.log('dedupe trigger removed');
+}
+
 async function errorsRetention() {
   const days = Number(flag('days', 14));
   const name = 'purge-application-error-log';
@@ -224,6 +275,9 @@ usage: node scripts/db-rescue.cjs <command> [opts]   (wrap with doppler run --co
   errors purge --days N [--like 'pat%']   delete error-log rows (repeatable --like)
        [--all]                            all ages — requires --like
   errors retention [--days N]             install nightly error-log purge cron (def 14d)
+  errors dedupe [--minutes N]             trigger: drop repeat of same message within
+                                          window (def 60m) — generic spam breaker
+  errors dedupe-status | dedupe-drop      inspect / remove the dedupe trigger
   guard install --like 'pat%' [...]       install spam circuit-breaker trigger
   guard status | drop                     inspect / remove the guard
   cron list | dupes                       pg_cron jobs / duplicate commands
@@ -244,7 +298,10 @@ usage: node scripts/db-rescue.cjs <command> [opts]   (wrap with doppler run --co
         if (sub === 'top') await errorsTop();
         else if (sub === 'purge') await errorsPurge();
         else if (sub === 'retention') await errorsRetention();
-        else throw new Error('errors top | purge --days N [--like pat] [--all] | retention [--days N]');
+        else if (sub === 'dedupe') await dedupeInstall();
+        else if (sub === 'dedupe-status') await dedupeStatus();
+        else if (sub === 'dedupe-drop') await dedupeDrop();
+        else throw new Error('errors top | purge | retention | dedupe [--minutes N] | dedupe-status | dedupe-drop');
         break;
       case 'guard':
         if (sub === 'install') await guardInstall();

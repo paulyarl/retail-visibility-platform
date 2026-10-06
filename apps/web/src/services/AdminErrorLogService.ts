@@ -46,6 +46,24 @@ export interface ErrorLogStats {
   byTenant: Array<{ tenantId: string | null; count: number }>;
 }
 
+export interface ErrorSuppressionRow {
+  message_md5: string;
+  message: string;
+  source: 'logger' | 'db-trigger' | string;
+  suppressed_count: string | number;
+  first_suppressed_at: string;
+  last_suppressed_at: string;
+}
+
+export interface ErrorSuppressionsResponse {
+  suppressions: ErrorSuppressionRow[];
+  summary: {
+    total_suppressed?: string | number;
+    distinct_messages?: string | number;
+    active_last_hour?: string | number;
+  };
+}
+
 export interface ErrorLogFilters {
   page?: number;
   limit?: number;
@@ -99,6 +117,16 @@ class AdminErrorLogService extends AdminApiSingleton {
       return result.success ? (result.data as ErrorLogStats) : null;
     } catch (error) {
       clientLogger.error('[AdminErrorLogService] Error fetching stats:', { detail: error });
+      return null;
+    }
+  }
+
+  async getSuppressions(): Promise<ErrorSuppressionsResponse | null> {
+    try {
+      const result = await this.makeDefaultRequest('/api/admin/errors/suppressions', {}, 'error-log-suppressions', 0);
+      return result.success ? (result.data as ErrorSuppressionsResponse) : null;
+    } catch (error) {
+      clientLogger.error('[AdminErrorLogService] Error fetching suppressions:', { detail: error });
       return null;
     }
   }

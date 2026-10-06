@@ -43,6 +43,8 @@ No prerequisites beyond `node_modules` — the script talks to Postgres directly
 | `errors purge --days N [--like 'pat%']` | Delete `application_error_log` rows older than N days; repeatable `--like` narrows to matching messages. **`--days` is required — refuses blanket deletes.** |
 | `guard install --like 'pat%' [--like …]` | Installs `BEFORE INSERT` trigger `trg_rvp_rescue_skip` + function `rvp_rescue_skip_rows` that **silently drops** matching rows — the spam circuit-breaker. Reversible via `guard drop`. |
 | `guard status` / `guard drop` | Show or remove the guard trigger/function. |
+| `errors dedupe [--minutes N]` | **Generic** circuit-breaker trigger (`trg_rvp_error_log_dedupe`): drops an insert when an identical `md5(message)` row exists within N minutes (default 60). Keeps ≥1 row/message/window. Uses `idx_ael_message_md5`. |
+| `errors dedupe-status` / `errors dedupe-drop` | Inspect / remove the dedupe trigger. |
 | `cron list` | All pg_cron jobs: id, name, schedule, command, active. |
 | `cron dupes` | Commands scheduled by more than one active job — the classic "two generations of refresh jobs" trap. |
 | `cron trim [--days N]` | Delete `cron.job_run_details` older than N days (default 3) + `VACUUM`. |
@@ -53,11 +55,12 @@ No prerequisites beyond `node_modules` — the script talks to Postgres directly
 
 Identifiers are regex-validated and LIKE patterns are single-quote-escaped; destructive paths require explicit flags.
 
-## Currently installed (prod, as of 2026-10-06)
+## Currently installed (prod + staging, as of 2026-10-06)
 
-- pg_cron jobs `purge-cron-run-history` (keeps 3 days) and `purge-application-error-log` (keeps 14 days), both ~04:15 UTC.
-- No guard trigger installed — removed after the monthly-fee-summary fix deployed. If a new write loop appears, `guard install` is the interim shield.
-- ~24 duplicate pg_cron refresh jobs were unscheduled during the incident; `cron dupes` should only ever show the intentional `cleanup_featured_products` pair and the empty-command `security-alerts-*` pair.
+- **Write-loop protection, two layers**: (1) `DatabaseTransport` in `apps/api/src/logger.ts` dedupes error inserts in-process — normalized-message fingerprint (UUIDs/ID digits collapsed), 60-min window, suppressed count surfaced in `context.dedupe_suppressed_count` and throttled console notes; `LOG_DB_DEDUPE=false` / `LOG_DB_DEDUPE_WINDOW_MS` to tune. (2) DB-side `trg_rvp_error_log_dedupe` BEFORE INSERT trigger (60-min window, `md5(message)` match) — catches writes that bypass the app logger entirely. Staging additionally still has the pattern-specific `trg_rvp_rescue_skip` guard until the fixed build deploys there.
+- **Suppression accounting**: both layers upsert `public.error_log_dedupe_stats` (migration `314_error_log_dedupe_stats.sql`, one row per distinct `md5(message)`) — the logger batches pending counts on a 60s flush, the trigger upserts per dropped insert. Admin visibility: `GET /api/admin/errors/suppressions` (declared before `/:id` in `routes/admin/errors.ts` — route order matters) and the **Log Dedupe** tab on `/settings/admin/jobs` (`AdminErrorLogService.getSuppressions`).
+- pg_cron jobs `purge-cron-run-history` (keeps 3 days) and `purge-application-error-log` (keeps 14 days) on both envs.
+- ~24 duplicate pg_cron refresh jobs unscheduled on prod, 2 on staging; `cron dupes` on prod should only ever show the intentional `cleanup_featured_products` pair and the empty-command `security-alerts-*` pair.
 
 ## Origin / incident postmortem (2026-10-06)
 
@@ -68,4 +71,5 @@ Supabase free-plan warning: DB at 0.702/0.5 GB. Diagnosis: the **old `monthly-fe
 - `errors purge`, `cron trim`, `cron unschedule`, `guard install`, and `vacuum` **mutate production** when run under `--config prd`. Prefer `report`/`sql`/`dupes`/`status` for reconnaissance.
 - `VACUUM FULL` takes an `ACCESS EXCLUSIVE` lock — fine on a 400MB table (seconds), think twice on multi-GB.
 - `guard` drops rows silently — real errors matching the pattern are also lost while it's installed. Remove it (`guard drop`) once the source is fixed.
+- `errors dedupe` collapses legitimately-repeating errors to ~1 row/hour — you keep the signal, lose the volume. Remove with `errors dedupe-drop` if you need raw counts.
 - Destructive DB work done through this tool should still be announced to the operator; the script doesn't prompt.

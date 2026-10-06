@@ -139,6 +139,35 @@ router.get('/stats', requirePlatformAdmin, async (req: Request, res: Response) =
 });
 
 /**
+ * GET /api/admin/errors/suppressions
+ * Dedupe suppression accounting — what the spam circuit-breakers dropped.
+ * Rows: one per distinct suppressed message (app logger + DB trigger share it).
+ * NOTE: must be declared before /:id or 'suppressions' is treated as an id.
+ */
+router.get('/suppressions', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT message_md5, message, source, suppressed_count, first_suppressed_at, last_suppressed_at
+      FROM public.error_log_dedupe_stats
+      ORDER BY last_suppressed_at DESC
+      LIMIT 200`;
+
+    const summary = await prisma.$queryRaw<any[]>`
+      SELECT COALESCE(SUM(suppressed_count), 0)::bigint AS total_suppressed,
+             COUNT(*)::bigint AS distinct_messages,
+             COUNT(*) FILTER (WHERE last_suppressed_at > now() - interval '1 hour')::bigint AS active_last_hour
+      FROM public.error_log_dedupe_stats`;
+
+    res.json({ suppressions: rows, summary: summary[0] ?? {} });
+  } catch (error: any) {
+    logger.error('[Admin Errors] Suppressions failed', undefined, {
+      error: { name: error.name, message: error.message, stack: error.stack },
+    });
+    res.status(500).json({ error: 'failed_to_fetch_suppressions', message: error.message });
+  }
+});
+
+/**
  * GET /api/admin/errors/:id
  * Full error detail including stack trace and context
  */

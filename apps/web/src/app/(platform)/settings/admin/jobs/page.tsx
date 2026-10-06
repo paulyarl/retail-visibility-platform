@@ -25,6 +25,7 @@ import {
   Title,
   Grid,
   Center,
+  Tabs,
 } from '@mantine/core';
 import {
   IconRefresh,
@@ -34,6 +35,7 @@ import {
   IconEye,
   IconClock,
   IconCalendarTime,
+  IconShieldCheck,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
@@ -43,6 +45,10 @@ import {
   ScheduledJob,
   JobRun,
 } from '@/services/AdminJobsService';
+import {
+  adminErrorLogService,
+  ErrorSuppressionsResponse,
+} from '@/services/AdminErrorLogService';
 import { clientLogger } from '@/lib/client-logger';
 
 dayjs.extend(relativeTime);
@@ -91,6 +97,11 @@ export default function AdminJobsPage() {
   const [selectedRun, setSelectedRun] = useState<JobRun | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Dedupe tab state
+  const [tab, setTab] = useState<string | null>('jobs');
+  const [suppData, setSuppData] = useState<ErrorSuppressionsResponse | null>(null);
+  const [suppLoading, setSuppLoading] = useState(false);
+
   // Reschedule modal state
   const [scheduleJob, setScheduleJob] = useState<ScheduledJob | null>(null);
   const [scheduleKind, setScheduleKind] = useState<'default' | 'interval' | 'cron'>('default');
@@ -122,9 +133,24 @@ export default function AdminJobsPage() {
     }
   }, []);
 
+  const fetchSuppressions = useCallback(async () => {
+    try {
+      setSuppLoading(true);
+      setSuppData(await adminErrorLogService.getSuppressions());
+    } catch (error) {
+      clientLogger.error('[AdminJobsPage] Error fetching suppressions:', { detail: error });
+    } finally {
+      setSuppLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  useEffect(() => {
+    if (tab === 'dedupe' && !suppData) fetchSuppressions();
+  }, [tab, suppData, fetchSuppressions]);
 
   const openHistory = (job: ScheduledJob) => {
     setHistoryJob(job);
@@ -228,12 +254,103 @@ export default function AdminJobsPage() {
         <Button
           leftSection={<IconRefresh size={16} />}
           variant="light"
-          onClick={fetchJobs}
-          loading={loading}
+          onClick={tab === 'dedupe' ? fetchSuppressions : fetchJobs}
+          loading={tab === 'dedupe' ? suppLoading : loading}
         >
           Refresh
         </Button>
       </Group>
+
+      <Tabs value={tab} onChange={setTab}>
+        <Tabs.List>
+          <Tabs.Tab value="jobs">Scheduled Jobs</Tabs.Tab>
+          <Tabs.Tab value="dedupe" leftSection={<IconShieldCheck size={16} />}>
+            Log Dedupe
+          </Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="dedupe" pt="md">
+          <Stack gap="md">
+            <Alert icon={<IconShieldCheck size={16} />} color="blue" variant="light">
+              Repeated identical errors are deduplicated before they reach the database —
+              the table below accounts for what was dropped so volume stays visible.
+            </Alert>
+            {suppData?.summary && (
+              <Grid>
+                <Grid.Col span={{ base: 6, sm: 4 }}>
+                  <Card withBorder p="md">
+                    <Text size="xs" c="dimmed" tt="uppercase">Suppressed (all time)</Text>
+                    <Text fw={700} size="xl">{Number(suppData.summary.total_suppressed ?? 0).toLocaleString()}</Text>
+                  </Card>
+                </Grid.Col>
+                <Grid.Col span={{ base: 6, sm: 4 }}>
+                  <Card withBorder p="md">
+                    <Text size="xs" c="dimmed" tt="uppercase">Distinct Messages</Text>
+                    <Text fw={700} size="xl">{Number(suppData.summary.distinct_messages ?? 0)}</Text>
+                  </Card>
+                </Grid.Col>
+                <Grid.Col span={{ base: 6, sm: 4 }}>
+                  <Card withBorder p="md">
+                    <Text size="xs" c="dimmed" tt="uppercase">Active (last hour)</Text>
+                    <Text fw={700} size="xl" c={Number(suppData.summary.active_last_hour) ? 'orange' : undefined}>
+                      {Number(suppData.summary.active_last_hour ?? 0)}
+                    </Text>
+                  </Card>
+                </Grid.Col>
+              </Grid>
+            )}
+            {suppLoading && !suppData ? (
+              <Center py="xl"><Loader /></Center>
+            ) : !suppData || suppData.suppressions.length === 0 ? (
+              <Alert icon={<IconShieldCheck size={16} />} color="green" variant="light">
+                No suppressed errors — dedupe is idle.
+              </Alert>
+            ) : (
+              <Paper withBorder>
+                <ScrollArea>
+                  <Table striped highlightOnHover>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Message</Table.Th>
+                        <Table.Th>Source</Table.Th>
+                        <Table.Th>Suppressed</Table.Th>
+                        <Table.Th>First Seen</Table.Th>
+                        <Table.Th>Last Seen</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {suppData.suppressions.map((row) => (
+                        <Table.Tr key={row.message_md5}>
+                          <Table.Td>
+                            <Tooltip label={row.message} multiline maw={500}>
+                              <Text size="sm" lineClamp={2} maw={420}>{row.message}</Text>
+                            </Tooltip>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge size="sm" variant="light" color={row.source === 'logger' ? 'violet' : 'cyan'}>
+                              {row.source}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text fw={600} size="sm">{Number(row.suppressed_count).toLocaleString()}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="xs" c="dimmed">{dayjs(row.first_suppressed_at).fromNow()}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="xs" c="dimmed">{dayjs(row.last_suppressed_at).fromNow()}</Text>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </ScrollArea>
+              </Paper>
+            )}
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="jobs" pt="md">
 
       <Grid>
         <Grid.Col span={{ base: 6, sm: 3 }}>
@@ -400,6 +517,9 @@ export default function AdminJobsPage() {
           </ScrollArea>
         </Paper>
       )}
+
+        </Tabs.Panel>
+      </Tabs>
 
       {/* Run history modal */}
       <Modal

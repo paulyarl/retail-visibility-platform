@@ -163,23 +163,99 @@ class FileTransport implements LogTransport {
 class DatabaseTransport implements LogTransport {
   private enabled: boolean;
 
+  // Write-loop circuit breaker: an identical (normalized) message within the
+  // window is not re-persisted. Prevents a retrying job from flooding the
+  // table — the 2026-10-06 incident wrote ~135K rows/day from one loop.
+  // Disable with LOG_DB_DEDUPE=false; tune window with LOG_DB_DEDUPE_WINDOW_MS.
+  private dedupeEnabled = process.env.LOG_DB_DEDUPE !== 'false';
+  private dedupeWindowMs = Number(process.env.LOG_DB_DEDUPE_WINDOW_MS) || 60 * 60 * 1000;
+  private dedupeMap = new Map<string, { at: number; suppressed: number; rawMessage: string }>();
+  private static readonly DEDUPE_MAX_KEYS = 5000;
+  // Pending suppression counts flushed to error_log_dedupe_stats on a 60s
+  // interval — admins see true suppression volume in /settings/admin/jobs.
+  private dedupePending = new Map<string, number>(); // rawMessage → count
+  private dedupeFlushTimer: NodeJS.Timeout | null = null;
+  private dedupeStatsDbOk = true;
+
   constructor() {
     this.enabled = process.env.LOG_DB_ENABLED === 'true' ||
                    process.env.NODE_ENV === 'production';
   }
 
+  /** Normalized fingerprint — collapses UUIDs, long digit runs (tenant IDs,
+   *  timestamps) and whitespace so "same error, different id" shares a bucket. */
+  private dedupeKey(entry: LogEntry): string {
+    const norm = String(entry.message)
+      .toLowerCase()
+      .replace(/[0-9a-f]{8}-[0-9a-f-]{27,36}/g, '#')
+      .replace(/\b\d{4,}\b/g, '#')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+    return `${entry.error?.name || ''}|${norm}`;
+  }
+
   log(entry: LogEntry): void {
     if (!this.enabled || entry.level !== LogLevel.ERROR) return;
 
+    let suppressedCount = 0;
+    if (this.dedupeEnabled) {
+      const key = this.dedupeKey(entry);
+      const rec = this.dedupeMap.get(key);
+      const now = Date.now();
+      if (rec && now - rec.at < this.dedupeWindowMs) {
+        rec.suppressed++;
+        this.trackSuppression(rec.rawMessage);
+        if (rec.suppressed === 10 || rec.suppressed % 100 === 0) {
+          console.error(`[logger] suppressed ${rec.suppressed} DB repeats of "${String(entry.message).slice(0, 80)}"`);
+        }
+        return;
+      }
+      suppressedCount = rec?.suppressed ?? 0;
+      this.dedupeMap.set(key, { at: now, suppressed: 0, rawMessage: String(entry.message).slice(0, 500) });
+      if (this.dedupeMap.size > DatabaseTransport.DEDUPE_MAX_KEYS) {
+        // evict oldest entries (Map iterates in insertion order)
+        for (const k of this.dedupeMap.keys()) {
+          if (this.dedupeMap.size <= DatabaseTransport.DEDUPE_MAX_KEYS) break;
+          this.dedupeMap.delete(k);
+        }
+      }
+    }
+
     // Fire-and-forget — never block the event loop for DB logging
     setImmediate(() => {
-      this.persist(entry).catch(() => {
+      this.persist(entry, suppressedCount).catch(() => {
         // Silently fail — console transport already has the entry
       });
     });
   }
 
-  private async persist(entry: LogEntry): Promise<void> {
+  /** Queue a suppression event for batched stats flush (one upsert per message
+   *  per minute — vs one full error row per occurrence). */
+  private trackSuppression(rawMessage: string): void {
+    this.dedupePending.set(rawMessage, (this.dedupePending.get(rawMessage) ?? 0) + 1);
+    if (!this.dedupeFlushTimer) {
+      this.dedupeFlushTimer = setInterval(() => this.flushDedupeStats(), 60_000);
+      this.dedupeFlushTimer.unref?.();
+    }
+  }
+
+  private flushDedupeStats(): void {
+    if (!this.dedupeStatsDbOk || this.dedupePending.size === 0) return;
+    const pending = [...this.dedupePending.entries()];
+    this.dedupePending.clear();
+    for (const [message, n] of pending) {
+      prisma.$executeRaw`
+        INSERT INTO error_log_dedupe_stats (message_md5, message, source, suppressed_count)
+        VALUES (md5(${message}), ${message}, 'logger', ${n})
+        ON CONFLICT (message_md5) DO UPDATE SET
+          suppressed_count = error_log_dedupe_stats.suppressed_count + EXCLUDED.suppressed_count,
+          last_suppressed_at = now()`
+        .catch(() => { this.dedupeStatsDbOk = false; });
+    }
+  }
+
+  private async persist(entry: LogEntry, suppressedCount = 0): Promise<void> {
     const data: any = {
       level: LogLevel[entry.level].toLowerCase(),
       message: entry.message,
@@ -196,6 +272,7 @@ class DatabaseTransport implements LogTransport {
         ip: entry.ip,
         userAgent: entry.userAgent,
         duration: entry.duration,
+        ...(suppressedCount > 0 ? { dedupe_suppressed_count: suppressedCount } : {}),
         ...this.extractExtraContext(entry),
       },
     };

@@ -78,6 +78,7 @@ model affiliate_clicks {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model application_error_log {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   occurred_at     DateTime  @default(now()) @db.Timestamptz(6)
@@ -8170,6 +8171,19 @@ model mkt_prospect_report_links {
 
   @@index([campaign_id], map: "idx_prl_campaign")
   @@index([business_prospect_id], map: "idx_prl_prospect")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model error_log_dedupe_stats {
+  message_md5         String   @id
+  message             String
+  source              String   @default("db-trigger") @db.VarChar(20)
+  suppressed_count    BigInt   @default(0)
+  first_suppressed_at DateTime @default(now()) @db.Timestamptz(6)
+  last_suppressed_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([last_suppressed_at(sort: Desc)], map: "idx_error_log_dedupe_stats_last_seen")
 }
 
 enum action {
