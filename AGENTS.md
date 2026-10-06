@@ -9,6 +9,10 @@
 - `doppler run --config local -- pnpm prisma generate` — Regenerate client with Doppler secrets
 - `cd apps/web && npx vitest run` — web unit tests (vitest, node environment, `src/**/*.test.ts`). Run a single file by path.
 
+### DB rescue utility (`apps/api/scripts/db-rescue.cjs`)
+
+Emergency DB diagnostics/cleanup for Supabase quota incidents — plain Node + PrismaClient (no build step, works when TS is broken). Run via `cd apps/api && doppler run --config <local|prd> -- node scripts/db-rescue.cjs <cmd>` (or `pnpm db:rescue` under doppler). Key commands: `report` (size/top tables/slots/error-log volume/cron dupes — run first), `errors top|purge --days N [--like 'pat%']`, `guard install --like 'pat%'|status|drop` (BEFORE INSERT circuit-breaker that silently drops spam rows), `cron list|dupes|trim|retention|unschedule`, `vacuum <table> [--full]` (FULL returns disk space, brief lock), `sql "select …"`. Prod nightly retention jobs exist: `purge-cron-run-history` (3d) + `purge-application-error-log` (14d). Added 2026-10-06 after the `application_error_log` spam incident (old `monthly-fee-summary` self-scheduling loop → 717K rows / 400MB); Supabase dashboard "Database Size" lags and counts WAL — verify with `pg_database_size`.
+
 ### Web component render tests (no jsdom needed)
 
 `apps/web` has no jsdom/testing-library, but Mantine 9 ships **pre-compiled CSS modules** (`.module.mjs` are plain JS class-name maps, no CSS imports), so a component can be server-rendered in the existing node-environment vitest project:

@@ -18,6 +18,7 @@
     "db:migrate": "doppler run --config dev -- prisma migrate dev",
     "db:migrate:local": "doppler run --config local -- prisma migrate dev",
     "db:studio": "doppler run --config dev -- prisma studio",
+    "db:rescue": "node scripts/db-rescue.cjs",
     "test:manual-billing": "tsx src/scripts/test-manual-billing.ts",
     "test:manual-billing:simple": "tsx src/scripts/test-manual-billing-simple.ts",
     "db:studio:local": "doppler run --config local -- prisma studio",

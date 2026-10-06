@@ -1,0 +1,71 @@
+# DB Rescue Utility — User Guide
+
+## Purpose
+
+`apps/api/scripts/db-rescue.cjs` is the emergency diagnostics and cleanup tool for Supabase database-size/quota incidents. It answers "why is the database huge and what do I delete" in one command, then provides the surgical fixes: purge runaway log tables, install a circuit-breaker trigger against write spam, trim pg_cron history, dedupe runaway schedules, and vacuum-reclaim disk space.
+
+Written in plain Node + `@prisma/client` with **no build step** — it works even when the TypeScript app won't compile, which is exactly when you need it.
+
+Use this skill whenever: a Supabase "Database Size" quota warning appears, a table is growing abnormally fast, an error log is being spammed, or pg_cron jobs/history need auditing.
+
+## How to run
+
+Always run through Doppler so `DATABASE_URL`/`DIRECT_URL` resolve for the target environment — never hardcode credentials:
+
+```bash
+cd apps/api
+
+# diagnostics against production
+doppler run --config prd   -- node scripts/db-rescue.cjs report
+
+# same against local/dev
+doppler run --config local -- node scripts/db-rescue.cjs report
+# or: doppler run --config <env> -- pnpm db:rescue <cmd>
+```
+
+**Prisma must be generated** (`pnpm prisma:generate`) — the script uses the generated client, not the app's TS code.
+
+## Incident workflow
+
+1. **`report` first.** Shows `pg_database_size`, schema totals, top-20 tables by size with live/dead tuple counts, replication slots (inactive slots pin WAL and inflate the dashboard metric), error-log volume by day, top error messages, spam-guard status, cron job count + duplicate commands, and `job_run_details` age/size.
+2. **Find the anomaly.** A table dominating the DB (`application_error_log` was 400MB of 656MB in the 2026-10-06 incident) or a day-count spike in the per-day volume table points at a write loop, not organic growth.
+3. **Identify the source before purging.** `errors top` shows the repeated message; pull a stack trace via `sql` (`select left(stack_trace,2000) from application_error_log where message like '…' order by occurred_at desc limit 1`) — it names the dist file/line of the looping caller.
+4. **Stop the write loop first** (deploy fix / kill job), or install `guard` as the interim circuit-breaker. Purging while the loop runs buys days at best.
+5. **Purge + `vacuum --full`** to actually return disk space. A plain `DELETE` only marks tuples dead; `VACUUM FULL` rewrites the table and shrinks files (brief exclusive lock).
+6. **Verify** with `report` again. Note: the Supabase **dashboard metric lags** and includes WAL — trust `pg_database_size`.
+
+## Command reference
+
+| Command | What it does |
+|---|---|
+| `report` | Full health snapshot (see workflow above). Read-only. |
+| `errors top [--days N]` | Most frequent error-log messages in window (default 7d). |
+| `errors purge --days N [--like 'pat%']` | Delete `application_error_log` rows older than N days; repeatable `--like` narrows to matching messages. **`--days` is required — refuses blanket deletes.** |
+| `guard install --like 'pat%' [--like …]` | Installs `BEFORE INSERT` trigger `trg_rvp_rescue_skip` + function `rvp_rescue_skip_rows` that **silently drops** matching rows — the spam circuit-breaker. Reversible via `guard drop`. |
+| `guard status` / `guard drop` | Show or remove the guard trigger/function. |
+| `cron list` | All pg_cron jobs: id, name, schedule, command, active. |
+| `cron dupes` | Commands scheduled by more than one active job — the classic "two generations of refresh jobs" trap. |
+| `cron trim [--days N]` | Delete `cron.job_run_details` older than N days (default 3) + `VACUUM`. |
+| `cron retention [--days N]` | Install/update nightly `purge-cron-run-history` job (04:15 UTC). Idempotent by job name. |
+| `cron unschedule <name>` | `cron.unschedule` by job name. |
+| `vacuum <table> [--full]` | `VACUUM ANALYZE` (non-blocking, frees space for reuse) or `VACUUM FULL ANALYZE` (exclusive lock, returns disk space). Accepts `table` or `schema.table`. |
+| `sql "select …"` | Read-only escape hatch — SELECT/WITH/EXPLAIN/SHOW only. |
+
+Identifiers are regex-validated and LIKE patterns are single-quote-escaped; destructive paths require explicit flags.
+
+## Currently installed (prod, as of 2026-10-06)
+
+- pg_cron jobs `purge-cron-run-history` (keeps 3 days) and `purge-application-error-log` (keeps 14 days), both ~04:15 UTC.
+- No guard trigger installed — removed after the monthly-fee-summary fix deployed. If a new write loop appears, `guard install` is the interim shield.
+- ~24 duplicate pg_cron refresh jobs were unscheduled during the incident; `cron dupes` should only ever show the intentional `cleanup_featured_products` pair and the empty-command `security-alerts-*` pair.
+
+## Origin / incident postmortem (2026-10-06)
+
+Supabase free-plan warning: DB at 0.702/0.5 GB. Diagnosis: the **old `monthly-fee-summary` job** (pre-JobRegistry, self-scheduling `setTimeout` with a non-positive delay) ran `sendAllMonthlySummaries` in a continuous loop; each of 4 Stripe-Connect tenants × 3 unconfigured email providers (SES/SendGrid/Mailtrap) wrote 3 rows per attempt → **~135K rows/day, 717K rows / 400MB**. Fixed by: `trg_skip_email_spam` BEFORE INSERT guard → DELETE + `VACUUM FULL` → redeploy of the registry-clamped build → trigger dropped. Consolidated into this utility afterward.
+
+## Safety notes
+
+- `errors purge`, `cron trim`, `cron unschedule`, `guard install`, and `vacuum` **mutate production** when run under `--config prd`. Prefer `report`/`sql`/`dupes`/`status` for reconnaissance.
+- `VACUUM FULL` takes an `ACCESS EXCLUSIVE` lock — fine on a 400MB table (seconds), think twice on multi-GB.
+- `guard` drops rows silently — real errors matching the pattern are also lost while it's installed. Remove it (`guard drop`) once the source is fixed.
+- Destructive DB work done through this tool should still be announced to the operator; the script doesn't prompt.
