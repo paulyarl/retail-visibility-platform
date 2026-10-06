@@ -7,12 +7,13 @@
  *   GET   /api/admin/jobs/:name/runs/:runId   — run detail incl. captured logs
  *   POST  /api/admin/jobs/:name/trigger       — manual run (instrumented jobs only)
  *   PATCH /api/admin/jobs/:name/enabled       — kill switch { enabled: boolean }
+ *   PATCH /api/admin/jobs/:name/schedule      — reschedule { kind, intervalMinutes | cron }
  *
  * Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
  */
 
 import { Router, Request, Response } from 'express';
-import { listJobs, listRuns, getRun, runJobNow, setJobEnabled } from '../../jobs/registry';
+import { listJobs, listRuns, getRun, runJobNow, setJobEnabled, setJobSchedule } from '../../jobs/registry';
 import { logger } from '../../logger';
 
 const router = Router();
@@ -96,6 +97,37 @@ router.patch('/:name/enabled', async (req: Request, res: Response) => {
       error: { name: error.name, message: error.message, stack: error.stack },
     });
     res.status(500).json({ error: 'toggle_failed', message: error.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/jobs/:name/schedule
+ * Body: { kind: 'default' }                              — back to code-defined schedule
+ *    or { kind: 'interval', intervalMinutes: 30 }        — every N minutes
+ *    or { kind: 'cron', cron: '0 5 1 * *' }              — 5-field cron, UTC
+ */
+router.patch('/:name/schedule', async (req: Request, res: Response) => {
+  try {
+    const { kind, intervalMinutes, cron } = req.body ?? {};
+    if (kind !== 'default' && kind !== 'interval' && kind !== 'cron') {
+      return res.status(400).json({ error: 'invalid_body', message: 'kind must be default | interval | cron' });
+    }
+    const value = kind === 'interval' ? String(intervalMinutes ?? '') : kind === 'cron' ? cron : undefined;
+    const result = await setJobSchedule(req.params.name, kind, value);
+    if (!result.ok) {
+      const status = result.error === 'persistence unavailable — DB unreachable or migration not applied' ? 503 : 400;
+      return res.status(status).json({ error: 'schedule_update_failed', message: result.error });
+    }
+    logger.info(`[Admin Jobs] ${req.params.name} rescheduled (${kind})`, undefined, {
+      by: (req as any).user?.id,
+      value,
+    });
+    res.json({ success: true, name: req.params.name, nextRunAt: result.nextRunAt });
+  } catch (error: any) {
+    logger.error('[Admin Jobs] Schedule update failed', undefined, {
+      error: { name: error.name, message: error.message, stack: error.stack },
+    });
+    res.status(500).json({ error: 'schedule_update_failed', message: error.message });
   }
 });
 

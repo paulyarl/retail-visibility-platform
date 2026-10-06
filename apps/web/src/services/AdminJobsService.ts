@@ -23,6 +23,8 @@ export interface ScheduledJob {
   name: string;
   description: string | null;
   scheduleLabel: string | null;
+  effectiveSchedule: string | null;
+  scheduleOverride: { kind: 'interval' | 'cron'; value: string } | null;
   instrumented: boolean;
   enabled: boolean;
   envDisabled: boolean;
@@ -96,6 +98,34 @@ class AdminJobsService extends AdminApiSingleton {
       return { ok: false, error: data?.message || data?.error || 'Trigger failed' };
     } catch (error) {
       clientLogger.error('[AdminJobsService] Error triggering job:', { detail: error });
+      return { ok: false, error: 'Request failed' };
+    }
+  }
+
+  async setSchedule(
+    jobName: string,
+    kind: 'default' | 'interval' | 'cron',
+    opts?: { intervalMinutes?: number; cron?: string },
+  ): Promise<{ ok: boolean; error?: string; nextRunAt?: string | null }> {
+    try {
+      const result = await this.makeDefaultRequest(
+        `/api/admin/jobs/${encodeURIComponent(jobName)}/schedule`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            kind,
+            ...(opts?.intervalMinutes != null ? { intervalMinutes: opts.intervalMinutes } : {}),
+            ...(opts?.cron != null ? { cron: opts.cron } : {}),
+          }),
+        },
+        `admin-job-schedule-${jobName}`,
+        0,
+      );
+      const data = result.data as { error?: string; message?: string; nextRunAt?: string | null } | undefined;
+      if (result.success) return { ok: true, nextRunAt: data?.nextRunAt ?? null };
+      return { ok: false, error: data?.message || data?.error || 'Update failed' };
+    } catch (error) {
+      clientLogger.error('[AdminJobsService] Error updating schedule:', { detail: error });
       return { ok: false, error: 'Request failed' };
     }
   }

@@ -27,6 +27,7 @@ import util from 'util';
 import { AsyncLocalStorage } from 'async_hooks';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { nextCronRun, isValidCron } from './cronSpec';
 
 export type JobTrigger = 'schedule' | 'manual' | 'api';
 
@@ -50,6 +51,8 @@ export interface ScheduleJobOptions {
   envDisableVar?: string;
 }
 
+type ScheduleOverrideKind = 'interval' | 'cron';
+
 interface RegisteredJob {
   name: string;
   description?: string;
@@ -62,6 +65,9 @@ interface RegisteredJob {
   timer: NodeJS.Timeout | null;
   computeNextDelay?: () => number;
   handler?: JobHandler;
+  /** DB-backed schedule override — null/null = use computeNextDelay */
+  overrideKind: ScheduleOverrideKind | null;
+  overrideValue: string | null;
 }
 
 type RunStatus = 'running' | 'success' | 'failed' | 'skipped';
@@ -151,11 +157,20 @@ async function seedJobRow(job: RegisteredJob): Promise<void> {
   );
 }
 
-async function refreshEnabled(job: RegisteredJob): Promise<boolean> {
+async function refreshJobState(job: RegisteredJob): Promise<boolean> {
   const row = await withJobDb(() =>
-    prisma.scheduled_jobs.findUnique({ where: { name: job.name }, select: { enabled: true } })
+    prisma.scheduled_jobs.findUnique({
+      where: { name: job.name },
+      select: { enabled: true, schedule_override_kind: true, schedule_override: true },
+    })
   );
-  if (row) job.enabled = row.enabled;
+  if (row) {
+    job.enabled = row.enabled;
+    // Sync overrides too — lets another replica's reschedule propagate
+    // within one cycle instead of requiring a restart.
+    job.overrideKind = (row.schedule_override_kind as ScheduleOverrideKind | null) ?? null;
+    job.overrideValue = row.schedule_override;
+  }
   return job.enabled && !job.envDisabled;
 }
 
@@ -179,12 +194,72 @@ export function declareJob(name: string, meta: { description?: string; scheduleL
     running: false,
     nextRunAt: null,
     timer: null,
+    overrideKind: null,
+    overrideValue: null,
   });
 }
 
 /** Batch-declare catalog entries. */
 export function declareJobs(entries: Array<{ name: string; description?: string; scheduleLabel?: string }>): void {
   for (const entry of entries) declareJob(entry.name, entry);
+}
+
+/** ms until the next run honoring a DB schedule override, else the job's
+ *  code-defined computeNextDelay. Returns NaN when nothing can compute one. */
+function effectiveNextDelay(job: RegisteredJob): number {
+  if (job.overrideKind === 'interval') {
+    const minutes = parseInt(job.overrideValue ?? '', 10);
+    if (Number.isFinite(minutes) && minutes > 0) return minutes * 60_000;
+    logger.warn(`[JobRegistry] ${job.name} has invalid interval override '${job.overrideValue}' — falling back to default schedule`);
+  } else if (job.overrideKind === 'cron') {
+    const next = job.overrideValue ? nextCronRun(job.overrideValue) : null;
+    if (next) return next.getTime() - Date.now();
+    logger.warn(`[JobRegistry] ${job.name} has invalid cron override '${job.overrideValue}' — falling back to default schedule`);
+  }
+  return job.computeNextDelay ? job.computeNextDelay() : NaN;
+}
+
+/** Node setTimeout overflows above ~24.86 days (32-bit signed ms) and fires
+ *  almost immediately — delays beyond this must hop via intermediate timers. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/** Arm (or re-arm) the next-run timer. Centralizing this enforces the
+ *  always-future-delay contract — a non-positive/NaN delay is clamped to 60s
+ *  rather than firing in a tight loop (the monthly-fee-summary spam bug),
+ *  and delays beyond the setTimeout 32-bit limit hop instead of running. */
+function armTimer(job: RegisteredJob): void {
+  if (job.timer) {
+    clearTimeout(job.timer);
+    job.timer = null;
+  }
+  if (job.envDisabled) {
+    job.nextRunAt = null;
+    return;
+  }
+
+  let delay = Number(effectiveNextDelay(job));
+  if (!Number.isFinite(delay) || delay <= 0) {
+    logger.warn(`[JobRegistry] ${job.name} computed non-positive next-run delay (${delay}ms) — clamping to 60s`);
+    delay = 60_000;
+  }
+  const targetAt = Date.now() + delay;
+  job.nextRunAt = new Date(targetAt);
+
+  job.timer = setTimeout(async () => {
+    if (Date.now() < targetAt) {
+      armTimer(job); // overflow hop — re-arm, don't run
+      return;
+    }
+    try {
+      await executeRun(job, 'schedule');
+    } catch (error: any) {
+      logger.error(`[JobRegistry] ${job.name} run failed`, undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack },
+      });
+    }
+    armTimer(job);
+  }, Math.min(delay, MAX_TIMER_MS));
+  if (job.timer.unref) job.timer.unref();
 }
 
 /**
@@ -209,36 +284,18 @@ export function scheduleJob(opts: ScheduleJobOptions): void {
     timer: null,
     computeNextDelay: opts.computeNextDelay,
     handler: opts.handler,
+    overrideKind: null,
+    overrideValue: null,
   };
   jobs.set(opts.name, job);
 
   if (envDisabled) {
     logger.info(`[JobRegistry] ${opts.name} disabled by ${opts.envDisableVar}`);
+    void seedJobRow(job);
     return;
   }
 
-  const scheduleNext = () => {
-    let delay = Number(opts.computeNextDelay());
-    if (!Number.isFinite(delay) || delay <= 0) {
-      logger.warn(`[JobRegistry] ${opts.name} computed non-positive next-run delay (${delay}ms) — clamping to 60s`);
-      delay = 60_000;
-    }
-    job.nextRunAt = new Date(Date.now() + delay);
-    job.timer = setTimeout(async () => {
-      try {
-        await executeRun(job, 'schedule');
-      } catch (error: any) {
-        logger.error(`[JobRegistry] ${job.name} run failed`, undefined, {
-          error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack },
-        });
-      }
-      scheduleNext();
-    }, delay);
-    if (job.timer.unref) job.timer.unref();
-  };
-
-  void seedJobRow(job);
-  scheduleNext();
+  void seedJobRow(job).then(() => refreshJobState(job)).then(() => armTimer(job));
   logger.info(`[JobRegistry] ${opts.name} scheduled (${opts.scheduleLabel})`);
 }
 
@@ -257,7 +314,7 @@ async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ sk
   if (!job.handler) return { skipped: 'not_instrumented' };
   if (job.running) return { skipped: 'already_running' };
 
-  if (!(await refreshEnabled(job))) {
+  if (!(await refreshJobState(job))) {
     // Record skips only for manual/api triggers — a disabled job on a tight
     // schedule (e.g. every 5 min) would otherwise flood the run table.
     if (trigger !== 'schedule') {
@@ -347,6 +404,9 @@ export interface JobListEntry {
   name: string;
   description: string | null;
   scheduleLabel: string | null;
+  /** Human-readable effective schedule — the override when set, else scheduleLabel */
+  effectiveSchedule: string | null;
+  scheduleOverride: { kind: ScheduleOverrideKind; value: string } | null;
   instrumented: boolean;
   enabled: boolean;
   envDisabled: boolean;
@@ -398,10 +458,19 @@ export async function listJobs(): Promise<JobListEntry[]> {
     const reg = jobs.get(name);
     const db = dbJobs?.find((j) => j.name === name);
     const last = lastRunByJob.get(name);
+    const overrideKind = (reg?.overrideKind ?? db?.schedule_override_kind ?? null) as ScheduleOverrideKind | null;
+    const overrideValue = reg?.overrideValue ?? db?.schedule_override ?? null;
+    const hasOverride = overrideKind !== null && overrideValue !== null;
     return {
       name,
       description: reg?.description ?? db?.description ?? null,
       scheduleLabel: reg?.scheduleLabel ?? db?.schedule_label ?? null,
+      effectiveSchedule: hasOverride
+        ? overrideKind === 'interval'
+          ? `every ${overrideValue} min (override)`
+          : `cron: ${overrideValue}`
+        : (reg?.scheduleLabel ?? db?.schedule_label ?? null),
+      scheduleOverride: hasOverride ? { kind: overrideKind, value: overrideValue! } : null,
       instrumented: reg?.instrumented ?? false,
       enabled: db?.enabled ?? reg?.enabled ?? true,
       envDisabled: reg?.envDisabled ?? false,
@@ -476,6 +545,74 @@ export async function setJobEnabled(name: string, enabled: boolean): Promise<boo
   if (result === null) return false; // DB unavailable — can't persist
   if (job) job.enabled = enabled;
   return true;
+}
+
+const MAX_INTERVAL_MINUTES = 30 * 24 * 60; // 30 days
+
+/**
+ * Set (or clear) a job's schedule override. Persists to scheduled_jobs and
+ * re-arms the registry timer immediately when the job is instrumented.
+ *
+ * kind='default'  → clear the override, back to the code-defined schedule
+ * kind='interval' → value = minutes between runs (1 … 43200)
+ * kind='cron'     → value = 5-field cron expression (UTC) or @-shorthand
+ */
+export async function setJobSchedule(
+  name: string,
+  kind: 'default' | ScheduleOverrideKind,
+  value?: string,
+): Promise<{ ok: boolean; error?: string; nextRunAt?: string | null }> {
+  let overrideKind: ScheduleOverrideKind | null = null;
+  let overrideValue: string | null = null;
+
+  if (kind === 'interval') {
+    const minutes = parseInt(value ?? '', 10);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > MAX_INTERVAL_MINUTES) {
+      return { ok: false, error: `interval must be 1–${MAX_INTERVAL_MINUTES} minutes` };
+    }
+    overrideKind = 'interval';
+    overrideValue = String(minutes);
+  } else if (kind === 'cron') {
+    const expr = (value ?? '').trim();
+    if (!expr || !isValidCron(expr)) {
+      return { ok: false, error: 'invalid cron expression (5 fields: minute hour dom month dow, UTC)' };
+    }
+    overrideKind = 'cron';
+    overrideValue = expr;
+  } else if (kind !== 'default') {
+    return { ok: false, error: 'kind must be default | interval | cron' };
+  }
+
+  const job = jobs.get(name);
+  const saved = await withJobDb(() =>
+    prisma.scheduled_jobs.upsert({
+      where: { name },
+      update: {
+        schedule_override_kind: overrideKind,
+        schedule_override: overrideValue,
+        updated_at: new Date(),
+      },
+      create: {
+        name,
+        schedule_override_kind: overrideKind,
+        schedule_override: overrideValue,
+        description: job?.description,
+        schedule_label: job?.scheduleLabel,
+      },
+    })
+  );
+  if (saved === null) return { ok: false, error: 'persistence unavailable — DB unreachable or migration not applied' };
+
+  if (job) {
+    job.overrideKind = overrideKind;
+    job.overrideValue = overrideValue;
+    if (job.instrumented) {
+      armTimer(job); // re-arm with the new cadence
+      logger.info(`[JobRegistry] ${name} schedule override → ${overrideKind ?? 'default'}${overrideValue ? ` (${overrideValue})` : ''}`);
+    }
+    return { ok: true, nextRunAt: job.nextRunAt?.toISOString() ?? null };
+  }
+  return { ok: true, nextRunAt: null };
 }
 
 /** Graceful shutdown — clears all registry-owned timers. */

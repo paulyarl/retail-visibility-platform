@@ -6253,12 +6253,14 @@ model sync_jobs {
 /// Rows are upserted by the JobRegistry at boot; `enabled` is the
 /// admin kill switch (a disabled job's handler never executes).
 model scheduled_jobs {
-  name           String   @id
-  description    String?
-  schedule_label String?
-  enabled        Boolean  @default(true)
-  created_at     DateTime @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  name                   String   @id
+  description            String?
+  schedule_label         String?
+  enabled                Boolean  @default(true)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime @default(now()) @db.Timestamptz(6)
+  schedule_override_kind String?  @db.VarChar(20)
+  schedule_override      String?
 }
 
 /// Per-execution history for scheduled jobs: status, timing, error,

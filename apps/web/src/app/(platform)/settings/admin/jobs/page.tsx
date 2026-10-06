@@ -18,6 +18,9 @@ import {
   Tooltip,
   ScrollArea,
   Code,
+  Radio,
+  NumberInput,
+  TextInput,
   Paper,
   Title,
   Grid,
@@ -30,6 +33,7 @@ import {
   IconAlertTriangle,
   IconEye,
   IconClock,
+  IconCalendarTime,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
@@ -86,6 +90,13 @@ export default function AdminJobsPage() {
   // Run detail modal state
   const [selectedRun, setSelectedRun] = useState<JobRun | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Reschedule modal state
+  const [scheduleJob, setScheduleJob] = useState<ScheduledJob | null>(null);
+  const [scheduleKind, setScheduleKind] = useState<'default' | 'interval' | 'cron'>('default');
+  const [intervalMinutes, setIntervalMinutes] = useState<number>(60);
+  const [cronExpr, setCronExpr] = useState('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -146,6 +157,41 @@ export default function AdminJobsPage() {
       if (historyJob?.name === job.name) fetchRuns(job.name, runsPage);
     } finally {
       setTriggering(null);
+    }
+  };
+
+  const openScheduleModal = (job: ScheduledJob) => {
+    setScheduleJob(job);
+    setScheduleKind(job.scheduleOverride?.kind ?? 'default');
+    setIntervalMinutes(
+      job.scheduleOverride?.kind === 'interval' ? parseInt(job.scheduleOverride.value, 10) || 60 : 60,
+    );
+    setCronExpr(job.scheduleOverride?.kind === 'cron' ? job.scheduleOverride.value : '');
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!scheduleJob) return;
+    setSavingSchedule(true);
+    try {
+      const result = await adminJobsService.setSchedule(scheduleJob.name, scheduleKind, {
+        intervalMinutes,
+        cron: cronExpr.trim(),
+      });
+      if (result.ok) {
+        notifications.show({
+          title: 'Schedule updated',
+          message: result.nextRunAt
+            ? `${scheduleJob.name} next runs ${dayjs(result.nextRunAt).fromNow()}`
+            : `${scheduleJob.name} rescheduled`,
+          color: 'green',
+        });
+        setScheduleJob(null);
+        await fetchJobs();
+      } else {
+        notifications.show({ title: 'Schedule update failed', message: result.error || 'Unknown error', color: 'red' });
+      }
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -249,7 +295,12 @@ export default function AdminJobsPage() {
                       )}
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{job.scheduleLabel ?? '—'}</Text>
+                      <Group gap={6} wrap="nowrap">
+                        <Text size="sm">{job.effectiveSchedule ?? job.scheduleLabel ?? '—'}</Text>
+                        {job.scheduleOverride && (
+                          <Badge size="xs" color="violet" variant="light">custom</Badge>
+                        )}
+                      </Group>
                     </Table.Td>
                     <Table.Td>{jobStatusBadge(job)}</Table.Td>
                     <Table.Td>
@@ -314,6 +365,24 @@ export default function AdminJobsPage() {
                               onClick={() => handleTrigger(job)}
                             >
                               <IconPlayerPlay size={16} />
+                            </ActionIcon>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          label={
+                            job.instrumented
+                              ? 'Reschedule'
+                              : 'Not instrumented — schedule is managed inside the job'
+                          }
+                        >
+                          <span>
+                            <ActionIcon
+                              variant="light"
+                              color="violet"
+                              disabled={!job.instrumented}
+                              onClick={() => openScheduleModal(job)}
+                            >
+                              <IconCalendarTime size={16} />
                             </ActionIcon>
                           </span>
                         </Tooltip>
@@ -390,6 +459,83 @@ export default function AdminJobsPage() {
                 total={runsTotalPages}
               />
             )}
+          </Stack>
+        )}
+      </Modal>
+
+      {/* Reschedule modal */}
+      <Modal
+        opened={!!scheduleJob}
+        onClose={() => setScheduleJob(null)}
+        title={
+          <Group gap="xs">
+            <IconCalendarTime size={18} />
+            <Text fw={600}>Reschedule — {scheduleJob?.name}</Text>
+          </Group>
+        }
+        size="md"
+      >
+        {scheduleJob && (
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              Code-defined schedule: <Text span fw={500}>{scheduleJob.scheduleLabel ?? 'unknown'}</Text>
+            </Text>
+            <Radio.Group
+              value={scheduleKind}
+              onChange={(v) => setScheduleKind(v as 'default' | 'interval' | 'cron')}
+            >
+              <Stack gap="sm">
+                <Radio
+                  value="default"
+                  label={`Default — ${scheduleJob.scheduleLabel ?? 'code-defined schedule'}`}
+                />
+                <Radio value="interval" label="Every N minutes" />
+                {scheduleKind === 'interval' && (
+                  <NumberInput
+                    ml="xl"
+                    label="Minutes between runs"
+                    min={1}
+                    max={43200}
+                    value={intervalMinutes}
+                    onChange={(v) => setIntervalMinutes(typeof v === 'number' ? v : 60)}
+                    size="sm"
+                    w={220}
+                  />
+                )}
+                <Radio value="cron" label="Cron expression (UTC)" />
+                {scheduleKind === 'cron' && (
+                  <Stack gap={4} ml="xl">
+                    <TextInput
+                      placeholder="5 0 1 * *"
+                      value={cronExpr}
+                      onChange={(e) => setCronExpr(e.currentTarget.value)}
+                      size="sm"
+                      w={280}
+                    />
+                    <Text size="xs" c="dimmed">
+                      5 fields: minute hour day-of-month month day-of-week. Supports lists,
+                      ranges, steps, names, and @hourly/@daily/@weekly/@monthly.
+                    </Text>
+                  </Stack>
+                )}
+              </Stack>
+            </Radio.Group>
+            <Group justify="flex-end" mt="xs">
+              <Button variant="default" onClick={() => setScheduleJob(null)}>Cancel</Button>
+              <Button
+                onClick={handleSaveSchedule}
+                loading={savingSchedule}
+                disabled={
+                  scheduleKind === 'interval'
+                    ? !intervalMinutes || intervalMinutes < 1
+                    : scheduleKind === 'cron'
+                      ? !cronExpr.trim()
+                      : false
+                }
+              >
+                Save schedule
+              </Button>
+            </Group>
           </Stack>
         )}
       </Modal>
