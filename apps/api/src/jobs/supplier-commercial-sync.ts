@@ -18,11 +18,13 @@ import {
   type SupplierConnector,
 } from '../services/SupplierConnectors';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'supplier-commercial-sync';
 const NIGHTLY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const STARTUP_DELAY_MS = 30 * 60 * 1000; // 30 minutes (after open-source nightly)
 
-let nightlyIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 /**
  * Ensure the supplier record exists in the database before ingesting data.
@@ -147,35 +149,19 @@ async function runNightlyBackfill(): Promise<void> {
  * Start the scheduled commercial supplier sync jobs.
  */
 export async function startSupplierCommercialSync(): Promise<void> {
-  if (process.env.DISABLE_SUPPLIER_COMMERCIAL_SYNC === 'true') {
-    logger.info('Commercial supplier sync disabled via DISABLE_SUPPLIER_COMMERCIAL_SYNC env var');
-    return;
-  }
-
-  if (nightlyIntervalId) {
-    logger.info('Commercial supplier sync already running');
-    return;
-  }
-
-  logger.info('Commercial supplier sync scheduler starting (nightly backfill)');
-
-  // Delay first run to avoid firing on nodemon restarts
-  setTimeout(() => {
-    runNightlyBackfill();
-  }, STARTUP_DELAY_MS);
-
-  nightlyIntervalId = setInterval(() => {
-    runNightlyBackfill();
-  }, NIGHTLY_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Commercial supplier sync + Kroger token refresh',
+    scheduleLabel: 'nightly backfill',
+    envDisableVar: 'DISABLE_SUPPLIER_COMMERCIAL_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : NIGHTLY_INTERVAL_MS),
+    handler: async () => runNightlyBackfill(),
+  });
 }
 
 /**
  * Stop the scheduled commercial supplier sync jobs.
  */
 export function stopSupplierCommercialSync(): void {
-  if (nightlyIntervalId) {
-    clearInterval(nightlyIntervalId);
-    nightlyIntervalId = null;
-  }
-  logger.info('Commercial supplier sync stopped');
+  stopJob(JOB_NAME);
 }

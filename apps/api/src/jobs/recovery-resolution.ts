@@ -14,14 +14,17 @@
 import { logger } from '../logger';
 import { prisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'recovery-resolution';
+const ORPHAN_JOB_NAME = 'recovery-orphan-purge';
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const ORPHAN_PURGE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const ORPHAN_PURGE_THRESHOLD_DAYS = 7;
 
-let resolutionIntervalId: NodeJS.Timeout | null = null;
-let orphanPurgeIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
+let orphanFirstRun = true;
 
 // ====================
 // RECOVERY RESOLUTION POLL
@@ -236,49 +239,33 @@ async function runRecoveryCascadePass(): Promise<void> {
 // ====================
 
 export async function startRecoveryResolutionJob(): Promise<void> {
-  if (process.env.DISABLE_RECOVERY_RESOLUTION === 'true') {
-    logger.info('[RecoveryResolution] Disabled by env var');
-    return;
-  }
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Runs pending recovery_resolution prompt executions',
+    scheduleLabel: 'every 5 minutes',
+    envDisableVar: 'DISABLE_RECOVERY_RESOLUTION',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : POLL_INTERVAL_MS),
+    handler: async () => {
+      await runRecoveryResolutionPass();
+      await runIntakeTimeoutSweep();
+      await runRecoveryCascadePass();
+    },
+  });
 
-  if (resolutionIntervalId) {
-    logger.info('[RecoveryResolution] Already running');
-    return;
-  }
-
-  logger.info(`[RecoveryResolution] Starting scheduler (every ${POLL_INTERVAL_MS / 60000}min)`);
-
-  // Initial pass after startup delay
-  setTimeout(() => {
-    runRecoveryResolutionPass();
-    runIntakeTimeoutSweep();
-    runRecoveryCascadePass();
-  }, STARTUP_DELAY_MS);
-
-  resolutionIntervalId = setInterval(() => {
-    runRecoveryResolutionPass();
-    runIntakeTimeoutSweep();
-    runRecoveryCascadePass();
-  }, POLL_INTERVAL_MS);
-
-  // Orphan purge runs on its own slower interval
-  setTimeout(() => {
-    runOrphanAttachmentPurge();
-  }, STARTUP_DELAY_MS + 60_000); // 1 min after the resolution pass
-
-  orphanPurgeIntervalId = setInterval(() => {
-    runOrphanAttachmentPurge();
-  }, ORPHAN_PURGE_INTERVAL_MS);
+  // Orphan purge runs on its own slower interval — registered as a sibling job
+  // so its cadence and run history stay visible independently.
+  scheduleJob({
+    name: ORPHAN_JOB_NAME,
+    description: 'Purges orphaned recovery attachments older than 7 days',
+    scheduleLabel: 'every hour',
+    envDisableVar: 'DISABLE_RECOVERY_RESOLUTION',
+    computeNextDelay: () => (orphanFirstRun ? ((orphanFirstRun = false), STARTUP_DELAY_MS + 60_000) : ORPHAN_PURGE_INTERVAL_MS),
+    handler: async () => runOrphanAttachmentPurge(),
+  });
 }
 
 export function stopRecoveryResolutionJob(): void {
-  if (resolutionIntervalId) {
-    clearInterval(resolutionIntervalId);
-    resolutionIntervalId = null;
-  }
-  if (orphanPurgeIntervalId) {
-    clearInterval(orphanPurgeIntervalId);
-    orphanPurgeIntervalId = null;
-  }
+  stopJob(JOB_NAME);
+  stopJob(ORPHAN_JOB_NAME);
   logger.info('[RecoveryResolution] Stopped');
 }

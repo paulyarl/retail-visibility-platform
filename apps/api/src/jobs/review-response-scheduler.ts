@@ -12,10 +12,13 @@
 import { logger } from '../logger';
 import { ReviewResponseScheduler } from '../services/ReviewResponseScheduler';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'review-response-scheduler';
 const STARTUP_DELAY_MS = 2 * 60 * 1000; // 2 minutes
 
-let reviewResponseIntervalId: NodeJS.Timeout | null = null;
+let configuredIntervalMs = 6 * 60 * 60 * 1000;
+let firstRun = true;
 
 async function runReviewResponseScheduler(): Promise<void> {
   logger.info('[ReviewResponseScheduler] Starting review-response pipeline pass...');
@@ -35,33 +38,20 @@ async function runReviewResponseScheduler(): Promise<void> {
 }
 
 export async function startReviewResponseScheduler(): Promise<void> {
-  if (process.env.DISABLE_REVIEW_RESPONSE_SCHEDULER === 'true') {
-    logger.info('[ReviewResponseScheduler] Disabled by env var');
-    return;
-  }
-
-  if (reviewResponseIntervalId) {
-    logger.info('[ReviewResponseScheduler] Already running');
-    return;
-  }
-
   const intervalHours = unifiedConfig.marketingOpsReviewResponseSchedulerIntervalHours;
-  const intervalMs = intervalHours * 60 * 60 * 1000;
+  configuredIntervalMs = intervalHours * 60 * 60 * 1000;
   logger.info(`[ReviewResponseScheduler] Starting scheduler (every ${intervalHours}h)`);
 
-  setTimeout(() => {
-    runReviewResponseScheduler();
-  }, STARTUP_DELAY_MS);
-
-  reviewResponseIntervalId = setInterval(() => {
-    runReviewResponseScheduler();
-  }, intervalMs);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Review pipeline gates, auto-advance, thread closing',
+    scheduleLabel: `every ${intervalHours} hours`,
+    envDisableVar: 'DISABLE_REVIEW_RESPONSE_SCHEDULER',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : configuredIntervalMs),
+    handler: async () => runReviewResponseScheduler(),
+  });
 }
 
 export function stopReviewResponseScheduler(): void {
-  if (reviewResponseIntervalId) {
-    clearInterval(reviewResponseIntervalId);
-    reviewResponseIntervalId = null;
-    logger.info('[ReviewResponseScheduler] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

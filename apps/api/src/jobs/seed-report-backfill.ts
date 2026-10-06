@@ -26,12 +26,13 @@
 
 import { logger } from '../logger';
 import { prisma } from '../prisma';
-import { unifiedConfig } from '../config/unifiedConfig';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'seed-report-backfill';
 const STARTUP_DELAY_MS = 7 * 60 * 1000; // 7 minutes — stagger after the other startup jobs
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-let backfillIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runSeedReportBackfill(): Promise<void> {
   logger.info('[SeedReportBackfill] Starting backfill sweep...');
@@ -105,31 +106,16 @@ async function runSeedReportBackfill(): Promise<void> {
 }
 
 export async function startSeedReportBackfillJob(): Promise<void> {
-  if (unifiedConfig.disableSeedReportBackfillJob) {
-    logger.info('[SeedReportBackfill] Disabled by env var');
-    return;
-  }
-
-  if (backfillIntervalId) {
-    logger.info('[SeedReportBackfill] Already running');
-    return;
-  }
-
-  logger.info('[SeedReportBackfill] Starting scheduler (every 24h)');
-
-  setTimeout(() => {
-    runSeedReportBackfill();
-  }, STARTUP_DELAY_MS);
-
-  backfillIntervalId = setInterval(() => {
-    runSeedReportBackfill();
-  }, INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Generates first report version for live seeds',
+    scheduleLabel: 'daily',
+    envDisableVar: 'DISABLE_SEED_REPORT_BACKFILL_JOB',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : INTERVAL_MS),
+    handler: async () => runSeedReportBackfill(),
+  });
 }
 
 export function stopSeedReportBackfillJob(): void {
-  if (backfillIntervalId) {
-    clearInterval(backfillIntervalId);
-    backfillIntervalId = null;
-    logger.info('[SeedReportBackfill] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

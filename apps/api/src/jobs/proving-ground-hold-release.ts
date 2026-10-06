@@ -14,10 +14,13 @@
 import { logger } from '../logger';
 import ProvingGroundCadenceService from '../services/ProvingGroundCadenceService';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'proving-ground-hold-release';
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes
 
-let holdReleaseIntervalId: NodeJS.Timeout | null = null;
+let configuredIntervalMs = 60 * 60 * 1000;
+let firstRun = true;
 
 async function runProvingGroundHoldRelease(): Promise<void> {
   logger.info('[ProvingGroundHoldRelease] Starting due-hold release sweep...');
@@ -37,33 +40,20 @@ async function runProvingGroundHoldRelease(): Promise<void> {
 }
 
 export async function startProvingGroundHoldRelease(): Promise<void> {
-  if (unifiedConfig.disableProvingGroundHoldReleaseJob) {
-    logger.info('[ProvingGroundHoldRelease] Disabled by env var');
-    return;
-  }
-
-  if (holdReleaseIntervalId) {
-    logger.info('[ProvingGroundHoldRelease] Already running');
-    return;
-  }
-
   const intervalHours = unifiedConfig.provingGroundHoldReleaseIntervalHours;
-  const intervalMs = intervalHours * 60 * 60 * 1000;
+  configuredIntervalMs = intervalHours * 60 * 60 * 1000;
   logger.info(`[ProvingGroundHoldRelease] Starting scheduler (every ${intervalHours}h)`);
 
-  setTimeout(() => {
-    runProvingGroundHoldRelease();
-  }, STARTUP_DELAY_MS);
-
-  holdReleaseIntervalId = setInterval(() => {
-    runProvingGroundHoldRelease();
-  }, intervalMs);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Re-enters hold prospects into the queued worklist',
+    scheduleLabel: `every ${intervalHours} hour(s)`,
+    envDisableVar: 'DISABLE_PROVING_GROUND_HOLD_RELEASE_JOB',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : configuredIntervalMs),
+    handler: async () => runProvingGroundHoldRelease(),
+  });
 }
 
 export function stopProvingGroundHoldRelease(): void {
-  if (holdReleaseIntervalId) {
-    clearInterval(holdReleaseIntervalId);
-    holdReleaseIntervalId = null;
-    logger.info('[ProvingGroundHoldRelease] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

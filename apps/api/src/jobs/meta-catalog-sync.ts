@@ -9,11 +9,14 @@
 import { prisma } from '../prisma';
 import { fullCatalogSync } from '../services/MetaCatalogSyncService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'meta-catalog-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const STARTUP_DELAY_MS = 120 * 1000; // 2 min initial delay
 const BATCH_DELAY_MS = 5000; // 5s between tenants to avoid rate limits
 
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runMetaCatalogSync(): Promise<void> {
   try {
@@ -81,26 +84,16 @@ async function runMetaCatalogSync(): Promise<void> {
 }
 
 export function startMetaCatalogSync(): void {
-  if (syncIntervalId) {
-    logger.warn('Meta catalog sync job already running');
-    return;
-  }
-
-  setTimeout(() => {
-    runMetaCatalogSync();
-  }, 120000); // 2 min initial delay
-
-  syncIntervalId = setInterval(() => {
-    runMetaCatalogSync();
-  }, SYNC_INTERVAL_MS);
-
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Meta/Facebook catalog sync',
+    scheduleLabel: 'every 6 hours',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runMetaCatalogSync(),
+  });
   logger.info('Meta catalog sync job started (every 6 hours)');
 }
 
 export function stopMetaCatalogSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    logger.info('Meta catalog sync job stopped');
-  }
+  stopJob(JOB_NAME);
 }

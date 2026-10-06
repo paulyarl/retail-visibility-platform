@@ -18,6 +18,7 @@ import { getSubscriptionBillingService } from '../services/subscription/Subscrip
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
 /**
  * Calculate the renewal charge amount based on coupon metadata.
@@ -728,41 +729,28 @@ async function autoPauseFunnels(tenantId: string, reason: string): Promise<void>
  * Start the scheduled job
  * Runs daily at midnight
  */
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'bsaas-renewal';
 
-export function startBsaasRenewalJob(): void {
-  if (jobInterval) {
-    console.log('[BSaaS Renewal] Job already running');
-    return;
-  }
-
-  const now = new Date();
-  const tomorrow = new Date(now);
+/** ms until the next local midnight — always a future delay. */
+function nextMidnightDelay(): number {
+  const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
-  const msUntilMidnight = tomorrow.getTime() - now.getTime();
+  return tomorrow.getTime() - Date.now();
+}
 
-  console.log(`[BSaaS Renewal] Scheduling first run in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
-
-  setTimeout(() => {
-    processBsaasRenewals().catch(console.error);
-
-    jobInterval = setInterval(() => {
-      processBsaasRenewals().catch(console.error);
-    }, 24 * 60 * 60 * 1000);
-
-    console.log('[BSaaS Renewal] Daily job started');
-  }, msUntilMidnight);
-
-  console.log('[BSaaS Renewal] Scheduler initialized');
+export function startBsaasRenewalJob(): void {
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'BSaaS feature renewals, grace periods, trial conversions',
+    scheduleLabel: 'daily at midnight',
+    computeNextDelay: nextMidnightDelay,
+    handler: async () => processBsaasRenewals(),
+  });
 }
 
 export function stopBsaasRenewalJob(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[BSaaS Renewal] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

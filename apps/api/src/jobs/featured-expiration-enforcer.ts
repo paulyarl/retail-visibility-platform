@@ -15,6 +15,7 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 import { invalidateActiveFeaturedCache } from '../services/ActiveFeaturedResolver';
 import CrmAlertService from '../services/CrmAlertService';
 import { generateBadgeEventId } from '../lib/id-generator';
@@ -231,43 +232,27 @@ async function getProductName(inventoryItemId: string): Promise<string> {
 // SCHEDULER
 // ====================
 
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'featured-expiration-enforcer';
 const RUN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+let firstRun = true;
 
 /**
  * Start the expiration enforcer job.
  * Runs every 5 minutes.
  */
 export function startFeaturedExpirationEnforcer(): void {
-  if (jobInterval) {
-    console.log('[FeaturedExpirationEnforcer] Job already running');
-    return;
-  }
-
-  console.log('[FeaturedExpirationEnforcer] Starting job (runs every 5 minutes)');
-
-  // Run immediately on start
-  processExpiredFeatured().catch(err => {
-    logger.error('[FeaturedExpirationEnforcer] Initial run failed', undefined, { error: err instanceof Error ? err.message : String(err) });
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Enforces featured product expirations',
+    scheduleLabel: 'every 5 minutes',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 5_000) : RUN_INTERVAL_MS),
+    handler: async () => processExpiredFeatured(),
   });
-
-  // Then run on interval
-  jobInterval = setInterval(() => {
-    processExpiredFeatured().catch(err => {
-      logger.error('[FeaturedExpirationEnforcer] Scheduled run failed', undefined, { error: err instanceof Error ? err.message : String(err) });
-    });
-  }, RUN_INTERVAL_MS);
-
-  console.log('[FeaturedExpirationEnforcer] Job started');
 }
 
 /**
  * Stop the expiration enforcer job.
  */
 export function stopFeaturedExpirationEnforcer(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[FeaturedExpirationEnforcer] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }

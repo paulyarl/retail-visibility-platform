@@ -12,10 +12,12 @@
 import { prisma } from '../prisma';
 import { aggregateQrAnalyticsForTenant, type PeriodType } from '../services/QrAnalyticsService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'qr-analytics-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 12 * 60 * 1000; // 12 minutes (after badge analytics sync)
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 export interface QrAnalyticsSyncResult {
   tenantsProcessed: number;
@@ -90,31 +92,16 @@ async function runScheduledSync(): Promise<QrAnalyticsSyncResult> {
 }
 
 export async function startQrAnalyticsSync(): Promise<void> {
-  if (process.env.DISABLE_QR_ANALYTICS_SYNC === 'true') {
-    console.log('[QrAnalyticsSync] Disabled via DISABLE_QR_ANALYTICS_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[QrAnalyticsSync] Already running');
-    return;
-  }
-
-  console.log(`[QrAnalyticsSync] Starting scheduler (every 6 hours)`);
-
-  setTimeout(() => {
-    runScheduledSync().catch(console.error);
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync().catch(console.error);
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Aggregates qr_scan_events into qr_analytics',
+    scheduleLabel: 'every 6 hours',
+    envDisableVar: 'DISABLE_QR_ANALYTICS_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 export function stopQrAnalyticsSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[QrAnalyticsSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

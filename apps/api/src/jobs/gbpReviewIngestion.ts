@@ -19,12 +19,14 @@ import { logger } from '../logger';
 import { CrmAlertService } from '../services/CrmAlertService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { listReviews } from '../services/GBPAdvancedSync';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'gbp-review-ingestion';
 const HOURLY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 const PAGE_SIZE = 50;
 
-let reviewIngestionIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 // ── Sentiment tagging (v1 — rule-based, no external API) ─────────────────
 
@@ -257,37 +259,22 @@ async function runHourlyIngestion(): Promise<void> {
  * Start the scheduled GBP review ingestion job (hourly).
  */
 export async function startGbpReviewIngestion(): Promise<void> {
-  if (process.env.DISABLE_GBP_REVIEW_INGESTION === 'true') {
-    logger.info('[GbpReviewIngestion] Disabled by env var');
-    return;
-  }
-
-  if (reviewIngestionIntervalId) {
-    logger.info('[GbpReviewIngestion] Already running');
-    return;
-  }
-
-  logger.info('[GbpReviewIngestion] Starting scheduler (hourly)');
-
-  // Delay first run to avoid firing on nodemon restarts
-  setTimeout(() => {
-    runHourlyIngestion();
-  }, STARTUP_DELAY_MS);
-
-  reviewIngestionIntervalId = setInterval(() => {
-    runHourlyIngestion();
-  }, HOURLY_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Polls Google reviews, refreshes ratings, fires CRM alerts',
+    scheduleLabel: 'hourly',
+    envDisableVar: 'DISABLE_GBP_REVIEW_INGESTION',
+    // Delay first run to avoid firing on nodemon restarts
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : HOURLY_INTERVAL_MS),
+    handler: async () => runHourlyIngestion(),
+  });
 }
 
 /**
  * Stop the scheduled GBP review ingestion job.
  */
 export function stopGbpReviewIngestion(): void {
-  if (reviewIngestionIntervalId) {
-    clearInterval(reviewIngestionIntervalId);
-    reviewIngestionIntervalId = null;
-    logger.info('[GbpReviewIngestion] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

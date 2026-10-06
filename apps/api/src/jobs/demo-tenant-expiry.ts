@@ -7,9 +7,11 @@
 
 import demoTenantService from '../services/DemoTenantService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'demo-tenant-expiry';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-let intervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runExpiryCheck(): Promise<void> {
   try {
@@ -37,29 +39,15 @@ async function runExpiryCheck(): Promise<void> {
 }
 
 export function startDemoExpiryJob(): void {
-  if (intervalId) {
-    console.log('[Demo Expiry Job] Already running');
-    return;
-  }
-
-  console.log('[Demo Expiry Job] Starting (runs every 1 hour)');
-
-  // Run immediately on startup
-  runExpiryCheck().catch(err =>
-    logger.error('[Demo Expiry Job] Initial run failed:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } })
-  );
-
-  intervalId = setInterval(() => {
-    runExpiryCheck().catch(err =>
-      logger.error('[Demo Expiry Job] Scheduled run failed:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } })
-    );
-  }, CHECK_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Expires demo tenants past their demo_expires_at',
+    scheduleLabel: 'every hour',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 5_000) : CHECK_INTERVAL_MS),
+    handler: async () => runExpiryCheck(),
+  });
 }
 
 export function stopDemoExpiryJob(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-    console.log('[Demo Expiry Job] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

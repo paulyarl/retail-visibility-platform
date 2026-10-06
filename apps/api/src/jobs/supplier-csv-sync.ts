@@ -12,10 +12,12 @@
 import { prisma } from '../prisma';
 import SupplierCatalogService, { type BatchIngestRow } from '../services/SupplierCatalogService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'supplier-csv-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 10 * 60 * 1000; // 10 minutes
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 /**
  * Parse a CSV text into rows of BatchIngestRow.
@@ -138,34 +140,19 @@ async function runScheduledSync(): Promise<void> {
  * Start the scheduled CSV sync job.
  */
 export async function startSupplierCsvSync(): Promise<void> {
-  if (process.env.DISABLE_SUPPLIER_CSV_SYNC === 'true') {
-    console.log('[SupplierCsvSync] Disabled via DISABLE_SUPPLIER_CSV_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[SupplierCsvSync] Already running');
-    return;
-  }
-
-  console.log('[SupplierCsvSync] Starting scheduler (every 6 hours)');
-
-  setTimeout(() => {
-    runScheduledSync();
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync();
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Supplier CSV feed sync',
+    scheduleLabel: 'every 6 hours',
+    envDisableVar: 'DISABLE_SUPPLIER_CSV_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 /**
  * Stop the scheduled CSV sync job.
  */
 export function stopSupplierCsvSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[SupplierCsvSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

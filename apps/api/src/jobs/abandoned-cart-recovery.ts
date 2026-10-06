@@ -7,13 +7,16 @@
 
 import { abandonedCartService } from '../services/AbandonedCartService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'abandoned-cart-recovery';
 const RECOVERY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const STARTUP_DELAY_MS = 60 * 1000; // 1 min initial delay
 const MIN_AGE_HOURS = 1;
 const MAX_AGE_HOURS = 24;
 const BATCH_DELAY_MS = 2000; // 2s between emails to avoid rate limits
 
-let recoveryIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runRecoveryJob(): Promise<void> {
   try {
@@ -67,26 +70,17 @@ async function runRecoveryJob(): Promise<void> {
 }
 
 export function startAbandonedCartRecovery(): void {
-  if (recoveryIntervalId) {
-    logger.warn('Abandoned cart recovery job already running', undefined, {});
-    return;
-  }
-
-  setTimeout(() => {
-    runRecoveryJob();
-  }, 60000); // 1 min initial delay
-
-  recoveryIntervalId = setInterval(() => {
-    runRecoveryJob();
-  }, RECOVERY_INTERVAL_MS);
-
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Sends abandoned cart recovery emails',
+    scheduleLabel: 'every 30 minutes',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : RECOVERY_INTERVAL_MS),
+    handler: async () => runRecoveryJob(),
+  });
   logger.info('Abandoned cart recovery job started (every 30 minutes)', undefined, {});
 }
 
 export function stopAbandonedCartRecovery(): void {
-  if (recoveryIntervalId) {
-    clearInterval(recoveryIntervalId);
-    recoveryIntervalId = null;
-    logger.info('Abandoned cart recovery job stopped', undefined, {});
-  }
+  stopJob(JOB_NAME);
+  logger.info('Abandoned cart recovery job stopped', undefined, {});
 }

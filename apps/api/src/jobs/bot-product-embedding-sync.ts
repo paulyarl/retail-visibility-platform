@@ -7,10 +7,13 @@
 import { prisma } from '../prisma';
 import BotRagService from '../services/BotRagService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'bot-product-embedding-sync';
 const DEFAULT_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes after server start (avoids firing on nodemon restarts)
-let syncIntervalId: NodeJS.Timeout | null = null;
+let configuredIntervalMs = DEFAULT_SYNC_INTERVAL_MS;
+let firstRun = true;
 
 /**
  * Get the configured sync interval from platform settings.
@@ -124,45 +127,33 @@ async function runScheduledSync(): Promise<void> {
  * Start the scheduled product embedding sync job.
  */
 export async function startBotProductEmbeddingSync(): Promise<void> {
-  if (process.env.DISABLE_BOT_EMBEDDING_SYNC === 'true') {
-    console.log('[BotProductEmbeddingSync] Disabled via DISABLE_BOT_EMBEDDING_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[BotProductEmbeddingSync] Already running');
-    return;
-  }
-
   const intervalMs = await getSyncIntervalMs();
   if (intervalMs === 0) {
     console.log('[BotProductEmbeddingSync] Sync interval is 0 (manual only), scheduler not started');
     return;
   }
+  configuredIntervalMs = intervalMs;
 
   const hours = intervalMs / 1000 / 60 / 60;
   console.log(`[BotProductEmbeddingSync] Starting scheduler (every ${hours} hours)`);
 
-  // Check platform settings before first run; if disabled, still set up the interval
-  // so it can self-activate when settings change (the runScheduledSync will no-op)
-  setTimeout(() => {
-    runScheduledSync();
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync();
-  }, intervalMs);
+  // runScheduledSync checks platform settings each run — stays registered so it
+  // self-activates when the admin re-enables embedding sync.
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Product embedding sync for the bot platform (platform-settings gated)',
+    scheduleLabel: `every ${hours} hours`,
+    envDisableVar: 'DISABLE_BOT_EMBEDDING_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : configuredIntervalMs),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 /**
  * Stop the scheduled product embedding sync job.
  */
 export function stopBotProductEmbeddingSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[BotProductEmbeddingSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

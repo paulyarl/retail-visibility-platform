@@ -8,11 +8,13 @@ import { prisma } from '../prisma';
 import { PayPalOAuthService } from '../services/paypal/PayPalOAuthService';
 import { SquareOAuthService } from '../services/square/SquareOAuthService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'oauth-token-refresh';
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const TOKEN_EXPIRY_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours before expiry
 
-let refreshIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 interface TokenRefreshResult {
   tenantId: string;
@@ -119,33 +121,21 @@ async function runScheduledRefresh(): Promise<void> {
  * Start the scheduled token refresh job
  */
 export function startOAuthTokenRefresh(): void {
-  if (refreshIntervalId) {
-    console.log('[OAuth Token Refresh] Already running');
-    return;
-  }
-
-  console.log(`[OAuth Token Refresh] Starting scheduler (every ${REFRESH_INTERVAL_MS / 1000 / 60} minutes)`);
-  
-  // Run immediately on startup (after a short delay to let server initialize)
-  setTimeout(() => {
-    runScheduledRefresh();
-  }, 60000); // 1 minute delay after startup
-
-  // Then run on interval
-  refreshIntervalId = setInterval(() => {
-    runScheduledRefresh();
-  }, REFRESH_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Refreshes expiring OAuth tokens',
+    scheduleLabel: `every ${REFRESH_INTERVAL_MS / 1000 / 60} minutes`,
+    // Short delay on first run to let the server initialize
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 60_000) : REFRESH_INTERVAL_MS),
+    handler: async () => runScheduledRefresh(),
+  });
 }
 
 /**
  * Stop the scheduled token refresh job
  */
 export function stopOAuthTokenRefresh(): void {
-  if (refreshIntervalId) {
-    clearInterval(refreshIntervalId);
-    refreshIntervalId = null;
-    console.log('[OAuth Token Refresh] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

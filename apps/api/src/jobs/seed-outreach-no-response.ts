@@ -15,11 +15,13 @@ import { logger } from '../logger';
 import { prisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'seed-outreach-no-response';
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-let noResponseIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runSeedOutreachNoResponse(): Promise<void> {
   logger.info('[SeedOutreachNoResponse] Starting no-response sweep...');
@@ -68,31 +70,16 @@ async function runSeedOutreachNoResponse(): Promise<void> {
 }
 
 export async function startSeedOutreachNoResponseJob(): Promise<void> {
-  if (unifiedConfig.disableSeedOutreachNoResponseJob) {
-    logger.info('[SeedOutreachNoResponse] Disabled by env var');
-    return;
-  }
-
-  if (noResponseIntervalId) {
-    logger.info('[SeedOutreachNoResponse] Already running');
-    return;
-  }
-
-  logger.info(`[SeedOutreachNoResponse] Starting scheduler (every 24h, ${unifiedConfig.seedOutreachNoResponseDays}d threshold)`);
-
-  setTimeout(() => {
-    runSeedOutreachNoResponse();
-  }, STARTUP_DELAY_MS);
-
-  noResponseIntervalId = setInterval(() => {
-    runSeedOutreachNoResponse();
-  }, INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Marks stale outreach seeds as no_response',
+    scheduleLabel: 'daily',
+    envDisableVar: 'DISABLE_SEED_OUTREACH_NO_RESPONSE_JOB',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : INTERVAL_MS),
+    handler: async () => runSeedOutreachNoResponse(),
+  });
 }
 
 export function stopSeedOutreachNoResponseJob(): void {
-  if (noResponseIntervalId) {
-    clearInterval(noResponseIntervalId);
-    noResponseIntervalId = null;
-    logger.info('[SeedOutreachNoResponse] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

@@ -16,9 +16,9 @@
 
 import { logger } from '../logger';
 import galleryAnalyticsService from '../services/GalleryAnalyticsService';
+import { scheduleJob, stopJob } from './registry';
 
-let jobInterval: NodeJS.Timeout | null = null;
-let jobTimeout: NodeJS.Timeout | null = null;
+const JOB_NAME = 'gallery-analytics-sync';
 
 async function runAggregation(): Promise<void> {
   const startTime = Date.now();
@@ -41,52 +41,27 @@ async function runAggregation(): Promise<void> {
  * Start the scheduled job — runs daily at 2:00 AM UTC.
  * Mirrors log-purge.ts scheduling pattern.
  */
+/** ms until the next 2:00 AM UTC — always a future delay. */
+function nextDailyRunDelay(): number {
+  const next = new Date();
+  next.setUTCDate(next.getUTCDate() + 1);
+  next.setUTCHours(2, 0, 0, 0);
+  return next.getTime() - Date.now();
+}
+
 export function startGalleryAnalyticsSync(): void {
-  if (jobInterval || jobTimeout) {
-    logger.info('[GalleryAnalyticsSync] Job already running');
-    return;
-  }
-
-  // Calculate time until next 2:00 AM UTC
-  const now = new Date();
-  const nextRun = new Date(now);
-  nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-  nextRun.setUTCHours(2, 0, 0, 0);
-
-  const msUntilNextRun = nextRun.getTime() - now.getTime();
-
-  logger.info(`[GalleryAnalyticsSync] Scheduling first run in ${Math.round(msUntilNextRun / 1000 / 60)} minutes`);
-
-  jobTimeout = setTimeout(() => {
-    runAggregation().catch((err) => {
-      logger.error('[GalleryAnalyticsSync] Unhandled error in first run', undefined, {
-        error: { name: err.name, message: err.message, stack: err.stack },
-      });
-    });
-
-    jobInterval = setInterval(() => {
-      runAggregation().catch((err) => {
-        logger.error('[GalleryAnalyticsSync] Unhandled error', undefined, {
-          error: { name: err.name, message: err.message, stack: err.stack },
-        });
-      });
-    }, 24 * 60 * 60 * 1000);
-
-    logger.info('[GalleryAnalyticsSync] Daily job started (2:00 AM UTC)');
-  }, msUntilNextRun);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Gallery analytics aggregation',
+    scheduleLabel: 'daily at 2 AM UTC',
+    computeNextDelay: nextDailyRunDelay,
+    handler: async () => runAggregation(),
+  });
 }
 
 /**
  * Stop the scheduled job (for testing / graceful shutdown).
  */
 export function stopGalleryAnalyticsSync(): void {
-  if (jobTimeout) {
-    clearTimeout(jobTimeout);
-    jobTimeout = null;
-  }
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-  }
-  logger.info('[GalleryAnalyticsSync] Job stopped');
+  stopJob(JOB_NAME);
 }

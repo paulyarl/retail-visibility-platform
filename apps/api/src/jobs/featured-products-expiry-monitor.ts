@@ -17,6 +17,7 @@ import { prisma } from '../prisma';
 import { CrmTaskService } from '../services/CrmTaskService';
 import FeaturedOptionsService from '../services/FeaturedOptionsService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
 export interface FeaturedExpiryMonitorResult {
   autoUnfeatured: number;
@@ -215,49 +216,33 @@ function groupByTenant(products: any[]): Map<string, any[]> {
 
 /**
  * Start the scheduled job
- * Runs daily at midnight
+ * Runs daily at 00:05
  */
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'featured-products-expiry-monitor';
+
+/** ms until the next 00:05 — always a future delay. */
+function nextDailyRunDelay(): number {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  next.setHours(0, 5, 0, 0); // 00:05 to avoid collision with grace period job
+  return next.getTime() - Date.now();
+}
 
 export function startFeaturedExpiryMonitor(): void {
-  if (jobInterval) {
-    console.log('[FeaturedExpiryMonitor] Job already running');
-    return;
-  }
-
-  // Calculate time until next midnight
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 5, 0, 0); // 00:05 UTC to avoid collision with grace period job
-  const msUntilMidnight = tomorrow.getTime() - now.getTime();
-
-  console.log(`[FeaturedExpiryMonitor] Scheduling first run in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
-
-  // Schedule first run at midnight
-  setTimeout(() => {
-    processFeaturedProductsExpiry().catch(console.error);
-
-    // Then run every 24 hours
-    jobInterval = setInterval(() => {
-      processFeaturedProductsExpiry().catch(console.error);
-    }, 24 * 60 * 60 * 1000);
-
-    console.log('[FeaturedExpiryMonitor] Daily job started');
-  }, msUntilMidnight);
-
-  console.log('[FeaturedExpiryMonitor] Scheduler initialized');
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Deactivates expired featured products and alerts tenants',
+    scheduleLabel: 'daily at 00:05',
+    computeNextDelay: nextDailyRunDelay,
+    handler: async () => processFeaturedProductsExpiry(),
+  });
 }
 
 /**
  * Stop the scheduled job
  */
 export function stopFeaturedExpiryMonitor(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[FeaturedExpiryMonitor] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

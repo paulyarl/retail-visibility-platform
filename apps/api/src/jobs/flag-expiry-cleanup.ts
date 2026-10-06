@@ -11,12 +11,14 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'flag-expiry-cleanup';
 const STARTUP_DELAY_MS = 60 * 1000; // 1 minute
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_STALE_DAYS = 90;
 
-let cleanupIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runFlagExpiryCleanup(): Promise<void> {
   console.log('[FlagExpiryCleanup] Starting stale flag cleanup...');
@@ -65,31 +67,16 @@ async function runFlagExpiryCleanup(): Promise<void> {
 }
 
 export async function startFlagExpiryCleanup(): Promise<void> {
-  if (process.env.DISABLE_FLAG_EXPIRY_CLEANUP === 'true') {
-    console.log('[FlagExpiryCleanup] Disabled by env var');
-    return;
-  }
-
-  if (cleanupIntervalId) {
-    console.log('[FlagExpiryCleanup] Already running');
-    return;
-  }
-
-  console.log('[FlagExpiryCleanup] Starting scheduler (daily)');
-
-  setTimeout(() => {
-    runFlagExpiryCleanup();
-  }, STARTUP_DELAY_MS);
-
-  cleanupIntervalId = setInterval(() => {
-    runFlagExpiryCleanup();
-  }, INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Removes stale tenant flag overrides',
+    scheduleLabel: 'daily',
+    envDisableVar: 'DISABLE_FLAG_EXPIRY_CLEANUP',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : INTERVAL_MS),
+    handler: async () => runFlagExpiryCleanup(),
+  });
 }
 
 export function stopFlagExpiryCleanup(): void {
-  if (cleanupIntervalId) {
-    clearInterval(cleanupIntervalId);
-    cleanupIntervalId = null;
-    console.log('[FlagExpiryCleanup] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

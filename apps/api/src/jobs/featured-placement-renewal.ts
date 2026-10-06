@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 import { invalidateActiveFeaturedCache } from '../services/ActiveFeaturedResolver';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import CrmAlertService from '../services/CrmAlertService';
@@ -518,43 +519,27 @@ async function getProductName(inventoryItemId: string): Promise<string> {
 // SCHEDULER
 // ====================
 
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'featured-placement-renewal';
 const RUN_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+let firstRun = true;
 
 /**
  * Start the placement renewal job.
  * Runs daily.
  */
 export function startPlacementRenewalJob(): void {
-  if (jobInterval) {
-    console.log('[PlacementRenewal] Job already running');
-    return;
-  }
-
-  console.log('[PlacementRenewal] Starting daily renewal job');
-
-  // Run immediately on start
-  processPlacementRenewals().catch(err => {
-    logger.error('[PlacementRenewal] Initial run failed', undefined, { error: err instanceof Error ? err.message : String(err) });
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Featured placement auto-renewals, grace periods, trials',
+    scheduleLabel: 'daily',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 5_000) : RUN_INTERVAL_MS),
+    handler: async () => processPlacementRenewals(),
   });
-
-  // Then run daily
-  jobInterval = setInterval(() => {
-    processPlacementRenewals().catch(err => {
-      logger.error('[PlacementRenewal] Scheduled run failed', undefined, { error: err instanceof Error ? err.message : String(err) });
-    });
-  }, RUN_INTERVAL_MS);
-
-  console.log('[PlacementRenewal] Job started (runs every 24 hours)');
 }
 
 /**
  * Stop the placement renewal job.
  */
 export function stopPlacementRenewalJob(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[PlacementRenewal] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }

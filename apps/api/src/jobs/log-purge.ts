@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
 export interface LogPurgeResult {
   dbRowsDeleted: number;
@@ -117,51 +118,29 @@ export async function runLogPurge(): Promise<LogPurgeResult> {
 /**
  * Start the scheduled job — runs daily at 2 AM UTC
  */
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'log-purge';
+
+/** ms until the next 2:00 AM UTC — always a future delay. */
+function nextDailyRunDelay(): number {
+  const next = new Date();
+  next.setUTCDate(next.getUTCDate() + 1);
+  next.setUTCHours(2, 0, 0, 0);
+  return next.getTime() - Date.now();
+}
 
 export function startLogPurgeJob(): void {
-  if (jobInterval) {
-    logger.info('[LogPurgeJob] Job already running');
-    return;
-  }
-
-  // Calculate time until next 2 AM UTC
-  const now = new Date();
-  const nextRun = new Date(now);
-  nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-  nextRun.setUTCHours(2, 0, 0, 0);
-  const msUntilNextRun = nextRun.getTime() - now.getTime();
-
-  logger.info(`[LogPurgeJob] Scheduling first run in ${Math.round(msUntilNextRun / 1000 / 60)} minutes`);
-
-  setTimeout(() => {
-    runLogPurge().catch((err) => {
-      logger.error('[LogPurgeJob] Unhandled error', undefined, {
-        error: { name: err.name, message: err.message, stack: err.stack },
-      });
-    });
-
-    jobInterval = setInterval(() => {
-      runLogPurge().catch((err) => {
-        logger.error('[LogPurgeJob] Unhandled error', undefined, {
-          error: { name: err.name, message: err.message, stack: err.stack },
-        });
-      });
-    }, 24 * 60 * 60 * 1000);
-
-    logger.info('[LogPurgeJob] Daily job started (2 AM UTC)');
-  }, msUntilNextRun);
-
-  logger.info('[LogPurgeJob] Scheduler initialized');
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Purges old application logs (DB + file)',
+    scheduleLabel: 'daily at 2 AM UTC',
+    computeNextDelay: nextDailyRunDelay,
+    handler: async () => runLogPurge(),
+  });
 }
 
 /**
  * Stop the scheduled job
  */
 export function stopLogPurgeJob(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    logger.info('[LogPurgeJob] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }

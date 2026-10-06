@@ -16,10 +16,12 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'supplier-auto-sync';
 const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 /**
  * Run auto-sync for all mappings with sync_mode='auto'.
@@ -158,34 +160,19 @@ async function runScheduledSync(): Promise<void> {
  * Start the scheduled auto-sync job.
  */
 export async function startSupplierAutoSync(): Promise<void> {
-  if (process.env.DISABLE_SUPPLIER_AUTO_SYNC === 'true') {
-    console.log('[SupplierAutoSync] Disabled via DISABLE_SUPPLIER_AUTO_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[SupplierAutoSync] Already running');
-    return;
-  }
-
-  console.log('[SupplierAutoSync] Starting scheduler (every 1 hour)');
-
-  setTimeout(() => {
-    runScheduledSync();
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync();
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Automatic supplier sync',
+    scheduleLabel: 'every hour',
+    envDisableVar: 'DISABLE_SUPPLIER_AUTO_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 /**
  * Stop the scheduled auto-sync job.
  */
 export function stopSupplierAutoSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[SupplierAutoSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

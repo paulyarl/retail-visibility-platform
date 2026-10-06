@@ -10,8 +10,12 @@
 
 import { logger } from '../logger';
 import wholesaleMatchingService from '../services/WholesaleMatchingService';
+import { scheduleJob, stopJob } from './registry';
 
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'affiliate-click-expiry';
+const INTERVAL_MS = 24 * 60 * 60 * 1000; // daily
+
+let firstRun = true;
 
 export async function processClickExpiry(): Promise<number> {
   try {
@@ -33,37 +37,18 @@ export async function processClickExpiry(): Promise<number> {
  * Runs daily.
  */
 export function startAffiliateClickExpiryJob(): void {
-  if (jobInterval) {
-    console.log('[AffiliateClickExpiry] Job already running');
-    return;
-  }
-
-  console.log('[AffiliateClickExpiry] Starting daily click expiry job');
-
-  // Run immediately on start
-  processClickExpiry().catch(err => {
-    logger.error('[AffiliateClickExpiry] Initial run failed', undefined, {
-      error: err instanceof Error ? err.message : String(err),
-    });
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Marks pending affiliate clicks expired after 30 days',
+    scheduleLabel: 'daily',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 5_000) : INTERVAL_MS),
+    handler: async () => processClickExpiry(),
   });
-
-  // Then run daily (24 hours)
-  jobInterval = setInterval(() => {
-    processClickExpiry().catch(err => {
-      logger.error('[AffiliateClickExpiry] Scheduled run failed', undefined, {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
-  }, 24 * 60 * 60 * 1000);
 }
 
 /**
  * Stop the affiliate click expiry job.
  */
 export function stopAffiliateClickExpiryJob(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[AffiliateClickExpiry] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }

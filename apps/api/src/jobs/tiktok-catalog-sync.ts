@@ -9,11 +9,14 @@
 import { prisma } from '../prisma';
 import { fullCatalogSync } from '../services/TikTokCatalogSyncService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'tiktok-catalog-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const STARTUP_DELAY_MS = 180 * 1000; // 3 min initial delay
 const BATCH_DELAY_MS = 5000; // 5s between tenants
 
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runTikTokCatalogSync(): Promise<void> {
   try {
@@ -81,26 +84,16 @@ async function runTikTokCatalogSync(): Promise<void> {
 }
 
 export function startTikTokCatalogSync(): void {
-  if (syncIntervalId) {
-    logger.warn('TikTok catalog sync job already running');
-    return;
-  }
-
-  setTimeout(() => {
-    runTikTokCatalogSync();
-  }, 180000); // 3 min initial delay
-
-  syncIntervalId = setInterval(() => {
-    runTikTokCatalogSync();
-  }, SYNC_INTERVAL_MS);
-
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'TikTok catalog sync',
+    scheduleLabel: 'every 6 hours',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runTikTokCatalogSync(),
+  });
   logger.info('TikTok catalog sync job started (every 6 hours)');
 }
 
 export function stopTikTokCatalogSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    logger.info('TikTok catalog sync job stopped');
-  }
+  stopJob(JOB_NAME);
 }

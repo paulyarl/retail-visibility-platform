@@ -154,7 +154,9 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'seed-report-backfill', scheduleLabel: 'daily', description: 'Generates first report version for live seeds' },
           { name: 'review-response-scheduler', scheduleLabel: 'every 6 hours', description: 'Review pipeline gates, auto-advance, thread closing' },
           { name: 'recovery-resolution', scheduleLabel: 'every 5 minutes', description: 'Runs pending recovery_resolution prompt executions' },
+          { name: 'recovery-orphan-purge', scheduleLabel: 'every hour', description: 'Purges orphaned recovery attachments older than 7 days' },
           { name: 'recovery-delivery-retry', scheduleLabel: 'every 15 minutes', description: 'Retries failed deliveries with backoff' },
+          { name: 'supplier-opensource-sync-nightly', scheduleLabel: 'nightly backfill', description: 'Open-source supplier nightly backfill' },
           { name: 'gbp-review-ingestion', scheduleLabel: 'hourly', description: 'Polls Google reviews, refreshes ratings, fires CRM alerts' },
           { name: 'gbp-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled GBP posts' },
         ]);

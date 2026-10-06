@@ -10,10 +10,12 @@ import { prisma } from '../prisma';
 import { syncProduct } from '../services/GMCProductSync';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'gmc-sync-retry';
 const RETRY_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
 const MAX_RETRIES = 3;
-let retryIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 /**
  * Get all tenants with active GMC connections
@@ -201,32 +203,21 @@ async function runRetryCycle(): Promise<void> {
  * Start the retry job
  */
 export function startGMCSyncRetry(): void {
-  if (retryIntervalId) {
-    console.log('[GMC Sync Retry] Already running');
-    return;
-  }
-
-  console.log(`[GMC Sync Retry] Starting retry job (every ${RETRY_INTERVAL_MS / 1000 / 60} minutes)`);
-
-  // Run after a short delay to let server initialize (and after the scheduled sync has run)
-  setTimeout(() => {
-    runRetryCycle();
-  }, 60000); // 1 minute after startup
-
-  retryIntervalId = setInterval(() => {
-    runRetryCycle();
-  }, RETRY_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Retries failed GMC syncs',
+    scheduleLabel: `every ${RETRY_INTERVAL_MS / 1000 / 60} minutes`,
+    // Run after a short delay to let server initialize (and after the scheduled sync has run)
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 60_000) : RETRY_INTERVAL_MS),
+    handler: async () => runRetryCycle(),
+  });
 }
 
 /**
  * Stop the retry job
  */
 export function stopGMCSyncRetry(): void {
-  if (retryIntervalId) {
-    clearInterval(retryIntervalId);
-    retryIntervalId = null;
-    console.log('[GMC Sync Retry] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

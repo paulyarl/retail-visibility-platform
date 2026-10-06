@@ -7,9 +7,11 @@ import { prisma } from '../prisma';
 import { batchSyncProducts } from '../services/GMCProductSync';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'gmc-scheduled-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 /**
  * Get all tenants with active GMC connections
@@ -98,33 +100,21 @@ async function runScheduledSync(): Promise<void> {
  * Start the scheduled sync job
  */
 export function startGMCScheduledSync(): void {
-  if (syncIntervalId) {
-    console.log('[GMC Scheduled Sync] Already running');
-    return;
-  }
-
-  console.log(`[GMC Scheduled Sync] Starting scheduler (every ${SYNC_INTERVAL_MS / 1000 / 60 / 60} hours)`);
-  
-  // Run immediately on startup (after a short delay to let server initialize)
-  setTimeout(() => {
-    runScheduledSync();
-  }, 30000); // 30 second delay after startup
-
-  // Then run on interval
-  syncIntervalId = setInterval(() => {
-    runScheduledSync();
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Google Merchant Center product sync',
+    scheduleLabel: `every ${SYNC_INTERVAL_MS / 1000 / 60 / 60} hours`,
+    // Short delay on first run to let the server initialize
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 30_000) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 /**
  * Stop the scheduled sync job
  */
 export function stopGMCScheduledSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[GMC Scheduled Sync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

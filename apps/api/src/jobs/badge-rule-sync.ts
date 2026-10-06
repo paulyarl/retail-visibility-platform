@@ -17,10 +17,12 @@ import { prisma } from '../prisma';
 import { evaluateBadgeRulesForTenant } from '../services/BadgeRuleEngine';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'badge-rule-sync';
 const SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes (before platform badge sync at 5 min)
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 export interface BadgeRuleSyncResult {
   tenantsProcessed: number;
@@ -149,36 +151,21 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
  * Start the scheduled badge rule sync job.
  */
 export async function startBadgeRuleSync(): Promise<void> {
-  if (process.env.DISABLE_BADGE_RULE_SYNC === 'true') {
-    console.log('[BadgeRuleSync] Disabled via DISABLE_BADGE_RULE_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[BadgeRuleSync] Already running');
-    return;
-  }
-
-  console.log(`[BadgeRuleSync] Starting scheduler (every 4 hours)`);
-
-  setTimeout(() => {
-    runScheduledSync().catch(console.error);
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync().catch(console.error);
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Evaluates sale/new_arrival/clearance badge rules',
+    scheduleLabel: 'every 4 hours',
+    envDisableVar: 'DISABLE_BADGE_RULE_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 /**
  * Stop the scheduled badge rule sync job.
  */
 export function stopBadgeRuleSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[BadgeRuleSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

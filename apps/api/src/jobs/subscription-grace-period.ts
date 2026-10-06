@@ -15,6 +15,7 @@ import { getTrialManagementService, GRACE_DURATION_DAYS } from '../services/subs
 import { expireManualSubscriptionControl } from './expireManualSubscriptionControl';
 import { processOrgStandingInheritance } from './org-standing-inheritance';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
 export interface GracePeriodResult {
   processed: number;
@@ -227,48 +228,31 @@ export async function getTenantsApproachingExpiry(): Promise<{
  * Start the scheduled job
  * Runs daily at midnight
  */
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'subscription-grace-period';
 
-export function startGracePeriodJob(): void {
-  if (jobInterval) {
-    console.log('[GracePeriodJob] Job already running');
-    return;
-  }
-
-  // Calculate time until next midnight
-  const now = new Date();
-  const tomorrow = new Date(now);
+/** ms until the next local midnight — always a future delay. */
+function nextMidnightDelay(): number {
+  const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
-  const msUntilMidnight = tomorrow.getTime() - now.getTime();
+  return tomorrow.getTime() - Date.now();
+}
 
-  console.log(`[GracePeriodJob] Scheduling first run in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
-
-  // Schedule first run at midnight
-  setTimeout(() => {
-    // Run the job
-    processGracePeriodExpiry().catch(console.error);
-
-    // Then run every 24 hours
-    jobInterval = setInterval(() => {
-      processGracePeriodExpiry().catch(console.error);
-    }, 24 * 60 * 60 * 1000);
-
-    console.log('[GracePeriodJob] Daily job started');
-  }, msUntilMidnight);
-
-  console.log('[GracePeriodJob] Scheduler initialized');
+export function startGracePeriodJob(): void {
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Expires grace-period subscriptions',
+    scheduleLabel: 'daily at midnight',
+    computeNextDelay: nextMidnightDelay,
+    handler: async () => processGracePeriodExpiry(),
+  });
 }
 
 /**
  * Stop the scheduled job
  */
 export function stopGracePeriodJob(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[GracePeriodJob] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

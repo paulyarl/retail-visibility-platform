@@ -12,11 +12,13 @@
 import { logger } from '../logger';
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'marketing-ops-stage-autoadvance';
 const STARTUP_DELAY_MS = 60 * 1000; // 1 minute
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-let autoAdvanceIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 async function runMarketingOpsAutoAdvance(): Promise<void> {
   logger.info('[MarketingOpsAutoAdvance] Starting stale shown campaign auto-advance...');
@@ -37,31 +39,16 @@ async function runMarketingOpsAutoAdvance(): Promise<void> {
 }
 
 export async function startMarketingOpsAutoAdvance(): Promise<void> {
-  if (process.env.DISABLE_MARKETING_OPS_AUTOADVANCE === 'true') {
-    logger.info('[MarketingOpsAutoAdvance] Disabled by env var');
-    return;
-  }
-
-  if (autoAdvanceIntervalId) {
-    logger.info('[MarketingOpsAutoAdvance] Already running');
-    return;
-  }
-
-  logger.info('[MarketingOpsAutoAdvance] Starting scheduler (daily)');
-
-  setTimeout(() => {
-    runMarketingOpsAutoAdvance();
-  }, STARTUP_DELAY_MS);
-
-  autoAdvanceIntervalId = setInterval(() => {
-    runMarketingOpsAutoAdvance();
-  }, INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Advances stale shown campaigns to lost',
+    scheduleLabel: 'daily',
+    envDisableVar: 'DISABLE_MARKETING_OPS_AUTOADVANCE',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : INTERVAL_MS),
+    handler: async () => runMarketingOpsAutoAdvance(),
+  });
 }
 
 export function stopMarketingOpsAutoAdvance(): void {
-  if (autoAdvanceIntervalId) {
-    clearInterval(autoAdvanceIntervalId);
-    autoAdvanceIntervalId = null;
-    logger.info('[MarketingOpsAutoAdvance] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

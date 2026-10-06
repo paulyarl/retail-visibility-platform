@@ -12,10 +12,12 @@
 import { prisma } from '../prisma';
 import { aggregateBadgeAnalyticsForTenant, type PeriodType } from '../services/BadgeAnalyticsService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'badge-analytics-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 10 * 60 * 1000; // 10 minutes (after other jobs)
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 export interface BadgeAnalyticsSyncResult {
   tenantsProcessed: number;
@@ -90,31 +92,16 @@ async function runScheduledSync(): Promise<BadgeAnalyticsSyncResult> {
 }
 
 export async function startBadgeAnalyticsSync(): Promise<void> {
-  if (process.env.DISABLE_BADGE_ANALYTICS_SYNC === 'true') {
-    console.log('[BadgeAnalyticsSync] Disabled via DISABLE_BADGE_ANALYTICS_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[BadgeAnalyticsSync] Already running');
-    return;
-  }
-
-  console.log(`[BadgeAnalyticsSync] Starting scheduler (every 6 hours)`);
-
-  setTimeout(() => {
-    runScheduledSync().catch(console.error);
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync().catch(console.error);
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Aggregates badge_events into badge_analytics',
+    scheduleLabel: 'every 6 hours',
+    envDisableVar: 'DISABLE_BADGE_ANALYTICS_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 export function stopBadgeAnalyticsSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[BadgeAnalyticsSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

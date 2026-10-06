@@ -18,13 +18,16 @@ import {
   OpenBeautyFactsConnector,
   type SupplierConnector,
 } from '../services/SupplierConnectors';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'supplier-opensource-sync';
+const NIGHTLY_JOB_NAME = 'supplier-opensource-sync-nightly';
 const HOURLY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const NIGHTLY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const STARTUP_DELAY_MS = 10 * 60 * 1000; // 10 minutes
 
-let hourlyIntervalId: NodeJS.Timeout | null = null;
-let nightlyIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
+let nightlyFirstRun = true;
 
 /**
  * Ensure the supplier record exists in the database before ingesting data.
@@ -151,48 +154,30 @@ async function runNightlyBackfill(): Promise<void> {
  * Start the scheduled open-source supplier sync jobs.
  */
 export async function startSupplierOpenSourceSync(): Promise<void> {
-  if (process.env.DISABLE_SUPPLIER_OPENSOURCE_SYNC === 'true') {
-    console.log('[SupplierOpenSourceSync] Disabled via DISABLE_SUPPLIER_OPENSOURCE_SYNC env var');
-    return;
-  }
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Open-source supplier data sync (hourly incremental)',
+    scheduleLabel: 'hourly incremental',
+    envDisableVar: 'DISABLE_SUPPLIER_OPENSOURCE_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : HOURLY_INTERVAL_MS),
+    handler: async () => runHourlySync(),
+  });
 
-  if (hourlyIntervalId || nightlyIntervalId) {
-    console.log('[SupplierOpenSourceSync] Already running');
-    return;
-  }
-
-  console.log('[SupplierOpenSourceSync] Starting scheduler (hourly incremental + nightly backfill)');
-
-  // Delay first run to avoid firing on nodemon restarts
-  setTimeout(() => {
-    runHourlySync();
-  }, STARTUP_DELAY_MS);
-
-  hourlyIntervalId = setInterval(() => {
-    runHourlySync();
-  }, HOURLY_INTERVAL_MS);
-
-  // Nightly backfill — start with a longer delay (30 min after startup)
-  setTimeout(() => {
-    runNightlyBackfill();
-  }, STARTUP_DELAY_MS + 20 * 60 * 1000);
-
-  nightlyIntervalId = setInterval(() => {
-    runNightlyBackfill();
-  }, NIGHTLY_INTERVAL_MS);
+  // Nightly backfill — registered as a sibling job (starts 30 min after startup)
+  scheduleJob({
+    name: NIGHTLY_JOB_NAME,
+    description: 'Open-source supplier nightly backfill',
+    scheduleLabel: 'nightly backfill',
+    envDisableVar: 'DISABLE_SUPPLIER_OPENSOURCE_SYNC',
+    computeNextDelay: () => (nightlyFirstRun ? ((nightlyFirstRun = false), STARTUP_DELAY_MS + 20 * 60 * 1000) : NIGHTLY_INTERVAL_MS),
+    handler: async () => runNightlyBackfill(),
+  });
 }
 
 /**
  * Stop the scheduled open-source supplier sync jobs.
  */
 export function stopSupplierOpenSourceSync(): void {
-  if (hourlyIntervalId) {
-    clearInterval(hourlyIntervalId);
-    hourlyIntervalId = null;
-  }
-  if (nightlyIntervalId) {
-    clearInterval(nightlyIntervalId);
-    nightlyIntervalId = null;
-  }
-  console.log('[SupplierOpenSourceSync] Stopped');
+  stopJob(JOB_NAME);
+  stopJob(NIGHTLY_JOB_NAME);
 }

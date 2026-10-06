@@ -14,10 +14,12 @@
 import { prisma } from '../prisma';
 import { aggregateCouponAnalyticsForTenant, type PeriodType } from '../services/CouponAnalyticsService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'coupon-analytics-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 12 * 60 * 1000; // 12 minutes (after badge analytics sync)
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 export interface CouponAnalyticsSyncResult {
   tenantsProcessed: number;
@@ -92,31 +94,16 @@ async function runScheduledSync(): Promise<CouponAnalyticsSyncResult> {
 }
 
 export async function startCouponAnalyticsSync(): Promise<void> {
-  if (process.env.DISABLE_COUPON_ANALYTICS_SYNC === 'true') {
-    console.log('[CouponAnalyticsSync] Disabled via DISABLE_COUPON_ANALYTICS_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[CouponAnalyticsSync] Already running');
-    return;
-  }
-
-  console.log(`[CouponAnalyticsSync] Starting scheduler (every 6 hours)`);
-
-  setTimeout(() => {
-    runScheduledSync().catch(console.error);
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync().catch(console.error);
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Aggregates coupon_events into coupon_analytics',
+    scheduleLabel: 'every 6 hours',
+    envDisableVar: 'DISABLE_COUPON_ANALYTICS_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 export function stopCouponAnalyticsSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[CouponAnalyticsSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

@@ -12,10 +12,13 @@
 import { logger } from '../logger';
 import { MarketingAutoFollowUpScheduler } from '../services/MarketingAutoFollowUpScheduler';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'marketing-ops-auto-followup';
 const STARTUP_DELAY_MS = 2 * 60 * 1000; // 2 minutes
 
-let autoFollowUpIntervalId: NodeJS.Timeout | null = null;
+let configuredIntervalMs = 6 * 60 * 60 * 1000;
+let firstRun = true;
 
 async function runMarketingOpsAutoFollowUp(): Promise<void> {
   logger.info('[MarketingOpsAutoFollowUp] Starting hot-prospect auto-follow-up pass...');
@@ -51,33 +54,20 @@ async function runMarketingOpsAutoFollowUp(): Promise<void> {
 }
 
 export async function startMarketingOpsAutoFollowUp(): Promise<void> {
-  if (process.env.DISABLE_MARKETING_OPS_AUTO_FOLLOWUP === 'true') {
-    logger.info('[MarketingOpsAutoFollowUp] Disabled by env var');
-    return;
-  }
-
-  if (autoFollowUpIntervalId) {
-    logger.info('[MarketingOpsAutoFollowUp] Already running');
-    return;
-  }
-
   const intervalHours = unifiedConfig.marketingOpsAutoFollowUpSchedulerIntervalHours;
-  const intervalMs = intervalHours * 60 * 60 * 1000;
+  configuredIntervalMs = intervalHours * 60 * 60 * 1000;
   logger.info(`[MarketingOpsAutoFollowUp] Starting scheduler (every ${intervalHours}h)`);
 
-  setTimeout(() => {
-    runMarketingOpsAutoFollowUp();
-  }, STARTUP_DELAY_MS);
-
-  autoFollowUpIntervalId = setInterval(() => {
-    runMarketingOpsAutoFollowUp();
-  }, intervalMs);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Schedules follow-ups for no-response hot prospects',
+    scheduleLabel: `every ${intervalHours} hours`,
+    envDisableVar: 'DISABLE_MARKETING_OPS_AUTO_FOLLOWUP',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : configuredIntervalMs),
+    handler: async () => runMarketingOpsAutoFollowUp(),
+  });
 }
 
 export function stopMarketingOpsAutoFollowUp(): void {
-  if (autoFollowUpIntervalId) {
-    clearInterval(autoFollowUpIntervalId);
-    autoFollowUpIntervalId = null;
-    logger.info('[MarketingOpsAutoFollowUp] Stopped');
-  }
+  stopJob(JOB_NAME);
 }

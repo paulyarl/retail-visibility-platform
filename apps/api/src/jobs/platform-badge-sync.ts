@@ -12,10 +12,12 @@
 import { prisma } from '../prisma';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'platform-badge-sync';
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
-let syncIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 /**
  * Get all active tenant IDs.
@@ -81,36 +83,21 @@ async function runScheduledSync(): Promise<void> {
  * Start the scheduled platform badge sync job.
  */
 export async function startPlatformBadgeSync(): Promise<void> {
-  if (process.env.DISABLE_PLATFORM_BADGE_SYNC === 'true') {
-    console.log('[PlatformBadgeSync] Disabled via DISABLE_PLATFORM_BADGE_SYNC env var');
-    return;
-  }
-
-  if (syncIntervalId) {
-    console.log('[PlatformBadgeSync] Already running');
-    return;
-  }
-
-  console.log(`[PlatformBadgeSync] Starting scheduler (every 6 hours)`);
-
-  setTimeout(() => {
-    runScheduledSync();
-  }, STARTUP_DELAY_MS);
-
-  syncIntervalId = setInterval(() => {
-    runScheduledSync();
-  }, SYNC_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Syncs trending/bestseller/recommended badges to featured products',
+    scheduleLabel: 'every 6 hours',
+    envDisableVar: 'DISABLE_PLATFORM_BADGE_SYNC',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    handler: async () => runScheduledSync(),
+  });
 }
 
 /**
  * Stop the scheduled platform badge sync job.
  */
 export function stopPlatformBadgeSync(): void {
-  if (syncIntervalId) {
-    clearInterval(syncIntervalId);
-    syncIntervalId = null;
-    console.log('[PlatformBadgeSync] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

@@ -24,11 +24,13 @@ import { permissionServiceFactory } from '../services/permissions/PermissionServ
 import { createPost, type GBPPost } from '../services/GBPAdvancedSync';
 import { CrmAlertService } from '../services/CrmAlertService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'gbp-post-scheduler';
 const SCHEDULER_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes
 
-let postSchedulerIntervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 // ── Entitlement cache (short TTL to avoid repeated DB hits) ──────────────
 
@@ -301,36 +303,21 @@ async function runPostScheduler(): Promise<void> {
  * Start the scheduled GBP post publisher (every 5 minutes).
  */
 export async function startGbpPostScheduler(): Promise<void> {
-  if (process.env.DISABLE_GBP_POST_SCHEDULER === 'true') {
-    logger.info('[GbpPostScheduler] Disabled by env var');
-    return;
-  }
-
-  if (postSchedulerIntervalId) {
-    logger.info('[GbpPostScheduler] Already running');
-    return;
-  }
-
-  logger.info('[GbpPostScheduler] Starting scheduler (every 5min)');
-
-  setTimeout(() => {
-    runPostScheduler();
-  }, STARTUP_DELAY_MS);
-
-  postSchedulerIntervalId = setInterval(() => {
-    runPostScheduler();
-  }, SCHEDULER_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Publishes due scheduled GBP posts',
+    scheduleLabel: 'every 5 minutes',
+    envDisableVar: 'DISABLE_GBP_POST_SCHEDULER',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SCHEDULER_INTERVAL_MS),
+    handler: async () => runPostScheduler(),
+  });
 }
 
 /**
  * Stop the scheduled GBP post publisher.
  */
 export function stopGbpPostScheduler(): void {
-  if (postSchedulerIntervalId) {
-    clearInterval(postSchedulerIntervalId);
-    postSchedulerIntervalId = null;
-    logger.info('[GbpPostScheduler] Stopped');
-  }
+  stopJob(JOB_NAME);
 }
 
 /**

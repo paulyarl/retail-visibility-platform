@@ -13,6 +13,7 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 import { getDirectPool } from '../utils/db-pool';
 import { getBillingNotificationService, BillingNotificationData } from '../services/subscription/BillingNotificationService';
 import Stripe from 'stripe';
@@ -366,34 +367,20 @@ async function sendBillingNotification(data: BillingNotificationData): Promise<v
 // SCHEDULER
 // ====================
 
-let jobInterval: NodeJS.Timeout | null = null;
+const JOB_NAME = 'promotion-renewal';
 const RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let firstRun = true;
 
 export function startPromotionRenewalJob(): void {
-  if (jobInterval) {
-    console.log('[PromotionRenewal] Job already running');
-    return;
-  }
-
-  console.log('[PromotionRenewal] Starting daily renewal job');
-
-  processPromotionRenewals().catch(err => {
-    logger.error('[PromotionRenewal] Initial run failed', undefined, { error: err instanceof Error ? err.message : String(err) });
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Directory promotion auto-renewals and expirations',
+    scheduleLabel: 'daily',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), 5_000) : RUN_INTERVAL_MS),
+    handler: async () => processPromotionRenewals(),
   });
-
-  jobInterval = setInterval(() => {
-    processPromotionRenewals().catch(err => {
-      logger.error('[PromotionRenewal] Scheduled run failed', undefined, { error: err instanceof Error ? err.message : String(err) });
-    });
-  }, RUN_INTERVAL_MS);
-
-  console.log('[PromotionRenewal] Job started (runs every 24 hours)');
 }
 
 export function stopPromotionRenewalJob(): void {
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-    console.log('[PromotionRenewal] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }

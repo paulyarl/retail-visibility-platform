@@ -15,11 +15,10 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'gallery-events-purge';
 const RETENTION_DAYS = 90;
-
-let jobInterval: NodeJS.Timeout | null = null;
-let jobTimeout: NodeJS.Timeout | null = null;
 
 async function runPurge(): Promise<void> {
   const startTime = Date.now();
@@ -49,52 +48,27 @@ async function runPurge(): Promise<void> {
  * Start the scheduled job — runs daily at 2:30 AM UTC.
  * Mirrors log-purge.ts scheduling pattern.
  */
+/** ms until the next 2:30 AM UTC — always a future delay. */
+function nextDailyRunDelay(): number {
+  const next = new Date();
+  next.setUTCDate(next.getUTCDate() + 1);
+  next.setUTCHours(2, 30, 0, 0);
+  return next.getTime() - Date.now();
+}
+
 export function startGalleryEventsPurge(): void {
-  if (jobInterval || jobTimeout) {
-    logger.info('[GalleryEventsPurge] Job already running');
-    return;
-  }
-
-  // Calculate time until next 2:30 AM UTC
-  const now = new Date();
-  const nextRun = new Date(now);
-  nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-  nextRun.setUTCHours(2, 30, 0, 0);
-
-  const msUntilNextRun = nextRun.getTime() - now.getTime();
-
-  logger.info(`[GalleryEventsPurge] Scheduling first run in ${Math.round(msUntilNextRun / 1000 / 60)} minutes`);
-
-  jobTimeout = setTimeout(() => {
-    runPurge().catch((err) => {
-      logger.error('[GalleryEventsPurge] Unhandled error in first run', undefined, {
-        error: { name: err.name, message: err.message, stack: err.stack },
-      });
-    });
-
-    jobInterval = setInterval(() => {
-      runPurge().catch((err) => {
-        logger.error('[GalleryEventsPurge] Unhandled error', undefined, {
-          error: { name: err.name, message: err.message, stack: err.stack },
-        });
-      });
-    }, 24 * 60 * 60 * 1000);
-
-    logger.info('[GalleryEventsPurge] Daily job started (2:30 AM UTC)');
-  }, msUntilNextRun);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Purges gallery events past 90-day retention',
+    scheduleLabel: 'daily at 2:30 AM UTC',
+    computeNextDelay: nextDailyRunDelay,
+    handler: async () => runPurge(),
+  });
 }
 
 /**
  * Stop the scheduled job (for testing / graceful shutdown).
  */
 export function stopGalleryEventsPurge(): void {
-  if (jobTimeout) {
-    clearTimeout(jobTimeout);
-    jobTimeout = null;
-  }
-  if (jobInterval) {
-    clearInterval(jobInterval);
-    jobInterval = null;
-  }
-  logger.info('[GalleryEventsPurge] Job stopped');
+  stopJob(JOB_NAME);
 }

@@ -17,12 +17,14 @@
 
 import { logger } from '../logger';
 import { prisma } from '../prisma';
+import { scheduleJob, stopJob } from './registry';
 
+const JOB_NAME = 'recovery-delivery-retry';
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes after startup
 const POLL_INTERVAL_MS = 15 * 60 * 1000; // every 15 minutes
 const MAX_ATTEMPTS = 3;
 
-let intervalId: NodeJS.Timeout | null = null;
+let firstRun = true;
 
 // ====================
 // DELIVERY RETRY PASS
@@ -97,28 +99,16 @@ async function runDeliveryRetryPass(): Promise<void> {
 // ====================
 
 export function startRecoveryDeliveryRetryJob(): void {
-  if (process.env.DISABLE_RECOVERY_DELIVERY_RETRY === 'true') {
-    logger.info('[RecoveryDeliveryRetry] Job disabled via DISABLE_RECOVERY_DELIVERY_RETRY env var');
-    return;
-  }
-
-  logger.info(`[RecoveryDeliveryRetry] Job scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${POLL_INTERVAL_MS / 1000}s`);
-
-  // First run after startup delay
-  setTimeout(() => {
-    runDeliveryRetryPass();
-  }, STARTUP_DELAY_MS);
-
-  // Recurring poll
-  intervalId = setInterval(() => {
-    runDeliveryRetryPass();
-  }, POLL_INTERVAL_MS);
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Retries failed recovery deliveries with backoff',
+    scheduleLabel: 'every 15 minutes',
+    envDisableVar: 'DISABLE_RECOVERY_DELIVERY_RETRY',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : POLL_INTERVAL_MS),
+    handler: async () => runDeliveryRetryPass(),
+  });
 }
 
 export function stopRecoveryDeliveryRetryJob(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-    logger.info('[RecoveryDeliveryRetry] Job stopped');
-  }
+  stopJob(JOB_NAME);
 }
