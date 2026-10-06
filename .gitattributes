@@ -10,6 +10,10 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.sh  text eol=lf
+# pnpm hashes patch file bytes and records the LF hash in pnpm-lock.yaml.
+# With autocrlf=true a CRLF checkout makes the hash mismatch and installs fail
+# with ERR_PNPM_LOCKFILE_CONFIG_MISMATCH on "patchedDependencies".
+*.patch text eol=lf
 
 # Windows scripts keep CRLF
 *.bat text eol=crlf
