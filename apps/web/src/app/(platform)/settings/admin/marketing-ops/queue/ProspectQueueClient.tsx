@@ -13,6 +13,7 @@ import marketingOpsService, {
 } from '@/services/MarketingOpsService';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import ProspectQueueBoard from '@/components/marketing-ops/ProspectQueueBoard';
+import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
 import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 
@@ -163,10 +164,6 @@ export default function ProspectQueueClient() {
 
   // Proving ground (Migration 262) — log-outcome modal state
   const [logModalEntry, setLogModalEntry] = useState<ProspectQueueEntry | null>(null);
-  const [logChannel, setLogChannel] = useState<string>('call');
-  const [logOutcome, setLogOutcome] = useState<string>('');
-  const [logNotes, setLogNotes] = useState('');
-  const [loggingTouch, setLoggingTouch] = useState(false);
 
   // Queue-list PG initiation (Migration 282) — multi-select + group action.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -454,42 +451,11 @@ export default function ProspectQueueClient() {
   };
 
   // ─── Proving ground: log outcome (Migration 262, spec §4.7–§4.8) ──────
+  // The modal is the shared ProspectTouchLogModal — it owns channel/outcome/
+  // notes state, shows the prospect's resolved contact channels, and writes
+  // the canonical seed touch via logProspectTouch.
 
-  const openLogModal = (entry: ProspectQueueEntry) => {
-    const ladder = entry.channel_sequence ?? [];
-    const idx = entry.current_channel_index ?? 0;
-    setLogChannel(ladder[idx]?.channel ?? 'call');
-    setLogOutcome('');
-    setLogNotes('');
-    setLogModalEntry(entry);
-  };
-
-  const handleLogTouch = async () => {
-    if (!logModalEntry) return;
-    setLoggingTouch(true);
-    setError(null);
-    try {
-      const res = await marketingOpsService.logProspectTouch(logModalEntry.id, {
-        channel: logChannel as any,
-        outcome: (logOutcome || undefined) as any,
-        notes: logNotes || undefined,
-      });
-      setEntries((prev) => prev.map((e) => e.id === logModalEntry.id ? {
-        ...e,
-        status: res.status as ProspectStatus,
-        current_channel_index: res.currentChannelIndex,
-        next_touch_at: res.nextTouchAt,
-        channel_sequence: res.channelSequence,
-      } : e));
-      setLogModalEntry(null);
-      await fetchQueue();
-    } catch (err: any) {
-      setError(err.message || 'Failed to log touch');
-      setLogModalEntry(null);
-    } finally {
-      setLoggingTouch(false);
-    }
-  };
+  const openLogModal = (entry: ProspectQueueEntry) => setLogModalEntry(entry);
 
   // Account family — identity patch (also allowed on hold/in_thread).
   const handleSetFamily = async (entry: ProspectQueueEntry) => {
@@ -1407,128 +1373,18 @@ export default function ProspectQueueClient() {
         )}
       </div>
 
-      {/* Proving ground: Log outcome modal (Migration 262, spec §4.7) */}
+      {/* Proving ground: Log outcome modal (Migration 262, spec §4.7) — the
+          shared touch logger; shows the prospect's resolved channels and the
+          cadence ladder, then writes the canonical seed touch. */}
       {logModalEntry && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => !loggingTouch && setLogModalEntry(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Log outcome — {logModalEntry.title || logModalEntry.business_name || 'prospect'}
-              </h2>
-              <button
-                onClick={() => !loggingTouch && setLogModalEntry(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                disabled={loggingTouch}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="px-4 py-3 space-y-3">
-              {/* Ladder context */}
-              {logModalEntry.channel_sequence && logModalEntry.channel_sequence.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1">
-                  {logModalEntry.channel_sequence.map((rung, i) => (
-                    <span
-                      key={i}
-                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                        rung.status === 'dead'
-                          ? 'bg-gray-100 text-gray-400 line-through dark:bg-neutral-700 dark:text-gray-500'
-                          : i === (logModalEntry.current_channel_index ?? 0)
-                            ? (CHANNEL_CHIP[rung.channel] ?? CHANNEL_CHIP.other)
-                            : 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400'
-                      }`}
-                    >
-                      {rung.channel}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Channel</label>
-                <select
-                  value={logChannel}
-                  onChange={(e) => setLogChannel(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  {(['call', 'email', 'sms', 'mail', 'form', 'referral', 'other'] as const).map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Outcome</label>
-                <select
-                  value={logOutcome}
-                  onChange={(e) => setLogOutcome(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                >
-                  <option value="">— logged only (no signal) —</option>
-                  <optgroup label="Live contact">
-                    <option value="connected">connected (live reply → in thread)</option>
-                    <option value="claimed">claimed</option>
-                  </optgroup>
-                  <optgroup label="Retry / advance">
-                    <option value="no_answer">no answer (retry +1d, max 2)</option>
-                    <option value="voicemail">voicemail (next rung +3bd)</option>
-                    <option value="no_reply">no reply — email (next rung +5bd)</option>
-                    <option value="unread">unread — text/DM (abandon +2d)</option>
-                    <option value="read_no_reply">read, no reply (next rung +5d)</option>
-                    <option value="form_submitted">form submitted (+7d)</option>
-                    <option value="referral_asked">referral asked (+14d)</option>
-                  </optgroup>
-                  <optgroup label="Dead channel">
-                    <option value="bad_number">bad number / disconnected</option>
-                    <option value="bounce">bounce (email dead)</option>
-                  </optgroup>
-                  <optgroup label="Terminal">
-                    <option value="not_interested">not interested (dismiss)</option>
-                  </optgroup>
-                </select>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
-                  Dead channels don&apos;t consume a touch slot. Cap: 3 consuming touches / 30 days → hold 60d.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
-                <textarea
-                  value={logNotes}
-                  onChange={(e) => setLogNotes(e.target.value)}
-                  rows={2}
-                  placeholder="What happened…"
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  onClick={() => setLogModalEntry(null)}
-                  disabled={loggingTouch}
-                  className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleLogTouch}
-                  disabled={loggingTouch}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
-                >
-                  {loggingTouch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Phone className="w-3.5 h-3.5" />}
-                  Log touch
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProspectTouchLogModal
+          entry={logModalEntry}
+          onClose={() => setLogModalEntry(null)}
+          onLogged={async () => {
+            setLogModalEntry(null);
+            await fetchQueue();
+          }}
+        />
       )}
 
       {/* Group into Proving Ground modal — stamps proving_ground_id on the

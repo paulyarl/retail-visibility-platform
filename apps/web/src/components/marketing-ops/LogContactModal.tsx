@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Sparkles, RefreshCw, Link2 } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Link2, Phone, Mail, Globe, Share2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails, ContactResult, OtherSubtype } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
@@ -134,6 +134,67 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   availableChannels.push('in_person', 'other');
 
   const [channel, setChannel] = useState<ContactChannel>(availableChannels[0] ?? 'phone');
+
+  // Contact targets — the actual value behind each available channel, with
+  // the direct action (Call/Text/Email/Open) so the operator can reach the
+  // prospect without leaving the modal. Clicking a row selects that channel
+  // in the form below.
+  const channelTargets: {
+    key: string;
+    channel: ContactChannel;
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+    links: { href: string; label: string; external?: boolean }[];
+  }[] = [];
+  const pushPhoneTarget = (key: string, label: string, number: string) =>
+    channelTargets.push({
+      key,
+      channel: 'phone',
+      icon: <Phone className="h-3.5 w-3.5 text-gray-400" />,
+      label,
+      value: number,
+      links: [
+        { href: `tel:${number}`, label: 'Call' },
+        { href: `sms:${number}`, label: 'Text' },
+      ],
+    });
+  if (campaign.phone) pushPhoneTarget('phone', 'Phone', campaign.phone);
+  (campaign.phones ?? []).forEach((p, i) => {
+    if (p.number) pushPhoneTarget(`phone-${i}`, p.label || 'Phone', p.number);
+  });
+  if (campaign.email) {
+    channelTargets.push({
+      key: 'email',
+      channel: 'email',
+      icon: <Mail className="h-3.5 w-3.5 text-gray-400" />,
+      label: 'Email',
+      value: campaign.email,
+      links: [{ href: `mailto:${campaign.email}`, label: 'Email' }],
+    });
+  }
+  if (campaign.website_url) {
+    channelTargets.push({
+      key: 'website',
+      channel: 'website',
+      icon: <Globe className="h-3.5 w-3.5 text-gray-400" />,
+      label: 'Website',
+      value: campaign.website_url,
+      links: [{ href: campaign.website_url, label: 'Open', external: true }],
+    });
+  }
+  (campaign.social_profiles ?? []).forEach((sp, i) => {
+    if (sp.url) {
+      channelTargets.push({
+        key: `social-${i}`,
+        channel: 'social',
+        icon: <Share2 className="h-3.5 w-3.5 text-gray-400" />,
+        label: sp.platform || 'Social',
+        value: sp.url,
+        links: [{ href: sp.url, label: 'Open', external: true }],
+      });
+    }
+  });
   const [contactDate, setContactDate] = useState(todayISO());
   const [outcome, setOutcome] = useState<ContactOutcome>('reached');
   const [followUpDate, setFollowUpDate] = useState('');
@@ -332,6 +393,48 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Contact channels — the value behind each channel option. The
+              action links reach the prospect in place; the row itself
+              selects that channel for the log entry. */}
+          {channelTargets.length > 0 && (
+            <div className="rounded-md border border-gray-200 divide-y divide-gray-100 dark:border-gray-700 dark:divide-gray-800">
+              {channelTargets.map((t) => (
+                <div
+                  key={t.key}
+                  className={`flex items-center gap-2 px-3 py-1.5 ${
+                    channel === t.channel ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setChannel(t.channel)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    title={`Log a ${t.label.toLowerCase()} contact`}
+                  >
+                    {t.icon}
+                    <span className="w-14 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      {t.label}
+                    </span>
+                    <span className="truncate text-xs text-gray-800 dark:text-gray-200">{t.value}</span>
+                  </button>
+                  <span className="flex flex-shrink-0 items-center gap-1">
+                    {t.links.map((l) => (
+                      <a
+                        key={l.label}
+                        href={l.href}
+                        target={l.external ? '_blank' : undefined}
+                        rel={l.external ? 'noopener noreferrer' : undefined}
+                        className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                      >
+                        {l.label}
+                      </a>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Channel</span>

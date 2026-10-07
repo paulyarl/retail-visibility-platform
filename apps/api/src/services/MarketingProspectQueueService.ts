@@ -568,6 +568,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
                   repair_track: true,
                   is_hot_prospect: true,
                   stage_entered_at: true,
+                  // Contact channels — the PG cockpit communications panel
+                  // renders the campaign's verified phone/email/website/social
+                  // without a per-row getCampaign fetch.
+                  phone: true,
+                  email: true,
+                  website_url: true,
+                  social_profiles: true,
                 },
               },
             }
@@ -707,6 +714,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
               campaign_has_business_audit: e.processed_campaign_id ? auditDates.has(e.processed_campaign_id) : null,
               business_audit_at: e.processed_campaign_id ? auditDates.get(e.processed_campaign_id) ?? null : null,
               checklist_completed: e.processed_campaign_id ? checklistCounts.get(e.processed_campaign_id) ?? 0 : null,
+              campaign_phone: camp?.phone ?? null,
+              campaign_email: camp?.email ?? null,
+              campaign_website_url: camp?.website_url ?? null,
+              campaign_social_profiles: camp?.social_profiles ?? null,
             };
           })
         : entries;

@@ -1464,6 +1464,13 @@ export interface ProspectQueueEntry {
   // playbook, so cross-campaign comparisons need the fraction view on the
   // campaign's checklist tab.
   checklist_completed?: number | null;
+  // Contact channels (present when includeCampaigns=true) — the processed
+  // campaign's verified channels, surfaced so comms surfaces (PG cockpit
+  // communications panel) can render them without a per-row campaign fetch.
+  campaign_phone?: string | null;
+  campaign_email?: string | null;
+  campaign_website_url?: string | null;
+  campaign_social_profiles?: { platform: string; url: string }[] | null;
   // Shelf enrichment coverage (present when includeEnrichment=true) — every
   // sweep category × the prospect's geo carries a campaign-applied
   // (composer_version >= 2) directory enrichment row. covered/total give the

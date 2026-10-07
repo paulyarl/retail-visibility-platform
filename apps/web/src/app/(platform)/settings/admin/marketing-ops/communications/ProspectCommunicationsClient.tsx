@@ -30,6 +30,7 @@ import marketingOpsService, {
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
 import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import LogContactModal from '@/components/marketing-ops/LogContactModal';
+import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
 import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
 import {
   DAYS,
@@ -67,9 +68,6 @@ const CHANNEL_CHIP: Record<string, string> = {
   social: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
   other: 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300',
 };
-
-/** Channel union accepted by the canonical seed-touch log (logProspectTouch). */
-type TouchChannel = 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
 
 const STATUS_LABELS: Record<string, string> = {
   queued: 'Queued',
@@ -166,14 +164,10 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
   const [logCampaign, setLogCampaign] = useState<Campaign | null>(null);
   const [logCampaignLoading, setLogCampaignLoading] = useState(false);
 
-  // Pre-campaign "Log touch" — canonical seed touch (channel/outcome/notes).
+  // Pre-campaign "Log touch" — canonical seed touch (channel/outcome/notes),
+  // via the shared ProspectTouchLogModal (shows the prospect's resolved
+  // contact channels — phone, email, website, socials).
   const [touchOpen, setTouchOpen] = useState(false);
-  const [touchChannel, setTouchChannel] = useState<TouchChannel>('call');
-  const [touchOutcome, setTouchOutcome] = useState('');
-  const [touchNotes, setTouchNotes] = useState('');
-  const [touchRecordingUrl, setTouchRecordingUrl] = useState('');
-  const [touchRecordingDuration, setTouchRecordingDuration] = useState('');
-  const [touchBusy, setTouchBusy] = useState(false);
 
   // Opening hours (migration 296) — the queue leg of the journey. Editable
   // while the row is open/enrichable; once it graduates, the campaign owns them.
@@ -297,34 +291,6 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
       setActionError(err.message || 'Failed to load campaign');
     } finally {
       setLogCampaignLoading(false);
-    }
-  };
-
-  const handleLogTouch = async () => {
-    if (!selectedId) return;
-    setTouchBusy(true);
-    setActionError(null);
-    try {
-      await marketingOpsService.logProspectTouch(selectedId, {
-        channel: touchChannel,
-        outcome: (touchOutcome || undefined) as any,
-        notes: touchNotes || undefined,
-        recording_url: touchRecordingUrl.trim() || undefined,
-        recording_duration_seconds: touchRecordingDuration.trim()
-          ? Number(touchRecordingDuration.trim())
-          : undefined,
-      });
-      setTouchOpen(false);
-      setTouchOutcome('');
-      setTouchNotes('');
-      setTouchRecordingUrl('');
-      setTouchRecordingDuration('');
-      setActionNotice('Touch logged.');
-      await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to log touch');
-    } finally {
-      setTouchBusy(false);
     }
   };
 
@@ -715,112 +681,18 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
         />
       )}
 
-      {/* Pre-campaign seed touch — canonical call-notes capture. */}
-      {touchOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 max-w-md w-full">
-            <div className="flex items-start gap-3 mb-4">
-              <PhoneCall className="w-5 h-5 text-teal-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Log touch</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {timeline?.prospect.business_name ?? timeline?.prospect.title ?? 'Prospect'} · pre-campaign
-                </p>
-              </div>
-              <button onClick={() => setTouchOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Channel</label>
-            <select
-              value={touchChannel}
-              onChange={(e) => setTouchChannel(e.target.value as TouchChannel)}
-              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-            >
-              {(['call', 'email', 'sms', 'mail', 'form', 'referral', 'other'] as TouchChannel[]).map((c) => (
-                <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
-
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Outcome</label>
-            <select
-              value={touchOutcome}
-              onChange={(e) => setTouchOutcome(e.target.value)}
-              className="w-full mb-3 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-            >
-              <option value="">— logged only (no signal) —</option>
-              <optgroup label="Live contact">
-                <option value="connected">connected (live reply → in thread)</option>
-                <option value="claimed">claimed</option>
-              </optgroup>
-              <optgroup label="Retry / advance">
-                <option value="no_answer">no answer (retry +1d, max 2)</option>
-                <option value="voicemail">voicemail (next rung +3bd)</option>
-                <option value="no_reply">no reply — email (next rung +5bd)</option>
-                <option value="unread">unread — text/DM (abandon +2d)</option>
-                <option value="read_no_reply">read, no reply (next rung +5d)</option>
-                <option value="form_submitted">form submitted (+7d)</option>
-                <option value="referral_asked">referral asked (+14d)</option>
-              </optgroup>
-              <optgroup label="Dead channel">
-                <option value="bad_number">bad number / disconnected</option>
-                <option value="bounce">bounce (email dead)</option>
-              </optgroup>
-              <optgroup label="Terminal">
-                <option value="not_interested">not interested (dismiss)</option>
-              </optgroup>
-            </select>
-
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Call notes</label>
-            <textarea
-              value={touchNotes}
-              onChange={(e) => setTouchNotes(e.target.value)}
-              rows={3}
-              placeholder="What happened…"
-              className="w-full mb-4 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-            />
-
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Recording <span className="font-normal text-gray-400 dark:text-gray-500">— optional link</span>
-            </label>
-            <div className="flex gap-2 mb-4">
-              <input
-                type="url"
-                placeholder="https://… (recording URL)"
-                value={touchRecordingUrl}
-                onChange={(e) => setTouchRecordingUrl(e.target.value)}
-                className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="sec"
-                value={touchRecordingDuration}
-                onChange={(e) => setTouchRecordingDuration(e.target.value)}
-                className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setTouchOpen(false)}
-                disabled={touchBusy}
-                className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogTouch}
-                disabled={touchBusy}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
-              >
-                {touchBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PhoneCall className="w-3.5 h-3.5" />}
-                Log touch
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Pre-campaign seed touch — canonical call-notes capture via the
+          shared modal (resolved channels visible: phone, email, website). */}
+      {touchOpen && timeline && (
+        <ProspectTouchLogModal
+          entry={timeline.prospect}
+          onClose={() => setTouchOpen(false)}
+          onLogged={async () => {
+            setTouchOpen(false);
+            setActionNotice('Touch logged.');
+            if (selectedId) await Promise.all([fetchTimeline(selectedId), fetchProspects()]);
+          }}
+        />
       )}
     </div>
   );

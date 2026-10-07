@@ -38,6 +38,7 @@ import directoryPresenceAdminService, {
 import CampaignChecklistTab from '@/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignChecklistTab';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import ProspectArtifactChips from '@/components/marketing-ops/ProspectArtifactChips';
+import ProspectCommsPanel from '@/components/marketing-ops/ProspectCommsPanel';
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
 import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import { STAGE_LABELS, STAGE_COLORS } from '@/components/marketing-ops/StageBadge';
@@ -80,16 +81,17 @@ function gateChip(pass: boolean | null): string {
   return 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400';
 }
 
-// Cockpit tab keys — the three operational surfaces (preflight, promotion,
-// discovery) each own a panel so any of them can grow without lengthening
-// the page.
-type CockpitTab = 'preflight' | 'promote' | 'discovery';
+// Cockpit tab keys — the operational surfaces (preflight, promotion,
+// communications, discovery) each own a panel so any of them can grow
+// without lengthening the page.
+type CockpitTab = 'preflight' | 'promote' | 'communications' | 'discovery';
 
 // Deep-link fragments minted by OutreachChecklistBridgeService.resolveInternalLinkUrl
 // resolve to the tab that owns the anchor. A panel is unmounted while its tab
 // is inactive, so the tab must be selected before the browser can scroll to it.
 const HASH_TABS: Record<string, CockpitTab> = {
   queue: 'promote',
+  communications: 'communications',
   prospects: 'discovery',
   children: 'discovery',
 };
@@ -928,6 +930,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const COCKPIT_TABS: Array<{ key: CockpitTab; label: string; count: number; warn?: boolean }> = [
     { key: 'preflight', label: 'Preflight checklist', count: dupGroups.length, warn: true },
     { key: 'promote', label: 'Promote to listings', count: promoteEntries.filter((e) => !e.seed_id).length },
+    { key: 'communications', label: 'Communications', count: promoteEntries.length },
     { key: 'discovery', label: 'Discovery prospects', count: children.length },
   ];
 
@@ -1889,6 +1892,23 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             <div className="mt-2 text-xs text-red-600 dark:text-red-400">{promoteError}</div>
           )}
         </div>
+
+        </div>
+      )}
+
+      {tab === 'communications' && (
+        <div role="tabpanel" id="cockpit-panel-communications" aria-labelledby="cockpit-tab-communications" className="space-y-6">
+        {/* Prospect communications — the queue's contact worklist: one row
+            per prospect with its resolved channels (campaign-verified once
+            graduated, discovery snapshot before that) and the log action
+            its lifecycle supports (campaign outreach log vs canonical seed
+            touch). promoteEntries is already the identity-collapsed,
+            non-dismissed prospect set. */}
+        <ProspectCommsPanel
+          entries={promoteEntries}
+          onChanged={load}
+          onResolve={(e) => setResolveEntry(e)}
+        />
 
         </div>
       )}
