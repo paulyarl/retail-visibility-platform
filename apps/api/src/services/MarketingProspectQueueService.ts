@@ -278,6 +278,11 @@ export interface UpdateQueueInput {
   // enrichment, so editable on the same statuses as account_family. `null`
   // clears them.
   hours?: Record<string, any> | null;
+  // Operator "contacted" flag (business_snapshot.manually_contacted_at) —
+  // the contact-state override for prospects with no log anchor (queue-only
+  // rows have no campaign outreach log or seed touch to derive it from).
+  // Editable on the same enrichment statuses as account_family/hours.
+  contacted?: boolean;
 }
 
 export interface CreateCampaignInput {
@@ -697,6 +702,49 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }
       }
 
+      // Contacted signal (communications panel grouping) — presence of ANY
+      // logged contact: campaign outreach log via processed_campaign_id, or
+      // seed outreach touch via seed_id. Two batched groupBy lookups for the
+      // whole page; the operator's manual flag (snapshot
+      // .manually_contacted_at) folds in at decoration below.
+      const logCampaignIds = (entries as any[])
+        .map((e) => e.processed_campaign_id)
+        .filter((id): id is string => !!id);
+      const touchSeedIds = (entries as any[])
+        .map((e) => e.seed_id)
+        .filter((id): id is string => !!id);
+      const lastLogByCampaign = new Map<string, Date>();
+      const lastTouchBySeed = new Map<string, Date>();
+      try {
+        const [campaignLogs, seedTouches] = await Promise.all([
+          logCampaignIds.length > 0
+            ? this.prisma.mkt_outreach_log.groupBy({
+                by: ['campaign_id'],
+                where: { campaign_id: { in: logCampaignIds } },
+                _max: { created_at: true },
+              })
+            : Promise.resolve([] as { campaign_id: string; _max: { created_at: Date | null } }[]),
+          touchSeedIds.length > 0
+            ? this.prisma.directory_seed_outreach_touches.groupBy({
+                by: ['seed_id'],
+                where: { seed_id: { in: touchSeedIds } },
+                _max: { occurred_at: true },
+              })
+            : Promise.resolve([] as { seed_id: string; _max: { occurred_at: Date | null } }[]),
+        ]);
+        for (const r of campaignLogs) {
+          if (r._max.created_at) lastLogByCampaign.set(r.campaign_id, r._max.created_at);
+        }
+        for (const r of seedTouches) {
+          if (r._max.occurred_at) lastTouchBySeed.set(r.seed_id, r._max.occurred_at);
+        }
+      } catch (e) {
+        // Non-fatal — grouping degrades to the manual flag alone.
+        logger.warn('list: contact-signal lookup failed (non-fatal)', ctx, {
+          error: (e as Error).message,
+        });
+      }
+
       // Flatten the campaign join for the board view so the API payload is
       // { ..., campaign_stage, campaign_category, ... } instead of the long
       // Prisma relation name.
@@ -731,6 +779,25 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // enrichment-only callers still got the raw relation — strip it.
           delete d.mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list;
         }
+      }
+
+      // Contacted decoration — a logged outreach (campaign log or seed
+      // touch) marks the prospect contacted; the operator's manual flag is
+      // the fallback for queue-only rows. last_contact_at reflects the most
+      // recent signal of either kind.
+      for (const d of decorated as any[]) {
+        const snap = (d.business_snapshot as any) ?? {};
+        const manualAt = snap.manually_contacted_at ? new Date(snap.manually_contacted_at) : null;
+        const logAt = [
+          d.processed_campaign_id ? lastLogByCampaign.get(d.processed_campaign_id) : undefined,
+          d.seed_id ? lastTouchBySeed.get(d.seed_id) : undefined,
+        ]
+          .filter((t): t is Date => !!t)
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+        const latest = logAt && (!manualAt || logAt > manualAt) ? logAt : manualAt;
+        d.last_contact_at = latest ? latest.toISOString() : null;
+        d.contacted = !!(logAt || manualAt);
+        d.contact_source = logAt ? 'log' : manualAt ? 'manual' : null;
       }
 
       // Seed confidence meter (discovery → seed lane): prospects carrying
@@ -798,17 +865,23 @@ class MarketingProspectQueueServiceClass extends BaseService {
       if (!existing) {
         throw new NotFoundError(`Queue entry ${id} not found`);
       }
-      // account_family + hours are identity enrichment — editable on
-      // hold/in_thread too. Cadence fields (priority/note/assigned_to) stay
-      // gated to open statuses.
+      // account_family + hours + the manual contacted flag are identity
+      // enrichment — editable on hold/in_thread too. Cadence fields
+      // (priority/note/assigned_to) stay gated to open statuses.
       const onlyEnrichmentPatch =
-        (patch.account_family !== undefined || patch.hours !== undefined) &&
+        (patch.account_family !== undefined || patch.hours !== undefined || patch.contacted !== undefined) &&
         patch.priority === undefined && patch.note === undefined && patch.assigned_to === undefined;
       const enrichmentEditable = ['intake', 'queued', 'verify_then_outreach', 'hold', 'in_thread'].includes(existing.status);
+      // The contacted flag is outreach annotation, not identity — a
+      // contact-only patch is allowed one step further, on campaign_created
+      // rows too (marked before the first logged outreach lands).
+      const contactOnly =
+        patch.contacted !== undefined && patch.account_family === undefined && patch.hours === undefined &&
+        patch.priority === undefined && patch.note === undefined && patch.assigned_to === undefined;
       // Migration 310 — intake rows are editable (priority/note/assign) while
       // parked in the staging lane; they still cannot create campaigns.
       const open = existing.status === 'intake' || existing.status === 'queued' || existing.status === 'verify_then_outreach';
-      if (!open && !(onlyEnrichmentPatch && enrichmentEditable)) {
+      if (!open && !(onlyEnrichmentPatch && enrichmentEditable) && !(contactOnly && existing.status === 'campaign_created')) {
         throw new ConflictError(`Queue entry ${id} is not editable (status=${existing.status})`);
       }
 
@@ -829,6 +902,16 @@ class MarketingProspectQueueServiceClass extends BaseService {
           else nap.hours = patch.hours;
           snapshot.verified_nap = nap;
         }
+        data.business_snapshot = snapshot;
+      }
+      // Manual contacted flag — the contact-state signal for queue-only
+      // prospects (no campaign outreach log or seed touch to derive it
+      // from). Stored on the snapshot so list() can fold it into the
+      // contacted decoration without a schema change.
+      if (patch.contacted !== undefined) {
+        const snapshot = { ...((data.business_snapshot as any) ?? (existing.business_snapshot as any) ?? {}) };
+        if (patch.contacted) snapshot.manually_contacted_at = new Date().toISOString();
+        else delete snapshot.manually_contacted_at;
         data.business_snapshot = snapshot;
       }
       if (patch.assigned_to !== undefined) {

@@ -70,6 +70,7 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
   const [logCampaign, setLogCampaign] = useState<Campaign | null>(null);
   const [logCampaignLoadingId, setLogCampaignLoadingId] = useState<string | null>(null);
   const [touchEntry, setTouchEntry] = useState<ProspectQueueEntry | null>(null);
+  const [contactedBusyId, setContactedBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
@@ -86,6 +87,28 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
     }
   };
 
+  // Manual contacted toggle — the contact-state override for queue-only
+  // prospects (campaign/seed rows derive "contacted" from their log records;
+  // unchecking a log-derived row is meaningless, so the checkbox is disabled
+  // there).
+  const handleToggleContacted = async (entry: ProspectQueueEntry, contacted: boolean) => {
+    setContactedBusyId(entry.id);
+    setActionError(null);
+    try {
+      await marketingOpsService.updateProspectQueue(entry.id, { contacted });
+      await onChanged();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to update contact status');
+    } finally {
+      setContactedBusyId(null);
+    }
+  };
+
+  // Contact-status grouping — a logged outreach (campaign log or seed
+  // touch) or the manual flag moves the prospect into Contacted.
+  const uncontacted = entries.filter((e) => !e.contacted);
+  const contactedEntries = entries.filter((e) => e.contacted);
+
   return (
     <div id="communications" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
       <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
@@ -100,6 +123,7 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
         Every prospect in this proving ground&apos;s queue with its reachable channels — the campaign&apos;s
         verified contact info once it exists, the discovery scan&apos;s evidence before that. Log contact
         writes the campaign outreach log; Log touch records the pre-campaign seed touch and advances the cadence.
+        A logged contact (or the manual check) moves the prospect into the Contacted group.
       </p>
 
       {actionError && (
@@ -119,14 +143,38 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
         </p>
       ) : (
         <ul className="space-y-1.5">
-          {entries.map((e) => (
+          {uncontacted.length > 0 && (
+            <li className="pt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              To contact · {uncontacted.length}
+            </li>
+          )}
+          {uncontacted.map((e) => (
             <CommsRow
               key={e.id}
               entry={e}
               loggingCampaign={logCampaignLoadingId === e.id}
+              contactedBusy={contactedBusyId === e.id}
               onLogContact={() => handleLogContact(e)}
               onLogTouch={() => setTouchEntry(e)}
               onResolve={() => onResolve(e)}
+              onToggleContacted={(checked) => handleToggleContacted(e, checked)}
+            />
+          ))}
+          {contactedEntries.length > 0 && (
+            <li className="pt-3 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+              Contacted · {contactedEntries.length}
+            </li>
+          )}
+          {contactedEntries.map((e) => (
+            <CommsRow
+              key={e.id}
+              entry={e}
+              loggingCampaign={logCampaignLoadingId === e.id}
+              contactedBusy={contactedBusyId === e.id}
+              onLogContact={() => handleLogContact(e)}
+              onLogTouch={() => setTouchEntry(e)}
+              onResolve={() => onResolve(e)}
+              onToggleContacted={(checked) => handleToggleContacted(e, checked)}
             />
           ))}
         </ul>
@@ -166,15 +214,19 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
 function CommsRow({
   entry,
   loggingCampaign,
+  contactedBusy,
   onLogContact,
   onLogTouch,
   onResolve,
+  onToggleContacted,
 }: {
   entry: ProspectQueueEntry;
   loggingCampaign: boolean;
+  contactedBusy: boolean;
   onLogContact: () => void;
   onLogTouch: () => void;
   onResolve: () => void;
+  onToggleContacted: (checked: boolean) => void;
 }) {
   const channels = resolveProspectChannels(entry);
   const hasChannel = !!(channels.phone || channels.email || channels.website || channels.socials.length);
@@ -217,6 +269,12 @@ function CommsRow({
                   : `next touch ${new Date(entry.next_touch_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
               </span>
             )}
+            {entry.last_contact_at && (
+              <span className="text-emerald-600 dark:text-emerald-400">
+                last contact {new Date(entry.last_contact_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                {entry.contact_source === 'manual' ? ' (manual)' : ''}
+              </span>
+            )}
             {entry.processed_campaign_id && (
               <Link
                 href={`/settings/admin/marketing-ops/campaigns/${entry.processed_campaign_id}`}
@@ -238,6 +296,35 @@ function CommsRow({
 
         {/* Log action — lifecycle decides which log the row can write. */}
         <div className="flex flex-shrink-0 items-center gap-1.5">
+          {/* Contacted toggle — log-derived rows are locked checked (the
+              record IS the signal); queue-only rows toggle the manual flag
+              so they can be grouped even without a log button. */}
+          <label
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium ${
+              entry.contacted
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
+                : 'border-gray-200 text-gray-500 dark:border-neutral-600 dark:text-gray-400'
+            } ${entry.contact_source === 'log' || contactedBusy ? 'cursor-default' : 'cursor-pointer hover:border-gray-300 dark:hover:border-neutral-500'}`}
+            title={
+              entry.contact_source === 'log'
+                ? 'Contacted — contact log on file (derived from logged contacts/touches)'
+                : contactedBusy
+                  ? 'Updating…'
+                  : entry.contacted
+                    ? 'Manually marked contacted — uncheck to move back'
+                    : 'Mark as contacted (e.g. you reached them outside the log flow)'
+            }
+          >
+            <input
+              type="checkbox"
+              checked={!!entry.contacted}
+              disabled={entry.contact_source === 'log' || contactedBusy}
+              onChange={(ev) => onToggleContacted(ev.target.checked)}
+              className="h-3 w-3 accent-emerald-600 disabled:cursor-default"
+            />
+            {contactedBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            contacted
+          </label>
           {entry.status === 'verify_then_outreach' && (
             <button
               type="button"

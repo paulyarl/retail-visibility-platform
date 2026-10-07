@@ -12,6 +12,8 @@ const {
   mockCampaigns,
   mockAudits,
   mockChecklistProgress,
+  mockOutreachLog,
+  mockSeedTouches,
   mockQueryRaw,
   mockExecuteRaw,
 } = vi.hoisted(() => ({
@@ -35,6 +37,10 @@ const {
   mockChecklistProgress: {
     groupBy: vi.fn(),
   },
+  // Contacted-signal lookups (communications panel grouping) — batched
+  // groupBy over the campaign outreach log and the seed touch table.
+  mockOutreachLog: { groupBy: vi.fn() },
+  mockSeedTouches: { groupBy: vi.fn() },
   // The audit-coverage decoration runs a raw query (it filters out
   // queue-promotion placeholder audits in SQL), so $queryRaw is mocked at
   // the client level rather than mkt_audits_list.findMany.
@@ -49,6 +55,8 @@ vi.mock('../../prisma', () => ({
     mkt_campaigns_list: mockCampaigns,
     mkt_audits_list: mockAudits,
     mkt_campaign_checklist_progress: mockChecklistProgress,
+    mkt_outreach_log: mockOutreachLog,
+    directory_seed_outreach_touches: mockSeedTouches,
     $queryRaw: mockQueryRaw,
     $executeRaw: mockExecuteRaw,
   },
@@ -166,6 +174,8 @@ describe('MarketingProspectQueueService', () => {
     mockQueue.groupBy.mockResolvedValue([]);
     mockQueryRaw.mockResolvedValue([]);
     mockChecklistProgress.groupBy.mockResolvedValue([]);
+    mockOutreachLog.groupBy.mockResolvedValue([]);
+    mockSeedTouches.groupBy.mockResolvedValue([]);
   });
 
   // ─── addToQueue ────────────────────────────────────────────────────────
@@ -594,6 +604,12 @@ describe('MarketingProspectQueueService', () => {
                 repair_track: true,
                 is_hot_prospect: true,
                 stage_entered_at: true,
+                // Contact channels — the comms surfaces render the campaign's
+                // verified phone/email/website/social without a per-row fetch.
+                phone: true,
+                email: true,
+                website_url: true,
+                social_profiles: true,
               },
             },
           },
@@ -674,6 +690,89 @@ describe('MarketingProspectQueueService', () => {
 
       expect(result.entries[0].campaign_has_business_audit).toBeNull();
       expect(result.entries[0].business_audit_at).toBeNull();
+    });
+
+    // ─── Contacted signal (communications panel grouping) ────────────────
+
+    it('marks an entry contacted from the campaign outreach log (source: log)', async () => {
+      const campaignId = 'mcamp-contacted-001';
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-contacted-001', processed_campaign_id: campaignId }),
+      ]);
+      mockOutreachLog.groupBy.mockResolvedValue([
+        { campaign_id: campaignId, _max: { created_at: new Date('2026-10-05T15:00:00Z') } },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(mockOutreachLog.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ by: ['campaign_id'], where: { campaign_id: { in: [campaignId] } } }),
+      );
+      expect(result.entries[0].contacted).toBe(true);
+      expect(result.entries[0].contact_source).toBe('log');
+      expect(result.entries[0].last_contact_at).toBe('2026-10-05T15:00:00.000Z');
+    });
+
+    it('marks an entry contacted from a seed outreach touch', async () => {
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-touch-001', seed_id: 'dps-seed-001' }),
+      ]);
+      mockSeedTouches.groupBy.mockResolvedValue([
+        { seed_id: 'dps-seed-001', _max: { occurred_at: new Date('2026-10-04T09:00:00Z') } },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(mockSeedTouches.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ by: ['seed_id'], where: { seed_id: { in: ['dps-seed-001'] } } }),
+      );
+      expect(result.entries[0].contacted).toBe(true);
+      expect(result.entries[0].contact_source).toBe('log');
+      expect(result.entries[0].last_contact_at).toBe('2026-10-04T09:00:00.000Z');
+    });
+
+    it('marks an entry contacted from the manual snapshot flag (source: manual)', async () => {
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({
+          id: 'pque-manual-001',
+          business_snapshot: scanSnapshot({ manually_contacted_at: '2026-10-06T12:00:00.000Z' }),
+        }),
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].contacted).toBe(true);
+      expect(result.entries[0].contact_source).toBe('manual');
+      expect(result.entries[0].last_contact_at).toBe('2026-10-06T12:00:00.000Z');
+    });
+
+    it('leaves contacted false when no log or manual flag exists', async () => {
+      mockQueue.findMany.mockResolvedValue([queueRow({ id: 'pque-clean-001' })]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].contacted).toBe(false);
+      expect(result.entries[0].contact_source).toBeNull();
+      expect(result.entries[0].last_contact_at).toBeNull();
+    });
+
+    it('prefers source log over a stale manual flag when both exist', async () => {
+      const campaignId = 'mcamp-both-001';
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({
+          id: 'pque-both-001',
+          processed_campaign_id: campaignId,
+          business_snapshot: scanSnapshot({ manually_contacted_at: '2026-10-01T00:00:00.000Z' }),
+        }),
+      ]);
+      mockOutreachLog.groupBy.mockResolvedValue([
+        { campaign_id: campaignId, _max: { created_at: new Date('2026-10-05T00:00:00Z') } },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].contact_source).toBe('log');
+      expect(result.entries[0].last_contact_at).toBe('2026-10-05T00:00:00.000Z');
     });
 
     // Migration 282 — direct PG membership column, OR'd with the legacy
@@ -1833,6 +1932,68 @@ describe('MarketingProspectQueueService', () => {
   });
 
   // ─── update editability + createCampaign guard (Migration 255) ────────
+
+  describe('update — contacted flag', () => {
+    it('writes manually_contacted_at into the snapshot when contacted=true', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'queued' }));
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: where.id })),
+      );
+
+      await MarketingProspectQueueService.update('pque-test-001', { contacted: true });
+
+      const data = mockQueue.update.mock.calls[0][0].data;
+      expect(typeof data.business_snapshot.manually_contacted_at).toBe('string');
+      // Existing snapshot keys are preserved by the merge.
+      expect(data.business_snapshot.business_name).toBe('Joe Pizza');
+    });
+
+    it('clears manually_contacted_at when contacted=false', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({
+        status: 'queued',
+        business_snapshot: scanSnapshot({ manually_contacted_at: '2026-10-06T00:00:00.000Z' }),
+      }));
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: where.id })),
+      );
+
+      await MarketingProspectQueueService.update('pque-test-001', { contacted: false });
+
+      const data = mockQueue.update.mock.calls[0][0].data;
+      expect(data.business_snapshot.manually_contacted_at).toBeUndefined();
+    });
+
+    it('allows the contacted flag on a hold entry (enrichment patch)', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'hold' }));
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: where.id })),
+      );
+
+      await MarketingProspectQueueService.update('pque-test-001', { contacted: true });
+
+      expect(mockQueue.update).toHaveBeenCalled();
+    });
+
+    it('rejects a contacted+priority patch on a hold entry (cadence fields stay gated)', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'hold' }));
+
+      await expect(
+        MarketingProspectQueueService.update('pque-test-001', { contacted: true, priority: 'high' }),
+      ).rejects.toThrow(/not editable/i);
+    });
+
+    it('allows a contact-only patch on a campaign_created entry (pre-first-log mark)', async () => {
+      mockQueue.findUnique.mockResolvedValue(queueRow({ status: 'campaign_created' }));
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve(queueRow({ ...data, id: where.id })),
+      );
+
+      await MarketingProspectQueueService.update('pque-test-001', { contacted: true });
+
+      const data = mockQueue.update.mock.calls[0][0].data;
+      expect(typeof data.business_snapshot.manually_contacted_at).toBe('string');
+    });
+  });
 
   describe('update — verify_then_outreach editability', () => {
     it('allows updating priority on a verify_then_outreach entry', async () => {

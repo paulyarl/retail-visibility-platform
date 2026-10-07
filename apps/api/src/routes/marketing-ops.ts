@@ -5751,6 +5751,10 @@ const prospectQueuePatchSchema = z.object({
   hours: businessHoursSchema.nullable().optional(),
   // Migration 262 — account-family grouping (one owner → one operator/thread).
   account_family: z.string().max(120).nullable().optional(),
+  // Operator "contacted" flag — drives the communications panel's
+  // contacted/not-contacted grouping for queue-only prospects (no campaign
+  // outreach log or seed touch to derive the signal from).
+  contacted: z.boolean().optional(),
 });
 
 // PATCH /prospect-queue/:id — update priority / note / assigned_to (claim semantics)
@@ -5764,6 +5768,7 @@ router.patch('/prospect-queue/:id', async (req: any, res: Response) => {
       assigned_to: parsed.assigned_to,
       account_family: parsed.account_family,
       hours: parsed.hours,
+      contacted: parsed.contacted,
     }, getCtx(req));
     res.json({ success: true, data: updated });
   } catch (error) {

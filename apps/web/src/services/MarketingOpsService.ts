@@ -1417,6 +1417,9 @@ export interface ProspectQueuePatch {
   // Migration 296 — opening hours on the queue snapshot (null clears);
   // editable on hold/in_thread rows too.
   hours?: Record<string, any> | null;
+  // Operator "contacted" flag — the manual contact-state signal for
+  // queue-only prospects (no log record to derive it from).
+  contacted?: boolean;
 }
 
 export interface ProspectQueueEntry {
@@ -1471,6 +1474,13 @@ export interface ProspectQueueEntry {
   campaign_email?: string | null;
   campaign_website_url?: string | null;
   campaign_social_profiles?: { platform: string; url: string }[] | null;
+  // Contacted signal — presence of any logged outreach (campaign
+  // mkt_outreach_log via processed_campaign_id, or seed touch via seed_id)
+  // or the operator's manual flag (snapshot.manually_contacted_at). Powers
+  // the communications panel's contacted/not-contacted grouping.
+  contacted?: boolean;
+  last_contact_at?: string | null;
+  contact_source?: 'log' | 'manual' | null;
   // Shelf enrichment coverage (present when includeEnrichment=true) — every
   // sweep category × the prospect's geo carries a campaign-applied
   // (composer_version >= 2) directory enrichment row. covered/total give the
