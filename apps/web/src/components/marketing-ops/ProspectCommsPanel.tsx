@@ -25,7 +25,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Phone, Mail, Globe, Share2, ClipboardList, PhoneCall, Loader2,
-  ShieldCheck, AlertTriangle, ExternalLink, MessageSquare, EyeOff, Eye,
+  ShieldCheck, AlertTriangle, ExternalLink, MessageSquare, EyeOff, Eye, Check,
 } from 'lucide-react';
 import marketingOpsService, {
   type Campaign,
@@ -76,6 +76,9 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
   // the processed campaign's id (writes verified NAP to the campaign, not
   // the queue row).
   const [verifyEntry, setVerifyEntry] = useState<VerificationEntryLike | null>(null);
+  // Queue-mode verify — requestVerification gates a queued prospect behind
+  // the phone call (same action the communications page offers).
+  const [verifyBusyId, setVerifyBusyId] = useState<string | null>(null);
   const [hideContacted, setHideContacted] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -118,6 +121,22 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
     .filter((e) => e.contacted)
     .sort((a, b) => (b.last_contact_at ?? '').localeCompare(a.last_contact_at ?? ''));
   const visibleContacted = hideContacted ? [] : contactedEntries;
+
+  // Queue-mode verify — moves a queued prospect to verify_then_outreach
+  // (the Resolve button then opens the shared modal for the call outcome).
+  const handleRequestVerify = async (entry: ProspectQueueEntry) => {
+    setVerifyBusyId(entry.id);
+    setActionError(null);
+    try {
+      await marketingOpsService.requestVerification(entry.id);
+      setActionNotice('Verification requested — the prospect is gated until the call is resolved.');
+      await onChanged();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to request verification');
+    } finally {
+      setVerifyBusyId(null);
+    }
+  };
 
   // Campaign-scoped verify — synthesizes the modal's entry shape with the
   // processed campaign's id (campaign mode writes to the campaign record).
@@ -192,10 +211,12 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
               entry={e}
               loggingCampaign={logCampaignLoadingId === e.id}
               contactedBusy={contactedBusyId === e.id}
+              verifyBusy={verifyBusyId === e.id}
               onLogContact={() => handleLogContact(e)}
               onLogTouch={() => setTouchEntry(e)}
               onResolve={() => onResolve(e)}
               onVerify={() => openCampaignVerify(e)}
+              onRequestVerify={() => handleRequestVerify(e)}
               onToggleContacted={(checked) => handleToggleContacted(e, checked)}
             />
           ))}
@@ -210,10 +231,12 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
               entry={e}
               loggingCampaign={logCampaignLoadingId === e.id}
               contactedBusy={contactedBusyId === e.id}
+              verifyBusy={verifyBusyId === e.id}
               onLogContact={() => handleLogContact(e)}
               onLogTouch={() => setTouchEntry(e)}
               onResolve={() => onResolve(e)}
               onVerify={() => openCampaignVerify(e)}
+              onRequestVerify={() => handleRequestVerify(e)}
               onToggleContacted={(checked) => handleToggleContacted(e, checked)}
             />
           ))}
@@ -271,19 +294,23 @@ function CommsRow({
   entry,
   loggingCampaign,
   contactedBusy,
+  verifyBusy,
   onLogContact,
   onLogTouch,
   onResolve,
   onVerify,
+  onRequestVerify,
   onToggleContacted,
 }: {
   entry: ProspectQueueEntry;
   loggingCampaign: boolean;
   contactedBusy: boolean;
+  verifyBusy: boolean;
   onLogContact: () => void;
   onLogTouch: () => void;
   onResolve: () => void;
   onVerify: () => void;
+  onRequestVerify: () => void;
   onToggleContacted: (checked: boolean) => void;
 }) {
   const channels = resolveProspectChannels(entry);
@@ -367,15 +394,22 @@ function CommsRow({
 
         {/* Log action — lifecycle decides which log the row can write. */}
         <div className="flex flex-shrink-0 items-center gap-1.5">
-          {/* Contacted toggle — log-derived rows are locked checked (the
-              record IS the signal); queue-only rows toggle the manual flag
-              so they can be grouped even without a log button. */}
-          <label
+          {/* Contacted toggle — custom checkbox (native boxes render
+              identically across disabled/enabled on some platforms).
+              Log/verify-derived rows are locked (the record IS the signal);
+              channelless rows can't be marked — nothing to contact them on;
+              an already-contacted row can always be unchecked to undo. */}
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={!!entry.contacted}
+            disabled={contactLocked}
+            onClick={() => onToggleContacted(!entry.contacted)}
             className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium ${
               entry.contacted
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
                 : 'border-gray-200 text-gray-500 dark:border-neutral-600 dark:text-gray-400'
-            } ${contactLocked ? 'cursor-default' : 'cursor-pointer hover:border-gray-300 dark:hover:border-neutral-500'}`}
+            } ${contactLocked ? 'cursor-not-allowed opacity-45' : 'hover:border-gray-300 dark:hover:border-neutral-500'}`}
             title={
               entry.contact_source === 'log'
                 ? 'Contacted — contact log on file (derived from logged contacts/touches)'
@@ -390,16 +424,32 @@ function CommsRow({
                         : 'Mark as contacted (e.g. you reached them outside the log flow)'
             }
           >
-            <input
-              type="checkbox"
-              checked={!!entry.contacted}
-              disabled={contactLocked}
-              onChange={(ev) => onToggleContacted(ev.target.checked)}
-              className="h-3 w-3 accent-emerald-600 disabled:cursor-default"
-            />
+            <span
+              className={`inline-flex h-3 w-3 flex-shrink-0 items-center justify-center rounded-[3px] border ${
+                entry.contacted
+                  ? 'border-emerald-600 bg-emerald-600 text-white'
+                  : 'border-gray-300 bg-white dark:border-neutral-500 dark:bg-neutral-800'
+              }`}
+            >
+              {entry.contacted && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
+            </span>
             {contactedBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
             contacted
-          </label>
+          </button>
+          {/* Queue-mode verify — gate a queued, pre-campaign prospect behind
+              the phone call (same action the communications page offers). */}
+          {!entry.processed_campaign_id && entry.status === 'queued' && (
+            <button
+              type="button"
+              onClick={onRequestVerify}
+              disabled={verifyBusy}
+              className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40"
+              title="Gate outreach on a phone call — moves the prospect to Verify, then resolve with the verified NAP"
+            >
+              {verifyBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+              Verify
+            </button>
+          )}
           {entry.status === 'verify_then_outreach' && (
             <button
               type="button"
