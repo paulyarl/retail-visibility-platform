@@ -355,6 +355,13 @@ function CommsRow({
                 seed →
               </Link>
             )}
+            <Link
+              href={`/settings/admin/marketing-ops/communications?prospect=${entry.id}`}
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+              title="Open the prospect's full communication timeline (seed touches + campaign outreach)"
+            >
+              history →
+            </Link>
           </div>
         </div>
 
