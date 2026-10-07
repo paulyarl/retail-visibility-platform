@@ -782,22 +782,32 @@ class MarketingProspectQueueServiceClass extends BaseService {
       }
 
       // Contacted decoration — a logged outreach (campaign log or seed
-      // touch) marks the prospect contacted; the operator's manual flag is
-      // the fallback for queue-only rows. last_contact_at reflects the most
-      // recent signal of either kind.
+      // touch) marks the prospect contacted, as does a completed
+      // verification call (verification.resolved_at — the resolve modal IS
+      // a completed outreach touch). The operator's manual flag is the
+      // fallback for queue-only rows. last_contact_at reflects the most
+      // recent signal of any kind.
       for (const d of decorated as any[]) {
         const snap = (d.business_snapshot as any) ?? {};
         const manualAt = snap.manually_contacted_at ? new Date(snap.manually_contacted_at) : null;
+        // verification.resolved_at covers the queue-mode resolve;
+        // campaign_verified_at is stamped by resolveCampaignVerification
+        // (the campaign-scoped counterpart) for the same signal.
+        const verifiedRaw =
+          (d.verification as any)?.resolved_at ?? snap.campaign_verified_at;
+        const verifiedAt = verifiedRaw ? new Date(verifiedRaw) : null;
         const logAt = [
           d.processed_campaign_id ? lastLogByCampaign.get(d.processed_campaign_id) : undefined,
           d.seed_id ? lastTouchBySeed.get(d.seed_id) : undefined,
         ]
           .filter((t): t is Date => !!t)
           .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-        const latest = logAt && (!manualAt || logAt > manualAt) ? logAt : manualAt;
+        const latest = [logAt, verifiedAt, manualAt]
+          .filter((t): t is Date => !!t)
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
         d.last_contact_at = latest ? latest.toISOString() : null;
-        d.contacted = !!(logAt || manualAt);
-        d.contact_source = logAt ? 'log' : manualAt ? 'manual' : null;
+        d.contacted = !!(logAt || verifiedAt || manualAt);
+        d.contact_source = logAt ? 'log' : verifiedAt ? 'verify' : manualAt ? 'manual' : null;
       }
 
       // Seed confidence meter (discovery → seed lane): prospects carrying

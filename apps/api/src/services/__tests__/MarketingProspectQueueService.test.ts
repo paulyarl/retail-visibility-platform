@@ -756,6 +756,37 @@ describe('MarketingProspectQueueService', () => {
       expect(result.entries[0].last_contact_at).toBeNull();
     });
 
+    it('marks an entry contacted from a completed verification call (source: verify)', async () => {
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({
+          id: 'pque-verified-001',
+          verification: { requested_at: '2026-10-01T00:00:00Z', resolved_at: '2026-10-03T14:00:00Z', outcome: 'operational' },
+        }),
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].contacted).toBe(true);
+      expect(result.entries[0].contact_source).toBe('verify');
+      expect(result.entries[0].last_contact_at).toBe('2026-10-03T14:00:00.000Z');
+    });
+
+    it('marks an entry contacted from a campaign-scoped verification stamp', async () => {
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({
+          id: 'pque-campver-001',
+          processed_campaign_id: 'mcamp-ver-001',
+          business_snapshot: scanSnapshot({ campaign_verified_at: '2026-10-06T10:00:00.000Z' }),
+        }),
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].contacted).toBe(true);
+      expect(result.entries[0].contact_source).toBe('verify');
+      expect(result.entries[0].last_contact_at).toBe('2026-10-06T10:00:00.000Z');
+    });
+
     it('prefers source log over a stale manual flag when both exist', async () => {
       const campaignId = 'mcamp-both-001';
       mockQueue.findMany.mockResolvedValue([

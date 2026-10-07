@@ -1475,12 +1475,13 @@ export interface ProspectQueueEntry {
   campaign_website_url?: string | null;
   campaign_social_profiles?: { platform: string; url: string }[] | null;
   // Contacted signal — presence of any logged outreach (campaign
-  // mkt_outreach_log via processed_campaign_id, or seed touch via seed_id)
-  // or the operator's manual flag (snapshot.manually_contacted_at). Powers
-  // the communications panel's contacted/not-contacted grouping.
+  // mkt_outreach_log via processed_campaign_id, or seed touch via seed_id),
+  // a completed verification call (verification.resolved_at), or the
+  // operator's manual flag (snapshot.manually_contacted_at). Powers the
+  // communications panel's contacted/not-contacted grouping.
   contacted?: boolean;
   last_contact_at?: string | null;
-  contact_source?: 'log' | 'manual' | null;
+  contact_source?: 'log' | 'verify' | 'manual' | null;
   // Shelf enrichment coverage (present when includeEnrichment=true) — every
   // sweep category × the prospect's geo carries a campaign-applied
   // (composer_version >= 2) directory enrichment row. covered/total give the

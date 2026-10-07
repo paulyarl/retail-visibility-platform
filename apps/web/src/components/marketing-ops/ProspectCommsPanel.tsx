@@ -25,7 +25,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Phone, Mail, Globe, Share2, ClipboardList, PhoneCall, Loader2,
-  ShieldCheck, AlertTriangle, ExternalLink, MessageSquare,
+  ShieldCheck, AlertTriangle, ExternalLink, MessageSquare, EyeOff, Eye,
 } from 'lucide-react';
 import marketingOpsService, {
   type Campaign,
@@ -34,6 +34,7 @@ import marketingOpsService, {
 import { resolveProspectChannels } from '@/lib/prospect-channels';
 import LogContactModal from './LogContactModal';
 import ProspectTouchLogModal from './ProspectTouchLogModal';
+import ResolveVerificationModal, { type VerificationEntryLike } from './ResolveVerificationModal';
 import VerificationBadge from './VerificationBadge';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -71,6 +72,11 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
   const [logCampaignLoadingId, setLogCampaignLoadingId] = useState<string | null>(null);
   const [touchEntry, setTouchEntry] = useState<ProspectQueueEntry | null>(null);
   const [contactedBusyId, setContactedBusyId] = useState<string | null>(null);
+  // Campaign-scoped verification — the campaign-mode resolve modal keyed by
+  // the processed campaign's id (writes verified NAP to the campaign, not
+  // the queue row).
+  const [verifyEntry, setVerifyEntry] = useState<VerificationEntryLike | null>(null);
+  const [hideContacted, setHideContacted] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
@@ -105,9 +111,28 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
   };
 
   // Contact-status grouping — a logged outreach (campaign log or seed
-  // touch) or the manual flag moves the prospect into Contacted.
+  // touch), a completed verification call, or the manual flag moves the
+  // prospect into Contacted. Contacted rows sort by most recent contact.
   const uncontacted = entries.filter((e) => !e.contacted);
-  const contactedEntries = entries.filter((e) => e.contacted);
+  const contactedEntries = entries
+    .filter((e) => e.contacted)
+    .sort((a, b) => (b.last_contact_at ?? '').localeCompare(a.last_contact_at ?? ''));
+  const visibleContacted = hideContacted ? [] : contactedEntries;
+
+  // Campaign-scoped verify — synthesizes the modal's entry shape with the
+  // processed campaign's id (campaign mode writes to the campaign record).
+  const openCampaignVerify = (e: ProspectQueueEntry) => {
+    if (!e.processed_campaign_id) return;
+    setVerifyEntry({
+      id: e.processed_campaign_id,
+      business_name: e.business_name ?? e.title ?? null,
+      title: e.title,
+      category: e.category,
+      city: e.city,
+      state: e.state,
+      business_snapshot: e.business_snapshot,
+    });
+  };
 
   return (
     <div id="communications" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
@@ -115,8 +140,21 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <MessageSquare className="w-4 h-4" /> Prospect communications
         </h2>
-        <span className="text-[10px] text-gray-400">
-          {entries.length} prospect{entries.length !== 1 ? 's' : ''}
+        <span className="flex items-center gap-2">
+          {contactedEntries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setHideContacted((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 dark:border-neutral-600 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-neutral-700"
+              title={hideContacted ? 'Show the contacted group again' : 'Hide contacted prospects — work only the un-contacted list'}
+            >
+              {hideContacted ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+              {hideContacted ? 'show contacted' : 'hide contacted'}
+            </button>
+          )}
+          <span className="text-[10px] text-gray-400">
+            {entries.length} prospect{entries.length !== 1 ? 's' : ''}
+          </span>
         </span>
       </div>
       <p className="text-[10px] text-gray-400 mb-3">
@@ -157,15 +195,16 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
               onLogContact={() => handleLogContact(e)}
               onLogTouch={() => setTouchEntry(e)}
               onResolve={() => onResolve(e)}
+              onVerify={() => openCampaignVerify(e)}
               onToggleContacted={(checked) => handleToggleContacted(e, checked)}
             />
           ))}
-          {contactedEntries.length > 0 && (
+          {visibleContacted.length > 0 && (
             <li className="pt-3 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-              Contacted · {contactedEntries.length}
+              Contacted · {visibleContacted.length}
             </li>
           )}
-          {contactedEntries.map((e) => (
+          {visibleContacted.map((e) => (
             <CommsRow
               key={e.id}
               entry={e}
@@ -174,6 +213,7 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
               onLogContact={() => handleLogContact(e)}
               onLogTouch={() => setTouchEntry(e)}
               onResolve={() => onResolve(e)}
+              onVerify={() => openCampaignVerify(e)}
               onToggleContacted={(checked) => handleToggleContacted(e, checked)}
             />
           ))}
@@ -205,6 +245,22 @@ export default function ProspectCommsPanel({ entries, onChanged, onResolve }: Pr
           }}
         />
       )}
+
+      {/* Campaign-scoped verification — writes verified NAP to the campaign
+          (the Identity Packet reads it); the call is provenance, not a queue
+          "next action". */}
+      {verifyEntry && (
+        <ResolveVerificationModal
+          mode="campaign"
+          entry={verifyEntry}
+          onClose={() => setVerifyEntry(null)}
+          onResolved={async () => {
+            setVerifyEntry(null);
+            setActionNotice('Verification recorded on the campaign.');
+            await onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -218,6 +274,7 @@ function CommsRow({
   onLogContact,
   onLogTouch,
   onResolve,
+  onVerify,
   onToggleContacted,
 }: {
   entry: ProspectQueueEntry;
@@ -226,6 +283,7 @@ function CommsRow({
   onLogContact: () => void;
   onLogTouch: () => void;
   onResolve: () => void;
+  onVerify: () => void;
   onToggleContacted: (checked: boolean) => void;
 }) {
   const channels = resolveProspectChannels(entry);
@@ -235,6 +293,12 @@ function CommsRow({
   const touchable =
     !!entry.seed_id &&
     (entry.status === 'queued' || entry.status === 'in_thread' || entry.status === 'verify_then_outreach' || !!holdDue);
+  // Contacted checkbox rules: log/verify-derived rows are locked (the record
+  // IS the signal); a channelless row can't be marked — there's nothing to
+  // contact the prospect on (but an already-contacted row can always be
+  // unchecked to undo a mark).
+  const contactDerived = entry.contact_source === 'log' || entry.contact_source === 'verify';
+  const contactLocked = contactDerived || contactedBusy || (!hasChannel && !entry.contacted);
 
   return (
     <li className="rounded-lg border border-gray-100 dark:border-neutral-700/60 px-3 py-2">
@@ -272,7 +336,7 @@ function CommsRow({
             {entry.last_contact_at && (
               <span className="text-emerald-600 dark:text-emerald-400">
                 last contact {new Date(entry.last_contact_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                {entry.contact_source === 'manual' ? ' (manual)' : ''}
+                {entry.contact_source === 'manual' ? ' (manual)' : entry.contact_source === 'verify' ? ' (verified)' : ''}
               </span>
             )}
             {entry.processed_campaign_id && (
@@ -304,21 +368,25 @@ function CommsRow({
               entry.contacted
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
                 : 'border-gray-200 text-gray-500 dark:border-neutral-600 dark:text-gray-400'
-            } ${entry.contact_source === 'log' || contactedBusy ? 'cursor-default' : 'cursor-pointer hover:border-gray-300 dark:hover:border-neutral-500'}`}
+            } ${contactLocked ? 'cursor-default' : 'cursor-pointer hover:border-gray-300 dark:hover:border-neutral-500'}`}
             title={
               entry.contact_source === 'log'
                 ? 'Contacted — contact log on file (derived from logged contacts/touches)'
-                : contactedBusy
-                  ? 'Updating…'
-                  : entry.contacted
-                    ? 'Manually marked contacted — uncheck to move back'
-                    : 'Mark as contacted (e.g. you reached them outside the log flow)'
+                : entry.contact_source === 'verify'
+                  ? 'Contacted — verification call completed (derived from the resolve record)'
+                  : contactedBusy
+                    ? 'Updating…'
+                    : !hasChannel && !entry.contacted
+                      ? 'No contact channel on file — nothing to reach them on'
+                      : entry.contacted
+                        ? 'Marked contacted — uncheck to move back'
+                        : 'Mark as contacted (e.g. you reached them outside the log flow)'
             }
           >
             <input
               type="checkbox"
               checked={!!entry.contacted}
-              disabled={entry.contact_source === 'log' || contactedBusy}
+              disabled={contactLocked}
               onChange={(ev) => onToggleContacted(ev.target.checked)}
               className="h-3 w-3 accent-emerald-600 disabled:cursor-default"
             />
@@ -337,16 +405,27 @@ function CommsRow({
             </button>
           )}
           {entry.processed_campaign_id ? (
-            <button
-              type="button"
-              onClick={onLogContact}
-              disabled={loggingCampaign}
-              className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-              title="Log a communication on the campaign outreach log — channel, message, outcome"
-            >
-              {loggingCampaign ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardList className="h-3 w-3" />}
-              Log contact
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onVerify}
+                className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40"
+                title="Verify contact details on the campaign — records the call outcome and verified NAP on the campaign record"
+              >
+                <ShieldCheck className="h-3 w-3" />
+                Verify
+              </button>
+              <button
+                type="button"
+                onClick={onLogContact}
+                disabled={loggingCampaign}
+                className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                title="Log a communication on the campaign outreach log — channel, message, outcome"
+              >
+                {loggingCampaign ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardList className="h-3 w-3" />}
+                Log contact
+              </button>
+            </>
           ) : touchable ? (
             <button
               type="button"

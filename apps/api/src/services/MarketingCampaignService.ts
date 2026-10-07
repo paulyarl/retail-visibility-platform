@@ -2970,6 +2970,28 @@ export class MarketingCampaignService extends BaseService {
       }
     }
 
+    // 4. Queue contacted signal — the verification call IS outreach. Stamp
+    //    the linked queue entry's snapshot so the prospect-queue contacted
+    //    decoration (communications panel grouping) reflects it as
+    //    contact_source 'verify'. Same live-contact gate as the seed
+    //    back-fill: unreachable / wrong_business produced no contact.
+    if (!['unreachable', 'wrong_business'].includes(input.outcome)) {
+      try {
+        await this.prisma.$executeRaw`
+          UPDATE mkt_prospect_queue
+          SET business_snapshot = COALESCE(business_snapshot, '{}'::jsonb)
+                || jsonb_build_object('campaign_verified_at', ${new Date().toISOString()}::text),
+              updated_at = now()
+          WHERE processed_campaign_id = ${campaignId}
+            AND status IS DISTINCT FROM 'dismissed'`;
+      } catch (error) {
+        logger.warn('resolveCampaignVerification: queue contacted stamp failed (non-fatal)', ctx, {
+          campaignId,
+          error: (error as Error).message,
+        });
+      }
+    }
+
     return updated;
   }
 
