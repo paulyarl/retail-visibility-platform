@@ -277,7 +277,12 @@ class DatabaseTransport implements LogTransport {
       },
     };
 
-    await prisma.application_error_log.create({ data });
+    // createMany, not create: the DB-level dedupe/guard trigger suppresses
+    // repeats via RETURN NULL; create() would panic ("Could not figure out an
+    // ID in create") because INSERT…RETURNING yields no row. count 0 = the
+    // trigger deduped this entry — it already records the hit in
+    // error_log_dedupe_stats, so nothing further to track here.
+    await prisma.application_error_log.createMany({ data });
   }
 
   private extractExtraContext(entry: LogEntry): Record<string, any> {

@@ -74,7 +74,11 @@ router.post('/', async (req: Request, res: Response) => {
 
   for (const report of batch) {
     try {
-      await prisma.application_error_log.create({
+      // createMany, not create: the DB dedupe/guard triggers (db-rescue.cjs)
+      // suppress rows via RETURN NULL, which makes create()'s INSERT…RETURNING
+      // panic with "Could not figure out an ID in create". createMany returns
+      // count 0 instead — a suppressed insert is a quiet drop, not an error.
+      const { count } = await prisma.application_error_log.createMany({
         data: {
           level: 'error',
           message: report.message?.slice(0, 5000) || 'Unknown client error',
@@ -94,7 +98,8 @@ router.post('/', async (req: Request, res: Response) => {
           },
         },
       });
-      accepted++;
+      if (count > 0) accepted++;
+      else dropped++;
     } catch (err: any) {
       dropped++;
       // Log but don't fail the entire batch
