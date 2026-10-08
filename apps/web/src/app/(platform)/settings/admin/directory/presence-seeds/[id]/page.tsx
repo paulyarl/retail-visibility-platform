@@ -230,6 +230,7 @@ function PresenceSeedDetailClient() {
   const [reengagement, setReengagement] = useState<ReEngagementSuggestion | null>(null);
   const [anchors, setAnchors] = useState<ManualOutreachAnchor[]>([]);
   const [showAnchorForm, setShowAnchorForm] = useState(false);
+  const [suggestingAnchors, setSuggestingAnchors] = useState(false);
   const [anchorForm, setAnchorForm] = useState<{
     anchorType: ManualAnchorType;
     title: string;
@@ -2409,13 +2410,46 @@ function PresenceSeedDetailClient() {
               change the detected archetype.
             </p>
           </div>
-          <button
-            onClick={() => setShowAnchorForm(!showAnchorForm)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Anchor
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setActionError(null);
+                setSuggestingAnchors(true);
+                try {
+                  const res = await directoryPresenceAdminService.suggestOutreachAnchors(seedId);
+                  if (!res) {
+                    setActionError('Failed to suggest variant anchors.');
+                    return;
+                  }
+                  setActionSuccess(
+                    res.created.length > 0
+                      ? `${res.created.length} variant anchor${res.created.length === 1 ? '' : 's'} drafted from linked campaigns${res.skipped > 0 ? ` · ${res.skipped} already covered` : ''}.`
+                      : res.skipped > 0
+                        ? 'All linked-campaign findings already have anchors.'
+                        : 'No linked campaign briefings with outreach problems found.',
+                  );
+                  loadAnchors();
+                } catch {
+                  setActionError('Failed to suggest variant anchors.');
+                } finally {
+                  setSuggestingAnchors(false);
+                }
+              }}
+              disabled={suggestingAnchors}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+              title="Draft anchors from every linked campaign's briefing + audit outreach problems"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {suggestingAnchors ? 'Suggesting…' : 'Suggest variants'}
+            </button>
+            <button
+              onClick={() => setShowAnchorForm(!showAnchorForm)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New Anchor
+            </button>
+          </div>
         </div>
 
         {/* Create anchor form */}
@@ -2534,7 +2568,17 @@ function PresenceSeedDetailClient() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{a.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{a.anchor_type.replace(/_/g, ' ')}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {a.anchor_type.replace(/_/g, ' ')}
+                      {a.seed_id !== seedId && (
+                        <span
+                          className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          title="Scoped to a campaign linked to this seed — shared via sibling awareness"
+                        >
+                          via linked campaign
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${

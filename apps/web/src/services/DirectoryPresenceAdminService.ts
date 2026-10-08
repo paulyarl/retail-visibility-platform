@@ -1657,6 +1657,22 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return (result.data?.data ?? result.data) ?? null;
   }
 
+  /**
+   * Sibling-aware variant anchors: drafts one anchor per outreach_problems
+   * entry found across every campaign linked to the seed (primary/sibling/
+   * recovery). Dual-scoped drafts land in the Anchors list for review.
+   */
+  async suggestOutreachAnchors(seedId: string): Promise<{ created: ManualOutreachAnchor[]; skipped: number } | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/outreach-anchors/suggest`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
   async getOutreachAnchor(anchorId: string): Promise<ManualOutreachAnchor | null> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/outreach-anchors/${encodeURIComponent(anchorId)}`,

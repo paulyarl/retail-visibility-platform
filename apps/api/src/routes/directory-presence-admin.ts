@@ -2648,6 +2648,34 @@ router.post('/presence-seeds/:id/outreach-anchors', requirePlatformStaff, async 
   }
 });
 
+/**
+ * POST /api/admin/directory-presence/presence-seeds/:id/outreach-anchors/suggest
+ * Sibling-aware variant anchors: for every campaign linked to the seed
+ * (primary/sibling/recovery), draft anchors from that campaign's briefing
+ * variant + audit outreach_problems. Dual-scoped drafts (seed + campaign);
+ * idempotent via evidence_refs provenance + observed_issue dedupe.
+ */
+router.post('/presence-seeds/:id/outreach-anchors/suggest', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: manualOutreachAnchorService } = await import(
+      '../services/intelligence/ManualOutreachAnchorService.js'
+    );
+    const result = await manualOutreachAnchorService.suggestVariantsForSeed(
+      req.params.id,
+      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
+    );
+    res.status(201).json({ success: true, data: result });
+  } catch (error: any) {
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/outreach-anchors/suggest] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory-presence/outreach-anchors/:anchorId — get a single anchor. */
 router.get('/outreach-anchors/:anchorId', requirePlatformStaff, async (req: Request, res: Response) => {
   try {

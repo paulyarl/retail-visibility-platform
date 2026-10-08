@@ -253,12 +253,20 @@ export class ManualOutreachAnchorService extends BaseService {
   }
 
   /**
-   * List anchors for a seed.
+   * List anchors for a seed — seed-scoped anchors UNION anchors scoped to
+   * any campaign linked to the seed (directory_seed_campaign_links, all
+   * link_roles). Sibling awareness: an anchor authored on a sibling
+   * campaign's Call Script tab describes the same business and belongs in
+   * the seed's verification-call picker too.
    */
   async listAnchorsForSeed(seedId: string, ctx?: RequestCtx): Promise<ManualOutreachAnchor[]> {
     const rows = await this.prisma.$queryRaw<any[]>`
       SELECT * FROM mkt_outreach_anchors
       WHERE seed_id = ${seedId}
+         OR campaign_id IN (
+           SELECT campaign_id FROM directory_seed_campaign_links
+           WHERE seed_id = ${seedId}
+         )
       ORDER BY created_at DESC
     `;
     return rows as ManualOutreachAnchor[];
@@ -274,6 +282,195 @@ export class ManualOutreachAnchorService extends BaseService {
       ORDER BY created_at DESC
     `;
     return rows as ManualOutreachAnchor[];
+  }
+
+  // ── Sibling-aware variant suggestions ────────────────────────────────────
+
+  /**
+   * Suggest variant anchors for a seed from its linked campaigns' outreach
+   * material (sibling awareness — spec §11/§12.4 extension).
+   *
+   * A seed may sit on several archetype campaigns at once
+   * (directory_seed_campaign_links link_role primary/sibling/recovery), each
+   * carrying its own briefing variant: the campaign's repair_triage_briefing
+   * and its per-platform audits (website_positioning, business_analysis, …)
+   * both carry the outreach_problems contract.
+   *
+   * For each problem → solution pair found, one DRAFT anchor is created,
+   * dual-scoped (seed_id + that campaign's id) so it surfaces on the seed's
+   * anchor picker AND the sibling campaign's Call Script tab. Draft status
+   * is the human gate — the operator edits/activates like any other anchor.
+   *
+   * Idempotent: an existing seed anchor carrying the same evidence_refs
+   * provenance marker or the same observed_issue text is skipped.
+   */
+  async suggestVariantsForSeed(
+    seedId: string,
+    ctx: RequestCtx,
+  ): Promise<{ created: ManualOutreachAnchor[]; skipped: number }> {
+    // 1. All campaigns linked to the seed — every role, primary first.
+    const links = await this.prisma.directory_seed_campaign_links.findMany({
+      where: { seed_id: seedId },
+      orderBy: [{ link_role: 'asc' }],
+      select: { campaign_id: true },
+    });
+    const campaignIds = links.map((l) => l.campaign_id);
+    if (campaignIds.length === 0) return { created: [], skipped: 0 };
+
+    // 2. Campaign rows — repair_triage_briefing is the per-sibling briefing
+    //    variant; campaign_category/repair_track label the variant.
+    const campaigns = await this.prisma.mkt_campaigns_list.findMany({
+      where: { id: { in: campaignIds } },
+      select: {
+        id: true,
+        campaign_category: true,
+        repair_track: true,
+        repair_triage_briefing: true,
+      },
+    }) as any[];
+
+    // 3. Latest audit per (campaign, platform) — audits carry their own
+    //    outreach_problems under the same contract.
+    const audits = await this.prisma.mkt_audits_list.findMany({
+      where: { campaign_id: { in: campaignIds } },
+      orderBy: { created_at: 'desc' },
+      select: { campaign_id: true, platform: true, audit_data: true },
+    }) as any[];
+    const latestAudit = new Map<string, any>();
+    for (const a of audits) {
+      const key = `${a.campaign_id}:${a.platform}`;
+      if (!latestAudit.has(key)) latestAudit.set(key, a);
+    }
+
+    // 4. Dedupe keys from existing seed anchors: the provenance marker in
+    //    evidence_refs plus the verbatim observed_issue text.
+    const existing = await this.listAnchorsForSeed(seedId);
+    const seenMarkers = new Set<string>();
+    const seenProblems = new Set<string>();
+    const norm = (s: unknown) => (typeof s === 'string' ? s.trim().toLowerCase() : '');
+    for (const a of existing) {
+      for (const ref of Array.isArray(a.evidence_refs) ? a.evidence_refs : []) {
+        if (ref && ref.kind === 'sibling_variant' && ref.campaign_id) {
+          seenMarkers.add(`${ref.campaign_id}:${ref.source}:${ref.index}`);
+        }
+      }
+      if (a.observed_issue) seenProblems.add(norm(a.observed_issue));
+    }
+
+    interface VariantCandidate {
+      campaignId: string;
+      label: string;
+      source: string;
+      index: number;
+      problem: string;
+      regular: string;
+      hook: string;
+      solution: string;
+      evidence: string;
+      outreachUse: string;
+    }
+
+    const candidates: VariantCandidate[] = [];
+    const campaignLabel = (c: any): string => {
+      const base = (c.campaign_category ?? 'linked').replace(/_/g, ' ');
+      return c.repair_track ? `${base} · ${c.repair_track}` : base;
+    };
+    const asString = (v: unknown) => (typeof v === 'string' ? v : '');
+
+    for (const campaign of campaigns) {
+      const label = campaignLabel(campaign);
+      const brief = campaign.repair_triage_briefing as any;
+      let found = 0;
+
+      // Triage briefing variant problems
+      for (const [i, p] of (Array.isArray(brief?.outreach_problems) ? brief.outreach_problems : []).entries()) {
+        if (!p || typeof p !== 'object' || !norm(p.problem)) continue;
+        candidates.push({
+          campaignId: campaign.id, label, source: 'triage_briefing', index: i,
+          problem: asString(p.problem), regular: asString(p.regular), hook: asString(p.hook),
+          solution: asString(p.solution), evidence: asString(p.evidence), outreachUse: asString(p.outreach_use),
+        });
+        found++;
+      }
+
+      // Audit outreach_problems (per platform — website_positioning etc.)
+      for (const [key, auditRow] of latestAudit) {
+        if (!key.startsWith(`${campaign.id}:`)) continue;
+        const platform = key.slice(campaign.id.length + 1);
+        for (const [i, p] of (Array.isArray(auditRow.audit_data?.outreach_problems) ? auditRow.audit_data.outreach_problems : []).entries()) {
+          if (!p || typeof p !== 'object' || !norm(p.problem)) continue;
+          candidates.push({
+            campaignId: campaign.id, label, source: platform, index: i,
+            problem: asString(p.problem), regular: asString(p.regular), hook: asString(p.hook),
+            solution: asString(p.solution), evidence: asString(p.evidence), outreachUse: asString(p.outreach_use),
+          });
+          found++;
+        }
+      }
+
+      // Pitch fallback — a briefing with no outreach_problems still has a
+      // primary angle + opener hook worth one variant anchor.
+      if (found === 0 && brief?.pitch && norm(brief.pitch.primary_angle)) {
+        candidates.push({
+          campaignId: campaign.id, label, source: 'triage_briefing', index: -1,
+          problem: asString(brief.pitch.primary_angle),
+          regular: asString(brief.pitch.opener_hook),
+          hook: '',
+          solution: '',
+          evidence: Array.isArray(brief.pitch.pain_points) ? brief.pitch.pain_points.join('; ') : '',
+          outreachUse: 'Sibling pitch angle',
+        });
+      }
+    }
+
+    // 5. Create drafts, skipping anything already on the seed.
+    const created: ManualOutreachAnchor[] = [];
+    let skipped = 0;
+    const inRun = new Set<string>();
+    for (const c of candidates) {
+      const marker = `${c.campaignId}:${c.source}:${c.index}`;
+      const problemKey = norm(c.problem);
+      if (seenMarkers.has(marker) || seenProblems.has(problemKey) || inRun.has(problemKey)) {
+        skipped++;
+        continue;
+      }
+      inRun.add(problemKey);
+      const anchor = await this.createAnchor(
+        {
+          seedId,
+          campaignId: c.campaignId,
+          anchorType: this.variantAnchorType(c.problem, c.source),
+          title: `[${c.label}] ${c.problem}`.slice(0, 255),
+          operatorThesis: c.outreachUse ? `${c.problem} — ${c.outreachUse}` : c.problem,
+          observedIssue: c.problem,
+          evidenceSummary: c.evidence || undefined,
+          evidenceRefs: [{ kind: 'sibling_variant', campaign_id: c.campaignId, source: c.source, index: c.index }],
+          verificationQuestion:
+            c.regular || `We have this noted for ${c.problem} — does that line up with what you see?`,
+          painQuestion: c.hook || undefined,
+          recommendedTransition: c.solution || undefined,
+          expectedVerification: 'confirm',
+        },
+        ctx,
+      );
+      created.push(anchor);
+    }
+
+    return { created, skipped };
+  }
+
+  /**
+   * Anchor-type heuristic for generated variants — the source platform leads,
+   * then a light keyword sniff on the problem text.
+   */
+  private variantAnchorType(problem: string, source: string): ManualAnchorType {
+    if (source === 'website_positioning') return 'website_or_profile_claim';
+    if (source === 'category_identification') return 'category_verification';
+    const p = problem.toLowerCase();
+    if (/\b(listing|listings|address|nap|duplicate|hours)\b/.test(p)) return 'listing_accuracy';
+    if (/\b(website|site|landing page|booking|cta)\b/.test(p)) return 'website_or_profile_claim';
+    if (/\bcategor/.test(p)) return 'category_verification';
+    return 'customer_discovery_problem';
   }
 
   /**
@@ -388,7 +585,10 @@ export class ManualOutreachAnchorService extends BaseService {
    * Returns the anchor snapshot to embed in `mkt_outreach_log.anchor_snapshot`.
    */
   async snapshotAnchor(anchorId: string, ctx?: RequestCtx): Promise<Record<string, any>> {
-    const anchor = await this.getAnchor(anchorId, ctx);
+    return this.buildAnchorSnapshot(await this.getAnchor(anchorId, ctx));
+  }
+
+  private buildAnchorSnapshot(anchor: ManualOutreachAnchor): Record<string, any> {
     return {
       id: anchor.id,
       anchor_type: anchor.anchor_type,
@@ -426,18 +626,26 @@ export class ManualOutreachAnchorService extends BaseService {
   }, ctx: RequestCtx): Promise<{ touchId: string | null; eventId: string | null }> {
     const { anchorId, campaignId, seedId, channel, callResult, verificationResults, contactEventId, notes } = params;
 
-    // Snapshot the anchor
-    const anchorSnapshot = await this.snapshotAnchor(anchorId, ctx);
+    // Snapshot the anchor. The loaded row also supplies the campaign-scope
+    // fallback below.
+    const anchor = await this.getAnchor(anchorId, ctx);
+    const anchorSnapshot = this.buildAnchorSnapshot(anchor);
     const userId = ctx.userId ?? 'system';
     let touchId: string | null = null;
     const eventId = contactEventId ?? generateOutreachLogId();
 
+    // Campaign ledger scope: the explicit param wins; when the caller is the
+    // seed-side route (seedId only), inherit the anchor's own campaign_id so
+    // a contact recorded against a sibling-authored anchor still lands in
+    // that campaign's outreach log (§12.5 — both ledgers when the link exists).
+    const effectiveCampaignId = campaignId ?? anchor.campaign_id ?? undefined;
+
     // Write to mkt_outreach_log if campaign-scoped. Use the existing
     // outreach-log contract; anchor-specific data belongs in call_details
     // and the three anchor columns added by migration 272.
-    if (campaignId) {
+    if (effectiveCampaignId) {
       const campaignRows = await this.prisma.$queryRaw<any[]>`
-        SELECT stage FROM mkt_campaigns_list WHERE id = ${campaignId} LIMIT 1
+        SELECT stage FROM mkt_campaigns_list WHERE id = ${effectiveCampaignId} LIMIT 1
       `;
       const stageAtTime = campaignRows[0]?.stage ?? 'seek';
       const normalizedChannel = channel ?? 'phone';
@@ -449,7 +657,7 @@ export class ManualOutreachAnchorService extends BaseService {
           verification_results, notes, created_at
         ) VALUES (
           ${eventId},
-          ${campaignId},
+          ${effectiveCampaignId},
           ${stageAtTime},
           ${normalizedChannel},
           CURRENT_DATE,
