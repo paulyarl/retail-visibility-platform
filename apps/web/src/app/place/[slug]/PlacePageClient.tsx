@@ -1,6 +1,7 @@
 'use client';
 
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { showsListingPhotoGallery } from '@/lib/place-photo-gallery';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
 
@@ -52,11 +53,9 @@ export default function PlacePageClient({
   const showsLocation = dirEntryOpts?.mapEnabled ?? true;
   const showsContact = dirEntryOpts?.contactEnabled ?? true;
   const showsQr = dirEntryOpts?.qrEnabled ?? true;
-  // Store photos on the seed surface. A seed has no merchant capability state,
-  // so this defaults on — the platform-controlled pre-claim gate. Once the
-  // listing is claimed the same flag resolves from the merchant's
-  // directory-entry tier config, which is why no separate flag is needed.
-  const showsGallery = dirEntryOpts?.galleryEnabled ?? true;
+  // Store photos. Operator-authored on a seed, so the tenant tier gate is
+  // bypassed there — see showsListingPhotoGallery for why it has to be.
+  const showsGallery = showsListingPhotoGallery(listing, dirEntryOpts);
 
   return (
     <>

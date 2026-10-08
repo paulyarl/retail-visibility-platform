@@ -11,6 +11,7 @@ import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabili
 import { tenantPublicService } from '@/services/TenantPublicService';
 import directoryClaimPublicService, { type DirectoryClaimSummary } from '@/services/DirectoryClaimPublicService';
 import { clientLogger } from '@/lib/client-logger';
+import { showsListingPhotoGallery } from '@/lib/place-photo-gallery';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 
@@ -175,8 +176,8 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
   const showsLocation = dirEntryOpts?.mapEnabled ?? true;
   const showsContact = dirEntryOpts?.contactEnabled ?? true;
   const showsQr = dirEntryOpts?.qrEnabled ?? true;
-  // Store photos — same platform-controlled default as the /place seed surface.
-  const showsGallery = dirEntryOpts?.galleryEnabled ?? true;
+  // Store photos — same seed bypass as the /place surface.
+  const showsGallery = showsListingPhotoGallery(listing, dirEntryOpts);
 
   const claimHref = previewToken ? `/place/claim/${previewToken}` : '/directory';
 
