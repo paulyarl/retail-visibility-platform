@@ -1,7 +1,10 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
+import { user_tenant_role } from "@prisma/client";
 import { prisma, basePrisma } from "../prisma";
+import { authenticateToken } from "../middleware/auth";
+import { isPlatformUser, isPlatformViewer } from "../utils/platform-admin";
 import { unifiedConfig } from "../config/unifiedConfig";
 // Create service role Supabase client for storage operations (bypasses RLS)
 const serviceRoleKey = unifiedConfig.supabaseServiceRoleKey;
@@ -60,7 +63,62 @@ async function resolveListing(identifier: string) {
   return null;
 }
 
-r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
+/**
+ * Authorize writes to a listing's photos.
+ *
+ * Runs after authenticateToken. The tenant is derived from the *resolved
+ * listing*, not from a URL param — `checkTenantAccess` reads
+ * `req.params.tenantId` / `req.params.id`, so it cannot be reused on
+ * `/:listingId/photos`: it would fall through to the caller's first tenant and
+ * authorize against the wrong one.
+ *
+ * Allowed: platform staff (admin/support — viewers are read-only) OR an
+ * OWNER/ADMIN member of the listing's own tenant. An unclaimed seed has no
+ * tenant members, so pre-claim writes are platform-only by construction; the
+ * claiming merchant takes over once the claim creates their membership.
+ *
+ * Reads stay public — the seed page and the directory listings fetch photos
+ * anonymously.
+ */
+async function requireDirectoryPhotoWrite(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "authentication_required", message: "Not authenticated" });
+    }
+
+    const identifier = Array.isArray(req.params.listingId) ? req.params.listingId[0] : req.params.listingId;
+    const listing = await resolveListing(identifier);
+    if (!listing) return res.status(400).json({ error: "directory listing not found" });
+
+    // Operator path — platform staff, but not read-only viewers.
+    if (isPlatformUser(req.user) && !isPlatformViewer(req.user)) return next();
+
+    const userId = req.user.userId || req.user.user_id;
+    if (!userId) {
+      return res.status(401).json({ error: "authentication_required", message: "Invalid authentication data" });
+    }
+
+    // Merchant path — OWNER/ADMIN of the listing's own tenant.
+    const membership = await prisma.user_tenants.findUnique({
+      where: { user_id_tenant_id: { user_id: userId, tenant_id: listing.id } },
+      select: { role: true },
+    });
+
+    if (membership && (membership.role === user_tenant_role.OWNER || membership.role === user_tenant_role.ADMIN)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      error: "tenant_access_denied",
+      message: "You do not have access to manage this listing's photos",
+    });
+  } catch (error) {
+    logger.error("[requireDirectoryPhotoWrite] authorization failed:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    return res.status(500).json({ error: "authorization_check_failed" });
+  }
+}
+
+r.post("/:listingId/photos", authenticateToken, requireDirectoryPhotoWrite, upload.single("file"), async (req, res) => {
   try {
     const listingId = Array.isArray(req.params.listingId) ? req.params.listingId[0] : req.params.listingId;
 
@@ -242,8 +300,66 @@ r.get("/:listingId/photos", async (req, res) => {
   res.json(photos);
 });
 
+/**
+ * PUT /:listingId/photos/reorder — bulk reorder directory photos.
+ *
+ * MUST stay declared above /:photoId. Express matches in declaration order, so
+ * a static sibling declared after a dynamic one is swallowed by it — the
+ * request below would be handled as "update the photo whose id is the literal
+ * string 'reorder'" and 400 with "photo not found". Static-before-dynamic is
+ * the convention across the directory routers (see routeRegistry comments).
+ */
+r.put("/:listingId/photos/reorder", authenticateToken, requireDirectoryPhotoWrite, async (req, res) => {
+  try {
+    const listingId = req.params.listingId;
+    const updates: Array<{ id: string; position: number }> = req.body;
+
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ error: "body must be array of {id, position}" });
+    }
+
+    // Verify listing exists
+    const listing = await resolveListing(listingId);
+    if (!listing) return res.status(400).json({ error: "directory listing not found" });
+
+    // Check if directory listing exists
+    const directoryListing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: listing.id }
+    });
+    if (!directoryListing) return res.status(400).json({ error: "directory listing not found" });
+
+    // Verify all photos belong to this listing
+    const photoIds = updates.map(u => u.id);
+    const photos = await prisma.directory_photos.findMany({
+      where: { id: { in: photoIds }, listing_id: directoryListing.id },
+    });
+
+    if (photos.length !== photoIds.length) {
+      return res.status(400).json({ error: "some photos not found or don't belong to this listing" });
+    }
+
+    // Update positions in transaction.
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as organizations.ts.
+    await basePrisma.$transaction(
+      updates.map(({ id, position }) =>
+        basePrisma.directory_photos.update({
+          where: { id },
+          data: { position },
+        })
+      )
+    );
+
+    res.status(204).send();
+  } catch (e: any) {
+    logger.error("directory photo reorder error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "reorder failed" });
+  }
+});
+
 /** PUT /:listingId/photos/:photoId — update alt, caption, or position */
-r.put("/:listingId/photos/:photoId", async (req, res) => {
+r.put("/:listingId/photos/:photoId", authenticateToken, requireDirectoryPhotoWrite, async (req, res) => {
   try {
     const { listingId, photoId } = req.params;
     const { alt, caption, position } = req.body || {};
@@ -335,58 +451,8 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
   }
 });
 
-/** PUT /:listingId/photos/reorder — bulk reorder directory photos */
-r.put("/:listingId/photos/reorder", async (req, res) => {
-  try {
-    const listingId = req.params.listingId;
-    const updates: Array<{ id: string; position: number }> = req.body;
-
-    if (!Array.isArray(updates)) {
-      return res.status(400).json({ error: "body must be array of {id, position}" });
-    }
-
-    // Verify listing exists
-    const listing = await resolveListing(listingId);
-    if (!listing) return res.status(400).json({ error: "directory listing not found" });
-
-    // Check if directory listing exists
-    const directoryListing = await prisma.directory_listings_list.findFirst({
-      where: { tenant_id: listing.id }
-    });
-    if (!directoryListing) return res.status(400).json({ error: "directory listing not found" });
-
-    // Verify all photos belong to this listing
-    const photoIds = updates.map(u => u.id);
-    const photos = await prisma.directory_photos.findMany({
-      where: { id: { in: photoIds }, listing_id: directoryListing.id },
-    });
-
-    if (photos.length !== photoIds.length) {
-      return res.status(400).json({ error: "some photos not found or don't belong to this listing" });
-    }
-
-    // Update positions in transaction.
-    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
-    // the array form of $transaction rejects ("need to be Prisma Client
-    // promises"). Same convention as organizations.ts.
-    await basePrisma.$transaction(
-      updates.map(({ id, position }) =>
-        basePrisma.directory_photos.update({
-          where: { id },
-          data: { position },
-        })
-      )
-    );
-
-    res.status(204).send();
-  } catch (e: any) {
-    logger.error("directory photo reorder error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
-    res.status(500).json({ error: (e as any)?.message || "reorder failed" });
-  }
-});
-
 /** DELETE /:listingId/photos/:photoId — delete directory photo and re-pack positions */
-r.delete("/:listingId/photos/:photoId", async (req, res) => {
+r.delete("/:listingId/photos/:photoId", authenticateToken, requireDirectoryPhotoWrite, async (req, res) => {
   try {
     const { listingId, photoId } = req.params;
 

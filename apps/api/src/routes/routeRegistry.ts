@@ -451,7 +451,7 @@ export const routeRegistry: RouteEntry[] = [
     router: directoryOrchestrator,
     domain: 'directory',
     authLevel: 'public',
-    comment: 'Directory orchestrator — mounts all sub-routers in strict static-first order',
+    comment: 'Directory orchestrator — mounts all sub-routers in strict static-first order. Reads are public by design; write sub-routes (e.g. /:listingId/photos POST/PUT/DELETE) self-guard via authenticateToken + requireDirectoryPhotoWrite.',
   },
   {
     path: '/api/directory-optimized',

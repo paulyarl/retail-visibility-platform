@@ -6,6 +6,7 @@ import { getCategoryUrl, getCityUrl, getPlaceCityShelfUrl } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
+import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
@@ -37,6 +38,8 @@ import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicServi
  * - Sidebar: Contact, Hours, Map, QR (the NAP+ data seeds actually have)
  * - Commerce sections (Featured Products, Categories, Coupons, Reviews, FAQ,
  *   Inquiry) are omitted — seeds have max_skus: 0 and no storefront
+ * - Store photos kept — directory_photos is the one commerce-adjacent surface a
+ *   seed legitimately carries, populated by the operator ahead of the claim
  * - Related Stores kept for shopper discovery
  * - Unclaimed banner at top
  *
@@ -60,6 +63,7 @@ export interface PlaceEntryEditorialLayoutProps {
   showsLocation: boolean;
   showsContact: boolean;
   showsQr: boolean;
+  showsGallery: boolean;
   currentUrl: string;
   baseUrl: string;
   fullAddress: string;
@@ -85,6 +89,7 @@ export default function PlaceEntryEditorialLayout({
   showsLocation,
   showsContact,
   showsQr,
+  showsGallery,
   currentUrl,
   baseUrl,
   fullAddress,
@@ -227,6 +232,19 @@ export default function PlaceEntryEditorialLayout({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left — Location + Contact stacked */}
             <div className="lg:col-span-7 space-y-8">
+              {/* Store photos — the shelves themselves. Reuses the directory
+                  entry gallery component, which self-hides when a listing has
+                  no photos, so it carries no heading here (same as the four
+                  directory entry layouts). Addressed by slug: a seed tenant has
+                  tenants.slug = null, so the photos API resolves the listing
+                  row by its slug. */}
+              {showsGallery && (
+                <DirectoryPhotoGalleryDisplay
+                  listing={{ id: slug, business_name: listing.businessName, is_directory_published: true }}
+                  isPublished={true}
+                />
+              )}
+
               {showsMap && listing.address && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Location</h3>

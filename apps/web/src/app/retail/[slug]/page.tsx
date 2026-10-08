@@ -175,6 +175,8 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
   const showsLocation = dirEntryOpts?.mapEnabled ?? true;
   const showsContact = dirEntryOpts?.contactEnabled ?? true;
   const showsQr = dirEntryOpts?.qrEnabled ?? true;
+  // Store photos — same platform-controlled default as the /place seed surface.
+  const showsGallery = dirEntryOpts?.galleryEnabled ?? true;
 
   const claimHref = previewToken ? `/place/claim/${previewToken}` : '/directory';
 
@@ -236,6 +238,7 @@ export default function RetailPreviewPage({ params }: RetailPreviewPageProps) {
         showsLocation={showsLocation}
         showsContact={showsContact}
         showsQr={showsQr}
+        showsGallery={showsGallery}
         currentUrl={currentUrl}
         baseUrl={baseUrl}
         fullAddress={fullAddress}

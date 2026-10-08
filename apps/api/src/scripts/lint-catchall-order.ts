@@ -89,17 +89,40 @@ export function scanFile(filePath: string): Violation[] {
 
 export interface RouteEntry {
   line: number;
+  /** Identifier the route is declared on (`router`, `r`, `api`, …). */
+  routerName: string;
   method: string;
   path: string;
   raw: string;
 }
 
+/**
+ * Any identifier bound to a Router — `router`, `r`, `api`, `dirRouter`, … —
+ * not just the literal name `router`.
+ *
+ * This was the reason a real static-vs-dynamic shadowing violation sat
+ * undetected in routes/directory-photos.ts: that file does `const r = Router()`
+ * and declares `r.put(...)`, so a `router\.`-anchored pattern skipped every
+ * route in it.
+ *
+ * Routes are compared only against siblings on the SAME identifier. A file may
+ * hold several routers mounted under different prefixes, and comparing across
+ * them yields false positives — e.g. routes/business-hours.ts, where `router`
+ * and `publicBusinessHoursRouter` are mounted under different paths.
+ */
+const ROUTE_DECL_RE = /\b([A-Za-z_$][\w$]*)\.(get|post|put|delete|patch)\(\s*['"`]([^'"`]+)['"`]/;
+
 export function extractRouteEntry(line: string, lineNum: number): RouteEntry | null {
   const trimmed = line.trim();
-  // Match router.get/post/put/delete/patch('path', ...)
-  const match = trimmed.match(/router\.(get|post|put|delete|patch)\(\s*['"`]([^'"`]+)['"`]/);
+  const match = trimmed.match(ROUTE_DECL_RE);
   if (!match) return null;
-  return { line: lineNum, method: match[1], path: match[2], raw: trimmed };
+  return {
+    line: lineNum,
+    routerName: match[1],
+    method: match[2],
+    path: match[3],
+    raw: trimmed,
+  };
 }
 
 export function getPrefix(path: string): string {
@@ -162,6 +185,9 @@ export function scanFileForParamShadowing(filePath: string): ParamViolation[] {
     for (let j = i + 1; j < routes.length; j++) {
       const later = routes[j];
       if (later.method !== route.method) continue;
+      // A different router instance means a different mount prefix, so the two
+      // routes cannot shadow one another.
+      if (later.routerName !== route.routerName) continue;
 
       const laterPrefix = getPrefix(later.path);
       const laterLastSeg = getLastSegment(later.path);
