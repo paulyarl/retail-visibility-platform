@@ -504,9 +504,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
 
   /**
    * List queue entries with filters. `statusCounts` (per-status row counts)
-   * plus the `queuedCount` / `intakeCount` conveniences are always returned
-   * regardless of filters — they drive the nav badge / widget / per-tab
-   * counts so no lane loiters invisibly.
+   * plus the `queuedCount` / `intakeCount` conveniences are tallied under the
+   * caller's non-status filters — the status filter itself is excluded so
+   * each tab/lane reports its own filtered total. Callers that pass no
+   * filters (nav badge, dashboard widget) get global counts.
    * `includeCampaigns` LEFT JOINs processed_campaign_id → mkt_campaigns_list
    * and decorates each entry with campaign stage fields for the board view.
    */
@@ -586,11 +587,16 @@ class MarketingProspectQueueServiceClass extends BaseService {
           : undefined,
       });
 
-      // statusCounts is always a full per-status tally regardless of the
-      // status filter the caller passed — it drives the nav badge and the
-      // queue page's per-tab counts. One groupBy instead of N count queries.
+      // statusCounts tallies every status under the caller's non-status
+      // filters — the status filter is dropped so each queue tab reports its
+      // own count within the filtered set (a global tally would desync the
+      // badges from the rows on screen). Filter-free calls (nav badge,
+      // dashboard widget) still produce global counts. One groupBy instead
+      // of N count queries.
+      const { status: _statusFilter, ...countWhere } = where;
       const statusGroups = await this.prisma.mkt_prospect_queue.groupBy({
         by: ['status'],
+        where: countWhere,
         _count: { _all: true },
       });
       const statusCounts: Record<string, number> = {};

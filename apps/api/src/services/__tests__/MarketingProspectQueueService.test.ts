@@ -567,10 +567,10 @@ describe('MarketingProspectQueueService', () => {
       const result = await MarketingProspectQueueService.list({ status: ['campaign_created'] });
 
       expect(result.queuedCount).toBe(5);
-      expect(mockQueue.groupBy).toHaveBeenCalledWith({ by: ['status'], _count: { _all: true } });
+      expect(mockQueue.groupBy).toHaveBeenCalledWith({ by: ['status'], where: {}, _count: { _all: true } });
     });
 
-    it('statusCounts tallies every status regardless of the status filter', async () => {
+    it('statusCounts tallies every status under the non-status filters', async () => {
       mockQueue.findMany.mockResolvedValue([]);
       mockQueue.groupBy.mockResolvedValue([
         { status: 'queued', _count: { _all: 5 } },
@@ -578,11 +578,19 @@ describe('MarketingProspectQueueService', () => {
         { status: 'in_thread', _count: { _all: 2 } },
       ]);
 
-      const result = await MarketingProspectQueueService.list({ status: ['dismissed'] });
+      const result = await MarketingProspectQueueService.list({ status: ['dismissed'], city: 'Indianapolis' });
 
       expect(result.queuedCount).toBe(5);
       expect(result.intakeCount).toBe(3);
       expect(result.statusCounts).toEqual({ queued: 5, intake: 3, in_thread: 2 });
+      // The status filter is excluded from the tally so each tab reports its
+      // own count, but the other filters still scope it (faceted counts).
+      expect(mockQueue.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['status'],
+          where: { city: { equals: 'Indianapolis', mode: 'insensitive' } },
+        }),
+      );
     });
 
     it('passes includeCampaigns through to the Prisma include when set', async () => {

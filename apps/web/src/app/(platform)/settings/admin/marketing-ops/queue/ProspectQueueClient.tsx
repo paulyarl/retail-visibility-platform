@@ -113,8 +113,9 @@ function rowBorderClass(entry: ProspectQueueEntry): string {
 
 export default function ProspectQueueClient() {
   const [entries, setEntries] = useState<ProspectQueueEntry[]>([]);
-  // Global per-status tallies (filter-independent) — drive every tab badge so
-  // non-active lanes report real counts, not just the loaded page.
+  // Per-status tallies under the active non-status filters (the backend drops
+  // only the status filter) — drive every tab badge so non-active lanes report
+  // real counts within the filtered set, not just the loaded page.
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const queuedCount = statusCounts['queued'] ?? 0;
   const intakeCount = statusCounts['intake'] ?? 0;
