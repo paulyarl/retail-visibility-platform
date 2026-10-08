@@ -15,6 +15,7 @@
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
+import type { OutreachProblem } from '@/services/MarketingOpsService';
 
 /** A row from directory_photos, as served by /api/directory/:id/photos. */
 export interface DirectoryListingPhoto {
@@ -927,6 +928,12 @@ export interface AssembledSeedCallScript {
     claim_url: string | null;
     claim_short_url: string | null;
   };
+  /**
+   * Verbatim outreach ammunition resolved through the seed's primary-linked
+   * campaign → latest business_analysis audit (outreach_problems contract).
+   * Empty for unlinked or unaudited seeds.
+   */
+  ammunition: OutreachProblem[];
 }
 
 export class DirectoryPresenceAdminService extends AdminApiSingleton {

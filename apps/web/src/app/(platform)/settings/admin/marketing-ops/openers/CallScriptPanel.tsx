@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, ArrowRight, ListChecks, Rocket } from 'lucide-react';
 import Link from 'next/link';
 import { marketingOpsService, type AssembledCallScript, type CampaignOutreachAnchor, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
+import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
 
 interface DeadNumberLog {
   id: string;
@@ -201,6 +202,7 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   if (!script) return null;
 
   const { stages, hookOptions, objections, callContext, anchor } = script;
+  const ammunition = script.ammunition ?? [];
 
   return (
     <div className="space-y-6">
@@ -427,6 +429,16 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
           ))}
         </div>
       </div>
+
+      {/* Audit ammunition — verbatim problem → hook → fix copy from the
+          campaign's business audit (outreach_problems contract). Operator
+          reference only: the audit's prospect-specific lines sit next to
+          the library hooks instead of in a separate tab. */}
+      {ammunition.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <OutreachProblemsSection problems={ammunition} title="Audit ammunition — from the business audit" />
+        </div>
+      )}
 
       {/* Five-Stage Script Body */}
       <div className="space-y-3">

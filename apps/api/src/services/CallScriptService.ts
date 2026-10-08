@@ -115,6 +115,21 @@ export interface CallContext {
   }>;
 }
 
+/**
+ * One problem → solution pair from the audit `outreach_problems` contract
+ * (Triage & Repair Outreach Problems spec §5) — the "Outreach Ammunition"
+ * card copy. Analyst-authored verbatim lines surfaced on both call-script
+ * payloads as operator reference only; never interpolated into stage text.
+ */
+export interface OutreachAmmunitionEntry {
+  problem: string;
+  regular: string;
+  hook: string;
+  solution: string;
+  evidence: string;
+  outreach_use: string;
+}
+
 export interface AssembledCallScript {
   stages: {
     verify: string;
@@ -137,6 +152,11 @@ export interface AssembledCallScript {
     recommended_transition: string | null;
     operator_thesis: string;
   } | null;
+  /**
+   * Verbatim outreach ammunition from the campaign's latest business_analysis
+   * audit (outreach_problems contract). Empty when no audit carries it.
+   */
+  ammunition: OutreachAmmunitionEntry[];
 }
 
 /**
@@ -172,6 +192,12 @@ export interface AssembledSeedCallScript {
     qr_url_report_in_person: string | null;
     qr_url_report_text: string | null;
   };
+  /**
+   * Verbatim outreach ammunition resolved through the seed's primary-linked
+   * campaign → latest business_analysis audit (outreach_problems contract).
+   * Empty for unlinked or unaudited seeds.
+   */
+  ammunition: OutreachAmmunitionEntry[];
 }
 
 export interface CallConfirmationInput {
@@ -449,6 +475,10 @@ export class CallScriptService extends BaseService {
           gap_severity: p.gapSeverity,
         })),
       },
+      // Outreach ammunition — verbatim problem → hook → fix copy from the
+      // audit already loaded for signal severity. Operator reference only;
+      // stage text is unchanged.
+      ammunition: this.extractAmmunition(auditDataForSeverity),
       anchor: anchorBlock,
     };
   }
@@ -573,6 +603,28 @@ export class CallScriptService extends BaseService {
       }
     }
 
+    // 4b. Outreach ammunition (best-effort) — resolve the seed's
+    //     primary-linked campaign and pull the outreach_problems verbatim
+    //     copy off its latest business_analysis audit. Same link traversal
+    //     as MarketIntelService (primary link_role first); getLatestAuditData
+    //     inherits the primary sibling's audit for non-primary siblings.
+    //     Unlinked or unaudited seeds get an empty list — the script is
+    //     unchanged.
+    let ammunition: OutreachAmmunitionEntry[] = [];
+    try {
+      const link = await this.prisma.directory_seed_campaign_links.findFirst({
+        where: { seed_id: seedId },
+        orderBy: [{ link_role: 'asc' }],
+        select: { campaign_id: true },
+      });
+      if (link?.campaign_id) {
+        const auditResult = await BusinessContextService.getLatestAuditData(link.campaign_id, ctx);
+        ammunition = this.extractAmmunition(auditResult?.auditData);
+      }
+    } catch {
+      // No linked campaign / audit lookup failed — ammunition stays empty
+    }
+
     // 5. Assemble stages — verification-call structure (not the five-stage
     //    cold-call arc). Defaults are tone-safe per §6.10: no alarmism, no
     //    unsupported claims, absence framed as "not found during discovery".
@@ -638,7 +690,30 @@ export class CallScriptService extends BaseService {
         qr_url_report_in_person: linkVars.qr_url_report_in_person ?? null,
         qr_url_report_text: linkVars.qr_url_report_text ?? null,
       },
+      ammunition,
     };
+  }
+
+  /**
+   * Extract the outreach_problems contract from a business_analysis audit
+   * payload — the analyst-authored problem → hook → fix pairs rendered as
+   * "Outreach Ammunition" on the audit card. audit_data is analyst JSON, so
+   * only well-formed entries survive. Returns [] when absent.
+   */
+  private extractAmmunition(auditData: any): OutreachAmmunitionEntry[] {
+    const raw = auditData?.outreach_problems;
+    if (!Array.isArray(raw)) return [];
+    const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
+    return raw
+      .filter((p) => p && typeof p === 'object' && typeof p.problem === 'string' && p.problem.trim())
+      .map((p) => ({
+        problem: p.problem,
+        regular: asString(p.regular),
+        hook: asString(p.hook),
+        solution: asString(p.solution),
+        evidence: asString(p.evidence),
+        outreach_use: asString(p.outreach_use),
+      }));
   }
 
   /**

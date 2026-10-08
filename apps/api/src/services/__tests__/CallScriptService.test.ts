@@ -35,6 +35,7 @@ const {
   mockGetClaimKitMeta,
   mockGetReportKitMeta,
   mockResolveSignalWeights,
+  mockSeedLinksFindFirst,
 } = vi.hoisted(() => ({
   mockGetCampaign: vi.fn(),
   mockResolveCampaignArchetype: vi.fn(),
@@ -55,6 +56,7 @@ const {
   mockGetClaimKitMeta: vi.fn(),
   mockGetReportKitMeta: vi.fn(),
   mockResolveSignalWeights: vi.fn(),
+  mockSeedLinksFindFirst: vi.fn(),
 }));
 
 // The pure helpers (rankPlatformPriorities, signalPlatformDisplayName) run
@@ -143,6 +145,9 @@ vi.mock('../../prisma', () => ({
     mkt_deliverable_preview_tokens: {
       findMany: mockPreviewTokensFindMany,
     },
+    directory_seed_campaign_links: {
+      findFirst: mockSeedLinksFindFirst,
+    },
     users: {
       findUnique: mockUsersFindUnique,
     },
@@ -217,6 +222,7 @@ beforeEach(() => {
   mockGetClaimKitMeta.mockResolvedValue(null);
   mockGetReportKitMeta.mockResolvedValue(null);
   mockResolveSignalWeights.mockResolvedValue(undefined); // no weights → legacy order
+  mockSeedLinksFindFirst.mockResolvedValue(null); // unlinked seed by default
 });
 
 // ─── Assembly tests ──────────────────────────────────────────────────────
@@ -601,6 +607,64 @@ describe('CallScriptService.assembleForCampaign', () => {
     expect(result.hookOptions[0].angle).toBe('zero_footprint');
     // gbp_verification is boosted second (also has A3 archetype affinity)
     expect(result.hookOptions[1].angle).toBe('gbp_verification');
+  });
+
+  it('surfaces the audit outreach_problems contract as ammunition', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        outreach_problems: [
+          {
+            problem: 'Filed as a plain convenience store',
+            regular: '"I was looking at your Google listing…"',
+            hook: '"Try this on your phone: search…"',
+            solution: 'Re-file under the right primary category.',
+            evidence: 'GBP primary category is Convenience store.',
+            outreach_use: 'Cold-call opener',
+          },
+        ],
+      },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    expect(result.ammunition).toHaveLength(1);
+    expect(result.ammunition[0].problem).toBe('Filed as a plain convenience store');
+    expect(result.ammunition[0].hook).toContain('Try this on your phone');
+    expect(result.ammunition[0].solution).toContain('Re-file');
+    // Reference only — stage text unchanged by ammunition
+    expect(result.stages.verify).toBeTruthy();
+  });
+
+  it('returns empty ammunition when the audit carries no outreach_problems', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: { gap_analysis: [] },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+    expect(result.ammunition).toEqual([]);
+  });
+
+  it('drops malformed outreach_problems entries and coerces missing fields', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        outreach_problems: [
+          { problem: 'Real problem', regular: 'line' },
+          { nope: 1 },
+          'junk',
+          null,
+        ],
+      },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    expect(result.ammunition).toHaveLength(1);
+    expect(result.ammunition[0].problem).toBe('Real problem');
+    expect(result.ammunition[0].hook).toBe('');
+    expect(result.ammunition[0].outreach_use).toBe('');
   });
 });
 
@@ -997,6 +1061,40 @@ describe('CallScriptService.assembleForSeed', () => {
     expect(result.callContext.qr_url_report_text).toBe('https://app.example.com/rt/abc123');
     // Canonical claim path — never the legacy /directory/claim form.
     expect(result.callContext.claim_url).not.toContain('/directory/claim/');
+  });
+
+  it('resolves ammunition through the primary-linked campaign audit', async () => {
+    mockSeedLinksFindFirst.mockResolvedValue({ campaign_id: 'camp-9' });
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        outreach_problems: [
+          {
+            problem: 'Duplicate listing splits customers',
+            regular: '"There is a second listing…"',
+            hook: '"Search your own store name right now…"',
+            solution: 'Claim and clean up the listings.',
+            evidence: 'Second live listing at a different address.',
+            outreach_use: 'Second touch or objection response',
+          },
+        ],
+      },
+      auditId: 'audit-9',
+    });
+
+    const result = await CallScriptService.assembleForSeed('seed-1');
+
+    expect(mockSeedLinksFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { seed_id: 'seed-1' } }),
+    );
+    expect(mockGetLatestAuditData).toHaveBeenCalledWith('camp-9', undefined);
+    expect(result.ammunition).toHaveLength(1);
+    expect(result.ammunition[0].problem).toBe('Duplicate listing splits customers');
+  });
+
+  it('returns empty ammunition for an unlinked seed', async () => {
+    const result = await CallScriptService.assembleForSeed('seed-1');
+    expect(result.ammunition).toEqual([]);
+    expect(mockGetLatestAuditData).not.toHaveBeenCalled();
   });
 });
 

@@ -711,6 +711,11 @@ export interface AssembledCallScript {
     recommended_transition: string | null;
     operator_thesis: string;
   } | null;
+  /**
+   * Verbatim outreach ammunition from the campaign's latest business_analysis
+   * audit (outreach_problems contract). Empty when no audit carries it.
+   */
+  ammunition: OutreachProblem[];
 }
 
 export interface CampaignOutreachAnchor {

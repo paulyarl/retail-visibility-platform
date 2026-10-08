@@ -21,6 +21,7 @@ import directoryPresenceAdminService, {
   ReEngagementSuggestion,
   ReportDeliveryQrKitMeta,
 } from '@/services/DirectoryPresenceAdminService';
+import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
 import { clientLogger } from '@/lib/client-logger';
 import { generateQrDataUrl, type QrTemplateName } from '@/lib/qr-engine';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
@@ -2796,6 +2797,18 @@ function PresenceSeedDetailClient() {
                   <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{text}</p>
                 </div>
               ) : null,
+            )}
+
+            {/* Audit ammunition — verbatim problem → hook → fix copy from
+                the linked campaign's business audit. Operator reference
+                only; the stage text above stays generic/anchor-driven. */}
+            {(seedScript.ammunition?.length ?? 0) > 0 && (
+              <div className="border border-gray-200 rounded-lg p-3">
+                <OutreachProblemsSection
+                  problems={seedScript.ammunition!}
+                  title="Audit ammunition — linked campaign audit"
+                />
+              </div>
             )}
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
