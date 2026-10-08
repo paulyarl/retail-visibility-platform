@@ -2594,7 +2594,40 @@ function PresenceSeedDetailClient() {
                     {a.status}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600">{a.operator_thesis}</p>
+                <dl className="space-y-1">
+                  {a.observed_issue && !a.title.includes(a.observed_issue) && (
+                    <div className="flex gap-2 text-xs">
+                      <dt className="w-14 shrink-0 font-medium text-gray-400">Issue</dt>
+                      <dd className="text-gray-600">{a.observed_issue}</dd>
+                    </div>
+                  )}
+                  <div className="flex gap-2 text-xs">
+                    <dt className="w-14 shrink-0 font-medium text-gray-400">Thesis</dt>
+                    <dd className="text-gray-600">{a.operator_thesis}</dd>
+                  </div>
+                  <div className="flex gap-2 text-xs">
+                    <dt className="w-14 shrink-0 font-medium text-gray-400">Ask</dt>
+                    <dd className="text-gray-600">{a.verification_question}</dd>
+                  </div>
+                  {a.pain_question && (
+                    <div className="flex gap-2 text-xs">
+                      <dt className="w-14 shrink-0 font-medium text-gray-400">Probe</dt>
+                      <dd className="text-gray-600">{a.pain_question}</dd>
+                    </div>
+                  )}
+                  {a.recommended_transition && (
+                    <div className="flex gap-2 text-xs">
+                      <dt className="w-14 shrink-0 font-medium text-gray-400">Then</dt>
+                      <dd className="text-gray-600">{a.recommended_transition}</dd>
+                    </div>
+                  )}
+                  {a.evidence_summary && (
+                    <div className="flex gap-2 text-xs">
+                      <dt className="w-14 shrink-0 font-medium text-gray-400">Evidence</dt>
+                      <dd className="text-gray-600">{a.evidence_summary}</dd>
+                    </div>
+                  )}
+                </dl>
                 <div className="flex flex-wrap gap-2">
                   {a.status === 'draft' && (
                     <button

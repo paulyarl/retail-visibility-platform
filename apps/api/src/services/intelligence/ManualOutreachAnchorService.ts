@@ -441,7 +441,7 @@ export class ManualOutreachAnchorService extends BaseService {
           campaignId: c.campaignId,
           anchorType: this.variantAnchorType(c.problem, c.source),
           title: `[${c.label}] ${c.problem}`.slice(0, 255),
-          operatorThesis: c.outreachUse ? `${c.problem} — ${c.outreachUse}` : c.problem,
+          operatorThesis: c.outreachUse || c.problem,
           observedIssue: c.problem,
           evidenceSummary: c.evidence || undefined,
           evidenceRefs: [{ kind: 'sibling_variant', campaign_id: c.campaignId, source: c.source, index: c.index }],
