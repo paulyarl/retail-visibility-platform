@@ -7,6 +7,7 @@ import { getCategoryUrl, getCityUrl, getPlaceCityShelfUrl } from '@/utils/slug';
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import { showsSeedAuthoredSurface } from '@/lib/place-photo-gallery';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
@@ -176,7 +177,7 @@ export default function PlaceEntryEditorialLayout({
             )}
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                {listing.logoUrl && (dirEntryOpts?.canShowLogo ?? true) && (
+                {listing.logoUrl && showsSeedAuthoredSurface(listing, dirEntryOpts?.canShowLogo) && (
                   <img src={listing.logoUrl} alt={listing.businessName} className="w-20 h-20 rounded-xl object-cover border-2 border-white/20" />
                 )}
                 <div>

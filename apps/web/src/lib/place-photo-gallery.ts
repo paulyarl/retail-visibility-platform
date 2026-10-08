@@ -34,16 +34,29 @@ import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolution
  * export of a `'use client'` module becomes a client reference, which a server
  * component cannot call).
  */
-export function showsListingPhotoGallery(
+export function showsSeedAuthoredSurface(
   listing: { listingOrigin?: string | null; seedId?: string | null } | null | undefined,
-  dirEntryOpts: Pick<DirectoryEntryOptionsState, 'galleryEnabled'> | null | undefined
+  tierGate: boolean | null | undefined
 ): boolean {
   if (listing?.listingOrigin === 'directory_seed') return true;
 
-  // Grandfathered: operator-captured photos survive the claim.
+  // Grandfathered: operator-authored content survives the claim.
   if (listing?.seedId) return true;
 
   // Non-seed listings keep the sibling-flag convention used across the layout
   // props: absent capability state defaults the section on.
-  return dirEntryOpts?.galleryEnabled ?? true;
+  return tierGate ?? true;
+}
+
+/**
+ * Photo gallery — a thin wrapper over the rule above, reading the gallery's own
+ * tier key. Kept as a named function so the gallery call sites state their
+ * intent; the general form serves every other operator-authored seed surface
+ * (the hero logo, for one), which reads a different tier flag.
+ */
+export function showsListingPhotoGallery(
+  listing: { listingOrigin?: string | null; seedId?: string | null } | null | undefined,
+  dirEntryOpts: Pick<DirectoryEntryOptionsState, 'galleryEnabled'> | null | undefined
+): boolean {
+  return showsSeedAuthoredSurface(listing, dirEntryOpts?.galleryEnabled);
 }

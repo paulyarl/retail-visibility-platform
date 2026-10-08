@@ -59,6 +59,22 @@ import IntelligenceProfileService, {
 } from './intelligence/IntelligenceProfileService';
 import { resolveCatIdAudit } from './intelligence/auditPublicNarrative';
 import type { RequestCtx } from '../context';
+
+/**
+ * Provenance source_names stamped by automated compose lanes — seed birth
+ * (seed_seo_composer / intelligence_profile), post-audit resharpen
+ * (business_analysis_audit / linked_campaign), campaign field sync
+ * (linked_campaign), and market sweep/reset (market_enrichment). Anything
+ * else (operator_override, owner_claim, manual) is human-authored.
+ */
+const COMPOSED_PROVENANCE_SOURCES = new Set([
+  'seed_seo_composer',
+  'intelligence_profile',
+  'business_analysis_audit',
+  'linked_campaign',
+  'market_enrichment',
+]);
+
 /** Audit context for seed/claim operations */
 interface SeedAuditCtx {
   actorType?: 'user' | 'system' | 'integration' | 'customer';
@@ -3378,54 +3394,111 @@ class DirectoryPresenceSeedService {
     if (!seed[0]) throw new Error('seed_not_found');
     const row = seed[0];
 
-    const category = row.primary_category || row.category || '';
-    const city = row.city || '';
-    const state = row.state || '';
-    const profile = await this.resolveProfileForMarket(
-      normalizeCategoryKey(category),
-      normalizeReferenceCity(city),
-      ctx,
-    );
-    const goldStandard = state
-      ? await IntelligenceProfileService.resolveGoldStandard(
-          normalizeCategoryKey(category),
-          null,
-          normalizeReferenceCity(city),
-          normalizeReferenceState(state),
-          ctx,
-        )
-      : null;
+    // Campaign lane — a seed with a primary-linked campaign composes from the
+    // campaign's CURRENT audit state through composeCampaignSeoPacket, the
+    // same path seed birth and resharpenSeedsForCampaign use. The audit: null
+    // market packet below would strip analyst narratives from linked seeds.
+    let packet: SeedSeoPacket | null = null;
+    let sourceName = 'none';
+    const link = await prisma.$queryRaw<{ campaign_id: string }[]>`
+      SELECT campaign_id FROM directory_seed_campaign_links
+      WHERE seed_id = ${seedId} AND link_role = 'primary'
+      LIMIT 1
+    `;
+    const linkedCampaignId = link[0]?.campaign_id ?? null;
+    if (linkedCampaignId) {
+      const linkedCampaign = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: linkedCampaignId },
+      });
+      if (linkedCampaign) {
+        const auditCandidates = await prisma.mkt_audits_list.findMany({
+          where: { campaign_id: linkedCampaignId, platform: 'business_analysis' },
+          orderBy: { created_at: 'desc' },
+          take: 10,
+        });
+        const audit =
+          (Array.isArray(auditCandidates) ? auditCandidates : []).find(
+            (a: any) => !isStubBusinessAnalysisAudit(a),
+          ) ?? null;
+        const stubAudit = audit
+          ? null
+          : ((Array.isArray(auditCandidates) ? auditCandidates : []).find(
+              (a: any) => isStubBusinessAnalysisAudit(a),
+            ) ?? null);
+        const d = ((audit ?? stubAudit)?.audit_data ?? {}) as any;
+        const resolvedNap = resolveCampaignNap(linkedCampaign, d);
+        packet = (
+          await this.composeCampaignSeoPacket(
+            linkedCampaign,
+            d,
+            (audit ?? stubAudit)?.id ?? '',
+            resolvedNap.name || linkedCampaign.business_name || row.business_name || 'Business',
+          )
+        ).packet;
+        // Cite the lane honestly — same stamps resharpen writes: a real audit
+        // for the full lane, linked_campaign for the partial/discovery lanes.
+        sourceName = audit ? 'business_analysis_audit' : 'linked_campaign';
+      }
+    }
 
-    const campaign: any = {
-      businessName: row.business_name || 'Business',
-      category,
-      addressCity: city || null,
-      addressState: state || null,
-    };
+    if (!packet) {
+      // Market lane — no campaign link: Tier A listing facts + intelligence
+      // profile (the only composition available to unlinked seeds).
+      const category = row.primary_category || row.category || '';
+      const city = row.city || '';
+      const state = row.state || '';
+      const profile = await this.resolveProfileForMarket(
+        normalizeCategoryKey(category),
+        normalizeReferenceCity(city),
+        ctx,
+      );
+      const goldStandard = state
+        ? await IntelligenceProfileService.resolveGoldStandard(
+            normalizeCategoryKey(category),
+            null,
+            normalizeReferenceCity(city),
+            normalizeReferenceState(state),
+            ctx,
+          )
+        : null;
 
-    const packet = buildSeedSeoPacket({
-      campaign,
-      audit: null,
-      intelligenceProfile: this.toIntelligenceProfileSeoFields(profile),
-      goldStandard: this.toGoldStandardSeoFields(goldStandard),
-    });
+      const campaign: any = {
+        businessName: row.business_name || 'Business',
+        category,
+        addressCity: city || null,
+        addressState: state || null,
+      };
+
+      packet = buildSeedSeoPacket({
+        campaign,
+        audit: null,
+        intelligenceProfile: this.toIntelligenceProfileSeoFields(profile),
+        goldStandard: this.toGoldStandardSeoFields(goldStandard),
+      });
+
+      sourceName = packet.inputs.auditId
+        ? 'linked_campaign'
+        : packet.inputs.intelligenceProfileId
+          ? 'market_enrichment'
+          : 'none';
+    }
 
     const provenance = await prisma.directory_field_provenance.findFirst({
       where: { seed_id: seedId, field_key: 'description' },
       select: { source_name: true, updated_at: true, value: true },
     });
 
-    const sourceName = packet.inputs.auditId
-      ? 'linked_campaign'
-      : packet.inputs.intelligenceProfileId
-        ? 'market_enrichment'
-        : 'none';
-
     return {
       seedId,
       packet,
       sourceName,
-      composedAt: provenance?.source_name === sourceName ? provenance.updated_at : null,
+      // "Last composed" reflects when the live description was last written by
+      // ANY automated compose lane (seed birth, audit resharpen, campaign sync,
+      // market sweep/reset) — not only when its stamp matches this packet's.
+      composedAt:
+        provenance && COMPOSED_PROVENANCE_SOURCES.has(provenance.source_name ?? '')
+          ? provenance.updated_at
+          : null,
       currentDescription: row.description || null,
       provenanceValue: provenance?.value || null,
     };
@@ -3451,6 +3524,17 @@ class DirectoryPresenceSeedService {
     const composed = await this.getComposedEnrichment(seedId, composeCtx);
     const packet = composed.packet as SeedSeoPacket;
     const now = new Date();
+
+    // Stamp the lane the packet actually came from — campaign-derived packets
+    // (linked_campaign / business_analysis_audit) keep the market sweep's
+    // campaign-content guard and preserve the audit provenance trail; pure
+    // template packets keep market_enrichment.
+    const provenanceSource =
+      composed.sourceName && composed.sourceName !== 'none'
+        ? composed.sourceName
+        : 'market_enrichment';
+    const provenanceConfidence =
+      provenanceSource === 'market_enrichment' ? 'medium' : 'high';
 
     await prisma.$executeRaw`
       UPDATE directory_listings_list
@@ -3480,10 +3564,10 @@ class DirectoryPresenceSeedService {
         ${row.tenant_id},
         'description',
         ${packet.description},
-        'market_enrichment',
+        ${provenanceSource},
         null,
         null,
-        'medium',
+        ${provenanceConfidence},
         true,
         null,
         null,
@@ -3514,10 +3598,10 @@ class DirectoryPresenceSeedService {
         ${row.tenant_id},
         'keywords',
         ${packet.keywords.join(', ')},
-        'market_enrichment',
+        ${provenanceSource},
         null,
         null,
-        'medium',
+        ${provenanceConfidence},
         true,
         null,
         null,

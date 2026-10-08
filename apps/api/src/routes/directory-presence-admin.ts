@@ -2809,7 +2809,9 @@ router.get('/presence-seeds/:id/call-script', requirePlatformStaff, async (req: 
 
 /**
  * POST /api/admin/directory-presence/presence-seeds/:id/compose
- * Return the deterministic composed enrichment for a seed (audit: null, market profile).
+ * Return the deterministic composed enrichment for a seed. Seeds with a
+ * primary-linked campaign compose through the campaign packet path (latest
+ * audit narrative included); unlinked seeds get the audit: null market profile.
  */
 router.post('/presence-seeds/:id/compose', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
@@ -2834,7 +2836,8 @@ router.post('/presence-seeds/:id/compose', requirePlatformAdmin, async (req: Req
 
 /**
  * POST /api/admin/directory-presence/presence-seeds/:id/reset
- * Reset a seed's description/keywords to the composed market enrichment and clear operator override.
+ * Reset a seed's description/keywords to the composed enrichment (campaign
+ * packet for linked seeds, market profile otherwise) and clear operator override.
  */
 router.post('/presence-seeds/:id/reset', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {

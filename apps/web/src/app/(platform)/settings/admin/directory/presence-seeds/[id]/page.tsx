@@ -63,6 +63,7 @@ import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import ReportQrDesignerModal from './ReportQrDesignerModal';
 import TrafficEngagementPanel from './TrafficEngagementPanel';
 import SeedPhotoCapturePanel from './SeedPhotoCapturePanel';
+import SeedLogoUploadPanel from './SeedLogoUploadPanel';
 import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -721,14 +722,14 @@ function PresenceSeedDetailClient() {
   };
 
   const handleResetEnrichment = async () => {
-    if (!confirm('Reset description and keywords to the composed market enrichment?')) return;
+    if (!confirm('Reset description and keywords to the composed enrichment?')) return;
     setActionError(null);
     setActionSuccess(null);
     try {
       setResettingEnrichment(true);
       const result = await directoryPresenceAdminService.resetSeedOverride(seedId);
       setComposedEnrichment(result);
-      setActionSuccess('Enrichment reset to composed market values.');
+      setActionSuccess('Enrichment reset to composed values.');
       fetchDetail();
     } catch (err) {
       setActionError(
@@ -2037,6 +2038,10 @@ function PresenceSeedDetailClient() {
           authored, so exempt from the tier gate that would otherwise hide the
           gallery on this listing (see lib/place-photo-gallery.ts). */}
       <SeedPhotoCapturePanel seedId={seedId} listing={listing} canEdit={canEdit} />
+
+      {/* Store logo — the same tenant-logo write the banner QR designer uses,
+          so it is the prospect's official logo on every surface. */}
+      <SeedLogoUploadPanel seedId={seedId} listing={listing} canEdit={canEdit} />
 
       {/* Traffic & Engagement — Layer 3 events on the public listing */}
       <TrafficEngagementPanel seedId={seedId} />

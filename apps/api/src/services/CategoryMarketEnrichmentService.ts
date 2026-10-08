@@ -33,6 +33,18 @@ const LOCATION_SENTINEL_KEY = '__location__';
 // rows written by a directory_enrichment campaign run (AI-produced packet).
 const CAMPAIGN_COMPOSER_VERSION = 2;
 
+// Provenance source_names stamped by the campaign packet paths — seed birth
+// (seed_seo_composer / intelligence_profile), post-audit resharpen
+// (business_analysis_audit / linked_campaign), operator campaign-field sync
+// (linked_campaign), and campaign-aware reset. Content stamped with any of
+// these is audit/campaign-derived and outranks the market template.
+const CAMPAIGN_SOURCED_PROVENANCE = new Set([
+  'linked_campaign',
+  'business_analysis_audit',
+  'seed_seo_composer',
+  'intelligence_profile',
+]);
+
 // Prisma.join throws on an empty array — emit a literal empty text[] instead.
 const textArraySql = (arr: string[]) =>
   arr.length ? Prisma.sql`ARRAY[${Prisma.join(arr)}]::text[]` : Prisma.sql`ARRAY[]::text[]`;
@@ -802,13 +814,13 @@ class CategoryMarketEnrichmentService extends BaseService {
               continue;
             }
 
-            // Also skip if a linked campaign already powered this seed. A
-            // linked-campaign provenance row for description/keywords means the
-            // content came from an operator-validated audit, which outranks market
-            // enrichment.
+            // Also skip if a campaign already powered this seed. Campaign-path
+            // provenance on description/keywords means the content came from an
+            // operator-validated audit or the campaign composer, which outranks
+            // market enrichment.
             const hasCampaignContent =
-              provenanceMap.get('description')?.source_name === 'linked_campaign' ||
-              provenanceMap.get('keywords')?.source_name === 'linked_campaign';
+              CAMPAIGN_SOURCED_PROVENANCE.has(provenanceMap.get('description')?.source_name ?? '') ||
+              CAMPAIGN_SOURCED_PROVENANCE.has(provenanceMap.get('keywords')?.source_name ?? '');
             if (hasCampaignContent) {
               this.incSkipReason(skipReasons, 'linked_campaign');
               skipped++;
