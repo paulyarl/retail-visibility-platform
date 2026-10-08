@@ -2801,14 +2801,14 @@ function PresenceSeedDetailClient() {
           <select
             value={scriptAnchorId}
             onChange={(e) => setScriptAnchorId(e.target.value)}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            className="max-w-md truncate rounded-md border border-gray-300 px-2 py-1.5 text-sm"
           >
             <option value="">(none — generic verification)</option>
             {anchors
               .filter((a) => a.status === 'active' || a.status === 'draft')
               .map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.title} ({a.status})
+                  {a.title.length > 80 ? `${a.title.slice(0, 80)}…` : a.title} ({a.status})
                 </option>
               ))}
           </select>
