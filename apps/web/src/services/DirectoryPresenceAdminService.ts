@@ -15,6 +15,15 @@
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
+/** A row from directory_photos, as served by /api/directory/:id/photos. */
+export interface DirectoryListingPhoto {
+  id: string;
+  url: string;
+  position: number;
+  alt?: string | null;
+  caption?: string | null;
+}
+
 // ─── Identity Packet (source-scored seed decision) ───────────────────────
 export type IdentitySourceTier =
   | 'authoritative'
@@ -1109,6 +1118,68 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/publish`,
       { method: 'POST', body: JSON.stringify({}) },
+      undefined,
+      0,
+    );
+  }
+
+  // ─── Seed listing photos (walk-in capture) ─────────────────────────────
+  //
+  // Wraps /api/directory/:listingId/photos. The identifier may be a tenant id,
+  // a directory listing id, or a slug — a seed tenant has tenants.slug = null,
+  // so its listing row is resolved by the listing's own slug. Reads are public;
+  // writes require platform staff, which AdminApiSingleton satisfies by adding
+  // the x-auth0-id / x-auth0-email headers authenticateToken reads.
+  //
+  // Uploads are sent as JSON dataUrls rather than multipart so the browser can
+  // re-encode each shot through a canvas first — that is what strips EXIF,
+  // which is what the stored exif_removed flag asserts.
+
+  async listSeedListingPhotos(listingId: string): Promise<DirectoryListingPhoto[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${encodeURIComponent(listingId)}/photos`,
+      { method: 'GET' },
+      `seed-listing-photos-${listingId}`,
+      0,
+    );
+    if (!result.success) return [];
+    return Array.isArray(result.data) ? result.data : [];
+  }
+
+  async uploadSeedListingPhoto(
+    listingId: string,
+    photo: {
+      dataUrl: string;
+      contentType?: string | null;
+      caption?: string | null;
+      alt?: string | null;
+      width?: number;
+      height?: number;
+    },
+  ): Promise<DirectoryListingPhoto | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${encodeURIComponent(listingId)}/photos`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...photo, exifRemoved: true }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message || 'Photo upload failed';
+      throw new Error(message);
+    }
+    return result.data ?? null;
+  }
+
+  async deleteSeedListingPhoto(listingId: string, photoId: string): Promise<void> {
+    await this.makeDefaultRequest<any>(
+      `/api/directory/${encodeURIComponent(listingId)}/photos/${encodeURIComponent(photoId)}`,
+      { method: 'DELETE' },
       undefined,
       0,
     );

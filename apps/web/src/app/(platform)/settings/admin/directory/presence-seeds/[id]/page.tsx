@@ -62,6 +62,7 @@ import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import ReportQrDesignerModal from './ReportQrDesignerModal';
 import TrafficEngagementPanel from './TrafficEngagementPanel';
+import SeedPhotoCapturePanel from './SeedPhotoCapturePanel';
 import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -2031,6 +2032,11 @@ function PresenceSeedDetailClient() {
           </div>
         )}
       </section>
+
+      {/* Store photos — walk-in capture, published to the seed live. Operator-
+          authored, so exempt from the tier gate that would otherwise hide the
+          gallery on this listing (see lib/place-photo-gallery.ts). */}
+      <SeedPhotoCapturePanel seedId={seedId} listing={listing} canEdit={canEdit} />
 
       {/* Traffic & Engagement — Layer 3 events on the public listing */}
       <TrafficEngagementPanel seedId={seedId} />

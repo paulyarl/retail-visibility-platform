@@ -18,6 +18,16 @@ import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolution
  * directory-entry tier config — which keeps the paid `presence` tier as the
  * upgrade that controls the gallery after the claim.
  *
+ * EXCEPT when the listing came from an operator seed (`seedId`), where the
+ * gallery is grandfathered past the gate. Without this, the operator's photos
+ * vanish at the exact moment of conversion: DirectoryClaimService flips
+ * `listing_origin` from 'directory_seed' to 'claimed' on claim, the tier gate
+ * takes over, and a merchant who claims without upgrading sits on
+ * `directory_presence` — the free tier, which has no gallery feature. The seed
+ * row itself persists (status 'claimed') and `seedId` is resolved by a LEFT
+ * JOIN on the listing, so the link survives the claim and the check still
+ * holds afterwards.
+ *
  * Kept in lib/ as a pure, dependency-light function rather than exported from
  * a page component: it is unit-testable directly in the node test environment,
  * and it stays importable from either a server or a client component (a named
@@ -25,10 +35,13 @@ import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolution
  * component cannot call).
  */
 export function showsListingPhotoGallery(
-  listing: { listingOrigin?: string | null } | null | undefined,
+  listing: { listingOrigin?: string | null; seedId?: string | null } | null | undefined,
   dirEntryOpts: Pick<DirectoryEntryOptionsState, 'galleryEnabled'> | null | undefined
 ): boolean {
   if (listing?.listingOrigin === 'directory_seed') return true;
+
+  // Grandfathered: operator-captured photos survive the claim.
+  if (listing?.seedId) return true;
 
   // Non-seed listings keep the sibling-flag convention used across the layout
   // props: absent capability state defaults the section on.

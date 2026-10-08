@@ -12,6 +12,7 @@ import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursColla
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import WhatsAppCtaButton from '@/components/directory/WhatsAppCtaButton';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import { showsListingPhotoGallery } from '@/lib/place-photo-gallery';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
@@ -44,7 +45,7 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
 
   const canShowLogo = directoryEntryOptions?.logoEnabled ?? directoryEntryOptions?.canShowLogo ?? true;
   const canShowAbout = directoryEntryOptions?.aboutEnabled ?? directoryEntryOptions?.canShowAbout ?? true;
-  const canShowGallery = directoryEntryOptions?.galleryEnabled ?? true;
+  const canShowGallery = showsListingPhotoGallery(listing, directoryEntryOptions);
   const canShowQr = directoryEntryOptions?.qrEnabled ?? true;
   const canShowContact = directoryEntryOptions?.contactEnabled ?? true;
   const whatsappCtaNumber = (directoryEntryOptions?.canShowWhatsapp ?? false)

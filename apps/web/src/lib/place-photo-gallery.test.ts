@@ -36,6 +36,35 @@ describe('showsListingPhotoGallery — seed listings bypass the tenant gate', ()
   });
 });
 
+describe('showsListingPhotoGallery — operator-seeded photos survive the claim', () => {
+  it('grandfathers the gallery on a claimed listing that came from a seed', () => {
+    // DirectoryClaimService flips listing_origin 'directory_seed' → 'claimed',
+    // so the seed branch stops matching and the tier gate takes over. The seed
+    // row persists (status 'claimed') and seedId still resolves, so the
+    // operator's photos must keep rendering. Without this they vanish at the
+    // exact moment of conversion, on a merchant who claimed without upgrading.
+    expect(
+      showsListingPhotoGallery(
+        { listingOrigin: 'claimed', seedId: 'seed-1' },
+        { galleryEnabled: false }
+      )
+    ).toBe(true);
+  });
+
+  it('still honours a closed gate on a claimed listing with no seed behind it', () => {
+    expect(
+      showsListingPhotoGallery(
+        { listingOrigin: 'claimed', seedId: null },
+        { galleryEnabled: false }
+      )
+    ).toBe(false);
+  });
+
+  it('does not treat an absent seedId as a seed', () => {
+    expect(showsListingPhotoGallery({ seedId: undefined }, { galleryEnabled: false })).toBe(false);
+  });
+});
+
 describe('showsListingPhotoGallery — claimed listings keep the tenant gate', () => {
   it('honours a closed gate', () => {
     expect(showsListingPhotoGallery(NOT_SEED, { galleryEnabled: false })).toBe(false);
