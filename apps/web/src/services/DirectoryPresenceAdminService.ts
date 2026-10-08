@@ -14,6 +14,7 @@
  *   - POST   /api/admin/directory-presence/presence-seeds/:id/tokens/:tokenId/revoke
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 
 /** A row from directory_photos, as served by /api/directory/:id/photos. */
 export interface DirectoryListingPhoto {
@@ -1173,6 +1174,9 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
           : result.error?.message || 'Photo upload failed';
       throw new Error(message);
     }
+    // Bust the public photo list. Must go through the DIRECTORY-context
+    // singleton — see invalidateDirectoryPhotosCache.
+    await directoryListingService.invalidateDirectoryPhotosCache();
     return result.data ?? null;
   }
 
@@ -1183,6 +1187,9 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       undefined,
       0,
     );
+    // Without this the deleted photo keeps rendering on the public place page
+    // for the life of the cached entry (persistent, ~10 minutes).
+    await directoryListingService.invalidateDirectoryPhotosCache();
   }
 
   async inviteSeed(id: string, expiresInDays?: number): Promise<InviteResult> {

@@ -92,20 +92,37 @@ Without these fields the remote variant cannot be planned, only hoped for.
 
 ## Stage 6 — Live photo capture (walk-in only; optional, mood- and moment-gated)
 
-The seed's most visible value move, and the one carrying the highest consent risk. Capture is optional
-and never blocks a rung — but once any photo is taken or published, the consent and approval rows are
-**GATE** rows. Nothing is published that the owner has not seen and approved.
+The seed's most visible value move. Capture is optional and never blocks a rung.
+
+**Consent here is a conversation, not a record.** The operator asks, shows the shots on the phone, and
+publishes only what the owner picks — and `SeedPhotoCapturePanel` enforces that with a required
+approval checkbox per shot. None of it is persisted: `directory_photos` has no consent column, and that
+is deliberate.
+
+The reasoning, recorded so it is not re-litigated: a seed's entire pre-conversion existence already
+stands on public information — name, address, phone, hours, an audit-written narrative, and
+**Google-sourced storefront photos of the same premises** — published under a "listed from public
+information" disclaimer, with a free claim invitation standing as the remedy. An operator-taken
+storefront photo therefore adds almost no incremental exposure, and once the owner converts they own
+the listing and can edit or delete anything from the tenant gallery they already have. What would be a
+rights failure is publishing a shot the owner has not seen; that is prevented in the UI rather than
+evidenced after the fact.
+
+The residual exposure, named rather than hidden: the **unconverted** case (photos stay up if the seed is
+never claimed, so the window is bounded only by the claim happening), and `people_in_frame` — which is
+not a public-data question at all, since a customer or employee in shot is personal information the
+platform's own rules prohibit collecting.
 
 | Field | Type / values | Purpose |
 | --- | --- | --- |
 | `moment_ok` | bool | not a delivery day, mid-rush or queue — gate on mood **and** moment |
 | `photo_consent_requested` | bool | asked explicitly and specifically, not vaguely |
-| `photo_consent_granted` | bool | **GATE** — nothing captured without a clear yes |
+| `photo_consent_granted` | bool | UI-enforced — nothing captured without a clear yes; not persisted |
 | `photo_consent_scope` | enum | `signage_only` / `signage_storefront` / `signage_storefront_shelf` / `none` |
 | `photos_taken` | int | |
-| `people_in_frame` | bool | must be false to publish — customers and staff are off-limits |
-| `photos_shown_to_owner` | bool | **GATE** — shown on the phone before any publish |
-| `photos_approved_count` | int | **GATE** — only these are published |
+| `people_in_frame` | bool | the one hard rule — customers and staff are off-limits; must be false to publish |
+| `photos_shown_to_owner` | bool | UI-enforced — shown on the phone before any publish; not persisted |
+| `photos_approved_count` | int | UI-enforced — only these are published; not persisted |
 | `photos_published_count` | int | |
 | `owner_declined` | bool | capture declined; record it and never push |
 | `fallback_offered` | enum | `none` / `owner_sends_later` / `signage_only` |

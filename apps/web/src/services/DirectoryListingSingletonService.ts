@@ -130,6 +130,25 @@ export class DirectoryListingSingletonService extends PublicApiSingleton {
   public async invalidateAllDirectoryListingCache(): Promise<void> {
     await this.invalidateCache('directory-listing-*');
   }
+
+  /**
+   * Invalidate the cached photo list for every listing.
+   *
+   * MUST be called on this DIRECTORY-context singleton, never from the writer's
+   * own service. `invalidateCachePattern` sweeps with the CALLING service's
+   * default context/isolation, so an admin- or tenant-context caller clearing
+   * `directory-photos-*` only touches its own namespace and leaves the public
+   * place page serving a stale list. That is precisely the bug this fixes: a
+   * photo deleted on the seed kept rendering on the place listing because this
+   * namespace was never swept.
+   *
+   * Namespace-wide rather than per-listing because the public page addresses
+   * photos by listing SLUG while the operator and tenant surfaces use the
+   * `dll-` id — the same listing produces two different cache keys.
+   */
+  public async invalidateDirectoryPhotosCache(): Promise<void> {
+    await this.invalidateCache('directory-photos*');
+  }
 }
 
 // Export singleton instance

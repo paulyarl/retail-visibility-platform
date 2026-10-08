@@ -8,7 +8,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { RequestTarget } from '@/providers/base/FlexibleApiSingleton';
-import { DirectoryListing } from './DirectoryListingSingletonService';
+import { DirectoryListing, directoryListingService } from './DirectoryListingSingletonService';
 import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryEntrySettings {
@@ -264,6 +264,10 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
 
     // Invalidate photos cache after successful upload
     await this.invalidateCache(`directory-photos-${listingId}`);
+    // The line above only sweeps this service's own TENANT namespace. The
+    // public place listing reads the DIRECTORY namespace, so clear that too —
+    // otherwise an uploaded photo does not appear until the entry expires.
+    await directoryListingService.invalidateDirectoryPhotosCache();
 
     return result.data;
   }
@@ -289,6 +293,10 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       return null;
     }
 
+    // Caption/alt/position edits are visible on the public listing, so the
+    // DIRECTORY-context photo cache must be cleared here as well.
+    await directoryListingService.invalidateDirectoryPhotosCache();
+
     return result.data;
   }
 
@@ -312,6 +320,8 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     if (result.success || (result.status === 204)) {
       // Invalidate photos cache after successful delete
       await this.invalidateCache(`directory-photos-${listingId}`);
+      // …and the DIRECTORY-context copy the public place listing reads.
+      await directoryListingService.invalidateDirectoryPhotosCache();
       return true;
     }
     
