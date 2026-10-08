@@ -29,6 +29,7 @@ const {
   mockCampaigns: {
     findUnique: vi.fn(),
     findFirst: vi.fn(),
+    findMany: vi.fn(),
     update: vi.fn(),
   },
   mockAudits: {
@@ -172,6 +173,7 @@ describe('MarketingProspectQueueService', () => {
     mockCampaigns.findUnique.mockResolvedValue(parentCampaign());
     mockQueue.count.mockResolvedValue(0);
     mockQueue.groupBy.mockResolvedValue([]);
+    mockCampaigns.findMany.mockResolvedValue([]);
     mockQueryRaw.mockResolvedValue([]);
     mockChecklistProgress.groupBy.mockResolvedValue([]);
     mockOutreachLog.groupBy.mockResolvedValue([]);
@@ -815,21 +817,55 @@ describe('MarketingProspectQueueService', () => {
     });
 
     // Migration 282 — direct PG membership column, OR'd with the legacy
-    // source_campaign_id linkage.
+    // source_campaign_id linkage. Tree-aware: the PG's children fold into
+    // the source clause server-side.
     it('filters by proving_ground_id alone (queue-list-initiated PGs)', async () => {
       mockQueue.findMany.mockResolvedValue([]);
+      mockCampaigns.findMany.mockResolvedValue([]); // no children
 
       await MarketingProspectQueueService.list({ proving_ground_id: 'mkt-pg-001' });
 
       expect(mockQueue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ proving_ground_id: 'mkt-pg-001' }),
+          where: expect.objectContaining({
+            AND: [{
+              OR: [
+                { source_campaign_id: { in: ['mkt-pg-001'] } },
+                { proving_ground_id: 'mkt-pg-001' },
+              ],
+            }],
+          }),
+        }),
+      );
+    });
+
+    it('expands the PG tree — children campaigns fold into the source_campaign_id clause', async () => {
+      mockQueue.findMany.mockResolvedValue([]);
+      mockCampaigns.findMany.mockResolvedValue([{ id: 'mkt-intel-001' }, { id: 'mkt-intel-002' }]);
+
+      await MarketingProspectQueueService.list({ proving_ground_id: 'mkt-pg-001' });
+
+      // Child lookup runs against the campaigns table.
+      expect(mockCampaigns.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { parent_campaign_id: 'mkt-pg-001' } }),
+      );
+      expect(mockQueue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: [{
+              OR: [
+                { source_campaign_id: { in: expect.arrayContaining(['mkt-pg-001', 'mkt-intel-001', 'mkt-intel-002']) } },
+                { proving_ground_id: 'mkt-pg-001' },
+              ],
+            }],
+          }),
         }),
       );
     });
 
     it('ORs proving_ground_id with source_campaign_ids when both are given', async () => {
       mockQueue.findMany.mockResolvedValue([]);
+      mockCampaigns.findMany.mockResolvedValue([]); // no children
 
       await MarketingProspectQueueService.list({
         proving_ground_id: 'mkt-pg-001',
@@ -848,6 +884,115 @@ describe('MarketingProspectQueueService', () => {
           }),
         }),
       );
+    });
+
+    it('pg_membership=any keeps only rows affiliated with a PG tree', async () => {
+      mockQueue.findMany.mockResolvedValue([]);
+      mockCampaigns.findMany
+        .mockResolvedValueOnce([{ id: 'mkt-pg-001' }]) // all PGs
+        .mockResolvedValueOnce([{ id: 'mkt-intel-001' }]); // children of PGs
+
+      await MarketingProspectQueueService.list({ pg_membership: 'any' });
+
+      expect(mockQueue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: [{
+              OR: [
+                { source_campaign_id: { in: ['mkt-pg-001', 'mkt-intel-001'] } },
+                { proving_ground_id: { in: ['mkt-pg-001'] } },
+              ],
+            }],
+          }),
+        }),
+      );
+    });
+
+    it('pg_membership=none keeps only ungrouped rows', async () => {
+      mockQueue.findMany.mockResolvedValue([]);
+      mockCampaigns.findMany
+        .mockResolvedValueOnce([{ id: 'mkt-pg-001' }]) // all PGs
+        .mockResolvedValueOnce([{ id: 'mkt-intel-001' }]); // children
+
+      await MarketingProspectQueueService.list({ pg_membership: 'none' });
+
+      expect(mockQueue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: [{
+              NOT: {
+                OR: [
+                  { source_campaign_id: { in: ['mkt-pg-001', 'mkt-intel-001'] } },
+                  { proving_ground_id: { in: ['mkt-pg-001'] } },
+                ],
+              },
+            }],
+          }),
+        }),
+      );
+    });
+
+    // PG badge decoration — resolves each row's proving ground from either
+    // linkage so every queue surface can show "which PG owns this prospect".
+    it('decorates entries with the proving ground from a direct proving_ground_id stamp', async () => {
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-pg-001', proving_ground_id: 'mkt-pg-001' }),
+      ]);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
+      mockCampaigns.findMany.mockResolvedValue([
+        {
+          id: 'mkt-pg-001', title: 'Austin Plumbers PG', category: 'plumber',
+          city: 'Austin', campaign_category: 'proving_ground', parent_campaign_id: null,
+        },
+        {
+          id: PARENT_CAMPAIGN_ID, title: 'City audit', category: 'restaurant',
+          city: 'Austin', campaign_category: 'review_management', parent_campaign_id: null,
+        },
+      ]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].proving_ground).toEqual({
+        id: 'mkt-pg-001', title: 'Austin Plumbers PG', category: 'plumber', city: 'Austin',
+      });
+    });
+
+    it('decorates entries with the proving ground via the source campaign\'s PG parent', async () => {
+      mockQueue.findMany.mockResolvedValue([
+        queueRow({ id: 'pque-pg-002', source_campaign_id: 'mkt-intel-001', proving_ground_id: null }),
+      ]);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
+      mockCampaigns.findMany
+        // First call: linked ids (source campaign) → the intel child.
+        .mockResolvedValueOnce([{
+          id: 'mkt-intel-001', title: 'Intel child', category: 'plumber',
+          city: 'Austin', campaign_category: 'directory_enrichment', parent_campaign_id: 'mkt-pg-001',
+        }])
+        // Second call: parents that are proving grounds.
+        .mockResolvedValueOnce([{
+          id: 'mkt-pg-001', title: 'Austin Plumbers PG', category: 'plumber',
+          city: 'Austin', campaign_category: 'proving_ground',
+        }]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].proving_ground).toEqual({
+        id: 'mkt-pg-001', title: 'Austin Plumbers PG', category: 'plumber', city: 'Austin',
+      });
+    });
+
+    it('leaves proving_ground null when no linkage resolves to a PG', async () => {
+      mockQueue.findMany.mockResolvedValue([queueRow({ id: 'pque-nopg-001' })]);
+      mockQueue.groupBy.mockResolvedValue([{ status: 'queued', _count: { _all: 1 } }]);
+      // Linked campaigns exist but none are proving grounds.
+      mockCampaigns.findMany.mockResolvedValue([{
+        id: PARENT_CAMPAIGN_ID, title: 'City audit', category: 'restaurant',
+        city: 'Austin', campaign_category: 'review_management', parent_campaign_id: null,
+      }]);
+
+      const result = await MarketingProspectQueueService.list({});
+
+      expect(result.entries[0].proving_ground).toBeNull();
     });
   });
 

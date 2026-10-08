@@ -1403,8 +1403,13 @@ export interface ProspectQueueListFilters {
   // of these campaign ids (proving ground + its intelligence children).
   source_campaign_ids?: string[];
   // Migration 282 — direct PG membership (queue-list-initiated proving
-  // grounds). OR'd with source_campaign_ids server-side.
+  // grounds). OR'd with source_campaign_ids server-side; tree-aware — the
+  // PG's children fold into the source clause, so a bare id scopes to the
+  // whole tree.
   proving_ground_id?: string;
+  // Queue-page PG lens — 'any' = rows affiliated with any proving-ground
+  // tree, 'none' = ungrouped rows (group-into-PG candidates).
+  pg_membership?: 'any' | 'none';
 }
 
 export interface ProspectQueuePatch {
@@ -1512,6 +1517,10 @@ export interface ProspectQueueEntry {
   // Migration 282 — direct PG membership for queue-list-initiated proving
   // grounds (OR'd with source_campaign_id in all tree readers).
   proving_ground_id?: string | null;
+  // Resolved proving-ground badge (present on every list read) — the PG
+  // this prospect belongs to via either linkage (direct stamp, or the
+  // source campaign being a PG / child of one). Null when ungrouped.
+  proving_ground?: { id: string; title: string | null; category?: string | null; city?: string | null } | null;
   channel_sequence?: Array<{
     channel: 'call' | 'email' | 'sms' | 'mail' | 'form' | 'referral' | 'other';
     contact?: string;
@@ -5542,6 +5551,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.assigned_to) params.set('assigned_to', filters.assigned_to);
     if (filters?.source_campaign_ids?.length) params.set('source_campaign_ids', filters.source_campaign_ids.join(','));
     if (filters?.proving_ground_id) params.set('proving_ground_id', filters.proving_ground_id);
+    if (filters?.pg_membership) params.set('pg_membership', filters.pg_membership);
     if (filters?.limit) params.set('limit', String(filters.limit));
     const include = [
       filters?.includeCampaigns ? 'campaigns' : null,

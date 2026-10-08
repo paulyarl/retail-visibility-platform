@@ -249,8 +249,15 @@ export interface ListQueueFilters {
   source_campaign_ids?: string[];
   // Migration 282 — queue-list PG initiation: rows grouped directly into a
   // proving ground carry proving_ground_id. OR'd with source_campaign_ids
-  // (dedup on row id is inherent — OR returns each row once).
+  // (dedup on row id is inherent — OR returns each row once). Tree-aware:
+  // the PG's child campaigns are folded into the source_campaign_id clause
+  // server-side, so a bare proving_ground_id scopes to the whole tree.
   proving_ground_id?: string;
+  // Queue-page PG lens — membership across EVERY proving-ground tree
+  // (direct proving_ground_id OR a source campaign that is a PG / child of
+  // one). 'any' limits to PG-affiliated rows; 'none' to ungrouped rows —
+  // the "still needs grouping" cut for queue-list PG initiation.
+  pg_membership?: 'any' | 'none';
   assigned_to?: string; // 'me' resolved to userId at route layer; 'unassigned' → null filter
   // When true, the assigned_to filter is OR'd with assigned_to IS NULL
   // (matches the "Assigned to me + unassigned" checkbox label on the queue page).
@@ -524,17 +531,54 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // Migration 282 adds the direct proving_ground_id column — grouped
       // entries may have no source campaign, so the two linkages OR together
       // (each row returns once regardless of how many columns match).
+      // proving_ground_id is tree-aware server-side: the PG's children are
+      // folded into the source clause so a bare id scopes to the whole tree
+      // (same union as getProvingGroundStageDistribution — callers no longer
+      // need to pre-resolve children).
       const pgLinkageOr: any[] = [];
-      if (filters.source_campaign_ids?.length) {
-        pgLinkageOr.push({ source_campaign_id: { in: filters.source_campaign_ids } });
-      }
+      const pgSourceIds = new Set(filters.source_campaign_ids ?? []);
       if (filters.proving_ground_id) {
+        const pgChildren = await this.prisma.mkt_campaigns_list.findMany({
+          where: { parent_campaign_id: filters.proving_ground_id },
+          select: { id: true },
+        });
+        pgSourceIds.add(filters.proving_ground_id);
+        for (const c of pgChildren) pgSourceIds.add(c.id);
         pgLinkageOr.push({ proving_ground_id: filters.proving_ground_id });
+      }
+      if (pgSourceIds.size > 0) {
+        pgLinkageOr.unshift({ source_campaign_id: { in: [...pgSourceIds] } });
       }
       if (pgLinkageOr.length === 1) {
         Object.assign(where, pgLinkageOr[0]);
       } else if (pgLinkageOr.length > 1) {
         where.AND = [...(where.AND ?? []), { OR: pgLinkageOr }];
+      }
+
+      // pg_membership — cross-PG lens for the queue page's Proving Ground
+      // filter. 'any' keeps rows affiliated with any PG tree; 'none' keeps
+      // ungrouped rows (group-into-PG candidates).
+      if (filters.pg_membership) {
+        const pgs = await this.prisma.mkt_campaigns_list.findMany({
+          where: { campaign_category: 'proving_ground' },
+          select: { id: true },
+        });
+        const pgIds = pgs.map((p) => p.id);
+        const pgChildrenAll = pgIds.length > 0
+          ? await this.prisma.mkt_campaigns_list.findMany({
+              where: { parent_campaign_id: { in: pgIds } },
+              select: { id: true },
+            })
+          : [];
+        const allTreeIds = [...pgIds, ...pgChildrenAll.map((c) => c.id)];
+        const memberOr = [
+          { source_campaign_id: { in: allTreeIds } },
+          { proving_ground_id: { in: pgIds } },
+        ];
+        where.AND = [
+          ...(where.AND ?? []),
+          filters.pg_membership === 'any' ? { OR: memberOr } : { NOT: { OR: memberOr } },
+        ];
       }
       if (filters.assigned_to === 'unassigned') {
         where.assigned_to = null;
@@ -603,6 +647,53 @@ class MarketingProspectQueueServiceClass extends BaseService {
       for (const g of statusGroups) statusCounts[g.status] = g._count._all;
       const queuedCount = statusCounts['queued'] ?? 0;
       const intakeCount = statusCounts['intake'] ?? 0;
+
+      // Proving-ground badge decoration — resolves each row's PG from either
+      // linkage: the direct proving_ground_id column, the source campaign
+      // itself being a PG, or the source campaign's parent being one (the
+      // discovery-child path). Two batched lookups for the whole page so
+      // every queue surface can show "which PG owns this prospect" without
+      // per-row campaign fetches. Non-fatal: degrades to no badges.
+      const pgByEntry = new Map<string, { id: string; title: string | null; category: string | null; city: string | null }>();
+      try {
+        const linkedIds = new Set<string>();
+        for (const e of entries as any[]) {
+          if (e.proving_ground_id) linkedIds.add(e.proving_ground_id);
+          if (e.source_campaign_id) linkedIds.add(e.source_campaign_id);
+        }
+        if (linkedIds.size > 0) {
+          const linked = await this.prisma.mkt_campaigns_list.findMany({
+            where: { id: { in: [...linkedIds] } },
+            select: { id: true, title: true, category: true, city: true, campaign_category: true, parent_campaign_id: true },
+          });
+          const parentIds = [...new Set(
+            linked.map((c) => c.parent_campaign_id).filter((id): id is string => !!id),
+          )];
+          const parents = parentIds.length > 0
+            ? await this.prisma.mkt_campaigns_list.findMany({
+                where: { id: { in: parentIds }, campaign_category: 'proving_ground' },
+                select: { id: true, title: true, category: true, city: true, campaign_category: true },
+              })
+            : [];
+          const byId = new Map<string, any>([...linked, ...parents].map((c) => [c.id, c]));
+          const asPg = (c: any) =>
+            c?.campaign_category === 'proving_ground'
+              ? { id: c.id as string, title: c.title as string | null, category: c.category as string | null, city: c.city as string | null }
+              : null;
+          for (const e of entries as any[]) {
+            const source = e.source_campaign_id ? byId.get(e.source_campaign_id) : undefined;
+            const pg =
+              asPg(e.proving_ground_id ? byId.get(e.proving_ground_id) : undefined) ??
+              asPg(source) ??
+              asPg(source?.parent_campaign_id ? byId.get(source.parent_campaign_id) : undefined);
+            if (pg) pgByEntry.set(e.id, pg);
+          }
+        }
+      } catch (e) {
+        logger.warn('list: proving-ground badge lookup failed (non-fatal)', ctx, {
+          error: (e as Error).message,
+        });
+      }
 
       // Audit coverage (pre-push tracking): when decorating with campaigns,
       // also flag which processed campaigns already have a business_analysis
@@ -814,6 +905,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
         d.last_contact_at = latest ? latest.toISOString() : null;
         d.contacted = !!(logAt || verifiedAt || manualAt);
         d.contact_source = logAt ? 'log' : verifiedAt ? 'verify' : manualAt ? 'manual' : null;
+        // PG badge — null when the row isn't affiliated with any proving
+        // ground tree.
+        d.proving_ground = pgByEntry.get(d.id) ?? null;
       }
 
       // Seed confidence meter (discovery → seed lane): prospects carrying

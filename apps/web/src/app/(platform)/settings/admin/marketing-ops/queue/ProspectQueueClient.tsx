@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw, Plus, Loader2, Flag, Star, MapPin, Flame, Inbox, X,
   Pencil, Check, ExternalLink, UserPlus, UserX, Table as TableIcon, LayoutGrid,
-  Phone,
+  Phone, FlaskConical,
 } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, {
@@ -44,6 +44,15 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
 };
 
 const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other'];
+
+// 'all'-tab row order — actionable statuses lead, terminal rows sink.
+const STATUS_ORDER: Record<string, number> = {
+  intake: 0, verify_then_outreach: 1, queued: 2, in_thread: 3, hold: 4,
+  campaign_created: 5, dismissed: 6,
+};
+
+/** Shared list/board status selector — 'all' shows every status. */
+type QueueTab = 'all' | ProspectStatus;
 
 const SCOPE_LABELS: Record<string, string> = {
   business: 'Business',
@@ -91,6 +100,28 @@ function dueLabel(iso: string | null | undefined): string | null {
   return `in ${d}d`;
 }
 
+// Status chip colors — used on 'all'-tab rows (the tab no longer labels the
+// row, so the status needs its own marker). Mirrors the board lane colors.
+const STATUS_CHIP: Record<string, string> = {
+  intake: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
+  queued: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  verify_then_outreach: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  in_thread: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  hold: 'bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300',
+  campaign_created: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  dismissed: 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400',
+};
+
+const STATUS_CHIP_LABEL: Record<string, string> = {
+  intake: 'Intake',
+  queued: 'Queued',
+  verify_then_outreach: 'Verify',
+  in_thread: 'In Thread',
+  hold: 'Hold',
+  campaign_created: 'Created',
+  dismissed: 'Dismissed',
+};
+
 const CHANNEL_CHIP: Record<string, string> = {
   call: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
   email: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
@@ -134,20 +165,26 @@ export default function ProspectQueueClient() {
     if (typeof window !== 'undefined') localStorage.setItem('prospectQueueView', mode);
   };
 
-  // Filters — status tab can be deep-linked via ?status= (e.g. from
-  // discovery surfaces that send a prospect straight to verify_then_outreach).
-  const initialStatus: ProspectStatus = (() => {
-    if (typeof window === 'undefined') return 'queued';
+  // Filters — shared by List and Board (the views render the same filtered
+  // dataset). 'all' = every status; the tab can be deep-linked via ?status=
+  // (e.g. from discovery surfaces that send a prospect straight to
+  // verify_then_outreach).
+  const initialStatus: QueueTab = (() => {
+    if (typeof window === 'undefined') return 'all';
     const param = new URLSearchParams(window.location.search).get('status');
-    if (param === 'intake' || param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed' || param === 'in_thread' || param === 'hold') {
-      return param as ProspectStatus;
+    if (param === 'all' || param === 'intake' || param === 'verify_then_outreach' || param === 'queued' || param === 'campaign_created' || param === 'dismissed' || param === 'in_thread' || param === 'hold') {
+      return param as QueueTab;
     }
-    return 'queued';
+    return 'all';
   })();
-  const [statusTab, setStatusTab] = useState<ProspectStatus>(initialStatus);
+  const [statusTab, setStatusTab] = useState<QueueTab>(initialStatus);
   const [assignedToMe, setAssignedToMe] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [cityFilter, setCityFilter] = useState('');
+  // Proving-ground lens — '' = every prospect, 'any' = affiliated with a PG
+  // tree, 'none' = ungrouped (group-into-PG candidates), otherwise the PG's
+  // campaign id (tree-aware server-side).
+  const [pgFilter, setPgFilter] = useState('');
 
   // Row-level action state
   const [creatingId, setCreatingId] = useState<string | null>(null);
@@ -211,21 +248,34 @@ export default function ProspectQueueClient() {
   // resort for the assign action label; the backend uses req.user.id.
   const currentUserId = staffUsers[0]?.id ?? null;
 
+  // PG list — powers the filter-bar lens and the group modal's target
+  // picker. Loaded once at mount (not just on modal open) so the filter
+  // works before any grouping.
+  const refreshPgOptions = useCallback(async () => {
+    try {
+      const r = await marketingOpsService.listCampaigns({ campaignCategory: 'proving_ground', limit: 200 });
+      setPgOptions(r.items);
+    } catch {
+      setPgOptions([]);
+    }
+  }, []);
+
   const fetchQueue = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Board view needs the intake + queued + verify + campaign_created
-      // entries and the campaign join (for stage columns). List view uses the
-      // active status tab.
-      const isBoard = viewMode === 'board';
+      // One filtered dataset drives both views — List slices it by the
+      // active status tab, Board slices it into lanes. No status filter:
+      // the status tab is a view concern (the tabs' counts come from
+      // statusCounts), and view toggling stays instant (no refetch).
       const result = await marketingOpsService.listProspectQueue({
-        status: isBoard ? ['intake', 'queued', 'verify_then_outreach', 'campaign_created'] : statusTab,
-        assigned_to: assignedToMe && (isBoard || statusTab === 'intake' || statusTab === 'queued' || statusTab === 'verify_then_outreach') ? 'me' : undefined,
+        assigned_to: assignedToMe ? 'me' : undefined,
         category: categoryFilter || undefined,
         city: cityFilter || undefined,
-        limit: 200,
-        includeCampaigns: isBoard,
+        proving_ground_id: pgFilter && pgFilter !== 'any' && pgFilter !== 'none' ? pgFilter : undefined,
+        pg_membership: pgFilter === 'any' || pgFilter === 'none' ? pgFilter : undefined,
+        limit: 500,
+        includeCampaigns: true,
       });
       setEntries(result.entries);
       setStatusCounts(result.statusCounts ?? { queued: result.queuedCount ?? 0, intake: result.intakeCount ?? 0 });
@@ -234,11 +284,15 @@ export default function ProspectQueueClient() {
     } finally {
       setLoading(false);
     }
-  }, [statusTab, assignedToMe, categoryFilter, cityFilter, viewMode]);
+  }, [assignedToMe, categoryFilter, cityFilter, pgFilter]);
 
   useEffect(() => {
     fetchQueue();
   }, [fetchQueue]);
+
+  useEffect(() => {
+    refreshPgOptions();
+  }, [refreshPgOptions]);
 
   // ─── Row actions ──────────────────────────────────────────────────────
 
@@ -276,12 +330,9 @@ export default function ProspectQueueClient() {
     setGroupResult(null);
     setGroupTargetId('');
     setGroupModalOpen(true);
-    // Load existing PGs for the "add to populated PG" target picker — the
+    // Refresh the PG list for the "add to populated PG" target picker — the
     // modal shows the target's ID constraints before the add.
-    marketingOpsService
-      .listCampaigns({ campaignCategory: 'proving_ground', limit: 50 })
-      .then((r) => setPgOptions(r.items))
-      .catch(() => setPgOptions([]));
+    refreshPgOptions();
   };
 
   // Resolved target PG — explicit pick wins; otherwise a best-effort
@@ -303,17 +354,28 @@ export default function ProspectQueueClient() {
 
   // Proving ground (Migration 262, spec §4.6): seeded rows sort by
   // next_touch_at — the operator's "due today" worklist. Unseeded rows keep
-  // queue order after the seeded block.
+  // queue order after the seeded block. The shared dataset is sliced by the
+  // active status tab here (the fetch is status-agnostic); 'all' groups the
+  // rows by status in funnel order.
   const displayEntries = useMemo(() => {
-    const seeded = entries.filter((e) => e.seed_id);
-    const unseeded = entries.filter((e) => !e.seed_id);
-    seeded.sort((a, b) => {
+    const scoped = statusTab === 'all' ? entries : entries.filter((e) => e.status === statusTab);
+    const seeded = scoped.filter((e) => e.seed_id);
+    const unseeded = scoped.filter((e) => !e.seed_id);
+    const touchAsc = (a: ProspectQueueEntry, b: ProspectQueueEntry) => {
       const ta = a.next_touch_at ? new Date(a.next_touch_at).getTime() : 0;
       const tb = b.next_touch_at ? new Date(b.next_touch_at).getTime() : 0;
       return ta - tb;
-    });
+    };
+    seeded.sort(touchAsc);
+    if (statusTab === 'all') {
+      const rank = (e: ProspectQueueEntry) => STATUS_ORDER[e.status] ?? 9;
+      return [
+        ...seeded.sort((a, b) => rank(a) - rank(b) || touchAsc(a, b)),
+        ...unseeded.sort((a, b) => rank(a) - rank(b)),
+      ];
+    }
     return [...seeded, ...unseeded];
-  }, [entries]);
+  }, [entries, statusTab]);
 
   // Off-domain check — asserted values that fall outside the target's
   // declared domain (blank entry fields don't count as violations).
@@ -362,7 +424,7 @@ export default function ProspectQueueClient() {
         reusedExisting: res.reusedExisting,
         domainExpanded: res.domainExpanded ?? { categories: [], geos: [] },
       });
-      await fetchQueue(); // proving_ground_id now stamped on the rows
+      await Promise.all([fetchQueue(), refreshPgOptions()]); // proving_ground_id now stamped on the rows
     } catch (err: any) {
       setError(err.message || 'Failed to group into proving ground');
     } finally {
@@ -592,7 +654,9 @@ export default function ProspectQueueClient() {
     [entries],
   );
 
-  const statusTabs: { key: ProspectStatus; label: string; count: number }[] = [
+  const totalCount = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const statusTabs: { key: QueueTab; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: totalCount },
     { key: 'intake', label: 'Intake', count: statusCounts['intake'] ?? 0 },
     { key: 'queued', label: 'Queued', count: statusCounts['queued'] ?? 0 },
     { key: 'verify_then_outreach', label: 'Verify', count: statusCounts['verify_then_outreach'] ?? 0 },
@@ -668,8 +732,8 @@ export default function ProspectQueueClient() {
           </div>
         </div>
 
-        {/* Filter bar — list view only */}
-        {viewMode === 'list' && (
+        {/* Filter bar — shared by both views (same dataset, two renderings).
+            The status tab doubles as the board's lane focus. */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {/* Status tabs */}
           <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
@@ -688,18 +752,16 @@ export default function ProspectQueueClient() {
             ))}
           </div>
 
-          {/* Assigned to me toggle (relevant for intake + queued + verify) */}
-          {(statusTab === 'intake' || statusTab === 'queued' || statusTab === 'verify_then_outreach') && (
-            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700">
-              <input
-                type="checkbox"
-                checked={assignedToMe}
-                onChange={(e) => setAssignedToMe(e.target.checked)}
-                className="rounded"
-              />
-              Assigned to me + unassigned
-            </label>
-          )}
+          {/* Assigned to me toggle */}
+          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700">
+            <input
+              type="checkbox"
+              checked={assignedToMe}
+              onChange={(e) => setAssignedToMe(e.target.checked)}
+              className="rounded"
+            />
+            Assigned to me + unassigned
+          </label>
 
           {/* Category filter */}
           <select
@@ -720,8 +782,25 @@ export default function ProspectQueueClient() {
             <option value="">All cities</option>
             {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+
+          {/* Proving ground filter — tree-aware: a specific PG catches its
+              direct members AND rows sourced from its child campaigns. */}
+          <select
+            value={pgFilter}
+            onChange={(e) => setPgFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 text-gray-900 dark:text-white"
+            title="Proving ground lens — scope the queue to a PG's whole tree, to every PG, or to ungrouped prospects"
+          >
+            <option value="">All proving grounds</option>
+            <option value="any">In any proving ground</option>
+            <option value="none">No proving ground</option>
+            {pgOptions.map((pg) => (
+              <option key={pg.id} value={pg.id}>
+                {pg.title || [pg.category, pg.city].filter(Boolean).join(' · ') || 'Proving ground'}
+              </option>
+            ))}
+          </select>
         </div>
-        )}
 
         {/* Error */}
         {error && (
@@ -739,17 +818,19 @@ export default function ProspectQueueClient() {
         )}
 
         {/* Empty state — list view only */}
-        {viewMode === 'list' && !loading && entries.length === 0 && (
+        {viewMode === 'list' && !loading && displayEntries.length === 0 && (
           <div className="text-center py-12">
             <Inbox className="w-12 h-12 mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {statusTab === 'intake'
+              {statusTab === 'all'
+                ? 'No prospects match the current filters.'
+                : statusTab === 'intake'
                 ? 'No intake records. Public directory suggestions and owner-submitted businesses land here automatically — validate to graduate, or dismiss.'
                 : statusTab === 'queued'
                 ? 'No queued prospects. Use "Add to Queue" above or "Queue" on any audit card to capture prospects for later.'
                 : statusTab === 'verify_then_outreach'
                   ? 'No prospects pending verification. Move a queued prospect to "Verify" when NAP is unverified and a phone call is needed before outreach.'
-                  : `No ${statusTab === 'campaign_created' ? 'created' : 'dismissed'} entries.`}
+                  : `No ${statusTab === 'campaign_created' ? 'created' : statusTab === 'in_thread' ? 'in-thread' : statusTab === 'hold' ? 'held' : 'dismissed'} entries.`}
             </p>
           </div>
         )}
@@ -779,7 +860,7 @@ export default function ProspectQueueClient() {
         )}
 
         {/* Table — list view only */}
-        {viewMode === 'list' && !loading && entries.length > 0 && (
+        {viewMode === 'list' && !loading && displayEntries.length > 0 && (
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -829,6 +910,11 @@ export default function ProspectQueueClient() {
                               {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
                             </span>
                             {entry.is_hot_prospect && <Flame className="w-3 h-3 text-orange-500 flex-shrink-0" />}
+                            {statusTab === 'all' && (
+                              <span className={`rounded px-1 py-0.5 text-[9px] font-medium flex-shrink-0 ${STATUS_CHIP[entry.status] ?? STATUS_CHIP.dismissed}`}>
+                                {STATUS_CHIP_LABEL[entry.status] ?? entry.status}
+                              </span>
+                            )}
                           </div>
                           {entry.title && entry.business_name && (
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{entry.business_name}</div>
@@ -900,6 +986,21 @@ export default function ProspectQueueClient() {
                             >
                               {entry.account_family ? `family: ${entry.account_family}` : '+ account family'}
                             </button>
+                          )}
+                          {/* Proving-ground membership — the PG this prospect
+                              belongs to (direct stamp or via its source
+                              campaign's tree). Links to the cockpit. */}
+                          {entry.proving_ground && (
+                            <div className="mt-1">
+                              <Link
+                                href={`/settings/admin/marketing-ops/proving-grounds/${entry.proving_ground.id}`}
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/50"
+                                title={`Proving ground: ${entry.proving_ground.title ?? [entry.proving_ground.category, entry.proving_ground.city].filter(Boolean).join(' · ') ?? entry.proving_ground.id}`}
+                              >
+                                <FlaskConical className="w-2.5 h-2.5" />
+                                {entry.proving_ground.title ?? [entry.proving_ground.category, entry.proving_ground.city].filter(Boolean).join(' · ') ?? 'Proving ground'}
+                              </Link>
+                            </div>
                           )}
                         </td>
 
@@ -1364,10 +1465,12 @@ export default function ProspectQueueClient() {
           </div>
         )}
 
-        {/* Board view */}
+        {/* Board view — same filtered dataset; the status tab focuses the
+            matching lane ('all' shows every lane). */}
         {viewMode === 'board' && !loading && (
           <ProspectQueueBoard
             entries={entries}
+            statusFocus={statusTab}
             onRefresh={fetchQueue}
             onError={(msg) => setError(msg || null)}
           />

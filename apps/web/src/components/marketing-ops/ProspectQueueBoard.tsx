@@ -4,12 +4,13 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Plus, Loader2, Flame, Flag, Inbox, X, ChevronDown, ChevronRight,
-  UserPlus, UserX, Calendar, AlertTriangle, Phone,
+  UserPlus, UserX, Calendar, AlertTriangle, Phone, FlaskConical,
 } from 'lucide-react';
 import marketingOpsService, {
-  ProspectQueueEntry, ProspectPriority, ProspectDismissReason, verificationClearsCampaign,
+  ProspectQueueEntry, ProspectStatus, ProspectPriority, ProspectDismissReason, verificationClearsCampaign,
 } from '@/services/MarketingOpsService';
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
+import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
 import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
@@ -58,15 +59,39 @@ function relativeTime(iso: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/** next_touch_at → "due now" / "in Nd" label (proving-ground worklist). */
+function dueLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (diffMs <= 0) return 'due now';
+  const d = Math.floor(diffMs / 86400000);
+  if (d === 0) return 'today';
+  return `in ${d}d`;
+}
+
+const CHANNEL_CHIP: Record<string, string> = {
+  call: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  email: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
+  sms: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  mail: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  form: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  referral: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+};
+
 // ─── Component ───────────────────────────────────────────────────────────
 
 interface ProspectQueueBoardProps {
   entries: ProspectQueueEntry[];
+  // Shared status-tab focus — the board renders the same filtered dataset
+  // as the list: 'all' shows every lane, a specific status shows just its
+  // lane (created → the campaign-stage lanes).
+  statusFocus: 'all' | ProspectStatus;
   onRefresh: () => Promise<void>;
   onError: (msg: string) => void;
 }
 
-export default function ProspectQueueBoard({ entries, onRefresh, onError }: ProspectQueueBoardProps) {
+export default function ProspectQueueBoard({ entries, statusFocus, onRefresh, onError }: ProspectQueueBoardProps) {
   const [pipelineMode, setPipelineMode] = useState<PipelineMode>('review');
   const [showClosed, setShowClosed] = useState(false);
   const [creatingId, setCreatingId] = useState<string | null>(null);
@@ -79,6 +104,8 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   const [checklistError, setChecklistError] = useState<{ campaignId: string; steps: { id: string; title: string; stage_tag?: string | null }[] } | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [resolveEntry, setResolveEntry] = useState<ProspectQueueEntry | null>(null);
+  // Proving-ground worklist lanes (in_thread / hold) — log-outcome modal.
+  const [logModalEntry, setLogModalEntry] = useState<ProspectQueueEntry | null>(null);
 
   const staffUsers = useStaffUsers();
   const currentUserId = staffUsers[0]?.id ?? null;
@@ -91,7 +118,8 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   // Split entries: intake (unvetted public-sourced staging) leads, queued
   // entries go in the Queued column; campaign_created entries go in the stage
   // column matching their campaign_stage (filtered by the current pipeline
-  // mode). Dismissed entries are excluded from the board.
+  // mode). in_thread/hold ride the PG cadence lanes; dismissed renders only
+  // when its lane is focused (excluded from the 'all' overview).
   const intakeEntries = useMemo(
     () => entries.filter((e) => e.status === 'intake'),
     [entries],
@@ -104,6 +132,35 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
 
   const verifyEntries = useMemo(
     () => entries.filter((e) => e.status === 'verify_then_outreach'),
+    [entries],
+  );
+
+  // Proving-ground cadence lanes — in_thread (live conversation) and hold
+  // (parked until next_touch_at) ride the same dataset as the list tabs.
+  // Seeded worklist rows lead by next_touch_at, matching the list's order.
+  const worklistSort = (list: ProspectQueueEntry[]) => {
+    const seeded = list.filter((e) => e.seed_id);
+    const unseeded = list.filter((e) => !e.seed_id);
+    seeded.sort((a, b) => {
+      const ta = a.next_touch_at ? new Date(a.next_touch_at).getTime() : 0;
+      const tb = b.next_touch_at ? new Date(b.next_touch_at).getTime() : 0;
+      return ta - tb;
+    });
+    return [...seeded, ...unseeded];
+  };
+
+  const inThreadEntries = useMemo(
+    () => worklistSort(entries.filter((e) => e.status === 'in_thread')),
+    [entries],
+  );
+
+  const holdEntries = useMemo(
+    () => worklistSort(entries.filter((e) => e.status === 'hold')),
+    [entries],
+  );
+
+  const dismissedEntries = useMemo(
+    () => entries.filter((e) => e.status === 'dismissed'),
     [entries],
   );
 
@@ -161,7 +218,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   };
 
   const handleTogglePriority = async (entry: ProspectQueueEntry) => {
-    if (entry.status !== 'queued') return;
+    if (entry.status !== 'intake' && entry.status !== 'queued' && entry.status !== 'verify_then_outreach') return;
     setTogglingPriorityId(entry.id);
     try {
       const newPriority: ProspectPriority = entry.priority === 'high' ? 'normal' : 'high';
@@ -175,7 +232,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   };
 
   const handleAssignToMe = async (entry: ProspectQueueEntry) => {
-    if (!currentUserId || entry.status !== 'queued') return;
+    if (!currentUserId || (entry.status !== 'intake' && entry.status !== 'queued' && entry.status !== 'verify_then_outreach')) return;
     setAssigningId(entry.id);
     try {
       await marketingOpsService.updateProspectQueue(entry.id, { assigned_to: currentUserId });
@@ -188,7 +245,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
   };
 
   const handleUnassign = async (entry: ProspectQueueEntry) => {
-    if (entry.status !== 'queued') return;
+    if (entry.status !== 'intake' && entry.status !== 'queued' && entry.status !== 'verify_then_outreach') return;
     setAssigningId(entry.id);
     try {
       await marketingOpsService.updateProspectQueue(entry.id, { assigned_to: null });
@@ -260,11 +317,35 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
 
   // ─── Render ────────────────────────────────────────────────────────────
 
-  const allColumns = ['__intake__', '__queued__', '__verify__', ...stageColumns, ...(showClosed ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed') : [])];
+  // Column set follows the shared status tab: 'all' shows the funnel —
+  // pre-campaign lanes, then the PG cadence lanes (in_thread / hold), then
+  // the campaign-stage lanes. A focused tab shows only its lane ('created'
+  // = the stage lanes; 'dismissed' = the dismissed lane).
+  const closedCols = showClosed
+    ? CLOSED_STAGES.filter((s) => transitions[s] !== undefined || s === 'closed')
+    : [];
+  const allColumns =
+    statusFocus === 'all'
+      ? ['__intake__', '__queued__', '__verify__', '__in_thread__', '__hold__', ...stageColumns, ...closedCols]
+      : statusFocus === 'campaign_created'
+        ? [...stageColumns, ...closedCols]
+        : statusFocus === 'intake'
+          ? ['__intake__']
+          : statusFocus === 'queued'
+            ? ['__queued__']
+            : statusFocus === 'verify_then_outreach'
+              ? ['__verify__']
+              : statusFocus === 'in_thread'
+                ? ['__in_thread__']
+                : statusFocus === 'hold'
+                  ? ['__hold__']
+                  : ['__dismissed__'];
 
   return (
     <div>
-      {/* Pipeline toggle + Show closed */}
+      {/* Pipeline toggle + Show closed — only relevant while the
+          campaign-stage lanes are on screen. */}
+      {(statusFocus === 'all' || statusFocus === 'campaign_created') && (
       <div className="mb-4 flex items-center gap-2 flex-wrap">
         <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
           <button
@@ -285,6 +366,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
           Show closed
         </label>
       </div>
+      )}
 
       {/* Board columns */}
       <div className="overflow-x-auto pb-4">
@@ -293,20 +375,35 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
             const isIntake = colKey === '__intake__';
             const isQueued = colKey === '__queued__';
             const isVerify = colKey === '__verify__';
+            const isInThread = colKey === '__in_thread__';
+            const isHold = colKey === '__hold__';
+            const isDismissedLane = colKey === '__dismissed__';
             const colEntries = isIntake
               ? intakeEntries
               : isQueued
                 ? queuedEntries
                 : isVerify
                   ? verifyEntries
-                  : (campaignEntriesByStage[colKey] ?? []);
+                  : isInThread
+                    ? inThreadEntries
+                    : isHold
+                      ? holdEntries
+                      : isDismissedLane
+                        ? dismissedEntries
+                        : (campaignEntriesByStage[colKey] ?? []);
             const colLabel = isIntake
               ? 'Intake'
               : isQueued
                 ? 'Queued'
                 : isVerify
                   ? 'Verify'
-                  : (STAGE_LABELS[colKey] ?? colKey);
+                  : isInThread
+                    ? 'In Thread'
+                    : isHold
+                      ? 'Hold'
+                      : isDismissedLane
+                        ? 'Dismissed'
+                        : (STAGE_LABELS[colKey] ?? colKey);
             const isClosedCol = CLOSED_STAGES.includes(colKey);
             return (
               <div key={colKey} className="w-72 flex-shrink-0">
@@ -318,13 +415,21 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-400'
                       : isVerify
                         ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400'
-                        : isClosedCol
-                          ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
-                          : 'bg-gray-50 dark:bg-neutral-700/30 border-gray-200 dark:border-neutral-600'
+                        : isInThread
+                          ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400'
+                          : isHold
+                            ? 'bg-slate-50 dark:bg-slate-900/30 border-slate-400'
+                            : isDismissedLane
+                              ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
+                              : isClosedCol
+                                ? 'bg-gray-100 dark:bg-neutral-700/40 border-gray-300 dark:border-neutral-600'
+                                : 'bg-gray-50 dark:bg-neutral-700/30 border-gray-200 dark:border-neutral-600'
                 }`}>
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 inline-flex items-center gap-1">
                     {isIntake && <Inbox className="w-3 h-3 text-sky-600 dark:text-sky-400" />}
                     {isVerify && <Phone className="w-3 h-3 text-amber-600 dark:text-amber-400" />}
+                    {isInThread && <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
+                    {isHold && <Calendar className="w-3 h-3 text-slate-500 dark:text-slate-400" />}
                     {colLabel}
                   </span>
                   <span className="text-xs text-gray-400">{colEntries.length}</span>
@@ -342,6 +447,8 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       isIntake={isIntake}
                       isQueued={isQueued}
                       isVerify={isVerify}
+                      isWorklist={isInThread || isHold}
+                      isDismissedLane={isDismissedLane}
                       staffUsers={staffUsers}
                       currentUserId={currentUserId}
                       creating={creatingId === entry.id}
@@ -352,7 +459,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       menuOpen={openMenuId === entry.id}
                       dismissReasonOpen={dismissReasonOpen === entry.id}
                       verifying={verifyingId === entry.id}
-                      validNextStages={isIntake || isQueued || isVerify ? [] : (transitions[entry.campaign_stage ?? ''] ?? [])}
+                      validNextStages={isIntake || isQueued || isVerify || isInThread || isHold || isDismissedLane ? [] : (transitions[entry.campaign_stage ?? ''] ?? [])}
                       onCreate={() => handleCreateCampaign(entry.id)}
                       onDismiss={(reason) => handleDismiss(entry.id, reason)}
                       onTogglePriority={() => handleTogglePriority(entry)}
@@ -364,6 +471,7 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
                       onRequestVerify={() => handleRequestVerification(entry.id)}
                       onGraduate={(target) => handleGraduate(entry.id, target)}
                       onOpenResolve={() => setResolveEntry(entry)}
+                      onLogTouch={() => setLogModalEntry(entry)}
                     />
                   ))}
                 </div>
@@ -420,6 +528,19 @@ export default function ProspectQueueBoard({ entries, onRefresh, onError }: Pros
           onResolved={onRefresh}
         />
       )}
+
+      {/* Proving-ground worklist lanes: the shared touch logger writes the
+          canonical seed touch and advances the cadence ladder. */}
+      {logModalEntry && (
+        <ProspectTouchLogModal
+          entry={logModalEntry}
+          onClose={() => setLogModalEntry(null)}
+          onLogged={async () => {
+            setLogModalEntry(null);
+            await onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -431,6 +552,9 @@ interface BoardCardProps {
   isIntake?: boolean;
   isQueued: boolean;
   isVerify?: boolean;
+  // Proving-ground cadence lanes (in_thread / hold) — seeded worklist cards.
+  isWorklist?: boolean;
+  isDismissedLane?: boolean;
   staffUsers: ReturnType<typeof useStaffUsers>;
   currentUserId: string | null;
   creating: boolean;
@@ -453,14 +577,15 @@ interface BoardCardProps {
   onRequestVerify: () => void;
   onGraduate: (target: 'queued' | 'verify_then_outreach') => void;
   onOpenResolve: () => void;
+  onLogTouch: () => void;
 }
 
 function BoardCard({
-  entry, isIntake, isQueued, isVerify, staffUsers, currentUserId,
+  entry, isIntake, isQueued, isVerify, isWorklist, isDismissedLane, staffUsers, currentUserId,
   creating, dismissing, togglingPriority, assigning, transitioning,
   menuOpen, dismissReasonOpen, verifying, validNextStages,
   onCreate, onDismiss, onTogglePriority, onAssignToMe, onUnassign, onToggleMenu, onTransition, onOpenDismissReason,
-  onRequestVerify, onGraduate, onOpenResolve,
+  onRequestVerify, onGraduate, onOpenResolve, onLogTouch,
 }: BoardCardProps) {
   const signals = entry.detected_signals ?? [];
   const crisis = hasCrisis(signals);
@@ -486,7 +611,7 @@ function BoardCard({
     }`}>
       {/* Header: name + hot/priority indicators */}
       <div className="flex items-center justify-between gap-1.5 mb-1.5">
-        {isQueued || isVerify || isIntake ? (
+        {isQueued || isVerify || isIntake || isWorklist || isDismissedLane ? (
           <span className="font-medium text-sm text-gray-900 dark:text-white truncate inline-flex items-center gap-1">
             {isVerify && <Phone className="w-3 h-3 text-amber-500 flex-shrink-0" />}
             {entry.title || entry.business_name || `${entry.category ?? ''} · ${entry.city ?? ''}`.trim().replace(/^·|·$/g, '').trim() || 'Untitled prospect'}
@@ -543,6 +668,20 @@ function BoardCard({
         )}
       </div>
 
+      {/* Proving-ground membership — links to the cockpit. */}
+      {entry.proving_ground && (
+        <div className="mb-1.5">
+          <Link
+            href={`/settings/admin/marketing-ops/proving-grounds/${entry.proving_ground.id}`}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/50"
+            title={`Proving ground: ${entry.proving_ground.title ?? [entry.proving_ground.category, entry.proving_ground.city].filter(Boolean).join(' · ') ?? entry.proving_ground.id}`}
+          >
+            <FlaskConical className="w-2.5 h-2.5" />
+            {entry.proving_ground.title ?? [entry.proving_ground.category, entry.proving_ground.city].filter(Boolean).join(' · ') ?? 'Proving ground'}
+          </Link>
+        </div>
+      )}
+
       {entry.verification && (
         <div className="mb-1.5">
           <VerificationBadge verification={entry.verification} />
@@ -550,7 +689,7 @@ function BoardCard({
       )}
 
       {/* Stage badge for campaign cards */}
-      {!isQueued && !isVerify && !isIntake && entry.campaign_stage && (
+      {!isQueued && !isVerify && !isIntake && !isWorklist && !isDismissedLane && entry.campaign_stage && (
         <div className="mb-1.5">
           <StageBadge stage={entry.campaign_stage} size="sm" />
           {stageDays != null && (
@@ -630,6 +769,47 @@ function BoardCard({
         <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate mb-2" title={entry.note}>
           {entry.note}
         </p>
+      )}
+
+      {/* PG cadence lanes — channel ladder (current rung highlighted) and
+          the next-touch due label, mirroring the list's worklist rows. */}
+      {isWorklist && entry.seed_id && entry.channel_sequence && entry.channel_sequence.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 mb-1.5" title="Channel ladder — current rung highlighted">
+          {entry.channel_sequence.map((rung, i) => (
+            <span
+              key={i}
+              className={`inline-block rounded px-1 py-0.5 text-[9px] font-medium ${
+                rung.status === 'dead'
+                  ? 'bg-gray-100 text-gray-400 line-through dark:bg-neutral-700 dark:text-gray-500'
+                  : i === (entry.current_channel_index ?? 0)
+                    ? (CHANNEL_CHIP[rung.channel] ?? CHANNEL_CHIP.other) + ' ring-1 ring-current'
+                    : 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-gray-400'
+              }`}
+              title={`${rung.channel}${rung.contact ? ` · ${rung.contact}` : ''}${rung.status === 'dead' ? ' (dead)' : ''}`}
+            >
+              {rung.channel}
+            </span>
+          ))}
+        </div>
+      )}
+      {isWorklist && entry.next_touch_at && (() => {
+        const label = dueLabel(entry.next_touch_at);
+        const due = new Date(entry.next_touch_at).getTime() <= Date.now();
+        return (
+          <div className={`text-[10px] mb-1.5 ${due ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-gray-400'}`}>
+            {due ? '● due now' : `next: ${label}`}
+          </div>
+        );
+      })()}
+      {isWorklist && entry.account_family && (
+        <div className="mb-1.5">
+          <span
+            className="inline-block rounded px-1.5 py-0.5 text-[9px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+            title="Account family — prospects sharing an owner share one operator and one thread"
+          >
+            family: {entry.account_family}
+          </span>
+        </div>
       )}
 
       {/* Actions */}
@@ -757,6 +937,39 @@ function BoardCard({
               Dismiss
             </button>
           )}
+        </div>
+      ) : isWorklist ? (
+        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-neutral-700">
+          {/* Seeded worklist rows log an outcome — the cadence advances the
+              ladder and schedules the next touch. Hold rows unlock when the
+              hold date passes (same gate as the list view). */}
+          {entry.seed_id && (
+            entry.status === 'in_thread' ||
+            (entry.status === 'hold' && entry.next_touch_at && new Date(entry.next_touch_at) <= new Date())
+          ) && (
+            <button
+              onClick={onLogTouch}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-700 rounded hover:bg-teal-100 dark:hover:bg-teal-900/50"
+              title="Log an outreach outcome — the cadence advances the ladder and schedules the next touch"
+            >
+              <Phone className="w-2.5 h-2.5" />
+              Log
+            </button>
+          )}
+          {entry.processed_campaign_id && (
+            <Link
+              href={`/settings/admin/marketing-ops/campaigns/${entry.processed_campaign_id}`}
+              className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline ml-auto"
+            >
+              View campaign →
+            </Link>
+          )}
+        </div>
+      ) : isDismissedLane ? (
+        <div className="pt-1 border-t border-gray-100 dark:border-neutral-700">
+          <span className="text-[10px] text-gray-400">
+            {entry.dismissed_reason ? entry.dismissed_reason.replace(/_/g, ' ') : 'dismissed'}
+          </span>
         </div>
       ) : (
         <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-neutral-700">

@@ -5679,7 +5679,14 @@ router.get('/prospect-queue', async (req: any, res: Response) => {
       source_kind: req.query.source_kind as any,
       source_campaign_ids: sourceCampaignIds,
       // Migration 282 — direct PG membership for queue-list-initiated PGs.
+      // Tree-aware server-side: the PG's children fold into the source
+      // clause, so a bare id scopes to the whole tree.
       proving_ground_id: req.query.proving_ground_id as string | undefined,
+      // Queue-page PG lens: 'any' = affiliated with any PG tree,
+      // 'none' = ungrouped (group-into-PG candidates).
+      pg_membership: req.query.pg_membership === 'any' || req.query.pg_membership === 'none'
+        ? req.query.pg_membership
+        : undefined,
       assigned_to: resolvedAssignedTo,
       include_unassigned: isMeFilter,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
