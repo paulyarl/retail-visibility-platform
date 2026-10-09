@@ -385,6 +385,10 @@ export default function CampaignDetailClient({
   const [reviewIntakeBusy, setReviewIntakeBusy] = useState(false);
   const [modalNotice, setModalNotice] = useState<string | null>(null);
 
+  // Step numbering in the Generate modal is lane-aware: the external lane
+  // spends two steps on source material (render → import), the AI lane one.
+  const smStepCount = sourceMaterialMode === 'external' ? 2 : 1;
+
   const fetchCampaign = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -2797,26 +2801,29 @@ export default function CampaignDetailClient({
                 </div>
 
                 {sourceMaterialMode === 'ai' && (
-                  <div className="mt-2 flex justify-end">
-                    <button
-                      onClick={async () => {
-                        setSourceMaterialBusy(true);
-                        setModalNotice(null);
-                        try {
-                          const r = await marketingOpsService.generateDeliverableSourceMaterial(campaignId);
-                          setSourceMaterialReady(Boolean(r?.sourceMaterial));
-                          if (!r?.sourceMaterial) setModalNotice('Source material ran but returned no content.');
-                        } catch (err: any) {
-                          setModalNotice(err.message || 'Failed to generate source material');
-                        } finally {
-                          setSourceMaterialBusy(false);
-                        }
-                      }}
-                      disabled={sourceMaterialBusy}
-                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      {sourceMaterialBusy ? 'Generating…' : 'Generate Source Material'}
-                    </button>
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Step 1 — Generate source material</p>
+                      <button
+                        onClick={async () => {
+                          setSourceMaterialBusy(true);
+                          setModalNotice(null);
+                          try {
+                            const r = await marketingOpsService.generateDeliverableSourceMaterial(campaignId);
+                            setSourceMaterialReady(Boolean(r?.sourceMaterial));
+                            if (!r?.sourceMaterial) setModalNotice('Source material ran but returned no content.');
+                          } catch (err: any) {
+                            setModalNotice(err.message || 'Failed to generate source material');
+                          } finally {
+                            setSourceMaterialBusy(false);
+                          }
+                        }}
+                        disabled={sourceMaterialBusy}
+                        className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        {sourceMaterialBusy ? 'Generating…' : 'Generate Source Material'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2936,7 +2943,7 @@ export default function CampaignDetailClient({
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deliverable Type</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{`Step ${smStepCount + 1} — Deliverable type`}</label>
                 <select
                   value={genForm.deliverableType}
                   onChange={(e) => setGenForm({ ...genForm, deliverableType: e.target.value as DeliverableType })}
@@ -3054,7 +3061,7 @@ export default function CampaignDetailClient({
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content (optional — overrides source material)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{`Step ${smStepCount + 2} — Content (optional — overrides source material)`}</label>
                 <textarea
                   rows={4}
                   value={genForm.content}
@@ -3079,6 +3086,7 @@ export default function CampaignDetailClient({
             </div>
 
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <p className="mr-auto text-xs font-medium text-gray-600 dark:text-gray-300">{`Step ${smStepCount + 3} — Generate the PDF`}</p>
               <button
                 onClick={() => setShowGenerateModal(false)}
                 className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
