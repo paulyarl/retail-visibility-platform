@@ -501,6 +501,22 @@ class DemoTenantService {
     }
 
     const name = seed.business_name || 'Sample Storefront';
+
+    // The listing's live description can still carry the market sweep's
+    // generic placeholder when a richer audit narrative exists — prefer the
+    // deterministic composed packet (the same source as the admin
+    // "Composed enrichment" card), falling back to the sourced listing text.
+    const { default: directoryPresenceSeedService } = await import('./DirectoryPresenceSeedService');
+    const composedPacket = await directoryPresenceSeedService
+      .getComposedEnrichment(seedId)
+      .then((c: any) => c?.packet ?? null)
+      .catch(() => null);
+    const businessDescription = composedPacket?.description || seed.description || null;
+    const seoTags =
+      Array.isArray(composedPacket?.keywords) && composedPacket.keywords.length > 0
+        ? composedPacket.keywords
+        : undefined;
+
     const scenario = options.scenario || mapSeedCategoryToScenario(seed.category);
     const productCount = options.productCount ?? SEED_PREVIEW_DEFAULT_PRODUCT_COUNT;
     const expiresAt = options.expiresAt || new Date(Date.now() + SEED_PREVIEW_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
@@ -563,7 +579,8 @@ class DemoTenantService {
           email: seed.email || null,
           website: seed.website || null,
           logo_url: seed.logo_url || null,
-          business_description: seed.description || null,
+          business_description: businessDescription,
+          seo_tags: seoTags,
           hours: seed.business_hours ?? undefined,
           latitude: seed.latitude ?? null,
           longitude: seed.longitude ?? null,
