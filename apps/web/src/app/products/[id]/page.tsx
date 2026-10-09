@@ -281,7 +281,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         title: product.title,
         description: `${ogVerb} ${product.title} from ${businessName}`,
         images: product.images?.map(img => img.url) || [],
-        type: 'product' as any,
       },
       twitter: {
         card: 'summary_large_image',
@@ -343,7 +342,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title: product.title,
       description: enhancedDescription,
       images: product.images?.map(img => img.url) || [],
-      type: 'product' as any,
     },
     twitter: {
       card: 'summary_large_image',
