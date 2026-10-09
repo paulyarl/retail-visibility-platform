@@ -36,8 +36,9 @@ export const SCOPE_VARIABLES: Record<string, string[]> = {
   business: [
     'business_name', 'category', 'city', 'state', 'neighborhood', 'contact_method',
     'contact_info', 'unaddressed_reviews', 'last_review_date', 'gbp_claimed',
-    'has_website', 'nap_consistent', 'pain_score', 'estimated_tier', 'notes',
-    'tone', 'attributes', 'business_origin', 'business_address', 'business_phone',
+    'has_website', 'website_url', 'nap_consistent', 'pain_score', 'estimated_tier',
+    'notes', 'tone', 'attributes', 'business_origin', 'business_address',
+    'business_phone',
   ],
   category: ['category', 'city', 'state', 'neighborhood', 'tone', 'attributes', 'business_origin'],
   city: ['city', 'state', 'neighborhood'],

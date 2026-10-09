@@ -69,6 +69,7 @@ describe('renderTemplate — scope-aware variable injection', () => {
     last_review_date: new Date('2026-06-15'),
     gbp_claimed: true,
     has_website: 'yes',
+    website_url: 'https://acme-hvac.example.com',
     nap_consistent: true,
     pain_score: 7,
     estimated_tier: 'tier_1',
@@ -162,5 +163,18 @@ describe('renderTemplate — scope-aware variable injection', () => {
     const body = 'Address: {{business_address}} | Phone: {{business_phone}}';
     const rendered = service.renderTemplate(body, undefined, campaignWithAddress);
     expect(rendered).toBe('Address: 123 Main St, Plainfield, IL, 60544 | Phone: 555-987-6543');
+  });
+
+  it('injects website_url for business scope without caller-supplied variables', () => {
+    const body = 'Site: {{website_url}}';
+    const rendered = service.renderTemplate(body, undefined, businessCampaign);
+    expect(rendered).toBe('Site: https://acme-hvac.example.com');
+  });
+
+  it('rejects out-of-scope website_url reference for category scope', () => {
+    const body = 'Site: {{website_url}}';
+    expect(() => service.renderTemplate(body, undefined, categoryCampaign)).toThrow(
+      /out-of-scope variables for scope "category"/,
+    );
   });
 });

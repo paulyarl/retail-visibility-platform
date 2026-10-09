@@ -4031,6 +4031,7 @@ PAYLOAD 2 — bronze_standard_scan
       last_review_date: campaign.last_review_date ? new Date(campaign.last_review_date).toLocaleDateString() : '',
       gbp_claimed: campaign.gbp_claimed ? 'Yes' : 'No',
       has_website: campaign.has_website ? 'Yes' : 'No',
+      website_url: campaign.website_url || '',
       nap_consistent: campaign.nap_consistent ? 'Yes' : 'No',
       pain_score: String(campaign.pain_score ?? ''),
       estimated_tier: campaign.estimated_tier || '',
