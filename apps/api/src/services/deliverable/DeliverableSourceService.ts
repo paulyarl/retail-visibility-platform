@@ -309,25 +309,32 @@ export class DeliverableSourceService extends BaseService {
     const businessAttributes = this.formatBusinessAttributes(campaign);
     const discoveryAttribution = MarketingExecutionService.getInstance()
       .renderProspectOriginBlock(campaign);
-    // The hash covers the attribution context too — an operator-edited origin
-    // or a re-attributed discovery_context changes the rendered prompt, so a
-    // cached execution from before the edit must not be reused.
+    const businessAddress = this.formatBusinessAddress(campaign);
+    const websiteUrl = campaign.website_url ?? '';
+    const businessPhone = campaign.phone ?? '';
+    // The hash covers the prompt-shaping context too — an operator-edited
+    // origin, re-attributed discovery_context, or a changed website/address
+    // renders a different prompt, so a cached execution from before the edit
+    // must not be reused.
     const snapshotHash = this.hashSnapshot(
       latestAudit?.id ?? null,
       eligibility.signals,
-      businessAttributes + '::' + discoveryAttribution,
+      [businessAttributes, discoveryAttribution, businessAddress, websiteUrl, businessPhone].join('::'),
     );
 
     const variables = {
       business_name: campaign.business_name ?? '',
       category: campaign.category ?? '',
       city: campaign.city ?? '',
+      website_url: websiteUrl,
+      business_address: businessAddress,
+      business_phone: businessPhone,
       detected_signals: this.formatSignals(eligibility.signals),
       audit_results: this.serializeAuditResults(auditData),
       business_attributes: businessAttributes,
       discovery_attribution: discoveryAttribution,
-      prior_outreach: priorOutreach,
-      review_intake: intake ? JSON.stringify(intake) : '',
+      prior_outreach: priorOutreach || '(none sent yet)',
+      review_intake: intake ? JSON.stringify(intake) : '(empty)',
       evidence_snapshot_hash: snapshotHash,
     };
 
@@ -736,6 +743,18 @@ export class DeliverableSourceService extends BaseService {
     const secondary = Array.isArray(campaign?.secondary_categories) ? campaign.secondary_categories.filter((c: any) => typeof c === 'string' && c.trim()) : [];
     if (secondary.length > 0) lines.push(`Secondary categories: ${secondary.join(', ')}`);
     return lines.length > 0 ? lines.join('\n') : '(none recorded)';
+  }
+
+  /** Street address assembled for prompt display; '' when unrecorded. */
+  private formatBusinessAddress(campaign: any): string {
+    const parts = [
+      campaign?.address_line1,
+      campaign?.address_line2,
+      campaign?.address_city,
+      campaign?.address_state,
+      campaign?.address_zip,
+    ].filter((v: any) => typeof v === 'string' && v.trim());
+    return parts.join(', ');
   }
 
   /**

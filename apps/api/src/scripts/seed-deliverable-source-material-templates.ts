@@ -31,7 +31,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V7 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V8 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -78,13 +78,16 @@ ${DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE}`;
 
 const SOURCE_MATERIAL_BODY = `${SEED_VERSION_MARKER}
 You are assembling the source material for a small business's marketing deliverables.
-You are given the business audit and the canonical signal set extracted from it.
-Your job is to produce the raw material each deliverable type needs — NOT the finished
-deliverable copy.
+You are given the business audit (when present) and the canonical signal set
+extracted from it. Your job is to produce the raw material each deliverable type
+needs — NOT the finished deliverable copy.
 
 Business: {{business_name}}
 City: {{city}}
 Category: {{category}}
+Website: {{website_url}}
+Address: {{business_address}}
+Phone: {{business_phone}}
 
 Signals detected (canonical set):
 {{detected_signals}}
@@ -121,8 +124,9 @@ Signal -> deliverable type:
 - website_build_package      <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
 
 RULES
-- Ground every field in the supplied audit results or parsed review intake. Do not
-  invent services, reviews, testimonials, NAP values, or product categories.
+- Ground every field in the supplied audit results, parsed review intake, or the
+  supplied category benchmark. Do not invent services, reviews, testimonials,
+  NAP values, or product categories.
 - Absence is not a negative. If a field is unavailable, mark it null — do not fabricate.
 - For review_responses, copy the unanswered reviews from the parsed review intake
   verbatim. Include ONLY unanswered reviews.
@@ -390,7 +394,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     promptType: 'seek',
     category: 'Deliverables',
     body: SOURCE_MATERIAL_BODY,
-    variables: ['business_name', 'city', 'category', 'detected_signals', 'audit_results', 'business_attributes', 'discovery_attribution', 'prior_outreach', 'review_intake'],
+    variables: ['business_name', 'city', 'category', 'website_url', 'business_address', 'business_phone', 'detected_signals', 'audit_results', 'business_attributes', 'discovery_attribution', 'prior_outreach', 'review_intake'],
     outputSchema: { name: DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME },
     isDefault: false,
   },

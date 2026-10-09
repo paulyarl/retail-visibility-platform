@@ -71,6 +71,18 @@ export { ScopeMismatchError, assertScopeCompatible };
 export const NATIONAL_ESTABLISHMENT_TEMPLATE_ID = 'mpt-seed-intel-profile-establishment-national-001';
 export const NATIONAL_LOCATION_ENRICHMENT_TEMPLATE_ID = 'mpt-location-enrichment-national';
 
+/**
+ * Deliverable-lane seek templates (DeliverableSourceService). The source-
+ * material analyst is a POST-audit assembler, not a researcher — it gets a
+ * dedicated `deliverable_source` amplification role (gold standard as TARGET
+ * + signal weights, no CI research block / INT signals / market context).
+ * The review-intake template is a verbatim parser — no amplification at all.
+ * Declared here rather than imported from DeliverableSourceService to keep
+ * the dependency edge one-directional (that service already imports this one).
+ */
+const SOURCE_MATERIAL_TEMPLATE_ID = 'mpt-deliverable-source-material';
+const REVIEW_INTAKE_TEMPLATE_ID = 'mpt-review-intake';
+
 export interface BatchExecutionInput {
   campaignIds: string[];
   templateId: string;
@@ -1748,13 +1760,17 @@ export class MarketingExecutionService extends BaseService {
     const isBusinessScope = campaignScope === 'business';
     const isFulfill = promptType === 'fulfill';
 
-    const promptRole: 'category_audit' | 'signal_triage' | 'fulfill_target' | 'none' =
+    const promptRole: 'category_audit' | 'signal_triage' | 'fulfill_target' | 'deliverable_source' | 'none' =
       !isBusinessScope
         ? 'none'
         : isFulfill
         ? 'fulfill_target'
         : !isSeek
         ? 'none'
+        : input.template.id === REVIEW_INTAKE_TEMPLATE_ID
+        ? 'none'
+        : input.template.id === SOURCE_MATERIAL_TEMPLATE_ID
+        ? 'deliverable_source'
         : isProfileRepair
         ? 'signal_triage'
         : 'category_audit';
@@ -2181,6 +2197,65 @@ export class MarketingExecutionService extends BaseService {
         resolution: {
           profile_id: goldStandard.id,
           profile_version: goldStandard.version,
+          intelligence_mode: 'profile',
+        },
+      };
+    }
+
+    // ─── Deliverable source-material analyst — dedicated lane ──────────────
+    // This seek is a POST-audit assembler, not a researcher: the business
+    // audit it would corroborate already ran upstream. It gets the gold
+    // standard as a TARGET (the bar the deliverables fix toward — the only
+    // category expectation source when no audit exists) plus the platform
+    // signal-weight ordering, but NOT the category-intelligence research
+    // block, INT discovery signals, or market context — those belong to the
+    // upstream audit, and INT codes must never leak into signals_consumed.
+    if (promptRole === 'deliverable_source') {
+      const profileService = IntelligenceProfileService.getInstance();
+      const campaignPlatform = (input.campaign as any).intelligence_platform || null;
+      const campaignCity = input.campaign.city || null;
+      const campaignState = (input.campaign as any).state || null;
+      const goldStandard = await profileService.resolveGoldStandard(category, campaignPlatform, campaignCity, campaignState, ctx);
+      const goldStandardBlock = goldStandard
+        ? profileService.serializeGoldStandard(goldStandard, 'target')
+        : '';
+
+      if (resolvedSignalWeights === undefined) {
+        try {
+          resolvedSignalWeights = await profileService.resolveSignalWeightsForCampaign(
+            input.campaign,
+            seekAuditData,
+            ctx,
+          );
+        } catch {
+          // Weight resolution is best-effort — the block is omitted.
+        }
+      }
+      const signalWeightBlock = profileService.serializeSignalWeightContext(
+        resolvedSignalWeights,
+        seekAuditData,
+      );
+
+      if (!goldStandardBlock && !signalWeightBlock) {
+        return {
+          renderedPrompt: this.appendPromptSuffix(baseRendered, promptSuffix),
+          resolution: { profile_id: null, profile_version: null, intelligence_mode: 'none' },
+        };
+      }
+      const amplified = baseRendered
+        + (goldStandardBlock ? '\n' + goldStandardBlock : '')
+        + (signalWeightBlock ? '\n' + signalWeightBlock : '');
+      logger.info('Gold standard target + signal weights injected into deliverable source prompt', ctx, {
+        campaignId: input.campaign.id,
+        category,
+        goldStandardProfileId: goldStandard?.id,
+        goldStandardProfileVersion: goldStandard?.version,
+      });
+      return {
+        renderedPrompt: this.appendPromptSuffix(amplified, promptSuffix),
+        resolution: {
+          profile_id: goldStandard?.id ?? null,
+          profile_version: goldStandard?.version ?? null,
           intelligence_mode: 'profile',
         },
       };
