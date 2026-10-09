@@ -2936,22 +2936,6 @@ export default function CampaignDetailClient({
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Template (optional)</label>
-                <select
-                  value={genForm.templateId}
-                  onChange={(e) => setGenForm({ ...genForm, templateId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">No template (use default layout)</option>
-                  {deliverableTemplates
-                    .filter((t) => t.deliverable_type === genForm.deliverableType)
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (default)' : ''}</option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deliverable Type</label>
                 <select
                   value={genForm.deliverableType}
@@ -3018,6 +3002,22 @@ export default function CampaignDetailClient({
                     so owner-voice calibration is applied.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Template (optional)</label>
+                <select
+                  value={genForm.templateId}
+                  onChange={(e) => setGenForm({ ...genForm, templateId: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">No template (use default layout)</option>
+                  {deliverableTemplates
+                    .filter((t) => t.deliverable_type === genForm.deliverableType)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (default)' : ''}</option>
+                    ))}
+                </select>
               </div>
 
               {(genForm.deliverableType === 'review_responses' || genForm.deliverableType === 'testimonial_cards') && (
