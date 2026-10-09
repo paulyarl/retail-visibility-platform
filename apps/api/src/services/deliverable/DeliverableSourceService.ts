@@ -308,7 +308,7 @@ export class DeliverableSourceService extends BaseService {
     const priorOutreach = await this.buildPriorOutreach(campaignId);
     const businessAttributes = this.formatBusinessAttributes(campaign);
     const discoveryAttribution = MarketingExecutionService.getInstance()
-      .renderProspectOriginBlock(campaign);
+      .renderProspectOriginBlock(await this.campaignWithResolvedAttribution(campaign, ctx));
     const businessAddress = this.formatBusinessAddress(campaign);
     const websiteUrl = campaign.website_url ?? '';
     const businessPhone = campaign.phone ?? '';
@@ -507,7 +507,7 @@ export class DeliverableSourceService extends BaseService {
       business_attributes: this.formatBusinessAttributes(campaign),
       public_narrative: auditData?.public_narrative ?? '',
       discovery_attribution: MarketingExecutionService.getInstance()
-        .renderProspectOriginBlock(campaign),
+        .renderProspectOriginBlock(await this.campaignWithResolvedAttribution(campaign, ctx)),
       ...linkVars,
     };
 
@@ -547,6 +547,24 @@ export class DeliverableSourceService extends BaseService {
   // ========================================================================
   // HELPERS
   // ========================================================================
+
+  /**
+   * Migration 317 — swap the campaign's promotion-time discovery_context for
+   * the resolved attribution view (own context + sibling contexts +
+   * mkt_discovery_attributions child rows) before rendering the prospect
+   * origin block. Non-fatal: resolver failure returns the raw campaign so
+   * the render degrades to the snapshot.
+   */
+  private async campaignWithResolvedAttribution(campaign: any, ctx?: RequestCtx): Promise<any> {
+    try {
+      const { ProspectAttributionService } = await import('../ProspectAttributionService.js');
+      const resolved = await ProspectAttributionService.getInstance().resolveForCampaign(campaign, ctx);
+      return resolved ? { ...campaign, discovery_context: resolved } : campaign;
+    } catch {
+      return campaign;
+    }
+  }
+
 
   /**
    * Deterministic post-normalization (G-10): null out any block whose governing

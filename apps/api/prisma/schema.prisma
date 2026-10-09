@@ -8178,6 +8178,34 @@ model mkt_prospect_report_links {
   @@index([business_prospect_id], map: "idx_prl_prospect")
 }
 
+model mkt_discovery_attributions {
+  id                     String    @id @db.VarChar(60)
+  business_prospect_id   String?   @db.VarChar(255)
+  campaign_id            String?   @db.VarChar(255)
+  queue_entry_id         String?   @db.VarChar(255)
+  source_campaign_id     String?   @db.VarChar(255)
+  source_audit_id        String?   @db.VarChar(255)
+  source_execution_id    String?   @db.VarChar(255)
+  focus                  String?   @db.VarChar(30)
+  source_category        String?   @db.VarChar(255)
+  business_seek_priority String?   @db.VarChar(20)
+  category_fit           String?   @db.VarChar(20)
+  identity_confidence    String?   @db.VarChar(20)
+  location_status        String?   @db.VarChar(50)
+  discovery_signals      Json?
+  discovery_provenance   Json?
+  bronze_attribution     Json?
+  competitive_weaknesses Json?
+  discovered_at          DateTime? @db.Timestamptz(6)
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([business_prospect_id], map: "idx_dattr_prospect")
+  @@index([campaign_id], map: "idx_dattr_campaign")
+  @@index([queue_entry_id], map: "idx_dattr_queue")
+  @@index([source_campaign_id], map: "idx_dattr_source")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model error_log_dedupe_stats {

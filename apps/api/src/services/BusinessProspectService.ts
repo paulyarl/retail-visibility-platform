@@ -244,6 +244,12 @@ export class BusinessProspectService extends BaseService {
         notes: notes || null,
         parent_campaign_id: source.parent_campaign_id,
         customer_id: source.customer_id,
+        // Migration 317 — copy the promotion-time discovery snapshot so the
+        // sibling renders prospect-origin attribution immediately. The
+        // canonical store is mkt_discovery_attributions (resolved via the
+        // shared business_prospect_id); this copy is backwards-compat for
+        // consumers that still read the campaign row directly.
+        discovery_context: (source as any).discovery_context ?? null,
         business_prospect_id: prospectId,
         is_primary_sibling: false,
         engagement_cycle: 1,

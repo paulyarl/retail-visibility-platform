@@ -2073,6 +2073,13 @@ export class MarketingCampaignService extends BaseService {
     // Migration 296 — opening hours captured on the verification call, carried
     // onto the derived campaign so "Add to place listing" can seed them.
     businessHours?: Record<string, any>;
+    // Migration 317 — attribution lineage: the queue entry / scan audit /
+    // execution that carried this prospect's discovery context. Stamped onto
+    // the mkt_discovery_attributions child row written alongside the context
+    // snapshot.
+    queueEntryId?: string;
+    sourceAuditId?: string;
+    sourceExecutionId?: string;
   }, ctx?: RequestCtx): Promise<any> {
     try {
       const parent = await this.prisma.mkt_campaigns_list.findUnique({
@@ -2219,6 +2226,31 @@ export class MarketingCampaignService extends BaseService {
               }]
             : undefined),
       }, ctx);
+
+      // Migration 317 — canonical attribution row: the discovery context was
+      // just stamped on the campaign as a point-in-time snapshot; persist it
+      // as a mkt_discovery_attributions child too so late-arriving scans,
+      // siblings, and seeds resolve the union instead of a stale snapshot.
+      // Best-effort — a write failure never fails the derive.
+      if (input.discoveryContext) {
+        try {
+          const { ProspectAttributionService } = await import('./ProspectAttributionService.js');
+          await ProspectAttributionService.getInstance().recordAttribution({
+            campaignId: child.id,
+            businessProspectId: child.business_prospect_id ?? null,
+            queueEntryId: input.queueEntryId ?? null,
+            sourceCampaignId: input.parentId,
+            sourceAuditId: input.sourceAuditId ?? null,
+            sourceExecutionId: input.sourceExecutionId ?? null,
+            context: input.discoveryContext,
+          }, ctx);
+        } catch (attrErr) {
+          logger.warn('deriveBusinessCampaign: attribution record failed (non-fatal)', ctx, {
+            campaignId: child.id,
+            error: (attrErr as Error).message,
+          });
+        }
+      }
 
       // Queue linkage (proving-ground promote panel): when the derived
       // business mirrors a prospect queued from the same discovery campaign,

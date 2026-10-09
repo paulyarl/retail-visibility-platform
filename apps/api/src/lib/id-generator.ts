@@ -1807,6 +1807,18 @@ export function generateBusinessProspectId(): string {
 }
 
 /**
+ * Generate discovery attribution ID
+ * Format: dattr-{nanoid} (14 chars)
+ *
+ * mkt_discovery_attributions — one row per (prospect target x source scan)
+ * attribution event.
+ */
+export function generateDiscoveryAttributionId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dattr-${nanoid()}`;
+}
+
+/**
  * Generate marketing audit ID
  * Format: maud-{nanoid} (13 chars)
  */

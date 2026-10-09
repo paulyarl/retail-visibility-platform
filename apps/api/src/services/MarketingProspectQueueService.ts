@@ -1491,6 +1491,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
           // Category corrected on the verification call overrides the
           // parent-inherited category (undefined → inherit as before).
           categoryOverride: (verifiedNap.category as string) ?? undefined,
+          // Migration 317 — attribution lineage for the canonical child row
+          // (mkt_discovery_attributions): which queue entry / scan audit /
+          // execution carried this prospect's context.
+          queueEntryId: entry.id,
+          sourceAuditId: entry.source_audit_id ?? undefined,
+          sourceExecutionId: entry.source_execution_id ?? undefined,
         }, ctx);
         result = { campaign, created: true };
       }
@@ -1556,6 +1562,27 @@ class MarketingProspectQueueServiceClass extends BaseService {
           processed_at: new Date(),
         },
       });
+
+      // Migration 317 — re-key attribution rows that were propagated onto
+      // this queue entry BEFORE promotion (a second scan attributed an
+      // already-queued prospect): they now resolve against the campaign.
+      if (result.campaign?.id) {
+        try {
+          const { ProspectAttributionService } = await import('./ProspectAttributionService.js');
+          await ProspectAttributionService.getInstance().linkAttributionsToCampaign(
+            input.queueEntryId,
+            result.campaign.id,
+            result.campaign.business_prospect_id ?? null,
+            ctx,
+          );
+        } catch (linkErr) {
+          logger.warn('createCampaignFromQueue: attribution link failed (non-fatal)', ctx, {
+            queueEntryId: input.queueEntryId,
+            campaignId: result.campaign.id,
+            error: (linkErr as Error).message,
+          });
+        }
+      }
 
       // PG retrofit (D2 — CAMPAIGN_SEED_STAGE_SPRINT_PLAN): a queue entry
       // carrying seed_id was preflight-seeded by its proving ground — the

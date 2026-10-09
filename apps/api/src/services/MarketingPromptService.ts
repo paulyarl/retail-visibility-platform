@@ -1335,6 +1335,27 @@ export class MarketingPromptService extends BaseService {
             campaignId: input.campaignId,
           });
         }
+        // Migration 317 — late-attribution propagation: candidates carrying
+        // attribution are matched to already-known prospects (queue entries
+        // and derived business campaigns, by name+city) and appended as
+        // mkt_discovery_attributions child rows. Repairs the case where the
+        // prospect was queued/promoted before this scan's attribution
+        // existed (e.g. a competitive scan arriving after the emerging
+        // promotion). Best-effort — a failure never fails the import.
+        try {
+          const { ProspectAttributionService } = await import('./ProspectAttributionService.js');
+          await ProspectAttributionService.getInstance().propagateFromScanAudit({
+            scanCampaignId: input.campaignId,
+            auditId: result.audit?.id ?? null,
+            executionId: result.execution?.id ?? null,
+            parsedJson,
+          }, ctx);
+        } catch (propErr) {
+          logger.error('Discovery attribution propagation failed (best-effort)', ctx, {
+            error: (propErr as Error).message,
+            campaignId: input.campaignId,
+          });
+        }
       }
 
       // Post-import hook for profile_repair_triage schema: persist the
@@ -1803,12 +1824,27 @@ export class MarketingPromptService extends BaseService {
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
       where: { id: campaignId },
       select: {
-        business_name: true, category: true, city: true, state: true,
+        id: true, business_name: true, category: true, city: true, state: true,
         intelligence_platform: true, discovery_context: true,
+        business_prospect_id: true,
         address_line1: true, address_city: true, address_state: true,
       },
     });
-    const attribution = (campaign?.discovery_context as any)?.bronze_attribution;
+    // Migration 317 — resolve attribution from the canonical child rows +
+    // sibling snapshots, not just this campaign's promotion-time context, so
+    // late-arriving attribution qualifies the audit fill too.
+    let attribution: any[] | null = (campaign?.discovery_context as any)?.bronze_attribution ?? null;
+    if (campaign) {
+      try {
+        const { ProspectAttributionService } = await import('./ProspectAttributionService.js');
+        const resolved = await ProspectAttributionService.getInstance().resolveForCampaign(campaign, ctx);
+        if (Array.isArray(resolved?.bronze_attribution) && resolved.bronze_attribution.length > 0) {
+          attribution = resolved.bronze_attribution;
+        }
+      } catch {
+        // Resolver failure → keep the snapshot read.
+      }
+    }
     if (!Array.isArray(attribution) || attribution.length === 0) return;
 
     // §7.3 qualification: the audit must confirm the business is a bronze

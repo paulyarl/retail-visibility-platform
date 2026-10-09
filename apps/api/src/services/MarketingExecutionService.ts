@@ -944,6 +944,27 @@ export class MarketingExecutionService extends BaseService {
     }
     const baseRendered = runPreamble + this.renderTemplate(templateBody, effectiveVariables, input.campaign);
 
+    // Migration 317 — resolve the campaign's attribution view: its own
+    // promotion-time discovery_context merged with sibling contexts and the
+    // canonical mkt_discovery_attributions child rows (late-arriving scans
+    // append there). Feeds renderDiscoveryLeadsBlock /
+    // renderProspectOriginBlock below so a sibling or a late-attributed
+    // prospect still renders its origin block. Falls back to the raw
+    // snapshot on resolver failure — byte-identical legacy render.
+    let campaignForAttribution = input.campaign;
+    if (input.campaign && campaignScope === 'business') {
+      try {
+        const { ProspectAttributionService } = await import('./ProspectAttributionService.js');
+        const resolvedContext = await ProspectAttributionService.getInstance()
+          .resolveForCampaign(input.campaign, ctx);
+        if (resolvedContext) {
+          campaignForAttribution = { ...input.campaign, discovery_context: resolvedContext };
+        }
+      } catch {
+        // Resolver failure → snapshot render preserved.
+      }
+    }
+
     // 2. Check amplification gates
     const isSeek = promptType === 'seek';
     const hasCategory = category.length > 0;
@@ -2308,7 +2329,7 @@ export class MarketingExecutionService extends BaseService {
       // section. Renders a combined DISCOVERY ATTRIBUTION block when the
       // prospect carries both lanes' attribution; weakness claims are labeled
       // scan-claimed (§7 epistemic caveat). '' when no attribution exists.
-      const prospectOriginBlock = this.renderProspectOriginBlock(input.campaign);
+      const prospectOriginBlock = this.renderProspectOriginBlock(campaignForAttribution);
 
       // CI is discovery-focus only (competitive → emerging). Resolving with no
       // focus would return the newest active row regardless of focus — which is
@@ -2445,7 +2466,7 @@ export class MarketingExecutionService extends BaseService {
         if (gsBlock) {
           let gsAmplified = baseRendered + '\n' + gsBlock;
           // Migration 253 — GAP-E3: inject discovery leads block (spec §8.4).
-          const leadsBlock = this.renderDiscoveryLeadsBlock(input.campaign);
+          const leadsBlock = this.renderDiscoveryLeadsBlock(campaignForAttribution);
           if (leadsBlock) {
             gsAmplified = gsAmplified + '\n' + leadsBlock;
           }
@@ -2480,7 +2501,7 @@ export class MarketingExecutionService extends BaseService {
       }
       // No active profile and no gold standard — inject discovery leads block
       // if present (independent of profile amplification), then return.
-      const leadsBlockNoProfile = this.renderDiscoveryLeadsBlock(input.campaign);
+      const leadsBlockNoProfile = this.renderDiscoveryLeadsBlock(campaignForAttribution);
       let noProfileAmplified = leadsBlockNoProfile
         ? baseRendered + '\n' + leadsBlockNoProfile
         : baseRendered;
@@ -2532,7 +2553,7 @@ export class MarketingExecutionService extends BaseService {
 
     // Migration 253 — GAP-E3: inject discovery leads block (spec §8.4).
     // After the gold-standard benchmark injection and before appendPromptSuffix.
-    const leadsBlock = this.renderDiscoveryLeadsBlock(input.campaign);
+    const leadsBlock = this.renderDiscoveryLeadsBlock(campaignForAttribution);
     if (leadsBlock) {
       amplified = amplified + '\n' + leadsBlock;
     }
