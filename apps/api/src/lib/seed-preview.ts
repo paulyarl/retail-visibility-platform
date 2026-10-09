@@ -25,8 +25,19 @@ export const SEED_PREVIEW_SANDBOX_RESPONSE = {
   message: 'Demo checkout. No payment is taken and no order is placed.',
 } as const;
 
+/** MVs that must be refreshed when a seed-preview lifecycle event commits:
+ *  - mv_storefront_discovery feeds the public /shops/[slug] product read.
+ *  - mv_tenant_effective_capabilities feeds feature resolution — a brand-new
+ *    preview tenant has NO rows there until refresh, so its storefront would
+ *    resolve an empty capability set (no commerce surface) without this.
+ *  Both refresh on demand only; no scheduled job covers them (spec C-9). */
+const SEED_PREVIEW_MVS = [
+  'mv_storefront_discovery',
+  'mv_tenant_effective_capabilities',
+] as const;
+
 /**
- * Storefront/discovery reads run off mv_storefront_discovery, which is only
+ * Storefront/capability reads run off materialized views, which are only
  * refreshed on demand. Any lifecycle change that should take effect on the
  * public storefront (preview creation, product archival, tenant retirement)
  * must call this after the writes commit — REFRESH ... CONCURRENTLY cannot
@@ -34,14 +45,16 @@ export const SEED_PREVIEW_SANDBOX_RESPONSE = {
  */
 export async function refreshStorefrontDiscoveryMv(): Promise<void> {
   const pool = getDirectPool();
-  try {
-    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_storefront_discovery');
-  } catch (err: any) {
-    if (err?.code === '55000') {
-      await pool.query('REFRESH MATERIALIZED VIEW mv_storefront_discovery');
-      return;
+  for (const view of SEED_PREVIEW_MVS) {
+    try {
+      await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${view}`);
+    } catch (err: any) {
+      if (err?.code === '55000') {
+        await pool.query(`REFRESH MATERIALIZED VIEW ${view}`);
+        continue;
+      }
+      throw err;
     }
-    throw err;
   }
 }
 

@@ -22,8 +22,18 @@ interface PublicInquiryFormProps {
   /** Listing this inquiry is about — backend resolves the presence seed,
    *  appends claim context to the body, and logs the contact on the seed. */
   listingId?: string;
+  /** Seed-preview storefront slug (/shops/[slug]) — backend resolves the
+   *  demo tenant → source seed for the same context/touch handling (D-1). */
+  previewSlug?: string;
   /** Pre-filled subject (editable). Only applied while the field is empty. */
   defaultSubject?: string;
+  /** Collapsed-header copy override (default: "Have a question?"). */
+  collapsedTitle?: string;
+  collapsedSubtitle?: string;
+  /** Owner-request fields (D-1): adds "I am the…" role + "I'd like to…"
+   *  intent selects; values ship as requester_role/request_intent and are
+   *  paired server-side with credibility signals vs the listing's NAP. */
+  requestFields?: boolean;
   onSuccess?: () => void;
   /** If true, FAQs are fetched and shown above the form */
   showFaqs?: boolean;
@@ -38,13 +48,14 @@ function generateCaptcha(): { num1: number; num2: number; seed: string; answer: 
   return { num1, num2, seed: `${num1},${num2}`, answer: num1 + num2 };
 }
 
-export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, sourceTag, listingId, defaultSubject, onSuccess, showFaqs = true, productId, productName }: PublicInquiryFormProps) {
+export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, sourceTag, listingId, previewSlug, defaultSubject, collapsedTitle, collapsedSubtitle, requestFields, onSuccess, showFaqs = true, productId, productName }: PublicInquiryFormProps) {
   const [expanded, setExpanded] = useState(false);
   const [subject, setSubject] = useState(defaultSubject ?? '');
   const [body, setBody] = useState('');
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [senderPhone, setSenderPhone] = useState('');
+  const [senderSocial, setSenderSocial] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [hpField, setHpField] = useState(''); // honeypot
   const [submitting, setSubmitting] = useState(false);
@@ -55,6 +66,8 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, s
   const [faqCategories, setFaqCategories] = useState<PublicFaqCategory[]>([]);
   const [faqsLoading, setFaqsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [requesterRole, setRequesterRole] = useState<'owner' | 'manager' | 'employee' | 'other'>('owner');
+  const [requestIntent, setRequestIntent] = useState<'claim' | 'remove' | 'question'>('claim');
 
   const captcha = useMemo(() => generateCaptcha(), []);
   const [currentCaptcha, setCurrentCaptcha] = useState(captcha);
@@ -148,8 +161,12 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, s
         sender_name: senderName.trim() || undefined,
         sender_email: senderEmail.trim() || undefined,
         sender_phone: senderPhone.trim() || undefined,
+        sender_social: senderSocial.trim() || undefined,
         source_tag: sourceTag,
         listing_id: listingId,
+        preview_slug: previewSlug,
+        request_intent: requestFields ? requestIntent : undefined,
+        requester_role: requestFields ? requesterRole : undefined,
         captcha_answer: captchaInput,
         captcha_seed: currentCaptcha.seed,
       });
@@ -187,6 +204,7 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, s
             setSenderName('');
             setSenderEmail('');
             setSenderPhone('');
+            setSenderSocial('');
             setCaptchaInput('');
             refreshCaptcha();
           }}
@@ -250,9 +268,9 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, s
               <MessageSquare className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-neutral-900 dark:text-white">Have a question?</p>
+              <p className="text-sm font-semibold text-neutral-900 dark:text-white">{collapsedTitle || 'Have a question?'}</p>
               <p className="text-xs text-neutral-500">
-                Send us an inquiry. Include your email if you would like a direct response.
+                {collapsedSubtitle || 'Send us an inquiry. Include your email if you would like a direct response.'}
               </p>
             </div>
           </div>
@@ -324,6 +342,42 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, s
               </div>
             )}
 
+            {/* Owner-request framing (D-1): asserted role + intent, paired
+                server-side with contact-match credibility signals. */}
+            {requestFields && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <select
+                  value={requesterRole}
+                  onChange={e => setRequesterRole(e.target.value as typeof requesterRole)}
+                  className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm text-neutral-600"
+                >
+                  <option value="owner">I&apos;m the owner</option>
+                  <option value="manager">I&apos;m a manager</option>
+                  <option value="employee">I work there</option>
+                  <option value="other">Other</option>
+                </select>
+                <select
+                  value={requestIntent}
+                  onChange={e => setRequestIntent(e.target.value as typeof requestIntent)}
+                  className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm text-neutral-600"
+                >
+                  <option value="claim">I want to claim this page</option>
+                  <option value="remove">Please take this page down</option>
+                  <option value="question">I have a question</option>
+                </select>
+                <input
+                  type="text"
+                  value={senderSocial}
+                  onChange={e => setSenderSocial(e.target.value)}
+                  placeholder="Business social profile (optional — @handle or URL)"
+                  className="sm:col-span-2 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+                />
+                <p className="sm:col-span-2 text-[10px] text-neutral-400">
+                  To verify you represent the business, use an email, phone, or social profile that matches the details on the listing.
+                </p>
+              </div>
+            )}
+
             {/* FAQ Category dropdown (when categories exist) */}
             {sortedCategories.length > 0 && (
               <select
@@ -352,7 +406,7 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, s
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
-              placeholder="Describe your question or request..."
+              placeholder={requestFields ? 'Anything else we should know? (optional)' : 'Describe your question or request...'}
               rows={3}
               className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
             />

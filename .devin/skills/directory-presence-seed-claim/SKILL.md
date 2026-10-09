@@ -13,7 +13,7 @@ This skill covers the seed/claim workflow: creating seed tenants, publishing lis
 - `tier_key`: `directory_presence`
 - Invite-only, zero-price, visibility-only
 - Below `discovery`/`starter` in the tier hierarchy
-- `max_skus`: 0, `max_locations`: 1
+- `max_skus`: 5 (the 5 free product slots are a **claim incentive** — unclaimed seeds publish none; a DB trigger forces operator-written products on unclaimed seed tenants to `item_status='inactive'`, migration 319), `max_locations`: 1
 - No Stripe customer or billing flow
 - Enabled capabilities: `directory_entry_enabled`, `directory_entry_layout_classic`, `directory_entry_hours_on`, `directory_entry_map_on`, `directory_entry_contact_on`, `directory_entry_qr_on`, `storefront_enabled`, `storefront_retail`, `directory_visibility_snap_ebt`
 - Disabled: `storefront_online`, `storefront_flexible`, `storefront_policies`, checkout, coupons, product types/options

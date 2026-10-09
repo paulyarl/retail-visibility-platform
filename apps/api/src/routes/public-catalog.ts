@@ -3798,6 +3798,18 @@ const PublicInquirySchema = z.object({
   // presence seed so context can be appended and the contact logged on the
   // seed's outreach-touches timeline.
   listing_id: z.string().max(64).optional(),
+  // Same resolution for seed-preview storefronts (/shops/[slug] owner
+  // contact — D-1): the shop slug resolves to the seed_preview demo tenant,
+  // then demo_source_tenant_id → the source seed.
+  preview_slug: z.string().max(200).optional(),
+  /** Owner-request framing (D-1): what the submitter wants and who they claim
+   *  to be. Asserted, not verified — paired with the server-computed
+   *  credibility signals appended to the inquiry context. */
+  request_intent: z.enum(['claim', 'remove', 'question']).optional(),
+  requester_role: z.enum(['owner', 'manager', 'employee', 'other']).optional(),
+  // Asserted business social profile (handle or URL) — compared against the
+  // listing's same_as links as a credibility signal.
+  sender_social: z.string().max(200).optional(),
   // CAPTCHA fields
   captcha_answer: z.string().min(1, 'CAPTCHA verification required'),
   captcha_seed: z.string().min(1, 'CAPTCHA seed required'),
@@ -3826,7 +3838,7 @@ router.post('/inquiries', async (req, res) => {
       });
     }
 
-    const { tenant_id, subject, body, sender_name, sender_email, sender_phone, source_tag, listing_id, captcha_answer, captcha_seed, website_hp } = parse.data;
+    const { tenant_id, subject, body, sender_name, sender_email, sender_phone, sender_social, source_tag, listing_id, preview_slug, request_intent, requester_role, captcha_answer, captcha_seed, website_hp } = parse.data;
 
     // Honeypot check — if filled, silently accept (don't tell bots it failed)
     if (website_hp !== undefined && website_hp !== '') {
@@ -3874,10 +3886,11 @@ router.post('/inquiries', async (req, res) => {
     // Resolve the presence seed behind the listing, when the form supplied
     // one — the inquiry body gets an operator context block and the contact
     // is logged on the seed's outreach-touches timeline below.
-    let seedContext: { seedId: string; businessName: string; slug: string } | null = null;
+    let seedContext: { seedId: string; businessName: string; slug: string; phone: string | null; email: string | null; website: string | null; sameAs: string[] } | null = null;
+    let previewContext: string | null = null;
     if (listing_id) {
       const seedRows = await prisma.$queryRaw<any[]>`
-        SELECT dps.id AS seed_id, dl.business_name, dl.slug
+        SELECT dps.id AS seed_id, dl.business_name, dl.slug, dl.phone, dl.email, dl.website, dl.same_as
         FROM directory_presence_seeds dps
         JOIN directory_listings_list dl ON dl.id = dps.listing_id
         WHERE dps.listing_id = ${listing_id}
@@ -3888,13 +3901,89 @@ router.post('/inquiries', async (req, res) => {
           seedId: seedRows[0].seed_id,
           businessName: seedRows[0].business_name || 'Unknown',
           slug: seedRows[0].slug || '',
+          phone: seedRows[0].phone ?? null,
+          email: seedRows[0].email ?? null,
+          website: seedRows[0].website ?? null,
+          sameAs: Array.isArray(seedRows[0].same_as) ? seedRows[0].same_as : [],
         };
+      }
+    } else if (preview_slug) {
+      // /shops/[slug] owner contact (D-1): the slug names a seed_preview demo
+      // tenant; resolve through demo_source_tenant_id to the source seed.
+      const seedRows = await prisma.$queryRaw<any[]>`
+        SELECT dps.id AS seed_id, dl.business_name, dl.slug, dl.phone, dl.email, dl.website, dl.same_as
+        FROM tenants pt
+        JOIN directory_presence_seeds dps ON dps.tenant_id = pt.demo_source_tenant_id
+        JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE pt.slug = ${preview_slug}
+          AND pt.is_demo = true
+          AND pt.demo_template = 'seed_preview'
+        LIMIT 1
+      `;
+      if (seedRows[0]) {
+        seedContext = {
+          seedId: seedRows[0].seed_id,
+          businessName: seedRows[0].business_name || 'Unknown',
+          slug: seedRows[0].slug || '',
+          phone: seedRows[0].phone ?? null,
+          email: seedRows[0].email ?? null,
+          website: seedRows[0].website ?? null,
+          sameAs: Array.isArray(seedRows[0].same_as) ? seedRows[0].same_as : [],
+        };
+        previewContext = preview_slug;
       }
     }
 
+    // D-1 credibility: compare the submitter's asserted contacts against the
+    // listing's own NAP. A request from a channel the business actually owns
+    // (matching email, matching phone, or an email on the listing's website
+    // domain) is triageable signal; no match means "treat as unverified".
+    const credibilitySignals: string[] = [];
+    if (seedContext) {
+      const normDigits = (v?: string | null) => (v || '').replace(/\D/g, '').slice(-10);
+      const senderDomain = (sender_email || '').split('@')[1]?.toLowerCase().replace(/^www\./, '');
+      const siteDomain = (seedContext.website || '')
+        .replace(/^https?:\/\//i, '').split('/')[0].toLowerCase().replace(/^www\./, '');
+      if (sender_email && seedContext.email && sender_email.toLowerCase() === seedContext.email.toLowerCase()) {
+        credibilitySignals.push('email matches listing contact email');
+      }
+      if (senderDomain && siteDomain && senderDomain === siteDomain) {
+        credibilitySignals.push('sender email domain matches listing website');
+      }
+      const sPhone = normDigits(sender_phone);
+      const lPhone = normDigits(seedContext.phone);
+      if (sPhone && lPhone && sPhone === lPhone) {
+        credibilitySignals.push('phone matches listing phone');
+      }
+      // Social: normalize the submitted handle/URL and each same_as link to
+      // a bare handle (last path segment, no scheme/@) and compare exactly.
+      const socialHandle = (v?: string | null): string => {
+        const raw = (v || '').trim().toLowerCase().replace(/^@/, '');
+        if (!raw) return '';
+        if (raw.includes('://') || raw.includes('/') || raw.includes('.')) {
+          const seg = raw.replace(/^https?:\/\//i, '').replace(/^www\./, '').split('/').filter(Boolean).pop() || '';
+          return seg.replace(/[?#].*$/, '').replace(/^@/, '');
+        }
+        return raw;
+      };
+      const sHandle = socialHandle(sender_social);
+      if (sHandle && seedContext.sameAs.some((u) => socialHandle(u) === sHandle)) {
+        credibilitySignals.push('social profile matches listing same_as link');
+      }
+      if (credibilitySignals.length === 0) {
+        credibilitySignals.push('no contact match — unverified');
+      }
+    }
+    const requestLine = [
+      request_intent ? `Intent: ${request_intent}` : null,
+      requester_role ? `Role: ${requester_role}` : null,
+      sender_social ? `Social: ${sender_social}` : null,
+      seedContext ? `Credibility: ${credibilitySignals.join('; ')}` : null,
+    ].filter(Boolean).join('\n');
+
     const contextBlock = seedContext
-      ? `\n\n---\nClaim request context:\nBusiness: ${seedContext.businessName}\nPlace: /place/${seedContext.slug}\nSeed: ${seedContext.seedId}\nReview: /settings/admin/directory/presence-seeds/${seedContext.seedId}`
-      : '';
+      ? `\n\n---\nClaim request context:\nBusiness: ${seedContext.businessName}\nPlace: /place/${seedContext.slug}${previewContext ? `\nPreview: /shops/${previewContext}` : ''}\nSeed: ${seedContext.seedId}\nReview: /settings/admin/directory/presence-seeds/${seedContext.seedId}${requestLine ? `\n${requestLine}` : ''}`
+      : requestLine ? `\n\n---\n${requestLine}` : '';
     const finalBody = body ? `${body}${contextBlock}` : contextBlock.trimStart() || undefined;
 
     const { CrmInquiryService } = await import('../services/CrmInquiryService');
@@ -3947,7 +4036,7 @@ router.post('/inquiries', async (req, res) => {
         await seedService.addOutreachTouch(seedContext.seedId, {
           channel: 'form',
           outcome: 'form_submitted',
-          notes: `Inbound claim inquiry via /place/${seedContext.slug}: "${subject}". Sender: ${finalSenderName || 'Anonymous'}${finalSenderEmail ? ` <${finalSenderEmail}>` : ''}${finalSenderPhone ? ` ${finalSenderPhone}` : ''}. Inquiry ${inquiry.id}.`,
+          notes: `Inbound ${request_intent || 'claim'} inquiry via ${previewContext ? `/shops/${previewContext} (seed preview)` : `/place/${seedContext.slug}`}${requester_role ? ` — says ${requester_role}` : ''}: "${subject}". Sender: ${finalSenderName || 'Anonymous'}${finalSenderEmail ? ` <${finalSenderEmail}>` : ''}${finalSenderPhone ? ` ${finalSenderPhone}` : ''}${sender_social ? ` · social ${sender_social}` : ''}. ${credibilitySignals.join('; ')}. Inquiry ${inquiry.id}.`,
         }, {
           actorType: 'customer',
           actorId: customerId || finalSenderEmail || 'anonymous',

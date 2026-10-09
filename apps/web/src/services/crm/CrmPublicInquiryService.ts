@@ -15,6 +15,10 @@ interface PublicInquiryInput {
   sender_name?: string;
   sender_email?: string;
   sender_phone?: string;
+  /** Asserted business social profile — a handle (@name) or profile URL.
+   *  Server-side it's compared against the listing's same_as links as a
+   *  credibility signal, and echoed into the operator context block. */
+  sender_social?: string;
   /** Origin tag stored on crm_inquiries.source for Requests-Hub triage
    *  (e.g. 'place_claim_request'). snake_case; validated server-side. */
   source_tag?: string;
@@ -22,6 +26,13 @@ interface PublicInquiryInput {
    *  /place/[slug]) the backend resolves its presence seed, appends context
    *  to the body, and logs the contact on the seed's touch timeline. */
   listing_id?: string;
+  /** Seed-preview storefront variant (D-1): the /shops/[slug] slug resolves
+   *  to the seed_preview demo tenant, then to the source seed. */
+  preview_slug?: string;
+  /** Owner-request framing — asserted intent + role, shown to the operator
+   *  alongside server-computed credibility signals. */
+  request_intent?: 'claim' | 'remove' | 'question';
+  requester_role?: 'owner' | 'manager' | 'employee' | 'other';
   captcha_answer: string;
   captcha_seed: string;
 }

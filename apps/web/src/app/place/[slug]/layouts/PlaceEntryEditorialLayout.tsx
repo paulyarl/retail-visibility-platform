@@ -440,6 +440,9 @@ export default function PlaceEntryEditorialLayout({
                 sourceTag="place_claim_request"
                 listingId={listing.id}
                 defaultSubject={`Claim request — ${listing.businessName}`}
+                collapsedTitle="Request claim access"
+                collapsedSubtitle="Tell us who you are and whether you want to claim this listing or have it removed."
+                requestFields
                 showFaqs={false}
               />
             </div>

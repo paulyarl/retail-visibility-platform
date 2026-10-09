@@ -666,7 +666,8 @@ export default function DirectoryClaimClient() {
                     </Text>
                     <Text size="xs" c="dimmed">
                       Add up to 5 signature products to your storefront — free with your claimed
-                      listing. It&apos;s enough to showcase your best offerings before upgrading to
+                      listing. Products on the free listing are display-only (no checkout).
+                      It&apos;s enough to showcase your best offerings before upgrading to
                       Discovery (75 products) or Storefront (200 products).{' '}
                       <Link href="/place/about" style={{ color: 'inherit', textDecoration: 'underline' }}>
                         Learn more

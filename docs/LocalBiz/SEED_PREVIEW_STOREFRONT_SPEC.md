@@ -370,11 +370,11 @@ Decided (rev 2 and rev 4 defaults, reviewable):
 Still open:
 
 1. **Source of the preview.** Should the preview use the seed's tenant (`demo_source_tenant_id`) or enrich the seed's own tenant? Option A was rejected for v1 because it risks the real listing. Rev 4 keeps a separate demo tenant.
-2. **Feature gates on the preview tier.** `omnichannel` and `storefront` both exist in the `SubscriptionTier` type (verified). Still to confirm: that the preview renders the commerce surface without feature-gate errors. This must be verified before build.
+2. **Feature gates on the preview tier — DONE (migration 321).** `subscription_tiers_list` + `tier_features_list` rows for `seed_preview` — the explicit §5f feature set (retail storefront, gallery, hours, maps, commerce enabled/full/deposit, `payment_gateway_disabled` as the hard off-switch, directory entry + storefront QR). No `*_flexible` keys. Verified against prod: `mv_tenant_effective_capabilities` doesn't filter tier `is_active`, so `billing_type='none'` + `price_monthly=0` keeps the key out of paid pickers while features still resolve. Apply migration 321 to staging + prod like 319/320.
 3. **Campaign-side generation — DECIDED (D-5): in v1.** The PB-08 campaign's Openers workspace triggers the same route via its linked seed.
 4. **Preview expiry — DECIDED (D-4).** 14 days base + capped extension: +7 days per call, max 2 extensions, hard cap 28 days.
-5. **Honesty labeling for the claim offer.** The preview shows Commerce features, but the claim offer starts on the `directory_presence` tier, which has 5 display-only slots and no checkout. Confirm the banner wording and the claim copy (§5b, §5c).
-6. **Documentation conflict on directory_presence limits.** `PLATFORM_STRATEGY_V3.1_DEPTH_RUNGS.md` and `.devin/skills/directory-presence-seed-claim/SKILL.md` both state `max_skus` 0 for the directory presence tier. The code sets 5 (verified). The code is the source of truth for the claim offer, so the docs should be corrected before the claim copy is written.
+5. **Honesty labeling for the claim offer — DONE.** The claim success copy names "Directory Presence", states "5 free product slots", and now says the free listing's products are "display-only (no checkout)". The upgrade teaser already says "checkout arrives with Commerce tiers". Banner wording still warrants a final read (D-2).
+6. **Documentation conflict on directory_presence limits — DONE.** Code (5) confirmed as source of truth. `.devin/skills/directory-presence-seed-claim/SKILL.md` now reads `max_skus: 5` with the claim-incentive/migration-319 note; `PLATFORM_STRATEGY_V3.1_DEPTH_RUNGS.md` carries a dated "Shipped correction" note pointing at the operational values.
 7. **Products provenance key.** Confirm the field name and the source types allowed for claimed-seed products (§5c). Owner entry at claim counts as owner-confirmed, so the pre-claim definition question no longer applies.
 8. **PB-08 eligibility — column verified, strictness open.** `mkt_campaigns_list.playbook_code = 'PB-08'` is the field (varchar, verified; `MarketingCampaignService` treats it as definitive). Open choice: any linked campaign with the code, or the stricter confirmed `playbook_decision` row. Tracked as D-8.
 9. **Publication gate (required before any preview ships).** Verify that the public product queries filter on claim (`org_standing_mode = 'independent'` or the seed's claimed status). If they don't, add the gate. Pre-claim drafts must stay private.
@@ -422,13 +422,13 @@ Each open problem from the final review, with its status. **Closed** means verif
 
 | Item | Question | Owner input |
 |---|---|---|
-| D-1 Takedown before claim | Owners can ask for removal. Define the contact route and the response time for pre-claim removal. | Operations |
-| D-2 Consent language | Confirm the sample banner wording for owners who have not agreed to a preview. | Product and legal |
+| D-1 Takedown before claim | IMPLEMENTED via existing anonymous contact plumbing — the demo banner's "Own {business}?" toggle expands `PublicInquiryForm` (math CAPTCHA + honeypot) posting to `POST /api/public/inquiries` with `tenant_id='platform'` + `preview_slug`. The route resolves the `seed_preview` demo tenant → `demo_source_tenant_id` → source seed, appends claim context (seed id, admin review link, preview URL) to the inquiry body, and logs the contact on the seed's outreach-touches timeline — the request lands in the CRM Requests Hub (`source_tag='seed_preview_owner'`) AND on the seed page. Response-time SLA remains an ops call. | Operations |
+| D-2 Consent language | Banner shipped as: "This is a sample storefront preview. Products shown are examples — this business has not claimed this page yet." + the D-1 owner line. Final wording sign-off remains open. | Product and legal |
 | D-3 Tier honesty | Confirm the claim copy names the `directory_presence` tier and says checkout is not included (§5b, open item 5). | Product |
 | D-4 Preview expiry | DECIDED: 14d base + capped extension (+7d per call, max 2, hard cap 28d). | Product |
 | D-5 Campaign-side generation | DECIDED: in v1 — Openers surface on a PB-08 campaign triggers the same seed-scoped route via the linked seed. | Product |
 | D-6 Docs conflict | Correct `PLATFORM_STRATEGY_V3.1` and the seed-claim skill to show `max_skus` 5, or confirm 5 is intended (open item 6). | Docs owner |
-| D-7 Demo tier | DECIDED: dedicated `seed_preview` tier with explicit feature list (§5f). Remaining: confirm the key renders `shops/[slug]` without feature-gate errors at build time. | Product and Engineering |
+| D-7 Demo tier | DONE: dedicated `seed_preview` tier + explicit feature rows via migration 321 (verified against prod schema + omnichannel's feature rows). | Product and Engineering |
 | D-8 PB-08 eligibility strictness | DECIDED: eligibility requires a **confirmed** `playbook_decision.kind='website_build_scope'` on a linked campaign (stricter than `playbook_code` alone). | Engineering |
 
 ### Remaining verification gates before any preview ships

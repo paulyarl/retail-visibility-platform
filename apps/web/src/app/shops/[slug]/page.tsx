@@ -20,6 +20,7 @@ import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
 import SeedPreviewTracker from './SeedPreviewTracker';
+import SeedPreviewOwnerContact from './SeedPreviewOwnerContact';
 import { clientLogger } from '@/lib/client-logger';
 
 interface ShopProfilePageProps {
@@ -241,6 +242,11 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="container mx-auto px-4 py-2 text-center text-sm text-amber-800">
             This is a sample storefront preview. Products shown are examples — this business has not claimed this page yet.
+          </div>
+          {/* D-1: owner-facing claim/removal path — anonymous CRM inquiry
+              resolved to the seed + logged on its outreach timeline */}
+          <div className="container mx-auto px-4 pb-3">
+            <SeedPreviewOwnerContact slug={slug} businessName={tenantInfo.name} />
           </div>
         </div>
       )}
