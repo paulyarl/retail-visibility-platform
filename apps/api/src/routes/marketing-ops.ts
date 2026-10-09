@@ -4192,12 +4192,19 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
     if (!parsed.content && !parsed.allow_override && !executionDriven && !assembledReport) {
       const eligibility = await DeliverableSourceService.resolveEligibleTypes(req.params.campaignId, ctx);
       if (!eligibility.types.includes(parsed.deliverable_type as any)) {
+        // A flagship type owned by another playbook points at the sibling
+        // campaign that should carry it (multi-archetype model).
+        const gated = (eligibility.gated_types ?? []).find((g) => g.type === parsed.deliverable_type);
         return res.status(400).json({
           success: false,
-          error: 'type_not_eligible',
-          message: `No governing signal fired for "${parsed.deliverable_type}". Pass allow_override: true to force it.`,
+          error: gated ? 'type_owned_by_sibling' : 'type_not_eligible',
+          message: gated
+            ? `"${parsed.deliverable_type}" belongs to the ${gated.owner_playbook} lane${gated.owner_campaign_id ? ` — generate it on sibling campaign ${gated.owner_campaign_id}` : ''}. Pass allow_override: true to force it here.`
+            : `No governing signal fired for "${parsed.deliverable_type}". Pass allow_override: true to force it.`,
           signals: eligibility.signals,
           eligible_types: eligibility.types,
+          gated_types: eligibility.gated_types,
+          owner_campaign_id: gated?.owner_campaign_id ?? null,
         });
       }
     }
@@ -4216,6 +4223,11 @@ router.post('/:campaignId/deliverables/generate', async (req: any, res: Response
       content = resolved.content ?? undefined;
       // Gates surface as warnings, not hard blocks (§7.4).
       warnings = [...resolved.qualityGate.issues, ...resolved.repetitionGate.issues];
+      // No imported/generated source block → the layout's body renders empty.
+      // Warn so the operator knows the PDF is a shell, not silently blank.
+      if (!content) {
+        warnings.push(`no_source_material: no source block for "${parsed.deliverable_type}" — generate or import source material first, or the deliverable body is empty`);
+      }
     } else if (!content && assembledReport) {
       const report = await RepairFulfillmentService.buildCompletionReport(
         req.params.campaignId, ctx,

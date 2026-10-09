@@ -4706,6 +4706,9 @@ class MarketingOpsService extends AdminApiSingleton {
     types: DeliverableType[];
     signals: string[];
     source: 'model_emitted' | 'derived' | 'fallback';
+    playbook_code?: string | null;
+    archetype?: string | null;
+    gated_types?: { type: string; owner_playbook: string; owner_campaign_id: string | null }[];
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/deliverable/${campaignId}/eligible-types`,

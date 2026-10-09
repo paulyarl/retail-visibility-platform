@@ -9,6 +9,8 @@ import {
   TYPE_GOVERNING_SIGNALS,
   DELIVERABLE_RELEVANT_FAMILIES,
   FULFILL_TEMPLATE_BY_TYPE,
+  TYPE_PLAYBOOK_OWNERSHIP,
+  gateTypesByOwnership,
 } from '../DeliverableSourceService';
 import { buildClaimCta } from '../deliverable-cta';
 import { KNOWN_SIGNAL_CODES } from '../../triage/signal-taxonomy';
@@ -52,6 +54,57 @@ describe('signal → deliverable type mapping (§3.2)', () => {
   it('maps every modal type to a fulfill template', () => {
     for (const t of MODAL_TYPES) {
       expect(FULFILL_TEMPLATE_BY_TYPE[t], `no fulfill template for ${t}`).toBeTruthy();
+    }
+  });
+});
+
+describe('archetype ownership gate (playbook routing)', () => {
+  const ALL = [...MODAL_TYPES];
+
+  it('only gates types that name an owning playbook', () => {
+    for (const t of Object.keys(TYPE_PLAYBOOK_OWNERSHIP)) {
+      expect(MODAL_TYPES).toContain(t);
+    }
+  });
+
+  it('unrouted campaigns (no playbook, no triage) keep every type', () => {
+    const { kept, gated } = gateTypesByOwnership(ALL, { playbookCode: null, archetype: null });
+    expect(kept).toEqual(ALL);
+    expect(gated).toEqual([]);
+  });
+
+  it('a PB-05 campaign drops the PB-08 website types (the reported bug)', () => {
+    const { kept, gated } = gateTypesByOwnership(
+      ['nap_report', 'lead_magnet', 'website_mockup', 'website_build_package', 'review_responses'],
+      { playbookCode: 'PB-05', archetype: 'A5' },
+    );
+    expect(kept).toEqual(['nap_report', 'lead_magnet', 'review_responses']);
+    expect(gated.map((g) => g.type)).toEqual(['website_mockup', 'website_build_package']);
+    expect(gated.every((g) => g.owner_playbook === 'PB-08')).toBe(true);
+  });
+
+  it('a PB-08 campaign keeps its website deliverables', () => {
+    const { kept, gated } = gateTypesByOwnership(
+      ['website_mockup', 'website_build_package', 'lead_magnet'],
+      { playbookCode: 'PB-08', archetype: 'A7' },
+    );
+    expect(kept).toEqual(['website_mockup', 'website_build_package', 'lead_magnet']);
+    expect(gated).toEqual([]);
+  });
+
+  it('triage-only routing gates on archetype when playbook_code is absent', () => {
+    const { gated } = gateTypesByOwnership(
+      ['website_build_package', 'product_visibility_preview', 'nap_report'],
+      { playbookCode: null, archetype: 'A3' },
+    );
+    expect(gated.map((g) => g.type)).toEqual(['website_build_package', 'product_visibility_preview']);
+  });
+
+  it('generic types are never gated regardless of archetype', () => {
+    const generic = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet'];
+    for (const archetype of ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7']) {
+      const { kept } = gateTypesByOwnership(generic, { playbookCode: null, archetype });
+      expect(kept).toEqual(generic);
     }
   });
 });

@@ -40,6 +40,7 @@ import {
   runRepetitionGate,
 } from './deliverable-quality-gate';
 import { buildClaimCta } from './deliverable-cta';
+import BusinessContextService from './BusinessContextService';
 
 // ─── Template IDs ────────────────────────────────────────────────────────
 
@@ -119,10 +120,59 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
 /** Families the analyst consumes — OX (outreach state) is excluded (G-12). */
 export const DELIVERABLE_RELEVANT_FAMILIES = ['RA', 'DS', 'WC', 'CP', 'VP', 'INT'];
 
+/**
+ * Archetype ownership — flagship deliverable types belong to the sibling
+ * campaign routed to the owning playbook. Siblings share the prospect's
+ * audit, so a signal firing on one sibling (e.g. WC_BUILDER_SUBDOMAIN on a
+ * PB-05 multi-signal campaign) must not surface another archetype's
+ * deliverable: each flagship type is generated on the campaign carrying the
+ * owning playbook_code (definitive) or accepted-triage archetype (fallback —
+ * mirrors isWebsiteGapCampaign / assertWebsiteGap).
+ */
+export const TYPE_PLAYBOOK_OWNERSHIP: Record<string, { playbook: string; archetype: string }> = {
+  product_visibility_preview: { playbook: 'PB-07', archetype: 'A6' },
+  website_mockup: { playbook: 'PB-08', archetype: 'A7' },
+  website_build_package: { playbook: 'PB-08', archetype: 'A7' },
+};
+
+export interface GatedDeliverableType {
+  type: string;
+  owner_playbook: string;
+  owner_campaign_id: string | null;
+}
+
+/**
+ * Pure gate — given the signal-derived types and the campaign's routing,
+ * split out the flagship types owned by a different playbook. Unrouted
+ * campaigns (no playbook_code, no accepted triage) keep every type.
+ */
+export function gateTypesByOwnership(
+  types: string[],
+  routing: { playbookCode: string | null; archetype: string | null },
+): { kept: string[]; gated: { type: string; owner_playbook: string }[] } {
+  const kept: string[] = [];
+  const gated: { type: string; owner_playbook: string }[] = [];
+  const routed = Boolean(routing.playbookCode || routing.archetype);
+  for (const t of types) {
+    const owner = TYPE_PLAYBOOK_OWNERSHIP[t];
+    if (routed && owner && routing.playbookCode !== owner.playbook && routing.archetype !== owner.archetype) {
+      gated.push({ type: t, owner_playbook: owner.playbook });
+    } else {
+      kept.push(t);
+    }
+  }
+  return { kept, gated };
+}
+
 export interface DeliverableSourceResolution {
   types: DeliverableType[];
   signals: SignalCode[];
   source: 'model_emitted' | 'derived' | 'fallback';
+  /** Campaign routing used for the ownership gate (null when unrouted). */
+  playbook_code: string | null;
+  archetype: string | null;
+  /** Flagship types filtered out — owned by a different playbook/sibling. */
+  gated_types: GatedDeliverableType[];
 }
 
 export class DeliverableSourceService extends BaseService {
@@ -145,12 +195,14 @@ export class DeliverableSourceService extends BaseService {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
-        include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
       });
       if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
-      const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
-      const auditData = (latestAudit?.audit_data ?? null) as any;
+      // Sibling-aware audit resolution (BusinessContextService): a
+      // non-primary sibling inherits the primary sibling's business_analysis
+      // audit — the audit is business-level evidence, not campaign-scoped.
+      const latestAudit = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+      const auditData = (latestAudit?.auditData ?? null) as any;
 
       // Phase 6 — signal-aligned gap gate (undefined → legacy primary set).
       const { IntelligenceProfileService } = await import('../intelligence/IntelligenceProfileService');
@@ -177,10 +229,39 @@ export class DeliverableSourceService extends BaseService {
           .map(([t]) => t)) as DeliverableType[];
       }
 
+      // Archetype ownership gate — flagship types belong to the sibling
+      // routed to the owning playbook, even when this campaign's signals
+      // would otherwise surface them (a shared audit fires WC_* on every
+      // sibling). Applies to the fallback set too: a routed campaign never
+      // offers another playbook's deliverable.
+      const routing = await this.resolveCampaignRouting(campaign);
+      let gatedTypes: GatedDeliverableType[] = [];
+      const { kept, gated } = gateTypesByOwnership(types, routing);
+      if (gated.length > 0) {
+        const ownerIds = await this.findOwnerCampaigns(
+          campaign,
+          [...new Set(gated.map((g) => g.owner_playbook))],
+        );
+        gatedTypes = gated.map((g) => ({
+          type: g.type,
+          owner_playbook: g.owner_playbook,
+          owner_campaign_id: ownerIds.get(g.owner_playbook) ?? null,
+        }));
+        types = kept as DeliverableType[];
+      }
+
       logger.info('Deliverable eligible types resolved', ctx, {
         campaignId, source, signalCount: relevant.length, types,
+        gatedTypes: gatedTypes.map((g) => g.type),
       });
-      return { types, signals: relevant, source };
+      return {
+        types,
+        signals: relevant,
+        source,
+        playbook_code: routing.playbookCode,
+        archetype: routing.archetype,
+        gated_types: gatedTypes,
+      };
     } catch (error) {
       logger.error('Failed to resolve eligible deliverable types', ctx, {
         error: (error as Error).message, campaignId,
@@ -296,12 +377,13 @@ export class DeliverableSourceService extends BaseService {
   }> {
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
       where: { id: campaignId },
-      include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
     });
     if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
-    const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
-    const auditData = (latestAudit?.audit_data ?? null) as any;
+    // Sibling-aware: a non-primary sibling inherits the primary's
+    // business_analysis audit (same resolver as eligibility/fulfill).
+    const latestAudit = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+    const auditData = (latestAudit?.auditData ?? null) as any;
 
     const eligibility = await this.resolveEligibleTypes(campaignId, ctx);
     const intake = await this.getReviewIntake(campaignId, ctx);
@@ -317,7 +399,7 @@ export class DeliverableSourceService extends BaseService {
     // renders a different prompt, so a cached execution from before the edit
     // must not be reused.
     const snapshotHash = this.hashSnapshot(
-      latestAudit?.id ?? null,
+      latestAudit?.auditId ?? null,
       eligibility.signals,
       [businessAttributes, discoveryAttribution, businessAddress, websiteUrl, businessPhone].join('::'),
     );
@@ -466,10 +548,10 @@ export class DeliverableSourceService extends BaseService {
 
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
       where: { id: campaignId },
-      include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
     });
     if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
-    const auditData = (campaign.mkt_audits_list?.[0]?.audit_data ?? null) as any;
+    // Sibling-aware audit resolution — same as eligibility/context builders.
+    const auditData = ((await BusinessContextService.getLatestAuditData(campaignId, ctx))?.auditData ?? null) as any;
 
     // Resolve claim/report links through the canonical module so the
     // /place/claim vs /directory/claim split cannot drift (§5.6). Mint a claim
@@ -547,6 +629,61 @@ export class DeliverableSourceService extends BaseService {
   // ========================================================================
   // HELPERS
   // ========================================================================
+
+  /**
+   * Resolve the campaign's routing for the ownership gate. playbook_code is
+   * definitive (set on sibling creation + triage acceptance); the accepted
+   * triage result's effective playbook (override wins) is the fallback —
+   * same precedence as assertWebsiteGap. Unrouted campaigns resolve null
+   * and are never gated.
+   */
+  private async resolveCampaignRouting(campaign: any): Promise<{ playbookCode: string | null; archetype: string | null }> {
+    try {
+      if (campaign.playbook_code) {
+        const pb = await this.prisma.mkt_playbook_catalog.findUnique({
+          where: { code: campaign.playbook_code },
+          select: { archetype: true },
+        });
+        return { playbookCode: campaign.playbook_code, archetype: pb?.archetype ?? null };
+      }
+      const triage = await this.prisma.mkt_campaign_triage_results.findFirst({
+        where: { campaign_id: campaign.id, is_operator_accepted: true },
+        include: {
+          playbook: { select: { code: true, archetype: true } },
+          overridden_playbook: { select: { code: true, archetype: true } },
+        },
+      });
+      const pb = (triage as any)?.overridden_playbook ?? (triage as any)?.playbook ?? null;
+      return { playbookCode: pb?.code ?? null, archetype: pb?.archetype ?? null };
+    } catch {
+      return { playbookCode: null, archetype: null };
+    }
+  }
+
+  /**
+   * Map owning playbook codes to the sibling campaign that carries them, so
+   * the caller can point the operator at the right sibling. Non-fatal —
+   * returns an empty map when the campaign has no prospect group.
+   */
+  private async findOwnerCampaigns(campaign: any, playbookCodes: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!campaign.business_prospect_id || playbookCodes.length === 0) return map;
+    try {
+      const owners = await this.prisma.mkt_campaigns_list.findMany({
+        where: {
+          business_prospect_id: campaign.business_prospect_id,
+          scope: 'business',
+          playbook_code: { in: playbookCodes },
+          id: { not: campaign.id },
+        },
+        select: { id: true, playbook_code: true },
+      });
+      for (const o of owners) {
+        if (o.playbook_code) map.set(o.playbook_code, o.id);
+      }
+    } catch { /* owner hint is best-effort */ }
+    return map;
+  }
 
   /**
    * Migration 317 — swap the campaign's promotion-time discovery_context for

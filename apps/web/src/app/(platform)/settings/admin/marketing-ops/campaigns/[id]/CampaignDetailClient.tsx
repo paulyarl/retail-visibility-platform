@@ -370,6 +370,7 @@ export default function CampaignDetailClient({
   // Deliverable source material — signal-derived eligible types + readiness.
   // Spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md
   const [eligibleTypes, setEligibleTypes] = useState<DeliverableType[] | null>(null);
+  const [gatedTypes, setGatedTypes] = useState<{ type: string; owner_playbook: string; owner_campaign_id: string | null }[]>([]);
   const [sourceMaterialReady, setSourceMaterialReady] = useState<boolean | null>(null);
   const [sourceMaterialBusy, setSourceMaterialBusy] = useState(false);
   // Dual-execution lanes for source material (same pattern as
@@ -577,6 +578,7 @@ export default function CampaignDetailClient({
         ]);
         if (cancelled) return;
         setEligibleTypes(elig?.types ?? null);
+        setGatedTypes(elig?.gated_types ?? []);
         setSourceMaterialReady(Boolean(material));
         if (elig?.types?.length) {
           setGenForm((f) => (elig.types.includes(f.deliverableType) ? f : { ...f, deliverableType: elig.types[0] }));
@@ -2934,6 +2936,13 @@ export default function CampaignDetailClient({
                 {eligibleTypes && (
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Signal-derived types: {eligibleTypes.length ? eligibleTypes.join(', ') : 'none — showing all'}
+                  </p>
+                )}
+                {gatedTypes.length > 0 && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    Owned by another playbook lane: {gatedTypes.map((g) =>
+                      `${g.type} (${g.owner_playbook}${g.owner_campaign_id ? ` → sibling ${g.owner_campaign_id}` : ''})`
+                    ).join(', ')}
                   </p>
                 )}
               </div>
