@@ -333,6 +333,15 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${LINK_ROLE_COLORS[link.linkRole] || LINK_ROLE_COLORS.sibling}`}>
                       {link.linkRole}
                     </span>
+                    {link.campaign?.playbookCode && (
+                      <span
+                        className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-50 text-violet-700 border-violet-200"
+                        title={link.campaign.playbookName ?? undefined}
+                      >
+                        {link.campaign.playbookCode}
+                        {link.campaign.playbookArchetype ? ` · ${link.campaign.playbookArchetype}` : ''}
+                      </span>
+                    )}
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${NAP_CONFIDENCE_COLORS[link.napMatchConfidence] || NAP_CONFIDENCE_COLORS.none}`}>
                       NAP: {link.napMatchConfidence}
                     </span>
@@ -341,6 +350,7 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                     {link.campaign?.category} · {link.campaign?.city}
                     {link.campaign?.state ? `, ${link.campaign.state}` : ''} · stage: {link.campaign?.stage}
                     {link.campaign?.displayId ? ` · ${link.campaign.displayId}` : ''}
+                    {link.campaign?.playbookName ? ` · ${link.campaign.playbookName}` : ''}
                   </p>
                   {link.lastSyncedAt && (
                     <p className="text-xs text-gray-400">
@@ -451,6 +461,8 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                         {c.category} · {c.city}
                         {c.state ? `, ${c.state}` : ''} · stage: {c.stage}
                         {c.displayId ? ` · ${c.displayId}` : ''}
+                        {c.playbookCode ? ` · ${c.playbookCode}` : ''}
+                        {c.playbookName ? ` — ${c.playbookName}` : ''}
                       </p>
                     </div>
                     {c.alreadyLinked ? (

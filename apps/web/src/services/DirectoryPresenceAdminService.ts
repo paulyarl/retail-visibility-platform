@@ -2836,6 +2836,9 @@ export interface DirectorySeedCampaignLink {
     state: string | null;
     stage: string;
     campaignCategory: string;
+    playbookCode: string | null;
+    playbookName: string | null;
+    playbookArchetype: string | null;
   };
 }
 
@@ -2848,6 +2851,9 @@ export interface DirectoryCampaignCandidate {
   state: string | null;
   stage: string;
   campaignCategory: string;
+  playbookCode: string | null;
+  playbookName: string | null;
+  playbookArchetype: string | null;
   alreadyLinked: boolean;
 }
 

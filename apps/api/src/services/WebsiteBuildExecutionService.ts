@@ -112,11 +112,14 @@ export class WebsiteBuildExecutionService extends BaseService {
                  l.campaign_id AS linked_via_campaign_id,
                  l.link_role   AS linked_via_role,
                  s.status      AS seed_status,
+                 c.playbook_code AS linked_via_playbook_code,
+                 pc.name         AS linked_via_playbook_name,
                  dl.business_name,
                  dl.city,
                  dl.state
           FROM directory_seed_campaign_links l
           JOIN mkt_campaigns_list c ON c.id = l.campaign_id
+          LEFT JOIN mkt_playbook_catalog pc ON pc.code = c.playbook_code
           JOIN directory_presence_seeds s ON s.id = l.seed_id
           JOIN directory_listings_list dl ON dl.id = s.listing_id
           WHERE c.business_prospect_id = ${campaign.business_prospect_id}

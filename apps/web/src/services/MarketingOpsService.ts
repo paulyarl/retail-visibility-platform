@@ -197,6 +197,8 @@ export interface WebsiteBuildExecutionReadModel {
     seed_id: string;
     linked_via_campaign_id: string;
     linked_via_role: string;
+    linked_via_playbook_code: string | null;
+    linked_via_playbook_name: string | null;
     seed_status: string | null;
     business_name: string | null;
     city: string | null;

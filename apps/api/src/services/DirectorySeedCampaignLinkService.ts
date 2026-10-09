@@ -87,6 +87,9 @@ export interface LinkRow {
     state: string | null;
     stage: string;
     campaignCategory: string;
+    playbookCode: string | null;
+    playbookName: string | null;
+    playbookArchetype: string | null;
   };
 }
 
@@ -389,9 +392,11 @@ class DirectorySeedCampaignLinkService {
         dscl.last_synced_at, dscl.last_sync_fields,
         dscl.created_at, dscl.updated_at,
         mc.display_id, mc.business_name, mc.category, mc.city, mc.state,
-        mc.stage, mc.campaign_category
+        mc.stage, mc.campaign_category, mc.playbook_code,
+        pc.name AS playbook_name, pc.archetype AS playbook_archetype
       FROM directory_seed_campaign_links dscl
       JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+      LEFT JOIN mkt_playbook_catalog pc ON pc.code = mc.playbook_code
       WHERE dscl.seed_id = ${seedId}
       ORDER BY
         CASE dscl.link_role WHEN 'primary' THEN 0 ELSE 1 END,
@@ -418,6 +423,9 @@ class DirectorySeedCampaignLinkService {
         state: r.state ?? null,
         stage: r.stage,
         campaignCategory: r.campaign_category,
+        playbookCode: r.playbook_code ?? null,
+        playbookName: r.playbook_name ?? null,
+        playbookArchetype: r.playbook_archetype ?? null,
       },
     }));
   }
@@ -1185,6 +1193,9 @@ class DirectorySeedCampaignLinkService {
     state: string | null;
     stage: string;
     campaignCategory: string;
+    playbookCode: string | null;
+    playbookName: string | null;
+    playbookArchetype: string | null;
     alreadyLinked: boolean;
   }>> {
     const seedRow = await prisma.$queryRaw<any[]>`
@@ -1206,12 +1217,14 @@ class DirectorySeedCampaignLinkService {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
         mc.id, mc.display_id, mc.business_name, mc.category, mc.city,
-        mc.state, mc.stage, mc.campaign_category,
+        mc.state, mc.stage, mc.campaign_category, mc.playbook_code,
+        pc.name AS playbook_name, pc.archetype AS playbook_archetype,
         EXISTS (
           SELECT 1 FROM directory_seed_campaign_links dscl
           WHERE dscl.campaign_id = mc.id AND dscl.seed_id = ${seedId}
         ) AS already_linked
       FROM mkt_campaigns_list mc
+      LEFT JOIN mkt_playbook_catalog pc ON pc.code = mc.playbook_code
       WHERE
         (
           mc.business_name ILIKE ${namePattern}
@@ -1238,6 +1251,9 @@ class DirectorySeedCampaignLinkService {
       state: r.state ?? null,
       stage: r.stage,
       campaignCategory: r.campaign_category,
+      playbookCode: r.playbook_code ?? null,
+      playbookName: r.playbook_name ?? null,
+      playbookArchetype: r.playbook_archetype ?? null,
       alreadyLinked: !!r.already_linked,
     }));
   }

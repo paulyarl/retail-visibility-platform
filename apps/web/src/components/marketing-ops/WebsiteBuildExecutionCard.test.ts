@@ -133,6 +133,8 @@ describe('WebsiteBuildExecutionCard', () => {
             seed_id: 'dps-329R-nf8nmoao',
             linked_via_campaign_id: 'mcamp-uvcasj3e',
             linked_via_role: 'primary',
+            linked_via_playbook_code: 'PB-05',
+            linked_via_playbook_name: 'Multi-Signal Footprint Triage',
             seed_status: 'invited',
             business_name: 'Arsema G Food Mart LLC',
             city: 'Indianapolis',
@@ -143,6 +145,7 @@ describe('WebsiteBuildExecutionCard', () => {
     );
     expect(html).toContain('Shared prospect seed found');
     expect(html).toContain('Arsema G Food Mart LLC');
+    expect(html).toContain('PB-05');
     expect(html).toContain('Attach (sibling link)');
   });
 

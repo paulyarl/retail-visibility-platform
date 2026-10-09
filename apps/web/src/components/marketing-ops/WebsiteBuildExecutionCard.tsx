@@ -254,7 +254,11 @@ export default function WebsiteBuildExecutionCard({ campaign, onRefresh, initial
                 <span className="text-gray-700 dark:text-gray-300">
                   {s.business_name ?? s.seed_id}
                   {s.city ? ` · ${s.city}${s.state ? `, ${s.state}` : ''}` : ''}
-                  <span className="ml-1.5 text-[10px] text-gray-400">via {s.linked_via_campaign_id} ({s.linked_via_role})</span>
+                  <span className="ml-1.5 text-[10px] text-gray-400">
+                    via {s.linked_via_playbook_code
+                      ? `${s.linked_via_playbook_code}${s.linked_via_playbook_name ? ` — ${s.linked_via_playbook_name}` : ''}`
+                      : s.linked_via_campaign_id} ({s.linked_via_role})
+                  </span>
                 </span>
                 <button
                   onClick={() => handleAttachSeed(s.seed_id)}
