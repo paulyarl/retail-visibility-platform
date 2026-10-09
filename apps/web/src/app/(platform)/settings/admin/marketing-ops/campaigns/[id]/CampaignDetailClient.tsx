@@ -372,6 +372,15 @@ export default function CampaignDetailClient({
   const [eligibleTypes, setEligibleTypes] = useState<DeliverableType[] | null>(null);
   const [sourceMaterialReady, setSourceMaterialReady] = useState<boolean | null>(null);
   const [sourceMaterialBusy, setSourceMaterialBusy] = useState(false);
+  // Dual-execution lanes for source material (same pattern as
+  // WebsiteGapBriefingPanel): 'ai' = internal run, 'external' = render →
+  // paste into an external LLM → import validated JSON. The external lane
+  // needs no platform AI credits.
+  const [sourceMaterialMode, setSourceMaterialMode] = useState<'ai' | 'external'>('ai');
+  const [smRenderedPrompt, setSmRenderedPrompt] = useState<string | null>(null);
+  const [smSnapshotHash, setSmSnapshotHash] = useState<string | null>(null);
+  const [smPastedOutput, setSmPastedOutput] = useState('');
+  const [smCopied, setSmCopied] = useState(false);
   const [reviewIntakeText, setReviewIntakeText] = useState('');
   const [reviewIntakeBusy, setReviewIntakeBusy] = useState(false);
   const [modalNotice, setModalNotice] = useState<string | null>(null);
@@ -2749,7 +2758,8 @@ export default function CampaignDetailClient({
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Source-material readiness (spec §9.1) */}
+              {/* Source-material readiness (spec §9.1) — dual-execution lanes:
+                  internal AI run, or render → external LLM → validated import. */}
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm">
@@ -2760,26 +2770,160 @@ export default function CampaignDetailClient({
                         ? <span className="text-green-600 dark:text-green-400">ready</span>
                         : <span className="text-amber-600 dark:text-amber-400">not generated — will run on Generate</span>}
                   </div>
-                  <button
-                    onClick={async () => {
-                      setSourceMaterialBusy(true);
-                      setModalNotice(null);
-                      try {
-                        const r = await marketingOpsService.generateDeliverableSourceMaterial(campaignId);
-                        setSourceMaterialReady(Boolean(r?.sourceMaterial));
-                        if (!r?.sourceMaterial) setModalNotice('Source material ran but returned no content.');
-                      } catch (err: any) {
-                        setModalNotice(err.message || 'Failed to generate source material');
-                      } finally {
-                        setSourceMaterialBusy(false);
-                      }
-                    }}
-                    disabled={sourceMaterialBusy}
-                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    {sourceMaterialBusy ? 'Generating…' : 'Generate Source Material'}
-                  </button>
+                  <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-neutral-800 p-0.5 shrink-0">
+                    <button
+                      onClick={() => setSourceMaterialMode('ai')}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                        sourceMaterialMode === 'ai'
+                          ? 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-900'
+                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      AI Run
+                    </button>
+                    <button
+                      onClick={() => setSourceMaterialMode('external')}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                        sourceMaterialMode === 'external'
+                          ? 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-900'
+                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <Copy className="w-3 h-3" />
+                      External
+                    </button>
+                  </div>
                 </div>
+
+                {sourceMaterialMode === 'ai' && (
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      onClick={async () => {
+                        setSourceMaterialBusy(true);
+                        setModalNotice(null);
+                        try {
+                          const r = await marketingOpsService.generateDeliverableSourceMaterial(campaignId);
+                          setSourceMaterialReady(Boolean(r?.sourceMaterial));
+                          if (!r?.sourceMaterial) setModalNotice('Source material ran but returned no content.');
+                        } catch (err: any) {
+                          setModalNotice(err.message || 'Failed to generate source material');
+                        } finally {
+                          setSourceMaterialBusy(false);
+                        }
+                      }}
+                      disabled={sourceMaterialBusy}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      {sourceMaterialBusy ? 'Generating…' : 'Generate Source Material'}
+                    </button>
+                  </div>
+                )}
+
+                {sourceMaterialMode === 'external' && (
+                  <div className="mt-2 space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Step 1 — Render prompt</p>
+                        <button
+                          onClick={async () => {
+                            setSourceMaterialBusy(true);
+                            setModalNotice(null);
+                            try {
+                              const r = await marketingOpsService.renderDeliverableSourceMaterialPrompt(campaignId);
+                              setSmRenderedPrompt(r.renderedPrompt);
+                              setSmSnapshotHash(r.snapshotHash);
+                            } catch (err: any) {
+                              setModalNotice(err.message || 'Failed to render source material prompt');
+                            } finally {
+                              setSourceMaterialBusy(false);
+                            }
+                          }}
+                          disabled={sourceMaterialBusy}
+                          className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                        >
+                          {sourceMaterialBusy ? 'Rendering…' : smRenderedPrompt ? 'Re-render' : 'Render Prompt'}
+                        </button>
+                      </div>
+                      {smRenderedPrompt ? (
+                        <div className="space-y-1">
+                          <div className="flex justify-end">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(smRenderedPrompt);
+                                  setSmCopied(true);
+                                  setTimeout(() => setSmCopied(false), 2000);
+                                } catch {
+                                  // Clipboard may be unavailable; the textarea is selectable as fallback
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                            >
+                              <Copy className="w-3 h-3" />
+                              {smCopied ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <textarea
+                            readOnly
+                            value={smRenderedPrompt}
+                            rows={6}
+                            className="w-full text-xs font-mono bg-white dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-700 dark:text-gray-300 resize-y"
+                          />
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Copy this prompt into any external LLM, then paste the JSON response below.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Render the analyst prompt with this campaign's audit + signals, run it in any external LLM, then import the output — no platform AI credits needed.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 border-t border-gray-200/60 dark:border-gray-700/60 pt-2">
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Step 2 — Paste external output & import</p>
+                      <textarea
+                        value={smPastedOutput}
+                        onChange={(e) => setSmPastedOutput(e.target.value)}
+                        rows={5}
+                        placeholder='Paste the external LLM JSON output here (must contain "deliverable_sources")...'
+                        className="w-full text-xs font-mono bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-600 rounded-lg p-2.5 text-gray-700 dark:text-gray-300 resize-y focus:ring-2 focus:ring-gray-400"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          onClick={async () => {
+                            if (!smPastedOutput.trim()) {
+                              setModalNotice('Paste the external LLM output before importing');
+                              return;
+                            }
+                            setSourceMaterialBusy(true);
+                            setModalNotice(null);
+                            try {
+                              const r = await marketingOpsService.importDeliverableSourceMaterial(
+                                campaignId,
+                                smPastedOutput,
+                                smSnapshotHash ?? undefined,
+                              );
+                              setSourceMaterialReady(Boolean(r?.sourceMaterial));
+                              setSmPastedOutput('');
+                              if (!r?.sourceMaterial) setModalNotice('Import accepted but produced no source material content.');
+                            } catch (err: any) {
+                              setModalNotice(err.message || 'Failed to import source material');
+                            } finally {
+                              setSourceMaterialBusy(false);
+                            }
+                          }}
+                          disabled={sourceMaterialBusy || !smPastedOutput.trim()}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                        >
+                          {sourceMaterialBusy ? 'Importing…' : 'Import Result'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {eligibleTypes && (
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Signal-derived types: {eligibleTypes.length ? eligibleTypes.join(', ') : 'none — showing all'}

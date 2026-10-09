@@ -6663,6 +6663,49 @@ router.post('/deliverable/:campaignId/source-material/generate', async (req: any
   }
 });
 
+// External lane: render the analyst prompt with the same server-assembled
+// variables the internal run uses — copy/paste bridge for external LLMs.
+router.get('/deliverable/:campaignId/source-material/render', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableSourceService.renderSourceMaterialPrompt(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// External lane: import an external LLM's JSON output (schema-validated
+// inside importExternalResult; execution stamped with the render's
+// evidence_snapshot_hash so the generate lane's §7.1 cache recognizes it).
+const sourceMaterialImportSchema = z.object({
+  raw_output: z.string().min(1),
+  source: z.string().max(100).optional(),
+  snapshot_hash: z.string().max(128).optional(),
+});
+router.post('/deliverable/:campaignId/source-material/import', async (req: any, res: Response) => {
+  try {
+    const parsed = sourceMaterialImportSchema.parse(req.body);
+    const result = await DeliverableSourceService.importSourceMaterial(req.params.campaignId, {
+      rawOutput: parsed.raw_output,
+      source: parsed.source,
+      snapshotHash: parsed.snapshot_hash,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    const msg = (error as Error).message || '';
+    if (/scope .* is not compatible|out-of-scope variables/i.test(msg)) {
+      return res.status(400).json({ success: false, error: 'scope_mismatch', message: msg });
+    }
+    if (/does not match .* output schema|does not declare a recognized output_schema|not valid JSON|no valid JSON found/i.test(msg)) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: msg });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Operator-pasted review intake (G-1 Option D)
 router.post('/deliverable/:campaignId/review-intake', async (req: any, res: Response) => {
   try {

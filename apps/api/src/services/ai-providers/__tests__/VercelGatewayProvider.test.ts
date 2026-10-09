@@ -58,7 +58,7 @@ describe('VercelGatewayProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (unifiedConfig as any).env.AI_GATEWAY_API_KEY = 'test-gateway-key';
-    (unifiedConfig as any).env.AI_GATEWAY_URL = 'https://gateway.ai.vercel.com/v1';
+    (unifiedConfig as any).env.AI_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1';
     provider = new VercelGatewayProvider();
   });
 

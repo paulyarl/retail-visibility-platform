@@ -19,7 +19,7 @@ The platform currently leverages AI models across multiple core functions:
 ## 2. Target Architecture
 
 By aligning with **Vercel AI Gateway** (with the web app hosted on Vercel and API communicating through standard OpenAI-compatible gateway endpoints):
-- **Unified Gateway Routing**: All text and embedding requests route via `https://gateway.ai.vercel.com/v1` (or local Vercel AI SDK runtime) using a single Gateway secret.
+- **Unified Gateway Routing**: All text and embedding requests route via `https://ai-gateway.vercel.sh/v1` (or local Vercel AI SDK runtime) using a single Gateway secret.
 - **Zero-Code Edge Failovers**: Gateway handles model failovers (e.g., `google/gemini-2.0-flash` $\rightarrow$ `openai/gpt-4o-mini` $\rightarrow$ `anthropic/claude-3-5-haiku`) on rate-limits (429) or upstream downtime.
 - **Zero-Cost Edge Caching**: Repeated queries return in milliseconds with \$0 in model fees.
 - **Multi-Tenant Attribution**: Outgoing requests send `x-tenant-id`, `x-campaign-id`, and `x-customer-id` headers for granular cost analytics.
@@ -48,7 +48,7 @@ Build the core `VercelGatewayProvider` adapter, integrate it with `AiProviderFac
 1. Update `apps/api/src/config/unifiedConfig.ts` to include:
    ```ts
    aiGateway: {
-     url: process.env.AI_GATEWAY_URL || 'https://gateway.ai.vercel.com/v1',
+     url: process.env.AI_GATEWAY_URL || 'https://ai-gateway.vercel.sh/v1',
      apiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_AI_GATEWAY_TOKEN || '',
      enabled: process.env.AI_GATEWAY_ENABLED === 'true',
      defaultChatModel: process.env.AI_GATEWAY_DEFAULT_CHAT_MODEL || 'openai/gpt-4o-mini',

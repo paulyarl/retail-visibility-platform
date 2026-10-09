@@ -4744,6 +4744,48 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  // External lane: render the source-material prompt with server-assembled
+  // variables for copy/paste into an external LLM. snapshotHash is echoed
+  // back to importDeliverableSourceMaterial for generate-lane idempotency.
+  async renderDeliverableSourceMaterialPrompt(campaignId: string): Promise<{ renderedPrompt: string; snapshotHash: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/source-material/render`,
+      { method: 'GET' },
+      `mkt-ops-source-material-render-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      const msg = typeof result.error === 'string'
+        ? result.error
+        : (result.error?.message ?? 'Failed to render source material prompt');
+      throw new Error(msg);
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // External lane: import an external LLM's validated JSON output.
+  async importDeliverableSourceMaterial(
+    campaignId: string,
+    rawOutput: string,
+    snapshotHash?: string,
+  ): Promise<{ executionId: string; sourceMaterial: any | null }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/source-material/import`,
+      { method: 'POST', body: JSON.stringify({ raw_output: rawOutput, source: 'external', snapshot_hash: snapshotHash }) },
+      `mkt-ops-source-material-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      const msg = typeof result.error === 'string'
+        ? result.error
+        : (result.error?.message ?? 'Failed to import source material');
+      throw new Error(msg);
+    }
+    await this.invalidateCachePattern(`mkt-ops-source-material-${campaignId}`);
+    await this.invalidateCachePattern('mkt-ops-executions');
+    return result.data?.data ?? result.data;
+  }
+
   async ingestReviewIntake(campaignId: string, rawReviews: string): Promise<{ executionId: string; intake: any | null }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/deliverable/${campaignId}/review-intake`,

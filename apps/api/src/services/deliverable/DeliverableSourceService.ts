@@ -20,6 +20,7 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { MarketingExecutionService } from '../MarketingExecutionService';
+import { MarketingPromptService } from '../MarketingPromptService';
 import { extractSignals } from '../triage/signal-extractor';
 import type { SignalCode } from '../triage/signal-taxonomy';
 import type { DeliverableType } from '../MarketingDeliverableService';
@@ -242,20 +243,8 @@ export class DeliverableSourceService extends BaseService {
     sourceMaterial: DeliverableSourceMaterial | null;
   }> {
     try {
-      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
-        where: { id: campaignId },
-        include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
-      });
-      if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
-
-      const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
-      const auditData = (latestAudit?.audit_data ?? null) as any;
-
-      const eligibility = await this.resolveEligibleTypes(campaignId, ctx);
-      const intake = await this.getReviewIntake(campaignId, ctx);
-      const priorOutreach = await this.buildPriorOutreach(campaignId);
-
-      const snapshotHash = this.hashSnapshot(latestAudit?.id ?? null, eligibility.signals);
+      const { eligibility, intake, snapshotHash, variables } =
+        await this.buildSourceMaterialContext(campaignId, ctx);
 
       // Idempotency: reuse a cached execution for the same audit + signals (§7.1).
       const cached = await this.prisma.mkt_prompt_executions_list.findFirst({
@@ -268,17 +257,6 @@ export class DeliverableSourceService extends BaseService {
           return { executionId: cached.id, sourceMaterial: this.normalize(parsed, eligibility, intake) };
         }
       }
-
-      const variables = {
-        business_name: campaign.business_name ?? '',
-        category: campaign.category ?? '',
-        city: campaign.city ?? '',
-        detected_signals: this.formatSignals(eligibility.signals),
-        audit_results: this.serializeAuditResults(auditData),
-        prior_outreach: priorOutreach,
-        review_intake: intake ? JSON.stringify(intake) : '',
-        evidence_snapshot_hash: snapshotHash,
-      };
 
       const execution = await MarketingExecutionService.getInstance().executeSingle(
         { campaignId, templateId: SOURCE_MATERIAL_TEMPLATE_ID, variables, executedBy: ctx?.userId || 'operator' },
@@ -295,6 +273,121 @@ export class DeliverableSourceService extends BaseService {
       };
     } catch (error) {
       logger.error('Failed to generate deliverable source material', ctx, {
+        error: (error as Error).message, campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Assemble the render context for the source-material prompt — campaign +
+   * latest business_analysis audit, eligibility/intake/prior-outreach, the
+   * evidence snapshot hash, and the substituted variables. Shared by the
+   * internal lane (generateSourceMaterial), the external render lane
+   * (renderSourceMaterialPrompt), and the import lane (importSourceMaterial)
+   * so the two executions can never drift.
+   */
+  private async buildSourceMaterialContext(campaignId: string, ctx?: RequestCtx): Promise<{
+    campaign: any;
+    eligibility: DeliverableSourceResolution;
+    intake: ReviewIntake | null;
+    snapshotHash: string;
+    variables: Record<string, any>;
+  }> {
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
+    });
+    if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
+
+    const latestAudit = campaign.mkt_audits_list?.[0] ?? null;
+    const auditData = (latestAudit?.audit_data ?? null) as any;
+
+    const eligibility = await this.resolveEligibleTypes(campaignId, ctx);
+    const intake = await this.getReviewIntake(campaignId, ctx);
+    const priorOutreach = await this.buildPriorOutreach(campaignId);
+    const snapshotHash = this.hashSnapshot(latestAudit?.id ?? null, eligibility.signals);
+
+    const variables = {
+      business_name: campaign.business_name ?? '',
+      category: campaign.category ?? '',
+      city: campaign.city ?? '',
+      detected_signals: this.formatSignals(eligibility.signals),
+      audit_results: this.serializeAuditResults(auditData),
+      prior_outreach: priorOutreach,
+      review_intake: intake ? JSON.stringify(intake) : '',
+      evidence_snapshot_hash: snapshotHash,
+    };
+
+    return { campaign, eligibility, intake, snapshotHash, variables };
+  }
+
+  /**
+   * External lane — render the source-material prompt with the same
+   * server-assembled variables generateSourceMaterial uses, for copy/paste
+   * into an external LLM. Returns the snapshot hash so the caller can echo
+   * it back to importSourceMaterial for §7.1 idempotency.
+   */
+  async renderSourceMaterialPrompt(campaignId: string, ctx?: RequestCtx): Promise<{
+    renderedPrompt: string;
+    snapshotHash: string;
+  }> {
+    try {
+      const { variables, snapshotHash } = await this.buildSourceMaterialContext(campaignId, ctx);
+      const renderedPrompt = await MarketingExecutionService.getInstance().renderPrompt(
+        { campaignId, templateId: SOURCE_MATERIAL_TEMPLATE_ID, variables },
+        ctx,
+      );
+      return { renderedPrompt, snapshotHash };
+    } catch (error) {
+      logger.error('Failed to render deliverable source material prompt', ctx, {
+        error: (error as Error).message, campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * External lane — import an external LLM's JSON output for the
+   * source-material prompt. Validated against the deliverable_source_material
+   * schema inside importExternalResult (auditPlatform: null — no audit row),
+   * then stamped with the render's snapshot hash so the §7.1 cache in
+   * generateSourceMaterial recognizes the import as the execution for the
+   * audit+signals state it was rendered against. Falls back to the current
+   * hash when the caller doesn't echo the render's hash.
+   */
+  async importSourceMaterial(campaignId: string, input: {
+    rawOutput: string;
+    source?: string;
+    snapshotHash?: string;
+  }, ctx?: RequestCtx): Promise<{
+    executionId: string;
+    sourceMaterial: DeliverableSourceMaterial | null;
+  }> {
+    try {
+      const { eligibility, intake, snapshotHash: currentHash } =
+        await this.buildSourceMaterialContext(campaignId, ctx);
+
+      const result = await MarketingPromptService.getInstance().importExternalResult({
+        campaignId,
+        templateId: SOURCE_MATERIAL_TEMPLATE_ID,
+        rawOutput: input.rawOutput,
+        source: input.source || 'external',
+        executedBy: ctx?.userId,
+      }, ctx);
+
+      await this.prisma.mkt_prompt_executions_list.update({
+        where: { id: result.execution.id },
+        data: { variables_used: { evidence_snapshot_hash: input.snapshotHash ?? currentHash } },
+      });
+
+      const parsed = this.parseAndValidate(deliverableSourceMaterialSchema, input.rawOutput, ctx, result.execution.id);
+      return {
+        executionId: result.execution.id,
+        sourceMaterial: parsed ? this.normalize(parsed, eligibility, intake) : null,
+      };
+    } catch (error) {
+      logger.error('Failed to import deliverable source material', ctx, {
         error: (error as Error).message, campaignId,
       });
       throw this.handleError(error, ctx);

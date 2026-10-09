@@ -370,7 +370,7 @@ class UnifiedConfig {
   // ─── AI Gateway (Vercel) ────────────────────────────────────────────────
 
   get aiGatewayUrl(): string {
-    return this.env.AI_GATEWAY_URL || 'https://gateway.ai.vercel.com/v1';
+    return this.env.AI_GATEWAY_URL || 'https://ai-gateway.vercel.sh/v1';
   }
 
   get aiGatewayApiKey(): string | undefined {
