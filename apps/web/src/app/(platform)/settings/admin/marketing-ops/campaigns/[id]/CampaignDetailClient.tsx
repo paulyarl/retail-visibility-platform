@@ -20,6 +20,7 @@ import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditC
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import WebsitePositioningAuditCard from '@/components/marketing-ops/WebsitePositioningAuditCard';
 import WebsiteGapBriefingPanel from '@/components/marketing-ops/WebsiteGapBriefingPanel';
+import WebsiteBuildExecutionCard from '@/components/marketing-ops/WebsiteBuildExecutionCard';
 import ArchetypeBriefingPanel from '@/components/marketing-ops/ArchetypeBriefingPanel';
 import OwnerReportSection from '@/components/marketing-ops/OwnerReportSection';
 import { isWebsiteGapCampaign } from '@/components/marketing-ops/repairCampaignGate';
@@ -1579,6 +1580,13 @@ export default function CampaignDetailClient({
                     PB-08 shares campaign_category='profile_repair' but has no
                     repair track. */}
                 <WebsiteGapBriefingPanel campaign={campaign} onRefresh={fetchCampaign} />
+                {/* Website Build Execution — the PB-08 post-decision tracker,
+                    the counterpart of RepairExecutionCard for the website-gap
+                    motion. Renders once a build scope is confirmed: delivery
+                    mode (dfy/diy, scope-gated), linked seed + sibling-attach
+                    path, preview storefront, website_build intake, checklist
+                    progress. Self-gates on isWebsiteGapCampaign + decision. */}
+                <WebsiteBuildExecutionCard campaign={campaign} onRefresh={fetchCampaign} />
                 {/* Archetype Briefing — the routed sibling's briefing home.
                     Composes a profile_repair_audit-shaped seek from the
                     deterministic archetype extract of the shared

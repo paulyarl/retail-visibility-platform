@@ -30,6 +30,7 @@ import type { DiscoveryContext } from '../validators/intelligence-discovery.sche
 import { deriveDiscoverySignals } from './triage/discovery-verdict';
 import type { IdentityFieldKey } from './directory/identityScoring';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import { isBuildDeliveryMode, modesForScope } from '../lib/website-build';
 
 /** Call outcome — mirrors the queue's VerificationOutcome. */
 export type CampaignVerificationOutcome =
@@ -3674,6 +3675,7 @@ export class MarketingCampaignService extends BaseService {
     campaignId: string;
     scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
     reason: string;
+    deliveryMode?: 'dfy' | 'diy';
     changedBy?: string;
   }, ctx?: RequestCtx): Promise<any> {
     try {
@@ -3709,6 +3711,20 @@ export class MarketingCampaignService extends BaseService {
       });
       const recommended = (latestAudit?.audit_data as any)?.build_scope?.recommended ?? null;
 
+      // Delivery mode (dfy/diy) is scope-gated: an explicit mode must be one
+      // the scope offers, and a re-confirm only carries a prior mode forward
+      // while it remains valid for the new scope.
+      const scopeModes = modesForScope(input.scope);
+      if (input.deliveryMode && !scopeModes.includes(input.deliveryMode)) {
+        throw new Error(`Delivery mode '${input.deliveryMode}' is not offered for scope '${input.scope}'`);
+      }
+      const prior = (campaign.playbook_decision as Record<string, any> | null) ?? null;
+      const carriedMode =
+        prior?.kind === 'website_build_scope' && isBuildDeliveryMode(prior.delivery_mode) && scopeModes.includes(prior.delivery_mode)
+          ? prior.delivery_mode
+          : null;
+      const deliveryMode = input.deliveryMode ?? carriedMode;
+
       const decision = {
         kind: 'website_build_scope',
         confirmed_scope: input.scope,
@@ -3718,6 +3734,7 @@ export class MarketingCampaignService extends BaseService {
         decided_at: new Date().toISOString(),
         decided_by: input.changedBy ?? null,
         audit_id: latestAudit?.id ?? null,
+        ...(deliveryMode ? { delivery_mode: deliveryMode } : {}),
       };
 
       const updated = await this.prisma.mkt_campaigns_list.update({

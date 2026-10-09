@@ -1726,6 +1726,7 @@ router.post('/:id/switch-track', async (req: any, res: Response) => {
 const buildScopeSchema = z.object({
   scope: z.enum(['new_build', 'rebuild', 'repair', 'secure_and_refresh']),
   reason: z.string().min(1, 'Reason is required'),
+  delivery_mode: z.enum(['dfy', 'diy']).optional(),
 });
 
 router.post('/:id/website-gap/confirm-scope', async (req: any, res: Response) => {
@@ -1735,6 +1736,7 @@ router.post('/:id/website-gap/confirm-scope', async (req: any, res: Response) =>
       campaignId: req.params.id,
       scope: parsed.scope,
       reason: parsed.reason,
+      deliveryMode: parsed.delivery_mode,
       changedBy: req.user?.id,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
@@ -1742,6 +1744,43 @@ router.post('/:id/website-gap/confirm-scope', async (req: any, res: Response) =>
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Website Gap (PB-08) — set the delivery mode on the confirmed decision.
+// The analog of the repair package's diy/dfy mode; scope-gated server-side
+// via BUILD_SCOPE_MODES.
+const deliveryModeSchema = z.object({
+  delivery_mode: z.enum(['dfy', 'diy']),
+});
+
+router.patch('/:id/website-gap/delivery-mode', async (req: any, res: Response) => {
+  try {
+    const parsed = deliveryModeSchema.parse(req.body);
+    const { default: websiteBuildExecutionService } = await import('../services/WebsiteBuildExecutionService.js');
+    const campaign = await websiteBuildExecutionService.updateDeliveryMode(
+      req.params.id,
+      parsed.delivery_mode,
+      req.user?.id,
+      getCtx(req),
+    );
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Website Gap (PB-08) — execution read model for the WebsiteBuildExecutionCard.
+router.get('/:id/website-build-execution', async (req: any, res: Response) => {
+  try {
+    const { default: websiteBuildExecutionService } = await import('../services/WebsiteBuildExecutionService.js');
+    const data = await websiteBuildExecutionService.getWebsiteBuildExecution(req.params.id, getCtx(req));
+    res.json({ success: true, data });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

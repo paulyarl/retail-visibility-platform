@@ -155,15 +155,78 @@ export interface TriageRecommendation {
   _validated?: boolean;
 }
 
+export type WebsiteBuildScope = 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
+export type WebsiteBuildDeliveryMode = 'dfy' | 'diy';
+
 export interface WebsiteGapDecision {
   kind: 'website_build_scope';
-  confirmed_scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
+  confirmed_scope: WebsiteBuildScope;
   recommended_scope: string | null;
   diverged_from_audit: boolean | null;
   reason: string;
   decided_at: string;
   decided_by: string | null;
   audit_id: string | null;
+  // Delivery mode (dfy/diy) — the PB-08 analog of the repair package mode.
+  // Scope-gated by BUILD_SCOPE_MODES on the API side.
+  delivery_mode?: WebsiteBuildDeliveryMode | null;
+  delivery_mode_decided_at?: string | null;
+  delivery_mode_decided_by?: string | null;
+}
+
+// PB-08 / A7 — post-decision execution read model
+// (GET /campaigns/:id/website-build-execution). The counterpart of
+// RepairExecutionReadModel for the website-gap motion.
+export interface WebsiteBuildExecutionReadModel {
+  campaign_id: string;
+  stage: string;
+  decision: WebsiteGapDecision | null;
+  confirmed_scope: WebsiteBuildScope | null;
+  delivery_mode: WebsiteBuildDeliveryMode | null;
+  scope_modes: WebsiteBuildDeliveryMode[];
+  seed: {
+    seed_id: string;
+    link_role: string;
+    nap_match_confidence: string | null;
+    nap_match_summary: any;
+    seed_status: string | null;
+    seed_claimed: boolean;
+    claimed_at: string | null;
+  } | null;
+  linkable_seeds: Array<{
+    seed_id: string;
+    linked_via_campaign_id: string;
+    linked_via_role: string;
+    seed_status: string | null;
+    business_name: string | null;
+    city: string | null;
+    state: string | null;
+  }>;
+  preview: {
+    eligible: boolean;
+    storefront_url: string | null;
+    tenant_id: string | null;
+    expires_at: string | null;
+    extensions_used: number;
+    page_views: number;
+  } | null;
+  intake: {
+    intake_id: string;
+    short_code: string | null;
+    short_url: string | null;
+    submitted_at: string | null;
+    viewed_at: string | null;
+    viewed_count: number;
+    expires_at: string | null;
+    attachment_count: number;
+  } | null;
+  checklist: {
+    steps_total: number;
+    steps_completed: number;
+    required_total: number;
+    required_completed: number;
+    next_steps: Array<{ id: string; title: string; step_order: number }>;
+  } | null;
 }
 
 export interface Campaign {
@@ -2578,6 +2641,7 @@ class MarketingOpsService extends AdminApiSingleton {
   async confirmWebsiteBuildScope(id: string, input: {
     scope: 'new_build' | 'rebuild' | 'repair' | 'secure_and_refresh';
     reason: string;
+    delivery_mode?: WebsiteBuildDeliveryMode;
   }): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${id}/website-gap/confirm-scope`,
@@ -2587,6 +2651,36 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to confirm build scope');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  // PB-08 / A7 — post-decision execution read model (the counterpart of
+  // getRepairExecution for the website-gap motion).
+  async getWebsiteBuildExecution(campaignId: string): Promise<WebsiteBuildExecutionReadModel> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/website-build-execution`,
+      {},
+      `mkt-ops-website-build-execution-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch website build execution');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // PB-08 / A7 — set the delivery mode on the confirmed build-scope decision.
+  async updateWebsiteBuildDeliveryMode(id: string, deliveryMode: WebsiteBuildDeliveryMode): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/website-gap/delivery-mode`,
+      { method: 'PATCH', body: JSON.stringify({ delivery_mode: deliveryMode }) },
+      `mkt-ops-campaign-website-gap-mode-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to set delivery mode');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;
