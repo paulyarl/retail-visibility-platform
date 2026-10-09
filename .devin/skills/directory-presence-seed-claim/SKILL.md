@@ -180,7 +180,7 @@ See `docs/LocalBiz/GBP_USER_GUIDE_PHASE5.md` for the full operational guide.
 
 ## Operator Invite Copy
 
-> You're already listed on the Indianapolis African grocery directory from public information (address, phone, and SNAP where reported). Claim the listing to fix hours or phone and add a photo. This is not an online store.
+> You're already listed on the Indianapolis African grocery directory from public information (address, phone, and SNAP where reported). Claim the listing to fix hours or phone and add a photo. Your shelves can also be browsed online, so customers can see what you carry before they visit.
 
 ## Non-Goals
 

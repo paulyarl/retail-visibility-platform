@@ -3060,6 +3060,110 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Operator-run in-store demo window (migration 317). Logged as a 'visit'
+   * touch. Expiry is read from demo_window_expected_end_at, so no background
+   * job is needed; only one window may be active per seed.
+   */
+  async getActiveDemoWindow(seedId: string): Promise<any | null> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, demo_window_started_at, demo_window_expected_end_at,
+             demo_window_ended_at, demo_window_started_by
+      FROM directory_seed_outreach_touches
+      WHERE seed_id = ${seedId}
+        AND demo_window_started_at IS NOT NULL
+        AND demo_window_ended_at IS NULL
+        AND demo_window_expected_end_at > now()
+      ORDER BY demo_window_started_at DESC
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  }
+
+  async listDemoWindows(seedId: string): Promise<any[]> {
+    return prisma.$queryRaw<any[]>`
+      SELECT id, demo_window_started_at, demo_window_expected_end_at,
+             demo_window_ended_at, demo_window_started_by
+      FROM directory_seed_outreach_touches
+      WHERE seed_id = ${seedId}
+        AND demo_window_started_at IS NOT NULL
+      ORDER BY demo_window_started_at DESC
+    `;
+  }
+
+  async startDemoWindow(
+    seedId: string,
+    durationMinutes: number,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ id: string; startedAt: Date; expectedEndAt: Date }> {
+    if (await this.getActiveDemoWindow(seedId)) throw new Error('demo_window_active');
+
+    const seed = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (!seed[0]) throw new Error('seed_not_found');
+
+    const touchId = randomUUID();
+    const startedAt = new Date();
+    const expectedEndAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
+
+    await prisma.$executeRaw`
+      INSERT INTO directory_seed_outreach_touches (
+        id, seed_id, tenant_id, channel, notes, operator_id, occurred_at, created_at,
+        demo_window_started_at, demo_window_expected_end_at, demo_window_started_by
+      ) VALUES (
+        ${touchId}::uuid,
+        ${seedId},
+        ${seed[0].tenant_id},
+        'visit',
+        'In-store demo window',
+        ${ctx?.actorId || null},
+        ${startedAt},
+        now(),
+        ${startedAt},
+        ${expectedEndAt},
+        ${ctx?.actorId || null}
+      )
+    `;
+
+    if (ctx) {
+      await audit({
+        actor: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'directory_presence_seed.demo_window_started',
+        payload: { seedId, tenantId: seed[0].tenant_id, touchId, durationMinutes },
+      });
+    }
+
+    logger.info('DirectoryPresenceSeedService.startDemoWindow', undefined, { seedId, touchId, durationMinutes });
+    return { id: touchId, startedAt, expectedEndAt };
+  }
+
+  async stopDemoWindow(seedId: string, ctx?: SeedAuditCtx): Promise<{ id: string }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      UPDATE directory_seed_outreach_touches
+      SET demo_window_ended_at = now()
+      WHERE seed_id = ${seedId}
+        AND demo_window_started_at IS NOT NULL
+        AND demo_window_ended_at IS NULL
+        AND demo_window_expected_end_at > now()
+      RETURNING id
+    `;
+    if (!rows[0]) throw new Error('demo_window_not_active');
+
+    if (ctx) {
+      await audit({
+        actor: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'directory_presence_seed.demo_window_stopped',
+        payload: { seedId, touchId: rows[0].id },
+      });
+    }
+
+    logger.info('DirectoryPresenceSeedService.stopDemoWindow', undefined, { seedId, touchId: rows[0].id });
+    return { id: rows[0].id };
+  }
+
+  /**
    * Spawn a business-scope marketing campaign from a directory presence seed,
    * pre-populated with the seed's NAP (name / address / phone / website /
    * category / geo), and immediately link it to the seed.

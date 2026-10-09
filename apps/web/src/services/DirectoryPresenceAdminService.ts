@@ -936,6 +936,19 @@ export interface AssembledSeedCallScript {
   ammunition: OutreachProblem[];
 }
 
+export interface DemoWindow {
+  id: string;
+  demo_window_started_at: string;
+  demo_window_expected_end_at: string;
+  demo_window_ended_at: string | null;
+  demo_window_started_by: string | null;
+}
+
+export interface DemoWindowState {
+  active: DemoWindow | null;
+  windows: DemoWindow[];
+}
+
 export class DirectoryPresenceAdminService extends AdminApiSingleton {
   private static instance: DirectoryPresenceAdminService;
 
@@ -1418,6 +1431,44 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (!result.success) return [];
     const data = result.data?.data ?? result.data;
     return (data as any)?.touches ?? [];
+  }
+
+  // ============================
+  // In-store demo window (migration 317)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/demo-window */
+  async getDemoWindow(seedId: string): Promise<DemoWindowState> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-window`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return { active: (data as any)?.active ?? null, windows: (data as any)?.windows ?? [] };
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/demo-window */
+  async startDemoWindow(seedId: string, durationMinutes: number): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-window`,
+      { method: 'POST', body: JSON.stringify({ durationMinutes }) },
+      undefined,
+      0,
+    );
+    return !!result.success;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/demo-window/stop */
+  async stopDemoWindow(seedId: string): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-window/stop`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    return !!result.success;
   }
 
   // ============================

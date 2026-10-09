@@ -488,6 +488,84 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
 });
 
 /**
+ * GET /api/admin/directory-presence/presence-seeds/:id/demo-window
+ *
+ * Active in-store demo window (null when none) plus recent windows (migration 317).
+ */
+router.get('/presence-seeds/:id/demo-window', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const [active, windows] = await Promise.all([
+      DirectoryPresenceSeedService.getActiveDemoWindow(req.params.id),
+      DirectoryPresenceSeedService.listDemoWindows(req.params.id),
+    ]);
+    res.json({ success: true, active, windows });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/demo-window] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+const demoWindowSchema = z.object({
+  durationMinutes: z.number().int().min(5).max(120),
+});
+
+/**
+ * POST /api/admin/directory-presence/presence-seeds/:id/demo-window
+ *
+ * Start an in-store demo window. Expires automatically at durationMinutes.
+ */
+router.post('/presence-seeds/:id/demo-window', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const parsed = demoWindowSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'validation_error', details: parsed.error.flatten() });
+    }
+    const ctx = { actorId: (req as any).user?.id, actorType: 'user' as const };
+    const result = await DirectoryPresenceSeedService.startDemoWindow(
+      req.params.id,
+      parsed.data.durationMinutes,
+      ctx,
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if ((error as Error).message === 'seed_not_found') {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    if ((error as Error).message === 'demo_window_active') {
+      return res.status(409).json({ error: 'demo_window_active' });
+    }
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/demo-window] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory-presence/presence-seeds/:id/demo-window/stop
+ *
+ * Stop the active demo window early. Expiry needs no call; the window
+ * closes on its own at demo_window_expected_end_at.
+ */
+router.post('/presence-seeds/:id/demo-window/stop', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const ctx = { actorId: (req as any).user?.id, actorType: 'user' as const };
+    const result = await DirectoryPresenceSeedService.stopDemoWindow(req.params.id, ctx);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if ((error as Error).message === 'demo_window_not_active') {
+      return res.status(409).json({ error: 'demo_window_not_active' });
+    }
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/demo-window/stop] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
  * POST /api/admin/directory/presence-seeds/:id/touches/:touchId/recording
  *
  * Attach (or replace) a call recording on an existing touch (migration 295).

@@ -65,6 +65,7 @@ import ReportQrDesignerModal from './ReportQrDesignerModal';
 import TrafficEngagementPanel from './TrafficEngagementPanel';
 import SeedPhotoCapturePanel from './SeedPhotoCapturePanel';
 import SeedLogoUploadPanel from './SeedLogoUploadPanel';
+import DemoWindowPanel from './DemoWindowPanel';
 import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -2044,6 +2045,9 @@ function PresenceSeedDetailClient() {
       {/* Store logo — the same tenant-logo write the banner QR designer uses,
           so it is the prospect's official logo on every surface. */}
       <SeedLogoUploadPanel seedId={seedId} listing={listing} canEdit={canEdit} />
+
+      {/* In-store demo window — logs the walk-in demo as a visit touch */}
+      <DemoWindowPanel seedId={seedId} canEdit={canEdit} />
 
       {/* Traffic & Engagement — Layer 3 events on the public listing */}
       <TrafficEngagementPanel seedId={seedId} />

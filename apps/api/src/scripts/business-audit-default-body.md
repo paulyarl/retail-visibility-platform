@@ -135,8 +135,8 @@ Rules:
 * Use the category intelligence block (when present) to make problems and solutions category-aware — what resonates for an African Grocery Store differs from a plumbing contractor.
 * Frame problems as business consequences ("customers asking Siri for your category are sent to a competitor"), never as technical labels ("NAP inconsistency").
 * Every entry carries two spoken lines: `regular` — the plain professional way to raise the problem — and `hook` — the alternative that earns attention with the same fact (a curiosity gap, a "try being your own customer" moment, a specific number). The hook must stay 100% true to the evidence: no clickbait, no invented stakes, no fear-mongering.
-* Solutions must be deliverable by the operator — never promise platform-side behavior the operator cannot control. Stay high-level: you do not know the platform's package catalog, so articulate the solution summary or high-level steps (e.g. "claim the listing and correct the phone across Google and Yelp") rather than naming a specific product — the operator maps your summary to the actual offer.
-* Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion).
+* Solutions must be deliverable by the operator — never promise platform-side behavior the operator cannot control. Stay high-level: articulate the solution summary or high-level steps (e.g. "claim the listing and correct the phone across Google and Yelp") rather than naming a specific product or price — the operator maps your summary to the actual offer. For website gaps, describe the offer family, not a SKU: a digital browse of the physical shelves, so customers can see the store's products and check availability before they visit. Frame it as the storefront's digital counterpart, not as an online store, since the business sells from its physical shelves.
+* Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion). The directory claim invitation is always part of the outreach. When website or positioning signals are strong (verified `WC_*` signals), the outreach also invites the owner to the website offer, and that invitation takes priority over the claim invitation in the pair's ordering. Both invitations may appear in the same outreach.
 * `outreach_use` must be concrete enough to act on without rework.
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
 ### Primary Outreach Hook — REQUIRED
@@ -429,6 +429,8 @@ Evaluate:
 * Conversion opportunities
 * Category-specific content check: Evaluate whether the website surfaces category-relevant products, services, terminology, or ordering/pickup options as defined in the Category Intelligence block. Record findings in `website.category_specific_content_present` and `website.ordering_or_pickup_info_present`. Absence of category-specific content is recorded as "not_verified," not as a negative claim.
 
+
+Website absence rule: emit `WC_MISSING_WEBSITE` when at least three readable profiles (Google, Yelp, Facebook, BBB, or directory listings where the website field is visible) show no website, and a search for an owned domain or builder subdomain returns none. Record the unread profiles in `website.issues`. Absence on an unread profile is not a reason to suppress the signal; it is a reason to note the limit. Set `website.status` to `none_found` on this evidence.
 
 Do not perform intrusive testing, vulnerability scanning, or security exploitation.
 ### Website Accessibility Verification — REQUIRED
@@ -1258,4 +1260,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-09-26-parity-6 -->
+<!-- seed-version: business-audit-default-2026-10-08-website-offer-1 -->

@@ -810,7 +810,8 @@ export default function DirectoryClaimClient() {
             You&apos;re already listed on the {summary?.city} {summary?.category} directory from public
             information (address, phone, and SNAP where reported). Claim the listing to fix hours or
             phone, add a photo, and manage the categories it appears under — your listing can show up
-            on every matching category shelf. This is not an online store.
+            on every matching category shelf. Your shelves can also be browsed online, so customers can see
+            what you carry before they visit.
           </Alert>
 
           {/* Owner verification — required consent step (migration 274).
