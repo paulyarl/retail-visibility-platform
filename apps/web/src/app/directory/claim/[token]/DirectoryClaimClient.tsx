@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DirectoryClaimListingEditor from './DirectoryClaimListingEditor';
+import ClaimSlugPicker from './ClaimSlugPicker';
 import ClaimVerificationPanel from './ClaimVerificationPanel';
 import {
   Container,
@@ -540,11 +541,19 @@ export default function DirectoryClaimClient() {
             </Stack>
 
             {summary && (
-              <DirectoryClaimListingEditor
-                token={token}
-                summary={summary}
-                onSaved={loadSummary}
-              />
+              <Stack gap="md">
+                <ClaimSlugPicker
+                  token={token}
+                  currentSlug={summary.slug}
+                  onSaved={loadSummary}
+                />
+                <Divider />
+                <DirectoryClaimListingEditor
+                  token={token}
+                  summary={summary}
+                  onSaved={loadSummary}
+                />
+              </Stack>
             )}
 
             <Divider />
@@ -826,6 +835,21 @@ export default function DirectoryClaimClient() {
             on every matching category shelf. Your shelves can also be browsed online, so customers can see
             what you carry before they visit.
           </Alert>
+
+          {/* Public web address — the prospect picks their slug up front
+              (address-aware patterns, auto-saved on select). Same write the
+              corrections editor uses; kept out of the collapsed corrections
+              block because the URL is an ownership choice, not a correction. */}
+          {summary && (
+            <>
+              <ClaimSlugPicker
+                token={token}
+                currentSlug={summary.slug}
+                onSaved={loadSummary}
+              />
+              <Divider />
+            </>
+          )}
 
           {/* Owner verification — required consent step (migration 274).
               The owner's confirmed categories + attributes are minted on the

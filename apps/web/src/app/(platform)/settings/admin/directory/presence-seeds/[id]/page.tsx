@@ -1523,7 +1523,7 @@ function PresenceSeedDetailClient() {
         )}
         {listing?.slug && listing.is_published ? (
           <Link
-            href={`/place/${listing.slug}`}
+            href={status === 'claimed' ? `/directory/${listing.slug}` : `/place/${listing.slug}`}
             target="_blank"
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
@@ -3062,6 +3062,62 @@ function PresenceSeedDetailClient() {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Claimed — live owner surfaces. The claim keeps the seed's own
+                tenant (tenants.slug stays null, but the universal identifier
+                resolves the listing slug to the tenant storefront). */}
+            {status === 'claimed' && (
+              <div className="border border-green-200 bg-green-50/40 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    Live surfaces
+                  </h3>
+                  <span className="text-[10px] uppercase tracking-wide text-green-700 bg-green-100 rounded px-1.5 py-0.5 font-medium">
+                    Claimed
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  {listing?.slug && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="text-gray-500 w-24 shrink-0">Directory</span>
+                      <a
+                        href={`/directory/${listing.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        /directory/{listing.slug}
+                      </a>
+                    </div>
+                  )}
+                  {listing?.slug && (
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="text-gray-500 w-24 shrink-0">Storefront</span>
+                      <a
+                        href={`/tenant/${listing.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        /tenant/{listing.slug}
+                      </a>
+                    </div>
+                  )}
+                  {seed?.tenant_id && (
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="text-gray-500 w-24 shrink-0">Dashboard</span>
+                      <span className="font-mono text-gray-700">/t/{seed.tenant_id}/dashboard</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

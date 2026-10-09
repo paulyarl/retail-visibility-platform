@@ -130,9 +130,6 @@ export default function DirectoryClaimListingEditor({
   // form state is "every day closed", which would wrongly overwrite a listing
   // that has no sourced hours yet.
   const [hoursTouched, setHoursTouched] = useState(false);
-  const [editSlug, setEditSlug] = useState('');
-  const [slugPatterns, setSlugPatterns] = useState<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }[]>([]);
-  const [loadingSlugs, setLoadingSlugs] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
@@ -162,7 +159,6 @@ export default function DirectoryClaimListingEditor({
     setEditSecondaryCategories(Array.isArray(summary.secondaryCategories) ? summary.secondaryCategories : []);
     setEditHours(parseHours(summary.businessHours));
     setEditTimezone(summary.businessHours?.timezone || 'America/New_York');
-    setEditSlug(summary.slug ?? '');
     setLogoUrl(summary.logoUrl ?? null);
   }, [summary]);
 
@@ -200,20 +196,6 @@ export default function DirectoryClaimListingEditor({
       setError(result.error === 'file_too_large' ? 'Logo must be under 5 MB.' : 'Failed to upload the logo.');
     }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoadingSlugs(true);
-      const patterns = await directoryClaimPublicService.getSlugPatterns(token);
-      if (!cancelled) {
-        setSlugPatterns(patterns);
-      }
-      setLoadingSlugs(false);
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [token]);
 
   const handleGetCoordinates = async () => {
     if (!editAddress.trim() || !editCity.trim() || !editZipCode.trim()) {
@@ -261,7 +243,6 @@ export default function DirectoryClaimListingEditor({
       longitude: editLongitude.trim() && !Number.isNaN(Number(editLongitude)) ? Number(editLongitude) : null,
       notes: editNotes.trim() || null,
       socialLinks: editSocialLinks.filter((s) => s.platform.trim() && s.url.trim()),
-      slug: editSlug.trim() || undefined,
     };
 
     if (includeCategories) {
@@ -441,53 +422,6 @@ export default function DirectoryClaimListingEditor({
             value={editWebsite}
             onChange={(e) => setEditWebsite(e.currentTarget.value)}
           />
-        </Stack>
-
-        <Divider />
-
-        <Stack gap="sm">
-          <Text size="sm" fw={500}>
-            Preferred public URL
-          </Text>
-          {loadingSlugs ? (
-            <Text size="sm" c="dimmed">Loading available URL options...</Text>
-          ) : slugPatterns.length === 0 ? (
-            <Text size="sm" c="dimmed">Enter a business name to see slug options.</Text>
-          ) : (
-            <div className="space-y-2">
-              {slugPatterns.map((p) => (
-                <label
-                  key={p.slug}
-                  className={`
-                    flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all
-                    ${editSlug === p.slug
-                      ? 'border-blue-500 bg-blue-50'
-                      : p.isAvailable
-                        ? 'border-gray-200 hover:border-gray-300 bg-white'
-                        : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  <input
-                    type="radio"
-                    name="slug"
-                    value={p.slug}
-                    checked={editSlug === p.slug}
-                    disabled={!p.isAvailable}
-                    onChange={(e) => setEditSlug(e.target.value)}
-                    className="mt-1"
-                  />
-                  <div>
-                    <code className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">{p.slug}</code>
-                    <p className="text-xs text-gray-500 mt-1">{p.description}</p>
-                    {!p.isAvailable && (
-                      <span className="text-xs text-red-500 font-medium">Taken</span>
-                    )}
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
         </Stack>
 
         <Divider />
