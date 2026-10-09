@@ -1055,6 +1055,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     }
 
     await this.promoteListingToClaimed(r.tenant_id);
+    await this.retireSeedPreviewStorefronts(r.tenant_id);
 
     // --- Customer-to-user promotion bridge ---
     let platformUserId: string | undefined;
@@ -1435,6 +1436,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     }
 
     await this.promoteListingToClaimed(r.tenant_id);
+    await this.retireSeedPreviewStorefronts(r.tenant_id);
 
     // Update request status
     await prisma.$executeRaw`
@@ -1791,6 +1793,30 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       WHERE tenant_id = ${tenantId}
         AND listing_origin = 'directory_seed'
     `;
+  }
+
+  /**
+   * Retire any live seed-preview storefronts sourced from the claimed seed's
+   * tenant (spec §5e) — once the owner controls the real tenant, no preview
+   * may remain publicly visible. Best-effort: a retirement failure must not
+   * block the claim.
+   */
+  private async retireSeedPreviewStorefronts(tenantId: string): Promise<void> {
+    try {
+      const { retireSeedPreviewsForSource } = await import('../lib/seed-preview');
+      const retired = await retireSeedPreviewsForSource(tenantId);
+      if (retired > 0) {
+        logger.info('[DirectoryClaim] Retired seed-preview storefront(s) on claim', undefined, {
+          tenantId,
+          retired,
+        });
+      }
+    } catch (err: any) {
+      logger.warn('[DirectoryClaim] Seed-preview retirement failed', undefined, {
+        tenantId,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+    }
   }
 
   /**

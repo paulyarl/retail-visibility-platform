@@ -566,6 +566,118 @@ router.post('/presence-seeds/:id/demo-window/stop', requirePlatformStaff, async 
 });
 
 /**
+ * POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront
+ *
+ * Generate a seed-preview storefront for a PB-08-eligible seed
+ * (docs/LocalBiz/SEED_PREVIEW_STOREFRONT_SPEC.md §3). Idempotent — a live
+ * preview returns { existing: true } rather than duplicating.
+ */
+router.post('/presence-seeds/:id/demo-storefront', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: demoTenantService } = await import('../services/DemoTenantService');
+    const result = await demoTenantService.createFromSeed(req.params.id, {
+      createdBy: (req as any).user?.id,
+    });
+    if (!result.ok) {
+      const status = result.code === 'seed_not_found' ? 404 : 409;
+      return res.status(status).json({ error: result.code, message: result.reason });
+    }
+
+    // §6b — log the preview generation as a seed touch (best-effort).
+    if (!result.existing) {
+      try {
+        await DirectoryPresenceSeedService.addOutreachTouch(req.params.id, {
+          channel: 'other',
+          notes: `preview_storefront_generated tenant_id=${result.tenantId} url=${result.storefrontUrl}`,
+        }, { actorId: (req as any).user?.id, actorType: 'user' });
+      } catch (touchErr) {
+        logger.warn('[POST demo-storefront] touch log failed (non-fatal)', undefined, {
+          error: { name: (touchErr as any)?.name || 'Error', message: String(touchErr) },
+        });
+      }
+    }
+
+    const { ok, code: _code, reason: _reason, ...data } = result as any;
+    res.status(result.existing ? 200 : 201).json({ success: true, ...data });
+  } catch (error) {
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory-presence/presence-seeds/:id/demo-storefront
+ *
+ * Preview status for the seed-page/campaign UI: PB-08 eligibility plus any
+ * live preview's URL/expiry/extension state.
+ */
+router.get('/presence-seeds/:id/demo-storefront', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: demoTenantService } = await import('../services/DemoTenantService');
+    const status = await demoTenantService.getSeedPreviewStatus(req.params.id);
+    if (!status.found) {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    res.json({ success: true, ...status });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/demo-storefront] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront/expire
+ *
+ * Retire the live preview now — same end state as natural expiry (§5e).
+ */
+router.post('/presence-seeds/:id/demo-storefront/expire', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: demoTenantService } = await import('../services/DemoTenantService');
+    const status = await demoTenantService.getSeedPreviewStatus(req.params.id);
+    if (!status.found) {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    if (!status.preview) {
+      return res.status(409).json({ error: 'no_live_preview' });
+    }
+    const result = await demoTenantService.expireDemoTenant(status.preview.tenantId);
+    res.json({ success: result.expired, reason: result.reason });
+  } catch (error) {
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront/expire] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront/extend
+ *
+ * Extend the live preview +7 days per call, max 2 extensions, 28-day hard
+ * cap from creation (D-4).
+ */
+router.post('/presence-seeds/:id/demo-storefront/extend', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const { default: demoTenantService } = await import('../services/DemoTenantService');
+    const result = await demoTenantService.extendSeedPreview(req.params.id);
+    if (!result.ok) {
+      const status = result.code === 'seed_not_found' ? 404 : 409;
+      return res.status(status).json({ error: result.code, message: result.reason, extensionsUsed: result.extensionsUsed, expiresAt: result.expiresAt });
+    }
+    res.json({ success: true, expiresAt: result.expiresAt, extensionsUsed: result.extensionsUsed });
+  } catch (error) {
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront/extend] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
  * POST /api/admin/directory/presence-seeds/:id/touches/:touchId/recording
  *
  * Attach (or replace) a call recording on an existing touch (migration 295).

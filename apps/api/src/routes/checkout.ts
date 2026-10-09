@@ -30,6 +30,7 @@ import {
   getDepositPercentageForOrder,
   validateCheckoutRequest,
 } from '../utils/commerce-capabilities';
+import { SEED_PREVIEW_TEMPLATE, SEED_PREVIEW_SANDBOX_RESPONSE } from '../lib/seed-preview';
 
 const router = Router();
 
@@ -209,9 +210,19 @@ router.post('/orders', async (req: Request, res: Response) => {
     // Get tenant subscription tier to determine checkout mode
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenant_id },
-      select: { subscription_tier: true },
+      select: { subscription_tier: true, demo_template: true },
     });
-    
+
+    // Seed-preview storefronts demonstrate checkout without taking payment —
+    // short-circuit before any order or payment row is written (spec §5b).
+    if (tenant?.demo_template === SEED_PREVIEW_TEMPLATE) {
+      return res.status(200).json({
+        ...SEED_PREVIEW_SANDBOX_RESPONSE,
+        order: null,
+        payment: { status: 'sandbox' },
+      });
+    }
+
     const tenantTier = tenant?.subscription_tier || 'starter';
     
     // Get comprehensive commerce capabilities
@@ -796,8 +807,8 @@ router.post('/orders', async (req: Request, res: Response) => {
         existingPayment = await prisma.payments.update({
           where: { id: existingPayment.id },
           data: {
-            gateway_type: payment_method || 'paypal',
-            payment_method: payment_method || 'paypal',
+            gateway_type: payment_method || null,
+            payment_method: payment_method || null,
             amount_cents: paymentAmount,
             platform_fee_cents: fees.platformFeeCents,
             platform_fee_percentage: fees.platformFeePercentage,
@@ -818,8 +829,8 @@ router.post('/orders', async (req: Request, res: Response) => {
             id: generatePaymentId(updatedOrder.tenant_id),
             tenant_id: updatedOrder.tenant_id,
             order_id: updatedOrder.id,
-            gateway_type: payment_method || 'paypal',
-            payment_method: payment_method || 'paypal',
+            gateway_type: payment_method || null,
+            payment_method: payment_method || null,
             amount_cents: paymentAmount,
             platform_fee_cents: fees.platformFeeCents,
             platform_fee_percentage: fees.platformFeePercentage,
@@ -959,8 +970,8 @@ router.post('/orders', async (req: Request, res: Response) => {
         id: generatePaymentId(order.tenant_id),
         tenant_id: order.tenant_id,
         order_id: order.id,
-        gateway_type: payment_method || 'paypal',
-        payment_method: payment_method || 'paypal',
+        gateway_type: payment_method || null,
+        payment_method: payment_method || null,
         // For deposit orders, collect deposit amount; for full payment, collect total
         amount_cents: paymentAmount,
         platform_fee_cents: fees.platformFeeCents,

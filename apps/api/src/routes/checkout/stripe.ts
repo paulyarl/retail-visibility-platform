@@ -5,6 +5,7 @@ import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
 import { redeemOrderCoupon } from '../../services/PostPaymentCouponRedemption';
 import FunnelEngine from '../../services/FunnelEngine';
 import { logger } from '../../logger';
+import { isSeedPreviewTenant, SEED_PREVIEW_SANDBOX_RESPONSE } from '../../lib/seed-preview';
 
 const router = Router();
 
@@ -38,6 +39,11 @@ router.post('/create-payment-intent', async (req, res) => {
     }
 
     const tenantId = payment.orders.tenant_id;
+
+    // Seed-preview storefronts: sandbox — no payment intent is created (spec §5b).
+    if (await isSeedPreviewTenant(tenantId)) {
+      return res.status(200).json(SEED_PREVIEW_SANDBOX_RESPONSE);
+    }
 
     // Create payment intent with platform fee
     const result = await stripeConnectService.createPaymentIntentWithFee(

@@ -13,7 +13,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import demoTenantService, { DemoTemplate } from '../../services/DemoTenantService';
+import demoTenantService, { DemoTemplate, SalesDemoTemplate } from '../../services/DemoTenantService';
 import { logger } from '../../logger';
 
 const router = Router();
@@ -88,7 +88,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const result = await demoTenantService.createDemoTenant({
-      template: template as DemoTemplate,
+      template: template as SalesDemoTemplate,
       businessName,
       createdBy: createdBy || (req.user as any)?.id,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,

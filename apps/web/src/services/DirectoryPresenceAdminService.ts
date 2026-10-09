@@ -949,6 +949,30 @@ export interface DemoWindowState {
   windows: DemoWindow[];
 }
 
+// Seed-preview storefront (docs/LocalBiz/SEED_PREVIEW_STOREFRONT_SPEC.md)
+export interface SeedPreviewInfo {
+  tenantId: string;
+  slug: string;
+  storefrontUrl: string;
+  expiresAt: string | null;
+  createdAt: string;
+  extensionsUsed: number;
+  pageViews: number;
+}
+
+export interface SeedPreviewStatus {
+  eligible: boolean;
+  preview: SeedPreviewInfo | null;
+}
+
+export type SeedPreviewGenerateResult =
+  | { ok: true; tenantId: string; slug: string; storefrontUrl: string; productsCreated: number; expiresAt: string; existing: boolean }
+  | { ok: false; error: string };
+
+export type SeedPreviewExtendResult =
+  | { ok: true; expiresAt: string; extensionsUsed: number }
+  | { ok: false; error: string; extensionsUsed: number; expiresAt: string | null };
+
 export class DirectoryPresenceAdminService extends AdminApiSingleton {
   private static instance: DirectoryPresenceAdminService;
 
@@ -1464,6 +1488,67 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   async stopDemoWindow(seedId: string): Promise<boolean> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-window/stop`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    return !!result.success;
+  }
+
+  // ============================
+  // Seed-preview storefront (spec docs/LocalBiz/SEED_PREVIEW_STOREFRONT_SPEC.md)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/demo-storefront */
+  async getSeedPreviewStatus(seedId: string): Promise<SeedPreviewStatus | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-storefront`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return {
+      eligible: !!data?.eligible,
+      preview: data?.preview ?? null,
+    };
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront */
+  async generateSeedPreview(seedId: string): Promise<SeedPreviewGenerateResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-storefront`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      return { ok: false, error: result.data?.error || result.error || 'generate_failed' };
+    }
+    const data = result.data?.data ?? result.data;
+    return { ok: true, ...data };
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront/extend */
+  async extendSeedPreview(seedId: string): Promise<SeedPreviewExtendResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-storefront/extend`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    if (!result.success) {
+      return { ok: false, error: data?.error || 'extend_failed', extensionsUsed: data?.extensionsUsed ?? 0, expiresAt: data?.expiresAt ?? null };
+    }
+    return { ok: true, expiresAt: data?.expiresAt, extensionsUsed: data?.extensionsUsed ?? 0 };
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/demo-storefront/expire */
+  async expireSeedPreview(seedId: string): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-storefront/expire`,
       { method: 'POST' },
       undefined,
       0,

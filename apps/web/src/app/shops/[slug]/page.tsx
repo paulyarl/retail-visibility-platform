@@ -5,6 +5,7 @@
  */
 
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { Store, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -18,6 +19,7 @@ import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
+import SeedPreviewTracker from './SeedPreviewTracker';
 import { clientLogger } from '@/lib/client-logger';
 
 interface ShopProfilePageProps {
@@ -29,6 +31,28 @@ interface ShopProfilePageProps {
     featured?: string;
     view?: string;
   }>;
+}
+
+// Demo/seed-preview storefronts are sample pages for an unclaimed business —
+// they must never be indexed (spec B-11). Conditional so real tenants' shops
+// keep their normal crawling behavior.
+export async function generateMetadata({ params }: ShopProfilePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const tenantId = await publicDirectoryService.resolveBySlug(slug);
+    if (tenantId) {
+      const tenantInfo = await tenantPublicService.getPublicTenantInfo(tenantId);
+      if (tenantInfo?.isDemo) {
+        return {
+          title: `${tenantInfo.name} — Sample Storefront Preview`,
+          robots: { index: false, follow: false },
+        };
+      }
+    }
+  } catch {
+    // Fall through to default metadata
+  }
+  return {};
 }
 
 // Loading skeleton component
@@ -174,6 +198,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
     return (
       <Suspense fallback={<ShopProfileSkeleton />}>
         {tenantId && <SocialPixels tenantId={tenantId as string} usePublic />}
+        {tenantInfo?.isDemo && <SeedPreviewTracker slug={slug} />}
         <ShopProfileClient
           shop={minimalShopResponse}
           businessHours={businessHours?.data}
@@ -211,9 +236,17 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   return (
     <Suspense fallback={<ShopProfileSkeleton />}>
       {tenantId && <SocialPixels tenantId={tenantId as string} usePublic />}
-      <ShopProfileClient 
-        shop={shop} 
-        businessHours={businessHours?.data} 
+      {tenantInfo?.isDemo && <SeedPreviewTracker slug={slug} />}
+      {tenantInfo?.isDemo && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="container mx-auto px-4 py-2 text-center text-sm text-amber-800">
+            This is a sample storefront preview. Products shown are examples — this business has not claimed this page yet.
+          </div>
+        </div>
+      )}
+      <ShopProfileClient
+        shop={shop}
+        businessHours={businessHours?.data}
         tenantInfo={tenantInfo}
         showStatusPanel={showStatusPanel}
         initialOptFlags={storefrontOptionFlags}

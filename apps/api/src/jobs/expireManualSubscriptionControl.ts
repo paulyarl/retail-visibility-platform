@@ -15,6 +15,7 @@ export async function expireManualSubscriptionControl(): Promise<void> {
     const expiredTenants = await prisma.tenants.findMany({
       where: {
         manual_subscription_control: true,
+        is_demo: { not: true },
         manual_subscription_expires_at: {
           lt: now
         }

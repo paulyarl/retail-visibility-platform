@@ -17,7 +17,15 @@ import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-sta
 import slugSingletonService from './SlugSingletonService';
 import { logger } from '../logger';
 
-export type DemoTemplate = 'grocery' | 'convenience' | 'specialty_retail';
+/**
+ * Sales-demo templates with a DEMO_TEMPLATES config. 'seed_preview' is a
+ * demo_template value written on preview storefronts but is NOT a sales
+ * template — it has no DEMO_TEMPLATES entry, so it never appears in the
+ * sales-demo template picker and createDemoTenant('seed_preview') throws
+ * "Unknown demo template" (spec §5f).
+ */
+export type SalesDemoTemplate = 'grocery' | 'convenience' | 'specialty_retail';
+export type DemoTemplate = SalesDemoTemplate | 'seed_preview';
 
 interface DemoTemplateConfig {
   scenario: QuickStartScenario;
@@ -36,7 +44,7 @@ interface DemoTemplateConfig {
   defaultDescription: string;
 }
 
-const DEMO_TEMPLATES: Record<DemoTemplate, DemoTemplateConfig> = {
+const DEMO_TEMPLATES: Record<SalesDemoTemplate, DemoTemplateConfig> = {
   grocery: {
     scenario: 'grocery',
     productCount: 20,
@@ -113,8 +121,75 @@ const DEMO_TEMPLATES: Record<DemoTemplate, DemoTemplateConfig> = {
 
 const DEFAULT_EXPIRY_DAYS = 30;
 
+// Seed-preview storefront lifecycle (docs/LocalBiz/SEED_PREVIEW_STOREFRONT_SPEC.md)
+const SEED_PREVIEW_EXPIRY_DAYS = 14;
+const SEED_PREVIEW_EXTENSION_DAYS = 7;
+const SEED_PREVIEW_MAX_EXTENSIONS = 2;
+const SEED_PREVIEW_HARD_CAP_DAYS = 28;
+const SEED_PREVIEW_DEFAULT_PRODUCT_COUNT = 20;
+
+export interface CreateFromSeedOptions {
+  productCount?: number;
+  expiresAt?: Date;
+  scenario?: QuickStartScenario;
+  createdBy?: string;
+}
+
+export type CreateFromSeedResult =
+  | {
+      ok: true;
+      tenantId: string;
+      name: string;
+      slug: string;
+      storefrontUrl: string;
+      productsCreated: number;
+      categoriesCreated: number;
+      expiresAt: Date;
+      existing: boolean;
+    }
+  | { ok: false; code: 'seed_not_found' | 'not_pb08_eligible'; reason: string };
+
+export type ExtendSeedPreviewResult =
+  | { ok: true; expiresAt: Date; extensionsUsed: number }
+  | { ok: false; code: 'seed_not_found' | 'no_live_preview' | 'extension_cap_reached' | 'hard_cap_reached'; extensionsUsed: number; expiresAt: Date | null; reason: string };
+
+/**
+ * Map a seed's category label to a quick-start catalog scenario. Deliberately
+ * fuzzy — the catalog is labeled sample data, so a near match beats a generic
+ * one but nothing here claims real inventory (spec §5).
+ */
+export function mapSeedCategoryToScenario(category: string | null | undefined): QuickStartScenario {
+  const c = (category || '').toLowerCase();
+  const rules: Array<[RegExp, QuickStartScenario]> = [
+    [/pharm|drug\s*store/, 'pharmacy'],
+    [/grocer|supermarket|food\s*mart|\bmart\b|market|convenience|deli|bodega|produce|butcher|bakery/, 'grocery'],
+    [/fashion|boutique|apparel|cloth|shoe|thrift|vintage/, 'fashion'],
+    [/electron|phone|computer|appliance/, 'electronics'],
+    [/hardware|tool|lumber|home\s*improvement/, 'hardware_tools'],
+    [/furniture|mattress/, 'furniture'],
+    [/pet|aquari/, 'pet_supplies'],
+    [/book|media|record|music\s*store/, 'books_media'],
+    [/sport|outdoor|fitness|bike|bicycle/, 'sports_outdoors'],
+    [/toy|game/, 'toys_games'],
+    [/auto|car\s*part|tire/, 'automotive'],
+    [/jewel|watch/, 'jewelry'],
+    [/baby|kid|children/, 'baby_kids'],
+    [/art|craft|hobby/, 'arts_crafts'],
+    [/office|stationer|suppl/, 'office_supplies'],
+    [/beauty|salon|barber|cosmet|spa|nail/, 'health_beauty'],
+    [/health|wellness|vitamin|supplement/, 'health_beauty'],
+    [/garden|nurser|plant|florist|home\s*goods|home\s*decor/, 'home_garden'],
+    [/restaurant|cafe|coffee|eater|diner|grill|pizza|taqueria/, 'restaurant'],
+    [/service|repair|clean|laundr/, 'service_business'],
+  ];
+  for (const [re, scenario] of rules) {
+    if (re.test(c)) return scenario;
+  }
+  return 'general';
+}
+
 export interface CreateDemoTenantOptions {
-  template: DemoTemplate;
+  template: SalesDemoTemplate;
   businessName?: string;
   createdBy?: string;
   expiresAt?: Date;
@@ -145,8 +220,8 @@ class DemoTenantService {
     return DemoTenantService.instance;
   }
 
-  getAvailableTemplates(): Array<{ key: DemoTemplate; name: string; productCount: number }> {
-    return (Object.keys(DEMO_TEMPLATES) as DemoTemplate[]).map(key => ({
+  getAvailableTemplates(): Array<{ key: SalesDemoTemplate; name: string; productCount: number }> {
+    return (Object.keys(DEMO_TEMPLATES) as SalesDemoTemplate[]).map(key => ({
       key,
       name: DEMO_TEMPLATES[key].businessName.replace('Demo ', ''),
       productCount: DEMO_TEMPLATES[key].productCount,
@@ -238,7 +313,7 @@ class DemoTenantService {
     };
   }
 
-  async seedDemoProducts(tenantId: string, template: DemoTemplate): Promise<{ productsCreated: number; categoriesCreated: number }> {
+  async seedDemoProducts(tenantId: string, template: SalesDemoTemplate): Promise<{ productsCreated: number; categoriesCreated: number }> {
     const config = DEMO_TEMPLATES[template];
     if (!config) {
       throw new Error(`Unknown demo template: ${template}`);
@@ -310,6 +385,321 @@ class DemoTenantService {
     }
   }
 
+  /**
+   * Create a seed-preview storefront for an eligible Directory Presence seed
+   * (docs/LocalBiz/SEED_PREVIEW_STOREFRONT_SPEC.md §3).
+   *
+   * Eligibility: at least one linked campaign carries a CONFIRMED PB-08
+   * website_build_scope playbook_decision — assignment alone is not enough.
+   * Idempotent: one live preview per seed; concurrent calls are serialized by
+   * a per-seed advisory lock inside the creation transaction.
+   */
+  /**
+   * §3 step 0 — the seed is preview-eligible when at least one linked campaign
+   * (any link role) carries a CONFIRMED PB-08 website_build_scope decision.
+   */
+  private async isSeedPb08Eligible(seedId: string): Promise<boolean> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT 1
+      FROM directory_seed_campaign_links l
+      JOIN mkt_campaigns_list c ON c.id = l.campaign_id
+      WHERE l.seed_id = ${seedId}
+        AND c.playbook_code = 'PB-08'
+        AND c.playbook_decision ->> 'kind' = 'website_build_scope'
+      LIMIT 1
+    `;
+    return rows.length > 0;
+  }
+
+  /** Live preview state for the seed-page/campaign UI. */
+  async getSeedPreviewStatus(seedId: string): Promise<{
+    found: boolean;
+    eligible: boolean;
+    preview: {
+      tenantId: string;
+      slug: string;
+      storefrontUrl: string;
+      expiresAt: Date | null;
+      createdAt: Date;
+      extensionsUsed: number;
+      pageViews: number;
+    } | null;
+  }> {
+    const seed = await prisma.directory_presence_seeds.findUnique({
+      where: { id: seedId },
+      select: { tenant_id: true },
+    });
+    if (!seed) {
+      return { found: false, eligible: false, preview: null };
+    }
+
+    const [eligible, preview] = await Promise.all([
+      this.isSeedPb08Eligible(seedId),
+      prisma.tenants.findFirst({
+        where: {
+          demo_source_tenant_id: seed.tenant_id,
+          is_demo: true,
+          demo_template: 'seed_preview',
+          location_status: 'active',
+        },
+        select: { id: true, slug: true, demo_expires_at: true, created_at: true, metadata: true },
+      }),
+    ]);
+
+    // B-3 — preview opens: page-view events are keyed by the preview tenant.
+    let pageViews = 0;
+    if (preview) {
+      const rows = await prisma.$queryRaw<{ views: bigint }[]>`
+        SELECT COUNT(*)::bigint AS views
+        FROM directory_presence_events
+        WHERE tenant_id = ${preview.id}
+          AND event_type = 'listing_viewed'
+      `;
+      pageViews = Number(rows[0]?.views ?? 0);
+    }
+
+    return {
+      found: true,
+      eligible,
+      preview: preview
+        ? {
+            tenantId: preview.id,
+            slug: preview.slug || '',
+            storefrontUrl: `/shops/${preview.slug}`,
+            expiresAt: preview.demo_expires_at,
+            createdAt: preview.created_at,
+            extensionsUsed: ((preview.metadata as any)?.seed_preview?.extensions_used ?? 0) as number,
+            pageViews,
+          }
+        : null,
+    };
+  }
+
+  async createFromSeed(seedId: string, options: CreateFromSeedOptions = {}): Promise<CreateFromSeedResult> {
+    // Load the seed and its listing NAP in one join
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT s.id, s.tenant_id, s.category,
+             dl.business_name, dl.address, dl.city, dl.state, dl.zip_code,
+             dl.phone, dl.email, dl.website, dl.business_hours,
+             dl.latitude, dl.longitude, dl.logo_url, dl.description
+      FROM directory_presence_seeds s
+      JOIN directory_listings_list dl ON dl.id = s.listing_id
+      WHERE s.id = ${seedId}
+      LIMIT 1
+    `;
+    const seed = seedRows[0];
+    if (!seed) {
+      return { ok: false, code: 'seed_not_found', reason: `Seed ${seedId} not found` };
+    }
+
+    if (!(await this.isSeedPb08Eligible(seedId))) {
+      return {
+        ok: false,
+        code: 'not_pb08_eligible',
+        reason: 'Seed has no linked campaign with a confirmed PB-08 website_build_scope decision',
+      };
+    }
+
+    const name = seed.business_name || 'Sample Storefront';
+    const scenario = options.scenario || mapSeedCategoryToScenario(seed.category);
+    const productCount = options.productCount ?? SEED_PREVIEW_DEFAULT_PRODUCT_COUNT;
+    const expiresAt = options.expiresAt || new Date(Date.now() + SEED_PREVIEW_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+    logger.info(`[DemoTenantService] Creating seed-preview storefront for seed ${seedId} (${name})`, undefined, { seedId, scenario });
+
+    const outcome = await prisma.$transaction(async (tx) => {
+      // B-5: serialize concurrent generate calls for this seed
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('seed_preview:' || ${seedId}))`;
+
+      const existing = await tx.tenants.findFirst({
+        where: {
+          demo_source_tenant_id: seed.tenant_id,
+          is_demo: true,
+          demo_template: 'seed_preview',
+          location_status: 'active',
+        },
+        select: { id: true, name: true, slug: true, demo_expires_at: true },
+      });
+      if (existing) {
+        return { existing } as const;
+      }
+
+      const tenantId = generateTenantId();
+      const location = { city: seed.city || '', state: seed.state || '', country: 'US' };
+      const slug = await slugSingletonService.generateSlug(name, location, tenantId);
+
+      await tx.tenants.create({
+        data: {
+          id: tenantId,
+          name,
+          slug,
+          created_by: options.createdBy || null,
+          subscription_tier: 'seed_preview',
+          subscription_status: 'active',
+          location_status: 'active',
+          directory_visible: false,
+          is_demo: true,
+          demo_expires_at: expiresAt,
+          demo_source_tenant_id: seed.tenant_id,
+          demo_template: 'seed_preview',
+          gbp_primary_category_name: seed.category || null,
+          metadata: { seed_preview: { seed_id: seedId, extensions_used: 0 } } as any,
+        },
+      });
+
+      // Business profile from the seed listing — only sourced fields (§3 step 2/5).
+      // Hours land in profile.hours the same way the claim path copies them;
+      // when unsourced they stay null and the page shows unconfirmed hours.
+      await tx.tenant_business_profiles_list.create({
+        data: {
+          tenant_id: tenantId,
+          business_name: name,
+          address_line1: seed.address || '',
+          city: seed.city || '',
+          state: seed.state || null,
+          postal_code: seed.zip_code || '',
+          country_code: 'US',
+          phone_number: seed.phone || null,
+          email: seed.email || null,
+          website: seed.website || null,
+          logo_url: seed.logo_url || null,
+          business_description: seed.description || null,
+          hours: seed.business_hours ?? undefined,
+          latitude: seed.latitude ?? null,
+          longitude: seed.longitude ?? null,
+          updated_at: new Date(),
+        } as any,
+      });
+
+      const seedResult = await generateQuickStartProducts({
+        tenant_id: tenantId,
+        scenario,
+        productCount,
+        assignCategories: true,
+        createAsDrafts: false,
+        allActive: true,
+        generateImages: false,
+        storefrontType: 'retail',
+      } as any, tx);
+
+      // Label every generated product as a sample (§5) — the public page shows
+      // a Sample badge and nothing ever claims real inventory.
+      await tx.$executeRaw`
+        UPDATE inventory_items
+        SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"sample": true}'::jsonb
+        WHERE tenant_id = ${tenantId}
+      `;
+
+      return { tenantId, slug, seedResult } as const;
+    }, { timeout: 60000, maxWait: 15000 });
+
+    if ('existing' in outcome) {
+      const e = outcome.existing as NonNullable<typeof outcome.existing>;
+      return {
+        ok: true,
+        tenantId: e.id,
+        name: e.name,
+        slug: e.slug || '',
+        storefrontUrl: `/shops/${e.slug}`,
+        productsCreated: 0,
+        categoriesCreated: 0,
+        expiresAt: e.demo_expires_at || expiresAt,
+        existing: true,
+      };
+    }
+
+    // §3 step 7 — the storefront MV only refreshes on demand; without this the
+    // preview URL renders an empty storefront. Post-commit (CONCURRENTLY can't
+    // run inside the transaction above).
+    try {
+      const { refreshStorefrontDiscoveryMv } = await import('../lib/seed-preview');
+      await refreshStorefrontDiscoveryMv();
+    } catch (err: any) {
+      logger.error('[DemoTenantService] mv_storefront_discovery refresh failed after preview create', undefined, {
+        tenantId: outcome.tenantId,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+    }
+
+    logger.info(`[DemoTenantService] Seed-preview storefront created: ${outcome.tenantId}`, undefined, {
+      seedId,
+      tenantId: outcome.tenantId,
+      productsCreated: outcome.seedResult.productsCreated,
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    return {
+      ok: true,
+      tenantId: outcome.tenantId,
+      name,
+      slug: outcome.slug,
+      storefrontUrl: `/shops/${outcome.slug}`,
+      productsCreated: outcome.seedResult.productsCreated,
+      categoriesCreated: outcome.seedResult.categoriesCreated,
+      expiresAt,
+      existing: false,
+    };
+  }
+
+  /**
+   * Extend a seed's live preview by +7 days, max 2 extensions, hard cap of
+   * 28 days from preview creation (D-4).
+   */
+  async extendSeedPreview(seedId: string): Promise<ExtendSeedPreviewResult> {
+    const seed = await prisma.directory_presence_seeds.findUnique({
+      where: { id: seedId },
+      select: { tenant_id: true },
+    });
+    if (!seed) {
+      return { ok: false, code: 'seed_not_found', extensionsUsed: 0, expiresAt: null, reason: `Seed ${seedId} not found` };
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('seed_preview_extend:' || ${seedId}))`;
+
+      const preview = await tx.tenants.findFirst({
+        where: {
+          demo_source_tenant_id: seed.tenant_id,
+          is_demo: true,
+          demo_template: 'seed_preview',
+          location_status: 'active',
+        },
+        select: { id: true, demo_expires_at: true, created_at: true, metadata: true },
+      });
+      if (!preview) {
+        return { ok: false, code: 'no_live_preview', extensionsUsed: 0, expiresAt: null, reason: 'No live preview for this seed' } as const;
+      }
+
+      const meta = ((preview.metadata as any)?.seed_preview ?? {}) as Record<string, any>;
+      const used = meta.extensions_used || 0;
+      if (used >= SEED_PREVIEW_MAX_EXTENSIONS) {
+        return { ok: false, code: 'extension_cap_reached', extensionsUsed: used, expiresAt: preview.demo_expires_at, reason: `Extension cap reached (${SEED_PREVIEW_MAX_EXTENSIONS})` } as const;
+      }
+
+      const hardCap = new Date(preview.created_at.getTime() + SEED_PREVIEW_HARD_CAP_DAYS * 24 * 60 * 60 * 1000);
+      const candidate = new Date((preview.demo_expires_at?.getTime() ?? Date.now()) + SEED_PREVIEW_EXTENSION_DAYS * 24 * 60 * 60 * 1000);
+      const newExpiry = candidate > hardCap ? hardCap : candidate;
+      if (newExpiry <= (preview.demo_expires_at ?? new Date(0))) {
+        return { ok: false, code: 'hard_cap_reached', extensionsUsed: used, expiresAt: preview.demo_expires_at, reason: 'Preview already at the 28-day hard cap' } as const;
+      }
+
+      await tx.tenants.update({
+        where: { id: preview.id },
+        data: {
+          demo_expires_at: newExpiry,
+          metadata: {
+            ...(preview.metadata as any ?? {}),
+            seed_preview: { ...meta, extensions_used: used + 1 },
+          } as any,
+        },
+      });
+
+      logger.info(`[DemoTenantService] Extended seed preview for ${seed.tenant_id} to ${newExpiry.toISOString()} (${used + 1}/${SEED_PREVIEW_MAX_EXTENSIONS})`);
+
+      return { ok: true, expiresAt: newExpiry, extensionsUsed: used + 1 } as const;
+    });
+  }
+
   async expireDemoTenant(tenantId: string): Promise<{ expired: boolean; reason: string }> {
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
@@ -326,17 +716,44 @@ class DemoTenantService {
 
     logger.info(`[DemoTenantService] Expiring demo tenant: ${tenantId} (${tenant.name})`);
 
-    await prisma.tenants.update({
-      where: { id: tenantId },
-      data: {
-        location_status: 'closed' as any,
-        status_changed_at: new Date(),
-        status_changed_by: 'demo_expiry_job',
-        closure_reason: 'Demo tenant expired',
-        directory_visible: false,
-        subscription_status: 'cancelled',
-      },
-    });
+    // Close the tenant and archive its catalog in one transaction — sample
+    // products are kept for audit (never deleted per spec §5e) but must stop
+    // surfacing once the demo ends.
+    const [, archived] = await prisma.$transaction([
+      prisma.tenants.update({
+        where: { id: tenantId },
+        data: {
+          location_status: 'closed' as any,
+          status_changed_at: new Date(),
+          status_changed_by: 'demo_expiry_job',
+          closure_reason: 'Demo tenant expired',
+          directory_visible: false,
+          subscription_status: 'cancelled',
+        },
+      }),
+      prisma.inventory_items.updateMany({
+        where: {
+          tenant_id: tenantId,
+          item_status: { in: ['active', 'inactive'] },
+        },
+        data: { item_status: 'archived' },
+      }),
+    ]);
+
+    // The storefront MV only refreshes on demand, and CONCURRENTLY cannot run
+    // inside a transaction — refresh now that the writes have committed, or
+    // archived products/closed tenant linger on the public storefront (B-1).
+    try {
+      const { refreshStorefrontDiscoveryMv } = await import('../lib/seed-preview');
+      await refreshStorefrontDiscoveryMv();
+    } catch (err: any) {
+      logger.error('[DemoTenantService] mv_storefront_discovery refresh failed after demo expiry', undefined, {
+        tenantId,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+    }
+
+    logger.info(`[DemoTenantService] Demo tenant ${tenantId} expired; ${archived.count} product(s) archived`);
 
     return { expired: true, reason: 'Demo tenant expired successfully' };
   }
@@ -451,6 +868,16 @@ class DemoTenantService {
     await prisma.tenants.delete({
       where: { id: tenantId },
     });
+
+    try {
+      const { refreshStorefrontDiscoveryMv } = await import('../lib/seed-preview');
+      await refreshStorefrontDiscoveryMv();
+    } catch (err: any) {
+      logger.error('[DemoTenantService] mv_storefront_discovery refresh failed after demo delete', undefined, {
+        tenantId,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+    }
 
     logger.info(`[DemoTenantService] Deleted demo tenant: ${tenantId} (${productCount} products removed)`);
 

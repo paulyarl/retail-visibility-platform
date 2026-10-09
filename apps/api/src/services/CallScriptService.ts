@@ -113,6 +113,13 @@ export interface CallContext {
     signal_weight: number;
     gap_severity: number;
   }>;
+  /**
+   * The linked directory-presence seed resolved for link/QR variables
+   * (resolveCampaignSeedId — primary link preferred). Surfaced so the
+   * Openers surface can drive the seed-scoped preview-storefront action
+   * (spec §4 campaign-side trigger, D-5). Null when no seed is linked.
+   */
+  linked_seed_id: string | null;
 }
 
 /**
@@ -474,6 +481,7 @@ export class CallScriptService extends BaseService {
           signal_weight: p.signalWeight,
           gap_severity: p.gapSeverity,
         })),
+        linked_seed_id: seedId,
       },
       // Outreach ammunition — verbatim problem → hook → fix copy from the
       // audit already loaded for signal severity. Operator reference only;

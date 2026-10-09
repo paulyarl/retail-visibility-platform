@@ -96,6 +96,7 @@ const SHELF_EVENT_SCHEMA = z.object({
   sessionId: z.string().max(100).optional(),
   eventType: z.enum([
     'shelf_viewed',
+    'listing_viewed',
     'listing_clicked',
     'filter_applied',
     'session_heartbeat',
@@ -118,6 +119,7 @@ const shelfSurfaceSchema = z.enum([
   'directory_location',
   'directory_store_type',
   'directory_home',
+  'seed_preview',
 ]);
 
 const shelfRefSchema = z
@@ -125,6 +127,19 @@ const shelfRefSchema = z
   .min(1)
   .max(200)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
+
+/**
+ * Preview storefront events are keyed by the preview tenant (spec §6b/B-3).
+ * Resolve the shop slug to its seed_preview demo tenant — null for anything
+ * else, so a crafted slug can't attach events to a real tenant.
+ */
+async function resolveSeedPreviewTenantId(slug: string): Promise<string | null> {
+  const tenant = await prisma.tenants.findFirst({
+    where: { slug, is_demo: true, demo_template: 'seed_preview' },
+    select: { id: true },
+  });
+  return tenant?.id ?? null;
+}
 
 /**
  * POST /api/public/directory/surfaces/:surface/:ref/events
@@ -146,8 +161,16 @@ router.post('/surfaces/:surface/:ref/events', async (req: Request, res: Response
       return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
     }
 
+    // seed_preview events are keyed by the preview tenant; other shelf
+    // surfaces have no tenant and stay null.
+    const tenantId =
+      surface.data === 'seed_preview' ? await resolveSeedPreviewTenantId(ref.data) : null;
+    if (surface.data === 'seed_preview' && !tenantId) {
+      return res.status(200).json({ success: true, tracked: false });
+    }
+
     directoryPresenceAnalyticsService.trackEvent({
-      tenantId: null,
+      tenantId,
       listingId: null,
       slug: ref.data,
       surface: surface.data,
@@ -185,8 +208,14 @@ router.post('/surfaces/:surface/:ref/events/batch', async (req: Request, res: Re
       return res.status(429).json({ success: false, error: 'rate_limited', message: 'Too many events. Please slow down.' });
     }
 
+    const tenantId =
+      surface.data === 'seed_preview' ? await resolveSeedPreviewTenantId(ref.data) : null;
+    if (surface.data === 'seed_preview' && !tenantId) {
+      return res.status(200).json({ success: true, tracked: 0 });
+    }
+
     const inputs = parsed.data.events.map((e) => ({
-      tenantId: null,
+      tenantId,
       listingId: null,
       slug: ref.data,
       surface: surface.data,

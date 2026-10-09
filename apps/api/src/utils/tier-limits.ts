@@ -7,7 +7,7 @@
  * NOTE: Trial tiers are wrappers that proxy to their base tiers for limits.
  */
 
-export type SubscriptionTier = 'directory_presence'|'google_only'|'presence'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier = 'directory_presence'|'google_only'|'presence'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization' | 'seed_preview';
 
 /**
  * Map trial tiers to their base tiers for limit proxying
@@ -29,7 +29,11 @@ function getBaseTierForTrial(tier: string): SubscriptionTier {
     'expired_trial': 'presence', // Deprecated — expired_trial now maps to presence (free baseline)
   };
   
-  return trialToBaseMap[tier] || 'discovery';
+  if (trialToBaseMap[tier]) return trialToBaseMap[tier];
+  // Non-trial tiers resolve to themselves — previously every real tier fell
+  // through to 'discovery' here (e.g. omnichannel resolved to 75 SKUs).
+  if (tier in TIER_LIMITS) return tier as SubscriptionTier;
+  return 'discovery';
 }
 
 export interface TierLimits {
@@ -86,6 +90,12 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     name: 'Organization',
     maxSkus: 5000, // V2: Updated limit
   },
+  // Demo-only tier for seed-preview storefronts — never sold, kept out of
+  // tier pickers and price maps (spec §5f). maxSkus = demo catalog size.
+  seed_preview: {
+    name: 'Seed Preview',
+    maxSkus: 20,
+  },
 };
 
 /**
@@ -97,7 +107,8 @@ export function getSKULimit(tier: string | null | undefined): number {
   
   // Handle trial tiers as wrappers - proxy to base tier
   const baseTier = getBaseTierForTrial(tier.toLowerCase());
-  return TIER_LIMITS[baseTier]?.maxSkus || TIER_LIMITS.starter.maxSkus;
+  // ?? not || — presence.maxSkus is legitimately 0 (directory-mode, no catalog)
+  return TIER_LIMITS[baseTier]?.maxSkus ?? TIER_LIMITS.starter.maxSkus;
 }
 
 /**

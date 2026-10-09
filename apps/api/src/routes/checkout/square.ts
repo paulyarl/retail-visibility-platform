@@ -5,6 +5,7 @@ import { redeemOrderCoupon } from '../../services/PostPaymentCouponRedemption';
 import { randomUUID } from 'crypto';
 import { unifiedConfig } from '../../config/unifiedConfig';
 import { logger } from '../../logger';
+import { isSeedPreviewTenant, SEED_PREVIEW_SANDBOX_RESPONSE } from '../../lib/seed-preview';
 
 const router = Router();
 
@@ -94,6 +95,15 @@ router.post('/process-payment', async (req, res) => {
         error: 'Missing required fields',
         message: 'orderId, paymentId, sourceId, and amount are required'
       });
+    }
+
+    // Seed-preview storefronts: sandbox — no Square payment is processed (spec §5b).
+    const orderRecord = await prisma.orders.findUnique({
+      where: { id: orderId },
+      select: { tenant_id: true },
+    });
+    if (await isSeedPreviewTenant(orderRecord?.tenant_id)) {
+      return res.status(200).json(SEED_PREVIEW_SANDBOX_RESPONSE);
     }
 
     // Process payment with Square API

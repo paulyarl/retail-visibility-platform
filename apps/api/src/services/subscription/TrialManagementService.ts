@@ -379,6 +379,7 @@ export class TrialManagementService {
     const tenants = await prisma.tenants.findMany({
       where: {
         subscription_status: 'trial',
+        is_demo: { not: true },
         trial_ends_at: {
           gte: today,
           lt: tomorrow,
@@ -402,6 +403,7 @@ export class TrialManagementService {
     const tenants = await prisma.tenants.findMany({
       where: {
         subscription_status: 'past_due',
+        is_demo: { not: true },
         grace_ends_at: { gt: now }, // Still in grace period
         trial_payment_failed_at: { lte: threeDaysAgo }, // Last retry was 3+ days ago
       },
@@ -420,6 +422,7 @@ export class TrialManagementService {
     const tenants = await prisma.tenants.findMany({
       where: {
         subscription_status: 'past_due',
+        is_demo: { not: true },
         grace_ends_at: { lt: now },
       },
       select: { id: true },

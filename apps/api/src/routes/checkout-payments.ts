@@ -50,6 +50,12 @@ router.post('/payments/charge', async (req: Request, res: Response) => {
       });
     }
 
+    // Seed-preview storefronts: sandbox — no PaymentIntent is created (spec §5b).
+    const { isSeedPreviewTenant, SEED_PREVIEW_SANDBOX_RESPONSE } = await import('../lib/seed-preview');
+    if (await isSeedPreviewTenant(order.tenant_id)) {
+      return res.status(200).json(SEED_PREVIEW_SANDBOX_RESPONSE);
+    }
+
     // Initialize Stripe directly for PaymentIntent creation
     const Stripe = require('stripe');
     console.log('STRIPE_SECRET_KEY loaded:', !!unifiedConfig.stripeSecretKey);

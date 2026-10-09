@@ -34,17 +34,21 @@ export interface DirectoryPresenceEventPayload {
   referrer?: string;
 }
 
-/** Shelf surfaces — public browse pages with no listing row (migration 295). */
+/** Shelf surfaces — public browse pages with no listing row (migration 295).
+ *  `seed_preview` is the seed-preview storefront surface (spec §6b/B-3) — its
+ *  ref is the preview tenant's shop slug, resolved to the demo tenant API-side. */
 export type DirectoryShelfSurface =
   | 'place_category'
   | 'place_city'
   | 'directory_category'
   | 'directory_location'
   | 'directory_store_type'
-  | 'directory_home';
+  | 'directory_home'
+  | 'seed_preview';
 
 export type DirectoryShelfEventType =
   | 'shelf_viewed'
+  | 'listing_viewed'
   | 'listing_clicked'
   | 'filter_applied'
   | 'session_heartbeat'

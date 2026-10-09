@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, ArrowRight, ListChecks, Rocket } from 'lucide-react';
 import Link from 'next/link';
 import { marketingOpsService, type AssembledCallScript, type CampaignOutreachAnchor, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
+import directoryPresenceAdminService, { type SeedPreviewStatus } from '@/services/DirectoryPresenceAdminService';
 import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
 
 interface DeadNumberLog {
@@ -64,6 +65,10 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const [showFullLog, setShowFullLog] = useState(false);
   const [campaignAnchors, setCampaignAnchors] = useState<CampaignOutreachAnchor[]>([]);
   const [selectedAnchorId, setSelectedAnchorId] = useState<string>('');
+  const [previewStatus, setPreviewStatus] = useState<SeedPreviewStatus | null>(null);
+  const [previewBusy, setPreviewBusy] = useState<string | null>(null);
+  const [previewCopied, setPreviewCopied] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const fetchScript = useCallback(async (angle?: string, anchorId?: string) => {
     setLoading(true);
@@ -117,6 +122,73 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
     fetchRecentLog();
     fetchAnchors();
   }, [fetchScript, fetchDeadNumberStatus, fetchRecentLog, fetchAnchors, campaignPhone]);
+
+  // Seed-preview storefront status — follows the script's resolved linked
+  // seed (D-5: campaign Openers drives the same seed-scoped action).
+  const linkedSeedId = script?.callContext?.linked_seed_id ?? null;
+  const fetchPreviewStatus = useCallback(async () => {
+    if (!linkedSeedId) {
+      setPreviewStatus(null);
+      return;
+    }
+    try {
+      const status = await directoryPresenceAdminService.getSeedPreviewStatus(linkedSeedId);
+      setPreviewStatus(status);
+    } catch {
+      setPreviewStatus(null);
+    }
+  }, [linkedSeedId]);
+
+  useEffect(() => {
+    fetchPreviewStatus();
+  }, [fetchPreviewStatus]);
+
+  const handleGeneratePreview = async () => {
+    if (!linkedSeedId) return;
+    setPreviewError(null);
+    setPreviewBusy('generate');
+    try {
+      const result = await directoryPresenceAdminService.generateSeedPreview(linkedSeedId);
+      if (!result.ok) {
+        setPreviewError(result.error === 'not_pb08_eligible'
+          ? 'Not eligible — needs a confirmed PB-08 website-build decision.'
+          : `Failed to generate preview: ${result.error}`);
+        return;
+      }
+      await fetchPreviewStatus();
+    } catch {
+      setPreviewError('Failed to generate preview storefront.');
+    } finally {
+      setPreviewBusy(null);
+    }
+  };
+
+  const handleExtendPreview = async () => {
+    if (!linkedSeedId) return;
+    setPreviewError(null);
+    setPreviewBusy('extend');
+    try {
+      const result = await directoryPresenceAdminService.extendSeedPreview(linkedSeedId);
+      if (!result.ok) {
+        setPreviewError('Extension cap reached (28-day maximum).');
+        return;
+      }
+      await fetchPreviewStatus();
+    } catch {
+      setPreviewError('Failed to extend preview.');
+    } finally {
+      setPreviewBusy(null);
+    }
+  };
+
+  const handleCopyPreviewUrl = () => {
+    const url = previewStatus?.preview?.storefrontUrl;
+    if (!url || typeof window === 'undefined') return;
+    navigator.clipboard?.writeText(`${window.location.origin}${url}`).then(() => {
+      setPreviewCopied(true);
+      setTimeout(() => setPreviewCopied(false), 2000);
+    });
+  };
 
   const handleConfirmDead = async (logId: string) => {
     setDeadNumberAction(logId);
@@ -437,6 +509,69 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
       {ammunition.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <OutreachProblemsSection problems={ammunition} title="Audit ammunition — from the business audit" />
+        </div>
+      )}
+
+      {/* Seed-preview storefront — the audit's website-gap fix performed as
+          proof-of-work on the linked seed (spec §4, D-5). Only renders when
+          the seed is PB-08-eligible. */}
+      {previewStatus?.eligible && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 dark:border-indigo-800 dark:bg-indigo-950/30">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+              <Globe className="w-4 h-4 text-indigo-600" />
+              Preview storefront
+            </h3>
+            <span className="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-100 rounded px-1.5 py-0.5 font-medium dark:text-amber-300 dark:bg-amber-900/40">
+              Sample catalog — not real inventory
+            </span>
+          </div>
+          {previewError && <p className="mb-2 text-xs text-red-600 dark:text-red-400">{previewError}</p>}
+          {previewStatus.preview ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <a
+                href={previewStatus.preview.storefrontUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono dark:text-blue-400"
+              >
+                <ExternalLink className="w-3 h-3" />
+                {previewStatus.preview.storefrontUrl}
+              </a>
+              <button
+                onClick={handleCopyPreviewUrl}
+                className="px-2 py-0.5 border border-gray-300 rounded text-gray-700 hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                {previewCopied ? 'Copied!' : 'Copy link'}
+              </button>
+              {previewStatus.preview.expiresAt && (
+                <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                  <Clock className="w-3 h-3" />
+                  {Math.max(0, Math.ceil((new Date(previewStatus.preview.expiresAt).getTime() - Date.now()) / 86400000))}d left
+                </span>
+              )}
+              <button
+                onClick={handleExtendPreview}
+                disabled={previewBusy !== null || previewStatus.preview.extensionsUsed >= 2}
+                className="px-2 py-0.5 border border-indigo-300 rounded text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-700 dark:text-indigo-300"
+              >
+                {previewBusy === 'extend' ? 'Extending…' : `Extend +7d (${previewStatus.preview.extensionsUsed}/2)`}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-600 dark:text-gray-400 flex-1">
+                Build a live sample storefront from the linked seed as proof-of-work for the website-gap fix.
+              </p>
+              <button
+                onClick={handleGeneratePreview}
+                disabled={previewBusy !== null}
+                className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {previewBusy === 'generate' ? 'Generating…' : 'Generate preview'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

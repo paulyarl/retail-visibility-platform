@@ -54,6 +54,8 @@ export const DIRECTORY_SURFACES = [
   'directory_location',
   'directory_store_type',
   'directory_home',
+  /** Seed-preview storefront /shops/[slug] (spec §6b — keyed by preview tenant). */
+  'seed_preview',
 ] as const;
 
 export type DirectorySurface = (typeof DIRECTORY_SURFACES)[number];
@@ -66,6 +68,9 @@ export const DIRECTORY_SHELF_SURFACES = [
   'directory_location',
   'directory_store_type',
   'directory_home',
+  /** Preview storefront — resolved to its demo tenant server-side, unlike the
+   *  other shelf surfaces which write tenant_id=null. */
+  'seed_preview',
 ] as const;
 
 export const ALLOWED_DIRECTORY_PRESENCE_EVENT_TYPES: DirectoryPresenceEventType[] = [

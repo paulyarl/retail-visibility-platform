@@ -715,6 +715,10 @@ export interface QuickStartOptions {
   productCount: number;
   assignCategories?: boolean;
   createAsDrafts?: boolean;
+  /** Seed-preview storefronts need a deterministic catalog — every generated
+   *  product is active (spec B-6). Overrides the mixed active/inactive random
+   *  split; createAsDrafts still takes precedence when both are set. */
+  allActive?: boolean;
   generateImages?: boolean;
   imageQuality?: 'standard' | 'hd';
   textModel?: 'openai' | 'google' | 'anthropic' | 'mistral';
@@ -744,6 +748,7 @@ export async function generateQuickStartProducts(
     productCount,
     assignCategories = true,
     createAsDrafts = true,
+    allActive = false,
     generateImages = false,
     imageQuality = 'standard',
     textModel = 'openai',
@@ -961,7 +966,9 @@ export async function generateQuickStartProducts(
       // Determine item status (map "draft" semantics to inactive in new enum)
       const itemStatus = createAsDrafts
         ? 'inactive' as const
-        : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
+        : allActive
+          ? 'active' as const
+          : (Math.random() > 0.25 ? 'active' as const : 'inactive' as const);
 
       const itemId = generateTenantItemId(tenant_id);
       

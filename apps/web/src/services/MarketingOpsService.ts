@@ -682,6 +682,9 @@ export interface CallScriptContext {
   team_signal: string;
   gallery_short_url: string | null;
   channel_hint: 'phone_first' | null;
+  /** Linked directory-presence seed (primary link preferred) — drives the
+   *  seed-scoped preview-storefront action on PB-08 campaigns (spec §4, D-5). */
+  linked_seed_id?: string | null;
 }
 
 export interface ObjectionRow {

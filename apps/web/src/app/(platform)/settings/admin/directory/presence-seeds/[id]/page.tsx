@@ -20,6 +20,7 @@ import directoryPresenceAdminService, {
   OutreachTouch,
   ReEngagementSuggestion,
   ReportDeliveryQrKitMeta,
+  SeedPreviewStatus,
 } from '@/services/DirectoryPresenceAdminService';
 import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
 import { clientLogger } from '@/lib/client-logger';
@@ -229,6 +230,9 @@ function PresenceSeedDetailClient() {
   }>>([]);
   const [refreshingReport, setRefreshingReport] = useState(false);
   const [reengagement, setReengagement] = useState<ReEngagementSuggestion | null>(null);
+  const [previewStatus, setPreviewStatus] = useState<SeedPreviewStatus | null>(null);
+  const [previewBusy, setPreviewBusy] = useState<string | null>(null);
+  const [previewCopied, setPreviewCopied] = useState(false);
   const [anchors, setAnchors] = useState<ManualOutreachAnchor[]>([]);
   const [showAnchorForm, setShowAnchorForm] = useState(false);
   const [suggestingAnchors, setSuggestingAnchors] = useState(false);
@@ -393,6 +397,84 @@ function PresenceSeedDetailClient() {
     }
   }, [seedId]);
 
+  const loadPreviewStatus = useCallback(async () => {
+    try {
+      const status = await directoryPresenceAdminService.getSeedPreviewStatus(seedId);
+      setPreviewStatus(status);
+    } catch (err) {
+      clientLogger.error('Failed to load seed preview status:', { detail: err });
+    }
+  }, [seedId]);
+
+  const handleGeneratePreview = async () => {
+    setActionError(null);
+    setPreviewBusy('generate');
+    try {
+      const result = await directoryPresenceAdminService.generateSeedPreview(seedId);
+      if (!result.ok) {
+        setActionError(result.error === 'not_pb08_eligible'
+          ? 'This seed is not eligible — it needs a linked campaign with a confirmed PB-08 website-build decision.'
+          : `Failed to generate preview: ${result.error}`);
+        return;
+      }
+      setActionSuccess(result.existing
+        ? 'Preview already exists — showing the live URL.'
+        : 'Preview storefront generated. Sample catalog — not the business\'s real inventory.');
+      await loadPreviewStatus();
+    } catch {
+      setActionError('Failed to generate preview storefront.');
+    } finally {
+      setPreviewBusy(null);
+    }
+  };
+
+  const handleExtendPreview = async () => {
+    setActionError(null);
+    setPreviewBusy('extend');
+    try {
+      const result = await directoryPresenceAdminService.extendSeedPreview(seedId);
+      if (!result.ok) {
+        setActionError(result.error === 'extension_cap_reached' || result.error === 'hard_cap_reached'
+          ? 'Extension cap reached (28-day maximum).'
+          : `Failed to extend preview: ${result.error}`);
+        return;
+      }
+      setActionSuccess(`Preview extended (${result.extensionsUsed}/2 extensions used).`);
+      await loadPreviewStatus();
+    } catch {
+      setActionError('Failed to extend preview.');
+    } finally {
+      setPreviewBusy(null);
+    }
+  };
+
+  const handleExpirePreview = async () => {
+    setActionError(null);
+    setPreviewBusy('expire');
+    try {
+      const ok = await directoryPresenceAdminService.expireSeedPreview(seedId);
+      if (!ok) {
+        setActionError('Failed to retire preview.');
+        return;
+      }
+      setActionSuccess('Preview retired.');
+      await loadPreviewStatus();
+    } catch {
+      setActionError('Failed to retire preview.');
+    } finally {
+      setPreviewBusy(null);
+    }
+  };
+
+  const handleCopyPreviewUrl = () => {
+    const url = previewStatus?.preview?.storefrontUrl;
+    if (!url || typeof window === 'undefined') return;
+    navigator.clipboard?.writeText(`${window.location.origin}${url}`).then(() => {
+      setPreviewCopied(true);
+      setTimeout(() => setPreviewCopied(false), 2000);
+    });
+  };
+
   const handleRecordContact = async (anchorId: string) => {
     setActionError(null);
     setRecordingContact(true);
@@ -460,7 +542,8 @@ function PresenceSeedDetailClient() {
     loadTouches();
     loadReportVersions();
     loadReengagement();
-  }, [fetchDetail, loadQrKit, loadReportQrKit, loadAnchors, loadTouches, loadReportVersions, loadReengagement]);
+    loadPreviewStatus();
+  }, [fetchDetail, loadQrKit, loadReportQrKit, loadAnchors, loadTouches, loadReportVersions, loadReengagement, loadPreviewStatus]);
 
   // Load the verification call script — refetches when the anchor selection
   // changes so the script reflects the anchor's questions + transition.
@@ -2889,6 +2972,91 @@ function PresenceSeedDetailClient() {
                   problems={seedScript.ammunition!}
                   title="Audit ammunition — linked campaign audit"
                 />
+              </div>
+            )}
+
+            {/* Seed-preview storefront — only on PB-08-eligible seeds (spec §4).
+                The generated /shops/[slug] page is a sample catalog proof-of-work
+                for the audit's website-gap fix. */}
+            {previewStatus?.eligible && (
+              <div className="border border-indigo-200 bg-indigo-50/40 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                    <Globe className="w-4 h-4 text-indigo-600" />
+                    Preview storefront
+                  </h3>
+                  <span className="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-100 rounded px-1.5 py-0.5 font-medium">
+                    Sample catalog — not real inventory
+                  </span>
+                </div>
+
+                {previewStatus.preview ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <a
+                        href={previewStatus.preview.storefrontUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        {previewStatus.preview.storefrontUrl}
+                      </a>
+                      <button
+                        onClick={handleCopyPreviewUrl}
+                        className="px-2 py-0.5 border border-gray-300 rounded text-gray-700 hover:bg-white"
+                      >
+                        {previewCopied ? 'Copied!' : 'Copy link'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      {previewStatus.preview.expiresAt && (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          expires {new Date(previewStatus.preview.expiresAt).toLocaleDateString()}
+                          {' '}({Math.max(0, Math.ceil((new Date(previewStatus.preview.expiresAt).getTime() - Date.now()) / 86400000))}d left)
+                        </span>
+                      )}
+                      <span>extensions used: {previewStatus.preview.extensionsUsed}/2</span>
+                      <span title="Page views on the preview storefront">
+                        {previewStatus.preview.pageViews} view{previewStatus.preview.pageViews === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleExtendPreview}
+                        disabled={previewBusy !== null || previewStatus.preview.extensionsUsed >= 2}
+                        className="px-3 py-1.5 border border-indigo-300 text-indigo-700 rounded text-xs font-medium hover:bg-indigo-50 disabled:opacity-50"
+                      >
+                        {previewBusy === 'extend' ? 'Extending…' : 'Extend +7d'}
+                      </button>
+                      <button
+                        onClick={handleExpirePreview}
+                        disabled={previewBusy !== null}
+                        className="px-3 py-1.5 border border-red-300 text-red-700 rounded text-xs font-medium hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {previewBusy === 'expire' ? 'Retiring…' : 'Expire now'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-600">
+                      Build a live sample storefront from this seed's listing as
+                      proof-of-work for the audit's website-gap fix. The page is
+                      labeled as a sample, excluded from search and the
+                      directory, takes no real payments, and expires in 14 days
+                      (extendable to 28).
+                    </p>
+                    <button
+                      onClick={handleGeneratePreview}
+                      disabled={previewBusy !== null}
+                      className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {previewBusy === 'generate' ? 'Generating…' : 'Generate preview storefront'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

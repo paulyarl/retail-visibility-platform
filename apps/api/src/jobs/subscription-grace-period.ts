@@ -204,6 +204,7 @@ export async function getTenantsApproachingExpiry(): Promise<{
       JOIN user_tenants ut ON ut.tenant_id = t.id AND ut.role = 'OWNER'
       JOIN users u ON u.id = ut.user_id
       WHERE t.subscription_status = 'past_due'
+        AND t.is_demo IS NOT TRUE
         AND t.status_changed_at >= ${startOfDay}
         AND t.status_changed_at <= ${endOfDay}
     `;

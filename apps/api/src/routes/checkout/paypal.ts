@@ -6,6 +6,7 @@ import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
 import { redeemOrderCoupon } from '../../services/PostPaymentCouponRedemption';
 import { unifiedConfig } from '../../config/unifiedConfig';
 import { logger } from '../../logger';
+import { isSeedPreviewTenant, SEED_PREVIEW_SANDBOX_RESPONSE } from '../../lib/seed-preview';
 
 const router = Router();
 
@@ -57,16 +58,23 @@ router.post('/create-order', async (req, res) => {
     
     // Retrieve the order's actual shipping_cents from database to enforce correct payment breakdowns
     let shippingCents = 0;
+    let orderTenantId: string | null = null;
     try {
       const orderRecord = await prisma.orders.findUnique({
         where: { id: orderId },
-        select: { shipping_cents: true },
+        select: { shipping_cents: true, tenant_id: true },
       });
       if (orderRecord) {
         shippingCents = orderRecord.shipping_cents || 0;
+        orderTenantId = orderRecord.tenant_id;
       }
     } catch (orderErr) {
       console.warn('[PayPal Checkout] Failed to fetch order record for shipping fee:', orderErr);
+    }
+
+    // Seed-preview storefronts: sandbox — no PayPal order is created (spec §5b).
+    if (await isSeedPreviewTenant(orderTenantId)) {
+      return res.status(200).json(SEED_PREVIEW_SANDBOX_RESPONSE);
     }
 
     const totalAmount = itemTotal + shippingCents;

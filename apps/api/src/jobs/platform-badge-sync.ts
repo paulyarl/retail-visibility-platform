@@ -25,7 +25,7 @@ let firstRun = true;
 async function getAllTenantIds(): Promise<string[]> {
   try {
     const tenants = await prisma.tenants.findMany({
-      where: { subscription_status: { not: 'cancelled' } },
+      where: { subscription_status: { not: 'cancelled' }, is_demo: { not: true } },
       select: { id: true },
     });
     return tenants.map(t => t.id);

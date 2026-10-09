@@ -658,7 +658,7 @@ export default function DirectoryClaimClient() {
                 {/* Entry Presence mode teaser (claim handoff spec §2/§4) */}
                 <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} />
 
-                {/* Directory Presence product allowance teaser (E5) */}
+                {/* Directory Presence product allowance + entry step (E5, spec B-4) */}
                 <Alert color="blue" variant="light" icon={<IconShoppingCart size={16} />} w="100%">
                   <Stack gap="xs">
                     <Text size="sm" fw={500}>
@@ -672,6 +672,18 @@ export default function DirectoryClaimClient() {
                         Learn more
                       </Link>
                     </Text>
+                    {tenantId && (
+                      <Button
+                        component={Link}
+                        href={hasPlatformSession ? `/t/${tenantId}/items/create` : withReturnTo(`/t/${tenantId}/items/create`)}
+                        size="xs"
+                        variant="light"
+                        mt="xs"
+                        style={{ alignSelf: 'flex-start' }}
+                      >
+                        Add your first product
+                      </Button>
+                    )}
                   </Stack>
                 </Alert>
 
