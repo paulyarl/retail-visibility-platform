@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Plus, Pencil, Trash2, Palette, Check } from 'lucide-react';
-import marketingOpsService, { BrandingConfig, BrandingCreateInput } from '@/services/MarketingOpsService';
+import marketingOpsService, { BrandingConfig, BrandingCreateInput, BRANDING_NO_LOGO_URL } from '@/services/MarketingOpsService';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const BASE_FONTS = ['helvetica', 'times', 'courier'];
+
+type LogoSource = 'platform' | 'custom' | 'none';
+
+const deriveLogoSource = (url: string | null | undefined): LogoSource =>
+  url === BRANDING_NO_LOGO_URL ? 'none' : url?.trim() ? 'custom' : 'platform';
 
 export default function BrandingConfigClient() {
   const [configs, setConfigs] = useState<BrandingConfig[]>([]);
@@ -15,6 +21,8 @@ export default function BrandingConfigClient() {
   const [editingConfig, setEditingConfig] = useState<BrandingConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const [vocab, setVocab] = useState({ fonts: [] as string[] });
+  const [platformLogoUrl, setPlatformLogoUrl] = useState<string | null>(null);
+  const [logoSource, setLogoSource] = useState<LogoSource>('platform');
 
   const [form, setForm] = useState<BrandingCreateInput>({
     operator_name: '',
@@ -45,6 +53,32 @@ export default function BrandingConfigClient() {
     fetchConfigs();
   }, [fetchConfigs]);
 
+  // Load the platform logo once — an empty operator_logo_url resolves to it
+  // at render time, so the form previews what will actually print. Probe the
+  // image before offering it (same pattern as the QR designer modals).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await platformSettingsService.getPlatformSettings();
+        const url = s?.logoUrl ?? null;
+        if (!url) return;
+        await new Promise<void>((resolve, reject) => {
+          const probe = new Image();
+          probe.onload = () => resolve();
+          probe.onerror = () => reject(new Error('logo probe failed'));
+          probe.src = url;
+        });
+        if (!cancelled) setPlatformLogoUrl(url);
+      } catch {
+        // No usable platform logo — leave the field informational only.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleEdit = (config: BrandingConfig) => {
     setEditingConfig(config);
     setForm({
@@ -57,6 +91,7 @@ export default function BrandingConfigClient() {
       footer_disclaimer: config.footer_disclaimer || '',
       is_active: config.is_active,
     });
+    setLogoSource(deriveLogoSource(config.operator_logo_url));
     setShowModal(true);
   };
 
@@ -72,6 +107,7 @@ export default function BrandingConfigClient() {
       footer_disclaimer: '',
       is_active: true,
     });
+    setLogoSource('platform');
     setShowModal(true);
   };
 
@@ -250,14 +286,57 @@ export default function BrandingConfigClient() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo URL (optional)</label>
-                <input
-                  type="text"
-                  value={form.operator_logo_url || ''}
-                  onChange={(e) => setForm({ ...form, operator_logo_url: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="https://example.com/logo.png"
-                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={logoSource}
+                    onChange={(e) => {
+                      const source = e.target.value as LogoSource;
+                      setLogoSource(source);
+                      setForm({
+                        ...form,
+                        operator_logo_url:
+                          source === 'none'
+                            ? BRANDING_NO_LOGO_URL
+                            : source === 'platform'
+                              ? ''
+                              : form.operator_logo_url === BRANDING_NO_LOGO_URL
+                                ? ''
+                                : form.operator_logo_url,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    <option value="platform">Platform logo (default)</option>
+                    <option value="custom">Custom URL</option>
+                    <option value="none">None — operator name only</option>
+                  </select>
+                  {logoSource === 'platform' && platformLogoUrl && (
+                    <img
+                      src={platformLogoUrl}
+                      alt="Platform logo"
+                      className="h-9 w-auto shrink-0 rounded border border-gray-200 bg-white object-contain p-1 dark:border-gray-700"
+                    />
+                  )}
+                </div>
+                {logoSource === 'custom' && (
+                  <input
+                    type="text"
+                    value={form.operator_logo_url || ''}
+                    onChange={(e) => setForm({ ...form, operator_logo_url: e.target.value })}
+                    className="mt-2 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                    placeholder="https://example.com/logo.png"
+                  />
+                )}
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {logoSource === 'platform'
+                    ? platformLogoUrl
+                      ? 'The platform logo prints on deliverables.'
+                      : 'No platform logo configured — the operator name prints in the header instead.'
+                    : logoSource === 'custom'
+                      ? 'Leave blank to fall back to the platform logo.'
+                      : 'No logo — the operator name prints in the header.'}
+                </p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">

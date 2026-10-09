@@ -13,7 +13,16 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateBrandingConfigId } from '../lib/id-generator';
+import { loadPlatformBranding } from './marketing/MarketingReceiptPdfService';
 import { jsPDF } from 'jspdf';
+
+/**
+ * Sentinel for operator_logo_url meaning "no logo — print the operator name".
+ * Matches the codebase's double-underscore sentinel convention ('__all__',
+ * '__location__'). Empty string/null is NOT none — it's the platform-logo
+ * fallback. The branding zod schema accepts any string, so no migration.
+ */
+export const NO_LOGO_URL = '__none__';
 
 export interface BrandingConfigInput {
   operatorName: string;
@@ -143,24 +152,20 @@ export class MarketingBrandingService extends BaseService {
   // STATIC PDF HELPERS
   // ====================
 
-  static applyBrandingToDoc(
+  static async applyBrandingToDoc(
     doc: jsPDF,
     config: any,
     opts: { pageWidth: number; margin: number; startY: number },
-  ): number {
+  ): Promise<number> {
     let yPos = opts.startY;
 
-    if (config.operator_logo_url) {
-      try {
-        doc.addImage(config.operator_logo_url, 'PNG', opts.margin, yPos, 30, 15);
-        yPos += 18;
-      } catch {
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(config.primary_color || '#111827');
-        doc.text(config.operator_name || 'Operator', opts.margin, yPos);
-        yPos += 8;
-      }
+    const logoUrl = await MarketingBrandingService.resolveLogoUrl(config);
+    const embedded = logoUrl
+      ? await MarketingBrandingService.embedLogo(doc, logoUrl, opts.margin, yPos, 15)
+      : false;
+
+    if (embedded) {
+      yPos += 18;
     } else {
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
@@ -181,6 +186,59 @@ export class MarketingBrandingService extends BaseService {
 
     doc.setTextColor(0, 0, 0);
     return yPos;
+  }
+
+  /**
+   * Resolve the logo to render for a config. Three scenarios:
+   *   - a URL              → the operator's custom logo
+   *   - NO_LOGO_URL        → no logo (operator-name text header)
+   *   - empty/null         → the platform logo (platform_settings_list.logo_url,
+   *                          the same source the QR kits and receipts use)
+   */
+  private static async resolveLogoUrl(config: any): Promise<string | null> {
+    const url = config.operator_logo_url?.trim();
+    if (url === NO_LOGO_URL) return null;
+    if (url) return url;
+    try {
+      const platform = await loadPlatformBranding();
+      return platform.logoUrl || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Embed a logo into the doc. Accepts a data URI directly or fetches a
+   * remote URL and converts it (the receipt/postcard pattern — jsPDF cannot
+   * resolve remote URLs itself). Returns false on any failure so the caller
+   * can fall back to the operator-name text header.
+   */
+  private static async embedLogo(
+    doc: jsPDF,
+    logoUrl: string,
+    x: number,
+    y: number,
+    height: number,
+  ): Promise<boolean> {
+    try {
+      let dataUri: string;
+      if (logoUrl.startsWith('data:')) {
+        dataUri = logoUrl;
+      } else {
+        const res = await fetch(logoUrl);
+        if (!res.ok) return false;
+        const contentType = res.headers.get('content-type') || 'image/png';
+        const base64 = Buffer.from(await res.arrayBuffer()).toString('base64');
+        dataUri = `data:${contentType};base64,${base64}`;
+      }
+      const props = doc.getImageProperties(dataUri);
+      const width = height * (props.width / props.height);
+      const format = /jpe?g/i.test(dataUri.slice(0, 30)) ? 'JPEG' : 'PNG';
+      doc.addImage(dataUri, format, x, y, width, height);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   static applyWatermark(doc: jsPDF, pageWidth: number, pageHeight: number): void {

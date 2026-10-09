@@ -1932,6 +1932,14 @@ export interface Deliverable {
   updated_at: string;
 }
 
+/**
+ * Sentinel for operator_logo_url meaning "no logo — print the operator name".
+ * Empty string means "use the platform logo" (resolved server-side via
+ * platform_settings_list.logo_url). Mirrors NO_LOGO_URL in the API's
+ * MarketingBrandingService.
+ */
+export const BRANDING_NO_LOGO_URL = '__none__';
+
 export interface BrandingConfig {
   id: string;
   operator_name: string;

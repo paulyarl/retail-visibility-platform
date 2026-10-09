@@ -319,7 +319,7 @@ export class MarketingDeliverableService extends BaseService {
       let yPos = 25;
 
       if (brandingConfig) {
-        yPos = MarketingBrandingService.applyBrandingToDoc(doc, brandingConfig, {
+        yPos = await MarketingBrandingService.applyBrandingToDoc(doc, brandingConfig, {
           pageWidth,
           margin,
           startY: yPos,

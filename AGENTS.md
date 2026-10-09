@@ -681,6 +681,10 @@ Mirrors the coupon `/s/{autoId}` short URL pattern for diagnostic gallery tokens
 - **Collision handling**: 3 retries on unique-index conflict; falls back to no short code (long URL still works) if exhausted
 - **Lazy backfill**: legacy tokens without `short_code` are not broken; `ensureShortCode()` can backfill them on demand
 
+## Deliverable PDF Branding — platform-logo fallback (added 2026-10-09)
+
+`mkt_branding_config` (managed at /settings/admin/marketing-ops/branding; one `is_active` row, enforced by `deactivateAllConfigs` + partial unique index) is consumed only by `MarketingDeliverableService.generateDeliverable` via `MarketingBrandingService.applyBrandingToDoc` — an async static that resolves the header logo from `operator_logo_url` with three scenarios: a URL = custom logo; the `'__none__'` sentinel (`NO_LOGO_URL` / web-side `BRANDING_NO_LOGO_URL`, same `__` convention as `__all__`) = no logo, operator-name text header; empty/null = platform logo via `loadPlatformBranding()` (same `platform_settings_list.logo_url` source the claim-invite QR postcard, receipts, mailers, and seed/prospect report PDFs use). Logos are embedded by fetch → base64 data URI → `getImageProperties` → aspect-ratio `addImage` — jsPDF cannot resolve a remote URL itself, so never pass a stored URL straight into `addImage` (the old code did, which is why the operator logo never actually rendered). `data:` URIs are embedded directly; failed embed falls back to the operator-name text header. The branding form exposes the three scenarios as a Logo select (platform default / custom URL / none), previews the probed platform logo, and keeps a separate `logoSource` state because an empty custom URL is indistinguishable from the platform choice.
+
 ## Intelligence Campaign Prompts — Focus + Kind Awareness
 
 Makes prompt templates focus- and kind-aware so the campaign workspace Prompts tab surfaces only the templates matching the campaign's intelligence type. Previously focus was inferred from the template NAME (regex `/competitive/i`) and kind was inferred from `output_schema.name` — both were artifacts, not queryable data.
