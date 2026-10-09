@@ -488,6 +488,61 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
 });
 
 /**
+ * GET /api/admin/directory-presence/presence-seeds/:id/owner-requests
+ * Anonymous claim/takedown requests resolved to this seed (migration 322) —
+ * each row carries the asserted intent/role, the server-computed credibility
+ * summary, and sla_due_at (set only for intent='remove').
+ */
+router.get('/presence-seeds/:id/owner-requests', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const requests = await DirectoryPresenceSeedService.listOwnerRequests(req.params.id);
+    const { TAKEDOWN_SLA_HOURS } = await import('../services/DirectoryPresenceSeedService');
+    res.json({ success: true, requests, takedownSlaHours: TAKEDOWN_SLA_HOURS });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory-presence/presence-seeds/:id/owner-requests] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+const ownerRequestTriageSchema = z.object({
+  action: z.enum(['acknowledge', 'actioned', 'dismiss_spam', 'dismiss_not_credible']),
+  note: z.string().max(2000).optional(),
+});
+
+/**
+ * POST /api/admin/directory-presence/presence-seeds/:id/owner-requests/:requestId/triage
+ * Record the operator verdict. Terminal actions resolve the linked
+ * crm_inquiries row and log an outreach touch.
+ */
+router.post('/presence-seeds/:id/owner-requests/:requestId/triage', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const parsed = ownerRequestTriageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'validation_error', details: parsed.error.flatten() });
+    }
+    const ctx = { actorId: (req as any).user?.id, actorType: 'user' as const };
+    const result = await DirectoryPresenceSeedService.triageOwnerRequest(
+      req.params.id,
+      req.params.requestId,
+      parsed.data.action,
+      parsed.data.note,
+      ctx,
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if ((error as Error).message === 'owner_request_not_found') {
+      return res.status(404).json({ error: 'owner_request_not_found' });
+    }
+    logger.error('[POST /api/admin/directory-presence/presence-seeds/:id/owner-requests/:requestId/triage] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
  * GET /api/admin/directory-presence/presence-seeds/:id/demo-window
  *
  * Active in-store demo window (null when none) plus recent windows (migration 317).

@@ -4044,6 +4044,25 @@ router.post('/inquiries', async (req, res) => {
       } catch (touchErr) {
         logger.error('[Public Inquiry] Seed touch log error (non-critical):', req.ctx, { error: { name: (touchErr as any)?.name || 'Error', message: (touchErr as any)?.message || String(touchErr), stack: (touchErr as any)?.stack } });
       }
+
+      // Structured triage record (migration 322) — the seed page lists these
+      // with an SLA clock (48h for intent='remove') and operator verdicts.
+      try {
+        const { default: seedService } = await import('../services/DirectoryPresenceSeedService');
+        await seedService.createOwnerRequest(seedContext.seedId, {
+          inquiryId: inquiry.id,
+          intent: request_intent || 'question',
+          requesterRole: requester_role,
+          credibility: credibilitySignals.join('; '),
+          senderName: finalSenderName,
+          senderEmail: finalSenderEmail,
+          senderPhone: finalSenderPhone,
+          senderSocial: sender_social,
+          subject,
+        });
+      } catch (reqErr) {
+        logger.error('[Public Inquiry] Owner-request row error (non-critical):', req.ctx, { error: { name: (reqErr as any)?.name || 'Error', message: (reqErr as any)?.message || String(reqErr), stack: (reqErr as any)?.stack } });
+      }
     }
 
     console.log(`[Public Inquiry] Created inquiry ${inquiry.id} for tenant ${tenant_id} from ${finalSenderEmail || 'anonymous'} (customer_id: ${customerId || 'none'})`);

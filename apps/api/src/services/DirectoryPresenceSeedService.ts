@@ -3002,6 +3002,129 @@ class DirectoryPresenceSeedService {
     return { id: touchId };
   }
 
+  // ── Owner-request triage (migration 322, D-1 follow-up) ──────────────
+  // Anonymous claim/takedown forms resolve to a seed in the public inquiry
+  // route; alongside the crm_inquiries row + outreach touch, a structured
+  // request row is written here so the seed page can list requests with an
+  // SLA clock and operators can record a verdict. Takedown (intent='remove')
+  // is the only intent that carries an SLA — it's the privileged action.
+
+  /** Takedown response window — see TAKEDOWN_SLA_HOURS (module export). */
+
+  async createOwnerRequest(
+    seedId: string,
+    input: {
+      inquiryId?: string;
+      intent: 'claim' | 'remove' | 'question';
+      requesterRole?: string;
+      credibility?: string;
+      senderName?: string;
+      senderEmail?: string;
+      senderPhone?: string;
+      senderSocial?: string;
+      subject?: string;
+    },
+  ): Promise<{ id: string }> {
+    const id = randomUUID();
+    const slaDueAt = input.intent === 'remove'
+      ? new Date(Date.now() + TAKEDOWN_SLA_HOURS * 3600_000)
+      : null;
+    await prisma.$executeRaw`
+      INSERT INTO directory_presence_owner_requests (
+        id, seed_id, inquiry_id, intent, requester_role, credibility,
+        sender_name, sender_email, sender_phone, sender_social, subject,
+        sla_due_at, status, created_at, updated_at
+      ) VALUES (
+        ${id}::uuid, ${seedId}, ${input.inquiryId || null}, ${input.intent},
+        ${input.requesterRole || null}, ${input.credibility || null},
+        ${input.senderName || null}, ${input.senderEmail || null},
+        ${input.senderPhone || null}, ${input.senderSocial || null},
+        ${input.subject || null}, ${slaDueAt}, 'open', now(), now()
+      )
+    `;
+    return { id };
+  }
+
+  async listOwnerRequests(seedId: string) {
+    return prisma.$queryRaw<any[]>`
+      SELECT id, inquiry_id, intent, requester_role, credibility,
+             sender_name, sender_email, sender_phone, sender_social, subject,
+             sla_due_at, status, triaged_at, triaged_by, triage_note, created_at
+      FROM directory_presence_owner_requests
+      WHERE seed_id = ${seedId}
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+  }
+
+  /** Record an operator verdict. Terminal actions (anything but
+   *  'acknowledge') also resolve the linked crm_inquiries row and log an
+   *  outreach touch so the triage is visible on the seed timeline. */
+  async triageOwnerRequest(
+    seedId: string,
+    requestId: string,
+    action: 'acknowledge' | 'actioned' | 'dismiss_spam' | 'dismiss_not_credible',
+    note: string | undefined,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ status: string }> {
+    const statusMap = {
+      acknowledge: 'acknowledged',
+      actioned: 'actioned',
+      dismiss_spam: 'dismissed_spam',
+      dismiss_not_credible: 'dismissed_not_credible',
+    } as const;
+    const status = statusMap[action];
+    const terminal = action !== 'acknowledge';
+
+    const rows = await prisma.$queryRaw<any[]>`
+      UPDATE directory_presence_owner_requests
+      SET status = ${status},
+          triaged_at = now(),
+          triaged_by = ${ctx?.actorId || null},
+          triage_note = ${note || null},
+          updated_at = now()
+      WHERE id = ${requestId}::uuid AND seed_id = ${seedId}
+      RETURNING id, inquiry_id, intent, requester_role, subject
+    `;
+    if (!rows[0]) throw new Error('owner_request_not_found');
+
+    if (terminal && rows[0].inquiry_id) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE crm_inquiries
+          SET status = 'resolved', resolved_at = now(), updated_at = now()
+          WHERE id = ${rows[0].inquiry_id} AND status <> 'resolved'
+        `;
+      } catch (err) {
+        logger.warn('[triageOwnerRequest] inquiry status mirror failed (non-fatal)', undefined, {
+          error: { name: (err as any)?.name || 'Error', message: String(err) },
+        });
+      }
+    }
+
+    try {
+      await this.addOutreachTouch(seedId, {
+        channel: 'other',
+        notes: `Owner request triaged: ${status} — "${rows[0].subject || rows[0].intent}" (intent: ${rows[0].intent}, says ${rows[0].requester_role || 'unknown'})${note ? `. Note: ${note}` : ''}`,
+      }, ctx);
+    } catch (touchErr) {
+      logger.warn('[triageOwnerRequest] touch log failed (non-fatal)', undefined, {
+        error: { name: (touchErr as any)?.name || 'Error', message: String(touchErr) },
+      });
+    }
+
+    if (ctx) {
+      await audit({
+        actor: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'directory_presence_seed.owner_request_triaged',
+        payload: { seedId, requestId, action, status },
+      });
+    }
+
+    return { status };
+  }
+
   /**
    * Attach (or replace) a call recording on an existing touch. Recordings
    * typically land after the touch is logged, so this is a separate write
@@ -4253,5 +4376,10 @@ class DirectoryPresenceSeedService {
     return { suggestions: out, recommendations };
   }
 }
+
+/** Takedown response window for owner requests (migration 322). Surfaced on
+ *  the seed page as active/expired — also returned by the owner-requests GET
+ *  route so the UI renders the same window the API enforces. */
+export const TAKEDOWN_SLA_HOURS = 48;
 
 export default new DirectoryPresenceSeedService();

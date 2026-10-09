@@ -67,6 +67,7 @@ import TrafficEngagementPanel from './TrafficEngagementPanel';
 import SeedPhotoCapturePanel from './SeedPhotoCapturePanel';
 import SeedLogoUploadPanel from './SeedLogoUploadPanel';
 import DemoWindowPanel from './DemoWindowPanel';
+import OwnerRequestsPanel from './OwnerRequestsPanel';
 import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 
@@ -2134,6 +2135,10 @@ function PresenceSeedDetailClient() {
 
       {/* Traffic & Engagement — Layer 3 events on the public listing */}
       <TrafficEngagementPanel seedId={seedId} />
+
+      {/* Owner requests — anonymous claim/takedown inbox with SLA + triage
+          verdicts (migration 322) */}
+      <OwnerRequestsPanel seedId={seedId} />
 
       {/* Claim QR Kit — tracked-scan artifacts, one variant per delivery channel */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">

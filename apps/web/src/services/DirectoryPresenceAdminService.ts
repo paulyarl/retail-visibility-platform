@@ -973,6 +973,36 @@ export type SeedPreviewExtendResult =
   | { ok: true; expiresAt: string; extensionsUsed: number }
   | { ok: false; error: string; extensionsUsed: number; expiresAt: string | null };
 
+// ── Owner-request triage (migration 322) ──────────────────────────────
+// Anonymous claim/takedown requests resolved to this seed. sla_due_at is
+// set only for intent='remove' — the privileged action carries the clock.
+
+export type SeedOwnerRequestIntent = 'claim' | 'remove' | 'question';
+export type SeedOwnerRequestStatus =
+  | 'open' | 'acknowledged' | 'actioned'
+  | 'dismissed_spam' | 'dismissed_not_credible';
+export type SeedOwnerRequestTriageAction =
+  | 'acknowledge' | 'actioned' | 'dismiss_spam' | 'dismiss_not_credible';
+
+export interface SeedOwnerRequest {
+  id: string;
+  inquiry_id: string | null;
+  intent: SeedOwnerRequestIntent;
+  requester_role: string | null;
+  credibility: string | null;
+  sender_name: string | null;
+  sender_email: string | null;
+  sender_phone: string | null;
+  sender_social: string | null;
+  subject: string | null;
+  sla_due_at: string | null;
+  status: SeedOwnerRequestStatus;
+  triaged_at: string | null;
+  triaged_by: string | null;
+  triage_note: string | null;
+  created_at: string;
+}
+
 export class DirectoryPresenceAdminService extends AdminApiSingleton {
   private static instance: DirectoryPresenceAdminService;
 
@@ -1550,6 +1580,41 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/demo-storefront/expire`,
       { method: 'POST' },
+      undefined,
+      0,
+    );
+    return !!result.success;
+  }
+
+  // ============================
+  // Owner-request triage (migration 322)
+  // ============================
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/owner-requests */
+  async listOwnerRequests(seedId: string): Promise<{ requests: SeedOwnerRequest[]; takedownSlaHours: number }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/owner-requests`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return {
+      requests: (data as any)?.requests ?? [],
+      takedownSlaHours: (data as any)?.takedownSlaHours ?? 48,
+    };
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/owner-requests/:requestId/triage */
+  async triageOwnerRequest(
+    seedId: string,
+    requestId: string,
+    action: SeedOwnerRequestTriageAction,
+    note?: string,
+  ): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/owner-requests/${encodeURIComponent(requestId)}/triage`,
+      { method: 'POST', body: JSON.stringify({ action, note }) },
       undefined,
       0,
     );
