@@ -31,7 +31,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V6 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V7 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -98,6 +98,11 @@ Already sent to the owner — do NOT reuse this phrasing or rhetorical structure
 Parsed review intake (verbatim reviews already structured by the operator; may be empty):
 {{review_intake}}
 
+Business attributes (operator-recorded — attributes, origin, tone, secondary shelves):
+{{business_attributes}}
+
+{{discovery_attribution}}
+
 TASK
 For each deliverable type whose governing signal is present in the signal set above,
 populate its source block in deliverable_sources. For every other type, set the
@@ -125,6 +130,10 @@ RULES
 - Do not reuse the phrasing or rhetorical structure of any line in prior_outreach —
   the owner has already seen it. No two source blocks may open with the same sentence
   pattern.
+- Discovery attribution, when supplied, is pipeline context on how this prospect
+  was found — let it shape emphasis (the blind spot a fix addresses, the exposure
+  a deliverable speaks to). It is not a business fact: do not quote it, and never
+  restate a scan-claimed weakness as verified.
 - Echo the signal set you actually used in signals_consumed.
 - Return the JSON object only — no preamble, no markdown fences.
 
@@ -144,6 +153,11 @@ You are producing ready-to-publish testimonial cards for {{business_name}}, a
 
 Testimonials (verbatim quotes):
 {{testimonials}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
 
 TASK
 Produce one card per testimonial. Each card: the verbatim quote (trimmed to <= 40
@@ -165,6 +179,11 @@ You are producing a per-platform NAP consistency report for {{business_name}}, a
 
 NAP status:
 {{nap_status}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
 
 TASK
 Header: the canonical record (name/address/phone). Then one row per platform:
@@ -191,6 +210,11 @@ Service page briefs:
 Public narrative (if supplied):
 {{public_narrative}}
 
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
+
 TASK
 For each supplied service page brief, write a ready-to-publish page: H1, meta title
 (<= 60 chars), meta description (<= 155 chars), a 150-250 word body grounded in the
@@ -210,6 +234,11 @@ You are producing a lead magnet for {{business_name}}, a {{category}} business i
 
 Offer:
 {{offer}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
 
 TASK
 Produce a one-page lead magnet for the supplied offer: title, a 2-sentence promise,
@@ -231,6 +260,11 @@ shelves are invisible to local search.
 
 Shelf-visibility gaps:
 {{product_visibility}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
 
 TASK
 Produce the shelf-visibility preview sections: the first five shelf slots as a
@@ -263,6 +297,11 @@ business in {{city}}.
 Web-presence state and positioning gaps:
 {{website_mockup}}
 
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
+
 TASK
 Describe the proposed homepage section by section — above the fold, the sections
 in order, the category-specific trust signals that make it look like THIS
@@ -291,6 +330,11 @@ needs to ship the site.
 
 Build package source material:
 {{website_build_package}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
 
 TASK
 Produce the complete build package, grounded in the supplied material:
@@ -346,17 +390,17 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     promptType: 'seek',
     category: 'Deliverables',
     body: SOURCE_MATERIAL_BODY,
-    variables: ['business_name', 'city', 'category', 'detected_signals', 'audit_results', 'prior_outreach', 'review_intake'],
+    variables: ['business_name', 'city', 'category', 'detected_signals', 'audit_results', 'business_attributes', 'discovery_attribution', 'prior_outreach', 'review_intake'],
     outputSchema: { name: DELIVERABLE_SOURCE_MATERIAL_SCHEMA_NAME },
     isDefault: false,
   },
-  { id: 'mpt-seed-fulfill-004', name: 'Fulfill: Testimonial Cards', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_004, variables: ['business_name', 'category', 'city', 'testimonials', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-005', name: 'Fulfill: NAP Consistency Report', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_005, variables: ['business_name', 'category', 'city', 'nap_status', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-009', name: 'Fulfill: Website Mockup', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_009, variables: ['business_name', 'category', 'city', 'website_mockup', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-010', name: 'Fulfill: Website Build Package', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_010, variables: ['business_name', 'category', 'city', 'website_build_package', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-004', name: 'Fulfill: Testimonial Cards', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_004, variables: ['business_name', 'category', 'city', 'testimonials', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-005', name: 'Fulfill: NAP Consistency Report', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_005, variables: ['business_name', 'category', 'city', 'nap_status', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-006', name: 'Fulfill: SEO Content Pack', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_006, variables: ['business_name', 'category', 'city', 'service_pages', 'public_narrative', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-007', name: 'Fulfill: Lead Magnet', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_007, variables: ['business_name', 'category', 'city', 'offer', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-009', name: 'Fulfill: Website Mockup', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_009, variables: ['business_name', 'category', 'city', 'website_mockup', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-010', name: 'Fulfill: Website Build Package', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_010, variables: ['business_name', 'category', 'city', 'website_build_package', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {

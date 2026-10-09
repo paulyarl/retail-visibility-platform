@@ -23,13 +23,16 @@
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { logger } from '../logger';
 
-const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V5';
+const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V6';
 
+// The fulfill content already closes with the resolved claim CTA (buildClaimCta,
+// with the real claim link when one exists). The layout's Next step points back
+// at that link rather than carrying a second, link-less CTA sentence.
 const CLAIM_CTA =
-  'Claim your listing and correct your details here — it takes about two minutes and there is no cost.';
+  'Claim your listing using the claim link in this report — it takes about two minutes and there is no cost.';
 
 const RETAINER_NEXT_STEP =
-  'Keep this coverage active — an ongoing listing-synchronization retainer re-verifies these platforms monthly and catches new drift before it costs you customers.';
+  'Keep this coverage active — an ongoing listing-synchronization retainer re-verifies these platforms monthly and catches new drift early.';
 
 interface LayoutTemplate {
   id: string;

@@ -11,7 +11,7 @@
  * execution metadata can identify which directive version produced a run.
  */
 
-export const REPORT_DIRECTIVES_VERSION = 'report_directives_v2';
+export const REPORT_DIRECTIVES_VERSION = 'report_directives_v3';
 
 /**
  * §6.10 — Shared business-intelligence tone directive.
@@ -129,9 +129,19 @@ never dull, dry, bureaucratic, alarmist, or generic.
 Tone — warm, professional, helpful: write copy the operator can read aloud to the
 owner with a straight face and a smile. Never dry, never dull.
 
+The platform exists to make the physical shelves of independent brick-and-mortar
+retailers visible to the customers who walk through the door. Source material
+should feed fixes that improve real-world findability — accurate public
+information, claimable profiles, in-store discovery — not generic marketing
+advice.
+
 Do not shame the business. Do not imply that incomplete public information proves
 poor business quality. Do not convert an unavailable field into a negative finding —
-absence is not a negative. Ground every claim in the supplied audit or review data.`;
+absence is not a negative. Ground every claim in the supplied audit or review data.
+
+Where business attributes, origin, or discovery attribution are supplied, let
+them shape the material (community-relevant emphasis, the gap the prospect was
+found through); where absent, do not infer them.`;
 
 /**
  * Register B — owner-facing deliverable copy (the eight fulfill prompts).
@@ -143,6 +153,15 @@ export const DELIVERABLE_FULFILL_TONE_DIRECTIVE = `DELIVERABLE OWNER-FACING TONE
 Warm and professional — a knowledgeable local speaking to a neighbor. Welcoming and
 plain-spoken, never casual or promotional: no exclamation marks, no superlatives, no
 hype. Ground every claim in the supplied source material; do not invent details.
+
+The platform exists to make the physical shelves of independent brick-and-mortar
+retailers visible to the customers who walk through the door. Favor the
+walk-in-and-visit motion and counter-fulfillment over generic digital advice.
+
+When business attributes or origin are supplied, honor them in the copy
+(community-relevant holidays, ownership attributions worth claiming); when
+absent, do not assume them. Discovery attribution, when supplied, is operator
+context that explains why this fix matters — never emit it into the deliverable.
 
 Close fix-implying deliverables on the claim-and-fix motion ("claim your profile and
 we fix it"), never a purchase ask. Do not invent fees, tiers, or package names.`;

@@ -2885,8 +2885,13 @@ export class MarketingExecutionService extends BaseService {
    * frames the differential. Single-lane contexts render their own block.
    *
    * Returns '' when the campaign carries no attribution of either kind.
+   *
+   * Public — the deliverable lane (DeliverableSourceService) injects the same
+   * block as a `{{discovery_attribution}}` variable into the source-material
+   * and fulfill prompts, so both surfaces render identical attribution
+   * framing instead of drifting copies.
    */
-  private renderProspectOriginBlock(campaign: any): string {
+  renderProspectOriginBlock(campaign: any): string {
     const rawContext = campaign?.discovery_context;
     if (!rawContext || typeof rawContext !== 'object') return '';
 

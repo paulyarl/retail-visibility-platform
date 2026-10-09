@@ -115,10 +115,17 @@ Format as structured JSON.`,
     isDefault: false,
   },
   {
+    // DEPRECATED — the review_responses deliverable runs through the
+    // ReviewSlotService + OwnerVoiceService construction workspace (spec
+    // G-4), which supplies per-review slots and the owner voice this
+    // template's {{voice}}/{{reviews}} variables never receive through
+    // resolveDeliverableContent. isActive: false keeps the row for audit
+    // history while removing it from the renderable set.
     id: 'mpt-seed-fulfill-001',
-    name: 'Fulfill: Review Responses',
+    name: 'Fulfill: Review Responses (DEPRECATED — see ReviewSlotService)',
     promptType: 'fulfill' as const,
     category: 'Review Response',
+    isActive: false,
     body: `You are a professional review response writer for local businesses. Write responses to the following reviews for {{business_name}} in {{city}}, a {{category}} business.
 
 Business voice/tone: {{voice}}
@@ -144,7 +151,7 @@ ${FULFILL_TONE}`,
     variables: ['business_name', 'city', 'category', 'voice', 'reviews', 'claim_cta'],
     outputSchema: {
       name: RAW_JSON_SCHEMA_NAME,
-      description: 'Review response fulfill — numbered review responses matching business voice. Permissive schema (freeform text/JSON).',
+      description: 'DEPRECATED — review_responses runs through ReviewSlotService/OwnerVoiceService. Review response fulfill — numbered review responses matching business voice. Permissive schema (freeform text/JSON).',
     },
     isDefault: true,
   },
@@ -153,61 +160,70 @@ ${FULFILL_TONE}`,
     name: 'Fulfill: Service Menu',
     promptType: 'fulfill' as const,
     category: 'Deliverables',
-    body: `You are a professional copywriter for local businesses. Create a compelling service menu for {{business_name}}, a {{category}} business.
+    body: `You are a professional copywriter for local businesses. Create a service menu for {{business_name}}, a {{category}} business.
 
-Services offered:
+Service menu source material:
 {{services}}
 
-Provide:
-1. Business name and tagline
-2. 5-8 core services with descriptions (2-3 sentences each)
-3. Pricing tiers if applicable (Basic/Standard/Premium)
-4. Call-to-action for booking
-5. Contact information placeholder
-6. Brief "Why choose us" section (3 bullet points)
+Business context:
+{{business_attributes}}
 
-Tone: Professional, approachable, locally-rooted. Avoid jargon.
+{{discovery_attribution}}
+
+Provide:
+1. Business name and tagline — grounded in the source material, no invented slogans
+2. 5-8 core services with descriptions (2-3 sentences each), taken only from the supplied source
+3. Prices ONLY where the source material supplies them — otherwise describe value without inventing a price
+4. A visit-and-inquire call-to-action (walk in, call, or check availability — whichever the source supports)
+5. A short "why visit" section (3 bullet points grounded in the supplied differentiators)
+
+Output JSON: { "tagline", "services": [{ "name", "description", "price" }], "cta", "why_visit": [...] }
 
 ${CLAIM_CTA}
 
 ${FULFILL_TONE}`,
-    variables: ['business_name', 'category', 'services', 'claim_cta'],
+    variables: ['business_name', 'category', 'services', 'business_attributes', 'discovery_attribution', 'claim_cta'],
     outputSchema: {
       name: RAW_JSON_SCHEMA_NAME,
-      description: 'Service menu fulfill — business name, tagline, core services, pricing tiers, CTA, contact, why-choose-us. Permissive schema (freeform text/JSON).',
+      description: 'Service menu fulfill — tagline, core services with source-grounded pricing, visit CTA, why-visit bullets. Permissive schema (variable shape).',
     },
     isDefault: false,
   },
   {
     id: 'mpt-seed-fulfill-003',
-    name: 'Fulfill: GBP Optimization',
+    name: 'Fulfill: GBP Audit Report',
     promptType: 'fulfill' as const,
     category: 'Deliverables',
     body: `You are a Google Business Profile optimization expert. Create an optimization plan for {{business_name}}, a {{category}} business in {{city}}.
 
-Services offered:
-{{services}}
+GBP audit findings:
+{{gbp_audit}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
 
 Provide:
-1. Optimized business description (750 chars max, keyword-rich, natural)
+1. Optimized business description (750 chars max, category-appropriate keywords woven naturally — no stuffing)
 2. Recommended GBP categories (primary + 2 secondary)
 3. Service area description
 4. 5 suggested GBP posts (What's New format, 100-300 words each)
-5. Attributes to enable (e.g., "Women-led", "Identifies as Black-owned", "In-store shopping", "Curbside pickup")
-6. Q&A section: 5 common questions with answers
-7. Photo recommendations: types and captions for 8-12 photos, prioritized by impact:
+5. Attributes to enable — only attributes the audit findings or business context support (ownership attributions when recorded, "In-store shopping", "Curbside pickup")
+6. Q&A section: 5 common questions with answers grounded in the audit findings
+7. Photo recommendations: types and captions for 8-12 photos, prioritized by the gaps the audit actually found:
    - For product/inventory businesses (grocery, bakery, pharmacy, specialty market): include storefront exterior, interior aisles, product close-ups (3-5 shots showing actual inventory), team/owner, signage
    - For service businesses: include storefront exterior, interior/workspace, team, project photos, signage
    - Each caption: keyword-rich, location-aware, ≤100 characters
-8. Hours sync checklist — list every platform where hours should be synchronized (GBP, website, Yelp, Facebook, Apple Maps, Bing Places) + holiday hours calendar for the next 12 months (include culturally relevant holidays for ethnic markets — e.g., Eid, Kwanzaa, Lunar New Year — alongside US federal holidays)
-9. Fulfillment attributes — recommend enabling "In-store shopping", "Curbside pickup", "Delivery" attributes if applicable to the business type
+8. Hours sync checklist — every platform where hours should be synchronized (GBP, website, Yelp, Facebook, Apple Maps, Bing Places) + a holiday-hours calendar for the next 12 months. Include community-relevant holidays ONLY when the business origin or attributes indicate them (e.g., Eid for a halal market, Lunar New Year for an East Asian business); otherwise US federal holidays
+9. Fulfillment attributes — "In-store shopping" first; "Curbside pickup" or "Delivery" only where the audit shows the business supports them
 
-Format as structured JSON.
+Output JSON: { "description", "categories": { "primary", "secondary": [...] }, "service_area", "posts": [...], "attributes": [...], "qa": [{ "question", "answer" }], "photo_recommendations": [...], "hours_sync": [...], "fulfillment_attributes": [...] }
 
 ${CLAIM_CTA}
 
 ${FULFILL_TONE}`,
-    variables: ['business_name', 'city', 'category', 'services', 'claim_cta'],
+    variables: ['business_name', 'city', 'category', 'gbp_audit', 'business_attributes', 'discovery_attribution', 'claim_cta'],
     outputSchema: {
       name: RAW_JSON_SCHEMA_NAME,
       description: 'GBP optimization plan — description, categories, service area, posts, attributes, Q&A, photo recommendations, hours sync, fulfillment attributes. Permissive schema (variable shape).',
@@ -304,7 +320,7 @@ async function main() {
             body: template.body,
             variables: template.variables,
             output_schema: (template as any).outputSchema ?? null,
-            is_active: true,
+            is_active: (template as any).isActive ?? true,
             is_default: template.isDefault,
             updated_at: new Date(),
           },
@@ -321,7 +337,7 @@ async function main() {
             body: template.body,
             variables: template.variables,
             output_schema: (template as any).outputSchema ?? null,
-            is_active: true,
+            is_active: (template as any).isActive ?? true,
             is_default: template.isDefault,
             created_by: 'system',
           },

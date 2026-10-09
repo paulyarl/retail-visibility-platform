@@ -306,7 +306,17 @@ export class DeliverableSourceService extends BaseService {
     const eligibility = await this.resolveEligibleTypes(campaignId, ctx);
     const intake = await this.getReviewIntake(campaignId, ctx);
     const priorOutreach = await this.buildPriorOutreach(campaignId);
-    const snapshotHash = this.hashSnapshot(latestAudit?.id ?? null, eligibility.signals);
+    const businessAttributes = this.formatBusinessAttributes(campaign);
+    const discoveryAttribution = MarketingExecutionService.getInstance()
+      .renderProspectOriginBlock(campaign);
+    // The hash covers the attribution context too — an operator-edited origin
+    // or a re-attributed discovery_context changes the rendered prompt, so a
+    // cached execution from before the edit must not be reused.
+    const snapshotHash = this.hashSnapshot(
+      latestAudit?.id ?? null,
+      eligibility.signals,
+      businessAttributes + '::' + discoveryAttribution,
+    );
 
     const variables = {
       business_name: campaign.business_name ?? '',
@@ -314,6 +324,8 @@ export class DeliverableSourceService extends BaseService {
       city: campaign.city ?? '',
       detected_signals: this.formatSignals(eligibility.signals),
       audit_results: this.serializeAuditResults(auditData),
+      business_attributes: businessAttributes,
+      discovery_attribution: discoveryAttribution,
       prior_outreach: priorOutreach,
       review_intake: intake ? JSON.stringify(intake) : '',
       evidence_snapshot_hash: snapshotHash,
@@ -445,8 +457,12 @@ export class DeliverableSourceService extends BaseService {
       };
     }
 
-    const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      include: { mkt_audits_list: { where: { platform: 'business_analysis' }, take: 1, orderBy: { created_at: 'desc' } } },
+    });
     if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
+    const auditData = (campaign.mkt_audits_list?.[0]?.audit_data ?? null) as any;
 
     // Resolve claim/report links through the canonical module so the
     // /place/claim vs /directory/claim split cannot drift (§5.6). Mint a claim
@@ -481,6 +497,10 @@ export class DeliverableSourceService extends BaseService {
       // A single CTA variable so the seeded body never renders a literal
       // {{claim_url}} when no link resolves (link-less variant instead).
       claim_cta: buildClaimCta(claimUrl),
+      business_attributes: this.formatBusinessAttributes(campaign),
+      public_narrative: auditData?.public_narrative ?? '',
+      discovery_attribution: MarketingExecutionService.getInstance()
+        .renderProspectOriginBlock(campaign),
       ...linkVars,
     };
 
@@ -601,9 +621,9 @@ export class DeliverableSourceService extends BaseService {
     return signals.map((s) => `- ${s}`).join('\n');
   }
 
-  private hashSnapshot(auditId: string | null, signals: SignalCode[]): string {
+  private hashSnapshot(auditId: string | null, signals: SignalCode[], contextFingerprint = ''): string {
     return createHash('sha256')
-      .update(`${auditId ?? 'none'}::${[...signals].sort().join(',')}`)
+      .update(`${auditId ?? 'none'}::${[...signals].sort().join(',')}::${contextFingerprint}`)
       .digest('hex');
   }
 
@@ -656,6 +676,39 @@ export class DeliverableSourceService extends BaseService {
     if (auditData.recommended_services?.length) {
       lines.push(`\nRecommended services: ${auditData.recommended_services.join('; ')}`);
     }
+    if (auditData.public_narrative) {
+      lines.push(`\nPublic narrative: ${auditData.public_narrative}`);
+    }
+
+    // Gold-standard-measured results — the audit's gap analysis and gate
+    // results are graded against the category benchmark (expected vs actual,
+    // non_negotiable vs recommended); the fulfills fix toward that bar.
+    const gaps = auditData.gap_analysis?.gaps;
+    if (Array.isArray(gaps) && gaps.length > 0) {
+      lines.push('\nGap analysis (expected vs actual):');
+      for (const g of gaps) {
+        lines.push(`- [${g.severity ?? 'recommended'}] ${g.platform ?? '?'} / ${g.field ?? '?'}: expected ${JSON.stringify(g.expected ?? null)}, actual ${JSON.stringify(g.actual ?? null)}${g.gap_description ? ` — ${g.gap_description}` : ''}`);
+      }
+      if (auditData.gap_analysis.summary) lines.push(`- summary: ${auditData.gap_analysis.summary}`);
+    }
+
+    const gateResults = auditData.quality_gate_results?.results;
+    if (Array.isArray(gateResults) && gateResults.length > 0) {
+      lines.push('\nQuality gate results:');
+      for (const r of gateResults) {
+        lines.push(`- [${r.severity ?? 'recommended'}] ${r.platform ?? '?'} / ${r.gate ?? '?'}: ${r.passed ? 'passed' : 'FAILED'}${r.notes ? ` — ${r.notes}` : ''}`);
+      }
+    }
+
+    // Recommended attributes carry their basis — gold_standard_expected
+    // entries are the category benchmark's bar, not observed facts.
+    if (auditData.recommended_attributes?.length) {
+      lines.push('\nRecommended attributes:');
+      for (const a of auditData.recommended_attributes) {
+        lines.push(`- ${a.label ?? a.key}${a.platform ? ` (${a.platform})` : ''}: ${a.current_state ?? 'unverified'}${a.basis ? `, basis=${a.basis}` : ''}${a.rationale ? ` — ${a.rationale}` : ''}`);
+      }
+    }
+
     if (auditData.negative_review_themes?.length) {
       lines.push('\nNegative review themes:');
       for (const t of auditData.negative_review_themes) {
@@ -663,6 +716,26 @@ export class DeliverableSourceService extends BaseService {
       }
     }
     return lines.join('\n');
+  }
+
+  /**
+   * Serialize the prospect's recorded attributes into a compact prompt line:
+   * operator-set attributes, business origin (drives community-relevant
+   * framing — e.g. which holidays matter), tone preference, and secondary
+   * shelf categories. '(none recorded)' keeps the rendered prompt explicit
+   * about absence rather than leaving a dangling blank.
+   */
+  private formatBusinessAttributes(campaign: any): string {
+    const lines: string[] = [];
+    const attrs = Array.isArray(campaign?.attributes) ? campaign.attributes.filter((a: any) => typeof a === 'string' && a.trim()) : [];
+    if (attrs.length > 0) lines.push(`Attributes: ${attrs.join(', ')}`);
+    const originParts = [campaign?.business_origin_region, campaign?.business_origin_country]
+      .filter((v: any) => typeof v === 'string' && v.trim());
+    if (originParts.length > 0) lines.push(`Business origin: ${originParts.join(', ')}`);
+    if (campaign?.tone) lines.push(`Tone preference: ${campaign.tone}`);
+    const secondary = Array.isArray(campaign?.secondary_categories) ? campaign.secondary_categories.filter((c: any) => typeof c === 'string' && c.trim()) : [];
+    if (secondary.length > 0) lines.push(`Secondary categories: ${secondary.join(', ')}`);
+    return lines.length > 0 ? lines.join('\n') : '(none recorded)';
   }
 
   /**
