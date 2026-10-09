@@ -57,6 +57,15 @@ PRIOR WEBSITE FINDINGS — the block opens with an EVIDENCE COVERAGE line:
   - NONE    — no prior audit; assess the site from scratch.
 {{prior_website_findings}}
 
+IDENTITY GATE: attribute the website to this business only when the site's name,
+address, or phone agree with the canonical NAP in the prior findings. If the site
+is not clearly this business, record it as unverified, state the mismatch in
+data_quality.limitations, and write no findings for it.
+
+OWNERSHIP: a website on a free builder host (for example *.square.site) is a
+platform-hosted site, so ownership is "platform_hosted". A site on the business's
+own domain is "owned_domain". Use "none" only when no website was found.
+
 === PLATFORM GOAL: THE DIGITAL SHELF ===
 VisibleShelf exists to make the PHYSICAL SHELVES of independent brick-and-mortar
 retailers visible to customers who walk through the door. For a storefront
@@ -81,10 +90,11 @@ the absence in data_quality.limitations.
 A GOLD STANDARD BENCHMARK block is appended after the Category Intelligence
 block. Use its expected fields and pattern exemplars as the benchmark for
 WEBSITE POSITIONING specifically: what a gold-standard {{category}} site must
-contain (service pages, product browsing, booking/ordering, menus, quote
-forms, category-specific trust signals) versus what this business's presence
-actually does. Record every difference as a positioning_gaps[] entry with
-platform "website".
+contain, as the Gold Standard and Category Intelligence blocks define it (the
+expected pages, product or service browsing, an availability or ordering channel,
+hours and location, and category-specific trust signals) versus what this
+business's presence actually does. Record every difference as a positioning_gaps[]
+entry with platform "website".
 
 === WEBSITE ACCESSIBILITY VERIFICATION — BINDING ===
 Evaluate the site on the four-state ladder and record which state you reached:
@@ -96,6 +106,12 @@ Evaluate the site on the four-state ladder and record which state you reached:
 Emit a quality judgment (WC_POOR_SITE_QUALITY, WC_STALE_WEBSITE,
 WC_CATEGORY_MISMATCH, WC_LEGACY_BUILDER_SITE) ONLY when you reached
 content-verified. Never emit a quality signal from unable_to_verify.
+
+JAVASCRIPT-RENDERED CONTENT: if page content is available only after JavaScript
+runs, and no exemplar site has been tested under the same conditions, record the
+content fields as unable_to_verify. Describe the conversion implication in terms of
+what the owner's customers can or cannot see on the site, not in terms of customers
+being unable to reach it.
 
 === RENDER CONTROL — BINDING ===
 Gold-standard exemplar WEBSITES are the control set for the site itself. If
@@ -134,6 +150,14 @@ Quality judgments (require content-verified):
 Emit ONLY the codes supported by verified evidence — never a quality code from
 unable_to_verify.
 
+HTTPS: set https to true only when a verified HTTPS response is observed. Set it to
+unable_to_verify when no response was checked.
+
+=== COMPETITIVE FRAME ===
+For competitive_frame, write one line per exemplar. Prefer exemplars in the same
+metro as the business. Use out-of-market exemplars only as reference, and say so
+in the line.
+
 === EVERY ISSUE CARRIES A CONVERSION IMPLICATION ===
 For each issue, write the consequence in the owner's language:
 "customers can't browse the menu, so they call or leave", "the site shows a
@@ -159,9 +183,10 @@ Rules:
 * 1–3 entries — the most painful problems only, ranked by severity. One well-grounded pair beats three thin ones: if the audit surfaces a single real issue (e.g. no website, everything else clean), return just that one. Never pad the count; never restate the same gap once per signal code.
 * Frame problems as business consequences ("customers looking for you find a Facebook page instead of a website"), never as technical labels ("WC_THIRD_PARTY_DOMAIN").
 * Every entry carries two spoken lines: \`regular\` — the plain professional way to raise the problem — and \`hook\` — the alternative that earns attention with the same fact (a curiosity gap, a "search for yourself and see" moment). The hook must stay 100% true to the evidence: no clickbait, no invented stakes.
-* Solutions must be deliverable — the operator builds or repairs the site, points the profiles at the domain, secures it. Stay high-level: summarize the fix, do not name a product.
+* Solutions must be deliverable and high-level, naming no product. A product-browse gap on a platform-hosted site is fixed by a digital browse of the shelves, delivered on the platform storefront. An owned-domain defect is fixed by a site build: the profiles point at the domain and the site is secured. Name the fix, not the package.
 * Ground every \`problem\` in THIS audit's findings — \`presence_classification\`, \`ownership\`, \`issues\`, \`positioning_gaps\`, and the Gold Standard benchmark. Do not invent gaps that are not present.
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
+* Every outreach_use includes the directory claim invitation. The listing is already public, and the owner can claim it to correct its details. When the presence classification is no_presence, builder_subdomain, parked, unfinished, or broken, or a WC_* signal is present, lead with the website invitation and keep the claim invitation alongside it.
 
 === OUTPUT ===
 Produce a SINGLE JSON object matching the schema in the EXPECTED OUTPUT FORMAT
