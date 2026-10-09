@@ -281,6 +281,19 @@ class UnifiedConfig {
     return this.env.RECOVERY_AI_MODEL;
   }
 
+  /**
+   * Lane-scoped model override for marketing-ops prompt executions
+   * (MarketingExecutionService.executeSingle). Same pattern as
+   * RECOVERY_AI_MODEL — the resolved provider instance runs this model
+   * instead of the platform's bot_chat_model, so analyst-grade prompts
+   * (source material, fulfill) can target a stronger model without
+   * changing the customer-facing bot. Accepts a universal gateway ID
+   * (e.g. 'anthropic/claude-sonnet-4-5') when the gateway is enabled.
+   */
+  get marketingOpsAiModel(): string | undefined {
+    return this.env.MARKETING_OPS_AI_MODEL;
+  }
+
   // ─── Sentry ───────────────────────────────────────────────────────────
 
   get sentryDsn(): string | undefined {

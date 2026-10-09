@@ -18,6 +18,7 @@ import { generateMarketingAuditId } from '../lib/id-generator';
 import { formatCampaignAddress } from '../lib/canonical-nap';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
 import aiProviderFactory from './ai-providers';
+import { unifiedConfig } from '../config/unifiedConfig';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { IntelligenceProfileService, type IntelligenceProfile, type PromptResolution, type ResolvedSignalWeight } from './intelligence/IntelligenceProfileService';
@@ -220,12 +221,24 @@ export class MarketingExecutionService extends BaseService {
       }, ctx);
 
       try {
-        const result = await aiProviderFactory.generateChatCompletion({
+        // Lane-scoped model override (MARKETING_OPS_AI_MODEL) — the
+        // RECOVERY_AI_MODEL pattern: the resolved provider instance runs an
+        // explicit model so analyst-grade prompts (source material, fulfill,
+        // openers) aren't pinned to the bot's chat model. Provider stays the
+        // configured one (the gateway accepts universal model IDs).
+        //
+        // Schema'd outputs (source material, fulfill, audit JSON) get a
+        // larger token budget — the deliverable source-material schema alone
+        // exceeds the 2000-token default, which compresses populated blocks
+        // to empty shells.
+        const chatConfig = await aiProviderFactory.getChatConfig();
+        const result = await chatConfig.provider.generateChatCompletion({
+          model: unifiedConfig.marketingOpsAiModel || chatConfig.model,
           messages: [
             { role: 'system', content: 'You are a marketing assistant generating content for local business prospects. Follow the prompt instructions precisely.' },
             { role: 'user', content: renderedPrompt },
           ],
-          maxTokens: 2000,
+          maxTokens: template.output_schema ? 6000 : 2000,
           temperature: 0.7,
         });
 
