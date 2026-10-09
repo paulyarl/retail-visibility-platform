@@ -2981,7 +2981,7 @@ function PresenceSeedDetailClient() {
             )}
 
             {/* Seed-preview storefront — only on PB-08-eligible seeds (spec §4).
-                The generated /shops/[slug] page is a sample catalog proof-of-work
+                The generated /tenant/[slug] page is a sample catalog proof-of-work
                 for the audit's website-gap fix. */}
             {previewStatus?.eligible && (
               <div className="border border-indigo-200 bg-indigo-50/40 rounded-lg p-3">

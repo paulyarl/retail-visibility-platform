@@ -47,6 +47,8 @@ import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/typ
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
 import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
 import DemoBanner from '@/components/storefront/DemoBanner';
+import SeedPreviewTracker from '@/components/storefront/SeedPreviewTracker';
+import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerContact';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 import { clientLogger } from '@/lib/client-logger';
@@ -775,6 +777,23 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   return (
     <ProductSingletonProvider>
       {tenant.isDemo && <DemoBanner expiresAt={tenant.demoExpiresAt} />}
+      {/* B-3 page-view tracking for seed_preview demo storefronts — the
+          tracker drops the event server-side when the slug isn't a live
+          seed_preview demo, so sales-demo tenants emit nothing. */}
+      {tenant.isDemo && <SeedPreviewTracker slug={tenant.slug} />}
+      {/* D-1: owner-facing claim/removal path — same band as /shops/[slug] so
+          the preview URL the operator shares keeps the claim-context inquiry
+          (preview_slug resolves the demo tenant → source seed). */}
+      {tenant.isDemo && tenant.slug && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="container mx-auto px-4 py-2 text-center text-sm text-amber-800">
+            This is a sample storefront preview. Products shown are examples — this business has not claimed this page yet.
+          </div>
+          <div className="container mx-auto px-4 pb-3">
+            <SeedPreviewOwnerContact slug={tenant.slug} businessName={tenant.name} />
+          </div>
+        </div>
+      )}
       <SocialPixels tenantId={resolvedTenantId || tenant.id || id} usePublic />
       <TenantPaymentProvider
         tenantId={resolvedTenantId || tenant.id || id}

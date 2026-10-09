@@ -22,7 +22,7 @@ interface PublicInquiryFormProps {
   /** Listing this inquiry is about — backend resolves the presence seed,
    *  appends claim context to the body, and logs the contact on the seed. */
   listingId?: string;
-  /** Seed-preview storefront slug (/shops/[slug]) — backend resolves the
+  /** Seed-preview storefront slug (/tenant/[slug]) — backend resolves the
    *  demo tenant → source seed for the same context/touch handling (D-1). */
   previewSlug?: string;
   /** Pre-filled subject (editable). Only applied while the field is empty. */

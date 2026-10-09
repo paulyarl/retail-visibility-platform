@@ -183,6 +183,11 @@ export interface WebsiteBuildExecutionReadModel {
   decision: WebsiteGapDecision | null;
   confirmed_scope: WebsiteBuildScope | null;
   delivery_mode: WebsiteBuildDeliveryMode | null;
+  /** True once a mode is set AND execution artifacts exist (live preview
+   *  storefront, submitted owner intake, or a post-sale stage) — the PB-08
+   *  analog of the repair package's mode_locked rule. */
+  delivery_mode_locked: boolean;
+  delivery_mode_lock_reason: string | null;
   scope_modes: WebsiteBuildDeliveryMode[];
   seed: {
     seed_id: string;

@@ -30,7 +30,7 @@ import type { DiscoveryContext } from '../validators/intelligence-discovery.sche
 import { deriveDiscoverySignals } from './triage/discovery-verdict';
 import type { IdentityFieldKey } from './directory/identityScoring';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
-import { isBuildDeliveryMode, modesForScope } from '../lib/website-build';
+import { isBuildDeliveryMode, deliveryModeLockReasons, modesForScope } from '../lib/website-build';
 
 /** Call outcome — mirrors the queue's VerificationOutcome. */
 export type CampaignVerificationOutcome =
@@ -3724,6 +3724,24 @@ export class MarketingCampaignService extends BaseService {
           ? prior.delivery_mode
           : null;
       const deliveryMode = input.deliveryMode ?? carriedMode;
+
+      // Mode-flip guard — the same invariant as PATCH
+      // /website-gap/delivery-mode (WebsiteBuildExecutionService): a chosen
+      // lane is immutable once execution artifacts exist. An explicit mode
+      // change through scope re-confirmation must not bypass the lock.
+      if (
+        input.deliveryMode &&
+        prior?.kind === 'website_build_scope' &&
+        isBuildDeliveryMode(prior.delivery_mode) &&
+        input.deliveryMode !== prior.delivery_mode
+      ) {
+        const reasons = await deliveryModeLockReasons(this.prisma, campaign);
+        if (reasons.length > 0) {
+          throw new ConflictError(
+            `delivery_mode_locked: the delivery mode cannot change after execution has begun (${reasons.join('; ')})`,
+          );
+        }
+      }
 
       const decision = {
         kind: 'website_build_scope',

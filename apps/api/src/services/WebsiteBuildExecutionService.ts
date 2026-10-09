@@ -23,9 +23,11 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { ValidationError } from '../middleware/errorHandler';
+import { ConflictError, ValidationError } from '../middleware/errorHandler';
 import {
   BUILD_SCOPE_MODES,
+  deliveryModeLockReasons,
+  isBuildDeliveryMode,
   isBuildScope,
   modesForScope,
 } from '../lib/website-build';
@@ -204,12 +206,20 @@ export class WebsiteBuildExecutionService extends BaseService {
         });
       }
 
+      // Mode-lock state — only meaningful once a mode is chosen (the first
+      // pick is always allowed; flips are locked by execution artifacts).
+      const lockReasons = isBuildDeliveryMode(decision?.delivery_mode)
+        ? await deliveryModeLockReasons(this.prisma, campaign)
+        : [];
+
       return {
         campaign_id: campaignId,
         stage: campaign.stage,
         decision,
         confirmed_scope: confirmedScope,
         delivery_mode: decision?.delivery_mode ?? null,
+        delivery_mode_locked: lockReasons.length > 0,
+        delivery_mode_lock_reason: lockReasons.join('; ') || null,
         scope_modes: modesForScope(confirmedScope),
         seed: seedLink
           ? {
@@ -252,6 +262,29 @@ export class WebsiteBuildExecutionService extends BaseService {
       const allowed = BUILD_SCOPE_MODES[decision.confirmed_scope as keyof typeof BUILD_SCOPE_MODES] ?? [];
       if (!allowed.includes(mode)) {
         throw new ValidationError(`Delivery mode '${mode}' is not offered for scope '${decision.confirmed_scope}'`);
+      }
+
+      const priorMode = isBuildDeliveryMode(decision.delivery_mode) ? decision.delivery_mode : null;
+
+      // Idempotent — re-clicking the active mode writes nothing. Return the
+      // full row to keep the PATCH response contract (callers read the whole
+      // campaign, not the slim assertWebsiteGap projection).
+      if (priorMode === mode) {
+        return this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+      }
+
+      // Mode immutability once execution has begun — the PB-08 analog of the
+      // repair package's mode_locked rule. A chosen lane may not flip after
+      // execution artifacts exist (live preview storefront, submitted owner
+      // intake, or a post-sale stage); picking the FIRST mode is always
+      // allowed.
+      if (priorMode) {
+        const reasons = await deliveryModeLockReasons(this.prisma, campaign);
+        if (reasons.length > 0) {
+          throw new ConflictError(
+            `delivery_mode_locked: the delivery mode cannot change after execution has begun (${reasons.join('; ')})`,
+          );
+        }
       }
 
       const updated = await this.prisma.mkt_campaigns_list.update({

@@ -54,7 +54,7 @@ export const DIRECTORY_SURFACES = [
   'directory_location',
   'directory_store_type',
   'directory_home',
-  /** Seed-preview storefront /shops/[slug] (spec §6b — keyed by preview tenant). */
+  /** Seed-preview storefront /tenant/[slug] (spec §6b — keyed by preview tenant). */
   'seed_preview',
 ] as const;
 

@@ -4,9 +4,10 @@
  * SeedPreviewOwnerContact — D-1 owner contact path on demo storefronts.
  * Renders the banner's "Own this business?" line as a toggle that expands
  * the shared anonymous PublicInquiryForm (math CAPTCHA + honeypot).
+ * Mounted on both preview surfaces: /shops/[slug] and /tenant/[slug].
  *
  * The inquiry posts to /api/public/inquiries with tenant_id='platform' (same
- * routing as the /place claim form) and preview_slug=<shop slug>; the API
+ * routing as the /place claim form) and preview_slug=<tenant slug>; the API
  * resolves the seed_preview demo tenant → source seed, appends claim context
  * (seed id + admin review link) to the inquiry body, and logs the contact on
  * the seed's outreach-touches timeline — so the request lands in the CRM

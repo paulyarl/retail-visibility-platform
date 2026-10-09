@@ -45,6 +45,8 @@ function makeExecution(overrides: Partial<WebsiteBuildExecutionReadModel> = {}):
     decision: DECISION,
     confirmed_scope: 'new_build',
     delivery_mode: null,
+    delivery_mode_locked: false,
+    delivery_mode_lock_reason: null,
     scope_modes: ['dfy', 'diy'],
     seed: null,
     linkable_seeds: [],
@@ -97,6 +99,26 @@ describe('WebsiteBuildExecutionCard', () => {
     );
     expect(html).toContain('New build · DFY');
     expect(html).not.toContain('choose who executes the build');
+  });
+
+  it('locks the mode toggle once execution has begun', () => {
+    const campaign = makeCampaign({ playbook_decision: { ...DECISION, delivery_mode: 'dfy' } });
+    const html = renderToStaticMarkup(
+      createElement(WebsiteBuildExecutionCard, {
+        campaign,
+        onRefresh: noop,
+        initialExecution: makeExecution({
+          delivery_mode: 'dfy',
+          delivery_mode_locked: true,
+          delivery_mode_lock_reason: 'a live preview storefront exists',
+        }),
+      }),
+    );
+    expect(html).toContain('New build · DFY');
+    expect(html).toContain('locked — a live preview storefront exists');
+    // Both options render disabled — no silent flip to DIY post-execution.
+    expect(html).toContain('disabled');
+    expect(html).toContain('Locked — a live preview storefront exists');
   });
 
   it('renders the linked seed state', () => {
@@ -181,13 +203,13 @@ describe('WebsiteBuildExecutionCard', () => {
             nap_match_summary: null, seed_status: 'published', seed_claimed: false, claimed_at: null,
           },
           preview: {
-            eligible: true, storefront_url: '/shops/sample-mart', tenant_id: 'tid-demo',
+            eligible: true, storefront_url: '/tenant/sample-mart', tenant_id: 'tid-demo',
             expires_at: '2027-01-01T00:00:00Z', extensions_used: 1, page_views: 7,
           },
         }),
       }),
     );
-    expect(html).toContain('/shops/sample-mart');
+    expect(html).toContain('/tenant/sample-mart');
     expect(html).toContain('Extend +7d (1/2)');
     expect(html).toContain('7 views');
   });

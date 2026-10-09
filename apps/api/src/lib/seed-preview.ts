@@ -30,10 +30,16 @@ export const SEED_PREVIEW_SANDBOX_RESPONSE = {
  *  - mv_tenant_effective_capabilities feeds feature resolution — a brand-new
  *    preview tenant has NO rows there until refresh, so its storefront would
  *    resolve an empty capability set (no commerce surface) without this.
- *  Both refresh on demand only; no scheduled job covers them (spec C-9). */
+ *  - storefront_category_counts feeds the Store Aisle sidebar on
+ *    /tenant/[id]. generateQuickStartProducts refreshes it on a pooled
+ *    connection INSIDE the creation transaction, where the preview's
+ *    products/categories are still invisible — the post-commit refresh here
+ *    is the only one that can see them.
+ *  All refresh on demand only; no scheduled job covers them (spec C-9). */
 const SEED_PREVIEW_MVS = [
   'mv_storefront_discovery',
   'mv_tenant_effective_capabilities',
+  'storefront_category_counts',
 ] as const;
 
 /**

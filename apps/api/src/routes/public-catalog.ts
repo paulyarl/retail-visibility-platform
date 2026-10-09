@@ -3798,8 +3798,8 @@ const PublicInquirySchema = z.object({
   // presence seed so context can be appended and the contact logged on the
   // seed's outreach-touches timeline.
   listing_id: z.string().max(64).optional(),
-  // Same resolution for seed-preview storefronts (/shops/[slug] owner
-  // contact — D-1): the shop slug resolves to the seed_preview demo tenant,
+  // Same resolution for seed-preview storefronts (preview owner contact —
+  // D-1): the tenant slug resolves to the seed_preview demo tenant,
   // then demo_source_tenant_id → the source seed.
   preview_slug: z.string().max(200).optional(),
   /** Owner-request framing (D-1): what the submitter wants and who they claim
@@ -3908,7 +3908,7 @@ router.post('/inquiries', async (req, res) => {
         };
       }
     } else if (preview_slug) {
-      // /shops/[slug] owner contact (D-1): the slug names a seed_preview demo
+      // Preview owner contact (D-1): the slug names a seed_preview demo
       // tenant; resolve through demo_source_tenant_id to the source seed.
       const seedRows = await prisma.$queryRaw<any[]>`
         SELECT dps.id AS seed_id, dl.business_name, dl.slug, dl.phone, dl.email, dl.website, dl.same_as
@@ -3982,7 +3982,7 @@ router.post('/inquiries', async (req, res) => {
     ].filter(Boolean).join('\n');
 
     const contextBlock = seedContext
-      ? `\n\n---\nClaim request context:\nBusiness: ${seedContext.businessName}\nPlace: /place/${seedContext.slug}${previewContext ? `\nPreview: /shops/${previewContext}` : ''}\nSeed: ${seedContext.seedId}\nReview: /settings/admin/directory/presence-seeds/${seedContext.seedId}${requestLine ? `\n${requestLine}` : ''}`
+      ? `\n\n---\nClaim request context:\nBusiness: ${seedContext.businessName}\nPlace: /place/${seedContext.slug}${previewContext ? `\nPreview: /tenant/${previewContext}` : ''}\nSeed: ${seedContext.seedId}\nReview: /settings/admin/directory/presence-seeds/${seedContext.seedId}${requestLine ? `\n${requestLine}` : ''}`
       : requestLine ? `\n\n---\n${requestLine}` : '';
     const finalBody = body ? `${body}${contextBlock}` : contextBlock.trimStart() || undefined;
 
@@ -4036,7 +4036,7 @@ router.post('/inquiries', async (req, res) => {
         await seedService.addOutreachTouch(seedContext.seedId, {
           channel: 'form',
           outcome: 'form_submitted',
-          notes: `Inbound ${request_intent || 'claim'} inquiry via ${previewContext ? `/shops/${previewContext} (seed preview)` : `/place/${seedContext.slug}`}${requester_role ? ` — says ${requester_role}` : ''}: "${subject}". Sender: ${finalSenderName || 'Anonymous'}${finalSenderEmail ? ` <${finalSenderEmail}>` : ''}${finalSenderPhone ? ` ${finalSenderPhone}` : ''}${sender_social ? ` · social ${sender_social}` : ''}. ${credibilitySignals.join('; ')}. Inquiry ${inquiry.id}.`,
+          notes: `Inbound ${request_intent || 'claim'} inquiry via ${previewContext ? `/tenant/${previewContext} (seed preview)` : `/place/${seedContext.slug}`}${requester_role ? ` — says ${requester_role}` : ''}: "${subject}". Sender: ${finalSenderName || 'Anonymous'}${finalSenderEmail ? ` <${finalSenderEmail}>` : ''}${finalSenderPhone ? ` ${finalSenderPhone}` : ''}${sender_social ? ` · social ${sender_social}` : ''}. ${credibilitySignals.join('; ')}. Inquiry ${inquiry.id}.`,
         }, {
           actorType: 'customer',
           actorId: customerId || finalSenderEmail || 'anonymous',

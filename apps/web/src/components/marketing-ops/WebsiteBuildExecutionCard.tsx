@@ -88,6 +88,10 @@ export default function WebsiteBuildExecutionCard({ campaign, onRefresh, initial
 
   const scope = decision.confirmed_scope;
   const deliveryMode = execution?.delivery_mode ?? decision.delivery_mode ?? null;
+  // Mode immutability — the PB-08 analog of the repair package's
+  // "(locked — access collected)" gate: once execution artifacts exist the
+  // read model flags the chosen lane as locked and flips 409 server-side.
+  const modeLocked = !!execution?.delivery_mode_locked;
   const scopeModes = execution?.scope_modes?.length ? execution.scope_modes : (['dfy', 'diy'] as WebsiteBuildDeliveryMode[]);
   const seed = execution?.seed ?? null;
   const linkableSeeds = execution?.linkable_seeds ?? [];
@@ -96,7 +100,7 @@ export default function WebsiteBuildExecutionCard({ campaign, onRefresh, initial
   const checklist = execution?.checklist ?? null;
 
   const handleSetMode = async (mode: WebsiteBuildDeliveryMode) => {
-    if (mode === deliveryMode) return;
+    if (mode === deliveryMode || modeLocked) return;
     setSavingMode(true);
     setError(null);
     try {
@@ -207,20 +211,27 @@ export default function WebsiteBuildExecutionCard({ campaign, onRefresh, initial
               <button
                 key={mode}
                 onClick={() => handleSetMode(mode)}
-                disabled={savingMode}
-                title={MODE_COPY[mode].hint}
+                disabled={savingMode || modeLocked}
+                title={modeLocked
+                  ? `Locked — ${execution?.delivery_mode_lock_reason ?? 'execution has begun'}`
+                  : MODE_COPY[mode].hint}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   deliveryMode === mode
                     ? 'bg-sky-600 text-white'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700'
-                } disabled:opacity-50`}
+                } disabled:opacity-50 ${modeLocked ? 'cursor-not-allowed' : ''}`}
               >
                 {MODE_COPY[mode].label} — {MODE_COPY[mode].hint}
               </button>
             ))}
           </div>
           {savingMode && <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" />}
-          {!deliveryMode && !savingMode && (
+          {modeLocked && (
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">
+              locked — {execution?.delivery_mode_lock_reason ?? 'execution has begun'}
+            </span>
+          )}
+          {!deliveryMode && !modeLocked && !savingMode && (
             <span className="text-[11px] text-amber-600 dark:text-amber-400">choose who executes the build</span>
           )}
         </div>

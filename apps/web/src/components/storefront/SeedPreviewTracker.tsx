@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * SeedPreviewTracker — B-3 page-view tracking for /shops/[slug] demo
+ * SeedPreviewTracker — B-3 page-view tracking for seed_preview demo
  * storefronts (SEED_PREVIEW_STOREFRONT_SPEC §6b). Mounted only when
- * tenantInfo.isDemo so real tenants emit nothing here.
+ * tenantInfo.isDemo so real tenants emit nothing here. Mounted on both
+ * preview surfaces: /shops/[slug] and /tenant/[slug].
  *
  * Posts to the shelf event route with surface='seed_preview'; the API
  * resolves the slug to the preview tenant (tenant_id) and drops the event

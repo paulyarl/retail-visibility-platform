@@ -94,7 +94,7 @@ describe('archiveTenantProducts', () => {
 describe('refreshStorefrontDiscoveryMv', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('tries CONCURRENTLY for both lifecycle MVs (storefront + capabilities)', async () => {
+  it('tries CONCURRENTLY for all lifecycle MVs (storefront + capabilities + category counts)', async () => {
     poolQuery.mockResolvedValue({});
     await refreshStorefrontDiscoveryMv();
     expect(poolQuery).toHaveBeenCalledWith(
@@ -103,7 +103,10 @@ describe('refreshStorefrontDiscoveryMv', () => {
     expect(poolQuery).toHaveBeenCalledWith(
       'REFRESH MATERIALIZED VIEW CONCURRENTLY mv_tenant_effective_capabilities',
     );
-    expect(poolQuery).toHaveBeenCalledTimes(2);
+    expect(poolQuery).toHaveBeenCalledWith(
+      'REFRESH MATERIALIZED VIEW CONCURRENTLY storefront_category_counts',
+    );
+    expect(poolQuery).toHaveBeenCalledTimes(3);
   });
 
   it('falls back to a blocking refresh on 55000 (concurrent-not-allowed) and continues', async () => {

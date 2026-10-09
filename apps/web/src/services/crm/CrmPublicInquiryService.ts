@@ -26,7 +26,7 @@ interface PublicInquiryInput {
    *  /place/[slug]) the backend resolves its presence seed, appends context
    *  to the body, and logs the contact on the seed's touch timeline. */
   listing_id?: string;
-  /** Seed-preview storefront variant (D-1): the /shops/[slug] slug resolves
+  /** Seed-preview storefront variant (D-1): the /tenant/[slug] slug resolves
    *  to the seed_preview demo tenant, then to the source seed. */
   preview_slug?: string;
   /** Owner-request framing — asserted intent + role, shown to the operator

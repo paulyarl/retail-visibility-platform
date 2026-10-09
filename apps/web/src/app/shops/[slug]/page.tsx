@@ -19,8 +19,8 @@ import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
-import SeedPreviewTracker from './SeedPreviewTracker';
-import SeedPreviewOwnerContact from './SeedPreviewOwnerContact';
+import SeedPreviewTracker from '@/components/storefront/SeedPreviewTracker';
+import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerContact';
 import { clientLogger } from '@/lib/client-logger';
 
 interface ShopProfilePageProps {
