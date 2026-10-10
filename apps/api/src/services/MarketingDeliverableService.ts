@@ -273,12 +273,49 @@ export class MarketingDeliverableService extends BaseService {
 
   async deleteDeliverable(id: string, ctx?: RequestCtx): Promise<void> {
     try {
+      const deliverable = await this.prisma.mkt_deliverables_list.findUnique({ where: { id } });
+      // prisma.delete throws the same not-found error as before when absent
       await this.prisma.mkt_deliverables_list.delete({ where: { id } });
       logger.info('Deliverable deleted', ctx, { deliverableId: id });
+
+      // Best-effort file cleanup — the row is the source of truth; a
+      // missing or unlinkable file must not fail the delete. Covers the
+      // PDF (storage_path) and the sibling TXT export (branding_applied).
+      const storagePaths = [
+        deliverable?.storage_path,
+        (deliverable?.branding_applied as any)?.txtExportPath,
+      ].filter((p): p is string => typeof p === 'string' && p.length > 0);
+      for (const storagePath of storagePaths) {
+        const filePath = this.resolveUploadFilePath(storagePath);
+        if (!filePath || !fs.existsSync(filePath)) continue;
+        try {
+          fs.unlinkSync(filePath);
+          logger.info('Deliverable file removed', ctx, { deliverableId: id, filePath });
+        } catch (fileErr) {
+          logger.warn('Deliverable deleted but file cleanup failed', ctx, {
+            deliverableId: id,
+            filePath,
+            error: (fileErr as Error).message,
+          });
+        }
+      }
     } catch (error) {
       logger.error('Failed to delete deliverable', ctx, { error: (error as Error).message, deliverableId: id });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * Resolve an /uploads/ storage path to an on-disk path under UPLOAD_DIR.
+   * Returns null for non-local paths or paths that escape the upload root —
+   * storage_path is operator-writable via PUT /deliverables/:id, so reads
+   * and deletes must never leave the upload directory.
+   */
+  private resolveUploadFilePath(storagePath: string): string | null {
+    if (!storagePath.startsWith('/uploads/')) return null;
+    const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads'));
+    const fullPath = path.resolve(uploadDir, storagePath.slice('/uploads/'.length));
+    return fullPath.startsWith(uploadDir + path.sep) ? fullPath : null;
   }
 
   // ====================
@@ -420,9 +457,8 @@ export class MarketingDeliverableService extends BaseService {
       const deliverable = await this.getDeliverable(deliverableId, ctx);
       if (!deliverable) return null;
 
-      const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
-      const fullPath = path.join(uploadDir, deliverable.storage_path.replace('/uploads/', ''));
-      if (!fs.existsSync(fullPath)) return null;
+      const fullPath = this.resolveUploadFilePath(deliverable.storage_path);
+      if (!fullPath || !fs.existsSync(fullPath)) return null;
 
       return {
         filePath: fullPath,

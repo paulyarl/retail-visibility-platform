@@ -2344,6 +2344,22 @@ export default function CampaignDetailClient({
                               Mark Sent
                             </button>
                           )}
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete "${deliv.file_name}"?${deliv.sent_at ? ' This deliverable was already marked sent — deleting removes that record too.' : ''}`)) return;
+                              try {
+                                await marketingOpsService.deleteDeliverable(deliv.id);
+                                await fetchDeliverables();
+                              } catch (err: any) {
+                                setError(err.message || 'Failed to delete deliverable');
+                              }
+                            }}
+                            title="Delete deliverable"
+                            aria-label="Delete deliverable"
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     ))}
