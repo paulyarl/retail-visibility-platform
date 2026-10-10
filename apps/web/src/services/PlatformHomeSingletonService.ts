@@ -350,8 +350,37 @@ export interface SubdomainStats {
   subdomainList: Array<{
     subdomain: string;
     tenantId: string;
+    tenantName?: string;
     createdAt: string;
   }>;
+}
+
+export interface AdminSubdomainRow {
+  tenantId: string;
+  tenantName: string | null;
+  slug: string | null;
+  subdomain: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface AdminSubdomainListResult {
+  data: AdminSubdomainRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminSubdomainAvailability {
+  available: boolean;
+  reason: string | null;
+  takenBy: { tenantId: string; tenantName: string | null } | null;
+}
+
+export interface AdminSubdomainMutationResult {
+  success: boolean;
+  error?: string;
+  data?: { slug: string | null; subdomain: string | null };
 }
 
 export interface RateLimitConfig {
@@ -1680,6 +1709,114 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     return result.data?.data || null;
+  }
+
+  /**
+   * Admin subdomain management — list tenants with a subdomain.
+   * Backed by /api/admin/subdomains (platform admin only).
+   */
+  async getAdminSubdomains(params: { search?: string; page?: number; limit?: number } = {}): Promise<AdminSubdomainListResult | null> {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+
+    const result = await this.makeDefaultRequest<AdminSubdomainListResult>(
+      `/api/admin/subdomains${suffix}`,
+      {},
+      `platform-admin-subdomains:${suffix}`,
+      60 * 1000,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    if (!result.success) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin subdomains:', { detail: result.error });
+      return null;
+    }
+
+    return result.data || null;
+  }
+
+  /**
+   * Availability check across slug + subdomain namespaces (rename modal).
+   */
+  async checkAdminSubdomainAvailability(value: string, excludeTenantId?: string): Promise<AdminSubdomainAvailability | null> {
+    const qs = new URLSearchParams({ value });
+    if (excludeTenantId) qs.set('excludeTenantId', excludeTenantId);
+
+    const result = await this.makeDefaultRequest<AdminSubdomainAvailability>(
+      `/api/admin/subdomains/check?${qs.toString()}`,
+      {},
+      `platform-admin-subdomain-check:${qs.toString()}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    if (!result.success) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to check subdomain availability:', { detail: result.error });
+      return null;
+    }
+
+    return result.data || null;
+  }
+
+  /**
+   * Assign or rename a tenant's subdomain.
+   */
+  async assignAdminSubdomain(tenantId: string, subdomain: string, reason?: string): Promise<AdminSubdomainMutationResult> {
+    const result = await this.makeDefaultRequest<{ data: { slug: string | null; subdomain: string | null } }>(
+      `/api/admin/subdomains/${encodeURIComponent(tenantId)}`,
+      { method: 'PUT', body: JSON.stringify({ subdomain, reason }) },
+      `platform-admin-subdomain-assign:${tenantId}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    await this.invalidateCache('platform-admin-subdomains*');
+    await this.invalidateCache('platform-admin-subdomain-stats*');
+
+    if (!result.success) {
+      const error = typeof result.error === 'string' ? result.error : (result.error as any)?.error;
+      return { success: false, error: error || 'failed_to_update_subdomain' };
+    }
+
+    return { success: true, data: result.data?.data };
+  }
+
+  /**
+   * Remove a tenant's subdomain (slug retained).
+   */
+  async removeAdminSubdomain(tenantId: string, reason?: string): Promise<AdminSubdomainMutationResult> {
+    const result = await this.makeDefaultRequest<{ data: { slug: string | null; subdomain: string | null } }>(
+      `/api/admin/subdomains/${encodeURIComponent(tenantId)}`,
+      { method: 'DELETE', body: JSON.stringify({ reason }) },
+      `platform-admin-subdomain-remove:${tenantId}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    await this.invalidateCache('platform-admin-subdomains*');
+    await this.invalidateCache('platform-admin-subdomain-stats*');
+
+    if (!result.success) {
+      const error = typeof result.error === 'string' ? result.error : (result.error as any)?.error;
+      return { success: false, error: error || 'failed_to_remove_subdomain' };
+    }
+
+    return { success: true, data: result.data?.data };
   }
 
   /**

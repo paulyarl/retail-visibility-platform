@@ -20,7 +20,6 @@ import { adminAnalyticsService } from './AdminAnalyticsService';
 import { tenantAnalyticsService } from './TenantAnalyticsService';
 import { integrationService } from './IntegrationService';
 import { organizationService } from './OrganizationService';
-import { subdomainService } from './SubdomainService';
 
 // User and Tenant Management Services
 export { tenantUserService, TenantUserService } from './TenantUserService';
@@ -44,7 +43,6 @@ export { integrationService, IntegrationService } from './IntegrationService';
 
 // Organization and Domain Services
 export { organizationService, OrganizationService } from './OrganizationService';
-export { subdomainService, SubdomainService } from './SubdomainService';
 
 /**
  * Service Registry - For dynamic service access
@@ -74,7 +72,6 @@ export const services = {
 
   // Organization & Domains
   organizationService,
-  subdomainService,
 } as const;
 
 /**
@@ -117,7 +114,6 @@ export const serviceCategories = {
   },
   organization: {
     organizationService,
-    subdomainService,
   },
 } as const;
 
@@ -136,7 +132,6 @@ export const serviceCategories = {
  * ✅ IntegrationService (100% complete)
  * ✅ AdminAnalyticsService (100% complete)
  * ✅ OrganizationService (100% complete)
- * ✅ SubdomainService (100% complete)
  * ✅ TenantAnalyticsService (100% complete)
  * 
  * 🔄 PlatformCategoryService (86% complete - 1 method remaining)

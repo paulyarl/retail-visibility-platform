@@ -137,14 +137,14 @@ const ADDRESS_ABBREVIATIONS: Record<string, string> = {
   nw: 'northwest', ne: 'northeast', sw: 'southwest', se: 'southeast',
 };
 
-const NAME_LEGAL_SUFFIXES = ['llc', 'inc', 'corp', 'ltd', 'co', 'llp', 'plc', 'lp'];
+const NAME_LEGAL_SUFFIXES = ['llc', 'inc', 'corp', 'corporation', 'ltd', 'co', 'company', 'llp', 'plc', 'lp', 'pc', 'pllc', 'dba', 'incorporated'];
 
-function normalizePhone(phone: string): string {
+export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
 }
 
-function normalizeAddress(addr: string): string {
+export function normalizeAddress(addr: string): string {
   return addr
     .toLowerCase()
     .replace(/\.+/g, ' ')
@@ -156,7 +156,7 @@ function normalizeAddress(addr: string): string {
     .trim();
 }
 
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   const lower = name.toLowerCase().replace(/[.,]/g, ' ').trim();
   return lower
     .split(/\s+/)
@@ -183,6 +183,84 @@ export function hasMaterialDrift(
   const distinctNames = new Set(names.map(normalizeName)).size;
 
   return distinctPhones > 1 || distinctAddresses > 1 || distinctNames > 1;
+}
+
+// ─── Field-scoped + status-aware material variance ──────────────────────
+//
+// Emission-site rules (project-phase sprint §1.1):
+//   - `unable_to_verify` never counts as inconsistency.
+//   - `material_issues` (analyst-curated free text) is authoritative when it
+//     names the field.
+//   - Field differences are material only when they survive normalization —
+//     "(317) 297-7036" vs "3172977036" and "… LLC" suffixes are cosmetic.
+
+type NapData = NonNullable<BusinessAnalysisAuditData['nap_consistency']>;
+
+function napUnableToVerify(nap: NapData | undefined | null): nap is null | undefined {
+  return !nap || nap.overall_status === 'unable_to_verify';
+}
+
+function issuesMentionField(nap: NapData, field: 'name' | 'address' | 'phone'): boolean {
+  const issues = nap.material_issues;
+  if (!Array.isArray(issues)) return false;
+  const re =
+    field === 'name' ? /\b(name|title|dba)\b/i
+    : field === 'address' ? /\b(address|street|location|suite)\b/i
+    : /\b(phone|number|tel)\b/i;
+  return issues.some((issue) => typeof issue === 'string' && re.test(issue));
+}
+
+/** True when the two names differ only in formatting/legal suffix. */
+export function isFormattingOnlyNameDifference(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  return na.length > 0 && na === normalizeName(b);
+}
+
+/** Material NAME drift: distinct normalized names, or analyst-flagged. */
+export function hasMaterialNameDrift(nap: NapData | undefined | null): boolean {
+  if (napUnableToVerify(nap)) return false;
+  if (issuesMentionField(nap, 'name')) return true;
+  const candidates = [nap.canonical_name, ...(nap.name_variations ?? [])]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  const distinct = new Set(candidates.map(normalizeName).filter(Boolean));
+  return distinct.size > 1;
+}
+
+/** Material ADDRESS drift: distinct normalized addresses, or analyst-flagged. */
+export function hasMaterialAddressDrift(nap: NapData | undefined | null): boolean {
+  if (napUnableToVerify(nap)) return false;
+  if (issuesMentionField(nap, 'address')) return true;
+  const candidates = [nap.canonical_address, ...(nap.address_variations ?? [])]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  const distinct = new Set(candidates.map(normalizeAddress).filter(Boolean));
+  return distinct.size > 1;
+}
+
+/** Material PHONE drift: distinct normalized phones, or analyst-flagged. */
+export function hasMaterialPhoneDrift(nap: NapData | undefined | null): boolean {
+  if (napUnableToVerify(nap)) return false;
+  if (issuesMentionField(nap, 'phone')) return true;
+  const candidates = [nap.canonical_phone, ...(nap.phone_variations ?? [])]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  const distinct = new Set(candidates.map(normalizePhone).filter(Boolean));
+  return distinct.size > 1;
+}
+
+/**
+ * Any verified material NAP inconsistency — the A3 "listing inconsistency"
+ * question. Analyst-verified material_issues or a major_inconsistencies
+ * classification are authoritative even when field detail is absent.
+ */
+export function hasMaterialNapVariance(nap: NapData | undefined | null): boolean {
+  if (napUnableToVerify(nap)) return false;
+  if (nap.overall_status === 'consistent') return false;
+  if (nap.overall_status === 'major_inconsistencies') return true;
+  if (Array.isArray(nap.material_issues) && nap.material_issues.length > 0) return true;
+  return (
+    hasMaterialNameDrift(nap) ||
+    hasMaterialAddressDrift(nap) ||
+    hasMaterialPhoneDrift(nap)
+  );
 }
 
 // ─── Per-signal severity ─────────────────────────────────────────────────

@@ -158,7 +158,7 @@ describe('Sprint 1 — A6 priority: A2 > A1 > A6 > A3 > A4', () => {
       website: undefined, // a website gap — now A7, which sits below A3
       nap_consistency: {
         overall_status: 'minor_variations',
-        name_variations: ['Indy African Market', 'Indy African Market LLC'],
+        name_variations: ['Indy African Market', 'Indy African Grocery'],
       },
     });
     const sel = selectArchetype(audit);

@@ -89,8 +89,14 @@ export default function SubdomainVerificationPage() {
       const itemsData = await tenantInfoService.getItems(tenantId, 3);
       let sampleProducts: Product[] = (itemsData || []).slice(0, 3);
 
-      // Check if subdomain is live (this is a basic check - in production you might want more sophisticated verification)
-      const isLive = hasSubdomain && platformDomain !== 'localhost'; // For localhost, we'd need special handling
+      // Real check: does the slug resolve to THIS tenant via the same
+      // resolve-subdomain endpoint the storefront proxy uses? (A DB row alone
+      // doesn't prove the wildcard path serves this tenant.)
+      let isLive = false;
+      if (hasSubdomain && subdomain) {
+        const resolved = await tenantInfoService.resolveSubdomain(subdomain);
+        isLive = resolved?.tenantId === tenantId;
+      }
 
       setStatus({
         hasSubdomain,
@@ -202,18 +208,18 @@ export default function SubdomainVerificationPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="font-medium">Live Status:</span>
+                <span className="font-medium">Resolves to your storefront:</span>
                 <div className="flex items-center gap-2">
                   {status?.isLive ? (
                     <>
                       <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-green-700 dark:text-green-300">Live</span>
+                      <span className="text-green-700 dark:text-green-300">Yes</span>
                     </>
                   ) : (
                     <>
                       <XCircle className="w-5 h-5 text-orange-600" />
                       <span className="text-orange-700 dark:text-orange-300">
-                        {status?.hasSubdomain ? 'Testing required' : 'Configure subdomain first'}
+                        {status?.hasSubdomain ? 'Not resolving' : 'Configure subdomain first'}
                       </span>
                     </>
                   )}
@@ -336,10 +342,11 @@ export default function SubdomainVerificationPage() {
             If your subdomain isn't working as expected, check these common issues:
           </p>
           <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-            <li>• DNS propagation may take up to 24-48 hours</li>
+            <li>• Platform subdomains activate as soon as the slug is saved — no DNS wait</li>
             <li>• Make sure your subdomain only contains lowercase letters, numbers, and hyphens</li>
             <li>• The subdomain must not start or end with a hyphen</li>
-            <li>• Try refreshing this page and testing again</li>
+            <li>• Open the test link above — it should load your storefront, not a sign-in page</li>
+            <li>• If the slug resolves but the storefront doesn't load, contact support — that's a platform routing issue, not something you configured wrong</li>
           </ul>
         </div>
       </div>

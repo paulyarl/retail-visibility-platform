@@ -96,6 +96,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
            FROM directory_claim_tokens dct
            JOIN directory_presence_seeds dps2 ON dps2.id = dct.seed_id
            WHERE dps2.listing_id = dll.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
+             AND dps2.seed_fidelity IS DISTINCT FROM 'misaligned'
            LIMIT 1) as active_claim,
           tsqs.qr_dot_type, tsqs.qr_corner_type, tsqs.qr_corner_dot_type,
           tsqs.qr_dot_color, tsqs.qr_corner_color, tsqs.qr_corner_dot_color,

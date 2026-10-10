@@ -1,6 +1,6 @@
 # Marketing Ops — Project Phase Spec
 
-Status: Draft for team review — v6 (per-signal lane provenance; INT_* input channel; deterministic cap protection; predicate table + severity floors; contract completion)
+Status: Draft for team review — v7 (subdomain architecture audited; capability source pinned to tenants.subdomain; storefront-path repair scoped into rollout)
 Owner: Marketing Ops
 Related: `docs/LocalBiz/marketing_ops_multi_archetype_campaign_sprint_plan.md`, `docs/LocalBiz/marketing_ops_outreach_opener_sprint_plan.md`, `docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md`, `.agents/skills/multi-archetype-campaigns/SKILL.md`, `apps/api/src/services/triage/signal-taxonomy.ts`, `apps/api/src/services/triage/signal-extractor.ts`
 
@@ -9,6 +9,7 @@ v3 changes: seed claim elevated to the plan's entry CTA — the engagement wedge
 v4 changes: full signal→phase coverage map; sibling attribution fixed to playbook signal pools (inherited signals collapse raw intersection); operator-input signals unioned into re-extraction; `audit` + `operatorInputs` added to selector input; cap-trim order defined; `fidelity: 'unknown'` added; claim-link resolution pinned to the read-only path.
 v5 changes: dynamic predicates from a versioned seed; lane-based confidence (`verified`/`suggested`); generic fixtures replace the single-prospect example.
 v6 changes: per-signal lane provenance (`signalLanes`); `INT_*` input channel; deterministic cap-protection rule; `mkt_project_phase_predicates` table + `min_severity` floors; contract completion (plan-level `predicateSeedVersion`, suggested-phase projection filter); design premise added to §1; Plan cockpit layout/flow/UX specified in §13.
+v7 changes: subdomain architecture audited — wildcard-backed (`tenants.subdomain` + host-header proxy, no per-tenant Vercel work); `subdomainEnabled` source corrected to slug-assignment + wildcard health (no API flag exists); proxy drift documented (redirects to `/t/` app root instead of `/tenant/[id]` storefront) with repair scoped into §17 rollout and sprint 0.2/0.4.
 
 ---
 
@@ -103,7 +104,7 @@ Input:
 - `estimatedTier`: `tier_1 | tier_2 | tier_3 | null` — `mkt_campaigns_list.estimated_tier` on the primary sibling (synced from audit `recommended_tier`; fall back to the audit value when the column is null). Note the direction: `tier_1` is the widest digital opportunity, `tier_3` the narrowest.
 - `operatorInputs`: `{ domainRequested?: boolean }` — read from the structured campaign field (decision 16.2), not a free-text note. Feeds the Expansion domain trigger.
 
-Trigger rules. Each phase is assigned by a **predicate** evaluated against `signals` on every read. Predicates are versioned definitions held in a predicate seed (section 13), not hardcoded per archetype or per prospect. A predicate is an `any_of` signal set with an optional per-signal `min_severity` floor — a signal that fired but sits below the floor does not trigger that phase (e.g. `RA_REVIEW_DROUGHT` may floor at `material`). A phase is included when its predicate matches. The table below is the initial contents of the seed (version 1), not a fixed mapping.
+Trigger rules. Each phase is assigned by a **predicate** evaluated against `signals` on every read. Predicates are versioned definitions held in a predicate seed (section 13), not hardcoded per archetype or per prospect. A predicate is an `any_of` signal set with an optional per-signal `min_severity` floor — a signal that fired but sits below the floor does not trigger that phase (illustrative for a later predicate version; seed v1 has no floors, §16.8). A phase is included when its predicate matches. The table below is the initial contents of the seed (version 1), not a fixed mapping.
 
 Severity (via `computeSignalSeverity` in `signal-magnitude.ts`) ranks phases and floors individual signals; it never assigns a phase on its own. Signals whose severity cannot be computed — no audit data on the partial lane — default to `borderline` for ranking. Lane sets confidence, not assignment: a phase triggered by full-lane signals is `verified`, one triggered only by partial-lane signals is `suggested`, and operator-input signals count as full-lane provenance. Both lanes can assign phases.
 
@@ -163,14 +164,14 @@ Capabilities resolve per prospect, in this anchor order: the wedge seed's tenant
 
 | Capability | Source | Effect when disabled |
 |---|---|---|
-| `subdomainEnabled` | Effective flags for the prospect's demo tenant (owner-facing control at `/t/[tenantId]/settings/subdomain`); platform-level availability when no demo tenant exists | Findability renders as pending; no owner-facing subdomain claim |
+| `subdomainEnabled` | The anchor tenant has an assigned platform subdomain (`tenants.subdomain`, set via `/t/[tenantId]/settings/subdomain`) and the wildcard host is healthy — no `subdomainEnabled` feature flag exists API-side; platform-level availability when no anchor tenant exists | Findability renders as pending; no owner-facing subdomain claim |
 | `storefrontEnabled` | Storefront capability on the same tenant scope (capability resolution service / effective flags) | Product browsing items are omitted |
 | `qrPrintEnabled` | QR tier features (print templates) on the same tenant scope | QR signage item is omitted; digital QR may still show |
 | `domainEnabled` | Owned domain integration (not yet built) — hardcode `false` in v1 | Owned-domain item is omitted; never promised |
 
 The turnkey promise in owner-facing output covers only phases whose capabilities are enabled. Items behind disabled capabilities are not described.
 
-Note: the subdomain capability wiring is a configuration fix that is in progress. This spec assumes it will be complete before Findability is shown as available.
+Note — subdomain architecture (audited during pre-flight): platform subdomains are wildcard-backed — `tenants.subdomain` + host-header resolution in `proxy.ts`, no per-tenant Vercel work. Two drifted pieces need repair before Findability is shown as available (sprint 0.2/0.4): the proxy 302-redirects to `/t/{tenantId}` — the authenticated app root — instead of rewriting to the `/tenant/[id]` public storefront, so a subdomain today lands on a login wall; and `*.visibleshelf.com` must be confirmed as a live wildcard domain on the Vercel project (one-time infra, not verifiable from the repo). Owner-owned custom domains are a separate, designed-but-unbuilt feature (`docs/CUSTOM_DOMAINS_FOR_STOREFRONTS.md` — Vercel Domains API automation, `domainEnabled`).
 
 ## 8. Status derivation
 
@@ -347,7 +348,7 @@ The owner-facing payload is a projection: phases with `suppressedReason` set **o
 ## 13. Integration
 
 - Evaluator (`selectProjectPhases`), types, and stage constants (`ACTIVE_STAGES`, `TERMINAL_COMPLETE_STAGES`): new `apps/api/src/services/outreach-openers/project-phases.ts`, exported from `outreach-openers/index.ts`, following the archetype-selection pattern. The evaluator is pure code. Predicate definitions are data.
-- Predicate seed: a versioned seed following the repo's existing pattern, where `SEED_VERSION_MARKER` bumps re-sync rows without a code deploy. Rows live in a new `mkt_project_phase_predicates` table (a schema migration — added to rollout, and not "plan persistence" under section 2), keyed by phase key and predicate version, carrying the `any_of` signal set, optional `min_severity` floors, `INT_*` rank-modifier map, and phase copy keys. A new predicate version is a seed bump, not an evaluator change. The seed script is `apps/api/src/scripts/seed-project-phase-predicates.ts`, with `PROJECT_PHASE_PREDICATES_VERSION`. The plan records the predicate version it used. The seed script and the table are new deliverables of this spec and do not exist yet.
+- Predicate seed: a versioned seed following the repo's existing pattern, where `SEED_VERSION_MARKER` bumps re-sync rows without a code deploy. Rows live in a new `mkt_project_phase_predicates` table (a schema migration — added to rollout, and not "plan persistence" under section 2), keyed by phase key and predicate version, carrying the `any_of` signal set, optional `min_severity` floors, `INT_*` rank-modifier map, and phase copy keys — named `project_phase.<phase_key>.<slot>` with slots `name`, `goal`, `evidence`, `actions`, `exit_criterion` (a new convention; no prior copy-key scheme exists). A new predicate version is a seed bump, not an evaluator change. The seed script is `apps/api/src/scripts/seed-project-phase-predicates.ts`, with `PROJECT_PHASE_PREDICATES_VERSION`. The plan records the predicate version it used. The seed script and the table are new deliverables of this spec and do not exist yet.
 
 Predicate seed governance: changes are expected to be ongoing, as requirements evolve with growth and business realignments. No formal approval is required at present. Formal review may be introduced as the platform scales, and this section will be updated when it is.
 - Signal resolution: a `resolveProspectSignals` helper (in the same file or `services/triage`) returning `{ signals, signalLanes, lane, sourceAuditId, discoverySignals }`. Full lane: re-extract via `extractSignals` from the primary sibling's latest real `business_analysis` audit (`getLatestAuditData` sibling fallback) — `getLatestAuditData` skips stubs by design. Partial lane: when no real audit exists, take the latest stub audit's `detected_signals` (`audit_metadata.source ∈ STUB_BUSINESS_ANALYSIS_AUDIT_SOURCES`) plus `extractSignals`' derive tier where cat-id `digital_footprint` data exists — all tagged `partial`. Operator-input codes (`RA_BBB_*`) unioned from the persisted `mkt_campaign_triage_results.detected_signals` always carry `full` provenance — they are human-entered, not scan-derived. The persisted snapshot is the fallback when neither lane has an audit; its lane is inherited from the audit that produced it. `discoverySignals` comes from the prospect's latest discovery scan or the stub's `discovery_signal_map`.
@@ -435,15 +436,18 @@ Settled (2026-10, sprint-plan D-table):
 5. **`DS_CLAIMED_STATUS`** — the section 5 audit-verdict-wins rule is sufficient; no extractor refinement.
 6. **`seed_fidelity`** — persisted on the seed; computed at publish (authoritative for public surfaces) and lazily refreshed at plan resolution when the source audit is newer than the stored verdict. `misaligned` degrades all claim CTAs to the `#claim-inquiry` path on every surface — never a token flow.
 7. **Cap protection** — trim in ascending rank order; dependencies of retained phases are skipped; dependent phases are trimmed last. The shown count never exceeds the cap and no phase shows without its dependency.
+8. **`min_severity` floors** — predicate seed v1 ships **no floors**: every `any_of` signal triggers its phase at any severity. Floors are introduced later as a predicate version bump, not a code change — the mechanism ships in the evaluator from day one.
+
+9. **Domain cost ownership** — settled. The prospect owns domain registration and hosting cost, since a domain is typically their own requirement. The platform analyzes the technical requirements and absorbs implementation cost.
 
 Still open:
 
-8. Ownership of the domain cost decision — a business/finance question, not a spec mechanic.
+10. Which signals deserve `min_severity` floors and at what level (seed v2+ decision — unblocked by 16.8).
 
 ## 17. Rollout
 
 1. Land the A1 and A3 fixes (both emission sites) with tests.
-2. Complete the subdomain capability wiring.
+2. Repair the subdomain storefront path (§7 note): repoint the proxy from `/t/{tenantId}` to a `/tenant/{tenantId}` rewrite, enforce the `subdomainResolve` rate limit, confirm the `*.visibleshelf.com` wildcard domain/cert in Vercel, and quarantine `SubdomainService`'s unimplemented custom-domain methods.
 3. Persist `seed_fidelity` on `directory_presence_seeds` (seed-side migration — this is not "plan persistence" under section 2) and wire misaligned-seed CTA degradation on the claim surfaces.
 4. Migrate `mkt_project_phase_predicates`, seed the initial predicate version, then build `selectProjectPhases`, `resolveProspectSignals`, the seed coverage check, lane confidence, types, and tests.
 5. Add the plan endpoint, operator Plan panel, and gallery project view behind a flag.

@@ -181,6 +181,10 @@ try {
   writeFileSync(outputFile, JSON.stringify(routeMap, null, 2));
   console.log(`✅ Route map generated: ${outputFile}`);
   console.log(`   ${routeMap.totalMounts} mounts, ${routeMap.totalRoutes} routes`);
+  // Importing the route registry warm-starts long-lived services (recommendation
+  // ML, DB pool, redis cache) whose handles keep the event loop alive, so the
+  // process would otherwise hang after writing the file. Exit explicitly.
+  process.exit(0);
 } catch (error) {
   logger.error('❌ Failed to generate route map:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   process.exit(1);

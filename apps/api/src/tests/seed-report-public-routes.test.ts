@@ -20,6 +20,12 @@ vi.mock('../services/intelligence/SeedIntelligenceReportService', () => ({
   },
 }));
 
+vi.mock('../services/intelligence/SeedReportEvidenceService', () => ({
+  SeedReportEvidenceService: {
+    getInstance: () => ({ resolveSeedAuditLane: vi.fn().mockResolvedValue('full') }),
+  },
+}));
+
 vi.mock('../prisma', () => ({
   prisma: {
     $queryRaw: mockQueryRaw,

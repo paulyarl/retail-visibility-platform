@@ -90,3 +90,25 @@ export {
   type GrowthReadiness,
   type ChannelHint,
 } from './emerging-angle-map';
+
+export {
+  selectProjectPhases,
+  toOwnerFacingPhases,
+  resolvePlanCta,
+  ACTIVE_STAGES,
+  TERMINAL_COMPLETE_STAGES,
+  STALLED_STAGES,
+  type PhaseStatus,
+  type PhaseExitPredicate,
+  type PlanLane,
+  type SignalLane,
+  type EstimatedTier,
+  type SeedFidelity,
+  type SeedStatus,
+  type ProjectPhaseInput,
+  type ProjectPhase,
+  type ProjectPhasePlan,
+  type EvaluationContext,
+  type OwnerFacingPhase,
+  type PlanCta,
+} from './project-phases';

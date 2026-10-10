@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isPlatformUser, isTenantOwnerOrAdmin, getTenantRole } from '@/lib/auth/access-control';
@@ -20,7 +21,8 @@ import {
   RefreshCw,
   AlertTriangle,
   CheckCircle,
-  Clock
+  Clock,
+  ArrowUpRight
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -32,6 +34,7 @@ interface SubdomainStats {
   subdomainList: Array<{
     subdomain: string;
     tenantId: string;
+    tenantName?: string;
     createdAt: string;
   }>;
 }
@@ -283,18 +286,28 @@ export default function AdminSubdomainPage() {
               {stats?.subdomainList && stats.subdomainList.length > 0 ? (
                 <div className="space-y-2">
                   {stats.subdomainList.slice(0, 20).map((item) => (
-                    <div key={item.tenantId} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <div>
-                          <p className="font-medium">{item.subdomain}.visibleshelf.com</p>
-                          <p className="text-sm text-neutral-500">Tenant: {item.tenantId}</p>
+                    <Link
+                      key={item.tenantId}
+                      href={`/t/${item.tenantId}/settings/subdomain`}
+                      title={`Open subdomain configuration for ${item.tenantName ?? item.tenantId}`}
+                      className="group flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate">
+                            {item.subdomain}.visibleshelf.com
+                          </p>
+                          <p className="text-sm text-neutral-500 truncate">Tenant: {item.tenantName ?? item.tenantId}</p>
                         </div>
                       </div>
-                      <Badge variant="default">
-                        {new Date(item.createdAt).toLocaleDateString()}
-                      </Badge>
-                    </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Badge variant="default">
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </Badge>
+                        <ArrowUpRight className="h-4 w-4 text-neutral-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
+                      </div>
+                    </Link>
                   ))}
                   {stats.subdomainList.length > 20 && (
                     <p className="text-sm text-neutral-500 mt-2">

@@ -10,8 +10,21 @@ import { authenticateToken } from '../middleware/auth';
 import slugSingletonService from '../services/SlugSingletonService';
 import { z } from 'zod';
 import { logger } from '../logger';
+import { deprecate } from '../middleware/deprecation';
+import { searchRateLimit } from '../middleware/rate-limit';
 
 const router = Router();
+
+// Retirement register for the un-consumed `/api/slugs` endpoints. See
+// docs/SLUG_API_RETIREMENT.md. These stay mounted + functional through the
+// deprecation window (Deprecation/Sunset headers + warning log); the frozen
+// copies live in routes/archive/slug-generation.retired.ts and the live
+// registrations are deleted when the window closes.
+const RETIREMENT = {
+  retiredOn: '2026-10-10',
+  sunsetOn: '2026-12-10',
+  doc: 'docs/SLUG_API_RETIREMENT.md',
+} as const;
 
 // Validation schemas
 const generateSlugSchema = z.object({
@@ -49,7 +62,7 @@ const checkAvailabilitySchema = z.object({
  *   "suggestions": ["business-name-new-york-ny", "business-name-new-york-ny-usa"]
  * }
  */
-router.post('/generate', authenticateToken, async (req: Request, res: Response) => {
+router.post('/generate', deprecate({ ...RETIREMENT, replacement: '/api/slugs/patterns' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const parsed = generateSlugSchema.safeParse(req.body);
 
@@ -126,7 +139,7 @@ router.post('/generate', authenticateToken, async (req: Request, res: Response) 
  *   "updatedAt": "2024-01-01T00:00:00.000Z"
  * }
  */
-router.get('/tenant/:tenantId', authenticateToken, async (req: Request, res: Response) => {
+router.get('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
@@ -134,25 +147,26 @@ router.get('/tenant/:tenantId', authenticateToken, async (req: Request, res: Res
       return res.status(400).json({ error: 'tenant_id_required' });
     }
 
-    // Get or create slug
-    const slug = await slugSingletonService.getOrCreateSlug(tenantId);
-
-    // Get full slug info with metadata
+    // Read-only: this handler used to call getOrCreateSlug(), writing a slug on
+    // a GET. It now reports the existing slug without mutating. See
+    // docs/SLUG_API_RETIREMENT.md.
     const slugInfo = await slugSingletonService.getSlugInfo(tenantId);
 
     if (!slugInfo) {
       return res.json({
-        slug,
+        slug: null,
         tenantId,
+        exists: false,
         isPublished: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: null,
+        updatedAt: null,
       });
     }
 
     return res.json({
       slug: slugInfo.slug,
       tenantId: slugInfo.tenantId,
+      exists: true,
       isPublished: slugInfo.isPublished,
       createdAt: slugInfo.createdAt,
       updatedAt: slugInfo.updatedAt,
@@ -181,7 +195,7 @@ router.get('/tenant/:tenantId', authenticateToken, async (req: Request, res: Res
  *   "slug": "new-business-name"
  * }
  */
-router.put('/tenant/:tenantId', authenticateToken, async (req: Request, res: Response) => {
+router.put('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { slug } = req.body;
@@ -239,7 +253,7 @@ router.put('/tenant/:tenantId', authenticateToken, async (req: Request, res: Res
  *   "isAvailable": true
  * }
  */
-router.post('/check-availability', authenticateToken, async (req: Request, res: Response) => {
+router.post('/check-availability', searchRateLimit, authenticateToken, async (req: Request, res: Response) => {
   try {
     const parsed = checkAvailabilitySchema.safeParse(req.body);
 
@@ -281,7 +295,7 @@ router.post('/check-availability', authenticateToken, async (req: Request, res: 
  *   "slug": "business-name"
  * }
  */
-router.post('/slugify', authenticateToken, async (req: Request, res: Response) => {
+router.post('/slugify', deprecate({ ...RETIREMENT, replacement: '/api/slugs/patterns' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const { text } = req.body;
 
@@ -322,7 +336,7 @@ router.post('/slugify', authenticateToken, async (req: Request, res: Response) =
  *   ]
  * }
  */
-router.post('/patterns', authenticateToken, async (req: Request, res: Response) => {
+router.post('/patterns', searchRateLimit, authenticateToken, async (req: Request, res: Response) => {
   try {
     const { businessName, location, tenantId } = req.body;
 
@@ -363,7 +377,7 @@ router.post('/patterns', authenticateToken, async (req: Request, res: Response) 
  *   "slug": "coffee-shop-seattle-wa"
  * }
  */
-router.post('/generate-with-pattern', authenticateToken, async (req: Request, res: Response) => {
+router.post('/generate-with-pattern', deprecate({ ...RETIREMENT, replacement: '/api/slugs/patterns' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const { businessName, location, pattern, tenantId } = req.body;
 
@@ -421,7 +435,7 @@ router.post('/generate-with-pattern', authenticateToken, async (req: Request, re
  *   "message": "Slug regenerated from business name"
  * }
  */
-router.post('/tenant/:tenantId/regenerate', authenticateToken, async (req: Request, res: Response) => {
+router.post('/tenant/:tenantId/regenerate', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { forceUpdate } = req.body;
@@ -459,7 +473,7 @@ router.post('/tenant/:tenantId/regenerate', authenticateToken, async (req: Reque
  *   "message": "Cache invalidated for tenant tid-12345"
  * }
  */
-router.delete('/tenant/:tenantId/cache', authenticateToken, async (req: Request, res: Response) => {
+router.delete('/tenant/:tenantId/cache', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 

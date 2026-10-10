@@ -118,44 +118,39 @@ export async function proxy(req: NextRequest) {
     }
 
     try {
-      // Look up tenant by subdomain using resolve endpoint
-      const tenantResponse = await fetch(`${API_BASE_URL}/api/tenants/resolve-subdomain/${subdomain}`);
+      // Look up tenant by subdomain using resolve endpoint.
+      // Forward the client IP — the API rate-limits resolves per client, and
+      // without this every lookup shares the edge egress IP and self-throttles.
+      const tenantResponse = await fetch(`${API_BASE_URL}/api/tenants/resolve-subdomain/${subdomain}`, {
+        headers: { 'x-forwarded-for': req.headers.get('x-forwarded-for') ?? '' },
+      });
 
       if (tenantResponse.ok) {
         const subdomainData = await tenantResponse.json();
         if (subdomainData.success && subdomainData.tenantId) {
-          // Subdomain exists, route to storefront
+          // Subdomain exists, rewrite to the public storefront at /tenant/{id}.
+          // Rewrite (never redirect) so the subdomain stays canonical in the URL.
           const tenantId = subdomainData.tenantId;
 
-          // For localhost development, use rewrite instead of redirect
-          if (domain === 'localhost') {
-            // Rewrite to tenant storefront path (keeps subdomain in URL)
-            const destPath = `/t/${tenantId}${pathname}`;
-            console.log(`[Proxy] Subdomain rewrite: ${hostname}${pathname} → ${destPath} (domain: ${domain})`);
-            
-            const url = req.nextUrl.clone();
-            url.pathname = destPath;
-            
-            const res = NextResponse.rewrite(url);
-            
-            // Set tenant context cookie
-            const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
-            setCookie(res, 'tcx', tcx);
-            
-            return res;
+          // Paths already under /tenant/ (absolute storefront links emitted by
+          // components) and global routes (/products/[id], /place, etc.) pass
+          // through untouched — only storefront-root paths get the tenant prefix.
+          const STOREFRONT_ROOTS = ['/services', '/policies'];
+          let destPath: string;
+          if (pathname.startsWith('/tenant/')) {
+            destPath = pathname;
+          } else if (pathname === '/' || STOREFRONT_ROOTS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
+            destPath = `/tenant/${tenantId}${pathname === '/' ? '' : pathname}`;
+          } else {
+            destPath = pathname;
           }
 
-          // For production domains, redirect to tenant storefront
-          const destUrl = new URL(`/t/${tenantId}${pathname}`, req.url);
-          // Preserve query params
-          const sourceUrl = new URL(req.url);
-          sourceUrl.searchParams.forEach((value, key) => {
-            destUrl.searchParams.set(key, value);
-          });
+          console.log(`[Proxy] Subdomain rewrite: ${hostname}${pathname} → ${destPath} (domain: ${domain})`);
 
-         // console.log(`[Proxy] Subdomain routing: ${hostname}${pathname} → ${destUrl.toString()} (domain: ${domain})`);
+          const url = req.nextUrl.clone();
+          url.pathname = destPath;
 
-          const res = NextResponse.redirect(destUrl, { status: 302 });
+          const res = NextResponse.rewrite(url);
 
           // Set tenant context cookie
           const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });

@@ -122,6 +122,10 @@ async function resolveClaimInviteKit(seedId: string): Promise<ClaimInviteQrKit |
     WHERE dct.seed_id = ${seedId}
       AND dct.consumed_at IS NULL
       AND (dct.expires_at IS NULL OR dct.expires_at > now())
+      -- Wedge fidelity (project-phase spec §4/§6): a misaligned seed never
+      -- emits a claim-token surface — every consumer of this kit (merge vars,
+      -- QR kits, claim links) degrades to the inquiry path.
+      AND dps.seed_fidelity IS DISTINCT FROM 'misaligned'
     ORDER BY dct.created_at DESC
     LIMIT 1
   `;

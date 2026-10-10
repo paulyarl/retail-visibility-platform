@@ -85,6 +85,10 @@ export interface ClaimTokenSummary {
   isConsumed: boolean;
   expiresAt: Date;
   consumedAt: Date | null;
+  /** Wedge-fidelity verdict (project-phase spec §4/§6). 'misaligned' tells the
+   *  claim landing page to render the inquiry path instead of the claim form —
+   *  a stale link degrades safely rather than inviting a claim on bad data. */
+  seedFidelity: 'aligned' | 'thin' | 'misaligned' | 'unknown';
 }
 
 /** An owner-typed category label held for operator acceptance (migration 274). */
@@ -173,6 +177,7 @@ class DirectoryClaimService {
         dps.city,
         dps.state,
         dps.notes,
+        dps.seed_fidelity,
         dl.slug,
         dl.business_name,
         dl.address,
@@ -246,6 +251,9 @@ class DirectoryClaimService {
       isConsumed: !!r.consumed_at,
       expiresAt,
       consumedAt: r.consumed_at ? new Date(r.consumed_at) : null,
+      seedFidelity: ['aligned', 'thin', 'misaligned', 'unknown'].includes(r.seed_fidelity)
+        ? r.seed_fidelity
+        : 'unknown',
     };
   }
 

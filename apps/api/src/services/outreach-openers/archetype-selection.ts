@@ -22,6 +22,7 @@
 // ─── Types ──────────────────────────────────────────────────────────────
 
 import { isSocialPlatformHost, isBuilderSubdomainHost } from '../triage/website-host-classification';
+import { hasMaterialNapVariance } from './signal-magnitude';
 
 export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
 
@@ -176,10 +177,12 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
     };
   }
 
-  // A1: review response gap
+  // A1: review response gap — material on BOTH dimensions: a meaningful
+  // unanswered rate (≥25%, so a 2-review business at 50% doesn't fire) AND a
+  // meaningful unanswered count (≥5, so 5/200 at 2.5% doesn't fire).
   if (
-    metrics.observable_unanswered_rate_percent >= 15 ||
-    metrics.observable_unanswered_reviews > 15
+    metrics.observable_unanswered_rate_percent >= 25 &&
+    metrics.observable_unanswered_reviews >= 5
   ) {
     return {
       archetype: 'A1',
@@ -202,17 +205,13 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
     }
   }
 
-  // A3: listing inconsistency
-  if (
-    nap &&
-    nap.overall_status !== 'consistent' &&
-    ((nap.name_variations?.length ?? 0) > 0 ||
-      (nap.address_variations?.length ?? 0) > 1 ||
-      (nap.phone_variations?.length ?? 0) > 1)
-  ) {
+  // A3: listing inconsistency — material variance only. Formatting-only name
+  // differences (case, punctuation, legal suffixes) and unable_to_verify do
+  // not fire; material_issues is analyst-authoritative when populated.
+  if (hasMaterialNapVariance(nap)) {
     return {
       archetype: 'A3',
-      reason: `listing inconsistency: ${nap.overall_status}`,
+      reason: `listing inconsistency: ${nap!.overall_status}`,
     };
   }
 

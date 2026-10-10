@@ -1196,6 +1196,33 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
+   * Resolve a subdomain to its tenant — the same endpoint the storefront proxy
+   * uses. Unauthenticated; used by the verification page to prove the slug
+   * actually resolves, not just that a DB row exists.
+   */
+  async resolveSubdomain(subdomain: string): Promise<{ tenantId: string; tenantName: string } | null> {
+    try {
+      if (!subdomain) {
+        throw new Error('Subdomain is required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/resolve-subdomain/${subdomain}`,
+        {},
+        `tenant-resolve-subdomain-${subdomain}`
+      );
+      if (!result.success || !result.data?.tenantId) {
+        return null;
+      }
+
+      return { tenantId: result.data.tenantId, tenantName: result.data.tenantName };
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to resolve subdomain:', { detail: error });
+      return null;
+    }
+  }
+
+  /**
    * Check subdomain availability
    */
   async checkSubdomainAvailability(subdomain: string): Promise<any> {

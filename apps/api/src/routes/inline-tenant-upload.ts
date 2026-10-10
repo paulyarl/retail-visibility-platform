@@ -3,7 +3,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { prisma, basePrisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { StorageBuckets } from '../storage-config';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
@@ -57,7 +57,7 @@ router.get("/api/public/features-showcase-config", async (req, res) => {
 
 // PATCH /api/tenant/profile - partial update
 const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
-router.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
+router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async (req, res) => {
   console.log('[PATCH /tenant/profile] Request body:', JSON.stringify(req.body, null, 2));
   const parsed = tenantProfileUpdateSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });

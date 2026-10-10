@@ -7,6 +7,16 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
+import { assignSubdomain, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
+
+// HTTP-facing copy for the shared subdomain helper's failure codes.
+const SUBDOMAIN_ERROR_MESSAGES: Record<SubdomainFailureCode, string> = {
+  invalid_subdomain:
+    'Subdomain must be 2-30 characters, contain only lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen',
+  reserved_subdomain: 'This subdomain is reserved by the platform',
+  subdomain_taken: 'This subdomain is already taken by another tenant',
+  tenant_not_found: 'Tenant not found',
+};
 import { canViewAllTenants } from '../utils/platform-admin';
 import { getLocationStatusInfo } from '../utils/location-status';
 import { z } from 'zod';
@@ -361,36 +371,20 @@ router.put('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: R
       });
     }
 
-    // Basic subdomain validation (lowercase, alphanumeric, hyphens only, 3-30 chars)
-    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]$/;
-    if (!subdomainRegex.test(subdomain)) {
-      return res.status(400).json({
+    // Format + reserved + cross-namespace availability + slug mirroring all
+    // live in the shared helper (lib/subdomain.ts).
+    const result = await assignSubdomain(id, subdomain);
+    if (!result.ok) {
+      const status = result.code === 'subdomain_taken' ? 409 : result.code === 'tenant_not_found' ? 404 : 400;
+      return res.status(status).json({
         success: false,
-        error: 'invalid_subdomain',
-        message: 'Subdomain must be 2-30 characters, contain only lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen'
+        error: result.code,
+        message: SUBDOMAIN_ERROR_MESSAGES[result.code],
       });
     }
 
-    // Check if subdomain is already taken by another tenant
-    const existingTenant = await prisma.tenants.findFirst({
-      where: {
-        subdomain,
-        id: { not: id } // Exclude current tenant
-      }
-    });
-
-    if (existingTenant) {
-      return res.status(409).json({
-        success: false,
-        error: 'subdomain_taken',
-        message: 'This subdomain is already taken by another tenant'
-      });
-    }
-
-    // Update tenant with new subdomain
-    const updatedTenant = await prisma.tenants.update({
+    const updatedTenant = await prisma.tenants.findUnique({
       where: { id },
-      data: { subdomain },
       select: {
         id: true,
         name: true,
@@ -399,7 +393,11 @@ router.put('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: R
       }
     });
 
-    console.log(`[TENANTS] Updated subdomain for tenant ${id}: ${subdomain}`);
+    if (!updatedTenant) {
+      return res.status(404).json({ success: false, error: 'tenant_not_found', message: 'Tenant not found' });
+    }
+
+    console.log(`[TENANTS] Updated subdomain for tenant ${id}: ${result.after.subdomain}`);
 
     res.json({
       success: true,
@@ -428,10 +426,15 @@ router.delete('/:id/subdomain', authenticateToken, checkTenantAccess, async (req
   try {
     const { id } = req.params;
 
-    // Remove subdomain by setting it to null
-    const updatedTenant = await prisma.tenants.update({
+    // Clears `subdomain` only — the tenant's slug (and its public slug URLs) is
+    // intentionally retained.
+    const result = await clearSubdomain(id);
+    if (!result.ok) {
+      return res.status(404).json({ success: false, error: result.code, message: 'Tenant not found' });
+    }
+
+    const updatedTenant = await prisma.tenants.findUnique({
       where: { id },
-      data: { subdomain: null },
       select: {
         id: true,
         name: true,
@@ -439,6 +442,10 @@ router.delete('/:id/subdomain', authenticateToken, checkTenantAccess, async (req
         created_at: true
       }
     });
+
+    if (!updatedTenant) {
+      return res.status(404).json({ success: false, error: 'tenant_not_found', message: 'Tenant not found' });
+    }
 
     console.log(`[TENANTS] Removed subdomain for tenant ${id}`);
 
@@ -557,6 +564,18 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
 router.get('/resolve-subdomain/:subdomain', async (req: Request, res: Response) => {
   try {
     const { subdomain } = req.params;
+
+    // Rate limit per real client (the storefront proxy forwards XFF). Unkeyed by
+    // req.ip alone — middleware calls share edge egress IPs and would self-throttle.
+    const clientKey = ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.ip || 'anonymous';
+    const rateLimitResult = checkRateLimit(clientKey, 'subdomainResolve');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many subdomain resolutions. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)} seconds.`
+      });
+    }
 
     // Find tenant by subdomain
     const tenant = await prisma.tenants.findFirst({

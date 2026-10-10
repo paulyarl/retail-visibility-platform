@@ -688,6 +688,18 @@ class DirectoryPresenceSeedService {
       action: 'directory_presence_seed.publish',
       payload: { seedId, tenantId: seed[0].tenant_id },
     });
+    // Wedge fidelity (project-phase spec §4/§6): the publish-time verdict is
+    // authoritative for every public claim surface. Non-fatal — a fidelity
+    // compute failure must never block a publish.
+    try {
+      const { computeAndStoreSeedFidelity } = await import('./seed-fidelity.js');
+      await computeAndStoreSeedFidelity(seedId);
+    } catch (err: any) {
+      logger.warn('DirectoryPresenceSeedService.publishSeed: fidelity compute failed', undefined, {
+        seedId,
+        error: err?.message,
+      });
+    }
     await this.resolveIntakeTickets(seedId);
     logger.info('DirectoryPresenceSeedService.publishSeed', undefined, { seedId });
   }
@@ -1023,6 +1035,7 @@ class DirectoryPresenceSeedService {
         dps.category,
         dps.city,
         dps.state,
+        dps.seed_fidelity,
         dl.business_name,
         dl.slug
       FROM directory_presence_seeds dps
@@ -1031,7 +1044,10 @@ class DirectoryPresenceSeedService {
       LIMIT 1
     `;
 
-    if (seed[0]?.owner_email) {
+    // Wedge fidelity: a misaligned seed never sends a claim CTA — the invite
+    // email is suppressed (the token is still minted; the seed needs repair
+    // before the owner sees a claim link).
+    if (seed[0]?.owner_email && seed[0].seed_fidelity !== 'misaligned') {
       const html = `
         <h1>Your business listing is ready to claim</h1>
         <p><strong>${seed[0].business_name}</strong> in ${seed[0].city}, ${seed[0].state} has been added to the directory.</p>
@@ -1445,6 +1461,21 @@ class DirectoryPresenceSeedService {
         );
       } catch (err: any) {
         logger.warn('DirectoryPresenceSeedService: post-update report refresh failed', undefined, {
+          seedId,
+          error: err?.message,
+        });
+      }
+    }
+
+    // Fidelity repair path: when the listing's NAP fields or hours change, the
+    // stored seed_fidelity verdict is stale — recompute so a repaired seed can
+    // leave 'misaligned'/'thin' and its claim CTAs come back. Non-fatal.
+    if (Object.keys(changedNapFields).length > 0 || fields.businessHours !== undefined) {
+      try {
+        const { computeAndStoreSeedFidelity } = await import('./seed-fidelity.js');
+        await computeAndStoreSeedFidelity(seedId);
+      } catch (err: any) {
+        logger.warn('DirectoryPresenceSeedService.updateFields: fidelity recompute failed', undefined, {
           seedId,
           error: err?.message,
         });

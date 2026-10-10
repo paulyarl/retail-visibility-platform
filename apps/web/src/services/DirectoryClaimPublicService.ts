@@ -44,6 +44,9 @@ export interface DirectoryClaimSummary {
   isConsumed: boolean;
   expiresAt: string;
   consumedAt: string | null;
+  /** Wedge-fidelity verdict (project-phase spec §4/§6). 'misaligned' routes
+   *  the landing page to the inquiry path instead of the claim form. */
+  seedFidelity?: 'aligned' | 'thin' | 'misaligned' | 'unknown';
 }
 
 export interface ClaimListingAttribute {

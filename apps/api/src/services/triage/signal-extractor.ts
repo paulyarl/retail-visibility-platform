@@ -38,6 +38,7 @@ import { isKnownSignalCode, signalLabel, type SignalCode } from './signal-taxono
 import { MIN_SIGNAL_WEIGHT_FOR_GAP } from '../../validators/business-analysis.schema';
 import { normalizeSignalPlatformKey } from '../intelligence/IntelligenceProfileService';
 import { isSocialPlatformHost, isBuilderSubdomainHost } from './website-host-classification';
+import { hasMaterialNameDrift, hasMaterialAddressDrift, hasMaterialPhoneDrift } from '../outreach-openers/signal-magnitude';
 
 // ─── Thresholds (Sprint 2A §2A.1 + registry derived_rule defaults) ───────
 //
@@ -589,16 +590,19 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
     }
   }
 
-  // CP_* — cross-platform consistency (NAP drift)
+  // CP_* — cross-platform consistency (NAP drift). Material variance only —
+  // formatting-only name differences (case, punctuation, legal suffixes) and
+  // unable_to_verify do not emit; phone/address differences are always
+  // material; analyst-curated material_issues escalate per field.
   if (auditData?.nap_consistency) {
     const nap = auditData.nap_consistency;
-    if (!signals.has('CP_NAP_NAME_DRIFT') && (nap.name_variations?.length ?? 0) > 0) {
+    if (!signals.has('CP_NAP_NAME_DRIFT') && hasMaterialNameDrift(nap)) {
       signals.add('CP_NAP_NAME_DRIFT');
     }
-    if (!signals.has('CP_NAP_ADDRESS_DRIFT') && (nap.address_variations?.length ?? 0) > 0) {
+    if (!signals.has('CP_NAP_ADDRESS_DRIFT') && hasMaterialAddressDrift(nap)) {
       signals.add('CP_NAP_ADDRESS_DRIFT');
     }
-    if (!signals.has('CP_NAP_PHONE_DRIFT') && (nap.phone_variations?.length ?? 0) > 0) {
+    if (!signals.has('CP_NAP_PHONE_DRIFT') && hasMaterialPhoneDrift(nap)) {
       signals.add('CP_NAP_PHONE_DRIFT');
     }
     if (!signals.has('CP_MISSING_CONTACT_INFO')) {

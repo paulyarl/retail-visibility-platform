@@ -51,7 +51,7 @@ import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeServi
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 
-type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'success' | 'otp_sent' | 'pending_approval';
+type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'misaligned' | 'success' | 'otp_sent' | 'pending_approval';
 
 /**
  * Best-effort platform (Auth0) session detection for success-screen CTAs.
@@ -132,6 +132,8 @@ export default function DirectoryClaimClient() {
         setState('expired');
       } else if (s.isConsumed) {
         setState('claimed');
+      } else if (s.seedFidelity === 'misaligned') {
+        setState('misaligned');
       } else {
         setState('valid');
       }
@@ -382,6 +384,28 @@ export default function DirectoryClaimClient() {
             <Text c="dimmed">
               Someone&apos;s already claimed this listing. If this is your business and that
               wasn&apos;t you, reach out — we&apos;ll get it sorted.
+            </Text>
+            <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
+              Back to Directory
+            </Button>
+          </Stack>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (state === 'misaligned') {
+    return (
+      <Container size="sm" className="py-12">
+        <Card withBorder shadow="sm" padding="xl" radius="md">
+          <Stack align="center" gap="md" ta="center">
+            <ThemeIcon size={56} radius="xl" color="orange">
+              <IconAlertCircle size={28} />
+            </ThemeIcon>
+            <Title order={3}>Listing Under Review</Title>
+            <Text c="dimmed">
+              We&apos;re updating some details on this listing before it can be claimed. If this is
+              your business, reach out and we&apos;ll get you set up.
             </Text>
             <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
               Back to Directory

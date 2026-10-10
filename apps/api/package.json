@@ -66,6 +66,7 @@
     "seed:intelligence-discovery-signals": "tsx src/scripts/seed-intelligence-discovery-signals.ts",
     "seed:category-identification-template": "tsx src/scripts/seed-category-identification-template.ts",
     "seed:proving-ground-preflight": "tsx src/scripts/seed-proving-ground-preflight.ts",
+    "seed:project-phase-predicates": "tsx src/scripts/seed-project-phase-predicates.ts",
     "migrate:mkt-data": "tsx src/scripts/migrate-marketing-ops-data.ts",
     "migrate:mkt-files": "tsx src/scripts/migrate-marketing-ops-files.ts",
     "gen:openapi": "tsx src/scripts/generate-openapi.ts",

@@ -51,11 +51,15 @@ export async function resolveCampaignSeedId(campaignId: string): Promise<string 
 async function claimUrlFromToken(seedId: string): Promise<string | null> {
   try {
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT token FROM directory_claim_tokens
-      WHERE seed_id = ${seedId}
-        AND consumed_at IS NULL
-        AND (expires_at IS NULL OR expires_at > now())
-      ORDER BY created_at DESC
+      SELECT dct.token FROM directory_claim_tokens dct
+      JOIN directory_presence_seeds dps ON dps.id = dct.seed_id
+      WHERE dct.seed_id = ${seedId}
+        AND dct.consumed_at IS NULL
+        AND (dct.expires_at IS NULL OR dct.expires_at > now())
+        -- Misaligned seeds degrade to the inquiry path on every surface
+        -- (project-phase spec §4/§6) — never a token flow.
+        AND dps.seed_fidelity IS DISTINCT FROM 'misaligned'
+      ORDER BY dct.created_at DESC
       LIMIT 1
     `;
     const token = rows[0]?.token;

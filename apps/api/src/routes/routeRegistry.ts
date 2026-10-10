@@ -217,6 +217,7 @@ import funnelOptionsSettingsRoutes from '../routes/funnel-options-settings';
 import couponsRoutes from '../routes/coupons';
 import couponAnalyticsRoutes from '../routes/coupon-analytics';
 import marketingOpsRoutes from '../routes/marketing-ops';
+import adminSubdomainsRoutes from '../routes/admin-subdomains';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
 import marketingCustomerRoutes from '../routes/marketing-customer';
 import gbpCustomerRoutes from '../routes/gbp-customer';
@@ -1389,6 +1390,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'admin',
     authLevel: 'admin',
     comment: 'Marketing Ops admin routes — campaigns, audits, files, files/upload (diagnostic screenshots), files/diagnostic-screenshots (signed URLs), prompts, executions, filter flags, scorecards, deliverables, branding, gallery-token, campaigns/:id/gallery-eligibility, campaigns/:id/gallery-analytics, gallery-analytics/dashboard',
+  },
+  {
+    path: '/api/admin/subdomains',
+    router: adminSubdomainsRoutes,
+    domain: 'admin',
+    authLevel: 'admin',
+    comment: 'Admin subdomain management — list, rename, remove (platform admin only)',
   },
   {
     path: '/api/admin/gbp-monitor',

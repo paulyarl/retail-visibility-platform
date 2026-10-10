@@ -62,6 +62,7 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
       },
       select: {
         id: true,
+        name: true,
         subdomain: true,
         created_at: true,
       },
@@ -90,9 +91,10 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
         tenantsWithSubdomains,
         adoptionRate: Math.round(adoptionRate * 100) / 100,
         recentAdoptions,
-        subdomainList: subdomainStats.map((tenant: { subdomain: string | null; id: string; created_at: Date }) => ({
+        subdomainList: subdomainStats.map((tenant: { subdomain: string | null; id: string; name: string; created_at: Date }) => ({
           subdomain: tenant.subdomain,
           tenantId: tenant.id,
+          tenantName: tenant.name,
           createdAt: tenant.created_at
         }))
       }

@@ -18,7 +18,8 @@
 | D6 | `misaligned` seed | **Settled:** degrade to `#claim-inquiry` on every claim surface — never a token flow. |
 | D7 | Cap protection | **Settled:** skip-protected rule — dependencies of retained phases are skipped, dependents trimmed last; cap never exceeded. |
 | D8 | `mkt_project_phase_predicates` shape | Proposed: `id`, `phase_key`, `predicate_version`, `signals jsonb` (any_of), `min_severity jsonb` (per-signal floors, nullable), `int_rank_modifiers jsonb`, `copy_keys jsonb`, `seed_version text`, `updated_at`. Unique `(phase_key, predicate_version)`. Confirm at migration time. |
-| D9 | Domain cost ownership | **Open** — business/finance question outside spec scope (spec §16.8). Does not block any phase below. |
+| D9 | Domain cost ownership | **Settled** (spec §16.9): the prospect owns domain registration and hosting cost, since a domain is typically their own requirement. The platform analyzes technical requirements and absorbs implementation cost. |
+| D10 | `min_severity` floor values | **Settled** (spec §16.8): seed v1 ships with **no floors** (every `any_of` signal triggers its phase). Floors are a seed bump, not a code change, so this doesn't block Phase 3–4. |
 
 ---
 
@@ -27,8 +28,30 @@
 | # | Task | Files | Notes |
 |---|---|---|---|
 | 0.1 | D1–D7 are settled (recorded in spec §16 and this table). Confirm D8's table shape at migration time; D9 stays open but blocks nothing. | — | The spec's decisions are the sprint's contract — don't code around them. |
-| 0.2 | Verify the subdomain capability wiring landed (spec §7 note says "in progress"). If not, Phase 8 proceeds but Findability renders `blocked` — acceptable, that's the designed behavior. | `CapabilityResolutionService.ts`, `/t/[tenantId]/settings/subdomain` | External dependency, not a sprint task. |
+| 0.2 | Repair the drifted subdomain storefront path (audit findings below). `proxy.ts` resolves `{slug}.visibleshelf.com` correctly via `resolve-subdomain`, but production then **302-redirects to `/t/{tenantId}`** — now the authenticated app root (`page.tsx` → `router.replace("/")` → dashboard), not the `/tenant/[id]` public storefront. Fix: rewrite (not redirect) to `/tenant/{tenantId}` so the slug stays canonical, and define the subpath map (`/` → storefront root; enumerate which storefront subpaths proxy through — `/tenant/[id]` serves `/`, `/services`, `/policies/[type]`). | `apps/web/src/proxy.ts` | Was logged as an external dependency — the audit shows the wildcard/DB architecture is sound but the storefront moved and the proxy never followed. Without this, every `publicSurfaces` storefront URL the plan emits links to a login wall. |
 | 0.3 | Survey every surface emitting a claim CTA and list where `seed_fidelity` must be consulted: `/place/[slug]` claim entry, `outreach-link-vars.ts` merge vars, QR kits (`ClaimInviteQrKitService`), seed-report pages. | `PlaceEntryEditorialLayout.tsx`, `outreach-link-vars.ts`, `ClaimInviteQrKitService.ts`, seed-report pages | D6 depends on this inventory being complete — a surface missed here keeps inviting claims on misaligned seeds. |
+| 0.4 | Subdomain housekeeping + infra confirmation: (a) apply the declared-but-unenforced `subdomainResolve` rate limit to `GET /api/tenants/resolve-subdomain/:subdomain`; (b) mark or stub `SubdomainService`'s phantom methods (`reserveSubdomain`, `verifySubdomainOwnership`, `getSubdomainConfig`, `updateSubdomainConfig`, `getAdminSubdomainStats` — no API endpoints exist; that interface is the unbuilt custom-domains surface) so nothing builds against them; (c) confirm `*.visibleshelf.com` domain + wildcard cert in the Vercel project — can't be verified from the repo; (d) fix the verify page's `isLive` check (currently just "DB row exists") and its "DNS propagation 24-48h" copy (wrong for wildcard). | `apps/api/src/routes/tenants.ts`, `apps/web/src/services/SubdomainService.ts`, verify page, Vercel dashboard | (c) is the only genuinely manual step — the wildcard is one-time platform infra, not per-tenant. `subdomainEnabled` (4.6) resolves from `tenants.subdomain IS NOT NULL` + wildcard health, not a feature flag — none exists API-side. |
+
+### 0.3 output — claim-CTA surface inventory (surveyed)
+
+Emission funnels through three choke points; gating fidelity there covers nearly every downstream surface. Degrade target `#claim-inquiry` already exists in the place layout as the no-token fallback.
+
+| Choke point | File | Surfaces it covers |
+|---|---|---|
+| `buildOutreachLinkVars` / `resolveClaimUrlForSeed` — `claim_url`, `claim_short_url`, `qr_url_*` merge vars | `apps/api/src/services/outreach-openers/outreach-link-vars.ts` | Outreach templates, `CallScriptService`, `ManualOutreachScriptService` + `manual-play-templates`, `DeliverableSourceService`, `PitchService`, SeedReportDelivery emails |
+| `active_claim` subquery in the place-listing SELECT | `apps/api/src/routes/directory-consolidated.ts` (~line 95–99, `claimShortCode` at ~404) | `/place/[slug]` claim card, `MarketIntelSidebar` — return null `active_claim` when misaligned → the existing `#claim-inquiry` fallback fires |
+| `canExposeClaimCta(report)` gate | `apps/api/src/routes/seed-report-public.ts` (all three routes: `/report`, `/report/preview`, `/report/pdf` via `SeedReportPdfService`'s `cta_eligible`) | Seed report pages + PDF claim QR |
+
+**Remaining surfaces needing individual handling:**
+
+| Surface | File | Handling |
+|---|---|---|
+| Claim QR kit generation | `ClaimInviteQrKitService.resolveClaimInviteKit` / `getClaimInviteKitMeta` | Misaligned → no kit. Also: lazily backfills `short_code` (write-in-read) — the plan endpoint must never call it. |
+| Tracked QR redirects (printed postcards already in the wild) | `directory-claim-qr.ts` `recordClaimScanAndRedirect` | Misaligned → 302 to `{placeUrl}#claim-inquiry` instead of `/place/claim/{token}` — graceful degrade for mailed cards. |
+| `/c/{shortCode}` resolution | `directory-presence-public.ts` `/claim-code/:shortCode` | Misaligned → resolve to place page + `#claim-inquiry`, same degrade. |
+| `/place/claim/[token]` landing | `GET /api/public/directory/claim/:token` response | Include `seed_fidelity`; page renders the inquiry path instead of the claim form (stale links degrade safely). |
+| Courtesy outreach trigger | `SeedOutreachTriggerService` | Don't fire claim-CTA outreach for a misaligned seed. |
+| Operator surfaces (admin seed page, suggestions queue, claim-kit endpoints) | `presence-seeds/[id]/page.tsx`, `directory-presence-admin.ts`, `DirectorySuggestionAdminService` | No suppression — show a fidelity badge/warning; operators need the links to inspect and repair. |
 
 ## Phase 1 — Selector prerequisite fixes (spec §10)
 
@@ -54,7 +77,7 @@
 | # | Task | Files | Notes |
 |---|---|---|---|
 | 3.1 | Migration: `mkt_project_phase_predicates` per D8. | `database/migrations/` + `pnpm prisma:generate` | |
-| 3.2 | `seed-project-phase-predicates.ts` + `PROJECT_PHASE_PREDICATES_VERSION`: seed v1 rows verbatim from the spec §5 trigger table — five `any_of` rows, the explicit-unmapped list as a coverage allowlist, the `INT_*` rank-modifier map, and per-phase copy keys. `SEED_VERSION_MARKER` idempotent pattern per existing seed scripts. | `apps/api/src/scripts/seed-project-phase-predicates.ts` (new) | The spec table is the initial seed contents — transcribe, don't reinterpret. |
+| 3.2 | `seed-project-phase-predicates.ts` + `PROJECT_PHASE_PREDICATES_VERSION`: seed v1 rows verbatim from the spec §5 trigger table — five `any_of` rows, the explicit-unmapped list as a coverage allowlist, the `INT_*` rank-modifier map, and per-phase copy keys. `SEED_VERSION_MARKER` idempotent pattern per existing seed scripts. | `apps/api/src/scripts/seed-project-phase-predicates.ts` (new) | The spec table is the initial seed contents — transcribe, don't reinterpret. Add a `seed:project-phase-predicates` pnpm script in `apps/api/package.json` (AGENTS.md convention for named seeds). Copy keys follow `project_phase.<phase_key>.<slot>` (e.g. `project_phase.findability.goal`), per spec §13. Seed v1 has no `min_severity` floors (D10). |
 | 3.3 | Coverage invariant: every `KNOWN_SIGNAL_CODES` entry is either referenced by a predicate row or in the explicit unmapped list — a check (test + optional seed-script assertion), not a runtime gate. | `signal-taxonomy.ts` consumer | Fails the build/tests, not production plans. |
 
 ## Phase 4 — Plan evaluator (`project-phases.ts`)
@@ -65,7 +88,8 @@
 | 4.2 | `resolveProspectSignals(campaignId/prospectId)`: full lane = `extractSignals` on primary's latest real `business_analysis` (`getLatestAuditData` sibling fallback); partial lane = latest stub `detected_signals` + derive tier on cat-id `digital_footprint`; operator-input BBB union (always `full` provenance); persisted-snapshot fallback with lane inheritance; `discoverySignals` from scan/`discovery_signal_map`. Returns `{signals, signalLanes, lane, sourceAuditId, discoverySignals}`. | `project-phases.ts` or `services/triage/` | The only I/O in the plan path lives here and in the endpoint — keep the evaluator pure. |
 | 4.3 | `selectProjectPhases` core: load predicate rows at `predicateSeedVersion` → evaluate `any_of` + `min_severity` floors → per-phase confidence from `signalLanes` → severity via `computeSignalSeverity` → sibling attribution via playbook `matchingRules` pools → caps with dependency protection → status derivation → exit predicates. | `project-phases.ts` | `INT_*` adjusts cap rank only when the audit-derived signal for the same gap exists. |
 | 4.4 | Seed-claim resolution: primary sibling's live seed via `DirectorySeedCampaignLinkService`; `dps.status`, `seed_fidelity`, `placeUrl`, and `claimUrl` via the **read-only** order (`/c/{short_code}` → active token → `placeUrl`). Never `getClaimInviteKitMeta`/`resolveClaimInviteKit` (lazy `ensureClaimShortCode` write). | `project-phases.ts` + `directory_claim_tokens` lookup | Spec §13 prohibits the kit resolvers in the plan path — assert it in review. |
-| 4.5 | Unit tests: every trigger set, every cap + protection interaction, every capability state, lane/provenance matrix, `INT_*` rank-only, `min_severity` floors, attribution pools, status derivation (incl. `lost`/`dead`), cycle increment, exit predicates, read-only claim resolution (no token mint/short-code backfill). | `project-phases.test.ts` (new) | Spec §14 matrix — generic full-lane + one partial-lane stub fixture. |
+| 4.5 | Unit tests: every trigger set, every cap + protection interaction, every capability state, lane/provenance matrix, `INT_*` rank-only, `min_severity` floors, attribution pools, status derivation (incl. `lost`/`dead`), cycle increment, exit predicates, read-only claim resolution (no token mint/short-code backfill). | `project-phases.test.ts` (new) | Spec §14 matrix — generic full-lane + one partial-lane stub fixture. Floor tests use **synthetic predicate rows** — v1 seeds no floors (D10). |
+| 4.6 | Capability resolution per prospect (spec §7): wedge seed's tenant → demo tenant (`demo_tenant_id`) → platform flags. Sets `storefrontEnabled`, `subdomainEnabled`, `qrPrintEnabled`; `domainEnabled` is hardcoded `false` in v1. | `project-phases.ts` resolver + `CapabilityResolutionService.ts` | Read-only. Unit-test each anchor fallback and the hardcoded `domainEnabled`. |
 
 ## Phase 5 — Owner-facing copy + quality gate
 
@@ -88,7 +112,7 @@
 |---|---|---|---|
 | 7.1 | `MarketingOpsService` types + `getProjectPlan(prospectId)` fetch. | `apps/web/src/services/MarketingOpsService.ts` | Mirror the API contract types; internal plan (all five phases + internals). |
 | 7.2 | `PlanCockpitPanel` component: header band (tier, cycle, lane, predicate version, source-audit link, gate badge), wedge card (seed status, fidelity badge, claim URL + copy, CTA counts), public-surfaces strip (7.5), phase board (all five rows — status/confidence/severity/signal/suppression chips, dependency markers, sibling links, collapsed suppressed rows), drill-down evidence popovers, prior-cycle history. | `apps/web/src/components/marketing-ops/PlanCockpitPanel.tsx` (new) | Cockpit conventions: chips carry state, every chip is a link, collapsed regions show counts. |
-| 7.3 | Mount the panel on **every** sibling's campaign detail beside the Siblings tab — resolve the plan by the viewed campaign's `business_prospect_id` (`?campaignId=` fallback for null-prospect singletons), so all members render the same cockpit. `#plan` hash selects the panel (cockpit hash-tab pattern). | `CampaignDetailClient.tsx` | One cockpit per prospect group — it is not a per-campaign artifact. Read-only surface — actions link out to owning surfaces. |
+| 7.3 | Mount the panel on **every** sibling's campaign detail beside the Siblings tab — resolve the plan by the viewed campaign's `business_prospect_id` (`?campaignId=` fallback for null-prospect singletons), so all members render the same cockpit. `#plan` hash selects the panel (cockpit hash-tab pattern). Build the panel container **tab-ready**: the proposal spec (§18) later adds `#proposal` and `#execution` tabs to the same prospect-keyed surface, with `#plan`/`#presentation` as today's tab — render the panel inside a tab wrapper now so the strip lands without restructuring. | `CampaignDetailClient.tsx` | One cockpit per prospect group — it is not a per-campaign artifact. Read-only surface — actions link out to owning surfaces. |
 | 7.4 | **Bidirectional awareness wiring.** (a) Prospect-family strip on the cockpit: every sibling under the `business_prospect_id` with stage chip + campaign-detail link — the full family, not just `contributingCampaignIds` (reuse the SiblingsTab dataset). (b) Sibling→cockpit entry: a "Project plan" link/chip in each sibling's campaign-detail context area navigating to `#plan`, so every member's awareness of the shared cockpit is one click. | `PlanCockpitPanel.tsx`, `CampaignDetailClient.tsx`, SiblingsTab data source | The awareness is navigation on the existing `business_prospect_id` join — no new entity, no new state. |
 | 7.5 | **Public-surfaces assembly + strip.** The endpoint wrapper gathers each sibling's linked seeds via `DirectorySeedCampaignLinkService` (status, `placeUrl`, `seed_fidelity` when known) and the demo storefront URL from `demo_tenant_id` (`{tenant-slug}.visibleshelf.com`); the panel renders the `publicSurfaces` strip — `suppressed` seeds show as retired history, not live surfaces. | route/service wrapper + `PlanCockpitPanel.tsx` | Read-only links out to the public surface or its admin — no new state. |
 | 7.6 | Render tests via the `renderToStaticMarkup` pattern (`.test.ts`, `MantineProvider`, `initialTab`-style props for collapsed panels). | `PlanCockpitPanel.test.ts` (new) | Assert board row order, badge presence, collapsed-region counts, family-strip membership (non-contributing siblings included), surfaces-strip entries (seed + demo links, suppressed-as-history). |
@@ -102,7 +126,7 @@
 | 8.1 | `GalleryMultiService` attaches the owner-facing projection (suppressed + `suggested` removed, internals stripped). | `apps/api/src/services/marketing/GalleryMultiService.ts` | Same plan object as the cockpit — curated twin, never a separate computation. |
 | 8.2 | `MultiGalleryPage` project view above the sibling accordion: plan header + visible phases + one plan-level CTA (seed claim → earliest incomplete verified phase → pricing fallback). CTA precedence: plan > sibling CTAs > "View Pricing". | `MultiGalleryPage.tsx` | Claim CTA suppressed on `misaligned` fidelity — surfaces already degrade via Phase 2.4. |
 | 8.3 | Feature flag the project view. | gallery env/flag plumbing | Flag off = today's gallery unchanged. |
-| 8.4 | Plan-CTA gallery event with a plan-level identifier alongside `siblingCampaignId`. | `GalleryMultiService` event write | Wedge claim-rate must be measurable separately from sibling CTA clicks. |
+| 8.4 | Plan-CTA gallery event with a plan-level identifier alongside `siblingCampaignId`. Include a `surface`/`artifact` dimension on the event so the proposal spec (§11) can record proposal issued/viewed/accepted on the same event model later without a schema change. | `GalleryMultiService` event write | Wedge claim-rate must be measurable separately from sibling CTA clicks. |
 
 ## Phase 9 — Verification & rollout
 
@@ -110,7 +134,7 @@
 2. `cd apps/api && npx vitest run` on the new/changed suites (project-phases, signal-extractor, archetype-selection, marketing-audits); `cd apps/web && npx vitest run` for the panel tests.
 3. Run migrations + predicate seed on **local**, then **prd**:
    ```powershell
-   doppler run --config local -- npx tsx src/scripts/seed-project-phase-predicates.ts
+   doppler run --config local -- pnpm seed:project-phase-predicates
    # repeat with --config prd
    ```
 4. Operator review on **two live prospects** (spec §17.6): one full-lane multi-sibling prospect, one partial-lane emerging-pool prospect — verify the board, the wedge, and the owner projection against each.

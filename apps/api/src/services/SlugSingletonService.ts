@@ -33,6 +33,7 @@ import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingl
 import { logger } from '../logger';
 import { basePrisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
+import { isReservedSubdomain } from '../lib/subdomain';
 import { 
   generateUniqueDirectorySlug, 
   getTenantLocation, 
@@ -347,6 +348,21 @@ class SlugSingletonService extends UniversalSingleton {
       } catch (directoryError) {
         logger.warn('[SlugSingletonService] Failed to update directory listing slug', undefined, { tenantId, error: directoryError });
         // Don't fail the entire operation if directory sync fails
+      }
+
+      // Mirror invariant: if the tenant has a subdomain, keep it equal to the
+      // slug (subdomain IS NULL OR subdomain = slug). Reserved names are never
+      // propagated into the subdomain namespace.
+      const current = await basePrisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { subdomain: true },
+      });
+      if (current?.subdomain && current.subdomain !== newSlug) {
+        if (isReservedSubdomain(newSlug)) {
+          logger.warn(`[SlugSingletonService] Refusing to mirror reserved slug "${newSlug}" into subdomain for tenant ${tenantId}`);
+        } else {
+          await basePrisma.tenants.update({ where: { id: tenantId }, data: { subdomain: newSlug } });
+        }
       }
 
       // Invalidate cache
