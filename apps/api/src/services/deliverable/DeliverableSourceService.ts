@@ -39,6 +39,7 @@ import {
   runDeliverableQualityGate,
   runRepetitionGate,
 } from './deliverable-quality-gate';
+import { formatFulfillContent } from './deliverable-content-format';
 import { buildClaimCta } from './deliverable-cta';
 import BusinessContextService from './BusinessContextService';
 
@@ -558,14 +559,19 @@ export class DeliverableSourceService extends BaseService {
     // token when the seed has none, mirroring SeedIntelligenceReportService
     // (§13.5 claim handoff) — so the deliverable CTA always carries a working
     // link when the campaign has a linked seed.
-    const claimUrl = await this.ensureClaimUrl(campaignId, ctx);
+    const claim = await this.ensureClaimUrl(campaignId, ctx);
+    // The CTA is render-appended to the content below — deterministic, so it
+    // can't be dropped or paraphrased by the analyst, and claimed seeds get
+    // no CTA at all (nothing left to claim). The link-less variant covers
+    // unlinked/unclaimed cases.
+    const claimCta = claim.claimed ? null : buildClaimCta(claim.url);
 
     let linkVars: Record<string, string> = {};
     try {
       const seedId = await resolveCampaignSeedId(campaignId);
       const built = await buildOutreachLinkVars(seedId);
       const intakeVars = await resolveIntakeLinkVarsForCampaign(campaignId);
-      if (claimUrl) linkVars.claim_url = claimUrl;
+      if (claim.url) linkVars.claim_url = claim.url;
       if (built.claim_short_url) linkVars.claim_short_url = built.claim_short_url;
       if (built.report_url) linkVars.report_url = built.report_url;
       if (intakeVars.intake_url) linkVars.intake_url = intakeVars.intake_url;
@@ -583,9 +589,10 @@ export class DeliverableSourceService extends BaseService {
       category: campaign.category ?? '',
       city: campaign.city ?? '',
       [blockKey]: sourceText,
-      // A single CTA variable so the seeded body never renders a literal
-      // {{claim_url}} when no link resolves (link-less variant instead).
-      claim_cta: buildClaimCta(claimUrl),
+      // Legacy prompt bodies (pre-V10 seeds) interpolate {{claim_cta}} — keep
+      // supplying it so seeded rows never render a literal placeholder. New
+      // bodies don't reference it; the CTA is appended at render time below.
+      claim_cta: claimCta ?? '',
       business_attributes: this.formatBusinessAttributes(campaign),
       public_narrative: auditData?.public_narrative ?? '',
       discovery_attribution: MarketingExecutionService.getInstance()
@@ -598,7 +605,16 @@ export class DeliverableSourceService extends BaseService {
       ctx,
     );
 
-    const content = execution?.filtered_output ?? execution?.raw_output ?? null;
+    // The fulfill execution stores raw_json — the structured artifact future
+    // consumers (e.g. a mock-draft build) read. For the PDF body it's
+    // formatted into document copy here; the execution row is untouched.
+    // Non-JSON output passes through unchanged.
+    const rawContent = execution?.filtered_output ?? execution?.raw_output ?? null;
+    let content = rawContent ? formatFulfillContent(type, rawContent) : null;
+
+    // Render-appended CTA — deterministic close the analyst can't drop,
+    // paraphrase, or misplace. Omitted entirely for claimed seeds.
+    if (content && claimCta) content = `${content}\n\n${claimCta}`;
 
     // Gates surface as warnings, not hard blocks (§7.4).
     const qualityGate = content
@@ -915,17 +931,18 @@ export class DeliverableSourceService extends BaseService {
   /**
    * Resolve a working claim URL for the campaign's linked seed, minting a claim
    * token when none is active (mirrors SeedIntelligenceReportService §13.5
-   * claim handoff). Returns null when the campaign has no linked seed, or the
-   * seed is already claimed — the caller then uses the link-less CTA variant.
-   * Best-effort: never throws.
+   * claim handoff). `claimed` tells the caller the seed is already claimed —
+   * the CTA is then omitted entirely (there is no claim path left to offer),
+   * vs the link-less variant used when resolution simply failed or no seed
+   * is linked. Best-effort: never throws.
    */
-  private async ensureClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<string | null> {
+  private async ensureClaimUrl(campaignId: string, ctx?: RequestCtx): Promise<{ url: string | null; claimed: boolean }> {
     try {
       const seedId = await resolveCampaignSeedId(campaignId);
-      if (!seedId) return null;
+      if (!seedId) return { url: null, claimed: false };
 
       const existing = await resolveClaimUrlForSeed(seedId);
-      if (existing) return existing;
+      if (existing) return { url: existing, claimed: false };
 
       // Already claimed → there is no claim path left to offer. Minting
       // flips the seed to 'invited', so it is gated on a public-facing
@@ -934,8 +951,9 @@ export class DeliverableSourceService extends BaseService {
       const seed = await this.prisma.$queryRaw<any[]>`
         SELECT status, claimed_at FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
       `;
-      if (!seed[0] || seed[0].claimed_at) return null;
-      if (seed[0].status !== 'published' && seed[0].status !== 'invited') return null;
+      if (!seed[0]) return { url: null, claimed: false };
+      if (seed[0].claimed_at) return { url: null, claimed: true };
+      if (seed[0].status !== 'published' && seed[0].status !== 'invited') return { url: null, claimed: false };
 
       const { default: seedService } = await import('../DirectoryPresenceSeedService.js');
       await seedService.inviteSeed(seedId, 90, {
@@ -944,12 +962,12 @@ export class DeliverableSourceService extends BaseService {
       });
       logger.info('Deliverable source: minted claim token for CTA', ctx, { campaignId, seedId });
 
-      return await resolveClaimUrlForSeed(seedId);
+      return { url: await resolveClaimUrlForSeed(seedId), claimed: false };
     } catch (err: any) {
       logger.warn('Deliverable source: claim URL resolution/mint failed (non-blocking)', ctx, {
         campaignId, error: err?.message,
       });
-      return null;
+      return { url: null, claimed: false };
     }
   }
 

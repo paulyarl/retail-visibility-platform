@@ -21,10 +21,10 @@ import { DELIVERABLE_FULFILL_TONE_DIRECTIVE } from '../services/intelligence/rep
 // Register B (owner-facing tone) + the claim-and-fix CTA. Defined once in
 // report-directives.ts and interpolated here so the deliverable fulfill
 // templates read in one voice with mpt-seed-fulfill-004..008.
+// The claim CTA itself is render-appended by DeliverableSourceService —
+// deterministic, omittable for claimed seeds — so it is NOT in the bodies.
 // Spec: docs/LocalBiz/marketing_ops_deliverable_source_material_spec.md §5.4, §5.6
 const FULFILL_TONE = `Tone: ${DELIVERABLE_FULFILL_TONE_DIRECTIVE}`;
-const CLAIM_CTA = `Close with the claim-and-fix CTA, using the supplied text verbatim:
-"{{claim_cta}}"`;
 
 const SEED_TEMPLATES = [
   {
@@ -145,8 +145,6 @@ Guidelines:
 
 Format: Number each response to match the review number.
 
-${CLAIM_CTA}
-
 ${FULFILL_TONE}`,
     variables: ['business_name', 'city', 'category', 'voice', 'reviews', 'claim_cta'],
     outputSchema: {
@@ -178,8 +176,6 @@ Provide:
 5. A short "why visit" section (3 bullet points grounded in the supplied differentiators)
 
 Output JSON: { "tagline", "services": [{ "name", "description", "price" }], "cta", "why_visit": [...] }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`,
     variables: ['business_name', 'category', 'services', 'business_attributes', 'discovery_attribution', 'claim_cta'],
@@ -219,8 +215,6 @@ Provide:
 9. Fulfillment attributes — "In-store shopping" first; "Curbside pickup" or "Delivery" only where the audit shows the business supports them
 
 Output JSON: { "description", "categories": { "primary", "secondary": [...] }, "service_area", "posts": [...], "attributes": [...], "qa": [{ "question", "answer" }], "photo_recommendations": [...], "hours_sync": [...], "fulfillment_attributes": [...] }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`,
     variables: ['business_name', 'city', 'category', 'gbp_audit', 'business_attributes', 'discovery_attribution', 'claim_cta'],

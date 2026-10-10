@@ -31,7 +31,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V8 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V10 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -145,11 +145,11 @@ ${DELIVERABLE_SOURCE_MATERIAL_TONE_DIRECTIVE}`;
 
 const FULFILL_TONE = `Tone: ${DELIVERABLE_FULFILL_TONE_DIRECTIVE}`;
 
-// Claim-and-fix closing CTA (spec §5.6). `claim_cta` is a single resolved
-// variable (link present, or a link-less variant when no claim path resolves),
-// so the body never renders a literal {{claim_url}}.
-const CLAIM_CTA = `Close with the claim-and-fix CTA, using the supplied text verbatim:
-"{{claim_cta}}"`;
+// The claim-and-fix CTA (spec §5.6) is render-appended by
+// DeliverableSourceService.resolveDeliverableContent — deterministic, so the
+// analyst can't drop or paraphrase it, and claimed seeds get none. It is
+// deliberately NOT in these bodies: echoing a resolved string through the
+// model only adds failure modes, and the raw_json suffix forbids prose.
 
 const FULFILL_004 = `${SEED_VERSION_MARKER}
 You are producing ready-to-publish testimonial cards for {{business_name}}, a
@@ -172,8 +172,6 @@ RULES
 - Never invent quotes or attribution. Use only the supplied testimonials.
 - Keep the quote's wording intact — trim only.
 - Output JSON: { "cards": [{ "quote", "attribution", "tagline" }] }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
@@ -199,8 +197,6 @@ RULES
 - Ground every row in the supplied NAP status. Mark unobserved platforms unverified.
 - Do not invent addresses, phones, or platform listings.
 - Output JSON: { "canonical", "platform_rows": [...], "corrections": [...] }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
@@ -228,8 +224,6 @@ RULES
 - Ground claims in the brief. No keyword stuffing, no superlatives, no hype.
 - Output JSON: { "pages": [...] }
 
-${CLAIM_CTA}
-
 ${FULFILL_TONE}`;
 
 const FULFILL_007 = `${SEED_VERSION_MARKER}
@@ -252,8 +246,6 @@ with contact details.
 RULES
 - Ground the offer in the supplied source. Do not invent fees or guarantees.
 - Output JSON: { "title", "promise", "sections": [...], "cta" }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
@@ -287,8 +279,6 @@ RULES
 - Ground every section in the supplied gaps. Do not invent inventory or capabilities.
 - Output JSON: { "sections": [{ "title", "content" }] }
 
-${CLAIM_CTA}
-
 ${FULFILL_TONE}`;
 
 // PB-08 (website gap) — the visual homepage mockup, the strongest FITD
@@ -316,8 +306,6 @@ this business and category.
 RULES
 - Ground every section in the supplied gaps. Do not invent capabilities or assets.
 - Output JSON: { "sections": [{ "title", "content" }] }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
@@ -372,8 +360,6 @@ RULES
   "domain_hosting": { "domain_recommendation", "ownership_state", "platform_recommendation" },
   "asset_requirements": [...], "platform_notes": [...],
   "launch_checklist": [...], "profile_cutover": [...] }
-
-${CLAIM_CTA}
 
 ${FULFILL_TONE}`;
 
