@@ -567,15 +567,7 @@ export class MarketingDeliverableService extends BaseService {
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(60, 60, 60);
-          const lines = doc.splitTextToSize(text, pageWidth - 2 * margin);
-          for (const line of lines) {
-            if (yPos > pageHeight - 30) {
-              doc.addPage();
-              yPos = 25;
-            }
-            doc.text(line, margin, yPos);
-            yPos += 5;
-          }
+          yPos = this.renderRichBody(doc, text, { margin, pageWidth, pageHeight, yPos });
           yPos += 3;
           break;
         case 'divider':
@@ -587,6 +579,98 @@ export class MarketingDeliverableService extends BaseService {
           yPos += section.height || 5;
           break;
       }
+    }
+
+    return yPos;
+  }
+
+  /**
+   * Render a `body` section's text with lightweight structure: `## ` lines
+   * become styled headings (this is what formatFulfillContent emits — and it
+   * upgrades the W6b citation-package markdown the same way), `• ` / `- `
+   * become hanging-indent bullets, `N. ` become numbered items, and leading
+   * two-space indents map to mm. Plain text wraps as before.
+   */
+  private renderRichBody(
+    doc: jsPDF,
+    text: string,
+    opts: { margin: number; pageWidth: number; pageHeight: number; yPos: number },
+  ): number {
+    const { margin, pageWidth, pageHeight } = opts;
+    const maxY = pageHeight - 30;
+    const fullWidth = pageWidth - 2 * margin;
+    let yPos = opts.yPos;
+
+    const bodyFont = () => {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+    };
+
+    const write = (line: string, x: number, width: number) => {
+      for (const l of doc.splitTextToSize(line, width)) {
+        if (yPos > maxY) {
+          doc.addPage();
+          yPos = 25;
+        }
+        doc.text(l, x, yPos);
+        yPos += 5;
+      }
+    };
+
+    for (const raw of String(text).split('\n')) {
+      if (!raw.trim()) {
+        yPos += 2.5;
+        continue;
+      }
+
+      const m = raw.match(/^(\s*)(.*)$/);
+      // 2 spaces = 3mm indent, capped at depth 4.
+      const indent = Math.min(Math.floor((m?.[1].length ?? 0) / 2), 4) * 3;
+      const line = m?.[2] ?? '';
+
+      const heading = line.match(/^(#{2,})\s+(.*)/);
+      if (heading) {
+        // Heading — bump a page early rather than orphaning it at the bottom.
+        if (yPos > maxY - 6) {
+          doc.addPage();
+          yPos = 25;
+        }
+        yPos += heading[1].length === 2 ? 3 : 1.5;
+        doc.setFontSize(heading[1].length === 2 ? 11 : 10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(40, 40, 40);
+        write(heading[2], margin + indent, fullWidth - indent);
+        bodyFont();
+        yPos += 1;
+        continue;
+      }
+
+      const bullet = line.match(/^[•\-*]\s+(.*)/);
+      if (bullet) {
+        if (yPos > maxY) {
+          doc.addPage();
+          yPos = 25;
+        }
+        doc.text('•', margin + indent, yPos);
+        write(bullet[1], margin + indent + 4, fullWidth - indent - 4);
+        continue;
+      }
+
+      const numbered = line.match(/^(\d+)\.\s+(.*)/);
+      if (numbered) {
+        if (yPos > maxY) {
+          doc.addPage();
+          yPos = 25;
+        }
+        const marker = `${numbered[1]}.`;
+        const markerWidth = doc.getTextWidth(marker) + 1.5;
+        doc.text(marker, margin + indent, yPos);
+        write(numbered[2], margin + indent + markerWidth, fullWidth - indent - markerWidth);
+        continue;
+      }
+
+      write(line, margin + indent, fullWidth - indent);
     }
 
     return yPos;

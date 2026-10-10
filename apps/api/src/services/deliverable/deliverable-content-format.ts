@@ -15,8 +15,9 @@
  * back to humanized labels and unknown shapes to the generic renderer, so
  * analyst output can never render as a raw JSON blob or silently drop keys.
  *
- * Emits plain text only — renderLayoutSections prints the body verbatim, so
- * markdown syntax (##, **) would show literally in the PDF.
+ * Section headers emit a `## ` prefix — the lightweight marker
+ * renderLayoutSections understands and styles as a real heading. Everything
+ * else is plain text (bullets `• `, numbered items `N. `, two-space indents).
  */
 
 import type { DeliverableType } from '../MarketingDeliverableService';
@@ -131,9 +132,9 @@ export function formatFulfillContent(deliverableType: string, raw: string): stri
     // CTA on executions produced while the prompt contract carried it.
     if (key === 'claim_cta') continue;
     if (value === null || value === undefined || value === '') continue;
-    const lines: string[] = [];
-    renderField(lines, labels[key] ?? COMMON_LABELS[key] ?? humanizeKey(key), value, 0);
-    if (lines.length > 0) sections.push(lines.join('\n'));
+    const lines: string[] = [`## ${labels[key] ?? COMMON_LABELS[key] ?? humanizeKey(key)}`];
+    renderValue(lines, value, 0);
+    if (lines.length > 1) sections.push(lines.join('\n'));
   }
 
   const body = sections.join('\n\n').trimEnd();
@@ -143,6 +144,40 @@ export function formatFulfillContent(deliverableType: string, raw: string): stri
 
 // ─── Renderer ────────────────────────────────────────────────────────────
 
+/** Unlabelled value — used for top-level keys, which get a `##` heading. */
+function renderValue(lines: string[], value: unknown, depth: number): void {
+  const ind = '  '.repeat(depth);
+  if (value === null || value === undefined || value === '') return;
+
+  if (isScalar(value)) {
+    lines.push(`${ind}${value}`);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return;
+    if (value.every((v) => isScalar(v))) {
+      const inline = value.map(String).join(' · ');
+      if (inline.length <= 80) {
+        lines.push(`${ind}${inline}`);
+      } else {
+        for (const v of value) lines.push(`${ind}• ${v}`);
+      }
+      return;
+    }
+    value.forEach((item, i) => renderObjectItem(lines, item, depth, i + 1));
+    return;
+  }
+
+  if (typeof value === 'object') {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === null || v === undefined || v === '') continue;
+      renderField(lines, COMMON_LABELS[k] ?? humanizeKey(k), v, depth);
+    }
+  }
+}
+
+/** Labelled field — `Label: value` / `Label:` + children, for nested keys. */
 function renderField(lines: string[], label: string, value: unknown, depth: number): void {
   const ind = '  '.repeat(depth);
 

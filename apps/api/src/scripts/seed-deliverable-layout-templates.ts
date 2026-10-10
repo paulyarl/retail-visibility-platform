@@ -23,7 +23,7 @@
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { logger } from '../logger';
 
-const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V6';
+const SEED_VERSION_MARKER = 'DELIVERABLE_LAYOUT_SEED_V7';
 
 // The fulfill content already closes with the resolved claim CTA (buildClaimCta,
 // with the real claim link when one exists). The layout's Next step points back
@@ -33,6 +33,14 @@ const CLAIM_CTA =
 
 const RETAINER_NEXT_STEP =
   'Keep this coverage active — an ongoing listing-synchronization retainer re-verifies these platforms monthly and catches new drift early.';
+
+// Website lane — the shared retainer line is listing-repair phrasing. The
+// mockup points at its delivery artifact; the build package pitches the
+// retainer against its own profile-cutover list instead of bare "platforms".
+const WEBSITE_MOCKUP_NEXT_STEP =
+  'The companion Website Build Package turns this mockup into a shipped site — site map, copy spec, domain and hosting direction, and the launch checklist.';
+const WEBSITE_BUILD_NEXT_STEP =
+  'Once the site is live, every profile in the cutover list must point at the new domain — an ongoing listing-synchronization retainer re-verifies them monthly and catches drift early.';
 
 interface LayoutTemplate {
   id: string;
@@ -93,7 +101,7 @@ const TEMPLATES: LayoutTemplate[] = [
     id: 'mdt-default-website-mockup', name: 'Default — Website Mockup',
     deliverableType: 'website_mockup', pageSize: 'letter', orientation: 'landscape',
     title: 'Website Mockup', subtitle: 'What your new site will look like, section by section',
-    nextStep: RETAINER_NEXT_STEP,
+    nextStep: WEBSITE_MOCKUP_NEXT_STEP,
   },
   // PB-08 (website gap) — the platform-centric build package: the delivery
   // artifact behind the mockup. Portrait — it's a working spec (site map,
@@ -103,7 +111,7 @@ const TEMPLATES: LayoutTemplate[] = [
     id: 'mdt-default-website-build-package', name: 'Default — Website Build Package',
     deliverableType: 'website_build_package', pageSize: 'letter', orientation: 'portrait',
     title: 'Website Build Package', subtitle: 'Everything the platform needs to ship your site',
-    nextStep: RETAINER_NEXT_STEP,
+    nextStep: WEBSITE_BUILD_NEXT_STEP,
   },
   // Profile Repair Fulfillment Sprint (W5c) — the shared Track A package
   // artifact. The composed content already carries the §5.1 section order

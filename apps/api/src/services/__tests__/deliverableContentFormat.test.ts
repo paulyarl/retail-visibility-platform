@@ -39,16 +39,16 @@ describe('formatFulfillContent', () => {
   it('renders website_build_package JSON as labeled sections — no raw JSON keys', () => {
     const out = formatFulfillContent('website_build_package', BUILD_PACKAGE_JSON);
 
-    expect(out).toContain('Site Map & Page Spec:');
+    expect(out).toContain('## Site Map & Page Spec');
     expect(out).toContain('1. Home');
     expect(out).toContain('Purpose: Introduce the store');
     expect(out).toContain('• Store name and branding');
-    expect(out).toContain('Navigation & CTA:');
+    expect(out).toContain('## Navigation & CTA');
     expect(out).toContain('Nav order: Home · Products · Contact');
-    expect(out).toContain('Domain & Hosting:');
+    expect(out).toContain('## Domain & Hosting');
     expect(out).toContain('Recommended domain: arsemafoodmart.com');
-    expect(out).toContain('QA & Launch Checklist:');
-    expect(out).toContain('Profile Cutover:');
+    expect(out).toContain('## QA & Launch Checklist');
+    expect(out).toContain('## Profile Cutover');
 
     // No JSON syntax or snake_case keys leak into the document
     expect(out).not.toContain('"site_map"');
@@ -69,7 +69,7 @@ describe('formatFulfillContent', () => {
     const out = formatFulfillContent('gbp_audit', JSON.stringify({
       qa: [{ question: 'Do you carry teff?', answer: 'Yes, in the grains aisle.' }],
     }));
-    expect(out).toContain('Q&A:');
+    expect(out).toContain('## Q&A');
     expect(out).toContain('1. Do you carry teff?');
     expect(out).toContain('A: Yes, in the grains aisle.');
   });
@@ -86,7 +86,7 @@ describe('formatFulfillContent', () => {
   it('unwraps fenced JSON', () => {
     const fenced = '```json\n{"launch_checklist": ["Check HTTPS"]}\n```';
     const out = formatFulfillContent('website_build_package', fenced);
-    expect(out).toContain('QA & Launch Checklist: Check HTTPS');
+    expect(out).toContain('## QA & Launch Checklist\nCheck HTTPS');
     expect(out).not.toContain('```');
   });
 
@@ -95,7 +95,7 @@ describe('formatFulfillContent', () => {
       profile_cutover: ['Google Business Profile'],
       claim_cta: 'Claim your listing and correct it here: https://example.com/claim/abc — it takes about two minutes and there is no cost.',
     }));
-    expect(out).toContain('Profile Cutover: Google Business Profile');
+    expect(out).toContain('## Profile Cutover\nGoogle Business Profile');
     expect(out).not.toContain('claim_cta');
     expect(out).not.toContain('example.com/claim');
   });
@@ -103,7 +103,7 @@ describe('formatFulfillContent', () => {
   it('preserves prose appended after the JSON (e.g. a claim CTA)', () => {
     const raw = '{"sections": [{"title": "Hero", "content": "Big photo"}]}\n\nClaim your listing at https://example.com/claim — it takes two minutes.';
     const out = formatFulfillContent('website_mockup', raw);
-    expect(out).toContain('Homepage Mockup:');
+    expect(out).toContain('## Homepage Mockup');
     expect(out).toContain('1. Hero');
     expect(out).toContain('Content: Big photo');
     expect(out).toContain('Claim your listing at https://example.com/claim');
@@ -114,17 +114,17 @@ describe('formatFulfillContent', () => {
       pages: [{ h1: 'Injera Wholesale', meta_title: 'Wholesale Injera | Shop' }],
       surprise_field: 'kept, not dropped',
     }));
-    expect(out).toContain('Service Pages:');
+    expect(out).toContain('## Service Pages');
     expect(out).toContain('1. Injera Wholesale');
     expect(out).toContain('Meta title: Wholesale Injera | Shop');
-    expect(out).toContain('Surprise field: kept, not dropped');
+    expect(out).toContain('kept, not dropped');
   });
 
   it('falls back to generic labels for types without a section map', () => {
     const out = formatFulfillContent('review_responses' as any, JSON.stringify({
       responses: [{ platform: 'Google', text: 'Thank you for visiting.' }],
     }));
-    expect(out).toContain('Responses:');
+    expect(out).toContain('## Responses');
     expect(out).toContain('1. Google');
     expect(out).toContain('Text: Thank you for visiting.');
   });
