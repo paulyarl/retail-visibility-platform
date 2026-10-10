@@ -28,6 +28,15 @@ import type { RequestCtx } from '../../context';
 import { resolveGalleryArchetypeDefaults } from './GalleryArchetypeDefaults';
 import { resolveCampaignArchetype } from '../OutreachOpenerService';
 import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
+import {
+  toOwnerFacingPhases,
+  resolvePlanCta,
+  type OwnerFacingPhase,
+  type PlanCta,
+} from '../outreach-openers/project-phases';
+import { buildProjectPhasePlanForKey } from '../triage/project-phase-resolution';
+import { runProjectPhaseGate } from '../outreach-openers/project-phase-gate';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -82,6 +91,18 @@ export interface MultiGalleryData {
   siblings: MultiGallerySiblingSection[];
   completedSiblings: CompletedSiblingSection[];
   payUrl: string;
+  /**
+   * Owner-facing project-plan projection (sprint 8.1) — the curated twin
+   * of the operator cockpit: suppressed + `suggested` phases removed,
+   * internals stripped. Attached only when the GALLERY_PROJECT_VIEW flag
+   * is on AND the quality gate passes — a flagged plan is never shown to
+   * an owner. Absent entirely when the flag is off.
+   */
+  projectPlan?: {
+    generatedAt: string;
+    phases: OwnerFacingPhase[];
+    cta: PlanCta;
+  };
 }
 
 // ─── Archetype priority for sibling ordering ─────────────────────────────
@@ -222,12 +243,42 @@ export class GalleryMultiService extends BaseService {
       businessName,
     });
 
+    // 6. Owner-facing project-plan projection (sprint 8.1) — the same plan
+    // object the cockpit shows, projected. Gated by the feature flag AND the
+    // quality gate; a failure logs and degrades to today's gallery (the field
+    // is simply absent — never a partial or flagged plan).
+    let projectPlan: MultiGalleryData['projectPlan'];
+    if (unifiedConfig.galleryProjectViewEnabled) {
+      try {
+        const plan = await buildProjectPhasePlanForKey({ prospectId }, ctx);
+        const gate = runProjectPhaseGate(plan);
+        if (gate.passed) {
+          projectPlan = {
+            generatedAt: plan.generatedAt,
+            phases: toOwnerFacingPhases(plan),
+            cta: resolvePlanCta(plan),
+          };
+        } else {
+          logger.warn('Multi-gallery: project-plan gate failed — projection withheld', ctx, {
+            prospectId,
+            issues: gate.issues,
+          });
+        }
+      } catch (err) {
+        logger.error('Multi-gallery: project-plan assembly failed (degrading to sibling view)', ctx, {
+          prospectId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return {
       prospectId,
       businessName,
       siblings: sections,
       completedSiblings: completedSections,
       payUrl: `/marketing/pay?prospect=${prospectId}`,
+      projectPlan,
     };
   }
 

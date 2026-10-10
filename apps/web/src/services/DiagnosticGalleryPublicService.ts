@@ -53,6 +53,10 @@ export interface GalleryEventPayload {
   eventType: string;
   sessionId?: string;
   siblingCampaignId?: string;
+  /** Plan/artifact dimensions (sprint 8.4) — 'gallery' | 'proposal' |
+   *  'execution' + an artifact id like 'plan:phase:foundation'. */
+  surface?: string;
+  artifact?: string;
   screenshotIndex?: number;
   screenshotId?: string;
   dwellMs?: number;
@@ -106,6 +110,26 @@ export interface MultiGalleryData {
   siblings?: MultiGallerySiblingSection[];
   completedSiblings?: CompletedSiblingSection[];
   payUrl?: string;
+  /** Owner-facing project-plan projection (sprint 8.1) — present only when
+   *  the API feature flag is on and the quality gate passed. */
+  projectPlan?: MultiGalleryProjectPlan;
+}
+
+export interface MultiGalleryProjectPlan {
+  generatedAt: string;
+  phases: {
+    key: 'foundation' | 'claim' | 'findability' | 'trust' | 'expansion';
+    name: string;
+    goal: string;
+    confidence: 'verified';
+    status: 'not_started' | 'in_progress' | 'complete' | 'blocked';
+    actions: { text: string; ownerAction: boolean }[];
+    exitCriterion: { copy: string };
+  }[];
+  cta:
+    | { kind: 'claim'; url: string }
+    | { kind: 'phase'; phaseKey: string }
+    | { kind: 'pricing' };
 }
 
 export class DiagnosticGalleryPublicService extends PublicApiSingleton {

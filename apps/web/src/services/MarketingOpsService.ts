@@ -5367,6 +5367,26 @@ class MarketingOpsService extends AdminApiSingleton {
     return json.data;
   }
 
+  // ─── Project plan (spec §13 — computed-on-read, internal view) ─────────
+  //
+  // The plan belongs to the prospect group, not one campaign — fetch it
+  // with the prospect id (or a campaign id for null-prospect singletons).
+  // Every sibling's detail page mounts the same cockpit on `#plan`.
+
+  async getProjectPlan(prospectIdOrCampaignId: string, campaignId?: string): Promise<ProjectPhasePlanResponse> {
+    const qs = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
+    const res = await fetch(
+      `${BASE_URL}/prospects/${encodeURIComponent(prospectIdOrCampaignId)}/project-plan${qs}`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' }, credentials: 'include' },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to get project plan (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
   // ─── Playbook catalog CRUD (Sprint 4) ────────────────────────────────
 
   async listPlaybooks(filters?: { category?: string; isActive?: boolean }): Promise<PlaybookCatalogEntry[]> {
@@ -8243,4 +8263,75 @@ export interface OutreachIntelligenceResult {
   updated_at: string;
   inherited?: boolean;
   sourceCampaignId?: string;
+}
+
+// ─── Project plan contract (spec §12 — mirrors apps/api) ─────────────────
+
+export type ProjectPhaseKey = 'foundation' | 'claim' | 'findability' | 'trust' | 'expansion';
+export type PhaseStatus = 'not_started' | 'in_progress' | 'complete' | 'blocked';
+export type PhaseConfidence = 'verified' | 'suggested';
+export type PlanLane = 'full' | 'partial' | 'none';
+export type SeedFidelity = 'aligned' | 'thin' | 'misaligned' | 'unknown';
+export type SeedStatus = 'draft' | 'published' | 'invited' | 'claimed' | 'suppressed';
+export type SuppressedReason = 'pain_tier_cap' | 'capability_disabled' | 'not_triggered';
+
+export interface ProjectPhase {
+  key: ProjectPhaseKey;
+  name: string;
+  goal: string;
+  confidence: PhaseConfidence;
+  severity: number;
+  triggerSignals: string[];
+  triggeredByDomainRequest?: boolean;
+  contributingCampaignIds: string[];
+  evidence: {
+    campaignId: string;
+    field: string;
+    value: string;
+    signalCode?: string;
+    isQuote?: boolean;
+    attribution?: string;
+  }[];
+  actions: { text: string; ownerAction: boolean }[];
+  capability: { required: string[]; enabled: boolean };
+  status: PhaseStatus;
+  exitCriterion: { copy: string; predicate?: string };
+  suppressedReason?: SuppressedReason;
+}
+
+export interface ProjectPhasePlan {
+  businessProspectId: string | null;
+  engagementCycle: number;
+  estimatedTier: 'tier_1' | 'tier_2' | 'tier_3' | null;
+  predicateSeedVersion: number;
+  lane: PlanLane;
+  signals: string[];
+  signalLanes: Record<string, 'full' | 'partial'>;
+  sourceAuditId: string | null;
+  seedClaim: {
+    seedId: string;
+    status: SeedStatus;
+    placeUrl: string | null;
+    claimUrl: string | null;
+    fidelity: SeedFidelity;
+  } | null;
+  publicSurfaces: {
+    campaignId: string;
+    seed: { seedId: string; status: SeedStatus; placeUrl: string; fidelity?: SeedFidelity } | null;
+    /** Suppressed linked seeds — operator audit history, not live surfaces. */
+    retiredSeeds: { seedId: string; status: SeedStatus; placeUrl: string }[];
+    demoStorefrontUrl: string | null;
+  }[];
+  phases: ProjectPhase[];
+  generatedAt: string;
+}
+
+export interface ProjectPhaseGateResult {
+  passed: boolean;
+  issues: string[];
+}
+
+export interface ProjectPhasePlanResponse {
+  plan: ProjectPhasePlan;
+  gate: ProjectPhaseGateResult;
 }

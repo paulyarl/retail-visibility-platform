@@ -3815,6 +3815,10 @@ model mkt_gallery_events {
   device_type         String?   @db.VarChar(20)
   created_at          DateTime? @default(now()) @db.Timestamptz(6)
   sibling_campaign_id String?   @db.VarChar(255)
+  /// Artifact family emitting the event — gallery | proposal | execution (migration 325).
+  surface             String?   @db.VarChar(30)
+  /// Artifact-level identifier — e.g. plan:claim | plan:phase:<key> | plan:pricing.
+  artifact            String?   @db.VarChar(255)
 
   @@index([campaign_id], map: "idx_mkt_gallery_events_campaign")
   @@index([campaign_id, event_type, created_at(sort: Desc)], map: "idx_mkt_gallery_events_campaign_type_time")
@@ -8245,6 +8249,21 @@ model directory_presence_owner_requests {
   directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([seed_id, created_at(sort: Desc)], map: "idx_dpor_seed_created")
+}
+
+model mkt_project_phase_predicates {
+  id                 String   @id @db.VarChar(60)
+  phase_key          String   @db.VarChar(40)
+  predicate_version  Int
+  signals            Json     @default("[]")
+  min_severity       Json?
+  int_rank_modifiers Json     @default("[]")
+  copy_keys          Json     @default("{}")
+  seed_version       String?
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([phase_key, predicate_version], map: "uq_mppp_phase_version")
 }
 
 enum action {

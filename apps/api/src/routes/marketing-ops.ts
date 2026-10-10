@@ -158,6 +158,8 @@ import MarketingDailyDigestService from '../services/MarketingDailyDigestService
 import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
+import { buildProjectPhasePlanForKey } from '../services/triage/project-phase-resolution';
+import { runProjectPhaseGate } from '../services/outreach-openers/project-phase-gate';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 import CategoryVocabularyService from '../services/CategoryVocabularyService';
@@ -1827,6 +1829,36 @@ router.get('/campaigns/:id/prospect-report', async (req: any, res: Response) => 
     const chapterCampaigns = await prospectReportService.listChapterSources(prospectId, ctx);
 
     res.json({ success: true, data: { report, available_chapters: available, chapter_campaigns: chapterCampaigns, prospect_id: prospectId } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * GET /prospects/:prospectId/project-plan
+ *
+ * The computed-on-read project plan (spec §13). Internal operator view —
+ * full signal/provenance detail; the owner-facing projection lives on the
+ * gallery side. Empty or unknown prospect → 200 with an all-`not_triggered`
+ * plan, never 404. Entirely read-only: no prospect initialization, no seed
+ * creation, no token minting, no stage advancement, no plan persistence.
+ *
+ * `:prospectId` may also be a campaign id — a campaign with no
+ * business_prospect_id is a singleton group and is its own primary.
+ * `?campaignId=` supplies that fallback explicitly.
+ */
+router.get('/prospects/:prospectId/project-plan', async (req: any, res: Response) => {
+  try {
+    const ctx = getCtx(req);
+    const plan = await buildProjectPhasePlanForKey(
+      {
+        prospectId: req.params.prospectId,
+        campaignId: typeof req.query.campaignId === 'string' ? req.query.campaignId : undefined,
+      },
+      ctx,
+    );
+    const gate = runProjectPhaseGate(plan);
+    res.json({ success: true, data: { plan, gate } });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

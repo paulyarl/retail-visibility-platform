@@ -47,17 +47,18 @@ import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
 import GalleryAnalyticsTab from './GalleryAnalyticsTab';
 import SiblingsTab from './SiblingsTab';
+import ProjectPlanTab from '@/components/marketing-ops/ProjectPlanTab';
 import OutreachIntelligenceTab from './OutreachIntelligenceTab';
 import IdentityPacketCard from '@/components/marketing-ops/IdentityPacketCard';
 import ExternalPromptLane from '@/components/deliverable/ExternalPromptLane';
 
-type Tab = 'overview' | 'identity' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
+type Tab = 'overview' | 'identity' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings' | 'plan';
 
 // Valid tab keys for deep-link validation (e.g. ?tab=checklist from the
 // openers workspace Next Steps). Invalid values fall back to 'overview'.
 const PIPELINE_TABS: readonly string[] = [
   'overview', 'identity', 'audits', 'files', 'deliverables', 'prompts', 'checklist',
-  'outreach-prep', 'history', 'lineage', 'cascade', 'gallery', 'siblings',
+  'outreach-prep', 'history', 'lineage', 'cascade', 'gallery', 'siblings', 'plan',
 ] as const;
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'seed', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
@@ -982,6 +983,9 @@ export default function CampaignDetailClient({
     // Visible for all campaigns (shows siblings if they exist, or a hint
     // about creating them via triage alternatives).
     { key: 'siblings', label: 'Siblings' },
+    // Project Plan — the prospect-keyed cockpit (spec §13). Same plan for
+    // every sibling; null-prospect campaigns show a singleton group.
+    { key: 'plan', label: 'Project Plan' },
     { key: 'files', label: 'Files', count: campaign?.files?.length },
     { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
   ];
@@ -2764,6 +2768,10 @@ export default function CampaignDetailClient({
 
             {activeTab === 'siblings' && campaign && (
               <SiblingsTab campaignId={campaign.id} campaign={campaign} onRefresh={fetchCampaign} />
+            )}
+
+            {activeTab === 'plan' && campaign && (
+              <ProjectPlanTab campaign={campaign} />
             )}
           </>
         ) : (

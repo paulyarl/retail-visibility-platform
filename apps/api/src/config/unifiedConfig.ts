@@ -145,6 +145,13 @@ class UnifiedConfig {
     return this.env.GALLERY_IP_HASH_SALT;
   }
 
+  // Multi-gallery project view (sprint 8.3) — when on, the multi-gallery
+  // payload carries the owner-facing project-plan projection. Off = today's
+  // gallery unchanged; the field is simply absent from the payload.
+  get galleryProjectViewEnabled(): boolean {
+    return (this.env.GALLERY_PROJECT_VIEW || '').toLowerCase() === 'true';
+  }
+
   // Prospect (Business Visibility) Report — HMAC signing secret for signed
   // public-report tokens (spec: docs/LocalBiz/WEBSITE_GAP_OWNER_REPORT_SPEC.md
   // §5.1). REQUIRED in production — returns '' there when unset so

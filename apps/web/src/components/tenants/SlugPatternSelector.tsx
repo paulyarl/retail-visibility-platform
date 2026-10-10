@@ -28,6 +28,12 @@ interface SlugPatternSelectorProps {
   selectedSlug: string;
   onSlugSelect: (slug: string) => void;
   className?: string;
+  /** Heading copy. Defaults to the shop-URL wording. */
+  label?: string;
+  /** Preview line label. Defaults to "Your shop URL:". */
+  urlLabel?: string;
+  /** Renders the selected slug as a URL. Defaults to `/shops/{slug}`. */
+  urlTemplate?: (slug: string) => string;
 }
 
 export default function SlugPatternSelector({
@@ -37,6 +43,9 @@ export default function SlugPatternSelector({
   selectedSlug,
   onSlugSelect,
   className = '',
+  label = 'Choose Your Shop URL *',
+  urlLabel = 'Your shop URL:',
+  urlTemplate = (slug) => `/shops/${slug}`,
 }: SlugPatternSelectorProps) {
   const [patterns, setPatterns] = useState<SlugPattern[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,7 +149,7 @@ export default function SlugPatternSelector({
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        Choose Your Shop URL *
+        {label}
       </label>
 
       <RadioGroup value={selectedSlug} onValueChange={onSlugSelect}>
@@ -225,9 +234,9 @@ export default function SlugPatternSelector({
       {selectedSlug && (
         <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-900">
-            <strong>Your shop URL:</strong>{' '}
+            <strong>{urlLabel}</strong>{' '}
             <code className="font-mono bg-white px-2 py-0.5 rounded">
-              /shops/{selectedSlug}
+              {urlTemplate(selectedSlug)}
             </code>
           </p>
         </div>

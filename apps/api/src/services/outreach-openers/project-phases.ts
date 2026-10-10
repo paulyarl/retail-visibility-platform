@@ -21,6 +21,7 @@ import {
   type SignalSeverity,
 } from './signal-magnitude';
 import type { BusinessAnalysisAuditData } from './archetype-selection';
+import type { PhaseEvidenceRow } from './project-phase-evidence';
 import {
   PROJECT_PHASE_CATALOG_ORDER,
   PROJECT_PHASE_PREDICATES_V1,
@@ -83,7 +84,9 @@ export interface ProjectPhase {
    *  not a signal, but a valid trigger under §5/the §11 gate. */
   triggeredByDomainRequest?: boolean;
   contributingCampaignIds: string[];
-  evidence: { campaignId: string; field: string; value: string; signalCode?: SignalCode }[];
+  /** Spec §12 rows: {campaignId, field, value, signalCode?} — `isQuote` +
+   *  `attribution` extend it for the verbatim-quote gate exemption (§9). */
+  evidence: PhaseEvidenceRow[];
   actions: { text: string; ownerAction: boolean }[];
   capability: { required: string[]; enabled: boolean };
   status: PhaseStatus;
@@ -96,6 +99,10 @@ export interface ProjectPhasePlan {
   engagementCycle: number;
   estimatedTier: EstimatedTier | null;
   predicateSeedVersion: number;
+  /** Lane of the source audit — 'none' on an empty plan (spec §12). The
+   *  cockpit header band renders it; per-signal provenance lives on
+   *  `signalLanes`. */
+  lane: PlanLane;
   signals: SignalCode[];
   sourceAuditId: string | null;
   seedClaim: {
@@ -113,10 +120,16 @@ export interface ProjectPhasePlan {
       placeUrl: string;
       fidelity?: SeedFidelity;
     } | null;
+    /** Suppressed linked seeds — operator-visible audit history, never a
+     *  live surface (sprint 7.5). */
+    retiredSeeds: { seedId: string; status: SeedStatus; placeUrl: string }[];
     demoStorefrontUrl: string | null;
   }[];
   phases: ProjectPhase[];
   generatedAt: string;
+  /** Per-signal provenance — internal only; the owner projection strips it.
+   *  The gate reads it for the verified-phase/full-lane-evidence rule. */
+  signalLanes: Partial<Record<SignalCode, SignalLane>>;
 }
 
 // ─── Stage sets (spec §8, per REVIEW_/RECOVERY_TRANSITIONS) ──────────────
@@ -577,6 +590,7 @@ export function selectProjectPhases(
     engagementCycle: ctx.engagementCycle ?? 1,
     estimatedTier: input.estimatedTier,
     predicateSeedVersion: input.predicateSeedVersion,
+    lane: input.lane,
     signals: input.signals,
     sourceAuditId: input.sourceAuditId,
     // Assembled by the endpoint (I/O) — the evaluator stays pure.
@@ -584,6 +598,7 @@ export function selectProjectPhases(
     publicSurfaces: [],
     phases: evaluated,
     generatedAt: new Date().toISOString(),
+    signalLanes: input.signalLanes,
   };
 }
 

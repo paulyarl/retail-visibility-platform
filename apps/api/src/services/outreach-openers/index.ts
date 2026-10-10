@@ -112,3 +112,19 @@ export {
   type OwnerFacingPhase,
   type PlanCta,
 } from './project-phases';
+
+export {
+  runProjectPhaseGate,
+  type ProjectPhaseGateResult,
+} from './project-phase-gate';
+
+export {
+  extractPhaseEvidence,
+  type PhaseEvidenceRow,
+} from './project-phase-evidence';
+
+export {
+  PHASE_TEMPLATES,
+  resolvePhaseCopy,
+  type PhaseCopy,
+} from './project-phase-prompts';

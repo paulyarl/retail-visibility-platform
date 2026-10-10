@@ -37,6 +37,7 @@ import diagnosticGalleryPublicService, {
   type MultiGalleryData,
   type MultiGallerySiblingSection,
   type CompletedSiblingSection,
+  type MultiGalleryProjectPlan,
 } from '@/services/DiagnosticGalleryPublicService';
 
 const ARCHETYPE_COLORS: Record<string, string> = {
@@ -177,6 +178,12 @@ export default function MultiGalleryPage() {
             )}
           </Group>
         </Stack>
+
+        {/* Project plan — owner-facing projection above the reports (sprint 8.2).
+            Present only when the API flag is on and the gate passed. */}
+        {data.projectPlan && (
+          <ProjectPlanView plan={data.projectPlan} payUrl={data.payUrl} token={token} />
+        )}
 
         {/* Sibling sections — accordion for multi-sibling, single for 1 sibling */}
         {siblings.length === 1 ? (
@@ -374,6 +381,101 @@ function SiblingSectionContent({
         </Button>
       </Group>
     </Stack>
+  );
+}
+
+// ─── Project plan view (sprint 8.2 — owner-facing projection) ────────────
+//
+// The curated twin of the operator cockpit: plan header, the visible
+// verified phases in catalog order, and ONE plan-level CTA resolved
+// server-side (claim → earliest incomplete verified phase → pricing).
+// Owner-safe language only — internals never cross the boundary.
+
+const PHASE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  not_started: { label: 'Planned', color: 'gray' },
+  in_progress: { label: 'In progress', color: 'blue' },
+  complete: { label: 'Done', color: 'green' },
+  blocked: { label: 'Scheduled', color: 'gray' },
+};
+
+export function ProjectPlanView({
+  plan,
+  payUrl,
+  token,
+}: {
+  plan: MultiGalleryProjectPlan;
+  payUrl?: string;
+  token?: string;
+}) {
+  const cta = plan.cta;
+  const ctaLabel =
+    cta.kind === 'claim'
+      ? 'Claim your listing'
+      : cta.kind === 'phase'
+        ? `Get started — ${plan.phases.find((p) => p.key === cta.phaseKey)?.name ?? 'next step'}`
+        : 'View Pricing';
+  const ctaHref = cta.kind === 'claim' ? cta.url : (payUrl || '#');
+  const artifact =
+    cta.kind === 'claim' ? 'plan:claim' : cta.kind === 'phase' ? `plan:phase:${cta.phaseKey}` : 'plan:pricing';
+
+  const onPlanCtaClick = () => {
+    if (!token) return;
+    diagnosticGalleryPublicService.trackEvent(token, {
+      eventType: 'plan_cta_clicked',
+      surface: 'gallery',
+      artifact,
+    }).catch(() => { /* fire-and-forget */ });
+  };
+
+  return (
+    <Card withBorder p="lg" radius="md">
+      <Stack gap="md">
+        <Stack gap={2}>
+          <Text fw={700} size="lg">Your action plan</Text>
+          <Text c="dimmed" size="sm">
+            {plan.phases.length} step{plan.phases.length === 1 ? '' : 's'} tailored to your business
+          </Text>
+        </Stack>
+
+        <Stack gap="sm">
+          {plan.phases.map((phase) => {
+            const status = PHASE_STATUS_LABELS[phase.status] ?? { label: phase.status, color: 'gray' };
+            return (
+              <Paper key={phase.key} p="sm" withBorder radius="sm" data-phase={phase.key}>
+                <Group justify="space-between" align="flex-start" wrap="nowrap">
+                  <Stack gap={4}>
+                    <Group gap="sm">
+                      <Text fw={600} size="sm">{phase.name}</Text>
+                      <Badge variant="light" color={status.color} size="sm">{status.label}</Badge>
+                    </Group>
+                    <Text c="dimmed" size="sm">{phase.goal}</Text>
+                    {phase.actions.length > 0 && (
+                      <Stack gap={2} mt={4}>
+                        {phase.actions.map((a, i) => (
+                          <Text key={i} size="xs" c="dimmed">• {a.text}</Text>
+                        ))}
+                      </Stack>
+                    )}
+                  </Stack>
+                </Group>
+              </Paper>
+            );
+          })}
+        </Stack>
+
+        <Group justify="flex-end">
+          <Button
+            component={Link}
+            href={ctaHref}
+            size="md"
+            leftSection={<IconExternalLink size={16} />}
+            onClick={onPlanCtaClick}
+          >
+            {ctaLabel}
+          </Button>
+        </Group>
+      </Stack>
+    </Card>
   );
 }
 

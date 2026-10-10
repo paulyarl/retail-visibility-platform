@@ -31,6 +31,8 @@ import {
   type ProjectPhasePredicateSeed,
 } from '../../lib/project-phase-predicates';
 import { selectProjectPhases } from '../outreach-openers/project-phases';
+import { extractPhaseEvidence } from '../outreach-openers/project-phase-evidence';
+import { resolvePhaseCopy } from '../outreach-openers/project-phase-prompts';
 import type {
   PlanLane,
   SignalLane,
@@ -84,6 +86,10 @@ export interface ResolvedProspectBundle {
   napConsistent: boolean | null;
   gbpClaimed: boolean | null;
   demoTenantId: string | null;
+  /** Primary campaign facts — evidence + copy interpolation. */
+  businessName: string | null;
+  websiteUrl: string | null;
+  unaddressedReviews: number | null;
   siblings: ResolvedSibling[];
 }
 
@@ -113,6 +119,7 @@ export async function resolvePlanSiblings(
       last_review_date: true,
       has_website: true,
       website_url: true,
+      business_name: true,
     },
   });
   if (!campaign) return null;
@@ -189,6 +196,9 @@ export async function resolvePlanSiblings(
     napConsistent: campaign.nap_consistent,
     gbpClaimed: campaign.gbp_claimed,
     demoTenantId: campaign.demo_tenant_id,
+    businessName: (campaign as any).business_name ?? null,
+    websiteUrl: campaign.website_url,
+    unaddressedReviews: campaign.unaddressed_reviews,
     siblings,
   };
 }
@@ -604,6 +614,9 @@ export async function resolvePlanPublicSurfaces(
   bundle: ResolvedProspectBundle,
 ): Promise<ProjectPhasePlan['publicSurfaces']> {
   const campaignIds = bundle.siblings.map((s) => s.campaignId);
+  // All linked seeds — live AND suppressed. Suppressed rows surface in the
+  // cockpit as retired history (the audit trail); only non-suppressed seeds
+  // count as live public surfaces.
   const seeds = await prisma.$queryRaw<
     {
       campaign_id: string;
@@ -623,21 +636,37 @@ export async function resolvePlanPublicSurfaces(
     JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
     JOIN directory_listings_list dl ON dl.id = dps.listing_id
     WHERE dscl.campaign_id = ANY(${campaignIds})
-      AND dps.status IS DISTINCT FROM 'suppressed'
   `;
-  const seedByCampaign = new Map(seeds.map((r) => [r.campaign_id, r]));
-  const demoTenants = new Map(
-    bundle.siblings.map((s) => [s.campaignId, null as string | null]),
-  );
+  const liveSeedByCampaign = new Map<string, (typeof seeds)[number]>();
+  const retiredByCampaign = new Map<string, (typeof seeds)[number][]>();
+  for (const r of seeds) {
+    if (r.status === 'suppressed') {
+      retiredByCampaign.set(r.campaign_id, [...(retiredByCampaign.get(r.campaign_id) ?? []), r]);
+    } else if (!liveSeedByCampaign.has(r.campaign_id)) {
+      liveSeedByCampaign.set(r.campaign_id, r);
+    }
+  }
   const demoRows = await prisma.mkt_campaigns_list.findMany({
     where: { id: { in: campaignIds } },
     select: { id: true, demo_tenant_id: true },
   });
-  for (const r of demoRows) demoTenants.set(r.id, r.demo_tenant_id);
+  const demoTenantIds = demoRows.map((r) => r.demo_tenant_id).filter((x): x is string => !!x);
+  // Demo storefront URL — the wildcard subdomain form `{slug}.visibleshelf.com`
+  // (subdomain mirrors slug); /tenant/{id} fallback when no slug yet.
+  const demoSlugs = new Map<string, string | null>();
+  if (demoTenantIds.length > 0) {
+    const tenants = await prisma.tenants.findMany({
+      where: { id: { in: demoTenantIds } },
+      select: { id: true, slug: true },
+    });
+    for (const t of tenants) demoSlugs.set(t.id, t.slug);
+  }
+  const demoTenantIdByCampaign = new Map(demoRows.map((r) => [r.id, r.demo_tenant_id]));
 
   return bundle.siblings.map((s) => {
-    const seed = seedByCampaign.get(s.campaignId);
-    const demoTenantId = demoTenants.get(s.campaignId) ?? null;
+    const seed = liveSeedByCampaign.get(s.campaignId);
+    const demoTenantId = demoTenantIdByCampaign.get(s.campaignId) ?? null;
+    const demoSlug = demoTenantId ? demoSlugs.get(demoTenantId) : null;
     return {
       campaignId: s.campaignId,
       seed: seed
@@ -648,7 +677,16 @@ export async function resolvePlanPublicSurfaces(
             fidelity: (seed.seed_fidelity ?? 'unknown') as SeedFidelity,
           }
         : null,
-      demoStorefrontUrl: demoTenantId ? `/tenant/${demoTenantId}` : null,
+      retiredSeeds: (retiredByCampaign.get(s.campaignId) ?? []).map((r) => ({
+        seedId: r.seed_id,
+        status: r.status as SeedStatus,
+        placeUrl: r.slug ? `/place/${r.slug}` : '',
+      })),
+      demoStorefrontUrl: demoTenantId
+        ? demoSlug
+          ? `https://${demoSlug}.visibleshelf.com`
+          : `/tenant/${demoTenantId}`
+        : null,
     };
   });
 }
@@ -710,6 +748,29 @@ export async function buildProjectPhasePlan(
     },
   );
 
+  // Phase 5 — evidence rows + owner-safe copy per phase. Attribution rides
+  // the phase's first contributing sibling (the campaign that owns the
+  // work); the primary campaign is the fallback.
+  for (const p of plan.phases) {
+    const evidenceCampaignId = p.contributingCampaignIds[0] ?? bundle.primaryCampaignId;
+    const evidence = extractPhaseEvidence({
+      phaseKey: p.key,
+      triggerSignals: p.triggerSignals,
+      audit: resolved.audit,
+      campaignId: evidenceCampaignId,
+      campaignFacts: {
+        website_url: bundle.websiteUrl,
+        unaddressed_reviews: bundle.unaddressedReviews,
+      },
+    });
+    p.evidence = evidence;
+    const copy = resolvePhaseCopy(p.key, { evidence, businessName: bundle.businessName });
+    p.name = copy.name;
+    p.goal = copy.goal;
+    p.actions = copy.actions;
+    p.exitCriterion.copy = copy.exitCopy;
+  }
+
   plan.seedClaim = seedClaim
     ? {
         seedId: seedClaim.seedId,
@@ -721,4 +782,67 @@ export async function buildProjectPhasePlan(
     : null;
   plan.publicSurfaces = await resolvePlanPublicSurfaces(bundle);
   return plan;
+}
+
+/**
+ * An all-`not_triggered` plan for an unknown/empty prospect — the endpoint
+ * returns 200 with this shape, never 404 (spec §13 plan lifecycle: the plan
+ * owns nothing; an empty prospect is a legal state, not an error).
+ */
+export function emptyProjectPhasePlan(businessProspectId: string | null): ProjectPhasePlan {
+  return selectProjectPhases(
+    {
+      predicateSeedVersion: PROJECT_PHASE_PREDICATES_VERSION,
+      lane: 'none',
+      signals: [],
+      signalLanes: {},
+      discoverySignals: [],
+      sourceAuditId: null,
+      audit: null,
+      siblings: [],
+      capabilities: {
+        storefrontEnabled: true,
+        subdomainEnabled: true,
+        qrPrintEnabled: true,
+        domainEnabled: false,
+      },
+      estimatedTier: null,
+    },
+    { businessProspectId },
+  );
+}
+
+/**
+ * Prospect-keyed entry for the plan endpoint. `:prospectId` may itself be a
+ * campaign id (a null-prospect campaign is a singleton group — the campaign
+ * is primary), and `?campaignId=` supplies that fallback explicitly.
+ */
+export async function buildProjectPhasePlanForKey(args: {
+  prospectId?: string;
+  campaignId?: string;
+}, ctx?: RequestCtx): Promise<ProjectPhasePlan> {
+  let campaignId = args.campaignId ?? null;
+  let prospectId = args.prospectId ?? null;
+
+  if (!campaignId && prospectId) {
+    const primary = await prisma.mkt_campaigns_list.findFirst({
+      where: { business_prospect_id: prospectId },
+      orderBy: [{ is_primary_sibling: 'desc' }, { created_at: 'asc' }],
+      select: { id: true },
+    });
+    if (primary) {
+      campaignId = primary.id;
+    } else {
+      // Maybe the "prospect id" is a campaign with no prospect — singleton.
+      const exists = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: prospectId },
+        select: { id: true },
+      });
+      if (exists) campaignId = prospectId;
+    }
+  }
+
+  if (!campaignId) return emptyProjectPhasePlan(prospectId);
+  const plan = await buildProjectPhasePlan(campaignId, ctx);
+  return plan ?? emptyProjectPhasePlan(prospectId);
 }

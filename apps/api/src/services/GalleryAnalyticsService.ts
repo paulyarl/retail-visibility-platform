@@ -28,7 +28,10 @@ export type GalleryEventType =
   | 'cta_clicked'
   | 'cta_hovered'
   | 'session_heartbeat'
-  | 'session_end';
+  | 'session_end'
+  // Plan-level CTA on the gallery project view (sprint 8.4). Carries
+  // `surface`/`artifact` instead of siblingCampaignId — see below.
+  | 'plan_cta_clicked';
 
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
 
@@ -36,6 +39,12 @@ export interface GalleryEventInput {
   tokenId: string;
   campaignId: string;
   siblingCampaignId?: string;
+  /** Artifact family emitting the event — 'gallery' today; 'proposal' /
+   *  'execution' later (proposal spec §11) on the same event model. */
+  surface?: string;
+  /** Artifact-level identifier for non-sibling events — e.g.
+   *  'plan:claim' | 'plan:phase:<key>' | 'plan:pricing'. */
+  artifact?: string;
   tenantId?: string;
   sessionId?: string;
   eventType: GalleryEventType;
@@ -66,6 +75,7 @@ const ALLOWED_EVENT_TYPES: GalleryEventType[] = [
   'cta_hovered',
   'session_heartbeat',
   'session_end',
+  'plan_cta_clicked',
 ];
 
 function parseDeviceType(userAgent: string | null | undefined): DeviceType {
@@ -152,6 +162,8 @@ export class GalleryAnalyticsService extends BaseService {
           sibling_campaign_id: input.siblingCampaignId || null,
           session_id: input.sessionId || null,
           event_type: input.eventType,
+          surface: input.surface || null,
+          artifact: input.artifact || null,
           screenshot_index: input.screenshotIndex ?? null,
           screenshot_id: input.screenshotId ?? null,
           dwell_ms: input.dwellMs ?? null,
@@ -197,8 +209,11 @@ export class GalleryAnalyticsService extends BaseService {
           tenant_id: input.tenantId || 'platform',
           token_id: input.tokenId,
           campaign_id: input.campaignId,
+          sibling_campaign_id: input.siblingCampaignId || null,
           session_id: input.sessionId || null,
           event_type: input.eventType,
+          surface: input.surface || null,
+          artifact: input.artifact || null,
           screenshot_index: input.screenshotIndex ?? null,
           screenshot_id: input.screenshotId ?? null,
           dwell_ms: input.dwellMs ?? null,

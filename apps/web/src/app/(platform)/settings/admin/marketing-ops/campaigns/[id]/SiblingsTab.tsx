@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ArrowRightCircle, Repeat, Users, Plus, X } from 'lucide-react';
+import { RefreshCw, ArrowRightCircle, Repeat, Users, Plus, X, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService from '@/services/MarketingOpsService';
 import { StageBadge } from '@/components/marketing-ops/StageBadge';
@@ -154,6 +154,14 @@ export default function SiblingsTab({ campaignId, campaign, onRefresh }: Sibling
             </p>
           )}
         </div>
+        {/* The plan is prospect-keyed — same cockpit for every sibling. */}
+        <Link
+          href={`/settings/admin/marketing-ops/campaigns/${campaignId}?tab=plan#plan`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          Project plan
+        </Link>
         {canCycle && (
           <button
             onClick={handleCycle}

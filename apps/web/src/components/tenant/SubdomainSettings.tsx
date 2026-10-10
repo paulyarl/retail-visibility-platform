@@ -1,34 +1,28 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, RefreshCw } from 'lucide-react';
+import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { tenantProfileService } from '@/services/TenantProfileService';
 import { clientLogger } from '@/lib/client-logger';
 
 interface SubdomainSettingsProps {
   tenantId: string;
 }
 
-interface SubdomainCheckResult {
-  available: boolean;
-  valid: boolean;
-  subdomain: string;
-  message: string;
-}
-
 export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) {
   const [currentSubdomain, setCurrentSubdomain] = useState<string>('');
-  const [newSubdomain, setNewSubdomain] = useState<string>('');
+  // The chosen slug — subdomain mirrors the slug (see lib/subdomain.ts), so the
+  // slug picker below sets both.
+  const [selectedSlug, setSelectedSlug] = useState<string>('');
+  const [businessName, setBusinessName] = useState<string>('');
+  const [location, setLocation] = useState<{ city?: string; state?: string; country?: string }>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isChecking, setIsChecking] = useState<boolean>(false);
-  const [checkResult, setCheckResult] = useState<SubdomainCheckResult | null>(null);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [userSubdomains, setUserSubdomains] = useState<any[]>([]);
@@ -64,12 +58,16 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
 
     loadCurrentSubdomain();
     loadUserSubdomains();
+    loadBusinessContext();
   }, [tenantId]);
 
   const loadCurrentSubdomain = async () => {
     try {
-      const data = await tenantInfoService.getTenantSubdomain(tenantId);
-      setCurrentSubdomain(data.subdomain || '');
+      const raw = await tenantInfoService.getTenantSubdomain(tenantId);
+      const data = raw?.data ?? raw;
+      setCurrentSubdomain(data?.subdomain || '');
+      // Seed the picker with the current value so it shows as "Yours".
+      if (data?.subdomain) setSelectedSlug(data.subdomain);
     } catch (error) {
       clientLogger.error('Failed to load current subdomain:', { detail: error });
     }
@@ -90,41 +88,50 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     }
   };
 
-  const checkSubdomainAvailability = async () => {
-    if (!newSubdomain.trim()) return;
-
-    setIsChecking(true);
-    setCheckResult(null);
-    setError('');
-
+  // The slug picker generates patterns from the business name + location, so
+  // fetch the business profile to feed it (tenant name is the fallback).
+  const loadBusinessContext = async () => {
     try {
-      const result = await tenantInfoService.checkSubdomainAvailability(newSubdomain);
-      setCheckResult(result);
+      const profile = await tenantProfileService.getTenantProfile(tenantId);
+      setLocation({
+        city: profile?.city || undefined,
+        state: profile?.state || undefined,
+        country: profile?.country || undefined,
+      });
+
+      let name = profile?.business_name || '';
+      if (!name) {
+        const raw = await tenantInfoService.getTenantSubdomain(tenantId).catch(() => null);
+        const tenant = raw?.data ?? raw;
+        name = tenant?.name || '';
+      }
+      setBusinessName(name);
     } catch (error) {
-      clientLogger.error('Failed to check subdomain:', { detail: error });
-      setError('Failed to check subdomain availability');
-    } finally {
-      setIsChecking(false);
+      clientLogger.error('Failed to load business profile for slug picker:', { detail: error });
     }
   };
 
   const updateSubdomain = async () => {
-    if (!newSubdomain.trim()) return;
+    if (!selectedSlug.trim()) return;
 
     setIsLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      const data = await tenantInfoService.updateTenantSubdomain(tenantId, newSubdomain);
-      
-      setCurrentSubdomain(newSubdomain);
+      await tenantInfoService.updateTenantSubdomain(tenantId, selectedSlug);
+      setCurrentSubdomain(selectedSlug);
       setSuccess('Subdomain updated successfully!');
-      setNewSubdomain('');
-      setCheckResult(null);
-    } catch (error) {
+    } catch (error: any) {
       clientLogger.error('Failed to update subdomain:', { detail: error });
-      setError('Failed to update subdomain');
+      const message = error?.message || 'Failed to update subdomain';
+      setError(
+        /taken/i.test(message)
+          ? 'That subdomain was just taken — pick another option.'
+          : /reserved/i.test(message)
+            ? 'That subdomain is reserved by the platform — pick another option.'
+            : message,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -136,12 +143,10 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     setSuccess('');
 
     try {
-      const data = await tenantInfoService.deleteTenantSubdomain(tenantId);
-      
+      await tenantInfoService.deleteTenantSubdomain(tenantId);
       setCurrentSubdomain('');
+      setSelectedSlug('');
       setSuccess('Subdomain removed successfully!');
-      setNewSubdomain('');
-      setCheckResult(null);
     } catch (error) {
       clientLogger.error('Failed to remove subdomain:', { detail: error });
       setError('Failed to remove subdomain');
@@ -189,7 +194,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
         {/* Current Subdomain Display */}
         {currentSubdomain && (
           <div className="space-y-2">
-            <Label className="text-gray-900 dark:text-white">Current Subdomain</Label>
+            <label className="text-sm font-medium text-gray-900 dark:text-white">Current Subdomain</label>
             <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="font-medium text-green-800">{currentSubdomain}.{platformDomain}</span>
@@ -200,61 +205,50 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
           </div>
         )}
 
-        {/* Subdomain Input */}
+        {/* Slug / subdomain picker — same component as onboarding + business
+            profile, so the tenant gets format validation, live availability
+            and name/location-based suggestions instead of free text. */}
         <div className="space-y-2">
-          <Label htmlFor="subdomain" className="text-gray-900 dark:text-white">
+          <label className="text-sm font-medium text-gray-900 dark:text-white">
             {currentSubdomain ? 'Change Subdomain' : 'Set Subdomain'}
-          </Label>
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Input
-                id="subdomain"
-                type="text"
-                placeholder="yourstore"
-                value={newSubdomain}
-                onChange={(e) => setNewSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                className="pr-20"
-              />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                .{platformDomain}
-              </span>
+          </label>
+
+          {businessName ? (
+            <SlugPatternSelector
+              businessName={businessName}
+              location={location}
+              tenantId={tenantId}
+              selectedSlug={selectedSlug}
+              onSlugSelect={setSelectedSlug}
+              label="Choose your subdomain *"
+              urlLabel="Your subdomain:"
+              urlTemplate={(slug) => `${slug}.${platformUrl}`}
+            />
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Add a business name to your profile to see available subdomains.
+            </p>
+          )}
+
+          {selectedSlug && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Your subdomain:</strong>{' '}
+                <code className="font-mono bg-white px-2 py-0.5 rounded">{selectedSlug}.{platformUrl}</code>
+              </p>
             </div>
-            <Button
-              variant="secondary"
-              onClick={checkSubdomainAvailability}
-              disabled={!newSubdomain.trim() || isChecking}
-            >
-              {isChecking ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Check'
-              )}
-            </Button>
-          </div>
+          )}
+
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Use only lowercase letters, numbers, and hyphens. Cannot start or end with a hyphen.
+            Your subdomain also becomes your public URL slug, so it should match your business name.
           </p>
         </div>
-
-        {/* Check Result */}
-        {checkResult && (
-          <Alert className={checkResult.available ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
-            {checkResult.available ? (
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            ) : (
-              <AlertCircle className="h-4 w-4 text-red-600" />
-            )}
-            <AlertDescription className={checkResult.available ? 'text-green-800' : 'text-red-800'}>
-              {checkResult.message}
-            </AlertDescription>
-          </Alert>
-        )}
 
         {/* Action Buttons */}
         <div className="flex gap-2">
           <Button
             onClick={updateSubdomain}
-            disabled={!newSubdomain.trim() || !checkResult?.available || isLoading}
+            disabled={!selectedSlug.trim() || selectedSlug === currentSubdomain || isLoading}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
