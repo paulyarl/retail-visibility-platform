@@ -33,12 +33,16 @@ vi.mock('../../lib/id-generator', () => ({
   generateOwnerVoiceProfileId: () => 'movp-test-001',
 }));
 
-vi.mock('../ai-providers', () => ({
-  default: {
-    generateChatCompletion: vi.fn().mockResolvedValue({
-      content: '{"person":"first_person","formality":"casual","humor":"none","apology_style":"fix_first","signoff_style":"first_name","signature":"- Sarah"}',
-      model: 'gpt-4-test',
-      usage: { totalTokens: 100 },
+vi.mock('../MarketingExecutionService', () => ({
+  MarketingExecutionService: {
+    getInstance: () => ({
+      executeSingle: vi.fn().mockResolvedValue({
+        filtered_output: '{"person":"first_person","formality":"casual","humor":"none","apology_style":"fix_first","signoff_style":"first_name","signature":"- Sarah"}',
+        raw_output: '{"person":"first_person","formality":"casual","humor":"none","apology_style":"fix_first","signoff_style":"first_name","signature":"- Sarah"}',
+        ai_provider: 'gpt',
+        ai_model: 'gpt-4-test',
+        tokens_used: 100,
+      }),
     }),
   },
 }));

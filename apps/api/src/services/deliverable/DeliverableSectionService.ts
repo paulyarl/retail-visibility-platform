@@ -13,25 +13,43 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateDeliverableSectionId } from '../../lib/id-generator';
-import aiProviderFactory from '../ai-providers';
-import {
-  buildRecoveryPlaybookPrompt,
-  buildListingCorrectionsPrompt,
-  buildCtaFixesPrompt,
-  buildMobileCatalogPrompt,
-  buildGbpPhotoOptimizationPrompt,
-  buildAvailabilityInquiryFlowPrompt,
-  buildFulfillmentPathwayPrompt,
-  buildHoursSyncPlanPrompt,
-  buildPositioningReportPrompt,
-  buildHomepageMockupPrompt,
-  buildDomainMigrationPlanPrompt,
-} from './prompts';
-import type { OwnerVoiceFields } from './prompts';
+import { MarketingExecutionService } from '../MarketingExecutionService';
+import { ownerVoiceVariables, businessContextVariables } from './prompts';
+import type { OwnerVoiceFields, BusinessContextFields } from './prompts';
 import OwnerVoiceService from './OwnerVoiceService';
 import BusinessContextService from './BusinessContextService';
 import { resolveCampaignArchetype } from '../OutreachOpenerService';
 import { MarketingBusinessTypeService } from '../MarketingBusinessTypeService';
+
+const DEFAULT_VOICE_FIELDS: OwnerVoiceFields = {
+  person: 'first_person',
+  formality: 'casual',
+  humor: 'none',
+  apologyStyle: 'fix_first',
+  signoffStyle: 'first_name',
+  signature: null,
+};
+
+/**
+ * Prompt-execution templates per section type (seeded by
+ * scripts/seed-deliverable-construction-templates.ts). One template per
+ * type keeps each hop's prompt body the single source of truth — the
+ * external lane renders the identical prompt via renderSectionPrompt and
+ * writes the answer back through updateSection (source: 'external').
+ */
+const SECTION_TEMPLATE_IDS: Record<SectionType, string> = {
+  recovery_playbook: 'mpt-deliverable-section-recovery-playbook',
+  listing_corrections: 'mpt-deliverable-section-listing-corrections',
+  cta_fixes: 'mpt-deliverable-section-cta-fixes',
+  mobile_catalog_preview: 'mpt-deliverable-section-mobile-catalog',
+  gbp_photo_optimization: 'mpt-deliverable-section-gbp-photo',
+  availability_inquiry_flow: 'mpt-deliverable-section-availability-inquiry',
+  fulfillment_pathway: 'mpt-deliverable-section-fulfillment-pathway',
+  hours_sync_plan: 'mpt-deliverable-section-hours-sync',
+  positioning_report: 'mpt-deliverable-section-positioning-report',
+  homepage_mockup: 'mpt-deliverable-section-homepage-mockup',
+  domain_migration_plan: 'mpt-deliverable-section-domain-migration',
+};
 
 export interface DeliverableSection {
   id: string;
@@ -321,207 +339,275 @@ export class DeliverableSectionService extends BaseService {
   // GENERATE SINGLE SECTION
   // ====================
 
+  /**
+   * Per-type input assembly shared by generateSection (internal lane) and
+   * renderSectionPrompt (external lane). Produces the {{variable}} map the
+   * section template consumes — the same values (and defaults) the legacy
+   * prompt builders substituted — plus the section title/index metadata.
+   */
+  private async buildSectionInputs(input: {
+    campaignId: string;
+    sectionType: SectionType;
+    auditData: any;
+    businessCtx: BusinessContextFields;
+    voiceFields: OwnerVoiceFields;
+  }): Promise<{ variables: Record<string, string>; title: string; sectionIndex: number }> {
+    const { campaignId, sectionType, auditData, businessCtx, voiceFields } = input;
+    const ctxVars = businessContextVariables(businessCtx);
+    const voiceVars = ownerVoiceVariables(voiceFields);
+
+    switch (sectionType) {
+      case 'recovery_playbook': {
+        const themes = auditData.negative_review_themes ?? [];
+        const themeClusters = themes.map((t: any) =>
+          `- ${t.theme} (${t.supporting_review_count} reviews): ${t.summary}`,
+        ).join('\n');
+        return {
+          variables: { ...ctxVars, ...voiceVars, theme_clusters: themeClusters },
+          title: 'Recovery Playbook',
+          sectionIndex: 100,
+        };
+      }
+
+      case 'listing_corrections': {
+        const nap = auditData.nap_consistency;
+        if (!nap) throw new Error('No NAP consistency data in audit');
+        const napVariations = [
+          ...(nap.name_variations ?? []).map((v: string) => `Name variation: ${v}`),
+          ...(nap.phone_variations ?? []).map((v: string) => `Phone variation: ${v}`),
+          ...(nap.address_variations ?? []).map((v: string) => `Address variation: ${v}`),
+        ].join('\n');
+        const platformsList = Object.keys(auditData.platforms ?? {})
+          .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+          .join(', ');
+        return {
+          variables: {
+            ...ctxVars,
+            nap_variations: napVariations,
+            canonical_name: nap.canonical_name ?? businessCtx.businessName,
+            canonical_phone: nap.canonical_phone ?? businessCtx.phone ?? 'N/A',
+            canonical_address: nap.canonical_address ?? 'N/A',
+            platforms_list: platformsList,
+          },
+          title: 'Listing Corrections',
+          sectionIndex: 200,
+        };
+      }
+
+      case 'cta_fixes': {
+        const website = auditData.website;
+        if (!website) throw new Error('No website audit data');
+        const missingCtas: string[] = [];
+        if (website.has_booking === false) missingCtas.push('Online booking button');
+        if (website.call_to_action_present === 'no') missingCtas.push('Call-to-action button');
+        if (website.click_to_call_available === 'no') missingCtas.push('Click-to-call button');
+        return {
+          variables: {
+            ...ctxVars,
+            website_url: businessCtx.websiteUrl ?? 'N/A',
+            missing_ctas: missingCtas.join('\n'),
+            conversion_opportunities: (website.conversion_opportunities ?? []).join('\n'),
+          },
+          title: 'CTA & Website Fixes',
+          sectionIndex: 300,
+        };
+      }
+
+      // ─── Sprint 2: Product-visibility sections (A6) ────────────────
+
+      case 'mobile_catalog_preview': {
+        const website = auditData.website;
+        const productCats = (website as any)?.product_categories_visible ?? [];
+        const productCategories = Array.isArray(productCats) ? productCats.join(', ') : String(productCats);
+        return {
+          variables: {
+            ...ctxVars,
+            product_categories: productCategories ||
+              'Not specified — infer from business category (e.g., for a grocery store: Produce, Grains & Rice, Spices & Seasonings, Sauces & Condiments, Frozen Foods, Beverages, Household Goods)',
+          },
+          title: 'Mobile Catalog Preview',
+          sectionIndex: 400,
+        };
+      }
+
+      case 'gbp_photo_optimization': {
+        const google = auditData.platforms?.google;
+        const photoCount = (google as any)?.photo_count ?? 0;
+        const photoTypes: string[] = (google as any)?.photo_types ?? [];
+        const knownTypes = ['storefront', 'exterior', 'interior', 'product', 'team', 'logo', 'signage'];
+        const missingTypes = knownTypes.filter((t) => !photoTypes.includes(t));
+        return {
+          variables: {
+            ...ctxVars,
+            photo_count: String(photoCount),
+            photo_types_present: photoTypes.join(', ') || 'None detected',
+            photo_types_missing: missingTypes.join(', ') || 'All types needed',
+          },
+          title: 'GBP Photo Optimization',
+          sectionIndex: 500,
+        };
+      }
+
+      case 'availability_inquiry_flow': {
+        const website = auditData.website;
+        const contactMethods: string[] = [];
+        if (businessCtx.phone) contactMethods.push(`Phone: ${businessCtx.phone} (click-to-call)`);
+        if (website && (website as any).has_availability_inquiry === false) {
+          contactMethods.push('No web-based inquiry currently');
+        }
+        if (contactMethods.length === 0) contactMethods.push('Phone only (click-to-call from GBP)');
+        return {
+          variables: { ...ctxVars, contact_methods: contactMethods.join('\n') },
+          title: 'Availability Inquiry Flow',
+          sectionIndex: 600,
+        };
+      }
+
+      case 'fulfillment_pathway': {
+        const website = auditData.website;
+        const fulfillmentParts: string[] = [];
+        if (website) {
+          if ((website as any).has_pickup_ordering === false) fulfillmentParts.push('No in-store/curbside pickup option');
+          if ((website as any).has_delivery_option === false) fulfillmentParts.push('No delivery option');
+        }
+        if (fulfillmentParts.length === 0) fulfillmentParts.push('No pickup or delivery options currently offered');
+        return {
+          variables: { ...ctxVars, fulfillment_status: fulfillmentParts.join('\n') },
+          title: 'Fulfillment Pathway',
+          sectionIndex: 700,
+        };
+      }
+
+      case 'hours_sync_plan': {
+        const google = auditData.platforms?.google;
+        const specialHours = (google as any)?.special_hours_present;
+        return {
+          variables: {
+            ...ctxVars,
+            regular_hours_status: 'See GBP listing for current hours',
+            special_hours_status: specialHours === false ? 'Not present on GBP' : specialHours === true ? 'Present on GBP' : 'Not assessed',
+            business_type: (auditData as any).business_type ?? 'Unknown',
+          },
+          title: 'Hours Sync Plan',
+          sectionIndex: 800,
+        };
+      }
+
+      // ─── PB-08: Website-gap sections (A7) ──────────────────────────
+
+      case 'positioning_report': {
+        const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
+        const { presenceState, gapFindings } = this.describeWebPresence(auditData, websiteAudit);
+        return {
+          variables: {
+            ...ctxVars,
+            presence_state: presenceState || 'No owned website detected',
+            gap_findings: gapFindings || 'None recorded',
+          },
+          title: 'Web Presence Report',
+          sectionIndex: 900,
+        };
+      }
+
+      case 'homepage_mockup': {
+        const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
+        const { presenceState } = this.describeWebPresence(auditData, websiteAudit);
+        const mustHave = this.mustHavePages(auditData, websiteAudit);
+        return {
+          variables: {
+            ...ctxVars,
+            presence_state: presenceState || 'No owned website detected',
+            must_have_pages: mustHave || 'Home, Services/Products, About, Contact',
+          },
+          title: 'Homepage Mockup',
+          sectionIndex: 910,
+        };
+      }
+
+      case 'domain_migration_plan': {
+        const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
+        const { presenceState } = this.describeWebPresence(auditData, websiteAudit);
+        const scope = websiteAudit?.build_scope;
+        const buildScope = scope
+          ? [scope.recommended, scope.scope_notes].filter(Boolean).join(' — ')
+          : undefined;
+        return {
+          variables: {
+            ...ctxVars,
+            presence_state: presenceState || 'No owned website detected',
+            build_scope: buildScope ? `Recommended build scope: ${buildScope}` : '',
+          },
+          title: 'Domain Migration Plan',
+          sectionIndex: 920,
+        };
+      }
+
+      default:
+        throw new Error(`Unknown section type: ${sectionType}`);
+    }
+  }
+
+  /**
+   * Shared context for both lanes — audit data, business context, and the
+   * owner voice profile (defaulting when none is set).
+   */
+  private async buildSectionContext(campaignId: string, ctx?: RequestCtx): Promise<{
+    auditData: any;
+    businessCtx: BusinessContextFields;
+    voiceFields: OwnerVoiceFields;
+  }> {
+    const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
+    if (!auditResult) throw new Error('No business_analysis audit found');
+
+    const businessCtx = await BusinessContextService.getBusinessContext(campaignId, ctx);
+    const voiceProfile = await OwnerVoiceService.getProfile(campaignId, ctx);
+    const voiceFields: OwnerVoiceFields = voiceProfile
+      ? OwnerVoiceService.toVoiceFields(voiceProfile)
+      : DEFAULT_VOICE_FIELDS;
+
+    return { auditData: auditResult.auditData, businessCtx, voiceFields };
+  }
+
+  /**
+   * External lane — render the section's prompt with the same
+   * server-assembled variables generateSection uses, for copy/paste into
+   * an external LLM. The external answer is written back through
+   * updateSection (source: 'external').
+   */
+  async renderSectionPrompt(campaignId: string, sectionType: SectionType, ctx?: RequestCtx): Promise<string> {
+    try {
+      const { auditData, businessCtx, voiceFields } = await this.buildSectionContext(campaignId, ctx);
+      const { variables } = await this.buildSectionInputs({ campaignId, sectionType, auditData, businessCtx, voiceFields });
+      return MarketingExecutionService.getInstance().renderPrompt({
+        campaignId,
+        templateId: SECTION_TEMPLATE_IDS[sectionType],
+        variables,
+      }, ctx);
+    } catch (error) {
+      logger.error('Failed to render section prompt', ctx, { error: (error as Error).message, campaignId, sectionType });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   async generateSection(campaignId: string, sectionType: SectionType, ctx?: RequestCtx): Promise<DeliverableSection> {
     try {
-      const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
-      if (!auditResult) throw new Error('No business_analysis audit found');
-
-      const { auditData } = auditResult;
-      const businessCtx = await BusinessContextService.getBusinessContext(campaignId, ctx);
-      const voiceProfile = await OwnerVoiceService.getProfile(campaignId, ctx);
-      const voiceFields: OwnerVoiceFields = voiceProfile
-        ? OwnerVoiceService.toVoiceFields(voiceProfile)
-        : { person: 'first_person', formality: 'casual', humor: 'none', apologyStyle: 'fix_first', signoffStyle: 'first_name', signature: null };
-
-      let prompt: string;
-      let title: string;
-      let sectionIndex: number;
-
-      switch (sectionType) {
-        case 'recovery_playbook': {
-          const themes = auditData.negative_review_themes ?? [];
-          const themeClusters = themes.map((t: any) =>
-            `- ${t.theme} (${t.supporting_review_count} reviews): ${t.summary}`,
-          ).join('\n');
-          prompt = buildRecoveryPlaybookPrompt(voiceFields, businessCtx, themeClusters);
-          title = 'Recovery Playbook';
-          sectionIndex = 100;
-          break;
-        }
-
-        case 'listing_corrections': {
-          const nap = auditData.nap_consistency;
-          if (!nap) throw new Error('No NAP consistency data in audit');
-          const napVariations = [
-            ...(nap.name_variations ?? []).map((v: string) => `Name variation: ${v}`),
-            ...(nap.phone_variations ?? []).map((v: string) => `Phone variation: ${v}`),
-            ...(nap.address_variations ?? []).map((v: string) => `Address variation: ${v}`),
-          ].join('\n');
-          const platformsList = Object.keys(auditData.platforms ?? {})
-            .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
-            .join(', ');
-          prompt = buildListingCorrectionsPrompt(
-            businessCtx,
-            napVariations,
-            nap.canonical_name ?? businessCtx.businessName,
-            nap.canonical_phone ?? businessCtx.phone ?? 'N/A',
-            nap.canonical_address ?? 'N/A',
-            platformsList,
-          );
-          title = 'Listing Corrections';
-          sectionIndex = 200;
-          break;
-        }
-
-        case 'cta_fixes': {
-          const website = auditData.website;
-          if (!website) throw new Error('No website audit data');
-          const missingCtas: string[] = [];
-          if (website.has_booking === false) missingCtas.push('Online booking button');
-          if (website.call_to_action_present === 'no') missingCtas.push('Call-to-action button');
-          if (website.click_to_call_available === 'no') missingCtas.push('Click-to-call button');
-          prompt = buildCtaFixesPrompt(
-            businessCtx,
-            missingCtas.join('\n'),
-            (website.conversion_opportunities ?? []).join('\n'),
-          );
-          title = 'CTA & Website Fixes';
-          sectionIndex = 300;
-          break;
-        }
-
-        // ─── Sprint 2: Product-visibility sections (A6) ────────────────
-
-        case 'mobile_catalog_preview': {
-          const website = auditData.website;
-          const productCats = (website as any)?.product_categories_visible ?? [];
-          prompt = buildMobileCatalogPrompt(
-            businessCtx,
-            Array.isArray(productCats) ? productCats.join(', ') : String(productCats),
-          );
-          title = 'Mobile Catalog Preview';
-          sectionIndex = 400;
-          break;
-        }
-
-        case 'gbp_photo_optimization': {
-          const google = auditData.platforms?.google;
-          const photoCount = (google as any)?.photo_count ?? 0;
-          const photoTypes: string[] = (google as any)?.photo_types ?? [];
-          const knownTypes = ['storefront', 'exterior', 'interior', 'product', 'team', 'logo', 'signage'];
-          const missingTypes = knownTypes.filter((t) => !photoTypes.includes(t));
-          prompt = buildGbpPhotoOptimizationPrompt(
-            businessCtx,
-            photoCount,
-            photoTypes.join(', '),
-            missingTypes.join(', '),
-          );
-          title = 'GBP Photo Optimization';
-          sectionIndex = 500;
-          break;
-        }
-
-        case 'availability_inquiry_flow': {
-          const website = auditData.website;
-          const contactMethods: string[] = [];
-          if (businessCtx.phone) contactMethods.push(`Phone: ${businessCtx.phone} (click-to-call)`);
-          if (website && (website as any).has_availability_inquiry === false) {
-            contactMethods.push('No web-based inquiry currently');
-          }
-          if (contactMethods.length === 0) contactMethods.push('Phone only (click-to-call from GBP)');
-          prompt = buildAvailabilityInquiryFlowPrompt(
-            businessCtx,
-            contactMethods.join('\n'),
-          );
-          title = 'Availability Inquiry Flow';
-          sectionIndex = 600;
-          break;
-        }
-
-        case 'fulfillment_pathway': {
-          const website = auditData.website;
-          const fulfillmentParts: string[] = [];
-          if (website) {
-            if ((website as any).has_pickup_ordering === false) fulfillmentParts.push('No in-store/curbside pickup option');
-            if ((website as any).has_delivery_option === false) fulfillmentParts.push('No delivery option');
-          }
-          if (fulfillmentParts.length === 0) fulfillmentParts.push('No pickup or delivery options currently offered');
-          prompt = buildFulfillmentPathwayPrompt(
-            businessCtx,
-            fulfillmentParts.join('\n'),
-          );
-          title = 'Fulfillment Pathway';
-          sectionIndex = 700;
-          break;
-        }
-
-        case 'hours_sync_plan': {
-          const google = auditData.platforms?.google;
-          const specialHours = (google as any)?.special_hours_present;
-          prompt = buildHoursSyncPlanPrompt(
-            businessCtx,
-            'See GBP listing for current hours',
-            specialHours === false ? 'Not present on GBP' : specialHours === true ? 'Present on GBP' : 'Not assessed',
-            (auditData as any).business_type ?? 'Unknown',
-          );
-          title = 'Hours Sync Plan';
-          sectionIndex = 800;
-          break;
-        }
-
-        // ─── PB-08: Website-gap sections (A7) ──────────────────────────
-
-        case 'positioning_report': {
-          const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
-          const { presenceState, gapFindings } = this.describeWebPresence(auditData, websiteAudit);
-          prompt = buildPositioningReportPrompt(businessCtx, presenceState, gapFindings);
-          title = 'Web Presence Report';
-          sectionIndex = 900;
-          break;
-        }
-
-        case 'homepage_mockup': {
-          const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
-          const { presenceState } = this.describeWebPresence(auditData, websiteAudit);
-          const mustHave = this.mustHavePages(auditData, websiteAudit);
-          prompt = buildHomepageMockupPrompt(businessCtx, presenceState, mustHave);
-          title = 'Homepage Mockup';
-          sectionIndex = 910;
-          break;
-        }
-
-        case 'domain_migration_plan': {
-          const websiteAudit = await this.getWebsitePositioningAuditData(campaignId);
-          const { presenceState } = this.describeWebPresence(auditData, websiteAudit);
-          const scope = websiteAudit?.build_scope;
-          const buildScope = scope
-            ? [scope.recommended, scope.scope_notes].filter(Boolean).join(' — ')
-            : undefined;
-          prompt = buildDomainMigrationPlanPrompt(businessCtx, presenceState, buildScope);
-          title = 'Domain Migration Plan';
-          sectionIndex = 920;
-          break;
-        }
-
-        default:
-          throw new Error(`Unknown section type: ${sectionType}`);
-      }
+      const { auditData, businessCtx, voiceFields } = await this.buildSectionContext(campaignId, ctx);
+      const { variables, title, sectionIndex } = await this.buildSectionInputs({
+        campaignId, sectionType, auditData, businessCtx, voiceFields,
+      });
 
       logger.info('Generating deliverable section', ctx, { campaignId, sectionType });
 
-      const result = await aiProviderFactory.generateChatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content: 'You are preparing a deliverable section for a small business owner. Write in clear, actionable language. Output only the section content — no preamble.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        maxTokens: 1000,
-        temperature: 0.7,
-      });
+      // Normalized analyst hop — shared prompt-execution lane. Persists an
+      // execution record per section with model/token provenance.
+      const execution = await MarketingExecutionService.getInstance().executeSingle({
+        campaignId,
+        templateId: SECTION_TEMPLATE_IDS[sectionType],
+        variables,
+        executedBy: ctx?.userId,
+      }, ctx);
 
-      const content = result.content.trim();
+      const content = (execution.filtered_output ?? execution.raw_output ?? '').trim();
 
       // Check for existing section of this type
       const existing = await this.prisma.mkt_deliverable_section.findFirst({

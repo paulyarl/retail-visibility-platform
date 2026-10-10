@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MarketingBrandingService } from './MarketingBrandingService';
 import MarketingCampaignService from './MarketingCampaignService';
+import { formatFulfillContent } from './deliverable/deliverable-content-format';
 
 export type DeliverableType =
   | 'review_responses'
@@ -347,7 +348,7 @@ export class MarketingDeliverableService extends BaseService {
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 10;
 
-      const content = input.content || await this.extractContentFromExecution(input.executionId, ctx);
+      const content = input.content || await this.extractContentFromExecution(input.executionId, input.deliverableType, ctx);
       const layoutSpec = template?.layout_spec || this.getDefaultLayoutSpec(input.deliverableType);
 
       yPos = this.renderLayoutSections(doc, layoutSpec, content, {
@@ -676,7 +677,7 @@ export class MarketingDeliverableService extends BaseService {
     return yPos;
   }
 
-  private async extractContentFromExecution(executionId: string | undefined, ctx?: RequestCtx): Promise<string> {
+  private async extractContentFromExecution(executionId: string | undefined, deliverableType?: DeliverableType, ctx?: RequestCtx): Promise<string> {
     if (!executionId) return '';
     try {
       const execution = await this.prisma.mkt_prompt_executions_list.findUnique({
@@ -708,7 +709,11 @@ export class MarketingDeliverableService extends BaseService {
       } catch {
         // Not JSON — fall through to raw text
       }
-      return text;
+      // Externally-imported fulfill executions (the generic render → external
+      // → import lane) reach the PDF through this path too — run the same
+      // JSON→copy formatter so raw_json output can't render as a blob.
+      // Pass-through for non-JSON text.
+      return deliverableType ? formatFulfillContent(deliverableType, text) : text;
     } catch {
       return '';
     }

@@ -17,12 +17,29 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateDeliverableReviewSlotId } from '../../lib/id-generator';
-import aiProviderFactory from '../ai-providers';
-import { buildDeliverableReviewResponsePrompt } from './prompts';
+import { MarketingExecutionService } from '../MarketingExecutionService';
+import { ownerVoiceVariables, businessContextVariables } from './prompts';
 import type { OwnerVoiceFields, BusinessContextFields } from './prompts';
 import OwnerVoiceService, { type OwnerVoiceProfile } from './OwnerVoiceService';
 import BusinessContextService from './BusinessContextService';
 import DeliverableSourceService from './DeliverableSourceService';
+
+/**
+ * Prompt-execution template for per-slot response drafting (seeded by
+ * scripts/seed-deliverable-construction-templates.ts). The external lane
+ * pairs renderSlotPrompt with the existing updateSlotResponse write-back
+ * (response_source: 'external').
+ */
+const REVIEW_RESPONSE_TEMPLATE_ID = 'mpt-review-response-draft';
+
+const DEFAULT_VOICE_FIELDS: OwnerVoiceFields = {
+  person: 'first_person',
+  formality: 'casual',
+  humor: 'none',
+  apologyStyle: 'fix_first',
+  signoffStyle: 'first_name',
+  signature: null,
+};
 
 export interface ReviewSlot {
   id: string;
@@ -232,7 +249,7 @@ export class ReviewSlotService extends BaseService {
       const voiceProfile = await OwnerVoiceService.getProfile(campaignId, ctx);
       const voiceFields: OwnerVoiceFields = voiceProfile
         ? OwnerVoiceService.toVoiceFields(voiceProfile)
-        : { person: 'first_person', formality: 'casual', humor: 'none', apologyStyle: 'fix_first', signoffStyle: 'first_name', signature: null };
+        : DEFAULT_VOICE_FIELDS;
 
       // Get business context
       const businessCtx = await BusinessContextService.getBusinessContext(campaignId, ctx);
@@ -257,38 +274,26 @@ export class ReviewSlotService extends BaseService {
             continue;
           }
 
-          const review = {
-            platform: slot.platform ?? 'unknown',
-            rating: slot.review_rating,
-            date: slot.review_date ? slot.review_date.toISOString().split('T')[0] : null,
-            text: slot.review_text,
-          };
+          // Normalized analyst hop — shared prompt-execution lane
+          // (mpt-review-response-draft). Each slot run persists an
+          // execution record with model/token provenance.
+          const execution = await MarketingExecutionService.getInstance().executeSingle({
+            campaignId,
+            templateId: REVIEW_RESPONSE_TEMPLATE_ID,
+            variables: this.slotResponseVariables(voiceFields, businessCtx, slot),
+            executedBy: ctx?.userId,
+          }, ctx);
 
-          const prompt = buildDeliverableReviewResponsePrompt(voiceFields, businessCtx, review);
-
-          const result = await aiProviderFactory.generateChatCompletion({
-            messages: [
-              {
-                role: 'system',
-                content: 'You are drafting an owner response to a customer review. Write in the owner\'s voice — not as a marketing bot. Follow the prompt instructions precisely. Output only the response — no preamble, no explanation.',
-              },
-              { role: 'user', content: prompt },
-            ],
-            maxTokens: 200,
-            temperature: 0.7,
-          });
-
-          const responseText = result.content.trim();
-          const tokensUsed = result.usage?.totalTokens || 0;
+          const responseText = (execution.filtered_output ?? execution.raw_output ?? '').trim();
 
           await this.prisma.mkt_deliverable_review_slot.update({
             where: { id: slot.id },
             data: {
               response_text: responseText,
               response_source: 'ai',
-              response_ai_provider: result.model.split('-')[0] || 'unknown',
-              response_ai_model: result.model,
-              response_tokens_used: tokensUsed,
+              response_ai_provider: execution.ai_provider || 'unknown',
+              response_ai_model: execution.ai_model,
+              response_tokens_used: execution.tokens_used || 0,
               quality_gate_passed: true, // Basic gate — response is non-empty
               quality_gate_issues: [],
             },
@@ -324,40 +329,26 @@ export class ReviewSlotService extends BaseService {
       const voiceProfile = await OwnerVoiceService.getProfile(slot.campaign_id, ctx);
       const voiceFields: OwnerVoiceFields = voiceProfile
         ? OwnerVoiceService.toVoiceFields(voiceProfile)
-        : { person: 'first_person', formality: 'casual', humor: 'none', apologyStyle: 'fix_first', signoffStyle: 'first_name', signature: null };
+        : DEFAULT_VOICE_FIELDS;
 
       const businessCtx = await BusinessContextService.getBusinessContext(slot.campaign_id, ctx);
 
-      const review = {
-        platform: slot.platform ?? 'unknown',
-        rating: slot.review_rating,
-        date: slot.review_date ? slot.review_date.toISOString().split('T')[0] : null,
-        text: slot.review_text,
-      };
+      const execution = await MarketingExecutionService.getInstance().executeSingle({
+        campaignId: slot.campaign_id,
+        templateId: REVIEW_RESPONSE_TEMPLATE_ID,
+        variables: this.slotResponseVariables(voiceFields, businessCtx, slot),
+        executedBy: ctx?.userId,
+      }, ctx);
 
-      const prompt = buildDeliverableReviewResponsePrompt(voiceFields, businessCtx, review);
-
-      const result = await aiProviderFactory.generateChatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content: 'You are drafting an owner response to a customer review. Write in the owner\'s voice. Output only the response.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        maxTokens: 200,
-        temperature: 0.7,
-      });
-
-      const responseText = result.content.trim();
+      const responseText = (execution.filtered_output ?? execution.raw_output ?? '').trim();
       const updated = await this.prisma.mkt_deliverable_review_slot.update({
         where: { id: slotId },
         data: {
           response_text: responseText,
           response_source: 'ai',
-          response_ai_provider: result.model.split('-')[0] || 'unknown',
-          response_ai_model: result.model,
-          response_tokens_used: result.usage?.totalTokens || 0,
+          response_ai_provider: execution.ai_provider || 'unknown',
+          response_ai_model: execution.ai_model,
+          response_tokens_used: execution.tokens_used || 0,
           quality_gate_passed: true,
           quality_gate_issues: [],
           status: 'draft', // Reset to draft after re-generation
@@ -370,6 +361,55 @@ export class ReviewSlotService extends BaseService {
       logger.error('Failed to regenerate slot', ctx, { error: (error as Error).message, slotId });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * External lane — render this slot's response-draft prompt with the
+   * same server-assembled variables the internal generation uses, for
+   * copy/paste into an external LLM. The external answer is written back
+   * through updateSlotResponse (response_source: 'external').
+   */
+  async renderSlotPrompt(slotId: string, ctx?: RequestCtx): Promise<string> {
+    try {
+      const slot = await this.prisma.mkt_deliverable_review_slot.findUnique({ where: { id: slotId } });
+      if (!slot) throw new Error('Review slot not found');
+      if (!slot.review_text) throw new Error('Slot has no review text');
+
+      const voiceProfile = await OwnerVoiceService.getProfile(slot.campaign_id, ctx);
+      const voiceFields: OwnerVoiceFields = voiceProfile
+        ? OwnerVoiceService.toVoiceFields(voiceProfile)
+        : DEFAULT_VOICE_FIELDS;
+
+      const businessCtx = await BusinessContextService.getBusinessContext(slot.campaign_id, ctx);
+
+      return MarketingExecutionService.getInstance().renderPrompt({
+        campaignId: slot.campaign_id,
+        templateId: REVIEW_RESPONSE_TEMPLATE_ID,
+        variables: this.slotResponseVariables(voiceFields, businessCtx, slot),
+      }, ctx);
+    } catch (error) {
+      logger.error('Failed to render slot prompt', ctx, { error: (error as Error).message, slotId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * {{variable}} map for the mpt-review-response-draft template — the
+   * same values (and defaults) the legacy prompt builder substituted.
+   */
+  private slotResponseVariables(
+    voiceFields: OwnerVoiceFields,
+    businessCtx: BusinessContextFields,
+    slot: { platform: string | null; review_rating: number | null; review_date: Date | null; review_text: string | null },
+  ): Record<string, string> {
+    return {
+      ...businessContextVariables(businessCtx),
+      ...ownerVoiceVariables(voiceFields),
+      review_platform: slot.platform ?? 'unknown',
+      review_rating: String(slot.review_rating ?? 'N/A'),
+      review_date: slot.review_date ? slot.review_date.toISOString().split('T')[0] : 'N/A',
+      review_text: slot.review_text ?? '',
+    };
   }
 
   // ====================

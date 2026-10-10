@@ -3192,8 +3192,14 @@ export default function CampaignDetailClient({
                     setGenerating(false);
                   }
                 }}
-                disabled={generating || reviewResponsesNeedsContent}
-                title={reviewResponsesNeedsContent ? 'Review Responses are generated in the Deliverable Construction workspace' : undefined}
+                disabled={generating || sourceMaterialBusy || reviewResponsesNeedsContent}
+                title={
+                  reviewResponsesNeedsContent
+                    ? 'Review Responses are generated in the Deliverable Construction workspace'
+                    : sourceMaterialBusy
+                      ? 'Wait for the source-material run to finish — Generate uses the last committed material'
+                      : undefined
+                }
                 className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {generating ? 'Generating...' : 'Generate PDF'}

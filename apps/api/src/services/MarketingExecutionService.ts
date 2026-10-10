@@ -175,6 +175,10 @@ export class MarketingExecutionService extends BaseService {
     templateId: string;
     variables?: Record<string, any>;
     executedBy?: string;
+    // Optional generation overrides for prompts that need a non-default
+    // sampling profile (e.g. voice inference wants a low-temperature,
+    // small-output extraction pass rather than the 0.7 drafting default).
+    generation?: { temperature?: number; maxTokens?: number };
   }, ctx?: RequestCtx): Promise<any> {
     const promptService = MarketingPromptService.getInstance();
     try {
@@ -238,8 +242,8 @@ export class MarketingExecutionService extends BaseService {
             { role: 'system', content: 'You are a marketing assistant generating content for local business prospects. Follow the prompt instructions precisely.' },
             { role: 'user', content: renderedPrompt },
           ],
-          maxTokens: template.output_schema ? 6000 : 2000,
-          temperature: 0.7,
+          maxTokens: input.generation?.maxTokens ?? (template.output_schema ? 6000 : 2000),
+          temperature: input.generation?.temperature ?? 0.7,
         });
 
         const tokensUsed = result.usage?.totalTokens || 0;

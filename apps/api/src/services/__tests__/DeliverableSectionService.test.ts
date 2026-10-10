@@ -16,7 +16,7 @@ const {
   },
   mockCampaigns: { findUnique: vi.fn() },
   mockVoiceProfile: { findUnique: vi.fn() },
-  aiMock: { generateChatCompletion: vi.fn() },
+  aiMock: { executeSingle: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -35,8 +35,10 @@ vi.mock('../../lib/id-generator', () => ({
   generateDeliverableSectionId: () => 'mds-test-001',
 }));
 
-vi.mock('../ai-providers', () => ({
-  default: aiMock,
+vi.mock('../MarketingExecutionService', () => ({
+  MarketingExecutionService: {
+    getInstance: () => ({ executeSingle: aiMock.executeSingle }),
+  },
 }));
 
 // NOTE: the real errorHandler is intentionally NOT mocked. BaseService.handleError
@@ -115,10 +117,12 @@ const baseSection = (overrides: Partial<any> = {}) => ({
 describe('DeliverableSectionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    aiMock.generateChatCompletion.mockResolvedValue({
-      content: '## Pricing\nWhat usually went wrong: Customers feel the diagnostic fee is too high.\nResponse template: [template]',
-      model: 'gpt-4-test',
-      usage: { totalTokens: 200 },
+    aiMock.executeSingle.mockResolvedValue({
+      filtered_output: '## Pricing\nWhat usually went wrong: Customers feel the diagnostic fee is too high.\nResponse template: [template]',
+      raw_output: '## Pricing\nWhat usually went wrong: Customers feel the diagnostic fee is too high.\nResponse template: [template]',
+      ai_provider: 'gpt',
+      ai_model: 'gpt-4-test',
+      tokens_used: 200,
     });
   });
 
@@ -150,7 +154,7 @@ describe('DeliverableSectionService', () => {
       expect(result.generated).toContain('recovery_playbook');
       expect(result.generated).toContain('listing_corrections');
       expect(result.generated).toContain('cta_fixes');
-      expect(aiMock.generateChatCompletion).toHaveBeenCalledTimes(3);
+      expect(aiMock.executeSingle).toHaveBeenCalledTimes(3);
     });
 
     it('only generates playbook when no NAP or website issues', async () => {
@@ -176,7 +180,7 @@ describe('DeliverableSectionService', () => {
       const result = await DeliverableSectionService.getInstance().generateAllSections('mcamp-1');
 
       expect(result.generated).toEqual(['recovery_playbook']);
-      expect(aiMock.generateChatCompletion).toHaveBeenCalledOnce();
+      expect(aiMock.executeSingle).toHaveBeenCalledOnce();
     });
 
     it('skips playbook when no negative themes', async () => {

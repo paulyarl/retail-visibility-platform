@@ -6463,6 +6463,28 @@ router.post('/deliverable/voice/:campaignId/infer', async (req: any, res: Respon
   }
 });
 
+// External lane — render the voice-inference prompt with the same
+// server-assembled variables /infer uses (copy/paste into an external LLM)
+router.get('/deliverable/voice/:campaignId/render-prompt', async (req: any, res: Response) => {
+  try {
+    const renderedPrompt = await OwnerVoiceService.renderInferencePrompt(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: { rendered_prompt: renderedPrompt, template_id: 'mpt-owner-voice-inference' } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// External lane — apply the latest completed mpt-owner-voice-inference
+// execution (imported via POST /prompts/executions/external) to the profile
+router.post('/deliverable/voice/:campaignId/apply-execution', async (req: any, res: Response) => {
+  try {
+    const result = await OwnerVoiceService.applyVoiceExecution(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Create or update voice profile (manual entry or operator override)
 router.post('/deliverable/voice/:campaignId', async (req: any, res: Response) => {
   try {
@@ -6526,6 +6548,17 @@ router.post('/deliverable/slots/:slotId/regenerate', async (req: any, res: Respo
   }
 });
 
+// External lane — render this slot's response-draft prompt for an external
+// LLM; the external answer is written back via PUT /deliverable/slots/:slotId
+router.get('/deliverable/slots/:slotId/render-prompt', async (req: any, res: Response) => {
+  try {
+    const renderedPrompt = await ReviewSlotService.renderSlotPrompt(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: { rendered_prompt: renderedPrompt, template_id: 'mpt-review-response-draft' } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Edit a slot's response text
 router.put('/deliverable/slots/:slotId', async (req: any, res: Response) => {
   try {
@@ -6577,6 +6610,21 @@ router.post('/deliverable/:campaignId/sections/generate', async (req: any, res: 
   try {
     const result = await DeliverableSectionService.generateAllSections(req.params.campaignId, getCtx(req));
     res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// External lane — render a section's prompt for an external LLM; the
+// external answer is written back via PUT /deliverable/sections/:sectionId
+router.get('/deliverable/:campaignId/sections/:sectionType/render-prompt', async (req: any, res: Response) => {
+  try {
+    const renderedPrompt = await DeliverableSectionService.renderSectionPrompt(
+      req.params.campaignId,
+      req.params.sectionType,
+      getCtx(req),
+    );
+    res.json({ success: true, data: { rendered_prompt: renderedPrompt } });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

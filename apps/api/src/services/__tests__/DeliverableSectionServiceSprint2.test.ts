@@ -25,7 +25,7 @@ const {
   mockCampaigns: { findUnique: vi.fn() },
   mockVoiceProfile: { findUnique: vi.fn() },
   mockTriageGetResult: vi.fn(),
-  aiMock: { generateChatCompletion: vi.fn() },
+  aiMock: { executeSingle: vi.fn() },
 }));
 
 // Mock CampaignTriageService directly — the default export is the singleton
@@ -53,8 +53,10 @@ vi.mock('../../lib/id-generator', () => ({
   generateDeliverableSectionId: () => 'mds-sprint2-001',
 }));
 
-vi.mock('../ai-providers', () => ({
-  default: aiMock,
+vi.mock('../MarketingExecutionService', () => ({
+  MarketingExecutionService: {
+    getInstance: () => ({ executeSingle: aiMock.executeSingle }),
+  },
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
@@ -207,10 +209,12 @@ const baseSection = (overrides: Partial<any> = {}) => ({
 describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    aiMock.generateChatCompletion.mockResolvedValue({
-      content: '## Section content for product visibility...',
-      model: 'gpt-4-test',
-      usage: { totalTokens: 200 },
+    aiMock.executeSingle.mockResolvedValue({
+      filtered_output: '## Section content for product visibility...',
+      raw_output: '## Section content for product visibility...',
+      ai_provider: 'gpt',
+      ai_model: 'gpt-4-test',
+      tokens_used: 200,
     });
   });
 
@@ -239,7 +243,7 @@ describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () =>
       );
       expect(result.generated).not.toContain('recovery_playbook');
       expect(result.generated).not.toContain('cta_fixes');
-      expect(aiMock.generateChatCompletion).toHaveBeenCalledTimes(5);
+      expect(aiMock.executeSingle).toHaveBeenCalledTimes(5);
     });
 
     it('does NOT generate product-visibility sections for a service-business A1 campaign', async () => {
@@ -283,10 +287,11 @@ describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () =>
       expect(section.title).toBe('Mobile Catalog Preview');
       expect(section.sectionIndex).toBe(400);
 
-      // Verify the prompt was built with product categories
-      const callArgs = aiMock.generateChatCompletion.mock.calls[0][0];
-      expect(callArgs.messages[1].content).toContain('Produce');
-      expect(callArgs.messages[1].content).toContain('Indy African Market');
+      // Verify the execution variables carry product categories + context
+      const callArgs = aiMock.executeSingle.mock.calls[0][0];
+      expect(callArgs.templateId).toBe('mpt-deliverable-section-mobile-catalog');
+      expect(callArgs.variables.product_categories).toContain('Produce');
+      expect(callArgs.variables.business_name).toContain('Indy African Market');
     });
   });
 
@@ -307,10 +312,11 @@ describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () =>
       expect(section.title).toBe('GBP Photo Optimization');
       expect(section.sectionIndex).toBe(500);
 
-      const callArgs = aiMock.generateChatCompletion.mock.calls[0][0];
+      const callArgs = aiMock.executeSingle.mock.calls[0][0];
+      expect(callArgs.templateId).toBe('mpt-deliverable-section-gbp-photo');
       // Photo count = 3, photo_types = ['logo'] → missing storefront, exterior, etc.
-      expect(callArgs.messages[1].content).toContain('3');
-      expect(callArgs.messages[1].content).toContain('storefront');
+      expect(callArgs.variables.photo_count).toBe('3');
+      expect(callArgs.variables.photo_types_missing).toContain('storefront');
     });
   });
 
@@ -331,9 +337,10 @@ describe('DeliverableSectionService — Sprint 2 (A6 product-visibility)', () =>
       expect(section.title).toBe('Hours Sync Plan');
       expect(section.sectionIndex).toBe(800);
 
-      const callArgs = aiMock.generateChatCompletion.mock.calls[0][0];
-      expect(callArgs.messages[1].content).toContain('Not present on GBP');
-      expect(callArgs.messages[1].content).toContain('product');
+      const callArgs = aiMock.executeSingle.mock.calls[0][0];
+      expect(callArgs.templateId).toBe('mpt-deliverable-section-hours-sync');
+      expect(callArgs.variables.special_hours_status).toBe('Not present on GBP');
+      expect(callArgs.variables.business_type).toBe('product');
     });
   });
 

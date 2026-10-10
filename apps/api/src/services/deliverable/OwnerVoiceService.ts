@@ -15,9 +15,16 @@ import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { generateOwnerVoiceProfileId } from '../../lib/id-generator';
 import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
-import aiProviderFactory from '../ai-providers';
-import { buildVoiceInferencePrompt } from './prompts';
+import { MarketingExecutionService } from '../MarketingExecutionService';
 import type { OwnerVoiceFields } from './prompts';
+
+/**
+ * Prompt-execution template for voice inference (seeded by
+ * scripts/seed-deliverable-construction-templates.ts). Carries the
+ * `raw_json` output schema so the generic external-import endpoint
+ * accepts analyst output for this hop.
+ */
+const VOICE_INFERENCE_TEMPLATE_ID = 'mpt-owner-voice-inference';
 
 export interface OwnerVoiceProfile {
   id: string;
@@ -141,121 +148,215 @@ export class OwnerVoiceService extends BaseService {
   /**
    * AI-infer the voice profile from existing owner responses found in the
    * audit data. Requires >= 3 existing responses to infer reliably.
-   * Returns the inferred profile (not yet persisted — caller upserts).
+   * Persists the inferred profile (preserving operator overrides) and
+   * returns the inference result.
    */
   async inferVoice(campaignId: string, ctx?: RequestCtx): Promise<VoiceInferenceResult> {
     try {
-      // Fetch the latest business_analysis audit
-      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
-        where: { id: campaignId },
-        include: { mkt_audits_list: { orderBy: { created_at: 'desc' } } },
-      });
-      if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
-
-      const businessAudits = (campaign.mkt_audits_list || [])
-        .filter((a: any) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a))
-        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      if (businessAudits.length === 0) {
-        throw new Error('No business_analysis audit found for this campaign');
-      }
-
-      const auditData = businessAudits[0].audit_data as any;
-
-      // Extract existing owner responses from audit data
-      const ownerResponses = this.extractExistingOwnerResponses(auditData);
-
-      if (ownerResponses.length < 3) {
-        throw new Error(
-          `Only ${ownerResponses.length} existing owner response(s) found — need at least 3 to infer voice. ` +
-          'Create a manual profile instead.',
-        );
-      }
-
-      const sampleText = ownerResponses.slice(0, 10).map((r, i) => `Response ${i + 1}:\n${r}`).join('\n\n');
-      const prompt = buildVoiceInferencePrompt(sampleText);
+      const { ownerResponses, sampleText } = await this.gatherInferenceContext(campaignId, ctx);
 
       logger.info('Inferring owner voice from existing responses', ctx, {
         campaignId,
         responseCount: ownerResponses.length,
       });
 
-      const result = await aiProviderFactory.generateChatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at analyzing writing voice patterns. Return only valid JSON.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        maxTokens: 300,
-        temperature: 0.3, // Low temp — we want consistent analysis
-      });
+      // Normalized analyst hop — shared prompt-execution lane
+      // (mpt-owner-voice-inference). The generation override keeps the
+      // low-temperature extraction profile this pass was tuned for.
+      const execution = await MarketingExecutionService.getInstance().executeSingle({
+        campaignId,
+        templateId: VOICE_INFERENCE_TEMPLATE_ID,
+        variables: { owner_responses: sampleText },
+        executedBy: ctx?.userId,
+        generation: { temperature: 0.3, maxTokens: 300 },
+      }, ctx);
 
-      const content = result.content.trim();
-      // Parse JSON — handle potential markdown code fences
-      const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const parsed = JSON.parse(jsonStr);
+      const parsed = this.parseVoiceInferenceOutput(
+        (execution.filtered_output ?? execution.raw_output ?? '').trim(),
+      );
 
-      const inferred: VoiceInferenceResult = {
-        person: parsed.person ?? 'first_person',
-        formality: parsed.formality ?? 'casual',
-        humor: parsed.humor ?? 'none',
-        apologyStyle: parsed.apology_style ?? 'fix_first',
-        signoffStyle: parsed.signoff_style ?? 'first_name',
-        signature: parsed.signature ?? null,
-        inferredFromCount: ownerResponses.length,
-        inferredSample: sampleText.substring(0, 2000), // Cap stored sample
-      };
-
-      // Persist the inferred profile
-      const id = generateOwnerVoiceProfileId();
-      const existing = await this.prisma.mkt_owner_voice_profile.findUnique({
-        where: { campaign_id: campaignId },
-      });
-
-      if (existing) {
-        // Update existing — preserve operator overrides
-        const overrides = existing.operator_overrides as any || {};
-        const updateData: any = {
-          person: overrides.person ? existing.person : inferred.person,
-          formality: overrides.formality ? existing.formality : inferred.formality,
-          humor: overrides.humor ? existing.humor : inferred.humor,
-          apology_style: overrides.apology_style ? existing.apology_style : inferred.apologyStyle,
-          signoff_style: overrides.signoff_style ? existing.signoff_style : inferred.signoffStyle,
-          signature: overrides.signature ? existing.signature : inferred.signature,
-          inferred_from_count: inferred.inferredFromCount,
-          inferred_sample: inferred.inferredSample,
-        };
-        await this.prisma.mkt_owner_voice_profile.update({
-          where: { campaign_id: campaignId },
-          data: updateData,
-        });
-        logger.info('Owner voice profile updated (AI-inferred, preserving overrides)', ctx, { campaignId });
-      } else {
-        await this.prisma.mkt_owner_voice_profile.create({
-          data: {
-            id,
-            campaign_id: campaignId,
-            person: inferred.person,
-            formality: inferred.formality,
-            humor: inferred.humor,
-            apology_style: inferred.apologyStyle,
-            signoff_style: inferred.signoffStyle,
-            signature: inferred.signature,
-            inferred_from_count: inferred.inferredFromCount,
-            inferred_sample: inferred.inferredSample,
-            operator_overrides: {},
-          },
-        });
-        logger.info('Owner voice profile created (AI-inferred)', ctx, { campaignId, profileId: id });
-      }
-
-      return inferred;
+      return this.persistInferredVoice(campaignId, parsed, ownerResponses.length, sampleText, ctx);
     } catch (error) {
       logger.error('Failed to infer owner voice', ctx, { error: (error as Error).message, campaignId });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * External lane — render the voice-inference prompt with the same
+   * server-assembled variables inferVoice uses, for copy/paste into an
+   * external LLM when the internal analyst is unavailable.
+   */
+  async renderInferencePrompt(campaignId: string, ctx?: RequestCtx): Promise<string> {
+    try {
+      const { sampleText } = await this.gatherInferenceContext(campaignId, ctx);
+      return MarketingExecutionService.getInstance().renderPrompt({
+        campaignId,
+        templateId: VOICE_INFERENCE_TEMPLATE_ID,
+        variables: { owner_responses: sampleText },
+      }, ctx);
+    } catch (error) {
+      logger.error('Failed to render voice inference prompt', ctx, {
+        error: (error as Error).message, campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * External lane — apply the latest completed mpt-owner-voice-inference
+   * execution to the campaign's voice profile. Pairs with the generic
+   * external-import endpoint (template carries the raw_json schema):
+   * render prompt → external LLM → POST /prompts/executions/external →
+   * this apply. The imported execution's raw JSON is parsed and persisted
+   * with the same operator-override preservation as inferVoice.
+   */
+  async applyVoiceExecution(campaignId: string, ctx?: RequestCtx): Promise<VoiceInferenceResult> {
+    try {
+      const { ownerResponses, sampleText } = await this.gatherInferenceContext(campaignId, ctx);
+
+      const execution = await this.prisma.mkt_prompt_executions_list.findFirst({
+        where: {
+          campaign_id: campaignId,
+          template_id: VOICE_INFERENCE_TEMPLATE_ID,
+          status: 'completed',
+        },
+        orderBy: { executed_at: 'desc' },
+      });
+      if (!execution?.raw_output && !execution?.filtered_output) {
+        throw new Error(
+          'No completed voice-inference execution found — render the prompt and import the external output first.',
+        );
+      }
+
+      const parsed = this.parseVoiceInferenceOutput(
+        (execution.filtered_output ?? execution.raw_output ?? '').trim(),
+      );
+
+      return this.persistInferredVoice(campaignId, parsed, ownerResponses.length, sampleText, ctx);
+    } catch (error) {
+      logger.error('Failed to apply voice inference execution', ctx, {
+        error: (error as Error).message, campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Shared context for all voice-inference lanes: latest non-stub
+   * business_analysis audit → existing owner responses (>= 3 required)
+   * → the numbered sample block the prompt consumes.
+   */
+  private async gatherInferenceContext(campaignId: string, ctx?: RequestCtx): Promise<{
+    ownerResponses: string[];
+    sampleText: string;
+  }> {
+    // Fetch the latest business_analysis audit
+    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      include: { mkt_audits_list: { orderBy: { created_at: 'desc' } } },
+    });
+    if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
+
+    const businessAudits = (campaign.mkt_audits_list || [])
+      .filter((a: any) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a))
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    if (businessAudits.length === 0) {
+      throw new Error('No business_analysis audit found for this campaign');
+    }
+
+    const auditData = businessAudits[0].audit_data as any;
+
+    // Extract existing owner responses from audit data
+    const ownerResponses = this.extractExistingOwnerResponses(auditData);
+
+    if (ownerResponses.length < 3) {
+      throw new Error(
+        `Only ${ownerResponses.length} existing owner response(s) found — need at least 3 to infer voice. ` +
+        'Create a manual profile instead.',
+      );
+    }
+
+    const sampleText = ownerResponses.slice(0, 10).map((r, i) => `Response ${i + 1}:\n${r}`).join('\n\n');
+    return { ownerResponses, sampleText };
+  }
+
+  /**
+   * Parse the voice-inference JSON out of an execution's stored output —
+   * handles potential markdown code fences.
+   */
+  private parseVoiceInferenceOutput(content: string): any {
+    const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(jsonStr);
+  }
+
+  /**
+   * Map parsed inference JSON to the result shape and persist the profile —
+   * create or update, always preserving operator-overridden fields.
+   */
+  private async persistInferredVoice(
+    campaignId: string,
+    parsed: any,
+    responseCount: number,
+    sampleText: string,
+    ctx?: RequestCtx,
+  ): Promise<VoiceInferenceResult> {
+    const inferred: VoiceInferenceResult = {
+      person: parsed.person ?? 'first_person',
+      formality: parsed.formality ?? 'casual',
+      humor: parsed.humor ?? 'none',
+      apologyStyle: parsed.apology_style ?? 'fix_first',
+      signoffStyle: parsed.signoff_style ?? 'first_name',
+      signature: parsed.signature ?? null,
+      inferredFromCount: responseCount,
+      inferredSample: sampleText.substring(0, 2000), // Cap stored sample
+    };
+
+    // Persist the inferred profile
+    const id = generateOwnerVoiceProfileId();
+    const existing = await this.prisma.mkt_owner_voice_profile.findUnique({
+      where: { campaign_id: campaignId },
+    });
+
+    if (existing) {
+      // Update existing — preserve operator overrides
+      const overrides = existing.operator_overrides as any || {};
+      const updateData: any = {
+        person: overrides.person ? existing.person : inferred.person,
+        formality: overrides.formality ? existing.formality : inferred.formality,
+        humor: overrides.humor ? existing.humor : inferred.humor,
+        apology_style: overrides.apology_style ? existing.apology_style : inferred.apologyStyle,
+        signoff_style: overrides.signoff_style ? existing.signoff_style : inferred.signoffStyle,
+        signature: overrides.signature ? existing.signature : inferred.signature,
+        inferred_from_count: inferred.inferredFromCount,
+        inferred_sample: inferred.inferredSample,
+      };
+      await this.prisma.mkt_owner_voice_profile.update({
+        where: { campaign_id: campaignId },
+        data: updateData,
+      });
+      logger.info('Owner voice profile updated (AI-inferred, preserving overrides)', ctx, { campaignId });
+    } else {
+      await this.prisma.mkt_owner_voice_profile.create({
+        data: {
+          id,
+          campaign_id: campaignId,
+          person: inferred.person,
+          formality: inferred.formality,
+          humor: inferred.humor,
+          apology_style: inferred.apologyStyle,
+          signoff_style: inferred.signoffStyle,
+          signature: inferred.signature,
+          inferred_from_count: inferred.inferredFromCount,
+          inferred_sample: inferred.inferredSample,
+          operator_overrides: {},
+        },
+      });
+      logger.info('Owner voice profile created (AI-inferred)', ctx, { campaignId, profileId: id });
+    }
+
+    return inferred;
   }
 
   /**

@@ -22,7 +22,7 @@
 
 // ─── Owner Voice Inference ───────────────────────────────────────────────
 
-const VOICE_INFERENCE_PROMPT = `You are analyzing a small business owner's existing review responses to infer their writing voice.
+export const VOICE_INFERENCE_PROMPT = `You are analyzing a small business owner's existing review responses to infer their writing voice.
 
 Existing owner responses (from Google Business Profile, Yelp, etc.):
 {{owner_responses}}
@@ -50,7 +50,7 @@ Output the JSON object only — no preamble, no explanation.`;
 
 // ─── Deliverable Review Response (owner-voice-extended) ──────────────────
 
-const DELIVERABLE_REVIEW_RESPONSE_PROMPT = `You are drafting an owner response to a customer review for {{business_name}}.
+export const DELIVERABLE_REVIEW_RESPONSE_PROMPT = `You are drafting an owner response to a customer review for {{business_name}}.
 Write in the owner's voice — not as a marketing bot. The response should sound
 like the owner personally sat down and typed it.
 
@@ -84,7 +84,7 @@ Output the response only — no preamble, no explanation.`;
 
 // ─── Recovery Playbook ───────────────────────────────────────────────────
 
-const RECOVERY_PLAYBOOK_PROMPT = `You are writing a recovery playbook for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const RECOVERY_PLAYBOOK_PROMPT = `You are writing a recovery playbook for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 The playbook gives the owner ready-to-use response templates for each recurring
 negative theme in their reviews. These are templates the owner can adapt — not
@@ -113,7 +113,7 @@ Output as structured text with clear section breaks between themes.`;
 
 // ─── Listing Corrections ─────────────────────────────────────────────────
 
-const LISTING_CORRECTIONS_PROMPT = `You are preparing listing correction recommendations for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const LISTING_CORRECTIONS_PROMPT = `You are preparing listing correction recommendations for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 NAP consistency audit found these variations across platforms:
 {{nap_variations}}
@@ -140,7 +140,7 @@ Output as structured text with clear section breaks.`;
 
 // ─── CTA/Website Fixes ───────────────────────────────────────────────────
 
-const CTA_FIXES_PROMPT = `You are preparing website CTA recommendations for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const CTA_FIXES_PROMPT = `You are preparing website CTA recommendations for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Website: {{website_url}}
 
@@ -274,7 +274,7 @@ export function buildCtaFixesPrompt(
 
 // ─── Mobile Catalog Preview (A6 — Product Visibility) ────────────────────
 
-const MOBILE_CATALOG_PROMPT = `You are preparing a mobile shelf-visibility mockup for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const MOBILE_CATALOG_PROMPT = `You are preparing a mobile shelf-visibility mockup for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 This business's storefront is indexed but its inventory is not — customers have no way to see what's on the physical shelves before visiting. The goal is a lightweight, mobile-first shelf catalog that shows what products are carried — not a full e-commerce store and never a shipping operation. Shoppers browse on their phone, then walk in and buy at the counter.
 
@@ -304,7 +304,7 @@ Output as structured text.`;
 
 // ─── GBP Photo Optimization (A6 — Product Visibility) ────────────────────
 
-const GBP_PHOTO_OPTIMIZATION_PROMPT = `You are preparing a Google Business Profile photo optimization plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const GBP_PHOTO_OPTIMIZATION_PROMPT = `You are preparing a Google Business Profile photo optimization plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current GBP photo audit:
 - Total photos: {{photo_count}}
@@ -331,7 +331,7 @@ Output as structured text.`;
 
 // ─── Availability Inquiry Flow (A6 — Product Visibility) ─────────────────
 
-const AVAILABILITY_INQUIRY_FLOW_PROMPT = `You are designing an availability-inquiry flow for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const AVAILABILITY_INQUIRY_FLOW_PROMPT = `You are designing an availability-inquiry flow for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current contact methods:
 {{contact_methods}}
@@ -362,7 +362,7 @@ Output as structured text.`;
 
 // ─── Fulfillment Pathway (A6 — Product Visibility) ───────────────────────
 
-const FULFILLMENT_PATHWAY_PROMPT = `You are preparing a counter-fulfillment pathway setup plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const FULFILLMENT_PATHWAY_PROMPT = `You are preparing a counter-fulfillment pathway setup plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current fulfillment status:
 {{fulfillment_status}}
@@ -400,7 +400,7 @@ Output as structured text.`;
 
 // ─── Hours Sync Plan (A6 — Product Visibility) ───────────────────────────
 
-const HOURS_SYNC_PLAN_PROMPT = `You are preparing an hours + holiday-hours synchronization plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const HOURS_SYNC_PLAN_PROMPT = `You are preparing an hours + holiday-hours synchronization plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current hours status:
 - GBP regular hours: {{regular_hours_status}}
@@ -522,7 +522,7 @@ export function buildHoursSyncPlanPrompt(
 
 // ─── Website Gap (A7 — PB-08) ────────────────────────────────────────────
 
-const POSITIONING_REPORT_PROMPT = `You are preparing a web-presence positioning report for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const POSITIONING_REPORT_PROMPT = `You are preparing a web-presence positioning report for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current web-presence state: {{presence_state}}
 Known website-gap findings: {{gap_findings}}
@@ -545,7 +545,7 @@ Keep it specific to this business and category. No pricing.
 
 Output as structured text.`;
 
-const HOMEPAGE_MOCKUP_PROMPT = `You are preparing a homepage mockup description for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const HOMEPAGE_MOCKUP_PROMPT = `You are preparing a homepage mockup description for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current web-presence state: {{presence_state}}
 Must-have pages: {{must_have_pages}}
@@ -566,7 +566,7 @@ Task: Describe the proposed homepage in enough detail that the owner can picture
 
 Output as structured text.`;
 
-const DOMAIN_MIGRATION_PLAN_PROMPT = `You are preparing a domain migration plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+export const DOMAIN_MIGRATION_PLAN_PROMPT = `You are preparing a domain migration plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
 
 Current web-presence state: {{presence_state}}
 {{build_scope}}
@@ -631,4 +631,35 @@ export function buildDomainMigrationPlanPrompt(
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{presence_state}}', presenceState || 'No owned website detected')
     .replace('{{build_scope}}', buildScope ? `Recommended build scope: ${buildScope}` : '');
+}
+
+// ─── Execution-layer variable maps ─────────────────────────────────────────
+// The prompt constants above are seeded into mpt_prompt_templates_list (see
+// src/scripts/seed-deliverable-construction-templates.ts) and rendered through
+// MarketingExecutionService.resolvePrompt. These maps produce the {{variable}}
+// values passed as `variables` — the same substitution semantics (and the same
+// defaults) as the legacy .replace() builders above.
+
+export function ownerVoiceVariables(voice: OwnerVoiceFields): Record<string, string> {
+  return {
+    voice_person: voice.person ?? 'first_person',
+    voice_formality: voice.formality ?? 'casual',
+    voice_humor: voice.humor ?? 'none',
+    voice_apology_style: voice.apologyStyle ?? 'fix_first',
+    voice_signoff_style: voice.signoffStyle ?? 'first_name',
+    voice_signature: voice.signature ?? '',
+  };
+}
+
+export function businessContextVariables(ctx: BusinessContextFields): Record<string, string> {
+  return {
+    business_name: ctx.businessName,
+    business_category: ctx.businessCategory,
+    business_origin: ctx.businessOrigin ?? 'unspecified',
+    business_city: ctx.city ?? '',
+    business_state: ctx.state ?? '',
+    business_phone: ctx.phone ?? 'N/A',
+    business_website: ctx.websiteUrl ?? 'N/A',
+    campaign_tone: ctx.campaignTone,
+  };
 }

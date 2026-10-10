@@ -21,7 +21,7 @@ const {
   // G-1b review-intake lookup (DeliverableSourceService.getReviewIntake) —
   // default null so ingest falls back to the audit path.
   mockPromptExecutions: { findFirst: vi.fn().mockResolvedValue(null) },
-  aiMock: { generateChatCompletion: vi.fn() },
+  aiMock: { executeSingle: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
@@ -42,8 +42,10 @@ vi.mock('../../lib/id-generator', () => ({
   generateDeliverableReviewSlotId: () => 'mdrs-test-001',
 }));
 
-vi.mock('../ai-providers', () => ({
-  default: aiMock,
+vi.mock('../MarketingExecutionService', () => ({
+  MarketingExecutionService: {
+    getInstance: () => ({ executeSingle: aiMock.executeSingle }),
+  },
 }));
 
 vi.mock('../../middleware/errorHandler', () => ({
@@ -125,10 +127,12 @@ const baseSlot = (overrides: Partial<any> = {}) => ({
 describe('ReviewSlotService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    aiMock.generateChatCompletion.mockResolvedValue({
-      content: 'Hi Jennifer — you\'re right, the trip fee should have been clearer. We\'ve updated our intake process. — Sarah',
-      model: 'gpt-4-test',
-      usage: { totalTokens: 85 },
+    aiMock.executeSingle.mockResolvedValue({
+      filtered_output: 'Hi Jennifer — you\'re right, the trip fee should have been clearer. We\'ve updated our intake process. — Sarah',
+      raw_output: 'Hi Jennifer — you\'re right, the trip fee should have been clearer. We\'ve updated our intake process. — Sarah',
+      ai_provider: 'gpt',
+      ai_model: 'gpt-4-test',
+      tokens_used: 85,
     });
   });
 
@@ -216,7 +220,7 @@ describe('ReviewSlotService', () => {
       const result = await ReviewSlotService.getInstance().generateAllResponses('mcamp-1');
 
       expect(result.generated).toBe(2);
-      expect(aiMock.generateChatCompletion).toHaveBeenCalledTimes(2);
+      expect(aiMock.executeSingle).toHaveBeenCalledTimes(2);
       expect(mockSlots.update).toHaveBeenCalledTimes(2);
     });
 
@@ -227,7 +231,7 @@ describe('ReviewSlotService', () => {
 
       const result = await ReviewSlotService.getInstance().generateAllResponses('mcamp-1');
       expect(result.generated).toBe(0);
-      expect(aiMock.generateChatCompletion).not.toHaveBeenCalled();
+      expect(aiMock.executeSingle).not.toHaveBeenCalled();
     });
 
     it('uses owner voice profile when available', async () => {
@@ -242,11 +246,12 @@ describe('ReviewSlotService', () => {
 
       await ReviewSlotService.getInstance().generateAllResponses('mcamp-1');
 
-      // Check the prompt sent to AI includes voice fields
-      const callArgs = aiMock.generateChatCompletion.mock.calls[0][0];
-      expect(callArgs.messages[1].content).toContain('we'); // voice person
-      expect(callArgs.messages[1].content).toContain('formal'); // voice formality
-      expect(callArgs.messages[1].content).toContain('- The Team'); // signature
+      // Check the variables passed to the prompt execution include voice fields
+      const callArgs = aiMock.executeSingle.mock.calls[0][0];
+      expect(callArgs.templateId).toBe('mpt-review-response-draft');
+      expect(callArgs.variables.voice_person).toBe('we');
+      expect(callArgs.variables.voice_formality).toBe('formal');
+      expect(callArgs.variables.voice_signature).toBe('- The Team');
     });
 
     it('records errors for slots without review text', async () => {
@@ -278,7 +283,7 @@ describe('ReviewSlotService', () => {
       expect(result.responseText).toContain('Hi Jennifer');
       expect(result.responseSource).toBe('ai');
       expect(result.status).toBe('draft'); // reset to draft after regen
-      expect(aiMock.generateChatCompletion).toHaveBeenCalledOnce();
+      expect(aiMock.executeSingle).toHaveBeenCalledOnce();
     });
 
     it('throws when slot not found', async () => {
