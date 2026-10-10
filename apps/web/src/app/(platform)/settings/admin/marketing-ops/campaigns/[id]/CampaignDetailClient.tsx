@@ -384,11 +384,16 @@ export default function CampaignDetailClient({
   const [smCopied, setSmCopied] = useState(false);
   const [reviewIntakeText, setReviewIntakeText] = useState('');
   const [reviewIntakeBusy, setReviewIntakeBusy] = useState(false);
-  const [modalNotice, setModalNotice] = useState<string | null>(null);
+  const [modalNotice, setModalNotice] = useState<{ text: string; tone: 'ok' | 'warn' | 'err' } | null>(null);
+  // The Generate modal splits two tasks across tabs: 'deliverable' is the
+  // generation form; 'source' is the analyst-input workshop that feeds it.
+  const [genModalTab, setGenModalTab] = useState<'deliverable' | 'source'>('deliverable');
 
-  // Step numbering in the Generate modal is lane-aware: the external lane
-  // spends two steps on source material (render → import), the AI lane one.
-  const smStepCount = sourceMaterialMode === 'external' ? 2 : 1;
+  // review_responses has a dedicated construction workflow — the route
+  // hard-400s without explicit content, so the primary action is disabled
+  // rather than left to fail.
+  const reviewResponsesNeedsContent =
+    genForm.deliverableType === 'review_responses' && !genForm.content.trim();
 
   const fetchCampaign = useCallback(async () => {
     setLoading(true);
@@ -570,6 +575,7 @@ export default function CampaignDetailClient({
     if (!showGenerateModal) return;
     let cancelled = false;
     setModalNotice(null);
+    setGenModalTab('deliverable');
     (async () => {
       try {
         const [elig, material] = await Promise.all([
@@ -2752,7 +2758,7 @@ export default function CampaignDetailClient({
 
       {showGenerateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-lg w-full">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Generate Deliverable</h2>
               <button
@@ -2763,10 +2769,48 @@ export default function CampaignDetailClient({
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Source-material readiness (spec §9.1) — dual-execution lanes:
-                  internal AI run, or render → external LLM → validated import. */}
-              <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3">
+            {/* Two tasks, two tabs — 'deliverable' is the generation form;
+                'source' is the analyst-input workshop (internal AI run, or
+                external render → import) that feeds it (spec §9.1). */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 px-6">
+              {([
+                ['deliverable', 'Deliverable'],
+                ['source', 'Source material'],
+              ] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  onClick={() => setGenModalTab(tab)}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    genModalTab === tab
+                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {modalNotice && (
+                <p
+                  className={`text-xs ${
+                    modalNotice.tone === 'ok'
+                      ? 'text-green-600 dark:text-green-400'
+                      : modalNotice.tone === 'err'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                  }`}
+                >
+                  {modalNotice.text}
+                </p>
+              )}
+
+              {genModalTab === 'source' ? (
+                <>
+                  {/* Source-material readiness (spec §9.1) — dual-execution lanes:
+                      internal AI run, or render → external LLM → validated import. */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm">
                     <span className="font-medium text-gray-700 dark:text-gray-300">Source material:</span>{' '}
@@ -2813,9 +2857,9 @@ export default function CampaignDetailClient({
                           try {
                             const r = await marketingOpsService.generateDeliverableSourceMaterial(campaignId);
                             setSourceMaterialReady(Boolean(r?.sourceMaterial));
-                            if (!r?.sourceMaterial) setModalNotice('Source material ran but returned no content.');
+                            if (!r?.sourceMaterial) setModalNotice({ text: 'Source material ran but returned no content.', tone: 'warn' });
                           } catch (err: any) {
-                            setModalNotice(err.message || 'Failed to generate source material');
+                            setModalNotice({ text: err.message || 'Failed to generate source material', tone: 'err' });
                           } finally {
                             setSourceMaterialBusy(false);
                           }
@@ -2843,7 +2887,7 @@ export default function CampaignDetailClient({
                               setSmRenderedPrompt(r.renderedPrompt);
                               setSmSnapshotHash(r.snapshotHash);
                             } catch (err: any) {
-                              setModalNotice(err.message || 'Failed to render source material prompt');
+                              setModalNotice({ text: err.message || 'Failed to render source material prompt', tone: 'err' });
                             } finally {
                               setSourceMaterialBusy(false);
                             }
@@ -2903,7 +2947,7 @@ export default function CampaignDetailClient({
                         <button
                           onClick={async () => {
                             if (!smPastedOutput.trim()) {
-                              setModalNotice('Paste the external LLM output before importing');
+                              setModalNotice({ text: 'Paste the external LLM output before importing', tone: 'warn' });
                               return;
                             }
                             setSourceMaterialBusy(true);
@@ -2916,9 +2960,9 @@ export default function CampaignDetailClient({
                               );
                               setSourceMaterialReady(Boolean(r?.sourceMaterial));
                               setSmPastedOutput('');
-                              if (!r?.sourceMaterial) setModalNotice('Import accepted but produced no source material content.');
+                              if (!r?.sourceMaterial) setModalNotice({ text: 'Import accepted but produced no source material content.', tone: 'warn' });
                             } catch (err: any) {
-                              setModalNotice(err.message || 'Failed to import source material');
+                              setModalNotice({ text: err.message || 'Failed to import source material', tone: 'err' });
                             } finally {
                               setSourceMaterialBusy(false);
                             }
@@ -2947,12 +2991,61 @@ export default function CampaignDetailClient({
                 )}
               </div>
 
-              {modalNotice && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">{modalNotice}</p>
-              )}
+              {/* Review intake — verbatim reviews parsed by mpt-review-intake
+                  into review_intake source material (feeds testimonial_cards
+                  and the review_responses construction workspace). */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paste reviews (source)</label>
+                <textarea
+                  rows={3}
+                  value={reviewIntakeText}
+                  onChange={(e) => setReviewIntakeText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="Paste reviews verbatim from Google/Yelp/Facebook. These are parsed into source material."
+                />
+                <button
+                  onClick={async () => {
+                    setReviewIntakeBusy(true);
+                    setModalNotice(null);
+                    try {
+                      const r = await marketingOpsService.ingestReviewIntake(campaignId, reviewIntakeText);
+                      const n = r?.intake?.reviews?.length ?? 0;
+                      setModalNotice({ text: `Parsed ${n} review(s). Re-generate source material to apply.`, tone: 'ok' });
+                      setReviewIntakeText('');
+                    } catch (err: any) {
+                      setModalNotice({ text: err.message || 'Failed to parse reviews', tone: 'err' });
+                    } finally {
+                      setReviewIntakeBusy(false);
+                    }
+                  }}
+                  disabled={reviewIntakeBusy || !reviewIntakeText.trim()}
+                  className="mt-2 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {reviewIntakeBusy ? 'Parsing…' : 'Parse & save reviews'}
+                </button>
+              </div>
+                </>
+              ) : (
+                <>
+                  {/* Compact readiness banner — the workshop is one tab over. */}
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Source material:</span>{' '}
+                    {sourceMaterialReady === null
+                      ? <span className="text-gray-500">checking…</span>
+                      : sourceMaterialReady
+                        ? <span className="text-green-600 dark:text-green-400">ready</span>
+                        : <span className="text-amber-600 dark:text-amber-400">not generated</span>}
+                    {' · '}
+                    <button
+                      onClick={() => setGenModalTab('source')}
+                      className="text-xs text-blue-600 dark:text-blue-400 underline"
+                    >
+                      {sourceMaterialReady ? 'regenerate / import' : 'generate it'}
+                    </button>
+                  </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{`Step ${smStepCount + 1} — Deliverable type`}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deliverable type</label>
                 <select
                   value={genForm.deliverableType}
                   onChange={(e) => setGenForm({ ...genForm, deliverableType: e.target.value as DeliverableType })}
@@ -3036,41 +3129,8 @@ export default function CampaignDetailClient({
                 </select>
               </div>
 
-              {(genForm.deliverableType === 'review_responses' || genForm.deliverableType === 'testimonial_cards') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paste reviews (source)</label>
-                  <textarea
-                    rows={3}
-                    value={reviewIntakeText}
-                    onChange={(e) => setReviewIntakeText(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
-                    placeholder="Paste reviews verbatim from Google/Yelp/Facebook. These are parsed into source material."
-                  />
-                  <button
-                    onClick={async () => {
-                      setReviewIntakeBusy(true);
-                      setModalNotice(null);
-                      try {
-                        const r = await marketingOpsService.ingestReviewIntake(campaignId, reviewIntakeText);
-                        const n = r?.intake?.reviews?.length ?? 0;
-                        setModalNotice(`Parsed ${n} review(s). Re-generate source material to apply.`);
-                        setReviewIntakeText('');
-                      } catch (err: any) {
-                        setModalNotice(err.message || 'Failed to parse reviews');
-                      } finally {
-                        setReviewIntakeBusy(false);
-                      }
-                    }}
-                    disabled={reviewIntakeBusy || !reviewIntakeText.trim()}
-                    className="mt-2 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    {reviewIntakeBusy ? 'Parsing…' : 'Parse & save reviews'}
-                  </button>
-                </div>
-              )}
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{`Step ${smStepCount + 2} — Content (optional — overrides source material)`}</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content (optional — overrides source material)</label>
                 <textarea
                   rows={4}
                   value={genForm.content}
@@ -3078,6 +3138,9 @@ export default function CampaignDetailClient({
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
                   placeholder="Custom content for the deliverable. Leave empty to build from source material."
                 />
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                  Pasted content renders verbatim — it skips analyst generation, formatting, and the claim CTA.
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -3092,10 +3155,16 @@ export default function CampaignDetailClient({
                   Generate as preview (watermarked)
                 </label>
               </div>
+                </>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-              <p className="mr-auto text-xs font-medium text-gray-600 dark:text-gray-300">{`Step ${smStepCount + 3} — Generate the PDF`}</p>
+              {reviewResponsesNeedsContent && (
+                <p className="mr-auto text-xs text-amber-600 dark:text-amber-400">
+                  Review Responses generate in the construction workspace — paste finished responses above to override.
+                </p>
+              )}
               <button
                 onClick={() => setShowGenerateModal(false)}
                 className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
@@ -3123,7 +3192,8 @@ export default function CampaignDetailClient({
                     setGenerating(false);
                   }
                 }}
-                disabled={generating}
+                disabled={generating || reviewResponsesNeedsContent}
+                title={reviewResponsesNeedsContent ? 'Review Responses are generated in the Deliverable Construction workspace' : undefined}
                 className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {generating ? 'Generating...' : 'Generate PDF'}
