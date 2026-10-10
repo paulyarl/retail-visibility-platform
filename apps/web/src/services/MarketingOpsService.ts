@@ -4891,6 +4891,43 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /**
+   * External lane — render the voice-inference prompt with the same
+   * server-assembled variables /infer uses, for copy/paste into an
+   * external LLM.
+   */
+  async renderVoiceInferencePrompt(campaignId: string): Promise<string> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/voice/${campaignId}/render-prompt`,
+      { method: 'GET' },
+      `mkt-ops-voice-render-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render voice inference prompt');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.rendered_prompt ?? '';
+  }
+
+  /**
+   * External lane — apply the latest completed mpt-owner-voice-inference
+   * execution (imported via createExternalExecution) to the profile.
+   */
+  async applyVoiceExecution(campaignId: string): Promise<VoiceInferenceResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/voice/${campaignId}/apply-execution`,
+      { method: 'POST' },
+      `mkt-ops-voice-apply-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to apply voice inference result');
+    }
+    await this.invalidateCachePattern('mkt-ops-voice');
+    return result.data?.data ?? result.data;
+  }
+
   // Review Slots
   async listReviewSlots(campaignId: string): Promise<ReviewSlot[]> {
     const result = await this.makeDefaultRequest<any>(
@@ -4945,6 +4982,24 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-slots');
     return result.data?.data ?? result.data;
+  }
+
+  /**
+   * External lane — render this slot's response-draft prompt for an
+   * external LLM; the external answer writes back via updateSlotResponse.
+   */
+  async renderSlotPrompt(slotId: string): Promise<string> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/slots/${slotId}/render-prompt`,
+      { method: 'GET' },
+      `mkt-ops-slot-render-${slotId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render slot prompt');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.rendered_prompt ?? '';
   }
 
   async updateSlotResponse(slotId: string, responseText: string): Promise<ReviewSlot> {
@@ -5015,6 +5070,24 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-sections');
     return result.data?.data ?? result.data;
+  }
+
+  /**
+   * External lane — render a section's prompt for an external LLM; the
+   * external answer writes back via updateSection.
+   */
+  async renderSectionPrompt(campaignId: string, sectionType: string): Promise<string> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/sections/${sectionType}/render-prompt`,
+      { method: 'GET' },
+      `mkt-ops-section-render-${campaignId}-${sectionType}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render section prompt');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.rendered_prompt ?? '';
   }
 
   async updateSection(sectionId: string, content: string): Promise<DeliverableSection> {

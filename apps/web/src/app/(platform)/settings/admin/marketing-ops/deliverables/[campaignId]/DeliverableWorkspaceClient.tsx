@@ -21,6 +21,8 @@ export default function DeliverableWorkspaceClient() {
   const [renderStatus, setRenderStatus] = useState<AssemblyStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [genSectionsBusy, setGenSectionsBusy] = useState(false);
+  const [genSectionsNotice, setGenSectionsNotice] = useState<{ text: string; tone: 'ok' | 'err' } | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -115,9 +117,11 @@ export default function DeliverableWorkspaceClient() {
 
       {/* Owner Voice */}
       <OwnerVoiceCard
+        campaignId={campaignId}
         profile={voiceProfile}
         onSaved={handleVoiceSaved}
         onInfer={handleVoiceInferred}
+        onChanged={fetchAll}
       />
 
       {/* Review Slots */}
@@ -128,13 +132,64 @@ export default function DeliverableWorkspaceClient() {
       />
 
       {/* Deliverable Sections */}
-      {sections.map((section) => (
-        <DeliverableSectionCard
-          key={section.id}
-          section={section}
-          onChanged={handleSectionsChanged}
-        />
-      ))}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Deliverable Sections
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Signal-derived narrative sections — draft with the analyst, or use each card's external lane.
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              setGenSectionsBusy(true);
+              setGenSectionsNotice(null);
+              try {
+                const r = await marketingOpsService.generateAllSections(campaignId);
+                const n = r?.generated?.length ?? 0;
+                const errs = r?.errors ?? [];
+                setGenSectionsNotice(
+                  errs.length
+                    ? { text: `Generated ${n} section(s) — ${errs.length} failed: ${errs.join('; ')}`, tone: 'err' }
+                    : { text: `Generated ${n} section(s).`, tone: 'ok' },
+                );
+                await handleSectionsChanged();
+              } catch (e) {
+                setGenSectionsNotice({ text: (e as Error).message, tone: 'err' });
+              } finally {
+                setGenSectionsBusy(false);
+              }
+            }}
+            disabled={genSectionsBusy}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {genSectionsBusy ? 'Generating…' : sections.length ? 'Regenerate sections' : 'Generate sections'}
+          </button>
+        </div>
+        {genSectionsNotice && (
+          <p className={`mb-3 text-xs ${genSectionsNotice.tone === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {genSectionsNotice.text}
+          </p>
+        )}
+        {sections.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500 dark:border-neutral-600 dark:text-gray-400">
+            No sections yet — run the analyst to draft the signal-derived sections for this deliverable.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sections.map((section) => (
+              <DeliverableSectionCard
+                key={section.id}
+                campaignId={campaignId}
+                section={section}
+                onChanged={handleSectionsChanged}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Render */}
       <RenderPanel

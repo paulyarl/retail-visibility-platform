@@ -4,6 +4,7 @@ import { useState } from 'react';
 import marketingOpsService, {
   OwnerVoiceProfile, OwnerVoiceInput, VoiceInferenceResult,
 } from '@/services/MarketingOpsService';
+import ExternalPromptLane from './ExternalPromptLane';
 
 const PERSON_OPTIONS = [
   { value: 'first_person', label: 'First person (I)' },
@@ -38,11 +39,13 @@ const SIGNOFF_OPTIONS = [
 ];
 
 export default function OwnerVoiceCard({
-  profile, onSaved, onInfer,
+  campaignId, profile, onSaved, onInfer, onChanged,
 }: {
+  campaignId: string;
   profile: OwnerVoiceProfile | null;
   onSaved: (input: OwnerVoiceInput) => Promise<void>;
   onInfer: () => Promise<VoiceInferenceResult>;
+  onChanged: () => Promise<void>;
 }) {
   const [person, setPerson] = useState(profile?.person ?? 'first_person');
   const [formality, setFormality] = useState(profile?.formality ?? 'casual');
@@ -78,6 +81,21 @@ export default function OwnerVoiceCard({
     }
   };
 
+  // External lane — import the externally-produced inference JSON through
+  // the validated execution path, then apply it to the profile.
+  const handleExternalApply = async (output: string) => {
+    await marketingOpsService.createExternalExecution({
+      campaign_id: campaignId,
+      template_id: 'mpt-owner-voice-inference',
+      raw_output: output,
+      source: 'external',
+    });
+    const result = await marketingOpsService.applyVoiceExecution(campaignId);
+    await onChanged();
+    setInferError(null);
+    setInferInfo(`External inference applied — from ${result.inferredFromCount} existing owner responses.`);
+  };
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-neutral-700 dark:bg-neutral-800">
       <div className="mb-4 flex items-center justify-between">
@@ -90,6 +108,14 @@ export default function OwnerVoiceCard({
           {inferring ? 'Inferring...' : 'Infer from existing responses'}
         </button>
       </div>
+
+      <ExternalPromptLane
+        fetchPrompt={() => marketingOpsService.renderVoiceInferencePrompt(campaignId)}
+        onApply={handleExternalApply}
+        applyLabel="Import & apply"
+        outputHint="expects the voice-inference JSON object"
+        outputPlaceholder='{"person": "first_person", "formality": "casual", ...}'
+      />
 
       {inferError && (
         <div className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">

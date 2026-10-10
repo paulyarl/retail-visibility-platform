@@ -49,6 +49,7 @@ import GalleryAnalyticsTab from './GalleryAnalyticsTab';
 import SiblingsTab from './SiblingsTab';
 import OutreachIntelligenceTab from './OutreachIntelligenceTab';
 import IdentityPacketCard from '@/components/marketing-ops/IdentityPacketCard';
+import ExternalPromptLane from '@/components/deliverable/ExternalPromptLane';
 
 type Tab = 'overview' | 'identity' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'outreach-prep' | 'history' | 'lineage' | 'cascade' | 'gallery' | 'siblings';
 
@@ -3023,6 +3024,31 @@ export default function CampaignDetailClient({
                 >
                   {reviewIntakeBusy ? 'Parsing…' : 'Parse & save reviews'}
                 </button>
+                {/* External lane — same mpt-review-intake analyst, run in an
+                    external LLM; output imports through the validated
+                    execution path and feeds getReviewIntake identically. */}
+                <div className="mt-2">
+                  <ExternalPromptLane
+                    fetchPrompt={() => {
+                      if (!reviewIntakeText.trim()) {
+                        return Promise.reject(new Error('Paste the reviews above first — the prompt embeds the verbatim text.'));
+                      }
+                      return marketingOpsService.renderPrompt('mpt-review-intake', campaignId, { raw_reviews: reviewIntakeText });
+                    }}
+                    onApply={async (output) => {
+                      await marketingOpsService.createExternalExecution({
+                        campaign_id: campaignId,
+                        template_id: 'mpt-review-intake',
+                        raw_output: output,
+                        source: 'external',
+                      });
+                      setModalNotice({ text: 'External review intake imported. Re-generate source material to apply.', tone: 'ok' });
+                    }}
+                    applyLabel="Import intake"
+                    outputHint="expects the review_intake JSON"
+                    outputPlaceholder='{"reviews": [...], "testimonials": [...]}'
+                  />
+                </div>
               </div>
                 </>
               ) : (

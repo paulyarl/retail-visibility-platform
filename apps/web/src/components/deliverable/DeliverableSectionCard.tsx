@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import marketingOpsService, { DeliverableSection } from '@/services/MarketingOpsService';
+import ExternalPromptLane from './ExternalPromptLane';
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
@@ -10,8 +11,9 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function DeliverableSectionCard({
-  section, onChanged,
+  campaignId, section, onChanged,
 }: {
+  campaignId: string;
   section: DeliverableSection;
   onChanged: () => Promise<void>;
 }) {
@@ -101,6 +103,18 @@ export default function DeliverableSectionCard({
           </pre>
 
           {error && <div className="mb-2 text-xs text-red-600 dark:text-red-400">{error}</div>}
+
+          {/* External lane — paste the external section content; writes back
+              through the same updateSection path (source: 'external'). */}
+          <ExternalPromptLane
+            fetchPrompt={() => marketingOpsService.renderSectionPrompt(campaignId, section.sectionType ?? '')}
+            onApply={async (output) => {
+              await marketingOpsService.updateSection(section.id, output);
+              await onChanged();
+            }}
+            applyLabel="Save as section content"
+            outputHint="structured section text"
+          />
 
           <div className="flex gap-2">
             <button

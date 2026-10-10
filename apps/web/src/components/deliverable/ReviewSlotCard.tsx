@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import marketingOpsService, { ReviewSlot } from '@/services/MarketingOpsService';
+import ExternalPromptLane from './ExternalPromptLane';
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
@@ -162,6 +163,18 @@ export default function ReviewSlotCard({
 
       {/* Actions */}
       {!editing && (
+        <>
+        {/* External lane — paste the external response; writes back through
+            the same updateSlotResponse path (response_source: 'external'). */}
+        <ExternalPromptLane
+          fetchPrompt={() => marketingOpsService.renderSlotPrompt(slot.id)}
+          onApply={async (output) => {
+            await marketingOpsService.updateSlotResponse(slot.id, output);
+            await onChanged();
+          }}
+          applyLabel="Save as response"
+          outputHint="plain text owner response"
+        />
         <div className="flex gap-2">
           <button
             onClick={() => { setEditText(slot.responseText ?? ''); setEditing(true); }}
@@ -196,6 +209,7 @@ export default function ReviewSlotCard({
             </button>
           )}
         </div>
+        </>
       )}
     </div>
   );
