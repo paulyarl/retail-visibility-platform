@@ -653,20 +653,24 @@ export async function resolvePlanPublicSurfaces(
   const demoTenantIds = demoRows.map((r) => r.demo_tenant_id).filter((x): x is string => !!x);
   // Demo storefront URL — the wildcard subdomain form `{slug}.visibleshelf.com`
   // (subdomain mirrors slug); /tenant/{id} fallback when no slug yet.
-  const demoSlugs = new Map<string, string | null>();
+  // Demo storefront URL — `subdomain.visibleshelf.com` only when the tenant
+  // opted in (`tenants.subdomain` mirrors slug when assigned); the
+  // internal /tenant/{id} path otherwise. Wildcard subdomains are opt-in
+  // and require the *.visibleshelf.com Vercel domain.
+  const demoTenants = new Map<string, string | null>();
   if (demoTenantIds.length > 0) {
     const tenants = await prisma.tenants.findMany({
       where: { id: { in: demoTenantIds } },
-      select: { id: true, slug: true },
+      select: { id: true, subdomain: true },
     });
-    for (const t of tenants) demoSlugs.set(t.id, t.slug);
+    for (const t of tenants) demoTenants.set(t.id, t.subdomain);
   }
   const demoTenantIdByCampaign = new Map(demoRows.map((r) => [r.id, r.demo_tenant_id]));
 
   return bundle.siblings.map((s) => {
     const seed = liveSeedByCampaign.get(s.campaignId);
     const demoTenantId = demoTenantIdByCampaign.get(s.campaignId) ?? null;
-    const demoSlug = demoTenantId ? demoSlugs.get(demoTenantId) : null;
+    const demoSubdomain = demoTenantId ? demoTenants.get(demoTenantId) : null;
     return {
       campaignId: s.campaignId,
       seed: seed
@@ -683,8 +687,8 @@ export async function resolvePlanPublicSurfaces(
         placeUrl: r.slug ? `/place/${r.slug}` : '',
       })),
       demoStorefrontUrl: demoTenantId
-        ? demoSlug
-          ? `https://${demoSlug}.visibleshelf.com`
+        ? demoSubdomain
+          ? `https://${demoSubdomain}.visibleshelf.com`
           : `/tenant/${demoTenantId}`
         : null,
     };
