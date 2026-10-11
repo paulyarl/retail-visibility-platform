@@ -905,3 +905,42 @@ Adjust `PLATFORM_HOSTS`, the target path (`/t/{tenantId}/storefront`), and error
 ---
 
 These SQL and TypeScript snippets, combined with the earlier sections, should provide a near-complete blueprint to implement custom domains end-to-end on Vercel + Supabase when you are ready.
+
+---
+
+## 15. Implementation Update — Platform wildcard `*.visibleshelf.com` landed (2026-10-11)
+
+The platform-side half of this architecture shipped as part of the Marketing Ops project-phase sprint. This is a **different feature** from tenant-owned custom domains (§1–§14, still unbuilt) — it is the platform wildcard that powers opt-in `tenant.visibleshelf.com` storefront subdomains — but it used the same Vercel-DNS mechanics this spec leans on, and it de-risks them.
+
+### What shipped
+
+- `*.visibleshelf.com` is a **Valid Configuration / Production** domain entry on `retail-visibility-platform-web` with an issued wildcard cert.
+- The app resolves `{subdomain}.visibleshelf.com` to a tenant via `tenants.subdomain` (opt-in; mirrors `slug`) and **rewrites** — not redirects — to the public storefront, so the canonical URL stays branded (`proxy.ts`, production + localhost paths).
+- Verified live: `baraka.visibleshelf.com` → 200 + storefront HTML, hostname preserved.
+
+### DNS move: Cloudflare → Vercel nameservers
+
+Vercel on the Pro plan requires the domain itself on **Vercel nameservers** for a wildcard + its cert — a `*` CNAME at an external DNS provider is not accepted. `visibleshelf.com` was moved from Cloudflare to `ns1/ns2.vercel-dns.com` (registrar: Namecheap).
+
+- Cloudflare was only a DNS host in practice — every record was "DNS only", so no proxy/CDN features were lost.
+- **Carried (13 records)**: Zoho `MX` ×3 (10/20/50), `TXT` ×5 (SPF, `_dmarc`, zoho-verification, google-site-verification, `zmail._domainkey` DKIM), `CNAME` ×5 (`api` → Railway, `mt49`/`mt-link`/`rwmt1._domainkey`/`rwmt2._domainkey` → Mailtrap).
+- **Deliberately not carried**: stale `NS` records, the apex `A` record, and the `www` CNAME — Vercel auto-manages apex/`www`/`*` records for its own domain entries (`*` and `@` exist as managed `ALIAS` rows in the zone).
+- The irreplaceable set is **mail**: MX + DKIM + SPF + DMARC must be copied character-for-character; a truncated DKIM `p=` silently breaks signing.
+
+### Wildcard-override behavior (worth knowing)
+
+Adding an explicit record under a branch **disables wildcard matching for that branch** — Vercel warns "Overriding the wildcard may make subdomains under these domains inaccessible if not explicitly configured." Creating `rwmt1._domainkey` meant `*._domainkey.visibleshelf.com` no longer matched the `*`. Harmless here (DKIM selectors always need explicit records anyway), but the same warning fires for any explicit subdomain record — an explicitly-created `x.visibleshelf.com` record overrides, never merges with, the wildcard.
+
+### Other learnings
+
+- An "Invalid Configuration" project-domain entry can silently disappear from the project Domains list after delegation state changes — if the wildcard resolves at DNS but TLS handshake fails at the edge, check that the **project-level** `*` entry still exists; re-adding it once DNS is on Vercel verifies near-instantly.
+- Resolvers negative-cache NXDOMAIN aggressively — a name queried *before* the wildcard existed can show NXDOMAIN locally while Google/authoritative resolve it fine.
+- A specific subdomain record for an *inactive* tenant still resolves at DNS — tenant state is an app-layer concern, not a DNS one.
+- DNS record management lives at **team-level** Domains (`vercel.com` → Domains → domain → DNS Records), not in the project's Domains list.
+- Staging (`visibleshelf.store`) was **not** moved — it stays at Cloudflare with hand-managed per-subdomain CNAMEs; if staging ever needs tenant subdomains it needs the same procedure or per-tenant records.
+
+### Implications for the custom-domains spec (§1–§14)
+
+- `visibleshelf.com` DNS is now **Vercel-managed**, which is the ideal posture for this spec: every future tenant-owned custom domain gets attached via the same project Domains mechanism the wildcard uses, and the DNS-verification flow in §6.2 is unchanged (it targets tenant-owned DNS, not ours).
+- The phantom `SubdomainService` methods noted in the sprint's Phase 0 audit (`reserveSubdomain`, `verifySubdomainOwnership`, `getSubdomainConfig`, `updateSubdomainConfig`, and the `Subdomain` interface's `isVerified`/`sslEnabled`/`customDomain` fields) describe **this** unbuilt feature — they were stubbed with explicit errors so a future implementation lands against this spec rather than an accidental caller.
+- Wildcard cert issuance timing: after delegation is detected, the `*` cert took on the order of minutes to issue and propagate to the edge.
