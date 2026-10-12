@@ -91,13 +91,32 @@ export class CustomDomainService extends BaseService {
    * `flexible ||` equivalent — flexible holders inherit without a grant).
    */
   private async isEntitled(tenantId: string): Promise<boolean> {
-    const rows = await prisma.$queryRaw<Array<{ feature_key: string }>>`
-      SELECT feature_key
-      FROM mv_tenant_effective_capabilities
-      WHERE tenant_id = ${tenantId}
-        AND feature_key IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
-    `;
-    return rows.length > 0;
+    // The MV is refreshed by pg_cron (~10 min cadence). Union a live read of
+    // its grant sources — same status/expiry semantics — so a just-granted
+    // BSaaS purchase or admin override entitles immediately instead of
+    // failing the write gate until the next refresh cycle.
+    const [mvRows, liveRows] = await Promise.all([
+      prisma.$queryRaw<Array<{ feature_key: string }>>`
+        SELECT feature_key
+        FROM mv_tenant_effective_capabilities
+        WHERE tenant_id = ${tenantId}
+          AND feature_key IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
+      `,
+      prisma.$queryRaw<Array<{ feature_key: string }>>`
+        SELECT feature_key FROM tenant_feature_purchases
+        WHERE tenant_id = ${tenantId}
+          AND feature_key IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
+          AND status IN ('active', 'past_due', 'trial')
+          AND (expires_at IS NULL OR expires_at > NOW())
+        UNION
+        SELECT feature AS feature_key FROM tenant_feature_overrides_list
+        WHERE tenant_id = ${tenantId}
+          AND feature IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
+          AND granted = true
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `,
+    ]);
+    return mvRows.length > 0 || liveRows.length > 0;
   }
 
   /** Flag check (D10): platform flag + tenant override via effectiveFlags. */

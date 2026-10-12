@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { randomUUID } from 'crypto'
 import { prisma } from '../prisma'
 import { checkTenantAccess, requireTenantOwner } from '../middleware/auth'
 import { audit } from '../audit'
@@ -58,7 +59,7 @@ router.put('/tenant-flags/:tenantId/:flag', requireTenantOwner, async (req, res)
   const row = await prisma.tenant_feature_flags_list.upsert({
     where: { tenant_id_flag: { tenant_id: tenantId, flag } },
     update: { enabled: !!enabled, description: description ?? null, rollout: rollout ?? null },
-    create: { tenant_id: tenantId, flag, enabled: !!enabled, description: description ?? null, rollout: rollout ?? null } as any,
+    create: { id: randomUUID(), tenant_id: tenantId, flag, enabled: !!enabled, description: description ?? null, rollout: rollout ?? null } as any,
   })
   await audit({
     tenantId,
