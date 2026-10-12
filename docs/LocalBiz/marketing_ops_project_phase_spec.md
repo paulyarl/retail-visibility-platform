@@ -1,6 +1,6 @@
 # Marketing Ops — Project Phase Spec
 
-Status: Draft for team review — v7 (subdomain architecture audited; capability source pinned to tenants.subdomain; storefront-path repair scoped into rollout)
+Status: Implemented — v7 spec, sprint phases 0–8 shipped to `main` (evaluator, endpoint, cockpit, gallery projection, `*.visibleshelf.com` wildcard live in production). Phase 9 rollout pending: operator review on two live prospects, then `GALLERY_PROJECT_VIEW=true` in prd.
 Owner: Marketing Ops
 Related: `docs/LocalBiz/marketing_ops_multi_archetype_campaign_sprint_plan.md`, `docs/LocalBiz/marketing_ops_outreach_opener_sprint_plan.md`, `docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md`, `.agents/skills/multi-archetype-campaigns/SKILL.md`, `apps/api/src/services/triage/signal-taxonomy.ts`, `apps/api/src/services/triage/signal-extractor.ts`
 

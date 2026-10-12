@@ -944,3 +944,12 @@ Adding an explicit record under a branch **disables wildcard matching for that b
 - `visibleshelf.com` DNS is now **Vercel-managed**, which is the ideal posture for this spec: every future tenant-owned custom domain gets attached via the same project Domains mechanism the wildcard uses, and the DNS-verification flow in §6.2 is unchanged (it targets tenant-owned DNS, not ours).
 - The phantom `SubdomainService` methods noted in the sprint's Phase 0 audit (`reserveSubdomain`, `verifySubdomainOwnership`, `getSubdomainConfig`, `updateSubdomainConfig`, and the `Subdomain` interface's `isVerified`/`sslEnabled`/`customDomain` fields) describe **this** unbuilt feature — they were stubbed with explicit errors so a future implementation lands against this spec rather than an accidental caller.
 - Wildcard cert issuance timing: after delegation is detected, the `*` cert took on the order of minutes to issue and propagate to the edge.
+
+### Operator quick-reference — giving a tenant a subdomain
+
+- **No infra work per tenant.** The wildcard covers every name — setting a subdomain is purely an app-layer write: demo-tenant create modal (`subdomain` field), `PUT /api/admin/subdomains/:tenantId`, or tenant self-service `PUT /api/tenants/:id/subdomain`. Never create DNS records or Vercel domain entries for a tenant subdomain — an explicit record would *override* the wildcard for that name and need its own cert.
+- **`subdomain` mirrors `slug`.** Assigning one writes the slug through `SlugSingletonService`, which rewrites `directory_settings_list` and `directory_listings_list` — the tenant's public slug URLs change everywhere. Treat it as a rename, not a cosmetic flag.
+- **Clearing leaves the slug.** `DELETE` removes only `subdomain`; the storefront falls back to the `/tenant/{id}` path URL and slug URLs stay live.
+- **Availability is shared across namespaces.** A name taken as another tenant's `slug` or a `directory_settings_list.slug` refuses assignment — one tenant's slug can never be another's subdomain. Reserved names (`www`, `api`, `admin`, …) are refused.
+- **Production only.** The wildcard exists on `visibleshelf.com`; `visibleshelf.store` (staging) has none — subdomain URLs only resolve in production.
+- **Verify with the real URL, not DNS.** `nslookup` will resolve *any* name under the wildcard, including names assigned to no tenant — resolution proves nothing. The check is `https://{subdomain}.visibleshelf.com` returning the storefront (app-layer tenant state applies — an inactive tenant 404s at the app even though DNS answers).

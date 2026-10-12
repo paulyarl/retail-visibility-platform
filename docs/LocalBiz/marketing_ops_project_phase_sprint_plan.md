@@ -4,6 +4,12 @@
 >
 > Ordering follows spec §17. The plan layer is computed-on-read and owns nothing — every phase below leaves sibling pipelines, triage outcomes, and the seed lifecycle untouched.
 
+**Status (2026-10-11): Phases 0–8 complete and merged to `main`.**
+- Phase 0 pre-flight: `*.visibleshelf.com` live in production (project domain Valid Configuration, cert issued, `baraka.visibleshelf.com` → 200 storefront); `visibleshelf.com` DNS moved Cloudflare → Vercel nameservers. Staging (`visibleshelf.store`) intentionally not moved.
+- Phases 1–8: A1/A3 materiality fixes, `seed_fidelity` persistence + CTA degradation, predicate substrate (v1 seeded local + prd), `selectProjectPhases` evaluator, evidence/copy/gate, read-only plan endpoint, `?tab=plan` cockpit on every sibling detail, gallery `ProjectPlanView` behind `GALLERY_PROJECT_VIEW`, `surface`/`artifact` event dimensions (migration 325).
+- Phase 9 verification: `checkapi`/`checkweb` clean; all new suites pass (evaluator 59, gate 14, endpoint 7, panel 11, project view 5, gallery-multi 18); migrations 323–325 applied to local + prd.
+- **Remaining:** §9.4 operator review (one full-lane multi-sibling + one partial-lane emerging-pool prospect), then `GALLERY_PROJECT_VIEW=true` in prd doppler.
+
 ---
 
 ## Decisions — settled

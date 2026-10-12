@@ -30,6 +30,27 @@ function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; subdomai
   return null;
 }
 
+// Paths a tenant storefront host is allowed to serve. The subdomain rewrite
+// below returns before the /admin and /settings auth gates run, so every path
+// not on this list must be refused — otherwise protected routes render on a
+// tenant subdomain with no session check. Rewritten storefront roots get the
+// /tenant/{id} prefix; pass-through roots serve as-is on the tenant host.
+const STOREFRONT_PREFIX_ROOTS = ['/services', '/policies'];
+const STOREFRONT_PASSTHROUGH_ROOTS = [
+  '/tenant', '/products', '/cart', '/carts', '/checkout', '/orders', '/my-orders', '/compare',
+  '/shops', '/directory', '/place', '/s', '/c', '/customerlogin',
+  '/privacy', '/terms', '/legal', '/contact', '/faq', '/support', '/guides',
+  '/features', '/solutions', '/retail', '/prospect-report', '/seed-report', '/preview',
+  // Short-code redirectors — safe to pass: they bounce to their canonical target.
+  '/g', '/i', '/q', '/qr', '/qe', '/qs', '/qw', '/r', '/re', '/rb', '/rp', '/rs', '/rt',
+];
+
+function isStorefrontPath(pathname: string): boolean {
+  if (pathname === '/') return true;
+  const root = `/${pathname.split('/')[1]}`;
+  return STOREFRONT_PREFIX_ROOTS.includes(root) || STOREFRONT_PASSTHROUGH_ROOTS.includes(root);
+}
+
 function getCookie(req: NextRequest, name: string): string | undefined {
   try {
     return req.cookies.get(name)?.value;
@@ -117,6 +138,13 @@ export async function proxy(req: NextRequest) {
       return NextResponse.next();
     }
 
+    // Non-storefront paths never serve on a tenant host — this branch returns
+    // before the /admin and /settings auth gates, so anything off the
+    // storefront allowlist is refused rather than rendered unauthenticated.
+    if (!isStorefrontPath(pathname)) {
+      return NextResponse.rewrite(new URL('/404', req.url));
+    }
+
     try {
       // Look up tenant by subdomain using resolve endpoint.
       // Forward the client IP — the API rate-limits resolves per client, and
@@ -133,13 +161,13 @@ export async function proxy(req: NextRequest) {
           const tenantId = subdomainData.tenantId;
 
           // Paths already under /tenant/ (absolute storefront links emitted by
-          // components) and global routes (/products/[id], /place, etc.) pass
-          // through untouched — only storefront-root paths get the tenant prefix.
-          const STOREFRONT_ROOTS = ['/services', '/policies'];
+          // components) and allowlisted global routes (/products/[id], /place,
+          // etc.) pass through untouched — only storefront-root paths get the
+          // tenant prefix.
           let destPath: string;
           if (pathname.startsWith('/tenant/')) {
             destPath = pathname;
-          } else if (pathname === '/' || STOREFRONT_ROOTS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
+          } else if (pathname === '/' || STOREFRONT_PREFIX_ROOTS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
             destPath = `/tenant/${tenantId}${pathname === '/' ? '' : pathname}`;
           } else {
             destPath = pathname;
@@ -159,6 +187,11 @@ export async function proxy(req: NextRequest) {
           return res;
         }
       }
+
+      // Definitive non-tenant answer (404, 429, or no tenantId): fail closed —
+      // never render the platform app on a tenant-named host. Only a fetch
+      // exception falls through, preserving API-outage resilience.
+      return NextResponse.rewrite(new URL('/404', req.url));
     } catch (error) {
       clientLogger.error('[Proxy] Error in subdomain routing:', { detail: error });
       // Continue with normal routing if subdomain lookup fails
