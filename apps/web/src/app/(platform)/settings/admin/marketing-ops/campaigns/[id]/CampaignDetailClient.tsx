@@ -951,22 +951,17 @@ export default function CampaignDetailClient({
   const formatCurrency = (cents: number | null) => cents != null ? `$${(cents / 100).toLocaleString()}` : '—';
   const formatDate = (date: string | null) => date ? new Date(date).toLocaleDateString() : '—';
 
-  // Tab order follows the operator workflow momentum:
-  //   1. Overview — campaign snapshot
-  //   2. Checklist — executive workflow driver that sequences all other actions
-  //   3. Prompts → 4. Audits → 5. Outreach Prep → 6. Diagnostic Gallery —
-  //      the active workflow run (prompt the work, audit the campaign, prep
-  //      outreach, prepare the gallery)
-  //   7. Cascade (review-pipeline only) — pipeline detail, grouped with the
-  //      workflow section
-  //   8. Stage History → 9. Derived Campaigns → 10. Siblings → 11. Files →
-  //      12. Deliverables — campaign info / artifacts
-  const tabs: { key: Tab; label: string; count?: number }[] = [
+  // Tabs fall into two groups — actionable surfaces first (work happens
+  // here: enrich, verify, run, upload, generate), read-only views last
+  // (navigation only). Overview leads because it's the landing tab and
+  // carries actions; Project Plan heads the read-only group as the
+  // prospect-level summary that links out to everything else.
+  const actionableTabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'overview', label: 'Overview' },
-    // Identity Packet — source-scored evidence ledger behind the seed
-    // decision (business-scope campaigns only).
-    ...((campaign?.scope === 'business') ? [{ key: 'identity' as Tab, label: 'Identity' }] : []),
     { key: 'checklist', label: 'Checklist' },
+    // Identity Packet — source-scored evidence ledger behind the seed
+    // decision; actionable (seed create/verify). Business-scope only.
+    ...((campaign?.scope === 'business') ? [{ key: 'identity' as Tab, label: 'Identity' }] : []),
     { key: 'prompts', label: 'Prompts' },
     { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
     // Outreach Prep — business-scope campaigns only (Sprint 1).
@@ -977,17 +972,18 @@ export default function CampaignDetailClient({
     // Cascade tab is review-pipeline only (Track A yes, Track B no).
     // Recovery-pipeline campaigns use RecoveryCascadeService instead.
     ...((campaign as any)?.pipeline === 'review' ? [{ key: 'cascade' as Tab, label: 'Cascade' }] : []),
-    { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
-    { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
-    // Siblings tab — multi-archetype sibling campaigns (Sprint 3).
-    // Visible for all campaigns (shows siblings if they exist, or a hint
-    // about creating them via triage alternatives).
+    // Siblings tab — multi-archetype sibling campaigns (Sprint 3);
+    // actionable (create sibling, cycle engagement).
     { key: 'siblings', label: 'Siblings' },
+    { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
+  ];
+  const readOnlyTabs: { key: Tab; label: string; count?: number }[] = [
     // Project Plan — the prospect-keyed cockpit (spec §13). Same plan for
     // every sibling; null-prospect campaigns show a singleton group.
     { key: 'plan', label: 'Project Plan' },
+    { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
+    { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
     { key: 'files', label: 'Files', count: campaign?.files?.length },
-    { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
   ];
 
   // Pipeline-aware stage stepper — recovery campaigns walk the recovery
@@ -1438,9 +1434,10 @@ export default function CampaignDetailClient({
               <IntelligentTriageCard campaign={campaign} onRefresh={fetchCampaign} />
             )}
 
-            {/* Tabs — a section dropdown on small screens (14 tabs don't
-                fit); the full underline strip on md+ scrolls within itself
-                instead of widening the page. */}
+            {/* Tabs — two groups: actionables first, read-onlys last (a
+                divider marks the split). Small screens get a grouped
+                section dropdown; the md+ underline strip scrolls within
+                itself instead of widening the page. */}
             <div className="mb-4">
               <select
                 value={activeTab}
@@ -1448,30 +1445,48 @@ export default function CampaignDetailClient({
                 aria-label="Campaign section"
                 className="md:hidden w-full rounded-md border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
               >
-                {tabs.map((tab) => (
-                  <option key={tab.key} value={tab.key}>
-                    {tab.label}
-                    {tab.count != null && tab.count > 0 ? ` (${tab.count})` : ''}
-                  </option>
-                ))}
+                <optgroup label="Actions">
+                  {actionableTabs.map((tab) => (
+                    <option key={tab.key} value={tab.key}>
+                      {tab.label}
+                      {tab.count != null && tab.count > 0 ? ` (${tab.count})` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Read-only">
+                  {readOnlyTabs.map((tab) => (
+                    <option key={tab.key} value={tab.key}>
+                      {tab.label}
+                      {tab.count != null && tab.count > 0 ? ` (${tab.count})` : ''}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <div className="hidden md:flex items-center gap-1 border-b border-gray-200 dark:border-neutral-700 overflow-x-auto">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab.key
-                        ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                    }`}
-                  >
-                    {tab.label}
-                    {tab.count != null && tab.count > 0 && (
-                      <span className="ml-1.5 text-xs text-gray-400">({tab.count})</span>
-                    )}
-                  </button>
-                ))}
+                {[...actionableTabs, null, ...readOnlyTabs].map((tab) =>
+                  tab === null ? (
+                    <div
+                      key="group-divider"
+                      aria-hidden="true"
+                      className="mx-1 h-5 w-px shrink-0 self-center bg-gray-300 dark:bg-neutral-600"
+                    />
+                  ) : (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === tab.key
+                          ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      {tab.label}
+                      {tab.count != null && tab.count > 0 && (
+                        <span className="ml-1.5 text-xs text-gray-400">({tab.count})</span>
+                      )}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
 
