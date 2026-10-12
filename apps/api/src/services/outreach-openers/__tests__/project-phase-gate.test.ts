@@ -180,6 +180,26 @@ describe('runProjectPhaseGate', () => {
     expect(res.issues.some((i) => i.includes('single-seed'))).toBe(true);
   });
 
+  it('passes when the wedge seed is mirrored in publicSurfaces (same seedId)', () => {
+    const plan = cleanPlan({ signals: ['WC_MISSING_WEBSITE'] });
+    plan.seedClaim = {
+      seedId: 's-1',
+      status: 'published',
+      placeUrl: '/place/a',
+      claimUrl: '/c/x',
+      fidelity: 'aligned',
+    };
+    plan.publicSurfaces = [
+      {
+        campaignId: 'c-1',
+        seed: { seedId: 's-1', status: 'published', placeUrl: '/place/a' },
+        demoStorefrontUrl: null,
+      },
+    ];
+    const res = runProjectPhaseGate(plan);
+    expect(res.issues.some((i) => i.includes('single-seed'))).toBe(false);
+  });
+
   it('fails when two phases describe the same action', () => {
     const plan = cleanPlan({ signals: ['WC_MISSING_WEBSITE', 'WC_MISSING_CTA'] });
     const shared = { text: 'We publish a clean, correct listing for your business.', ownerAction: false };

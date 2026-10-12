@@ -112,11 +112,16 @@ export function runProjectPhaseGate(
     issues.push(`owner-facing phase count ${ownerPhases.length} exceeds ${plan.estimatedTier ?? 'default'} cap ${cap}`);
   }
 
-  // 5. Single-seed rule — at most one live seed across the plan.
-  const liveSeeds =
-    plan.publicSurfaces.filter((s) => s.seed != null).length + (plan.seedClaim ? 1 : 0);
-  if (liveSeeds > 1) {
-    issues.push(`plan carries ${liveSeeds} live seeds — the single-seed rule allows one`);
+  // 5. Single-seed rule — at most one live seed across the plan. Dedupe by
+  // seed id: the wedge seed also appears inside publicSurfaces on its
+  // campaign's entry, so counting both slots double-fires on a one-seed plan.
+  const liveSeedIds = new Set<string>();
+  for (const s of plan.publicSurfaces) {
+    if (s.seed) liveSeedIds.add(s.seed.seedId);
+  }
+  if (plan.seedClaim) liveSeedIds.add(plan.seedClaim.seedId);
+  if (liveSeedIds.size > 1) {
+    issues.push(`plan carries ${liveSeedIds.size} live seeds — the single-seed rule allows one`);
   }
 
   // 6. Two phases describe the same action.
