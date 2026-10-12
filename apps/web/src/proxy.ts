@@ -3,53 +3,11 @@ import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 import { clientLogger } from '@/lib/client-logger';
+import { isPlatformSubdomain, isStorefrontPath, STOREFRONT_PREFIX_ROOTS } from '@/lib/storefront-routing';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
 const FF_TENANT_URLS = process.env.NEXT_PUBLIC_FF_TENANT_URLS === 'true';
-
-// Platform domains that support subdomains
-const PLATFORM_DOMAINS = ['visibleshelf.com', 'visibleshelf.store'];
-
-// Check if hostname is a platform subdomain
-function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; subdomain: string; domain: string } | null {
-  // Check production domains
-  for (const domain of PLATFORM_DOMAINS) {
-    if (hostname.endsWith(`.${domain}`) && hostname !== domain) {
-      const subdomain = hostname.replace(`.${domain}`, '');
-      return { isSubdomain: true, subdomain, domain };
-    }
-  }
-
-  // Check localhost for development
-  if (hostname.endsWith('.localhost') && hostname !== 'localhost') {
-    const subdomain = hostname.replace('.localhost', '');
-    return { isSubdomain: true, subdomain, domain: 'localhost' };
-  }
-
-  return null;
-}
-
-// Paths a tenant storefront host is allowed to serve. The subdomain rewrite
-// below returns before the /admin and /settings auth gates run, so every path
-// not on this list must be refused — otherwise protected routes render on a
-// tenant subdomain with no session check. Rewritten storefront roots get the
-// /tenant/{id} prefix; pass-through roots serve as-is on the tenant host.
-const STOREFRONT_PREFIX_ROOTS = ['/services', '/policies'];
-const STOREFRONT_PASSTHROUGH_ROOTS = [
-  '/tenant', '/products', '/cart', '/carts', '/checkout', '/orders', '/my-orders', '/compare',
-  '/shops', '/directory', '/place', '/s', '/c', '/customerlogin',
-  '/privacy', '/terms', '/legal', '/contact', '/faq', '/support', '/guides',
-  '/features', '/solutions', '/retail', '/prospect-report', '/seed-report', '/preview',
-  // Short-code redirectors — safe to pass: they bounce to their canonical target.
-  '/g', '/i', '/q', '/qr', '/qe', '/qs', '/qw', '/r', '/re', '/rb', '/rp', '/rs', '/rt',
-];
-
-function isStorefrontPath(pathname: string): boolean {
-  if (pathname === '/') return true;
-  const root = `/${pathname.split('/')[1]}`;
-  return STOREFRONT_PREFIX_ROOTS.includes(root) || STOREFRONT_PASSTHROUGH_ROOTS.includes(root);
-}
 
 function getCookie(req: NextRequest, name: string): string | undefined {
   try {

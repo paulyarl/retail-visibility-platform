@@ -219,6 +219,7 @@ Notes:
 - Store a `primary` flag (`is_primary`) for the multi-domain future; **v1 caps at one domain per tenant** (sprint plan D4) and enforces it with a partial unique index on `tenant_id where status <> 'disabled'`.
 - **Status is limited to what Vercel can tell us:** the project-domain object exposes `verified` (boolean) + the TXT `verification` challenge; there is **no certificate field**, and `GET /v6/domains/{domain}/config` exposes only `misconfigured` + recommended records + `acceptedChallenges` (issuance *capability*, not issued status). `certificate_status` therefore comes from our own HTTPS probe, not the API — hence no `cert_provisioning` state.
 - **Resolution path:** the platform resolves `host → tenant_id` via an API endpoint (`GET /api/tenants/resolve-custom-domain/:host`), not Supabase-from-edge — see the sprint plan D5; §5.3 Option A and §14.4 are superseded.
+- **Logical root storage (sprint plan D9):** one row per logical domain. `addDomain` strips a leading `www.` and stores the root; apex rows attach *both* the apex and `www` project domains, subdomain rows attach the single host. Apex-ness is declared by the caller/UI flow (D2), **not** parsed from the hostname — there is no public-suffix machinery, and label-counting misclassifies multi-part suffixes (`mybrand.co.uk`). Resolve strips a leading `www.` before lookup; the proxy owns the `www`→apex 301.
 
 If we decide to support custom domains in multiple environments (e.g., staging and production), we may add an `environment` column (e.g., `env text check (env in ('staging','production'))`) and include it in uniqueness constraints. For v1, the recommendation is to treat **custom domains as production-only** to avoid confusion.
 
@@ -294,6 +295,8 @@ Idempotency & removal considerations:
   - Tenants will use ALIAS/ANAME or A records as per their DNS provider's guidance, pointing at Vercel's apex target.
   - More registrar-specific edge cases; Phase 2 only if needed.
 
+- **apex + `www` are one logical domain** (sprint plan D9): attaching an apex also attaches its `www` companion, and the proxy 301s `www` → apex. Apex-ness is declared in the UI flow, **not** inferred from the hostname — the repo has no public-suffix parsing, and label-counting misclassifies multi-part suffixes (so a misclassified apex would leave `www` unattached and Vercel would edge-404 it).
+
 ---
 
 ## 7. Application Changes (Web + API)
@@ -352,6 +355,11 @@ New UI components / pages:
   - If a non-platform host is **not** found in `custom_domains` with `status = 'active'`, return a 404 or a generic "domain not configured" page.
   - Never attempt to "guess" a tenant from the path when the host is unknown; unknown hosts should not be mapped to arbitrary tenants.
 
+- **Host canonicalization + workspace entry (sprint plan D9/D13):**
+  - `www.` → apex **301** lives in `proxy.ts`, before resolution, so the served origin is always the canonical host; apex-shaped rows attach both the apex and its `www` companion.
+  - A resolved custom host exposes a branded entry to the tenant workspace by **302 redirect to the platform origin** — `{customhost}/manage` → `visibleshelf.com/t/{tenantId}`, and `{customhost}/manage/<rest>` → `visibleshelf.com/t/{tenantId}/<rest>` (path + query preserved; origin config-derived, never the request host). Auth sessions, cookies, and CORS stay on `visibleshelf.com`; the tenant host never carries a platform session.
+  - Ordering: resolve first, then `/manage`, then the storefront allowlist — the custom-host branch does **not** reuse the subdomain branch's 404-before-resolve order.
+
 - Ensure that **directory / storefront routes** are able to operate purely from `tenantId` set by host-based resolution (without always relying on `/t/{tenantId}` paths in the URL the user sees).
 
 ### 7.4 Directory, QR Codes, and External Links
@@ -405,6 +413,16 @@ Implementation:
 - **Domain transfer between tenants**:
   - For v1, direct transfer of a custom domain from one tenant to another is **not supported**.
   - To move a domain between tenants, it must first be removed/disabled from the original tenant (and detached from Vercel), then added anew under the new tenant's settings.
+
+### 8.4 Capability Model (sprint plan D12)
+
+- Both presentation levels above the baseline `/tenant/{id}` path are **feature keys on `storefront_options`** (like `storefront_opt_enhanced_seo`), not a new module:
+  - `storefront_opt_platform_subdomain` — the `{slug}.visibleshelf.com` entitlement (assignment is a separate action; `tenants.subdomain` mirrors slug). Bundled into the Google-surface tiers as the required minimum.
+  - `storefront_opt_custom_domain` — this feature. Granted to `tier_professional` + `tier_organization` for v1.
+- Enforcement is **capability-authoritative**: check the resolved feature (via `EffectiveCapabilityResolver`), never a raw `tier_key` — so admin overrides and explicit grants work uniformly.
+- Flag and capability compose: flag (`custom_domains`, §13.2) = deployed-to-you; capability = entitled-to-you; `addDomain` requires both.
+- **`_flexible` expansion is not automatic** — it is hardcoded per-resolver, so granting either key to `storefront_opt_flexible` must be an explicit link in `capability_features_list`, not an assumption.
+- Grandfathering: gating `assignSubdomain` on the new key is an **assignment** gate only (at the self-service route); existing `tenants.subdomain` rows keep resolving — the read path is never capability-gated.
 
 ---
 
@@ -1035,5 +1053,6 @@ Corrections folded in from the review of `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` so
 - **Tiers & flags (§8.1, §13.1, §13.2):** v1 gates `professional` + `organization` (DB `tier_key`s), 1 domain, apex + `www` = one logical domain (D4/D9); beta rides the platform flag system, not `custom_domains_beta` (D10/H7).
 - **Open questions (§11):** resolved by the sprint plan's D-table.
 - **Phasing (§10):** sequenced by the sprint plan's Phase 0–6.
+- **Capabilities & workspace entry (§7.3, §8.4):** D12 — both non-baseline presentation levels are `storefront_options` feature keys (`storefront_opt_platform_subdomain`, `storefront_opt_custom_domain`), enforced capability-authoritatively, not by raw `tier_key`; `_flexible` inheritance is an explicit grant, not automatic. D13 — a resolved custom host redirects `/manage` → the platform workspace (`visibleshelf.com/t/{id}`); auth sessions, cookies, and CORS stay on `visibleshelf.com`.
 
 See `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` (second-pass findings B5–B7 / H7–H11 / M8–M14) for the evidence.
