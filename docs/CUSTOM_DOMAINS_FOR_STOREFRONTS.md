@@ -149,16 +149,17 @@ These can be layered on later if needed.
    - Creates a `custom_domains` record in Supabase with status `pending_verification`.
    - Calls Vercel's Domains / Project Domains API to attach the domain to the storefront project.
    - Receives DNS verification records (TXT and/or CNAME) from Vercel.
-   - Displays those DNS instructions:
+   - Displays those DNS instructions as **two distinct records**:
      - Step 1: Log into your domain provider.
-     - Step 2: Add the TXT and/or CNAME records exactly as shown (copied from Vercel's response).
+     - Step 2 (routing): add the **CNAME** (subdomain) or **A/ALIAS** (apex) record that points traffic at Vercel — use the Vercel-recommended value if returned, else the standard target (`cname.vercel-dns.com` / apex A).
+     - Step 3 (ownership, only if Vercel returned a TXT challenge): add the **TXT** record exactly as shown.
 5. Tenant updates DNS and clicks **"Check DNS"** or waits for automatic background verification.
 6. Backend verification job:
-   - Calls the relevant Vercel API endpoint for that domain.
-   - Reads Vercel's `verified` and certificate state.
-   - Updates `custom_domains.status` and certificate fields in Supabase.
+   - Calls the Vercel project-domain get/verify endpoints for that domain.
+   - Reads Vercel's `verified` flag and the TXT `verification` challenge — **not** certificate state (Vercel exposes none).
+   - When `verified && !misconfigured`, our own HTTPS probe of the host confirms TLS before flipping to `active`; updates `custom_domains.status` and the probe-derived `certificate_status`.
 7. On success:
-   - Status transitions to `active` once Vercel reports the domain as verified and TLS-ready.
+   - Status transitions to `active` once Vercel reports the domain verified/configured **and** our probe confirms TLS.
    - Tenant sees status: **Active**, with a preview link `https://shop.mylocalstore.com`.
 
 ### 4.2 Tenant Flow: Removing / Disabling a Domain
@@ -175,7 +176,7 @@ These can be layered on later if needed.
 - See:
   - Domain
   - Tenant
-  - Status (`pending_verification`, `verified`, `cert_provisioning`, `active`, `disabled`, `error`)
+  - Status (`pending_verification`, `verified`, `active`, `disabled`, `error` — `cert_provisioning` is not API-observable, see §5.1)
   - Verification token
   - Last verification attempt + error (if any)
   - Certificate status and expiry
@@ -191,22 +192,22 @@ New table (Supabase): `custom_domains`
 ```sql
 custom_domains (
   id uuid primary key,
-  tenant_id uuid not null references tenants(id),
+  tenant_id uuid not null references tenants(id) on delete cascade, -- keep the cascade; detach from Vercel in a pre-delete step (§8.3) so a tenant delete can't orphan a live project domain
   domain text not null unique, -- e.g. 'shop.mylocalstore.com'
   status text not null check (status in (
     'pending_verification',
     'verified',
-    'cert_provisioning',
     'active',
     'disabled',
     'error'
-  )),
+  )), -- 'cert_provisioning' is NOT an API-observable state — Vercel exposes no cert field (see note below)
   verification_token text, -- optional: only needed if we ever add our own TXT-flow on top of Vercel
   vercel_domain_id text, -- ID or name reference returned by Vercel Domains/Project Domains API
   verification_checked_at timestamptz,
   verification_error text,
-  certificate_status text, -- e.g. 'none', 'pending', 'issued', 'failed'
+  certificate_status text, -- PROBE-DERIVED ONLY (our own HTTPS probe) — Vercel exposes no issued/expiry field
   certificate_error text,
+  is_primary boolean not null default false, -- present for the multi-domain future; v1 caps at one domain per tenant
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -215,7 +216,9 @@ custom_domains (
 Notes:
 - `domain` should be stored normalized (lowercase, no trailing dot).
 - Index on `domain` for fast host lookup.
-- Optionally store `primary` flag if multiple domains per tenant.
+- Store a `primary` flag (`is_primary`) for the multi-domain future; **v1 caps at one domain per tenant** (sprint plan D4) and enforces it with a partial unique index on `tenant_id where status <> 'disabled'`.
+- **Status is limited to what Vercel can tell us:** the project-domain object exposes `verified` (boolean) + the TXT `verification` challenge; there is **no certificate field**, and `GET /v6/domains/{domain}/config` exposes only `misconfigured` + recommended records + `acceptedChallenges` (issuance *capability*, not issued status). `certificate_status` therefore comes from our own HTTPS probe, not the API — hence no `cert_provisioning` state.
+- **Resolution path:** the platform resolves `host → tenant_id` via an API endpoint (`GET /api/tenants/resolve-custom-domain/:host`), not Supabase-from-edge — see the sprint plan D5; §5.3 Option A and §14.4 are superseded.
 
 If we decide to support custom domains in multiple environments (e.g., staging and production), we may add an `environment` column (e.g., `env text check (env in ('staging','production'))`) and include it in uniqueness constraints. For v1, the recommendation is to treat **custom domains as production-only** to avoid confusion.
 
@@ -228,15 +231,12 @@ At request time (web app or edge/middleware layer):
 3. If match found → extract `tenant_id` and set tenant context.
 4. If no match found → fall back to existing tenant routing scheme (e.g. `/t/{tenantId}/...` under platform domain) or return safe 404 for unknown custom domains.
 
-This logic should be centralized (e.g., in a `resolveTenantFromHost` utility or middleware) to avoid duplication.
+This logic is centralized in the API (`CustomDomainService.resolveHostToTenant`) behind `GET /api/tenants/resolve-custom-domain/:host`, consumed by the Next.js proxy (`proxy.ts`) — not queried from the edge (sprint plan D5).
 
-### 5.3 Supabase RLS & Public Access Pattern
+### 5.3 RLS & Host-Resolution Access Pattern
 
-- Writes to `custom_domains` (create/update/delete) should only be allowed via backend services using the **service role** key.
-- For read access in Vercel Middleware (edge), we need a safe way to resolve `domain → tenant_id` without exposing sensitive data:
-  - Option A: Create a **limited view** (e.g., `public_custom_domains`) that only exposes `domain` and `tenant_id`, with RLS allowing read access to anonymous clients.
-  - Option B: Implement an internal API endpoint for host resolution (less ideal for latency at the edge).
-- The recommended approach is Option A with a very small surface area and strict RLS, so Middleware can query Supabase directly using the public anon key while keeping write operations locked down.
+- Writes to `custom_domains` (create/update/delete) happen only via backend services (Prisma / service role); the base table has RLS enabled with **no anon policy**.
+- **Superseded (sprint plan D5):** the original recommendation here was Option A — a `public_custom_domains` view readable by the edge middleware with the anon key. The resolution path is now **Option B-style**: an internal API endpoint (`GET /api/tenants/resolve-custom-domain/:host`) that the Next.js proxy fetches. The proxy never holds a Supabase key, and the view is dropped (§14.1.2 / §14.1.3 / §14.4 are superseded). Reintroduce the view only if a concrete edge consumer is named.
 
 ---
 
@@ -262,10 +262,10 @@ This logic should be centralized (e.g., in a `resolveTenantFromHost` utility or 
 - Verification flow:
   - UI surfaces the Vercel-provided DNS records to the tenant.
   - Tenant updates DNS.
-  - A background job or "Check DNS" API endpoint calls `GET /v10/domains/{name}` or `GET /v10/projects/{projectId}/domains/{name}`.
-  - When Vercel reports the domain as `verified` and TLS as ready, backend updates Supabase:
+  - A background job or "Check DNS" API endpoint calls `GET /v9/projects/{projectId}/domains/{name}` (the project-domain object), optionally followed by `POST /v9/projects/{projectId}/domains/{name}/verify` to complete a TXT challenge. (`GET /v10/domains/{name}` is **not** in the REST reference — do not rely on it.)
+  - When Vercel reports `verified && !misconfigured` **and** our HTTPS probe confirms TLS, the backend updates Supabase:
     - `status = 'active'`
-    - `certificate_status = 'issued'` (or similar)
+    - `certificate_status` = probe-derived (`'issued'`-ish)
 - Error states from Vercel (e.g. verification failed) are surfaced to tenants and admins via `verification_error` and `certificate_error` fields.
 
 Idempotency & removal considerations:
@@ -304,8 +304,9 @@ New APIs (examples, adapt to existing conventions):
 
 - `GET /api/tenants/{tenantId}/custom-domains`
 - `POST /api/tenants/{tenantId}/custom-domains`
-- `POST /api/tenants/{tenantId}/custom-domains/{id}/verify`
+- `POST /api/tenants/{tenantId}/custom-domains/{id}/check` (verify/refresh; the sprint plan uses `check`)
 - `DELETE /api/tenants/{tenantId}/custom-domains/{id}`
+- `GET /api/tenants/resolve-custom-domain/:host` (public, rate-limited — the proxy's host→tenant resolution; sprint plan D5)
 
 Responsibilities:
 
@@ -315,7 +316,7 @@ Responsibilities:
 - Store any Vercel domain identifiers and verification metadata.
 - Return DNS instructions payload (TXT/CNAME records from Vercel) to the frontend.
 - Trigger or schedule background verification checks.
-- Poll Vercel for updated verification and certificate status, and update Supabase `status`, `certificate_status`, and error fields.
+- Poll Vercel for updated **verification** state (there is no certificate state to poll), probe TLS ourselves, and update Supabase `status`, `certificate_status`, and error fields.
 
 Background job(s):
 
@@ -342,11 +343,10 @@ New UI components / pages:
 
 ### 7.3 Middleware / Routing
 
-- Add a **host-based tenant resolution** layer in the Next.js app running on Vercel:
-  - Use `middleware.ts` (edge middleware) to read `headers().get('host')`, normalize it, and resolve `tenantId` via a Supabase query against `custom_domains`.
-  - Maintain a configuration of **platform root domains** (e.g., `app.retailvisibility.com`). For these hosts, continue using existing path-based tenant routing (e.g. `/t/{tenantId}/...`).
-  - For **non-platform hosts**, attempt to resolve them as custom domains via `custom_domains`.
-  - Attach tenant context by rewriting to a tenant-scoped path (e.g. `/t/{tenantId}/storefront/...`) or by injecting a header (e.g. `x-tenant-id`) consumed by downstream handlers.
+- Add a **host-based tenant resolution** layer in the Next.js app running on Vercel. **Superseded (sprint plan D5):** this runs in `proxy.ts` (Next.js 16 renamed `middleware.ts` → `proxy.ts`; the function is exported as `proxy`) and resolves via the **API endpoint**, not a Supabase query from the edge:
+  - In `proxy.ts`, after the platform-subdomain branch misses, classify the remaining host (excluding `*.vercel.app`, `localhost`/IP hosts, and platform apexes) and fetch `GET /api/tenants/resolve-custom-domain/:host`.
+  - Maintain a configuration of **platform root domains** (`visibleshelf.com`, `visibleshelf.store`). For these hosts, continue using the existing subdomain/apex routing.
+  - Attach tenant context by rewriting to the storefront path (`/tenant/{id}`) and setting the `tcx` cookie — the same rewrite mechanics the live `*.visibleshelf.com` subdomain branch uses.
 
 - Routing safeguards:
   - If a non-platform host is **not** found in `custom_domains` with `status = 'active'`, return a 404 or a generic "domain not configured" page.
@@ -373,13 +373,15 @@ New UI components / pages:
 
 - **Starter / Trial**: No custom domains.
 - **Professional**: 1 custom domain.
-- **Enterprise / Organization**: Multiple custom domains.
+- **Enterprise / Organization**: Multiple custom domains (post-v1).
+
+> **Sprint-plan D4 (v1):** gate to the `professional` + `organization` **tier_keys** (the DB uses `professional` / `organization` / `enterprise` — not the Starter/Pro/Enterprise wording above), **1 domain per tenant**, with apex + `www` counting as one logical domain (D9). This deliberately narrows the multi-domain expectation at the top tier; `is_primary` is schema-ready so multi-domain lands later.
 
 This aligns with the mission of providing **enterprise features at small business pricing** while still making higher tiers feel materially more powerful.
 
 Implementation:
 - Add custom domain limits to existing tier system (similar to SKU/location capacity).
-- Enforce limits within the API when creating new `custom_domains` entries.
+- Enforce limits within the API when creating new `custom_domains` entries — **and** with a partial unique index on `tenant_id where status <> 'disabled'`.
 
 ### 8.2 Role-Based Permissions
 
@@ -478,6 +480,8 @@ Implementation:
 
 ## 11. Open Questions for Finalization
 
+> **Resolved by the sprint plan's Decisions table (D1–D11).** These are kept for history; see `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` for the settled outcomes (production-only; canonical tags only, no redirect; `professional`+`organization` 1-domain; apex accepted; public-surface URL preference deferred past v1; API resolution path).
+
 Before implementation, the following decisions should be made explicitly:
 
 1. **Vercel Project & Environment Strategy**
@@ -528,8 +532,8 @@ This document should serve as the **master product spec and technical blueprint*
   - Test with platform roles: PLATFORM_ADMIN (full access), PLATFORM_SUPPORT (support tools), PLATFORM_VIEWER (read-only).
 - **Tier coverage**:
   - Trial/Starter (no domains): ensure UI shows gating and appropriate upsell messaging.
-  - Professional (1 domain): ensure limit enforcement and clear errors when exceeding.
-  - Enterprise/Organization (multiple domains): ensure multiple domains and primary domain selection work.
+  - Professional/Organization (1 domain, v1): ensure limit enforcement and clear errors when exceeding — including the apex + `www` "one logical domain" rule (sprint plan D4/D9).
+  - Multi-domain + primary-domain selection: post-v1 (schema-ready, UI later).
 - **Lifecycle scenarios**:
   - Add → verify → active → disable → re-add.
   - Tenant deletion and tier downgrade flows.
@@ -537,7 +541,7 @@ This document should serve as the **master product spec and technical blueprint*
 
 ### 13.2 Rollout Strategy
 
-- Gate custom domains behind a feature flag (e.g., `custom_domains_beta`).
+- Gate custom domains behind the platform flag system: platform flag `custom_domains` (`allow_tenant_override=true`) + per-tenant `tenant_feature_flags_list` rows for the beta cohort; the proxy reads `NEXT_PUBLIC_FF_CUSTOM_DOMAINS` (sprint plan D10/H7).
 - Start with a small set of **internal tenants** or friendly beta customers.
 - Monitor:
   - Vercel domain/SSL errors.
@@ -560,33 +564,40 @@ These snippets are **reference implementations** to accelerate future work. They
 
 create table if not exists public.custom_domains (
   id uuid primary key default gen_random_uuid(),
-  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  tenant_id uuid not null references public.tenants(id) on delete cascade, -- keep the cascade; detach from Vercel pre-delete (sprint plan D11)
   domain text not null unique,
   status text not null check (status in (
     'pending_verification',
     'verified',
-    'cert_provisioning',
     'active',
     'disabled',
     'error'
-  )),
+  )), -- no 'cert_provisioning': Vercel exposes no cert state (sprint plan H4)
   verification_token text,
   vercel_domain_id text,
   verification_checked_at timestamptz,
   verification_error text,
-  certificate_status text,
+  certificate_status text, -- probe-derived only
   certificate_error text,
+  is_primary boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists idx_custom_domains_domain
   on public.custom_domains (lower(domain));
+
+-- v1 one-domain cap (sprint plan D4/M7)
+create unique index if not exists uq_custom_domains_tenant_live
+  on public.custom_domains (tenant_id)
+  where status <> 'disabled';
 ```
 
 > Note: if you later support multiple environments, add an `env` column and include it in uniqueness/indexing as discussed earlier.
 
-#### 14.1.2 Public View for Host Resolution
+#### 14.1.2 Public View for Host Resolution — **superseded (sprint plan D5/M1)**
+
+> The API endpoint is the only resolution path; this view has no consumer. Kept for history — do not create it.
 
 ```sql
 -- 002_create_public_custom_domains_view.sql
@@ -601,7 +612,9 @@ where status = 'active';
 alter view public.public_custom_domains set (security_invoker = true);
 ```
 
-#### 14.1.3 RLS Policies (Example)
+#### 14.1.3 RLS Policies (Example) — base table only; view-based resolution dropped
+
+> Keep RLS + the service-role/no-anon policies on the **base table** (defense in depth). The view-based resolution policy below is **superseded** (sprint plan D5) — there is no anon read path.
 
 ```sql
 -- Enable RLS on base table
@@ -692,6 +705,7 @@ export async function addDomainToProject(domain: string): Promise<VercelDomainRe
     body: JSON.stringify({ name: domain }),
   });
 
+  // A duplicate add returns 400 (not 409) — treat as "already attached, reuse".
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Vercel addDomain failed (${res.status}): ${body}`);
@@ -700,25 +714,59 @@ export async function addDomainToProject(domain: string): Promise<VercelDomainRe
   return (await res.json()) as VercelDomainResponse;
 }
 
-export async function getDomain(domain: string): Promise<VercelDomainResponse> {
-  const url = new URL(`${VERCEL_API_BASE}/v10/domains/${domain}`);
+// Get a project domain (v9 — NOT /v10/domains/{name}, which is not in the REST reference)
+export async function getProjectDomain(domain: string): Promise<VercelDomainResponse> {
+  const url = new URL(`${VERCEL_API_BASE}/v9/projects/${projectId}/domains/${domain}`);
   withTeam(url.searchParams);
 
-  const res = await fetch(url.toString(), {
-    method: 'GET',
-    headers: vercelHeaders(),
-  });
+  const res = await fetch(url.toString(), { method: 'GET', headers: vercelHeaders() });
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Vercel getDomain failed (${res.status}): ${body}`);
+    throw new Error(`Vercel getProjectDomain failed (${res.status}): ${body}`);
   }
 
   return (await res.json()) as VercelDomainResponse;
 }
 
+// Complete a TXT verification challenge (v9). Safe to call when already verified.
+export async function verifyProjectDomain(domain: string): Promise<VercelDomainResponse> {
+  const url = new URL(`${VERCEL_API_BASE}/v9/projects/${projectId}/domains/${domain}/verify`);
+  withTeam(url.searchParams);
+
+  const res = await fetch(url.toString(), { method: 'POST', headers: vercelHeaders() });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Vercel verifyProjectDomain failed (${res.status}): ${body}`);
+  }
+
+  return (await res.json()) as VercelDomainResponse;
+}
+
+// Domain config (v6): `misconfigured` + recommendedCNAME/recommendedIPv4 (may be empty) +
+// acceptedChallenges. No issued-cert field — TLS is confirmed by our own HTTPS probe, not here.
+export async function getDomainConfig(domain: string): Promise<{
+  misconfigured: boolean;
+  recommendedCNAME?: Array<{ rank: number; value: string }>;
+  recommendedIPv4?: Array<{ rank: number; value: string[] }>;
+  acceptedChallenges?: string[];
+}> {
+  const url = new URL(`${VERCEL_API_BASE}/v6/domains/${domain}/config`);
+  withTeam(url.searchParams);
+
+  const res = await fetch(url.toString(), { method: 'GET', headers: vercelHeaders() });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Vercel getDomainConfig failed (${res.status}): ${body}`);
+  }
+
+  return (await res.json()) as any;
+}
+
 export async function removeDomainFromProject(domain: string): Promise<void> {
-  const url = new URL(`${VERCEL_API_BASE}/v10/projects/${projectId}/domains/${domain}`);
+  const url = new URL(`${VERCEL_API_BASE}/v9/projects/${projectId}/domains/${domain}`);
   withTeam(url.searchParams);
 
   const res = await fetch(url.toString(), {
@@ -745,7 +793,7 @@ Example of a backend service using Supabase service-role client + the Vercel ser
 // apps/api/src/services/customDomainService.ts
 
 import { createClient } from '@supabase/supabase-js';
-import { addDomainToProject, getDomain, removeDomainFromProject } from './vercelDomainsService';
+import { addDomainToProject, getProjectDomain, getDomainConfig, verifyProjectDomain, removeDomainFromProject } from './vercelDomainsService';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -755,7 +803,6 @@ const supabase = createClient(
 export type CustomDomainStatus =
   | 'pending_verification'
   | 'verified'
-  | 'cert_provisioning'
   | 'active'
   | 'disabled'
   | 'error';
@@ -795,14 +842,23 @@ export async function createCustomDomain(tenantId: string, domain: string) {
 export async function refreshCustomDomainStatus(domain: string) {
   const normalizedDomain = domain.trim().toLowerCase();
 
-  const vercelDomain = await getDomain(normalizedDomain);
+  // Vercel tells us verification + DNS configuration — NOT certificate state.
+  const vercelDomain = await getProjectDomain(normalizedDomain);
+  const config = await getDomainConfig(normalizedDomain);
 
-  const status: CustomDomainStatus = vercelDomain.verified ? 'active' : 'pending_verification';
+  // `verified && !misconfigured` = ready to route. TLS is then confirmed by our own
+  // HTTPS probe of the host before we flip to `active` (Vercel exposes no cert field).
+  let status: CustomDomainStatus = 'pending_verification';
+  if (vercelDomain.verified && !config.misconfigured) {
+    const tlsReady = await probeHttps(normalizedDomain); // our own probe
+    status = tlsReady ? 'active' : 'verified';
+  }
 
   const { data, error } = await supabase
     .from('custom_domains')
     .update({
       status,
+      certificate_status: status === 'active' ? 'issued' : null, // probe-derived
       verification_checked_at: new Date().toISOString(),
       verification_error: null,
     })
@@ -817,6 +873,16 @@ export async function refreshCustomDomainStatus(domain: string) {
     status: data.status as CustomDomainStatus,
     verified: vercelDomain.verified,
   };
+}
+
+// Our own HTTPS probe — the only source of certificate state (sprint plan H4).
+async function probeHttps(domain: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://${domain}/`, { method: 'HEAD' });
+    return res.ok || res.status < 500;
+  } catch {
+    return false;
+  }
 }
 
 export async function disableCustomDomain(domain: string) {
@@ -837,13 +903,15 @@ export async function disableCustomDomain(domain: string) {
 }
 ```
 
-These functions can back your `POST /custom-domains`, `POST /custom-domains/{id}/verify`, and `DELETE /custom-domains/{id}` endpoints.
+These functions can back your `POST /custom-domains`, `POST /custom-domains/{id}/check`, and `DELETE /custom-domains/{id}` endpoints.
 
 ---
 
-### 14.4 Next.js Middleware for Host-based Tenant Resolution
+### 14.4 Next.js Middleware for Host-based Tenant Resolution — **superseded (sprint plan D5)**
 
-Below is an example `middleware.ts` for the web app on Vercel using Supabase anon client to resolve `host → tenantId` via `public_custom_domains`.
+> Superseded: resolution runs in `proxy.ts` (Next.js 16) via the **API endpoint**, not a Supabase anon query from the edge. Kept for history.
+
+Below is the original example `middleware.ts` for the web app on Vercel using a Supabase anon client to resolve `host → tenantId` via `public_custom_domains`.
 
 ```ts
 // apps/web/src/middleware.ts
@@ -953,3 +1021,19 @@ Adding an explicit record under a branch **disables wildcard matching for that b
 - **Availability is shared across namespaces.** A name taken as another tenant's `slug` or a `directory_settings_list.slug` refuses assignment — one tenant's slug can never be another's subdomain. Reserved names (`www`, `api`, `admin`, …) are refused.
 - **Production only.** The wildcard exists on `visibleshelf.com`; `visibleshelf.store` (staging) has none — subdomain URLs only resolve in production.
 - **Verify with the real URL, not DNS.** `nslookup` will resolve *any* name under the wildcard, including names assigned to no tenant — resolution proves nothing. The check is `https://{subdomain}.visibleshelf.com` returning the storefront (app-layer tenant state applies — an inactive tenant 404s at the app even though DNS answers).
+
+---
+
+## 16. Sprint-plan alignment (2026-10-11)
+
+Corrections folded in from the review of `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` so this spec matches the settled decisions and the live platform. Intent in §1–§13 is unchanged; the deltas are technical accuracy plus the D-table outcomes.
+
+- **Data model (§5.1, §14.1.1):** dropped `cert_provisioning` from the status enum (Vercel exposes no certificate state — H4); `certificate_status` is **probe-derived only**; added `is_primary`; kept `ON DELETE CASCADE` with a pre-delete Vercel detach (D11); added the v1 partial unique index on `tenant_id where status <> 'disabled'` (D4/M7).
+- **Resolution path (§5.2, §5.3, §7.3, §14.1.2, §14.1.3, §14.4):** the `public_custom_domains` view + Supabase-from-edge middleware are **superseded** (D5) — resolution is `GET /api/tenants/resolve-custom-domain/:host`, consumed by `proxy.ts` (Next.js 16). RLS stays on the base table only.
+- **Vercel endpoints (§6.2, §7.1, §14.2.2):** project-domain get/verify/remove are **v9** (add is v10); `GET /v10/domains/{name}` is not in the REST reference — use `getProjectDomain` + `verifyProjectDomain` + `getDomainConfig`; a duplicate add returns 400 (H9). `getDomainConfig`'s `recommendedCNAME`/`recommendedIPv4` may be empty — fall back to constants (H10).
+- **Lifecycle (§4.1, §14.3):** `active` requires `verified && !misconfigured` **plus** our HTTPS probe; the routing record (A/CNAME) and the ownership TXT are presented as separate steps (H4/H10).
+- **Tiers & flags (§8.1, §13.1, §13.2):** v1 gates `professional` + `organization` (DB `tier_key`s), 1 domain, apex + `www` = one logical domain (D4/D9); beta rides the platform flag system, not `custom_domains_beta` (D10/H7).
+- **Open questions (§11):** resolved by the sprint plan's D-table.
+- **Phasing (§10):** sequenced by the sprint plan's Phase 0–6.
+
+See `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` (second-pass findings B5–B7 / H7–H11 / M8–M14) for the evidence.
