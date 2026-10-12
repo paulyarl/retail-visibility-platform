@@ -387,6 +387,21 @@ class UnifiedConfig {
     return this.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   }
 
+  // Vercel Domains API — tenant custom domains (CUSTOM_DOMAINS_SPRINT_PLAN §2.1).
+  // All three are required for domain attachment/verification; absent values
+  // must surface as a typed vercel_unconfigured failure, never a crash.
+  get vercelApiToken(): string | undefined {
+    return this.env.VERCEL_API_TOKEN;
+  }
+
+  get vercelProjectId(): string | undefined {
+    return this.env.VERCEL_PROJECT_ID;
+  }
+
+  get vercelTeamId(): string | undefined {
+    return this.env.VERCEL_TEAM_ID;
+  }
+
   // ─── AI Gateway (Vercel) ────────────────────────────────────────────────
 
   get aiGatewayUrl(): string {

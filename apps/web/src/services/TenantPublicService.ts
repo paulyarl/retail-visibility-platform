@@ -163,6 +163,26 @@ class TenantPublicService extends PublicApiSingleton {
   }
 
   /**
+   * Storefront canonical ladder (sprint plan 4.2): the API resolves tenant
+   * state — kind 'custom' (active custom domain), 'subdomain', or 'path'.
+   * Best-effort: null on any failure so metadata never blocks render.
+   */
+  async getStorefrontCanonical(idOrSlug: string): Promise<{ kind: 'custom' | 'subdomain' | 'path'; host?: string; tenantId?: string } | null> {
+    try {
+      const response = await this.makeDefaultRequest<any>(
+        `/api/tenants/storefront-canonical/${encodeURIComponent(idOrSlug)}`,
+        {},
+        `storefront-canonical-${idOrSlug}`,
+        this.PROFILE_TTL
+      );
+      if (!response.success || !response.data?.kind) return null;
+      return { kind: response.data.kind, host: response.data.host, tenantId: response.data.tenantId };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get tenant logo (public)
    * Uses the /api/public/tenant/:tenantId/logo endpoint
    */

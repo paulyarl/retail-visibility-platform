@@ -159,6 +159,7 @@ These exist in `platform_feature_flags_list` DB table. Can be toggled via admin 
 | FF_ITEMS_V2_GRID | false | `FF_ITEMS_V2_GRID` | true | off | ❌ Inactive | Items grid v2 (virtualized) |
 | FF_CATEGORY_MANAGEMENT_PAGE | true | `FF_CATEGORY_MANAGEMENT_PAGE` | false | on (100%) | ✅ Active | OnboardingWizard, category management |
 | FF_CATEGORY_QUICK_ACTIONS | false | `FF_CATEGORY_QUICK_ACTIONS` | true | off | ❌ Inactive | Quick actions footer |
+| custom_domains | false | — (no env override; DB flag only on API) | true | off | ❌ Inactive (beta cohort via `tenant_feature_flags_list`) | Tenant-owned storefront domains — API `CustomDomainService.addDomain` gate + `useEffectiveTenantFlags` in `CustomDomainSettings`; web twin `NEXT_PUBLIC_FF_CUSTOM_DOMAINS` gates the proxy custom-host branch (`proxy.ts`). Seeded by migration `328_custom_domains_flag.sql` (lowercase key, `use_file_based_navigation` style — not `seed-platform-flags.ts`) |
 
 ### Group E: Web `featureFlags/index.ts` Only (not in seed script, not in DB)
 

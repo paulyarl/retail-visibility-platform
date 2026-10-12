@@ -218,6 +218,7 @@ import couponsRoutes from '../routes/coupons';
 import couponAnalyticsRoutes from '../routes/coupon-analytics';
 import marketingOpsRoutes from '../routes/marketing-ops';
 import adminSubdomainsRoutes from '../routes/admin-subdomains';
+import adminCustomDomainsRoutes from '../routes/admin-custom-domains';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
 import marketingCustomerRoutes from '../routes/marketing-customer';
 import gbpCustomerRoutes from '../routes/gbp-customer';
@@ -1397,6 +1398,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'admin',
     authLevel: 'admin',
     comment: 'Admin subdomain management — list, rename, remove (platform admin only)',
+  },
+  {
+    path: '/api/admin/custom-domains',
+    router: adminCustomDomainsRoutes,
+    domain: 'admin',
+    authLevel: 'admin',
+    comment: 'Admin custom-domain management — list, per-tenant entitlement detail, attach (DFY), check, remove (platform admin only)',
   },
   {
     path: '/api/admin/gbp-monitor',

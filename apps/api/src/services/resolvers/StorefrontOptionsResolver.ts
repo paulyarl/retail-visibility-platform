@@ -117,6 +117,10 @@ export function resolveStorefrontOptions(
     can_use_contact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
     can_use_enhanced_seo: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     can_use_storefront_actions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+    // D12 entitlements — `flexible ||` per R23 so storefront_opt_flexible
+    // holders inherit both keys with no explicit grant.
+    platform_subdomain_enabled: flexible || !!features.storefront_opt_platform_subdomain,
+    custom_domain_enabled: flexible || !!features.storefront_opt_custom_domain,
     merchant_preferences: prefs,
   };
 }

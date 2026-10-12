@@ -3,11 +3,43 @@ import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 import { clientLogger } from '@/lib/client-logger';
-import { isPlatformSubdomain, isStorefrontPath, STOREFRONT_PREFIX_ROOTS } from '@/lib/storefront-routing';
+import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, STOREFRONT_PREFIX_ROOTS } from '@/lib/storefront-routing';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
 const FF_TENANT_URLS = process.env.NEXT_PUBLIC_FF_TENANT_URLS === 'true';
+// Custom domains (level 3, D10): off → the custom-host branch is skipped
+// entirely and behavior is identical to pre-sprint.
+const FF_CUSTOM_DOMAINS = process.env.NEXT_PUBLIC_FF_CUSTOM_DOMAINS === 'true';
+// D13: the /manage redirect target must come from config — never the request
+// host (tenant-controlled DNS), never a literal baked into the redirect line.
+const PLATFORM_APP_ORIGIN = platformOrigin();
+
+// Resolve-cache (1.4): positive AND definitive-miss entries cached briefly so
+// the resolve endpoint isn't hit per request; transient 429/5xx is never
+// cached — the next request retries live. Per-isolate, ephemeral — fine.
+const customHostCache = new Map<string, { value: { tenantId: string; domain: string } | null; expires: number }>();
+const CUSTOM_HOST_CACHE_TTL_MS = 60_000;
+
+async function resolveCustomHost(req: NextRequest, hostname: string): Promise<{ tenantId: string; domain: string } | null> {
+  const key = hostname.toLowerCase();
+  const hit = customHostCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value;
+
+  const resp = await fetch(`${API_BASE_URL}/api/tenants/resolve-custom-domain/${encodeURIComponent(key)}`, {
+    headers: { 'x-forwarded-for': req.headers.get('x-forwarded-for') ?? '' },
+  });
+  if (resp.ok) {
+    const data = await resp.json();
+    const value = data?.success && data.tenantId ? { tenantId: data.tenantId as string, domain: data.domain as string } : null;
+    customHostCache.set(key, { value, expires: Date.now() + CUSTOM_HOST_CACHE_TTL_MS });
+    return value;
+  }
+  if (resp.status === 404) {
+    customHostCache.set(key, { value: null, expires: Date.now() + CUSTOM_HOST_CACHE_TTL_MS });
+  }
+  return null; // 429/5xx — definitive miss handling but NOT cached
+}
 
 function getCookie(req: NextRequest, name: string): string | undefined {
   try {
@@ -153,6 +185,78 @@ export async function proxy(req: NextRequest) {
     } catch (error) {
       clientLogger.error('[Proxy] Error in subdomain routing:', { detail: error });
       // Continue with normal routing if subdomain lookup fails
+    }
+  }
+
+  // Tenant-owned custom domains (level 3 — sprint plan 4.1–4.4). Any host
+  // that isn't ours is a candidate: resolve it or fail closed. Order (F-M1):
+  //   resolve → www→apex 301 → /manage redirect → allowlist → rewrite.
+  if (FF_CUSTOM_DOMAINS && isCandidateCustomHost(hostname)) {
+    if (pathname.startsWith('/api/') ||
+        pathname.startsWith('/_next/') ||
+        pathname.startsWith('/favicon') ||
+        pathname.includes('.')) {
+      return NextResponse.next();
+    }
+
+    try {
+      const resolved = await resolveCustomHost(req, hostname);
+
+      if (resolved) {
+        // D9 host canonicalization first: the www companion 301s to the
+        // stored (www-stripped) host. Path + query preserved — a /manage
+        // request lands on the apex /manage and takes its own redirect.
+        if (hostname.toLowerCase().startsWith('www.')) {
+          const dest = new URL(`${pathname}${req.nextUrl.search}`, `https://${resolved.domain}`);
+          console.log(`[Proxy] Custom-host www→apex: ${hostname}${pathname} → ${dest.toString()}`);
+          return NextResponse.redirect(dest, { status: 301 });
+        }
+
+        // D13 branded workspace entry: /manage[/rest] → platform /t/{id}[/rest].
+        // Absolute platform origin — the workspace is never served under the
+        // tenant-controlled host, and the redirect can't become open.
+        const manageSuffix = managePathSuffix(pathname);
+        if (manageSuffix !== null) {
+          const dest = new URL(`${PLATFORM_APP_ORIGIN}/t/${resolved.tenantId}${manageSuffix}${req.nextUrl.search}`);
+          console.log(`[Proxy] Custom-host /manage: ${hostname}${pathname} → ${dest.toString()}`);
+          return NextResponse.redirect(dest, { status: 302 });
+        }
+
+        // Same trust boundary as subdomains (B1): the custom-host branch
+        // returns before the /admin and /settings auth gates, so anything
+        // off the storefront allowlist is refused, never rendered.
+        if (!isStorefrontPath(pathname)) {
+          return NextResponse.rewrite(new URL('/404', req.url));
+        }
+
+        let destPath: string;
+        if (pathname.startsWith('/tenant/')) {
+          destPath = pathname;
+        } else if (pathname === '/' || STOREFRONT_PREFIX_ROOTS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
+          destPath = `/tenant/${resolved.tenantId}${pathname === '/' ? '' : pathname}`;
+        } else {
+          destPath = pathname;
+        }
+
+        console.log(`[Proxy] Custom-host rewrite: ${hostname}${pathname} → ${destPath} (domain: ${resolved.domain})`);
+
+        const url = req.nextUrl.clone();
+        url.pathname = destPath;
+
+        const res = NextResponse.rewrite(url);
+        const tcx = JSON.stringify({ tenant_id: resolved.tenantId, aud: 'user' });
+        setCookie(res, 'tcx', tcx);
+        return res;
+      }
+
+      // Unresolved custom host → fail closed (H8-style): never render the
+      // platform app on a host that might be a tenant domain. Transient
+      // resolve failures land here too — a 404 beats serving the wrong app.
+      return NextResponse.rewrite(new URL('/404', req.url));
+    } catch (error) {
+      clientLogger.error('[Proxy] Error in custom-domain routing:', { detail: error });
+      // Fetch exception → fall through (API-outage resilience, matching the
+      // subdomain branch's semantics).
     }
   }
 

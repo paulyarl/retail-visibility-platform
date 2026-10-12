@@ -660,6 +660,12 @@ export interface EffectiveStorefrontOptions {
   can_use_contact: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
+  // Level-2/3 storefront presentation entitlements (D12): action gates, not
+  // merchant prefs — entitlement only, state lives in tenants.subdomain /
+  // custom_domains. Not gated on `enabled` (master key) — a Discovery tenant
+  // can hold the subdomain entitlement without the full options bundle.
+  platform_subdomain_enabled: boolean;
+  custom_domain_enabled: boolean;
   merchant_preferences: Record<string, any>;
 }
 

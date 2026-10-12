@@ -1820,6 +1820,19 @@ class DirectoryPresenceSeedService {
     await prisma.$executeRaw`DELETE FROM business_hours_special_list WHERE tenant_id = ${tenantId}`.catch(() => {});
     await prisma.$executeRaw`DELETE FROM user_tenants WHERE tenant_id = ${tenantId}`.catch(() => {});
 
+    // Detach any custom domains from Vercel before the tenant row cascades
+    // them (sprint plan 1.6/D11 — orphan attachments would keep routing to a
+    // gone tenant). Best-effort: a Vercel-side failure must not block delete.
+    try {
+      const { customDomainService } = await import('./CustomDomainService');
+      await customDomainService.detachAllForTenant(tenantId);
+    } catch (detachError) {
+      logger.warn('[DirectoryPresenceSeed] custom-domain detach failed during seed delete (continuing)', undefined, {
+        error: { name: (detachError as any)?.name || 'Error', message: (detachError as any)?.message || String(detachError) },
+        tenantId,
+      });
+    }
+
     // Finally, the tenant row. Cascades any remaining tenant-scoped tables.
     await prisma.$executeRaw`DELETE FROM tenants WHERE id = ${tenantId}`;
 

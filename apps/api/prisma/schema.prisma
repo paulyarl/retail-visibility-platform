@@ -7281,6 +7281,7 @@ model tenants {
   crm_support_tickets                                                                    crm_support_tickets[]
   crm_tasks                                                                              crm_tasks[]
   crm_user_read_states                                                                   crm_user_read_states[]
+  custom_domains                                                                         custom_domains[]
   customer_saved_coupons                                                                 customer_saved_coupons[]
   customer_tenant_relationships                                                          customer_tenant_relationships[]
   digital_access_grants                                                                  digital_access_grants[]
@@ -8264,6 +8265,31 @@ model mkt_project_phase_predicates {
   updated_at         DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([phase_key, predicate_version], map: "uq_mppp_phase_version")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model custom_domains {
+  id                      String    @id @db.VarChar(255)
+  tenant_id               String    @db.VarChar(255)
+  domain                  String    @unique
+  status                  String    @default("pending_verification")
+  verification_token      String?
+  vercel_domain_id        String?
+  attached_hosts          String[]  @default([])
+  verification_checked_at DateTime? @db.Timestamptz(6)
+  verification_error      String?
+  certificate_status      String?
+  certificate_error       String?
+  is_primary              Boolean   @default(false)
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime  @default(now()) @db.Timestamptz(6)
+  tenants                 tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_custom_domains_status")
+  @@index([tenant_id], map: "idx_custom_domains_tenant")
 }
 
 enum action {

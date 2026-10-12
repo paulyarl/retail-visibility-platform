@@ -359,6 +359,9 @@ interface BackendEffectiveStorefrontOptions {
   can_use_contact: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
+  // D12 entitlements — level-2/3 presentation keys (action gates)
+  platform_subdomain_enabled: boolean;
+  custom_domain_enabled: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -807,6 +810,8 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseContact: b.can_use_contact,
     canUseEnhancedSEO: b.can_use_enhanced_seo,
     canUseStorefrontActions: b.can_use_storefront_actions,
+    platformSubdomainEnabled: b.platform_subdomain_enabled ?? false,
+    customDomainEnabled: b.custom_domain_enabled ?? false,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };

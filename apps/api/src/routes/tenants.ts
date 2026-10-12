@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { assignSubdomain, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
+import { customDomainService } from '../services/CustomDomainService';
 
 // HTTP-facing copy for the shared subdomain helper's failure codes.
 const SUBDOMAIN_ERROR_MESSAGES: Record<SubdomainFailureCode, string> = {
@@ -29,6 +30,8 @@ const RATE_LIMITS = {
   subdomainCheck: { maxRequests: 10, windowMs: 60 * 1000 }, // 10 checks per minute
   subdomainCreate: { maxRequests: 3, windowMs: 60 * 60 * 1000 }, // 3 creations per hour per tenant
   subdomainResolve: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 resolutions per minute (for middleware)
+  customDomainResolve: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 resolutions per minute (for middleware)
+  customDomainAction: { maxRequests: 10, windowMs: 60 * 60 * 1000 }, // 10 add/check/remove actions per hour per tenant
 };
 
 /**
@@ -371,6 +374,25 @@ router.put('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: R
       });
     }
 
+    // Entitlement gate (sprint plan 1.8/D12): the assignment ACTION checks
+    // storefront_opt_platform_subdomain at the self-service route — NOT in
+    // lib/subdomain.ts (shared with the admin route, which stays ungated).
+    // `storefront_opt_flexible` composed inline, mirroring the resolver's
+    // `flexible ||` (F-H1/R23). The resolve path is never gated — existing
+    // subdomains keep serving regardless (grandfathering).
+    const entitlement = await prisma.$queryRaw<Array<{ feature_key: string }>>`
+      SELECT feature_key FROM mv_tenant_effective_capabilities
+      WHERE tenant_id = ${id}
+        AND feature_key IN ('storefront_opt_platform_subdomain', 'storefront_opt_flexible')
+    `;
+    if (!entitlement.length) {
+      return res.status(403).json({
+        success: false,
+        error: 'not_entitled',
+        message: 'A platform subdomain is not included in your plan'
+      });
+    }
+
     // Format + reserved + cross-namespace availability + slug mirroring all
     // live in the shared helper (lib/subdomain.ts).
     const result = await assignSubdomain(id, subdomain);
@@ -604,6 +626,245 @@ router.get('/resolve-subdomain/:subdomain', async (req: Request, res: Response) 
       error: 'internal_error',
       message: 'Failed to resolve subdomain'
     });
+  }
+});
+
+/**
+ * GET /api/tenants/resolve-custom-domain/:host
+ * Resolve a tenant-owned custom host to tenant ID for storefront routing
+ * (sprint plan 1.4 — identical contract to resolve-subdomain; the proxy
+ * treats both the same). Strips a leading www.; only `active` rows serve.
+ */
+router.get('/resolve-custom-domain/:host', async (req: Request, res: Response) => {
+  try {
+    const { host } = req.params;
+
+    const clientKey = ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.ip || 'anonymous';
+    const rateLimitResult = checkRateLimit(clientKey, 'customDomainResolve');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many domain resolutions. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)} seconds.`
+      });
+    }
+
+    const resolved = await customDomainService.resolveHostToTenant(host);
+
+    if (!resolved) {
+      return res.status(404).json({
+        success: false,
+        error: 'domain_not_found',
+        message: 'No active custom domain for this host'
+      });
+    }
+
+    res.json({
+      success: true,
+      tenantId: resolved.tenantId,
+      domain: resolved.domain
+    });
+  } catch (error: any) {
+    logger.error('[TENANTS] Error resolving custom domain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to resolve custom domain'
+    });
+  }
+});
+
+// ─── Tenant custom domains (sprint plan 3.1) ────────────────────────────────
+// Self-service DIY flow: add → DNS at registrar → "Check status" → active.
+// Auth: authenticateToken + checkTenantAccess — same scope as /subdomain.
+// Entitlement (flag + capability) is enforced inside the service.
+
+const CUSTOM_DOMAIN_ERROR_STATUS: Record<string, number> = {
+  not_entitled: 403,
+  non_dns_host: 400,
+  invalid_domain: 400,
+  platform_domain: 400,
+  domain_taken: 409,
+  domain_limit: 409,
+  not_found: 404,
+  vercel_error: 502,
+  unconfigured: 503,
+};
+
+function customDomainErrorStatus(code: string): number {
+  return CUSTOM_DOMAIN_ERROR_STATUS[code] ?? 400;
+}
+
+/**
+ * GET /api/tenants/:id/custom-domains
+ * List the tenant's custom domains (max 1 live per plan, audit rows included).
+ */
+router.get('/:id/custom-domains', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const domains = await customDomainService.listForTenant(req.params.id);
+    res.json({ success: true, domains });
+  } catch (error: any) {
+    logger.error('[TENANTS] Error listing custom domains:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to list custom domains' });
+  }
+});
+
+/**
+ * POST /api/tenants/:id/custom-domains
+ * Add a domain. Body: { domain, apex? } — `apex` declares the apex-vs-
+ * subdomain flow (D9/F-B1); when absent both apex + www project domains
+ * are attached as a safe default.
+ */
+router.post('/:id/custom-domains', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { domain, apex } = req.body ?? {};
+
+    const rateLimitResult = checkRateLimit(id, 'customDomainAction');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many domain actions. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000 / 60)} minutes.`,
+        retryAfter: rateLimitResult.resetTime
+      });
+    }
+
+    if (!domain || typeof domain !== 'string') {
+      return res.status(400).json({ success: false, error: 'bad_request', message: 'domain is required and must be a string' });
+    }
+
+    const result = await customDomainService.addDomain(id, domain, {
+      apexDeclared: typeof apex === 'boolean' ? apex : undefined,
+    });
+    if (!result.ok) {
+      return res.status(customDomainErrorStatus(result.code)).json({
+        success: false,
+        error: result.code,
+        message: result.message,
+      });
+    }
+
+    res.status(201).json({ success: true, domain: result.domain, attachedHosts: result.attachedHosts });
+  } catch (error: any) {
+    logger.error('[TENANTS] Error adding custom domain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to add custom domain' });
+  }
+});
+
+/**
+ * POST /api/tenants/:id/custom-domains/:domainId/check
+ * Manual "Check status" — same lifecycle path the sweeper runs (verify →
+ * misconfigured → HTTPS probe → active).
+ */
+router.post('/:id/custom-domains/:domainId/check', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id, domainId } = req.params;
+
+    const rateLimitResult = checkRateLimit(id, 'customDomainAction');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many domain actions. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000 / 60)} minutes.`,
+        retryAfter: rateLimitResult.resetTime
+      });
+    }
+
+    const result = await customDomainService.checkDomain(id, domainId);
+    if (!result.ok) {
+      return res.status(customDomainErrorStatus(result.code)).json({
+        success: false,
+        error: result.code,
+        message: result.message,
+      });
+    }
+
+    res.json({ success: true, domain: result.domain });
+  } catch (error: any) {
+    logger.error('[TENANTS] Error checking custom domain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to check custom domain' });
+  }
+});
+
+/**
+ * DELETE /api/tenants/:id/custom-domains/:domainId
+ * Detach Vercel hosts + remove the row.
+ */
+router.delete('/:id/custom-domains/:domainId', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id, domainId } = req.params;
+
+    const rateLimitResult = checkRateLimit(id, 'customDomainAction');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many domain actions. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000 / 60)} minutes.`,
+        retryAfter: rateLimitResult.resetTime
+      });
+    }
+
+    const result = await customDomainService.removeDomain(id, domainId);
+    if (!result.ok) {
+      return res.status(customDomainErrorStatus(result.code)).json({
+        success: false,
+        error: result.code,
+        message: 'Domain not found',
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[TENANTS] Error removing custom domain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to remove custom domain' });
+  }
+});
+
+/**
+ * GET /api/tenants/storefront-canonical/:id
+ * Canonical-host ladder (sprint plan 4.2): active custom domain → platform
+ * subdomain → platform path. Tenant-based lookup (id OR slug), never
+ * request-host — the SAME canonical must be emitted on every surface for
+ * equity to consolidate. Public + rate-limited like resolve-*.
+ */
+router.get('/storefront-canonical/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const clientKey = ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.ip || 'anonymous';
+    const rateLimitResult = checkRateLimit(clientKey, 'customDomainResolve');
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'rate_limit_exceeded',
+        message: `Too many lookups. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)} seconds.`
+      });
+    }
+
+    const tenant = await prisma.tenants.findFirst({
+      where: { OR: [{ id }, { slug: id }] },
+      select: { id: true, subdomain: true },
+    });
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'tenant_not_found', message: 'Tenant not found' });
+    }
+
+    const domain = await prisma.custom_domains.findFirst({
+      where: { tenant_id: tenant.id, status: 'active' },
+      orderBy: { is_primary: 'desc' },
+      select: { domain: true },
+    });
+    if (domain) {
+      return res.json({ success: true, kind: 'custom', host: domain.domain });
+    }
+    if (tenant.subdomain) {
+      return res.json({ success: true, kind: 'subdomain', host: tenant.subdomain });
+    }
+    return res.json({ success: true, kind: 'path', tenantId: tenant.id });
+  } catch (error: any) {
+    logger.error('[TENANTS] Error resolving storefront canonical:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to resolve canonical' });
   }
 });
 

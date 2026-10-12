@@ -556,8 +556,9 @@ export interface PlanCapabilities {
 /**
  * Anchor-tenant order (spec 4.6): wedge seed's tenant → primary campaign's
  * demo tenant → platform defaults. Storefront/subdomain/QR are
- * platform-provided at the platform level; domainEnabled is hardcoded
- * false in v1 (custom domains are the unbuilt Vercel-Domains-API surface).
+ * platform-provided at the platform level; domainEnabled mirrors
+ * assignment-state (an `active` custom_domains row) — entitlement is the
+ * `storefront_opt_custom_domain` key, state is the domain lifecycle.
  */
 export async function resolvePlanCapabilities(args: {
   wedgeTenantId?: string | null;
@@ -581,6 +582,13 @@ export async function resolvePlanCapabilities(args: {
   // is opt-in (AGENTS.md 2026-10-10). NULL → capability off.
   const subdomainEnabled = tenant?.subdomain != null && tenant.subdomain.length > 0;
 
+  // Assignment-state, parallel to subdomainEnabled: an ACTIVE row only —
+  // pending/verified/error rows are mid-configuration, not a live surface.
+  const activeDomain = await prisma.custom_domains.findFirst({
+    where: { tenant_id: anchorTenantId, status: 'active' },
+    select: { id: true },
+  });
+
   const capRows = await prisma.$queryRaw<{ feature_key: string }[]>`
     SELECT feature_key
     FROM mv_tenant_effective_capabilities
@@ -599,7 +607,7 @@ export async function resolvePlanCapabilities(args: {
     storefrontEnabled,
     subdomainEnabled,
     qrPrintEnabled,
-    domainEnabled: false,
+    domainEnabled: activeDomain != null,
   };
 }
 

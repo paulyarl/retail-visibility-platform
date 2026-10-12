@@ -9,6 +9,7 @@ import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, Refr
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantProfileService } from '@/services/TenantProfileService';
+import { useEffectiveStorefrontOptions } from '@/hooks/useEffectiveCapabilities';
 import { clientLogger } from '@/lib/client-logger';
 
 interface SubdomainSettingsProps {
@@ -16,6 +17,10 @@ interface SubdomainSettingsProps {
 }
 
 export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) {
+  // D12/3.2: the assignment UI mirrors the 1.8 route gate — when the tenant
+  // isn't entitled, show an upsell instead of a dead form.
+  const { data: storefrontOptions, isLoading: capsLoading } = useEffectiveStorefrontOptions(tenantId);
+  const platformSubdomainEntitled = storefrontOptions?.platformSubdomainEnabled ?? true;
   const [currentSubdomain, setCurrentSubdomain] = useState<string>('');
   // The chosen slug — subdomain mirrors the slug (see lib/subdomain.ts), so the
   // slug picker below sets both.
@@ -178,6 +183,35 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
   const getSubdomainUrl = (subdomain: string) => {
     return `https://${subdomain}.${platformUrl}`;
   };
+
+  // Entitlement resolved and this tenant lacks the level-2 key → upsell, not
+  // a dead form (the 1.8 route gate would reject the save anyway).
+  if (!capsLoading && !platformSubdomainEntitled) {
+    return (
+      <Card className="dark:bg-gray-800 dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+            <Info className="h-5 w-5" />
+            Custom Subdomain
+          </CardTitle>
+          <CardDescription className="text-gray-600 dark:text-gray-300">
+            A <code className="font-mono text-xs">yourname.{platformDomain}</code> address for your storefront — required for Google Shopping surfaces.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+            Subdomains are included with Discovery and Storefront plans. Your storefront keeps working at its current address either way.
+          </p>
+          <Link
+            href={`/t/${tenantId}/settings/billing`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            View plans
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="dark:bg-gray-800 dark:border-gray-700">

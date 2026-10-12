@@ -364,6 +364,16 @@ export class TrialManagementService {
       type: 'trial_expired',
     }).catch(err => console.error('[TrialManagement] Failed to send notification:', err));
 
+    // Tier downgrade loses the storefront_opt_custom_domain entitlement —
+    // detach + disable the tenant's domains (sprint plan 1.6/H2). Non-fatal:
+    // a Vercel/DB hiccup must not break the billing downgrade path.
+    try {
+      const { customDomainService } = await import('../CustomDomainService');
+      await customDomainService.suspendAllForTenant(tenantId);
+    } catch (suspendError) {
+      console.error('[TrialManagement] custom-domain suspend failed (continuing):', suspendError);
+    }
+
     // Invalidate capability cache so subscription-status-aware override takes effect
     invalidateEffectiveCapabilities(tenantId);
   }

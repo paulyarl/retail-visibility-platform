@@ -187,6 +187,16 @@ router.delete('/tenants/:tenantId', async (req, res) => {
       where: { tenant_id: tenantId },
     });
 
+    // Detach any custom domains from Vercel BEFORE the tenant delete cascades
+    // their rows (sprint plan 1.6/D11 — a cascade alone would orphan live
+    // project-domain attachments routing to a gone tenant).
+    try {
+      const { customDomainService } = await import('../services/CustomDomainService');
+      await customDomainService.detachAllForTenant(tenantId);
+    } catch (detachError) {
+      logger.warn('[Admin Tools] Custom-domain detach failed during tenant delete (continuing):', undefined, { error: { name: (detachError as any)?.name || 'Error', message: (detachError as any)?.message || String(detachError) }, tenantId });
+    }
+
     // Delete the tenant
     const deletedTenant = await prisma.tenants.delete({
       where: { id: tenantId },

@@ -2357,3 +2357,13 @@ export function generateManualOutreachAnchorId(): string {
   return `anchor-${nanoid()}`;
 }
 
+/**
+ * Generate custom domain ID (tenant-scoped)
+ * Format: cdm-{tenantKey}-{nanoid}
+ * One row per logical domain — see custom_domains (migration 326, sprint plan D9).
+ */
+export function generateCustomDomainId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cdm-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPlatformSubdomain, isStorefrontPath } from './storefront-routing';
+import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix } from './storefront-routing';
 
 describe('isPlatformSubdomain', () => {
   it('detects tenant subdomains on platform domains', () => {
@@ -53,5 +53,58 @@ describe('isStorefrontPath (B1 allowlist)', () => {
     expect(isStorefrontPath('/products-deep/1')).toBe(false);
     expect(isStorefrontPath('/admin')).toBe(false);
     expect(isStorefrontPath('/adminxyz')).toBe(false);
+  });
+});
+
+describe('isCandidateCustomHost (custom-domains sprint 4.1)', () => {
+  // Everything that can't be ours is a candidate — the proxy resolves it
+  // against the API and fails closed on a miss.
+  it.each(['mybrand.com', 'www.mybrand.com', 'shop.mybrand.com', 'mybrand.co.uk', 'www.mybrand.co.uk'])(
+    'accepts candidate tenant-owned host %s',
+    (host) => {
+      expect(isCandidateCustomHost(host)).toBe(true);
+    },
+  );
+
+  it.each([
+    'visibleshelf.com',
+    'www.visibleshelf.com',
+    'visibleshelf.store',
+    'www.visibleshelf.store',
+    'baraka.visibleshelf.com', // platform subdomain — the subdomain branch owns it
+    'localhost',
+    'dev.localhost',
+    '127.0.0.1',
+    '::1',
+    'rvp-web-git-main.vercel.app', // deployment/preview host
+    '',                            // empty
+    'barename',                    // not DNS-shaped
+  ])('rejects %s', (host) => {
+    expect(isCandidateCustomHost(host)).toBe(false);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isCandidateCustomHost('MyBrand.COM')).toBe(true);
+    expect(isCandidateCustomHost('Baraka.VisibleShelf.com')).toBe(false);
+  });
+});
+
+describe('managePathSuffix (D13 workspace entry)', () => {
+  it('maps /manage to the workspace root', () => {
+    expect(managePathSuffix('/manage')).toBe('');
+    expect(managePathSuffix('/manage/')).toBe('');
+  });
+
+  it('maps /manage/<rest> to the /t/{id} suffix', () => {
+    expect(managePathSuffix('/manage/items')).toBe('/items');
+    expect(managePathSuffix('/manage/settings/tenant')).toBe('/settings/tenant');
+  });
+
+  it('returns null for non-manage paths', () => {
+    expect(managePathSuffix('/')).toBeNull();
+    expect(managePathSuffix('/manager')).toBeNull(); // prefix must be exact
+    expect(managePathSuffix('/manage-extra')).toBeNull();
+    expect(managePathSuffix('/admin')).toBeNull();
+    expect(managePathSuffix('/products/1')).toBeNull();
   });
 });

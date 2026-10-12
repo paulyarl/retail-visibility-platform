@@ -1354,6 +1354,90 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  // ─── Tenant custom domains (sprint plan 3.1 DIY flow) ───────────────────
+
+  async listCustomDomains(tenantId: string): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/custom-domains`,
+        {},
+        `tenant-custom-domains-${tenantId}`
+      );
+      if (!result.success) {
+        clientLogger.error('[TenantInfoService] Failed to list custom domains:', { detail: result.error });
+        throw new Error(getErrorMessage(result.error) || 'Failed to list custom domains');
+      }
+      return result.data;
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to list custom domains:', { detail: error });
+      throw error;
+    }
+  }
+
+  async addCustomDomain(tenantId: string, domain: string, apex?: boolean): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/custom-domains`,
+        { method: 'POST', body: JSON.stringify({ domain, apex }) },
+        `tenant-custom-domain-add-${tenantId}`
+      );
+      if (!result.success) {
+        clientLogger.error('[TenantInfoService] Failed to add custom domain:', { detail: result.error });
+        const error = new Error(getErrorMessage(result.error) || 'Failed to add custom domain');
+        (error as any).cause = result.error;
+        throw error;
+      }
+      return result.data;
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to add custom domain:', { detail: error });
+      throw error;
+    }
+  }
+
+  async checkCustomDomain(tenantId: string, domainId: string): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/custom-domains/${domainId}/check`,
+        { method: 'POST' },
+        `tenant-custom-domain-check-${tenantId}-${domainId}`
+      );
+      if (!result.success) {
+        clientLogger.error('[TenantInfoService] Failed to check custom domain:', { detail: result.error });
+        const error = new Error(getErrorMessage(result.error) || 'Failed to check custom domain');
+        (error as any).cause = result.error;
+        throw error;
+      }
+      return result.data;
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to check custom domain:', { detail: error });
+      throw error;
+    }
+  }
+
+  async removeCustomDomain(tenantId: string, domainId: string): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/custom-domains/${domainId}`,
+        { method: 'DELETE' },
+        `tenant-custom-domain-delete-${tenantId}-${domainId}`
+      );
+      if (!result.success) {
+        clientLogger.error('[TenantInfoService] Failed to remove custom domain:', { detail: result.error });
+        const error = new Error(getErrorMessage(result.error) || 'Failed to remove custom domain');
+        (error as any).cause = result.error;
+        throw error;
+      }
+      return result.data;
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to remove custom domain:', { detail: error });
+      throw error;
+    }
+  }
+
   /**
    * Get tenant data with cache busting
    */

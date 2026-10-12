@@ -17,6 +17,7 @@ const {
   mockPlaybookCatalog,
   mockSeeds,
   mockTenants,
+  mockCustomDomains,
   mockQueryRaw,
   mockRefreshFidelity,
 } = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ const {
   mockPlaybookCatalog: { findMany: vi.fn() },
   mockSeeds: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   mockTenants: { findUnique: vi.fn() },
+  mockCustomDomains: { findFirst: vi.fn() },
   mockQueryRaw: vi.fn(),
   mockRefreshFidelity: vi.fn(),
 }));
@@ -38,6 +40,7 @@ vi.mock('../../../prisma', () => ({
     mkt_playbook_catalog: mockPlaybookCatalog,
     directory_presence_seeds: mockSeeds,
     tenants: mockTenants,
+    custom_domains: mockCustomDomains,
     $queryRaw: mockQueryRaw,
   },
 }));
@@ -141,6 +144,9 @@ const BUNDLE = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSeeds.findUnique.mockResolvedValue(null);
+  // Default: no active custom domain — assignment-state off unless a test
+  // sets an active row.
+  mockCustomDomains.findFirst.mockResolvedValue(null);
 });
 
 // ─── resolveProspectSignals ──────────────────────────────────────────────
@@ -353,6 +359,26 @@ describe('resolvePlanCapabilities', () => {
     await resolvePlanCapabilities({ wedgeTenantId: 't-seed', demoTenantId: 'tenant-demo-1' });
     expect(mockTenants.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 't-seed' } }),
+    );
+  });
+
+  it('active custom_domains row → domainEnabled true (assignment-state)', async () => {
+    mockTenants.findUnique.mockResolvedValue({ subdomain: null });
+    mockCustomDomains.findFirst.mockResolvedValue({ id: 'cdm-t-1' });
+    mockQueryRaw.mockResolvedValueOnce([]);
+    const caps = await resolvePlanCapabilities({ wedgeTenantId: 't-seed' });
+    expect(caps.domainEnabled).toBe(true);
+  });
+
+  it('non-active custom_domains row → domainEnabled stays false', async () => {
+    mockTenants.findUnique.mockResolvedValue({ subdomain: null });
+    // findFirst is called with status: 'active' — a pending/error row never
+    // matches in the real query, so the mock returning null is the truth.
+    mockQueryRaw.mockResolvedValueOnce([]);
+    const caps = await resolvePlanCapabilities({ wedgeTenantId: 't-seed' });
+    expect(caps.domainEnabled).toBe(false);
+    expect(mockCustomDomains.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenant_id: 't-seed', status: 'active' } }),
     );
   });
 });

@@ -502,6 +502,10 @@ export interface StorefrontOptionsState {
   canUseContact: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
+  /** D12 entitlements — level-2 platform subdomain assignment action */
+  platformSubdomainEnabled: boolean;
+  /** D12 entitlements — level-3 tenant-owned custom domain */
+  customDomainEnabled: boolean;
   /** Merchant preference toggles */
   merchantPreferences: {
     storefront_opt_enabled: boolean;
@@ -2311,6 +2315,9 @@ export function resolveStorefrontOptionsState(
     canUseContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
     canUseEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     canUseStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+    // D12 entitlements — `flexible ||` parity with the backend resolver (R30)
+    platformSubdomainEnabled: flexible || !!features.storefront_opt_platform_subdomain,
+    customDomainEnabled: flexible || !!features.storefront_opt_custom_domain,
     merchantPreferences: prefs,
     features,
   };

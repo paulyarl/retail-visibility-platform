@@ -52,6 +52,7 @@ import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerCon
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 import { clientLogger } from '@/lib/client-logger';
+import { platformOrigin, platformApexHost } from '@/lib/storefront-routing';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -531,10 +532,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
   const typeLabel = typeLabels[storefrontType] || typeLabels.retail;
 
+  // Canonical ladder (sprint plan 4.2): active custom domain → platform
+  // subdomain → platform path. Tenant-based, not request-host — the SAME
+  // canonical emits on all three surfaces so equity consolidates to the
+  // tenant-owned domain while platform URLs stay reachable (D3).
+  const canonicalLookup = await tenantPublicService.getStorefrontCanonical(id).catch(() => null);
+  const canonicalUrl =
+    canonicalLookup?.kind === 'custom' && canonicalLookup.host
+      ? `https://${canonicalLookup.host}/`
+      : canonicalLookup?.kind === 'subdomain' && canonicalLookup.host
+        ? `https://${canonicalLookup.host}.${platformApexHost()}/`
+        : `${platformOrigin()}/tenant/${data.resolvedTenantId}`;
+
   // Basic metadata — always emitted
   const basicMetadata: Metadata = {
     title: `${businessName} - ${typeLabel.title}`,
     description: `${typeLabel.desc} from ${businessName}.`,
+    alternates: { canonical: canonicalUrl },
   };
 
   if (!showEnhancedSEO) {
@@ -572,6 +586,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${businessName} - ${typeLabel.title}`,
     description: enhancedDescription as string,
     keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title: businessName,
       description: `${typeLabel.desc} from ${businessName}`,

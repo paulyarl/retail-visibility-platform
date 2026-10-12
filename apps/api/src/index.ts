@@ -209,6 +209,16 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start BSaaS renewal job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Custom-domain sweeper — re-checks pending/verified tenant domains,
+      // promotes to active on HTTPS probe success (sprint plan B4/2.3)
+      try {
+        const { startCustomDomainSweeperJob } = await import('./jobs/custom-domain-sweeper');
+        startCustomDomainSweeperJob();
+        logger.info('Custom-domain sweeper started (every 15 minutes)');
+      } catch (err) {
+        logger.error('Failed to start custom-domain sweeper', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start monthly fee summary job (1st of each month at 00:05 UTC) — sends
       // Stripe Connect fee summaries to merchants
       try {
