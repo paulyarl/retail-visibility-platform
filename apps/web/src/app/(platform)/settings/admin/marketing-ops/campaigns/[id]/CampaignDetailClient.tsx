@@ -1438,24 +1438,41 @@ export default function CampaignDetailClient({
               <IntelligentTriageCard campaign={campaign} onRefresh={fetchCampaign} />
             )}
 
-            {/* Tabs */}
-            <div className="flex items-center gap-1 mb-4 border-b border-gray-200 dark:border-neutral-700">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab.key
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                  }`}
-                >
-                  {tab.label}
-                  {tab.count != null && tab.count > 0 && (
-                    <span className="ml-1.5 text-xs text-gray-400">({tab.count})</span>
-                  )}
-                </button>
-              ))}
+            {/* Tabs — a section dropdown on small screens (14 tabs don't
+                fit); the full underline strip on md+ scrolls within itself
+                instead of widening the page. */}
+            <div className="mb-4">
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value as Tab)}
+                aria-label="Campaign section"
+                className="md:hidden w-full rounded-md border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              >
+                {tabs.map((tab) => (
+                  <option key={tab.key} value={tab.key}>
+                    {tab.label}
+                    {tab.count != null && tab.count > 0 ? ` (${tab.count})` : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="hidden md:flex items-center gap-1 border-b border-gray-200 dark:border-neutral-700 overflow-x-auto">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === tab.key
+                        ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count != null && tab.count > 0 && (
+                      <span className="ml-1.5 text-xs text-gray-400">({tab.count})</span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Tab Content */}

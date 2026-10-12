@@ -283,7 +283,7 @@ describe('resolvePlanSeedClaim', () => {
   it('falls back to an active claim token, then the place URL', async () => {
     mockQueryRaw.mockResolvedValueOnce([{ ...seedRow, short_code: null }]);
     const res = await resolvePlanSeedClaim('c-primary');
-    expect(res?.claimUrl).toBe('/claim/tok-1');
+    expect(res?.claimUrl).toBe('/place/claim/tok-1');
   });
 
   it('no short code + no token → claimUrl null (placeUrl only)', async () => {

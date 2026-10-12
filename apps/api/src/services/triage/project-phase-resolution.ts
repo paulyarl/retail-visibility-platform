@@ -477,21 +477,22 @@ export async function resolvePlanSeedClaim(
       dps.status,
       dps.tenant_id,
       dl.slug,
-      dps.short_code,
+      dct.short_code,
       dps.seed_fidelity,
       dps.seed_fidelity_audit_id,
-      (
-        SELECT dct.token
-        FROM directory_claim_tokens dct
-        WHERE dct.seed_id = dps.id
-          AND dct.used_at IS NULL
-          AND (dct.expires_at IS NULL OR dct.expires_at > now())
-        ORDER BY dct.created_at DESC
-        LIMIT 1
-      ) AS claim_token
+      dct.token         AS claim_token
     FROM directory_seed_campaign_links dscl
     JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
     JOIN directory_listings_list dl ON dl.id = dps.listing_id
+    LEFT JOIN LATERAL (
+      SELECT t.token, t.short_code
+      FROM directory_claim_tokens t
+      WHERE t.seed_id = dps.id
+        AND t.consumed_at IS NULL
+        AND (t.expires_at IS NULL OR t.expires_at > now())
+      ORDER BY t.created_at DESC
+      LIMIT 1
+    ) dct ON true
     WHERE dscl.campaign_id = ${primaryCampaignId}
       AND dps.status IS DISTINCT FROM 'suppressed'
     ORDER BY
@@ -530,7 +531,7 @@ export async function resolvePlanSeedClaim(
     if (row.short_code) {
       claimUrl = `/c/${row.short_code}`;
     } else if (row.claim_token) {
-      claimUrl = `/claim/${row.claim_token}`;
+      claimUrl = `/place/claim/${row.claim_token}`;
     }
   }
 
