@@ -21,9 +21,15 @@ export function resolveStorefrontGallery(
   fallbackFeatures: Record<string, boolean> = {},
 ): EffectiveStorefrontGallery {
   const disabled = !!features.storefront_gallery_disabled || !!fallbackFeatures.storefront_opt_disabled;
-  const enabled = !disabled && (!!features.storefront_gallery_enabled || !!fallbackFeatures.storefront_opt_enabled);
   const flexible = !!features.storefront_gallery_flexible || !!fallbackFeatures.storefront_opt_flexible;
-  const mainOn = enabled;
+  // Capability contract: `_disabled` vetoes the module. Any other active key
+  // in the module's own namespace (`storefront_gallery_*`) — or its legacy
+  // `storefront_opt_*` namespace — implicitly activates it; `_enabled`/
+  // `_flexible` are the explicit forms of the same activation.
+  const mainOn = !disabled && (
+    Object.entries(features).some(([k, v]) => v && k.startsWith('storefront_gallery_') && k !== 'storefront_gallery_disabled')
+    || Object.entries(fallbackFeatures).some(([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled')
+  );
 
   // Gallery group — new keys with fallback to old storefront_opt_gallery_* keys
   const galleryGroupEnabled = flexible

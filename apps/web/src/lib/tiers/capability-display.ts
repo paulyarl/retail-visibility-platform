@@ -24,6 +24,7 @@ export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: 
   { key: 'payment_gateway_options', label: 'Payment Gateways', flexibleKeys: ['payment_gateway_flexible'], group: 'Commerce & Conversion' },
   { key: 'storefront_types', label: 'Storefront Types', flexibleKeys: ['storefront_flexible'], group: 'Platform Presence' },
   { key: 'storefront_options', label: 'Storefront Options', flexibleKeys: ['storefront_opt_flexible'], group: 'Platform Presence' },
+  { key: 'storefront_domains', label: 'Storefront Domains', flexibleKeys: ['storefront_domains_flexible'], group: 'Platform Presence' },
   { key: 'storefront_qr', label: 'QR Codes', flexibleKeys: ['storefront_qr_flexible'], group: 'Platform Presence' },
   { key: 'storefront_gallery', label: 'Image Gallery', flexibleKeys: ['storefront_gallery_flexible'], group: 'Platform Presence' },
   { key: 'storefront_hours', label: 'Business Hours', flexibleKeys: ['storefront_hours_flexible'], group: 'Platform Presence' },

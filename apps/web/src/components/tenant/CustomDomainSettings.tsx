@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Globe, ExternalLink, RefreshCw, Clock, Copy } from 'lucide-react';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import { useEffectiveStorefrontOptions } from '@/hooks/useEffectiveCapabilities';
+import { useEffectiveStorefrontDomains } from '@/hooks/useEffectiveCapabilities';
 import { useEffectiveTenantFlags } from '@/hooks/useEffectiveFlags';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -82,10 +82,10 @@ function DnsRecordRow({ type, name, value }: { type: string; name: string; value
 }
 
 export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsProps) {
-  const { data: storefrontOptions, isLoading: capsLoading } = useEffectiveStorefrontOptions(tenantId);
+  const { data: storefrontDomains, isLoading: capsLoading } = useEffectiveStorefrontDomains(tenantId);
   const { data: tenantFlags } = useEffectiveTenantFlags(tenantId);
   const flagOn = tenantFlags?.['custom_domains']?.effectiveOn ?? false;
-  const entitled = storefrontOptions?.customDomainEnabled ?? false;
+  const entitled = storefrontDomains?.customDomainEnabled ?? false;
 
   const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [loading, setLoading] = useState(false);

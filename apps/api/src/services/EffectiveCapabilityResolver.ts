@@ -26,6 +26,7 @@ import {
   resolveIntegrationOptions,
   resolveQuickstartOptions,
   resolveStorefrontOptions,
+  resolveStorefrontDomains,
   resolveStorefrontQr,
   resolveStorefrontGallery,
   resolveStorefrontHours,
@@ -262,6 +263,9 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.gbp_management?.features || {},
       merchantBundle.gbpManagement
     ),
+    resolveStorefrontDomains(
+      rawCaps.capabilities.storefront_domains?.features || {}
+    ),
   ]);
 
   // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
@@ -309,6 +313,7 @@ export async function resolveEffectiveCapabilities(
       coupon_options: effective[26],
       marketing_ops: effective[27],
       gbp_management: effective[28],
+      storefront_domains: effective[29],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -770,6 +775,9 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.gbp_management?.features || {},
       merchantBundle.gbpManagement
     ),
+    resolveStorefrontDomains(
+      rawCaps.capabilities.storefront_domains?.features || {}
+    ),
   ]);
 
   // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
@@ -817,6 +825,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       coupon_options: effective[26],
       marketing_ops: effective[27],
       gbp_management: effective[28],
+      storefront_domains: effective[29],
     },
     constraint_violations: [],
     constraint_status: {},

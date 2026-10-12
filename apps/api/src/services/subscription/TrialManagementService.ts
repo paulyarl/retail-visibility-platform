@@ -364,7 +364,7 @@ export class TrialManagementService {
       type: 'trial_expired',
     }).catch(err => console.error('[TrialManagement] Failed to send notification:', err));
 
-    // Tier downgrade loses the storefront_opt_custom_domain entitlement —
+    // Tier downgrade loses the storefront_domains_custom_domain entitlement —
     // detach + disable the tenant's domains (sprint plan 1.6/H2). Non-fatal:
     // a Vercel/DB hiccup must not break the billing downgrade path.
     try {

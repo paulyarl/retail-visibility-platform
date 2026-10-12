@@ -285,7 +285,7 @@ export function resolveWholesaleMatching(
 
 The `wholesale_matching` capability is fully wired through the 8-phase deployment flow:
 
-- **`EffectiveCapabilityResolver.ts`**: Added to `buildExpiredCapabilitiesResponse`, `isReadOnly` override block, and `isLimited` override block (R13, R23, R27)
+- **`EffectiveCapabilityResolver.ts`**: Added to `buildExpiredCapabilitiesResponse`, `isReadOnly` override block, and `isLimited` override block (R13, R36, R27)
 - **`CAPABILITY_META`** (`apps/web/src/lib/tiers/capability-display.ts`): Entry with label, icon, and summary fields
 - **`summarizeResolvedCapabilities`**: Includes `wholesale_matching` in the summary output
 - **`PlanSummaryPanel.tsx`** (`CAPABILITY_DISPLAY` map): Display entry for the plan summary panel (plan-summary page only — options pages use `PlanSummaryWidget`)

@@ -6,6 +6,8 @@ description: Rules for consistent capability data flow from backend resolver thr
 
 This skill defines the canonical pattern for how a tier-gated capability flows from backend resolver to dashboard UI. All existing and new capabilities MUST follow these rules to ensure consistent merchant-gating display across `PlanSummaryWidget` (dashboard + options pages), `PlanSummaryPanel` (dedicated plan-summary page only), and `CapabilityShowcase`.
 
+> **Quick reference**: `capability-module-cheatsheet.md` — module kinds, state locations, key contract, and the module-responsibility test on one page.
+
 ## Architecture: 6 Layers
 
 ```
@@ -301,6 +303,8 @@ A capability type MUST represent a single concern. Domain capabilities that mix 
 - **`<domain>_types`**: Gates which entity kinds are available (e.g., `storefront_types`, `product_types`). Resolved by a `XxxTypeResolver` that produces `EffectiveXxxType` with `allowed_types`, `effective_type`, and `has_merchant_selection`. Merchant prefs stored in `tenant_<domain>_type_settings`.
 - **`<domain>_options`**: Gates display/behavior/creation features (e.g., `storefront_options`, `product_options`). Resolved by a `XxxOptionsResolver` that produces `EffectiveXxxOptions` with group-based `allowed_*_types` and `can_use_*` flags. Merchant prefs stored in `tenant_<domain>_options_settings`.
 
+**Not every non-type capability belongs in `_options`.** `_options` modules are *merchant-facing configurators* — every feature corresponds to a merchant-editable preference. Platform/operator-administered entitlements (addressing, DNS, hosting, deployment — state in infra rows, not merchant prefs) MUST get a dedicated entitlement capability type instead of riding the nearest `_options` module. See R37.
+
 **Current canonical pairs**:
 | Types Capability | Options Capability |
 |---|---|
@@ -437,7 +441,9 @@ Constraints are declared as data (source target, target target, type, severity),
 ### R22: Write-Time Validation Mirrors Read-Time Evaluation
 PUT handlers in settings routes MUST use `validateProposedChange()` from `CapabilityConstraintResolver.ts` to validate settings changes before persisting. The function is **async** — it loads constraints from the DB via `getActiveConstraints()`. The evaluation logic is identical to read-time — the only difference is the input (simulated effective state vs. current effective state).
 
-### R23: Subscription-Status Override Must Include Every Write-Capable Domain
+### R36: Subscription-Status Override Must Include Every Write-Capable Domain
+
+*(Renumbered from R23 — R23 is canonically the flexible rule above. Earlier docs may cite this rule as "R23-data-flow".)*
 `EffectiveCapabilityResolver.ts` Step 6 applies a subscription-status override after all resolvers run. When `internalStatus` is `frozen`, `canceled`, or `expired` (`isReadOnly`), it sets `enabled = false` on write-heavy capabilities. When `internalStatus` is `maintenance` or `past_due` (`isLimited`), it disables a subset.
 
 **When adding a new capability domain, it MUST be added to the appropriate override block**:
@@ -787,6 +793,31 @@ it('disables <feature> when tier does not allow it', () => {
 **When adding a new capability domain**: No extra hiding logic is required in `PlanSummaryPanel` — the `if (xxx.enabled)` gate plus a correct resolver (R17-compliant `enabled = false` when no feature keys) is sufficient. The failure mode to watch for is the inverse: a resolver that returns `enabled: true` even when no feature keys exist (e.g., hardcoding `enabled: true`, or deriving `enabled` from `capabilityEnabled` without confirming the group has features). `capabilityEnabled` (passed to `resolveOrgOptions`, `resolveIntegrationOptions`, `resolveDirectoryPromotion`) is only `true` when the group has at least one feature row, so it is safe. Verify the new resolver's `enabled` field is `false` for an empty feature map before shipping.
 
 **Audit rule**: For every capability block in `resolveCapabilitySummaries()`, confirm it is gated by `if (xxx.enabled)` (or `if (xxx && xxx.enabled)` for optional domains). A block that pushes a summary unconditionally will render an empty/"None available" card on tiers that never assigned the module — that is the clutter this rule forbids.
+
+### R37: Module Responsibility — A Feature Key Lives in the Capability Type Whose Concern It Configures
+
+A feature key MUST be linked (via `capability_features_list`) to the capability type that owns the concern it gates — never to a conveniently adjacent module.
+
+**The three module kinds**:
+
+| Kind | Purpose | Merchant prefs? | Examples |
+|---|---|---|---|
+| `<domain>_types` | Which entity kinds exist | `tenant_<domain>_type_settings` | `storefront_types`, `product_types` |
+| `<domain>_options` | Merchant-facing display/behavior configurator | `tenant_<domain>_options_settings` | `storefront_options`, `faq_options` |
+| Entitlement / infrastructure | Operator- or platform-administered grants with lifecycle state outside merchant settings | **None** | `storefront_domains` |
+
+**The test**: if a feature's state lives in platform-administered rows (`custom_domains`, `tenants.subdomain`, DNS, Vercel project domains) and there is no merchant preference for a configurator to store, it does not belong in an `_options` module. Addressing, DNS, hosting, deployment, and similar infrastructure-lifecycle features get their own entitlement capability type.
+
+**Module kind describes concern ownership, not a prefs ban.** An entitlement module MAY later gain a merchant opt-in feature (e.g., a `storefront_domains_*` key whose effective state needs a merchant toggle). That feature still lives in the module — its concern is still addressing — and the resolver simply grows the standard `(features, merchantPrefs)` signature + `can_use_*` effective fields (R1/R33). What it must never do is host a *different* concern's keys.
+
+**Why** — two failure modes this prevents:
+
+1. **Responsibility bleed.** Granting `storefront_opt_custom_domain` inside `storefront_options` gave a merchant settings module platform-level responsibility — the module's contract ("what the merchant may configure") no longer described its contents.
+2. **Veto entanglement.** Under R17, `<cap>_disabled` vetoes the WHOLE module. When an entitlement rides an options module, a tier that legitimately wants "options off, entitlement on" (Discovery: no storefront options, but a platform subdomain for the Google surface) becomes internally contradictory — `_disabled` and the entitlement key coexist, and resolvers must special-case the entitlement outside the veto to keep it working. That forces fabricated `_enabled` rows (see migration 330 → 331) and breaks `checkCapabilityEngagement` for à-la-carte purchases on `_disabled`-only tiers.
+
+**Canonical precedent**: `storefront_domains` (migration `331_storefront_domains_capability.sql`) — the three-level addressing model (`path` baseline → `platform_subdomain` → `custom_domain`) moved out of `storefront_options`. Its resolver returns `allowed_levels` (types-shaped output), and `_disabled`/`_flexible`/`_enabled`/implicit-activation apply to the module exactly as R17/R23 specify. `platform_services` was explicitly REJECTED as the home — it is human-delivered, one-time-billed, CRM-fulfilled services, not recurring infrastructure entitlements. Do not use it as a semantic dumping ground.
+
+**Consequences of placing a key in the wrong module**: the `_disabled` veto reaches it (or fails to), `checkCapabilityEngagement` gates purchases on the wrong tier evidence, and the module's resolver/manifest output contract (`allowed_*_types`/`can_use_*`) gains bolt-on fields.
 
 ## File Reference
 

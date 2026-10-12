@@ -660,13 +660,24 @@ export interface EffectiveStorefrontOptions {
   can_use_contact: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
-  // Level-2/3 storefront presentation entitlements (D12): action gates, not
-  // merchant prefs — entitlement only, state lives in tenants.subdomain /
-  // custom_domains. Not gated on `enabled` (master key) — a Discovery tenant
-  // can hold the subdomain entitlement without the full options bundle.
+  merchant_preferences: Record<string, any>;
+}
+
+export type StorefrontAddressingLevel = 'path' | 'platform_subdomain' | 'custom_domain';
+
+/**
+ * Storefront addressing entitlements — the `storefront_domains` capability
+ * type (module-responsibility split from storefront_options). Level 1
+ * (platform path) is the universal baseline; levels 2/3 are grants. No
+ * merchant prefs — addressing state lives in tenants.subdomain /
+ * custom_domains rows + DNS, administered by platform ops.
+ */
+export interface EffectiveStorefrontDomains {
+  enabled: boolean;
+  is_flexible: boolean;
+  allowed_levels: StorefrontAddressingLevel[];
   platform_subdomain_enabled: boolean;
   custom_domain_enabled: boolean;
-  merchant_preferences: Record<string, any>;
 }
 
 export type StorefrontLayoutType = 'classic' | 'editorial' | 'immersive';
@@ -1077,6 +1088,7 @@ export interface EffectiveCapabilities {
     integrations: EffectiveIntegrations;
     quickstart: EffectiveQuickstart;
     storefront_options: EffectiveStorefrontOptions;
+    storefront_domains: EffectiveStorefrontDomains;
     storefront_qr: EffectiveStorefrontQr;
     storefront_gallery: EffectiveStorefrontGallery;
     storefront_hours: EffectiveStorefrontHours;

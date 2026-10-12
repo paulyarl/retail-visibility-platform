@@ -300,9 +300,14 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_layout_immersive: false,
         gallery_magazine_enabled: false,
         can_use_magazine_gallery: false,
+        merchant_preferences: {},
+      },
+      storefront_domains: {
+        enabled: false,
+        is_flexible: false,
+        allowed_levels: [],
         platform_subdomain_enabled: false,
         custom_domain_enabled: false,
-        merchant_preferences: {},
       },
       storefront_qr: {
         enabled: false,

@@ -25,9 +25,13 @@ export function resolveStorefrontOptions(
   merchantPrefs: StorefrontOptionsMerchantSettings | null
 ): EffectiveStorefrontOptions {
   const disabled = !!features.storefront_opt_disabled;
-  const enabled = !disabled && !!features.storefront_opt_enabled;
   const flexible = !!features.storefront_opt_flexible;
-  const mainOn = enabled;
+  // Capability contract: `_disabled` vetoes the ENTIRE module. Any other active
+  // `storefront_opt_*` key activates it — `_enabled`/`_flexible` explicitly, or
+  // any lone feature key as an implicit `_enabled`.
+  const mainOn = !disabled && Object.entries(features).some(
+    ([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled'
+  );
 
   // Category — individual features (group gate removed, fallback to old group gate)
   const allowedCategoryTypes: StorefrontOptCategoryType[] = [];
@@ -117,10 +121,6 @@ export function resolveStorefrontOptions(
     can_use_contact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
     can_use_enhanced_seo: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     can_use_storefront_actions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
-    // D12 entitlements — `flexible ||` per R23 so storefront_opt_flexible
-    // holders inherit both keys with no explicit grant.
-    platform_subdomain_enabled: flexible || !!features.storefront_opt_platform_subdomain,
-    custom_domain_enabled: flexible || !!features.storefront_opt_custom_domain,
     merchant_preferences: prefs,
   };
 }

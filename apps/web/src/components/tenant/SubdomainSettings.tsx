@@ -9,7 +9,7 @@ import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, Refr
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantProfileService } from '@/services/TenantProfileService';
-import { useEffectiveStorefrontOptions } from '@/hooks/useEffectiveCapabilities';
+import { useEffectiveStorefrontDomains } from '@/hooks/useEffectiveCapabilities';
 import { clientLogger } from '@/lib/client-logger';
 
 interface SubdomainSettingsProps {
@@ -19,8 +19,8 @@ interface SubdomainSettingsProps {
 export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) {
   // D12/3.2: the assignment UI mirrors the 1.8 route gate — when the tenant
   // isn't entitled, show an upsell instead of a dead form.
-  const { data: storefrontOptions, isLoading: capsLoading } = useEffectiveStorefrontOptions(tenantId);
-  const platformSubdomainEntitled = storefrontOptions?.platformSubdomainEnabled ?? true;
+  const { data: storefrontDomains, isLoading: capsLoading } = useEffectiveStorefrontDomains(tenantId);
+  const platformSubdomainEntitled = storefrontDomains?.platformSubdomainEnabled ?? true;
   const [currentSubdomain, setCurrentSubdomain] = useState<string>('');
   // The chosen slug — subdomain mirrors the slug (see lib/subdomain.ts), so the
   // slug picker below sets both.

@@ -558,7 +558,7 @@ export interface PlanCapabilities {
  * demo tenant → platform defaults. Storefront/subdomain/QR are
  * platform-provided at the platform level; domainEnabled mirrors
  * assignment-state (an `active` custom_domains row) — entitlement is the
- * `storefront_opt_custom_domain` key, state is the domain lifecycle.
+ * `storefront_domains_custom_domain` key, state is the domain lifecycle.
  */
 export async function resolvePlanCapabilities(args: {
   wedgeTenantId?: string | null;
@@ -596,12 +596,21 @@ export async function resolvePlanCapabilities(args: {
       AND (feature_key LIKE 'storefront%' OR feature_key LIKE 'product_opt_qr%')
   `;
   const keys = new Set(capRows.map((r) => r.feature_key));
-  const storefrontEnabled = [...keys].some((k) => k.startsWith('storefront_'));
+  // Capability contract: `*_disabled` keys are vetoes, not grants — a
+  // `storefront_opt_disabled`-only tenant has NO storefront capability. Keys
+  // in a vetoed namespace don't count either.
+  const vetoPrefixes = [...keys]
+    .filter((k) => k.endsWith('_disabled'))
+    .map((k) => k.slice(0, -'_disabled'.length) + '_');
+  const active = [...keys].filter(
+    (k) => !k.endsWith('_disabled') && !vetoPrefixes.some((p) => k.startsWith(p))
+  );
+  const storefrontEnabled = active.some((k) => k.startsWith('storefront_'));
   const qrPrintEnabled =
-    keys.has('storefront_opt_qr_enabled') ||
-    keys.has('storefront_qr_enabled') ||
-    keys.has('product_opt_qr_codes') ||
-    [...keys].some((k) => k.startsWith('storefront_opt_qr'));
+    active.includes('storefront_opt_qr_enabled') ||
+    active.includes('storefront_qr_enabled') ||
+    active.includes('product_opt_qr_codes') ||
+    active.some((k) => k.startsWith('storefront_opt_qr') || k.startsWith('storefront_qr_'));
 
   return {
     storefrontEnabled,

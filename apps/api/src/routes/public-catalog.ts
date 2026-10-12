@@ -3420,10 +3420,14 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
     }
 
     // Resolve capability state (same logic as frontend resolveStorefrontOptionsState)
-    const enabled = !!features.storefront_opt_enabled;
     const disabled = !!features.storefront_opt_disabled;
     const flexible = !!features.storefront_opt_flexible;
-    const mainOn = enabled && !disabled;
+    // Capability contract: `_disabled` vetoes the module; any other active
+    // `storefront_opt_*` key activates it — `_enabled`/`_flexible` explicitly,
+    // or any lone feature key as an implicit `_enabled` (R17 §4).
+    const mainOn = !disabled && Object.entries(features).some(
+      ([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled'
+    );
 
     // Hours group
     const hoursGroupEnabled = !!features.storefront_opt_hours_enabled;
@@ -3466,9 +3470,14 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
 
     // Section Display (standalone, no group gate)
     const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
-    // Maps — new storefront_maps_* keys with fallback to old storefront_opt_* keys
+    // Maps — new storefront_maps_* keys with fallback to old storefront_opt_* keys.
+    // Same capability contract: `_disabled` vetoes; any other active key in the
+    // module's own or legacy storefront_opt_* namespace implicitly activates.
     const mapsDisabled = !!features.storefront_maps_disabled || !!features.storefront_opt_disabled;
-    const mapsEnabled = !mapsDisabled && (!!features.storefront_maps_enabled || !!features.storefront_opt_enabled);
+    const mapsEnabled = !mapsDisabled && (
+      Object.entries(features).some(([k, v]) => v && k.startsWith('storefront_maps_') && k !== 'storefront_maps_disabled')
+      || Object.entries(features).some(([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled')
+    );
     const mapsFlexible = !!features.storefront_maps_flexible || !!features.storefront_opt_flexible;
     const mapDisplayTierAllowed = mapsFlexible
       || !!features.storefront_maps_display

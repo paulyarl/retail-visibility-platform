@@ -414,15 +414,18 @@ Implementation:
   - For v1, direct transfer of a custom domain from one tenant to another is **not supported**.
   - To move a domain between tenants, it must first be removed/disabled from the original tenant (and detached from Vercel), then added anew under the new tenant's settings.
 
-### 8.4 Capability Model (sprint plan D12)
+### 8.4 Capability Model (sprint plan D12 — superseded by module-responsibility split)
 
-- Both presentation levels above the baseline `/tenant/{id}` path are **feature keys on `storefront_options`** (like `storefront_opt_enhanced_seo`), not a new module:
-  - `storefront_opt_platform_subdomain` — the `{slug}.visibleshelf.com` entitlement (assignment is a separate action; `tenants.subdomain` mirrors slug). Bundled into the Google-surface tiers as the required minimum.
-  - `storefront_opt_custom_domain` — this feature. Granted to `tier_professional` + `tier_organization` for v1.
-- Enforcement is **capability-authoritative**: check the resolved feature (via `EffectiveCapabilityResolver`), never a raw `tier_key` — so admin overrides and explicit grants work uniformly.
+- The presentation levels above the baseline `/tenant/{id}` path are **feature keys on `storefront_domains`** — a dedicated entitlement capability type (migration `331_storefront_domains_capability.sql`; module-responsibility rule R37 in `capability-data-flow-rules.md`). D12 originally placed them on `storefront_options` (`storefront_opt_platform_subdomain` / `storefront_opt_custom_domain`); that conflated operator-administered addressing (state in `tenants.subdomain` / `custom_domains` / DNS — no merchant prefs) with the merchant-facing options configurator, and it veto-entangled Discovery (`storefront_opt_disabled` + subdomain key). The dedicated module restored honest tier data: `storefront_opt_disabled` stays active on Discovery, and the subdomain grant lives where `_disabled` can't reach it.
+  - `storefront_domains_platform_subdomain` — the `{slug}.visibleshelf.com` entitlement (assignment is a separate action; `tenants.subdomain` mirrors slug). Bundled into the Google-surface tiers as the required minimum.
+  - `storefront_domains_custom_domain` — this feature. Granted to `tier_professional` + `tier_organization` for v1.
+  - `storefront_domains_enabled` / `_disabled` / `_flexible` — module gates; `enabled` alone grants the level-1 `path` baseline.
+- `storefront_options` retains **only** merchant-facing display/behavior settings (category, recommend, info, hours, advanced…) — no addressing fields (`platform_subdomain_enabled`/`custom_domain_enabled` were removed from `EffectiveStorefrontOptions`).
+- Enforcement is **capability-authoritative**: check the resolved feature (via `EffectiveCapabilityResolver` → `effective.storefront_domains`), never a raw `tier_key` — so admin overrides and explicit grants work uniformly.
 - Flag and capability compose: flag (`custom_domains`, §13.2) = deployed-to-you; capability = entitled-to-you; `addDomain` requires both.
-- **`_flexible` expansion is not automatic** — it is hardcoded per-resolver, so granting either key to `storefront_opt_flexible` must be an explicit link in `capability_features_list`, not an assumption.
+- **`_flexible` expansion is not automatic** — it is hardcoded per-resolver (`storefront_domains_flexible` unlocks both levels in `StorefrontDomainsResolver`), so granting either level key to a flexible tier must be an explicit link in `capability_features_list`, not an assumption.
 - Grandfathering: gating `assignSubdomain` on the new key is an **assignment** gate only (at the self-service route); existing `tenants.subdomain` rows keep resolving — the read path is never capability-gated.
+- The BSaaS catalog SKU was re-keyed to `storefront_domains_custom_domain` (migration 331); `checkCapabilityEngagement` resolves the SKU's capability type generically, so purchases now evaluate the `storefront_domains` module — a tier holding any active `storefront_domains_*` key (including `_enabled`-only baselines like `directory_presence`) is purchase-eligible.
 
 ---
 
@@ -1053,7 +1056,7 @@ Corrections folded in from the review of `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` so
 - **Tiers & flags (§8.1, §13.1, §13.2):** v1 gates `professional` + `organization` (DB `tier_key`s), 1 domain, apex + `www` = one logical domain (D4/D9); beta rides the platform flag system, not `custom_domains_beta` (D10/H7).
 - **Open questions (§11):** resolved by the sprint plan's D-table.
 - **Phasing (§10):** sequenced by the sprint plan's Phase 0–6.
-- **Capabilities & workspace entry (§7.3, §8.4):** D12 — both non-baseline presentation levels are `storefront_options` feature keys (`storefront_opt_platform_subdomain`, `storefront_opt_custom_domain`), enforced capability-authoritatively, not by raw `tier_key`; `_flexible` inheritance is an explicit grant, not automatic. D13 — a resolved custom host redirects `/manage` → the platform workspace (`visibleshelf.com/t/{id}`); auth sessions, cookies, and CORS stay on `visibleshelf.com`.
+- **Capabilities & workspace entry (§7.3, §8.4):** D12 — both non-baseline presentation levels are capability feature keys, enforced capability-authoritatively, not by raw `tier_key`; `_flexible` inheritance is an explicit grant, not automatic. **Amended by the module-responsibility split (migration 331, R37): the keys now live on `storefront_domains` (`storefront_domains_platform_subdomain`, `storefront_domains_custom_domain`), a dedicated entitlement module — not on `storefront_options`.** D13 — a resolved custom host redirects `/manage` → the platform workspace (`visibleshelf.com/t/{id}`); auth sessions, cookies, and CORS stay on `visibleshelf.com`.
 
 See `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` (second-pass findings B5–B7 / H7–H11 / M8–M14) for the evidence.
 
@@ -1075,7 +1078,7 @@ How an operator actually provisions a custom domain today, and what the SLA cove
 
 The write path requires **both** a capability and a flag. The entitlement card shows each gate's live state and offers the fix inline:
 
-- **Capability `storefront_opt_custom_domain`** — resolved via `mv_tenant_effective_capabilities` (tier grant for `professional`/`organization`/`_flexible` holders; purchase; admin override). When absent → **"Grant via BSaaS"** opens the complimentary-grant dialog prefilled with tenant + the `storefront_opt_custom_domain` catalog SKU (private, grant-only — migration 329). Reason required — it's the audit trail.
+- **Capability `storefront_domains_custom_domain`** — resolved via `mv_tenant_effective_capabilities` (tier grant for `professional`/`organization`/`storefront_domains_flexible` holders; purchase; admin override). When absent → **"Grant via BSaaS"** opens the complimentary-grant dialog prefilled with tenant + the `storefront_domains_custom_domain` catalog SKU (private, grant-only — migration 329, re-keyed by 331). Reason required — it's the audit trail.
 - **Flag `custom_domains`** — platform-off + tenant override during beta. When absent → **"Enable flag"** writes `tenant_feature_flags_list` through the same owner-powers route the tenant's own settings use (platform admins pass `requireTenantOwner`'s admin short-circuit).
 
 Both badges refresh in place after the action — the operator watches `entitled ✓ / flag ✓` go green, then attaches.

@@ -502,10 +502,6 @@ export interface StorefrontOptionsState {
   canUseContact: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
-  /** D12 entitlements — level-2 platform subdomain assignment action */
-  platformSubdomainEnabled: boolean;
-  /** D12 entitlements — level-3 tenant-owned custom domain */
-  customDomainEnabled: boolean;
   /** Merchant preference toggles */
   merchantPreferences: {
     storefront_opt_enabled: boolean;
@@ -520,6 +516,23 @@ export interface StorefrontOptionsState {
     storefront_actions: boolean;
   };
   /** Raw feature map from backend */
+  features: Record<string, boolean>;
+}
+
+export type StorefrontAddressingLevel = 'path' | 'platform_subdomain' | 'custom_domain';
+
+/**
+ * Storefront addressing entitlements — the `storefront_domains` module
+ * (module-responsibility split from storefront_options). Level 1 path is
+ * the universal baseline; levels 2/3 are grants. No merchant prefs —
+ * addressing state lives in tenants.subdomain / custom_domains rows.
+ */
+export interface StorefrontDomainsState {
+  enabled: boolean;
+  isFlexible: boolean;
+  allowedLevels: StorefrontAddressingLevel[];
+  platformSubdomainEnabled: boolean;
+  customDomainEnabled: boolean;
   features: Record<string, boolean>;
 }
 
@@ -1143,6 +1156,7 @@ export interface AllCapabilitiesState {
   integrationOptions: IntegrationOptionsState;
   quickstartOptions: QuickstartOptionsState;
   storefrontOptions: StorefrontOptionsState;
+  storefrontDomains: StorefrontDomainsState;
   storefrontQr: StorefrontQrState;
   storefrontGallery: StorefrontGalleryState;
   storefrontHours: StorefrontHoursState;
@@ -1180,6 +1194,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   storefront_hours_: 'storefront_hours',
   storefront_layouts_: 'storefront_layouts',
   storefront_maps_: 'storefront_maps',
+  storefront_domains_: 'storefront_domains',
   storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
@@ -2277,7 +2292,12 @@ export function resolveStorefrontOptionsState(
     allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
   }
 
-  const mainOn = enabled && !disabled;
+  // Capability contract: `_disabled` vetoes the ENTIRE module. Any other active
+  // `storefront_opt_*` key activates it — `_enabled`/`_flexible` explicitly, or
+  // any lone feature key as an implicit `_enabled`.
+  const mainOn = !disabled && Object.entries(features).some(
+    ([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled'
+  );
 
   // Effective flags
   const effectiveCategoryTypes = prefs.storefront_opt_enabled
@@ -2315,10 +2335,44 @@ export function resolveStorefrontOptionsState(
     canUseContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
     canUseEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     canUseStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
-    // D12 entitlements — `flexible ||` parity with the backend resolver (R30)
-    platformSubdomainEnabled: flexible || !!features.storefront_opt_platform_subdomain,
-    customDomainEnabled: flexible || !!features.storefront_opt_custom_domain,
     merchantPreferences: prefs,
+    features,
+  };
+}
+
+/**
+ * Resolve storefront domains state — the `storefront_domains` entitlement
+ * module (mirror of the backend StorefrontDomainsResolver; no merchant
+ * prefs). Levels: path (baseline) → platform_subdomain → custom_domain.
+ */
+export function resolveStorefrontDomainsState(
+  features: Record<string, boolean>
+): StorefrontDomainsState {
+  const disabled = !!features.storefront_domains_disabled;
+  const flexible = !!features.storefront_domains_flexible;
+  // Capability contract: `_disabled` vetoes the module. Any other active
+  // `storefront_domains_*` key activates it — `_enabled`/`_flexible`
+  // explicitly, or any lone feature key as an implicit `_enabled` (R17 §4).
+  const mainOn = !disabled && Object.entries(features).some(
+    ([k, v]) => v && k.startsWith('storefront_domains_') && k !== 'storefront_domains_disabled'
+  );
+
+  const platformSubdomainEnabled = mainOn && (flexible || !!features.storefront_domains_platform_subdomain);
+  const customDomainEnabled = mainOn && (flexible || !!features.storefront_domains_custom_domain);
+
+  const allowedLevels: StorefrontAddressingLevel[] = [];
+  if (mainOn) {
+    allowedLevels.push('path');
+    if (platformSubdomainEnabled) allowedLevels.push('platform_subdomain');
+    if (customDomainEnabled) allowedLevels.push('custom_domain');
+  }
+
+  return {
+    enabled: mainOn,
+    isFlexible: flexible,
+    allowedLevels,
+    platformSubdomainEnabled,
+    customDomainEnabled,
     features,
   };
 }
@@ -2337,9 +2391,15 @@ export function resolveStorefrontLayoutState(
 ): StorefrontLayoutState {
   const fb = fallbackFeatures || {};
   const disabled = !!features.storefront_layouts_disabled || !!fb.storefront_opt_disabled;
-  const enabled = !disabled && (!!features.storefront_layouts_enabled || !!fb.storefront_opt_enabled);
   const flexible = !!features.storefront_layouts_flexible || !!fb.storefront_opt_flexible;
-  const mainOn = enabled;
+  // Capability contract: `_disabled` vetoes the module. Any other active key
+  // in the module's own namespace (`storefront_layouts_*`) — or its legacy
+  // `storefront_opt_*` namespace — implicitly activates it; `_enabled`/
+  // `_flexible` are the explicit forms of the same activation.
+  const mainOn = !disabled && (
+    Object.entries(features).some(([k, v]) => v && k.startsWith('storefront_layouts_') && k !== 'storefront_layouts_disabled')
+    || Object.entries(fb).some(([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled')
+  );
 
   const layoutGroupEnabled = flexible
     || !!features.storefront_layouts_on || !!features.storefront_layouts
@@ -2398,9 +2458,15 @@ export function resolveStorefrontMapsState(
 ): StorefrontMapsState {
   const fb = fallbackFeatures || {};
   const disabled = !!features.storefront_maps_disabled || !!fb.storefront_opt_disabled;
-  const enabled = !disabled && (!!features.storefront_maps_enabled || !!fb.storefront_opt_enabled);
   const flexible = !!features.storefront_maps_flexible || !!fb.storefront_opt_flexible;
-  const mainOn = enabled;
+  // Capability contract: `_disabled` vetoes the module. Any other active key
+  // in the module's own namespace (`storefront_maps_*`) — or its legacy
+  // `storefront_opt_*` namespace — implicitly activates it; `_enabled`/
+  // `_flexible` are the explicit forms of the same activation.
+  const mainOn = !disabled && (
+    Object.entries(features).some(([k, v]) => v && k.startsWith('storefront_maps_') && k !== 'storefront_maps_disabled')
+    || Object.entries(fb).some(([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled')
+  );
 
   const mapsGroupEnabled = flexible
     || !!features.storefront_maps_on || !!features.storefront_maps

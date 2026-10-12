@@ -73,6 +73,11 @@ export function useEffectiveQuickstartOptions(tenantId?: string) {
   return { data: data?.quickstartOptions, ...rest };
 }
 
+export function useEffectiveStorefrontDomains(tenantId?: string) {
+  const { data, ...rest } = useEffectiveCapabilities(tenantId);
+  return { data: data?.storefrontDomains, ...rest };
+}
+
 export function useEffectiveStorefrontOptions(tenantId?: string) {
   const { data, ...rest } = useEffectiveCapabilities(tenantId);
   return { data: data?.storefrontOptions, ...rest };

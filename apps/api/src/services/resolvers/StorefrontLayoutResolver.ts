@@ -20,9 +20,15 @@ export function resolveStorefrontLayouts(
   fallbackFeatures: Record<string, boolean> = {},
 ): EffectiveStorefrontLayouts {
   const disabled = !!features.storefront_layouts_disabled || !!fallbackFeatures.storefront_opt_disabled;
-  const enabled = !disabled && (!!features.storefront_layouts_enabled || !!fallbackFeatures.storefront_opt_enabled);
   const flexible = !!features.storefront_layouts_flexible || !!fallbackFeatures.storefront_opt_flexible;
-  const mainOn = enabled;
+  // Capability contract: `_disabled` vetoes the module. Any other active key
+  // in the module's own namespace (`storefront_layouts_*`) — or its legacy
+  // `storefront_opt_*` namespace — implicitly activates it; `_enabled`/
+  // `_flexible` are the explicit forms of the same activation.
+  const mainOn = !disabled && (
+    Object.entries(features).some(([k, v]) => v && k.startsWith('storefront_layouts_') && k !== 'storefront_layouts_disabled')
+    || Object.entries(fallbackFeatures).some(([k, v]) => v && k.startsWith('storefront_opt_') && k !== 'storefront_opt_disabled')
+  );
 
   // Layout group — new keys with fallback to old storefront_opt_layout_* keys
   const layoutGroupEnabled = flexible

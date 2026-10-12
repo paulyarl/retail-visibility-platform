@@ -14,6 +14,7 @@ export { resolveFeaturedOptions } from './FeaturedOptionsResolver';
 export { resolveIntegrationOptions } from './IntegrationOptionsResolver';
 export { resolveQuickstartOptions } from './QuickstartOptionsResolver';
 export { resolveStorefrontOptions } from './StorefrontOptionsResolver';
+export { resolveStorefrontDomains } from './StorefrontDomainsResolver';
 export { resolveStorefrontQr } from './StorefrontQrResolver';
 export { resolveStorefrontGallery } from './StorefrontGalleryResolver';
 export { resolveStorefrontHours } from './StorefrontHoursResolver';

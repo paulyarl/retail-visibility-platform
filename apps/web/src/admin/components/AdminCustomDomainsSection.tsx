@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
-const CUSTOM_DOMAIN_FEATURE_KEY = 'storefront_opt_custom_domain';
+const CUSTOM_DOMAIN_FEATURE_KEY = 'storefront_domains_custom_domain';
 const CUSTOM_DOMAINS_FLAG = 'custom_domains';
 
 const STATUS_BADGE: Record<string, { variant: 'success' | 'info' | 'warning' | 'error' | 'secondary'; label: string }> = {

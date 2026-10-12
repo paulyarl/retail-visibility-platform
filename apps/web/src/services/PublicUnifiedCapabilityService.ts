@@ -349,6 +349,7 @@ class PublicUnifiedCapabilityService extends PublicApiSingleton {
 const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   commerce_: 'commerce',
   payment_gateway_: 'paymentGateway',
+  storefront_domains_: 'storefrontDomains',
   storefront_: 'storefront',
   barcode_: 'barcodeScan',
   fulfillment_: 'fulfillment',

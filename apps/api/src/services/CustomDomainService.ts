@@ -9,9 +9,9 @@
  * Gates (composed per D10/D12):
  *   - flag `custom_domains` (platform flag + tenant override, effectiveFlags)
  *     = deployed-to-you
- *   - capability `storefront_opt_custom_domain` (MV feature keys, flexible
- *     composed inline to mirror the resolver's `flexible ||` — F-H1 corrected)
- *     = entitled-to-you
+ *   - capability `storefront_domains_custom_domain` (MV feature keys,
+ *     flexible composed inline to mirror the resolver's `flexible ||` —
+ *     F-H1 corrected) = entitled-to-you
  *   addDomain requires BOTH; the resolve path is never gated.
  *
  * One row per LOGICAL domain (D9): `domain` stores the root with `www.`
@@ -19,6 +19,7 @@
  * record the full set in `attached_hosts` — the detach source of truth.
  */
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { BaseService } from './BaseService';
@@ -35,8 +36,9 @@ import {
 import { vercelDomainsService, VercelUnconfiguredError } from './VercelDomainsService';
 import { getEffectiveTenant } from '../utils/effectiveFlags';
 
-const CUSTOM_DOMAIN_FEATURE = 'storefront_opt_custom_domain';
-const STOREFRONT_FLEXIBLE = 'storefront_opt_flexible';
+const CUSTOM_DOMAIN_FEATURE = 'storefront_domains_custom_domain';
+const STOREFRONT_FLEXIBLE = 'storefront_domains_flexible';
+const STOREFRONT_DISABLED = 'storefront_domains_disabled';
 const PLATFORM_FLAG = 'custom_domains';
 const MAX_LIVE_DOMAINS_PER_TENANT = 1;
 const HTTPS_PROBE_TIMEOUT_MS = 5000;
@@ -85,38 +87,51 @@ function toRecord(row: any): CustomDomainRecord {
 
 export class CustomDomainService extends BaseService {
   /**
-   * Capability check (D12): resolved `storefront_opt_custom_domain` via the
-   * effective-capability MV — tier grant, purchase, or admin override all
-   * feed it. `storefront_opt_flexible` composed inline (the resolver's
-   * `flexible ||` equivalent — flexible holders inherit without a grant).
+   * Capability check (D12): resolved `storefront_domains_custom_domain` via
+   * the effective-capability MV — tier grant, purchase, or admin override
+   * all feed it. `storefront_domains_flexible` composed inline (the
+   * resolver's `flexible ||` equivalent — flexible holders inherit without
+   * a grant).
    */
   private async isEntitled(tenantId: string): Promise<boolean> {
     // The MV is refreshed by pg_cron (~10 min cadence). Union a live read of
     // its grant sources — same status/expiry semantics — so a just-granted
     // BSaaS purchase or admin override entitles immediately instead of
     // failing the write gate until the next refresh cycle.
+    //
+    // Capability contract: `storefront_domains_disabled` vetoes the ENTIRE
+    // module; any lone feature key implicitly activates it — so entitlement
+    // is `!disabled && (flexible || custom_domain)`. `_enabled` is not
+    // required: the key itself is the implicit module activation.
+    const moduleKeys = [
+      CUSTOM_DOMAIN_FEATURE,
+      STOREFRONT_FLEXIBLE,
+      STOREFRONT_DISABLED,
+    ];
     const [mvRows, liveRows] = await Promise.all([
       prisma.$queryRaw<Array<{ feature_key: string }>>`
         SELECT feature_key
         FROM mv_tenant_effective_capabilities
         WHERE tenant_id = ${tenantId}
-          AND feature_key IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
+          AND feature_key IN (${Prisma.join(moduleKeys)})
       `,
       prisma.$queryRaw<Array<{ feature_key: string }>>`
         SELECT feature_key FROM tenant_feature_purchases
         WHERE tenant_id = ${tenantId}
-          AND feature_key IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
+          AND feature_key IN (${Prisma.join(moduleKeys)})
           AND status IN ('active', 'past_due', 'trial')
           AND (expires_at IS NULL OR expires_at > NOW())
         UNION
         SELECT feature AS feature_key FROM tenant_feature_overrides_list
         WHERE tenant_id = ${tenantId}
-          AND feature IN (${CUSTOM_DOMAIN_FEATURE}, ${STOREFRONT_FLEXIBLE})
+          AND feature IN (${Prisma.join(moduleKeys)})
           AND granted = true
           AND (expires_at IS NULL OR expires_at > NOW())
       `,
     ]);
-    return mvRows.length > 0 || liveRows.length > 0;
+    const keys = new Set([...mvRows, ...liveRows].map((r) => r.feature_key));
+    if (keys.has(STOREFRONT_DISABLED)) return false;
+    return keys.has(STOREFRONT_FLEXIBLE) || keys.has(CUSTOM_DOMAIN_FEATURE);
   }
 
   /** Flag check (D10): platform flag + tenant override via effectiveFlags. */
@@ -343,7 +358,7 @@ export class CustomDomainService extends BaseService {
   }
 
   /**
-   * Tier-downgrade path (1.6/H2): losing `storefront_opt_custom_domain`
+   * Tier-downgrade path (1.6/H2): losing `storefront_domains_custom_domain`
    * entitlement detaches the Vercel hosts and marks the rows 'disabled' —
    * the domain stops resolving but the record survives for audit/re-enable.
    * Called from TrialManagementService.downgradeToExpired.

@@ -22,6 +22,7 @@ import {
   IntegrationOptionsState,
   QuickstartOptionsState,
   StorefrontOptionsState,
+  StorefrontDomainsState,
   StorefrontQrState,
   StorefrontGalleryState,
   StorefrontHoursState,
@@ -146,6 +147,7 @@ export interface BackendEffectiveCapabilities {
     integrations: BackendEffectiveIntegrations;
     quickstart: BackendEffectiveQuickstart;
     storefront_options: BackendEffectiveStorefrontOptions;
+    storefront_domains: BackendEffectiveStorefrontDomains;
     storefront_qr: BackendEffectiveStorefrontQr;
     storefront_gallery: BackendEffectiveStorefrontGallery;
     storefront_hours: BackendEffectiveStorefrontHours;
@@ -359,10 +361,15 @@ interface BackendEffectiveStorefrontOptions {
   can_use_contact: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
-  // D12 entitlements — level-2/3 presentation keys (action gates)
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontDomains {
+  enabled: boolean;
+  is_flexible: boolean;
+  allowed_levels: Array<'path' | 'platform_subdomain' | 'custom_domain'>;
   platform_subdomain_enabled: boolean;
   custom_domain_enabled: boolean;
-  merchant_preferences: Record<string, any>;
 }
 
 interface BackendEffectiveStorefrontLayouts {
@@ -810,9 +817,18 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseContact: b.can_use_contact,
     canUseEnhancedSEO: b.can_use_enhanced_seo,
     canUseStorefrontActions: b.can_use_storefront_actions,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontDomains(b: BackendEffectiveStorefrontDomains): StorefrontDomainsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    allowedLevels: b.allowed_levels ?? [],
     platformSubdomainEnabled: b.platform_subdomain_enabled ?? false,
     customDomainEnabled: b.custom_domain_enabled ?? false,
-    merchantPreferences: b.merchant_preferences as any,
     features: {},
   };
 }
@@ -1294,6 +1310,10 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     integrationOptions: mapIntegrations(b.effective.integrations),
     quickstartOptions: mapQuickstart(b.effective.quickstart),
     storefrontOptions: mapStorefrontOptions(b.effective.storefront_options),
+    storefrontDomains: mapStorefrontDomains(b.effective.storefront_domains ?? {
+      enabled: false, is_flexible: false, allowed_levels: [],
+      platform_subdomain_enabled: false, custom_domain_enabled: false,
+    }),
     storefrontQr: mapStorefrontQr(b.effective.storefront_qr),
     storefrontGallery: mapStorefrontGallery(b.effective.storefront_gallery),
     storefrontHours: mapStorefrontHours(b.effective.storefront_hours),
@@ -1647,6 +1667,7 @@ class UnifiedCapabilityService extends TenantApiSingleton {
 const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   commerce_: 'commerce',
   payment_gateway_: 'paymentGateway',
+  storefront_domains_: 'storefrontDomains',
   storefront_: 'storefront',
   barcode_: 'barcodeScan',
   fulfillment_: 'fulfillment',

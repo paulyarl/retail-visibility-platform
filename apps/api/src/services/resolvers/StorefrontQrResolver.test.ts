@@ -218,6 +218,46 @@ describe('resolveStorefrontQr', () => {
   });
 });
 
+// Capability contract matrix — `_disabled` vetoes the module; any other
+// active key in the module's own namespace (or its legacy storefront_opt_*
+// namespace) implicitly activates it.
+describe('resolveStorefrontQr — capability contract', () => {
+  it('lone storefront_qr_* key → implicit module activation', () => {
+    const result = resolveStorefrontQr({ storefront_qr_store: true }, null);
+    expect(result.enabled).toBe(true);
+    expect(result.allowed_qr_content_types).toContain('qr_store');
+  });
+
+  it('lone storefront_qr_flexible → module on, all features', () => {
+    const result = resolveStorefrontQr({ storefront_qr_flexible: true }, null);
+    expect(result.enabled).toBe(true);
+    expect(result.qr_styled_enabled).toBe(true);
+  });
+
+  it('storefront_qr_disabled + feature key → still off (absolute veto)', () => {
+    const result = resolveStorefrontQr(
+      { storefront_qr_disabled: true, storefront_qr_store: true },
+      null
+    );
+    expect(result.enabled).toBe(false);
+  });
+
+  it('lone legacy storefront_opt_qr_* key → implicit activation via storefront_opt', () => {
+    const result = resolveStorefrontQr({}, null, { storefront_opt_qr_store: true });
+    expect(result.enabled).toBe(true);
+    expect(result.allowed_qr_content_types).toContain('qr_store');
+  });
+
+  it('legacy storefront_opt_disabled vetoes the fallback path', () => {
+    const result = resolveStorefrontQr(
+      { storefront_qr_store: true },
+      null,
+      { storefront_opt_disabled: true, storefront_opt_qr_store: true }
+    );
+    expect(result.enabled).toBe(false);
+  });
+});
+
 describe('DEFAULT_QR_SETTINGS gradient target fields', () => {
   it('includes qr_gradient_on_dots, qr_gradient_on_corners, qr_gradient_on_corner_dots', () => {
     expect(DEFAULT_QR_SETTINGS).toHaveProperty('qr_gradient_on_dots');

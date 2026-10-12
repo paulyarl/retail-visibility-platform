@@ -8,7 +8,7 @@
 | **Merchant gate** | `tenant_storefront_options_settings.snap_status_display` (new column) |
 | **Sibling feature** | `directory_visibility_snap_ebt` (directory entry badge — existing) |
 | **Reference resolvers** | `DirectoryEntryOptionsResolver.ts` (SNAP pattern), `GbpManagementResolver.ts` (`can_show_*` vs `*_enabled` naming), `StorefrontOptionsResolver.ts` (host domain) |
-| **Governing rules** | `capability-data-flow-rules.md` R13, R15, R16, R17, R23 (flexible), R23-data-flow (subscription override), R30, R32, R33, R34, R35; `add-capability-feature.md` Step 0 |
+| **Governing rules** | `capability-data-flow-rules.md` R13, R15, R16, R17, R23 (flexible), R36 (subscription override), R30, R32, R33, R34, R35; `add-capability-feature.md` Step 0 |
 
 ---
 
@@ -212,7 +212,7 @@ Checklist against the rules:
 - [x] Types — add both fields to `EffectiveStorefrontOptions` in
       `apps/api/src/services/resolvers/types.ts`; add `snap_status_display` to
       `StorefrontOptionsMerchantSettings`
-- [x] **R23-data-flow** — storefront options is a read-only display capability: no change
+- [x] **R36** — storefront options is a read-only display capability: no change
       needed in the Step 6 `isReadOnly`/`isLimited` override blocks (stays `enabled` for
       frozen tenants so the page renders read-only)
 - [x] **R13** — add `can_show_snap_status: false` / `snap_status_enabled: false` to the

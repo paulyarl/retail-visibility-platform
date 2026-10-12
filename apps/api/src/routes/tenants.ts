@@ -5,6 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { assignSubdomain, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
@@ -375,17 +376,44 @@ router.put('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: R
     }
 
     // Entitlement gate (sprint plan 1.8/D12): the assignment ACTION checks
-    // storefront_opt_platform_subdomain at the self-service route — NOT in
+    // storefront_domains_platform_subdomain at the self-service route — NOT in
     // lib/subdomain.ts (shared with the admin route, which stays ungated).
-    // `storefront_opt_flexible` composed inline, mirroring the resolver's
-    // `flexible ||` (F-H1/R23). The resolve path is never gated — existing
-    // subdomains keep serving regardless (grandfathering).
-    const entitlement = await prisma.$queryRaw<Array<{ feature_key: string }>>`
-      SELECT feature_key FROM mv_tenant_effective_capabilities
-      WHERE tenant_id = ${id}
-        AND feature_key IN ('storefront_opt_platform_subdomain', 'storefront_opt_flexible')
-    `;
-    if (!entitlement.length) {
+    // Capability contract: `storefront_domains_disabled` vetoes the ENTIRE
+    // module; any lone feature key implicitly activates it — so entitlement
+    // is `!disabled && (flexible || platform_subdomain)`. MV (pg_cron ~10
+    // min) is unioned with live grant sources so just-granted
+    // purchases/overrides resolve immediately. The resolve path is never
+    // gated — existing subdomains keep serving regardless (grandfathering).
+    const moduleKeys = [
+      'storefront_domains_platform_subdomain',
+      'storefront_domains_flexible',
+      'storefront_domains_disabled',
+    ];
+    const [mvKeys, liveKeys] = await Promise.all([
+      prisma.$queryRaw<Array<{ feature_key: string }>>`
+        SELECT feature_key FROM mv_tenant_effective_capabilities
+        WHERE tenant_id = ${id}
+          AND feature_key IN (${Prisma.join(moduleKeys)})
+      `,
+      prisma.$queryRaw<Array<{ feature_key: string }>>`
+        SELECT feature_key FROM tenant_feature_purchases
+        WHERE tenant_id = ${id}
+          AND feature_key IN (${Prisma.join(moduleKeys)})
+          AND status IN ('active', 'past_due', 'trial')
+          AND (expires_at IS NULL OR expires_at > NOW())
+        UNION
+        SELECT feature AS feature_key FROM tenant_feature_overrides_list
+        WHERE tenant_id = ${id}
+          AND feature IN (${Prisma.join(moduleKeys)})
+          AND granted = true
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `,
+    ]);
+    const keys = new Set([...mvKeys, ...liveKeys].map((r) => r.feature_key));
+    const entitled =
+      !keys.has('storefront_domains_disabled') &&
+      (keys.has('storefront_domains_flexible') || keys.has('storefront_domains_platform_subdomain'));
+    if (!entitled) {
       return res.status(403).json({
         success: false,
         error: 'not_entitled',
