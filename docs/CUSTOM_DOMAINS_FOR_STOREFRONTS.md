@@ -1056,3 +1056,55 @@ Corrections folded in from the review of `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` so
 - **Capabilities & workspace entry (§7.3, §8.4):** D12 — both non-baseline presentation levels are `storefront_options` feature keys (`storefront_opt_platform_subdomain`, `storefront_opt_custom_domain`), enforced capability-authoritatively, not by raw `tier_key`; `_flexible` inheritance is an explicit grant, not automatic. D13 — a resolved custom host redirects `/manage` → the platform workspace (`visibleshelf.com/t/{id}`); auth sessions, cookies, and CORS stay on `visibleshelf.com`.
 
 See `docs/CUSTOM_DOMAINS_SPRINT_PLAN.md` (second-pass findings B5–B7 / H7–H11 / M8–M14) for the evidence.
+
+---
+
+## 17. Operator workflow — custom domains (2026-10-12)
+
+How an operator actually provisions a custom domain today, and what the SLA covers.
+
+### The console
+
+`/settings/admin/subdomain` → **Custom Domains** section. The whole DFY/support loop is one page:
+
+- **List** — all tenant domains, search by domain or tenant, status filter chips (`pending_verification` / `verified` / `active` / `error` / `disabled`), pagination.
+- **Row actions** — force check (same lifecycle as the tenant button and the sweeper), remove (reason → audit), expandable detail panel (verification/cert errors, TXT token, attached hosts, timestamps).
+- **Attach Domain** (DFY) — tenant picker → live **entitlement card** → domain + apex/reason → submit. Errors surface inline (`not_entitled`, `domain_taken`, `domain_limit`, `unconfigured`, …).
+
+### The two gates — and the in-place fixes
+
+The write path requires **both** a capability and a flag. The entitlement card shows each gate's live state and offers the fix inline:
+
+- **Capability `storefront_opt_custom_domain`** — resolved via `mv_tenant_effective_capabilities` (tier grant for `professional`/`organization`/`_flexible` holders; purchase; admin override). When absent → **"Grant via BSaaS"** opens the complimentary-grant dialog prefilled with tenant + the `storefront_opt_custom_domain` catalog SKU (private, grant-only — migration 329). Reason required — it's the audit trail.
+- **Flag `custom_domains`** — platform-off + tenant override during beta. When absent → **"Enable flag"** writes `tenant_feature_flags_list` through the same owner-powers route the tenant's own settings use (platform admins pass `requireTenantOwner`'s admin short-circuit).
+
+Both badges refresh in place after the action — the operator watches `entitled ✓ / flag ✓` go green, then attaches.
+
+### DFY sequence (purchased service)
+
+```
+purchase/grant → flag on → Attach Domain → DNS instructions to customer
+             → force check on propagation → verified → active (probe)
+```
+
+- **Entitlement freshness:** the console and the write gate resolve grants **immediately** (live read of `tenant_feature_purchases`/`tenant_feature_overrides_list` unioned with the MV). Tenant-facing capability surfaces stay MV-bound — ≤10 min propagation via the `refresh-mv_tenant_effective_capabilities` pg_cron job. Document in the checklist: *"entitlement changes propagate within ~10 min."*
+- **`pending_verification` + `verified` filters are the SLA work queue** — "purchased, awaiting setup" rows. An operator works the queue: attach → check → done when the row flips `active`.
+- **Customer-blocked is visible:** when the domain sits `pending_verification` with `attached_hosts` set, platform-side work is done and it's waiting on the customer's DNS — the row is the audit trail.
+
+### SLA framing — 24 hours
+
+DFY custom domain setup is a **purchased service** — set the customer-facing expectation at **"setup completes within 24 hours."** The window honestly covers the real latency: operator queue time, customer DNS propagation (the dominant constraint — a registrar change can legitimately take hours), Vercel verification, and TLS issuance. Promising tighter would be promising against DNS physics. DIY self-service remains instant — the SLA only describes the DFY path.
+
+### Routine SOP vs exception tooling
+
+| Phase | Operator action for a tenant wanting a custom domain |
+|---|---|
+| **Beta (now)** | Entitled tier (Pro/Org/flexible): enable the `custom_domains` tenant flag — one console click. Other tiers: BSaaS comp grant or à-la-carte purchase first. |
+| **GA** | Platform flag flips on globally → zero operator action for entitled tiers; console is support tooling only. |
+| **Exception** | BSaaS comp grant (demo tenants, goodwill, DFY pilot) — exception tooling, never a routine checklist line. Capability overrides via `tenant_feature_overrides_list` remain the lower-level escape hatch; prefer the BSaaS grant (it records a purchase artifact). |
+
+### Gotchas found in smoke testing
+
+- **`tenant-flags` upsert 500 (fixed):** the route never supplied `id` on create — every first-time flag row failed. Any flag toggle that 500s is this; verify a row appears in `tenant_feature_flags_list`.
+- **Grant duration:** `duration_days` on a comp grant expires the entitlement — the card flips back to "not entitled" when it lapses. Leave duration blank (permanent) for pilot windows.
+- **Flag enable ≠ entitlement:** the two gates are independent — a flag-on tenant without the capability gets a clean `not_entitled` 403, and the entitlement card is the fastest way to tell which gate failed.
