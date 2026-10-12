@@ -31,9 +31,12 @@ interface ComplimentaryAccessFormProps {
   onSuccess?: () => void;
   entries?: BsaasCatalogEntry[];
   bundles?: BsaasBundleEntry[];
+  /** Pre-fill the form on open — e.g. a contextual grant action that already knows tenant + feature. */
+  initialTenantId?: string;
+  initialFeatureKey?: string;
 }
 
-export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess, entries, bundles }: ComplimentaryAccessFormProps) {
+export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess, entries, bundles, initialTenantId, initialFeatureKey }: ComplimentaryAccessFormProps) {
   const [catalog, setCatalog] = useState<BsaasCatalogEntry[]>([]);
   const [tenants, setTenants] = useState<{ id: string; name: string; subscriptionTier: string; subscriptionStatus: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,6 +51,8 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess,
 
   useEffect(() => {
     if (open) {
+      if (initialTenantId) setTenantId(initialTenantId);
+      if (initialFeatureKey) setFeatureKey(initialFeatureKey);
       if (!entries && !bundles) {
         adminBsaasCatalogService.list().then(setCatalog).catch(() => {});
       }

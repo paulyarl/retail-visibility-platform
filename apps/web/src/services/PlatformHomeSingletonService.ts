@@ -383,6 +383,45 @@ export interface AdminSubdomainMutationResult {
   data?: { slug: string | null; subdomain: string | null };
 }
 
+export interface AdminCustomDomainRow {
+  id: string;
+  tenantId: string;
+  tenantName: string | null;
+  tenantSlug: string | null;
+  tenantSubdomain: string | null;
+  domain: string;
+  status: string;
+  attachedHosts: string[];
+  verificationToken: string | null;
+  verificationCheckedAt: string | null;
+  verificationError: string | null;
+  certificateStatus: string | null;
+  certificateError: string | null;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface AdminCustomDomainListResult {
+  data: AdminCustomDomainRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminTenantDomainDetail {
+  domains: AdminCustomDomainRow[];
+  entitlement: { entitled: boolean; flagOn: boolean };
+}
+
+export interface AdminCustomDomainMutationResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+  data?: AdminCustomDomainRow;
+  attachedHosts?: string[];
+}
+
 export interface RateLimitConfig {
   subdomainCheck: { maxRequests: number; windowMs: number };
   subdomainCreate: { maxRequests: number; windowMs: number };
@@ -1817,6 +1856,176 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     return { success: true, data: result.data?.data };
+  }
+
+  /**
+   * Admin custom-domain management — list all tenant custom domains.
+   * Backed by /api/admin/custom-domains (platform admin only).
+   */
+  async getAdminCustomDomains(params: { search?: string; status?: string; page?: number; limit?: number } = {}): Promise<AdminCustomDomainListResult | null> {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.status) qs.set('status', params.status);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+
+    const result = await this.makeDefaultRequest<{ data: AdminCustomDomainRow[]; total: number; page: number; limit: number }>(
+      `/api/admin/custom-domains${suffix}`,
+      {},
+      `platform-admin-custom-domains:${suffix}`,
+      60 * 1000,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    if (!result.success) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin custom domains:', { detail: result.error });
+      return null;
+    }
+
+    return result.data || null;
+  }
+
+  /**
+   * Per-tenant custom-domain detail: domain rows + composed entitlement/flag
+   * state — the "why can't this tenant attach" answer in one call.
+   */
+  async getAdminTenantDomains(tenantId: string): Promise<AdminTenantDomainDetail | null> {
+    const result = await this.makeDefaultRequest<AdminTenantDomainDetail>(
+      `/api/admin/custom-domains/${encodeURIComponent(tenantId)}`,
+      {},
+      `platform-admin-custom-domains-tenant:${tenantId}`,
+      30 * 1000,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    if (!result.success) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenant custom domains:', { detail: result.error });
+      return null;
+    }
+
+    return result.data || null;
+  }
+
+  /**
+   * Operator attach (DFY/concierge). Capability + flag gates still apply
+   * server-side — use the entitlement card first.
+   */
+  async attachAdminCustomDomain(tenantId: string, domain: string, opts: { apex?: boolean; reason?: string } = {}): Promise<AdminCustomDomainMutationResult> {
+    const result = await this.makeDefaultRequest<{ data: AdminCustomDomainRow; attachedHosts?: string[]; message?: string }>(
+      `/api/admin/custom-domains/${encodeURIComponent(tenantId)}`,
+      { method: 'POST', body: JSON.stringify({ domain, apex: opts.apex, reason: opts.reason }) },
+      `platform-admin-custom-domain-attach:${tenantId}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    await this.invalidateCache('platform-admin-custom-domains*');
+
+    if (!result.success) {
+      const err: any = result.error;
+      return {
+        success: false,
+        error: (typeof err === 'object' ? err?.error : err) || 'failed_to_attach_domain',
+        message: typeof err === 'object' ? err?.message : undefined,
+      };
+    }
+
+    return { success: true, data: result.data?.data, attachedHosts: result.data?.attachedHosts };
+  }
+
+  /**
+   * Force re-check — same lifecycle path as the tenant button and the sweeper.
+   */
+  async checkAdminCustomDomain(tenantId: string, domainId: string): Promise<AdminCustomDomainMutationResult> {
+    const result = await this.makeDefaultRequest<{ data: AdminCustomDomainRow; message?: string }>(
+      `/api/admin/custom-domains/${encodeURIComponent(tenantId)}/${encodeURIComponent(domainId)}/check`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `platform-admin-custom-domain-check:${tenantId}:${domainId}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    await this.invalidateCache('platform-admin-custom-domains*');
+
+    if (!result.success) {
+      const err: any = result.error;
+      return {
+        success: false,
+        error: (typeof err === 'object' ? err?.error : err) || 'failed_to_check_domain',
+        message: typeof err === 'object' ? err?.message : undefined,
+      };
+    }
+
+    return { success: true, data: result.data?.data };
+  }
+
+  /**
+   * Operator remove — detaches Vercel hosts then deletes the row (audited).
+   */
+  async removeAdminCustomDomain(tenantId: string, domainId: string, reason?: string): Promise<AdminCustomDomainMutationResult> {
+    const result = await this.makeDefaultRequest<{ data?: AdminCustomDomainRow; message?: string }>(
+      `/api/admin/custom-domains/${encodeURIComponent(tenantId)}/${encodeURIComponent(domainId)}`,
+      { method: 'DELETE', body: JSON.stringify({ reason }) },
+      `platform-admin-custom-domain-remove:${tenantId}:${domainId}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    await this.invalidateCache('platform-admin-custom-domains*');
+
+    if (!result.success) {
+      const err: any = result.error;
+      return {
+        success: false,
+        error: (typeof err === 'object' ? err?.error : err) || 'failed_to_remove_domain',
+        message: typeof err === 'object' ? err?.message : undefined,
+      };
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Flip a tenant feature flag — same powers as the tenant owner's own toggle
+   * (platform admins pass requireTenantOwner's isPlatformAdmin short-circuit).
+   * Routes through the Next.js admin proxy to /api/admin/tenant-flags.
+   */
+  async setAdminTenantFlag(tenantId: string, flag: string, enabled: boolean, description?: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.makeDefaultRequest<{ data?: any }>(
+      `/api/admin/tenant-flags/${encodeURIComponent(tenantId)}/${encodeURIComponent(flag)}`,
+      { method: 'PUT', body: JSON.stringify({ enabled, description, rollout: 'tenant' }) },
+      `platform-admin-tenant-flag:${tenantId}:${flag}`,
+      0,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    await this.invalidateCache('platform-admin-custom-domains*');
+
+    if (!result.success) {
+      const err: any = result.error;
+      return { success: false, error: (typeof err === 'object' ? err?.error : err) || 'failed_to_set_flag' };
+    }
+
+    return { success: true };
   }
 
   /**

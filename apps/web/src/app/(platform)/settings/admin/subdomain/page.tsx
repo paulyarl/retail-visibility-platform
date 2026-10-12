@@ -8,6 +8,7 @@ import {
   platformHomeService,
   type AdminSubdomainRow,
 } from '@/services/PlatformHomeSingletonService';
+import AdminCustomDomainsSection from '@/admin/components/AdminCustomDomainsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Modal, ModalFooter } from '@/components/ui';
@@ -261,8 +262,8 @@ export default function AdminSubdomainPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <PageHeader
-        title="Subdomain Management"
-        description="Monitor subdomain usage, adoption rates, and manage rate limiting settings"
+        title="Domain Management"
+        description="Platform subdomains and tenant-owned custom domains — usage, adoption, and support tooling"
         icon={Icons.Admin}
         backLink={{
           href: '/settings/admin',
@@ -417,6 +418,9 @@ export default function AdminSubdomainPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Custom Domains — tenant-owned domains, DFY attach, verification support */}
+        <AdminCustomDomainsSection />
 
         {/* Management Section */}
         <Card className="dark:bg-gray-800 dark:border-gray-700">
