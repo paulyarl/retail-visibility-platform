@@ -80,6 +80,12 @@ Entitlement ≠ assignment: the key grants the *ability*; `tenants.subdomain`
 or an `active` `custom_domains` row is the *state*. "Merchant doesn't want it"
 = don't attach (no prefs needed today).
 
+**Tier policy (deliberate — do not "fix" missing keys)**:
+- `_enabled` baseline alone (`directory_presence`) → path surface + purchase-eligible
+- Paid tiers → `platform_subdomain` (+ `custom_domain` on pro/org, `_flexible` on enterprise)
+- `seed_preview`, `presence`, `chain_*`, `trial_*` → **zero keys**: platform path only, no self-serve purchase, admin grant is the escape path
+- Do NOT assign `_disabled` to those tiers — the veto would also block admin grants (see contract above). Zero keys is the correct "not engaged" state.
+
 ## Evolution path — when an entitlement module needs merchant opt-in
 
 1. Feature key stays in the module (`<module>_<feature>`) — same concern.
