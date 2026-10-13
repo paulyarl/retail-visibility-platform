@@ -589,6 +589,14 @@ Evaluate the verified audit observations and populate the top-level `detected_si
 * `DS_MISSING_SERVICE_MENU`: Missing service menu or primary category services on GBP/Yelp.
 * `DS_OUTDATED_HOURS`: Business hours missing, conflicting, or un-updated.
 * `DS_PHOTO_DEFICIT`: Zero business photos or no new photos added in last 6 months.
+* `DS_ZERO_INDEXED_PRESENCE`: a direct name + city search returns essentially no business-attributable indexed footprint — no directory listings, no owned site, no review presence. Emit only for near-total absence; weak rank with identifiable listings is not zero-indexed.
+* `DS_PROFILE_SUSPENDED`: the platform shows the profile as suspended, disabled, removed-for-policy, or pending verification review — or the listing is unfindable while evidence shows it recently existed (indexed references, reviews citing it). Emit only on an observed suspension state, never on ordinary absence.
+* `DS_DUPLICATE_LISTING`: two or more listings for the same business on one platform (same or near-same name/address/phone, slight variants). Emit on sight.
+* `DS_HIJACKED_LISTING`: profile content appears controlled by a third party — a planted foreign website or phone number, different branding, or an unauthorized claim. Emit when profile content conflicts with the business's verified identity; stale or drifted info alone is drift, not hijack.
+* `DS_OWNERSHIP_DISPUTE`: ownership is contested — "this listing has already been claimed" states, pending or conflicting ownership requests, or control held by a former manager/agency.
+* `DS_ADDRESS_VERIFICATION_BLOCK`: the platform refuses verification at the stated address — postcard/video verification required, PO box / virtual office / residential address flagged.
+
+Emit the six codes above ONLY from observed evidence — a rendered notice, a visible duplicate, a displayed suspension or claim state. Never infer an integrity state from a profile that did not render: a non-rendering profile is an availability question (render_controls / DS_MISSING_PROFILE), not an integrity finding.
 
 ### Website & Conversion Signals
 * `WC_MISSING_WEBSITE`: Business has no website URL listed on any profile.
@@ -1260,4 +1268,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-08-website-offer-1 -->
+<!-- seed-version: business-audit-default-2026-10-10-presence-signals-2 -->

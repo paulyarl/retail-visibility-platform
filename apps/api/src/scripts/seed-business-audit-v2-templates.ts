@@ -467,6 +467,13 @@ function appendWebsiteGapDefinitions(out: string): string {
   return out;
 }
 
+// ─── §PB-09/A8: presence & integrity signal definitions.
+//     The six model_emitted presence/integrity codes live in the canonical
+//     audit body (business-audit-default-body.md) — the two V2 variants were
+//     retired 2026-09-26 and are no longer seeded, so no transform is needed
+//     here. See the §Digital Surface & Profile Signals list in the default
+//     body and the DEFAULT_AUDIT_MARKER bump that re-applies it.
+
 // ─── §6.1 scoring amendment: google_profile_maintenance rubric.
 //     The old rule scored unverifiability as health — "0 points when the
 //     profile appears maintained OR STATUS IS UNAVAILABLE" — so the more
@@ -1896,7 +1903,7 @@ function transformBusinessAuditV1(body: string): string {
 //     canonical_city/state/zip)
 // The .md asset is the source of truth — edit it and bump
 // DEFAULT_AUDIT_MARKER when the canonical body changes.
-const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-08-website-offer-1 -->';
+const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-10-presence-signals-2 -->';
 
 function transformSeedBusinessAudit(): string {
   const body = readFileSync(
