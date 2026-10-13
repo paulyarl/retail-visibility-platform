@@ -11,7 +11,7 @@
  * Every other "latest audit" consumer (deliverables, call scripts,
  * openers, repair flows) keeps latest-wins.
  */
-import { prisma } from '../../prisma';
+import { prisma, basePrisma } from '../../prisma';
 
 export type SetControllingAuditResult =
   | { ok: true; controllingAuditId: string | null }
@@ -74,13 +74,16 @@ export async function setControllingAuditForProspect(args: {
     }
   }
 
-  await prisma.$transaction([
-    prisma.mkt_audits_list.updateMany({
+  // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+  // the array form of $transaction rejects ("need to be Prisma Client
+  // promises"). Same convention as CrmTaskService.
+  await basePrisma.$transaction([
+    basePrisma.mkt_audits_list.updateMany({
       where: { campaign_id: { in: campaignIds } },
       data: { is_controlling: false },
     }),
     ...(auditId !== null
-      ? [prisma.mkt_audits_list.update({ where: { id: auditId }, data: { is_controlling: true } })]
+      ? [basePrisma.mkt_audits_list.update({ where: { id: auditId }, data: { is_controlling: true } })]
       : []),
   ]);
 

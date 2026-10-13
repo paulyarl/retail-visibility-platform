@@ -11,7 +11,7 @@
  *   - specialty_retail: Specialty retail with 18 products
  */
 
-import { prisma } from '../prisma';
+import { prisma, basePrisma } from '../prisma';
 import { generateTenantId, generateUserTenantId } from '../lib/id-generator';
 import { generateQuickStartProducts, QuickStartScenario } from '../lib/quick-start';
 import slugSingletonService from './SlugSingletonService';
@@ -736,8 +736,11 @@ class DemoTenantService {
     // Close the tenant and archive its catalog in one transaction — sample
     // products are kept for audit (never deleted per spec §5e) but must stop
     // surfacing once the demo ends.
-    const [, archived] = await prisma.$transaction([
-      prisma.tenants.update({
+    // basePrisma (unwrapped) — the retry proxy returns plain Promises, which
+    // the array form of $transaction rejects ("need to be Prisma Client
+    // promises"). Same convention as CrmTaskService.
+    const [, archived] = await basePrisma.$transaction([
+      basePrisma.tenants.update({
         where: { id: tenantId },
         data: {
           location_status: 'closed' as any,
@@ -748,7 +751,7 @@ class DemoTenantService {
           subscription_status: 'cancelled',
         },
       }),
-      prisma.inventory_items.updateMany({
+      basePrisma.inventory_items.updateMany({
         where: {
           tenant_id: tenantId,
           item_status: { in: ['active', 'inactive'] },
