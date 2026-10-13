@@ -159,6 +159,7 @@ import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import { buildProjectPhasePlanForKey } from '../services/triage/project-phase-resolution';
+import { setControllingAuditForProspect } from '../services/triage/controlling-audit';
 import { runProjectPhaseGate } from '../services/outreach-openers/project-phase-gate';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
@@ -1859,6 +1860,41 @@ router.get('/prospects/:prospectId/project-plan', async (req: any, res: Response
     );
     const gate = runProjectPhaseGate(plan);
     res.json({ success: true, data: { plan, gate } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * PUT /prospects/:prospectId/controlling-audit
+ *
+ * Operator pin for the plan's source audit (migration 333). Body:
+ * `{ auditId: string | null }` — null clears the pin. The audit must be a
+ * `business_analysis` audit on a campaign in the prospect group. Exactly
+ * one audit per prospect is controlling at a time: the clear + set run in
+ * one transaction. Plan-scoped — only resolveProspectSignals consults the
+ * pin; every other latest-audit consumer keeps latest-wins.
+ *
+ * `:prospectId` / `?campaignId=` resolve like the plan route — a campaign
+ * id or a null-prospect campaign is a singleton group.
+ */
+const controllingAuditSchema = z.object({ auditId: z.string().nullable() });
+
+router.put('/prospects/:prospectId/controlling-audit', async (req: any, res: Response) => {
+  try {
+    const parsed = controllingAuditSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const result = await setControllingAuditForProspect({
+      prospectId: req.params.prospectId,
+      campaignId: typeof req.query.campaignId === 'string' ? req.query.campaignId : null,
+      auditId: parsed.data.auditId,
+    });
+    if (!result.ok) {
+      return res.status(result.status).json({ success: false, error: result.error, message: result.message });
+    }
+    res.json({ success: true, data: { controlling_audit_id: result.controllingAuditId } });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

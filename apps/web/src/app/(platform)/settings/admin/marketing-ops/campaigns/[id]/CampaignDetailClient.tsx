@@ -420,6 +420,50 @@ export default function CampaignDetailClient({
     fetchCampaign();
   }, [fetchCampaign]);
 
+  // Migration 333 — operator pin for the plan's controlling audit.
+  // Prospect-scoped: the pin overrides latest-wins in
+  // resolveProspectSignals; null clears back to latest. Busy flag is keyed
+  // by audit id so concurrent clicks can't double-fire.
+  const [controllingAuditBusy, setControllingAuditBusy] = useState<string | null>(null);
+  const setControllingAudit = async (auditId: string | null) => {
+    if (!campaign) return;
+    setControllingAuditBusy(auditId ?? '__clear__');
+    try {
+      const prospectKey = campaign.businessProspectId ?? campaign.id;
+      await marketingOpsService.setControllingAudit(
+        prospectKey,
+        auditId,
+        campaign.businessProspectId ? undefined : campaign.id,
+      );
+      await fetchCampaign();
+    } catch (err: any) {
+      setError(err.message || 'Failed to set controlling audit');
+    } finally {
+      setControllingAuditBusy(null);
+    }
+  };
+
+  // Purge an audit outright — DELETE /audits/:id already exists API-side
+  // (triage snapshots keep their signals via ON DELETE SET NULL; a pinned
+  // audit's pin dies with the row, reverting the plan to latest-wins).
+  const [purgingAudit, setPurgingAudit] = useState<string | null>(null);
+  const purgeAudit = async (audit: Audit) => {
+    if (
+      !confirm(
+        `Purge audit ${audit.id}? Its signals will stop feeding the project plan and every other latest-audit consumer. Persisted triage snapshots keep their signals. This cannot be undone.`,
+      )
+    ) return;
+    setPurgingAudit(audit.id);
+    try {
+      await marketingOpsService.deleteAudit(audit.id);
+      await fetchCampaign();
+    } catch (err: any) {
+      setError(err.message || 'Failed to purge audit');
+    } finally {
+      setPurgingAudit(null);
+    }
+  };
+
   // Directory entry for the linked tenant — resolves the public listing slug
   // so the operator can open the place/directory preview from here. Claimed
   // tenants have no seed row, so the seed page's preview link is unavailable.
@@ -2177,6 +2221,41 @@ export default function CampaignDetailClient({
                             Inherited from primary sibling
                           </p>
                         )}
+                        <div className="mb-1 flex items-center justify-between">
+                          {audit.platform === 'business_analysis' ? (
+                            audit.is_controlling ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-teal-50 dark:bg-teal-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                                Controlling audit — feeds the project plan
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                Newest audit feeds the project plan by default
+                              </span>
+                            )
+                          ) : (
+                            <span />
+                          )}
+                          <div className="flex items-center gap-3">
+                            {audit.platform === 'business_analysis' && (
+                              <button
+                                type="button"
+                                disabled={controllingAuditBusy !== null}
+                                onClick={() => setControllingAudit(audit.is_controlling ? null : audit.id)}
+                                className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                              >
+                                {audit.is_controlling ? 'Clear override' : 'Set as controlling'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              disabled={purgingAudit !== null}
+                              onClick={() => purgeAudit(audit)}
+                              className="text-[10px] font-medium text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
+                            >
+                              {purgingAudit === audit.id ? 'Purging…' : 'Purge'}
+                            </button>
+                          </div>
+                        </div>
                         {audit.platform === 'city_category_analysis' && audit.audit_data ? (
                         <CityCategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'category_analysis' && audit.audit_data ? (

@@ -1725,6 +1725,10 @@ export interface Audit {
     [key: string]: any;
   } | null;
   created_at: string;
+  // Migration 333 — operator-pinned controlling audit for the project plan.
+  // At most one business_analysis audit per prospect group carries this;
+  // resolveProspectSignals prefers it over latest-wins.
+  is_controlling?: boolean;
   // True when this audit was inherited from the primary sibling (non-primary
   // siblings share the primary's business_analysis audit). Set by the backend
   // in getCampaign; absent for audits generated on the campaign itself.
@@ -5387,6 +5391,38 @@ class MarketingOpsService extends AdminApiSingleton {
     return json.data;
   }
 
+  /**
+   * Set (or clear, auditId=null) the prospect's controlling audit — the
+   * operator override for which business_analysis audit feeds the project
+   * plan's signal resolution (migration 333). Plan-scoped only.
+   */
+  async setControllingAudit(
+    prospectIdOrCampaignId: string,
+    auditId: string | null,
+    campaignId?: string,
+  ): Promise<{ controlling_audit_id: string | null }> {
+    const qs = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
+    const res = await fetch(
+      `${BASE_URL}/prospects/${encodeURIComponent(prospectIdOrCampaignId)}/controlling-audit${qs}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ auditId }),
+      },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to set controlling audit (${res.status})`);
+    }
+    // Pinned audit rows are embedded in every sibling's cached campaign
+    // detail (inherited audits) — drop the whole campaign cache prefix.
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    await this.invalidateCachePattern('mkt-ops-audits');
+    const json = await res.json();
+    return json.data;
+  }
+
   // ─── Playbook catalog CRUD (Sprint 4) ────────────────────────────────
 
   async listPlaybooks(filters?: { category?: string; isActive?: boolean }): Promise<PlaybookCatalogEntry[]> {
@@ -8308,6 +8344,9 @@ export interface ProjectPhasePlan {
   signals: string[];
   signalLanes: Record<string, 'full' | 'partial'>;
   sourceAuditId: string | null;
+  /** Migration 333 — true when the source audit is the operator-pinned
+   *  controlling audit rather than the latest-wins pick. */
+  sourceAuditPinned?: boolean;
   seedClaim: {
     seedId: string;
     status: SeedStatus;

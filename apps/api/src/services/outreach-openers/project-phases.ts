@@ -105,6 +105,9 @@ export interface ProjectPhasePlan {
   lane: PlanLane;
   signals: SignalCode[];
   sourceAuditId: string | null;
+  /** True when the source audit is the operator-pinned controlling audit
+   *  (migration 333) rather than the latest-wins pick. */
+  sourceAuditPinned?: boolean;
   seedClaim: {
     seedId: string;
     status: SeedStatus;

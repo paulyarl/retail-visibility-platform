@@ -157,6 +157,11 @@ function PlanHeader({ plan, gate }: { plan: ProjectPhasePlan; gate: ProjectPhase
         {plan.sourceAuditId && (
           <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
             source audit <code className="font-mono">{plan.sourceAuditId}</code>
+            {plan.sourceAuditPinned && (
+              <span className="ml-1 inline-flex items-center rounded bg-teal-100 dark:bg-teal-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                operator-selected
+              </span>
+            )}
           </span>
         )}
       </div>

@@ -22,7 +22,7 @@ const {
   mockRefreshFidelity,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findUnique: vi.fn(), findMany: vi.fn() },
-  mockAuditsList: { findMany: vi.fn(), findUnique: vi.fn() },
+  mockAuditsList: { findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn() },
   mockTriageResults: { findMany: vi.fn(), findFirst: vi.fn() },
   mockPlaybookCatalog: { findMany: vi.fn() },
   mockSeeds: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -113,9 +113,11 @@ function mockBundleSignals(input: {
   audits?: any[];
   triage?: any[];
   campaign?: any;
+  pinned?: any;
 }) {
   mockCampaignsList.findUnique.mockResolvedValue(input.campaign ?? CAMPAIGN);
   mockAuditsList.findMany.mockResolvedValue(input.audits ?? []);
+  mockAuditsList.findFirst.mockResolvedValue(input.pinned ?? null);
   mockTriageResults.findMany.mockResolvedValue(input.triage ?? []);
   mockTriageResults.findFirst.mockResolvedValue(null);
   mockAuditsList.findUnique.mockResolvedValue(null);
@@ -224,6 +226,61 @@ describe('resolveProspectSignals', () => {
     expect(res.lane).toBe('partial');
     expect(res.signals).toContain('RA_BBB_GRADE_SUPPRESSION');
     expect(res.signalLanes['RA_BBB_GRADE_SUPPRESSION']).toBe('full');
+  });
+
+  // Migration 333 — operator-pinned controlling audit overrides latest-wins.
+  it('pinned audit wins over a newer real audit (operator override)', async () => {
+    const olderThorough = {
+      ...REAL_AUDIT,
+      id: 'a-pinned',
+      created_at: new Date('2026-01-15'),
+      is_controlling: true,
+    };
+    mockBundleSignals({ audits: [REAL_AUDIT, olderThorough], pinned: olderThorough });
+    const res = await resolveProspectSignals(BUNDLE);
+    expect(res.lane).toBe('full');
+    expect(res.sourceAuditId).toBe('a-pinned');
+    expect(res.auditSource).toBe('operator_pin');
+  });
+
+  it('pinned audit on a sibling campaign is honored', async () => {
+    const siblingPinned = {
+      ...REAL_AUDIT,
+      id: 'a-sibling-pinned',
+      campaign_id: 'c-secondary',
+      is_controlling: true,
+    };
+    const bundle = {
+      ...BUNDLE,
+      siblings: [
+        ...BUNDLE.siblings,
+        { campaignId: 'c-secondary', isPrimary: false, playbookCode: 'PB-08', archetype: 'A7', stage: 'seek', detectedSignals: [] as any[] },
+      ],
+    };
+    mockBundleSignals({ audits: [REAL_AUDIT], pinned: siblingPinned });
+    const res = await resolveProspectSignals(bundle);
+    expect(res.sourceAuditId).toBe('a-sibling-pinned');
+    expect(res.auditSource).toBe('operator_pin');
+    expect(mockAuditsList.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ is_controlling: true }),
+      }),
+    );
+  });
+
+  it('pinned stub audit yields the partial lane with operator_pin source', async () => {
+    const pinnedStub = { ...STUB_AUDIT, is_controlling: true };
+    mockBundleSignals({ audits: [REAL_AUDIT, STUB_AUDIT], pinned: pinnedStub });
+    const res = await resolveProspectSignals(BUNDLE);
+    expect(res.lane).toBe('partial');
+    expect(res.sourceAuditId).toBe('a-stub');
+    expect(res.auditSource).toBe('operator_pin');
+  });
+
+  it('unpinned real audit reports latest source', async () => {
+    mockBundleSignals({ audits: [STUB_AUDIT, REAL_AUDIT] });
+    const res = await resolveProspectSignals(BUNDLE);
+    expect(res.auditSource).toBe('latest');
   });
 });
 

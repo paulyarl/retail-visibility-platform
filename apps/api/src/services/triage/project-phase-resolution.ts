@@ -211,6 +211,11 @@ export interface ResolvedSignals {
   lane: PlanLane;
   sourceAuditId: string | null;
   discoverySignals: string[];
+  /** Where the source audit came from: 'operator_pin' when the prospect's
+   *  controlling audit was operator-selected (migration 333 — overrides
+   *  latest-wins), 'latest'/'stub' the default picks, 'snapshot' the
+   *  persisted-triage fallback, 'none' when nothing resolved. */
+  auditSource: 'operator_pin' | 'latest' | 'stub' | 'snapshot' | 'none';
   /** The real-audit JSON when lane === 'full' (evaluator exit predicates +
    *  severity need it); stub audit JSON in partial lane; null otherwise. */
   audit: any | null;
@@ -232,6 +237,11 @@ export interface ResolvedSignals {
  *
  * RA_BBB_* / operator-entered codes from persisted triage results are
  * unioned in every lane and always carry 'full' provenance.
+ *
+ * Operator pin (migration 333): when a business_analysis audit under the
+ * prospect carries is_controlling, it is the source — overriding
+ * latest-wins regardless of created_at. A pinned stub yields the partial
+ * lane like any other stub.
  */
 export async function resolveProspectSignals(
   bundle: ResolvedProspectBundle,
@@ -245,10 +255,22 @@ export async function resolveProspectSignals(
     orderBy: { created_at: 'desc' },
     take: 10,
   });
+  // The pin is fetched separately — a controlling audit can be older than
+  // the take-10 recency window.
+  const pinnedAudit = await prisma.mkt_audits_list.findFirst({
+    where: {
+      campaign_id: { in: siblingIds },
+      platform: 'business_analysis',
+      is_controlling: true,
+    },
+    select: { id: true, campaign_id: true, audit_data: true, created_at: true },
+  });
   const realAudit = audits.find((a) => !isStubBusinessAnalysisAudit(a)) ?? null;
   const stubAudit = audits.find((a) => isStubBusinessAnalysisAudit(a)) ?? null;
-  const realAuditData = realAudit?.audit_data as any;
-  const stubAuditData = stubAudit?.audit_data as any;
+  // Pin overrides latest-wins; unpinned falls back to real → stub → snapshot.
+  const sourceAudit = pinnedAudit ?? realAudit ?? stubAudit;
+  const sourceAuditData = sourceAudit?.audit_data as any;
+  const sourceIsStub = sourceAudit ? isStubBusinessAnalysisAudit(sourceAudit) : false;
 
   const primaryCampaign = await prisma.mkt_campaigns_list.findUnique({
     where: { id: bundle.primaryCampaignId },
@@ -268,11 +290,13 @@ export async function resolveProspectSignals(
   let sourceAuditId: string | null = null;
   let discoverySignals: string[] = [];
   let audit: any | null = null;
+  let auditSource: ResolvedSignals['auditSource'] = 'none';
 
-  if (realAudit) {
+  if (sourceAudit && !sourceIsStub) {
     lane = 'full';
-    sourceAuditId = realAudit.id;
-    audit = realAuditData;
+    sourceAuditId = sourceAudit.id;
+    audit = sourceAuditData;
+    auditSource = pinnedAudit ? 'operator_pin' : 'latest';
     signals = toCanonicalSignals(
       extractSignals({
         campaign: {
@@ -283,16 +307,17 @@ export async function resolveProspectSignals(
           website_url: primaryCampaign?.website_url,
           gbp_claimed: primaryCampaign?.gbp_claimed,
         },
-        auditData: realAuditData,
+        auditData: sourceAuditData,
       }),
     );
     for (const code of signals) signalLanes[code] = 'full';
-    discoverySignals = intCodesFromDiscoveryMap(realAuditData?.discovery_signal_map);
-  } else if (stubAudit) {
+    discoverySignals = intCodesFromDiscoveryMap(sourceAuditData?.discovery_signal_map);
+  } else if (sourceAudit) {
     lane = 'partial';
-    sourceAuditId = stubAudit.id;
-    audit = stubAuditData;
-    const stubSignals = toCanonicalSignals(stubAuditData?.detected_signals);
+    sourceAuditId = sourceAudit.id;
+    audit = sourceAuditData;
+    auditSource = pinnedAudit ? 'operator_pin' : 'stub';
+    const stubSignals = toCanonicalSignals(sourceAuditData?.detected_signals);
     // extractSignals derives tier-related codes where the stub carries
     // cat-id digital_footprint data (spec §12) — same partial provenance.
     const derived = toCanonicalSignals(
@@ -305,12 +330,12 @@ export async function resolveProspectSignals(
           website_url: primaryCampaign?.website_url,
           gbp_claimed: primaryCampaign?.gbp_claimed,
         },
-        auditData: stubAuditData,
+        auditData: sourceAuditData,
       }),
     );
     signals = [...new Set([...stubSignals, ...derived])];
     for (const code of signals) signalLanes[code] = 'partial';
-    discoverySignals = intCodesFromDiscoveryMap(stubAuditData?.discovery_signal_map);
+    discoverySignals = intCodesFromDiscoveryMap(sourceAuditData?.discovery_signal_map);
   } else {
     // Persisted snapshot fallback — lane inherited from the producing audit.
     const triage = await prisma.mkt_campaign_triage_results.findFirst({
@@ -322,6 +347,7 @@ export async function resolveProspectSignals(
       if (persisted.length > 0) {
         signals = persisted;
         sourceAuditId = triage.source_audit_id;
+        auditSource = 'snapshot';
         const producingAudit = triage.source_audit_id
           ? await prisma.mkt_audits_list.findUnique({
               where: { id: triage.source_audit_id },
@@ -350,12 +376,13 @@ export async function resolveProspectSignals(
     }
   }
 
-  if (signals.length === 0 && lane !== 'none' && !realAudit && !stubAudit) {
+  if (signals.length === 0 && lane !== 'none' && !sourceAudit) {
     lane = 'none';
+    auditSource = 'none';
   }
 
   void ctx;
-  return { signals, signalLanes, lane, sourceAuditId, discoverySignals, audit };
+  return { signals, signalLanes, lane, sourceAuditId, discoverySignals, auditSource, audit };
 }
 
 /** INT_* codes recorded on a stub audit's discovery_signal_map (via='int_signal'). */
@@ -769,6 +796,8 @@ export async function buildProjectPhasePlan(
       engagementCycle: bundle.engagementCycle,
     },
   );
+
+  plan.sourceAuditPinned = resolved.auditSource === 'operator_pin';
 
   // Phase 5 — evidence rows + owner-safe copy per phase. Attribution rides
   // the phase's first contributing sibling (the campaign that owns the

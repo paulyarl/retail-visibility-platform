@@ -3242,6 +3242,7 @@ model mkt_audits_list {
   created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
   updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
   import_metadata             Json?
+  is_controlling              Boolean                       @default(false)
   mkt_campaigns_list          mkt_campaigns_list            @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_audits_campaign")
   mkt_campaign_triage_results mkt_campaign_triage_results[]
 
