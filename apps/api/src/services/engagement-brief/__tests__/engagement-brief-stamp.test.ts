@@ -15,6 +15,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   applyEngagementBriefStamp,
+  assertEngagementBriefSourceAudit,
   buildEngagementBriefVariables,
   ENGAGEMENT_BRIEF_VERSION,
 } from '../engagement-brief-stamp';
@@ -24,6 +25,9 @@ function prismaWithAudit(audit: { id: string; audit_data: any } | null) {
   return {
     mkt_audits_list: {
       findFirst: vi.fn().mockResolvedValue(audit),
+      findMany: vi
+        .fn()
+        .mockResolvedValue(audit ? [{ platform: 'business_analysis', ...audit }] : []),
     },
   };
 }
@@ -97,6 +101,43 @@ describe('applyEngagementBriefStamp', () => {
       { prisma, campaignId: 'camp_3' },
     );
     expect(out.source_audit_id).toBe('aud_manual_9');
+  });
+});
+
+describe('assertEngagementBriefSourceAudit', () => {
+  it('passes when the campaign already carries a real business_analysis audit', async () => {
+    const campaign = {
+      id: 'camp_1',
+      audits: [{ platform: 'business_analysis', audit_data: { summary: 'x' } }],
+    };
+    await expect(assertEngagementBriefSourceAudit(campaign, prismaWithAudit(null))).resolves.toBeUndefined();
+  });
+
+  it('falls back to the audit table when the campaign object has no audit list', async () => {
+    const prisma = prismaWithAudit({ id: 'aud_1', audit_data: { summary: 'x' } });
+    await expect(
+      assertEngagementBriefSourceAudit({ id: 'camp_2' }, prisma),
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses when no business_analysis audit exists — the audit-first fallback', async () => {
+    const prisma = prismaWithAudit(null);
+    await expect(
+      assertEngagementBriefSourceAudit({ id: 'camp_3', audits: [] }, prisma),
+    ).rejects.toThrow(/Business Audit/i);
+  });
+
+  it('refuses when the only business_analysis rows are stubs', async () => {
+    const stub = {
+      platform: 'business_analysis',
+      audit_data: { audit_metadata: { source: 'queue_promotion' } },
+    };
+    const prisma = {
+      mkt_audits_list: { findMany: vi.fn().mockResolvedValue([stub]) },
+    };
+    await expect(
+      assertEngagementBriefSourceAudit({ id: 'camp_4' }, prisma),
+    ).rejects.toThrow(/Business Audit/i);
   });
 });
 

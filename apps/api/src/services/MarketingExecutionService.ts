@@ -209,6 +209,18 @@ export class MarketingExecutionService extends BaseService {
         );
       }
 
+      // Engagement Brief precondition (Pass 2 — Audit Channel Scan spec):
+      // the brief judges a stored Pass-1 audit, so a business-scope campaign
+      // with no business_analysis audit has nothing to cite. The audit is
+      // render-bound (external agent sweep — an internal chat run cannot
+      // load Instagram/Apple Maps surfaces), so the correct fallback is to
+      // refuse here and send the operator to the audit prompt, NOT to
+      // silently emit an empty spine. Render-preview stays permissive.
+      if ((template.output_schema as any)?.name === ENGAGEMENT_BRIEF_SCHEMA_NAME) {
+        const { assertEngagementBriefSourceAudit } = await import('./engagement-brief/engagement-brief-stamp');
+        await assertEngagementBriefSourceAudit(campaign, this.prisma);
+      }
+
       // Resolve the prompt with profile-aware amplification (§1B, GAP-P7).
       // For non-seek or non-business-scope prompts, this returns the base
       // render byte-identical (no amplification).
@@ -281,7 +293,8 @@ export class MarketingExecutionService extends BaseService {
           outputSchemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME ||
           outputSchemaName === LOCATION_ENRICHMENT_SCHEMA_NAME ||
           outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME ||
-          outputSchemaName === WEBSITE_POSITIONING_SCHEMA_NAME
+          outputSchemaName === WEBSITE_POSITIONING_SCHEMA_NAME ||
+          outputSchemaName === ENGAGEMENT_BRIEF_SCHEMA_NAME
         ) {
           try {
             await this.applyEnrichmentFromOutput({
@@ -376,6 +389,17 @@ export class MarketingExecutionService extends BaseService {
     }
     if (!parsedJson) {
       throw new Error(`Execution output does not match the "${input.schemaName}" output schema`);
+    }
+
+    // Pass 2 stamp — identical contract to the external-import hook: the
+    // brief's source_audit_id / side / brief_version are code-authoritative
+    // over the persisted payload (engagement-brief-stamp.ts).
+    if (input.schemaName === ENGAGEMENT_BRIEF_SCHEMA_NAME) {
+      const { applyEngagementBriefStamp } = await import('./engagement-brief/engagement-brief-stamp');
+      parsedJson = await applyEngagementBriefStamp(parsedJson, {
+        prisma: this.prisma,
+        campaignId: input.campaign.id,
+      });
     }
 
     // Audit row so the result is visible on the campaign Audits tab —

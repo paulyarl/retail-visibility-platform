@@ -27,6 +27,7 @@
  */
 
 import { classifyFootprintSide } from './footprint-side';
+import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
 
 export const ENGAGEMENT_BRIEF_VERSION = 1;
 
@@ -79,6 +80,42 @@ export function buildEngagementBriefVariables(audit: SourceAuditRow | null | und
       2,
     ),
   };
+}
+
+/**
+ * Pass-2 execution precondition — a brief without a source audit has no
+ * evidence to cite. The audit is render-bound (an external agent must load
+ * the surfaces), so the correct fallback is to refuse the internal run and
+ * send the operator to the audit prompt, NOT to silently emit an empty
+ * spine. Throws a plain Error with the actionable message; the caller
+ * (executePrompt) surfaces it before creating an execution row.
+ *
+ * A campaign whose only business_analysis rows are stubs (queue-promotion /
+ * discovery placeholders) still fails — a stub carries signals but no
+ * channel-scan evidence for the brief to rank.
+ */
+export async function assertEngagementBriefSourceAudit(
+  campaign: any,
+  prisma: any,
+): Promise<void> {
+  let hasSourceAudit =
+    (campaign?.audits ?? campaign?.mkt_audits_list ?? []).some(
+      (a: any) => a.platform === 'business_analysis' && !isStubBusinessAnalysisAudit(a),
+    );
+  if (!hasSourceAudit && campaign?.id) {
+    const rows = await prisma.mkt_audits_list.findMany({
+      where: { campaign_id: campaign.id, platform: 'business_analysis' },
+      orderBy: { created_at: 'desc' },
+      take: 10,
+      select: { id: true, platform: true, audit_data: true },
+    });
+    hasSourceAudit = (rows ?? []).some((a: any) => !isStubBusinessAnalysisAudit(a));
+  }
+  if (!hasSourceAudit) {
+    throw new Error(
+      'Engagement Brief requires a completed Business Audit on this campaign — run the Business Audit prompt first (it renders real channels and is imported via Path 2), then re-run the Engagement Brief.',
+    );
+  }
 }
 
 /**
