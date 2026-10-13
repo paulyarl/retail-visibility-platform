@@ -662,6 +662,17 @@ const channelScanEntrySchema = z.object({
   confidence: evidenceConfidenceEnum.nullable().optional(),
 }).passthrough();
 
+// Opportunity Sentiment (spec §F) — reviews as a context source, not an
+// audience metric. `class` is the opportunity taxonomy; `observation` is the
+// operational fact the reviews establish. Evidence, not impression.
+const sentimentContextEntrySchema = z.object({
+  class: z.enum(['logistics', 'demand', 'gaps', 'infrastructure']),
+  observation: z.string(),
+  evidence: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  confidence: evidenceConfidenceEnum.nullable().optional(),
+}).passthrough();
+
 const observedAssetEntrySchema = z.object({
   asset: z.string(),
   evidence: z.string().nullable().optional(),
@@ -757,6 +768,12 @@ export const businessAnalysisSchema = z.object({
   competitive_benchmarks: z.array(competitiveBenchmarkSchema).optional(),
   unanswered_negative_review_examples: z.array(reviewExampleSchema).optional(),
   negative_review_themes: z.array(reviewThemeSchema).optional(),
+  // Opportunity Sentiment (§F) — the positive half of review content (the
+  // negative half had the only theme collection) plus the opportunity-bearing
+  // context that is neither a strength nor a defect. Never public_narrative
+  // material as deficiency language; neither influences the footprint side.
+  positive_review_themes: z.array(reviewThemeSchema).optional(),
+  sentiment_context: z.array(sentimentContextEntrySchema).optional(),
   digital_opportunity_score: digitalOpportunityScoreSchema,
   high_attention: z.boolean(),
   high_attention_reasons: z.array(z.string()).optional(),

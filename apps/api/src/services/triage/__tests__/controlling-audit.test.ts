@@ -20,6 +20,12 @@ vi.mock('../../../prisma', () => ({
     mkt_audits_list: mockAuditsList,
     $transaction: mockTransaction,
   },
+  // Writes go through basePrisma (unwrapped client — the retry proxy's
+  // plain Promises are rejected by the array form of $transaction).
+  basePrisma: {
+    mkt_audits_list: mockAuditsList,
+    $transaction: mockTransaction,
+  },
 }));
 
 import { setControllingAuditForProspect } from '../controlling-audit';

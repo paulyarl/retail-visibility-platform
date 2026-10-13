@@ -226,6 +226,47 @@ This widening is deliberately one clause — if `market_opportunities` later mig
 
 `signal_checklist` cannot be ungated — it is defined as one entry per `category_signals` item, and with no Category block there are literally no signals to evaluate. The honest fix for both fields is the same: **whenever a gated field is suppressed by a missing upstream block, record the suppression in `data_quality.limitations`**, so a downstream consumer can tell "no opportunity" from "opportunity field not evaluated." The bindings already do this at block level (L60/L75/L111); extend it to name the suppressed field explicitly.
 
+### F. Positive sentiment — reviews as a context source, not an audience metric
+
+**The gap.** The audit's review capture is asymmetrically negative. It collects `negative_review_themes` (body L772, schema L759) and `unanswered_negative_review_examples` (schema L758), but the positive side exists only as *counts* — `observable_unanswered_positive_reviews` — with no content collection anywhere. `reviewThemeSchema` is used for negative themes alone.
+
+**Why it matters.** Sentiment is not audience volume — it is **context**. It is frequently the only public surface that establishes how a business actually operates: what it is known for, what customers expect of it, which channel drives its traffic, where its physical constraints are. Excluding review *volume* from the density score (above) does not exclude review *content* from the audit. Those are different inputs, and only the first was the problem.
+
+What the triggering audit's reviews established, against where each fact could land today:
+
+| What sentiment revealed | Structured home today |
+|---|---|
+| Known for fufu flour specifically (assortment identity) | none — no positive-theme collection |
+| Same-day delivery is expected and praised | `observed_assets` only if the analyst promotes it out of prose |
+| Instagram ads drive store traffic | none |
+| Owner-vs-counter service split (a regular withdrew over it) | `negative_review_themes` — the negative half only |
+| Needs a wheelchair ramp at the entrance | none — a physical constraint, not a review theme |
+
+Four of five have no home. That is precisely the failure mode this spec exists to fix: a verified, useful fact demoted to narrative.
+
+**Proposed shape (Pass 1).**
+
+```
+"positive_review_themes": [
+  { "theme": "<string>", "observed_frequency": "<low|medium|high|null>",
+    "supporting_review_count": <number|null>, "summary": "<string|null>" }
+],
+"sentiment_context": [
+  { "observation": "<what the reviews establish about how this business operates>",
+    "source": "<platform>" }
+]
+```
+
+`positive_review_themes` reuses the existing `reviewThemeSchema` verbatim — no new type. `sentiment_context` is deliberately not a theme list: it carries the operational facts sentiment establishes (assortment identity, fulfillment expectations, traffic channel, physical constraints, service dynamics) that are neither a strength nor a defect yet shape how the business should be approached. Each entry cites its platform so it stays evidence rather than impression.
+
+**Directive rules.** Positive sentiment establishing a strength is promoted into `observed_assets` (`observed_on: "reviews"`), not left sitting in the theme list. Sentiment establishing a defect stays in `negative_review_themes` / `gap_analysis`. `sentiment_context` is for the residue that is neither, but still shapes outreach. Absence of positive themes is not evidence of poor sentiment — record "not verified" per the standing absence rule.
+
+**What consumes it.** Pass 2: `sentiment_context` informs `engagement_shape` (what to lead with, what to avoid claiming) and can seed `assets`; `positive_review_themes` is the evidence source for a "customers already value X" beat.
+
+**This does not route the side.** The side remains surface-only (see above). This section reads "reviews play a role" as *context*, not as a routing input — if sentiment should also influence routing, that is a separate decision and the density model would need revisiting.
+
+**Cost.** Body asset + embedded schema + validator + marker bump + reseed (local and prd) — the same rollout shape as A–E.
+
 ---
 
 ## Two-Pass Architecture: Gather, Then Judge
@@ -395,6 +436,12 @@ Stored on the brief beside `source_audit_id`. Persisting `inputs_used` and `clas
 
 **It must read activity, not just channel count.** A 9,320-follower Instagram posting last week and a dormant Facebook page with 12 followers are both "one social channel." A presence count alone would classify them identically. Weigh `last_activity` and `notable_activity`, not only rendered-channel count.
 
+**Audience is not a routing input (decided 2026-10-13).** The side routes on **surface** density — whether the business owns or controls a surface it can be measured on. Review volume, follower counts, and traffic are deliberately excluded from the score: the platform's priorities are surface/presence, so audience volume would only decide the side if those priorities were audience/traffic-aligned.
+
+This matters concretely. The triggering prospect carries ~600 observable reviews and **zero owned surface** — no website, no catalog, no ordering. Scoring audience (+3, the largest non-anchor input) routed it to `competitive` and away from the presence work it actually needs. Under the surface rule it lands `emerging`, which is also what the exemplar framing called for. Worth naming the shape: **high audience, low surface** is one of the platform's best prospect types — demand already exists, presence does not — not a competitive signal.
+
+Nothing is lost by excluding audience from the score: the brief embeds the full source audit, so Pass 2 still sees `combined_review_metrics` and can use it as context without it deciding the route.
+
 **The side is a precondition, not a peer.** It gates which signals are reachable at all. An emerging prospect has nothing to measure, so its focus is presence — build the surface, capture what exists, invite the claim. A competitive prospect has surfaces, so its focus is deficiency and optimization. The secondary's `capability_fits` will therefore look structurally different per side; design for that rather than forcing one shape with different emphasis.
 
 **Default when unclassifiable: `emerging` (recommended — see Open Question 8).** In this category the intelligence measured 0 of 55 businesses with any Yelp presence and most with no owned site, so the thin case is the norm, not the exception. Defaulting the other way applies instruments that cannot read the majority of the market.
@@ -434,7 +481,7 @@ Pass 1 `business_analysis` output + a `PLATFORM CAPABILITIES` block (custom doma
 
 ## Rollout
 
-1. Edit `business-audit-default-body.md` — the asset is the source of truth. This includes the L475 preamble **and** L483 (both bind the product-visibility fields to the website), the L55/L219 `specialized_sources_audited` binding lines (name the `channels_scanned` split), and the embedded schema.
+1. Edit `business-audit-default-body.md` — the asset is the source of truth. This includes the L475 preamble **and** L483 (both bind the product-visibility fields to the website), the L55/L219 `specialized_sources_audited` binding lines (name the `channels_scanned` split), the §F sentiment blocks (`positive_review_themes` + `sentiment_context`), and the embedded schema.
 2. Bump `DEFAULT_AUDIT_MARKER` in `seed-business-audit-v2-templates.ts` (**L1906**) so the body transform re-applies. Bump `SEED_VERSION_MARKER` (**L57**) only if the seeder's binding-section transforms change.
 3. Land the validator and body schema-block changes **first** — the embedded schema is the model's only output contract (`business_analysis` is in `LEGACY_NO_SUFFIX_SCHEMAS`), and "Do not add properties outside the schema" would forbid the new fields outright.
 4. Land the downstream code changes in the same release: the consumer copy pass (item 5 above) — the report/deliverable attribution bug ships the moment `observed_on` can be non-`owned_site` — and the §A2 gate change in `signal-extractor.ts` (exclude the fulfillment signal from `frictionSuppressed`), which is inert until the fields can carry channel-sourced determinations.
@@ -460,6 +507,7 @@ Pass 1 `business_analysis` output + a `PLATFORM CAPABILITIES` block (custom doma
 - `underexposed: false` is reachable — assets that are already surfaced must not be flagged for pitching.
 - A monetizable offer in `offers_observed`/`notable_activity` also appears in `observed_assets`; a non-monetizable observation does not.
 - Gate (§A2): a social-URL or builder-subdomain business whose rendered surfaces state an explicit negative ("pickup only", "no shipping") now fires `WC_MISSING_PICKUP_DELIVERY`; the same business with no rendered fulfillment information emits `null` and still does not fire. The gate changes suppression into evaluation — it never manufactures a signal.
+- Sentiment (§F): positive themes are collected and reuse `reviewThemeSchema`; a positive theme establishing a strength also appears in `observed_assets`; every `sentiment_context` entry cites a platform; an absent positive theme records "not verified" and never reads as poor sentiment; neither `positive_review_themes` nor `sentiment_context` influences the side.
 - Side (§"The side"): the side is stamped in code and carries `inputs_used` + `classifier_version`; an unclassifiable footprint resolves to `emerging`; a single social channel with recent activity does not classify identically to a dormant one; the side never renders publicly.
 - Public-safety: no tier, package, score, or pitch language reaches `public_narrative` via the new fields; `underexposed`, `underexposure_note`, and `confidence` never render publicly. And no owner-facing copy attributes a non-`owned_site` fact to "your site" — the `observed_on` companion is respected in `ProspectReportService`, deliverable copy, and opener prompts.
 

@@ -19,7 +19,7 @@ const {
   mockRefreshFidelity,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
-  mockAuditsList: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  mockAuditsList: { findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
   mockTriageResults: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
   mockPlaybookCatalog: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
   mockSeeds: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -125,6 +125,8 @@ function wireAll() {
   ]);
   mockAuditsList.findMany.mockResolvedValue([REAL_AUDIT]);
   mockAuditsList.findUnique.mockResolvedValue(null);
+  // No controlling-audit pin in these fixtures → latest-wins resolution.
+  mockAuditsList.findFirst.mockResolvedValue(null);
   mockSeeds.findUnique.mockResolvedValue(null);
   mockTenants.findUnique.mockResolvedValue(null);
   rawDispatch([

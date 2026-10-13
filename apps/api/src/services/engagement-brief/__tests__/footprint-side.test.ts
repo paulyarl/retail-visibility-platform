@@ -8,6 +8,8 @@
  *   - a single social channel with recent activity does NOT classify
  *     identically to a dormant one (activity, not channel count)
  *   - deterministic: same input → same output
+ *   - audience (review volume) does NOT affect the side — surface routes
+ *     (decided 2026-10-13: the platform's priorities are surface/presence)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -133,7 +135,9 @@ describe('classifyFootprintSide', () => {
           { channel: 'whatsapp', rendered: false, access_barrier: 'login_wall' },
         ],
         platforms: {
-          google: { profile_status: 'unclaimed', rating: 4.6, total_reviews: 41 },
+          // total_reviews deliberately absent — audience volume is not a
+          // routing input (only profile_status + rating are read).
+          google: { profile_status: 'unclaimed', rating: 4.6 },
         },
       }),
       NOW,
@@ -172,7 +176,36 @@ describe('classifyFootprintSide', () => {
     );
     expect(r.side).toBe('competitive');
     expect(r.density_score).toBeGreaterThanOrEqual(COMPETITIVE_DENSITY_THRESHOLD);
-    expect(r.inputs_used).toContain('combined_review_metrics.observable_total_reviews=307');
+    // 307 reviews is in the fixture but never scored — audience is not a
+    // routing input (decided 2026-10-13).
+    expect(r.inputs_used).not.toContain(
+      'combined_review_metrics.observable_total_reviews=307',
+    );
+  });
+
+  it('review volume does not move the side — surface routes', () => {
+    const surface = {
+      channels_scanned: [
+        { channel: 'instagram', rendered: true, last_activity: RECENT },
+        { channel: 'facebook', rendered: true, last_activity: RECENT },
+      ],
+    };
+    const quiet = classifyFootprintSide(audit({ ...surface }), NOW);
+    const loud = classifyFootprintSide(
+      audit({
+        ...surface,
+        combined_review_metrics: {
+          observable_total_reviews: 612,
+          observable_unanswered_reviews: 0,
+          observable_unanswered_rate_percent: 0,
+          observable_unanswered_negative_reviews: 0,
+        },
+      }),
+      NOW,
+    );
+    expect(loud.density_score).toBe(quiet.density_score);
+    expect(loud.side).toBe(quiet.side);
+    expect(loud.inputs_used).toEqual(quiet.inputs_used);
   });
 
   it('not_attempted channels contribute nothing', () => {

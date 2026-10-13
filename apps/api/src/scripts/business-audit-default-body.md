@@ -808,6 +808,34 @@ Do not assign a frequency based on a single review unless only one negative revi
 
 ---
 
+## Opportunity Sentiment — REQUIRED
+
+Reviews are a context source, not an audience metric. Beyond the negative themes above, mine the review corpus for **opportunity-bearing sentiment** — the observations that reveal how the business actually operates and where its unmet potential sits. This is the highest-value signal in the review data; review volume alone is not.
+
+Do NOT attempt to enumerate or summarize every review. Extract the opportunity-bearing signal and move on.
+
+Classify each observation under exactly one of four classes:
+
+* `logistics` — fulfillment and flow: delivery, pickup, hours, wait times, order handling, restocking cadence.
+* `demand` — what customers ask for, want, or arrive expecting: requested items not stocked, "do you have…", repeat-purchase intent, unmet demand.
+* `gaps` — unmet expectations and missing capability: out-of-stock staples, expired or poor-condition goods, absent services, no receipt, unfulfilled orders.
+* `infrastructure` — the physical and operating environment: parking, accessibility, entrance, space, shelving, refrigeration, store condition, signage.
+
+Record each in `sentiment_context`:
+
+{ "class": "logistics|demand|gaps|infrastructure", "observation": "<the opportunity-bearing fact the reviews establish>", "evidence": "<the review signal supporting it>", "source": "<platform>", "confidence": "verified_on_surface|inferred" }
+
+Rules:
+
+* Promotion — a positive theme that establishes a strength is ALSO promoted into `observed_assets` with `observed_on: "reviews"`. The theme list is the raw record; `observed_assets` is the roll-up. A defect stays in `negative_review_themes` / `gap_analysis`. `sentiment_context` carries the residue that is neither a strength nor a defect, but still shapes how the business should be approached.
+* Praise is evidence — record `positive_review_themes` as well as negative ones, using the same four fields (theme name, observed frequency, supporting review count when verifiable, concise summary). Assortment identity, fulfillment expectations, and service strengths surface in praise.
+* Cite a platform on every `sentiment_context` entry — this is evidence, not impression.
+* Do NOT estimate `supporting_review_count`. Leave it null unless an authorized source states the number.
+* Absence of positive themes is NOT evidence of poor sentiment — record "not verified" per the standing absence rule.
+* `sentiment_context` and `positive_review_themes` never render in `public_narrative` as deficiency language.
+
+---
+
 ## Digital Opportunity Score
 
 Calculate a score from 0 to 10 using only verified evidence.
@@ -1255,6 +1283,23 @@ Omit a conditional field entirely when its governing directive says to omit it (
       "summary": null
     }
   ],
+  "positive_review_themes": [
+    {
+      "theme": "",
+      "observed_frequency": null,
+      "supporting_review_count": null,
+      "summary": null
+    }
+  ],
+  "sentiment_context": [
+    {
+      "class": "logistics",
+      "observation": "",
+      "evidence": "",
+      "source": "",
+      "confidence": null
+    }
+  ],
   "digital_opportunity_score": {
     "score": 0,
     "classification": "low",
@@ -1366,4 +1411,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-13-channel-scan-1 -->
+<!-- seed-version: business-audit-default-2026-10-13-opportunity-sentiment-1 -->

@@ -247,3 +247,102 @@ describe('Channel Scan — observed_assets entries', () => {
     expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
   });
 });
+
+// ─── Opportunity Sentiment (§F) ──────────────────────────────────────────
+
+describe('Opportunity Sentiment — positive_review_themes + sentiment_context', () => {
+  const incidentSentiment = () => [
+    {
+      class: 'logistics',
+      observation:
+        'Customers expect and praise same-day delivery, and the store already runs free delivery over $200',
+      evidence: '"Very fast and same day delivery of my order" (5 stars)',
+      source: 'yelp',
+      confidence: 'verified_on_surface',
+    },
+    {
+      class: 'demand',
+      observation:
+        'Shoppers arrive looking for specific staples and sometimes leave empty-handed',
+      evidence: '"Good store but did not find what i want" (4 stars, 2025-09-30)',
+      source: 'google',
+      confidence: 'verified_on_surface',
+    },
+    {
+      class: 'gaps',
+      observation:
+        'Stock rotation is a recurring complaint — expired and poor-condition goods on the shelf',
+      evidence: 'Moldy bread and expired items reported (1 star, 2023-10-27)',
+      source: 'google',
+      confidence: 'verified_on_surface',
+    },
+    {
+      class: 'infrastructure',
+      observation: 'No wheelchair ramp at the entrance; customers ask for one',
+      evidence: '"Needs a wheelchair ramp in front of the store" (5 stars, 2023-08-17)',
+      source: 'google',
+      confidence: 'verified_on_surface',
+    },
+  ];
+
+  it('accepts the incident-shaped sentiment context across all four classes', () => {
+    const audit = baseAudit();
+    audit.sentiment_context = incidentSentiment();
+    audit.positive_review_themes = [
+      {
+        theme: 'Assortment depth — fufu flour and West African staples',
+        observed_frequency: 'high',
+        supporting_review_count: null,
+        summary:
+          'Reviewers repeatedly name the fufu flour selection as the reason to shop here',
+      },
+    ];
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sentiment_context).toHaveLength(4);
+      expect(result.data.sentiment_context?.map((e: any) => e.class)).toEqual([
+        'logistics',
+        'demand',
+        'gaps',
+        'infrastructure',
+      ]);
+      expect(result.data.positive_review_themes).toHaveLength(1);
+    }
+  });
+
+  it('rejects an unknown sentiment class (enum enforced)', () => {
+    const audit = baseAudit();
+    audit.sentiment_context = [
+      { class: 'vibes', observation: 'x', source: 'google' },
+    ];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+
+  it('rejects a sentiment entry with no observation', () => {
+    const audit = baseAudit();
+    audit.sentiment_context = [{ class: 'demand', source: 'google' }];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+
+  it('accepts empty sentiment arrays (absence is a real answer, not a failure)', () => {
+    const audit = baseAudit();
+    audit.sentiment_context = [];
+    audit.positive_review_themes = [];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+
+  it('rejects a positive theme with no theme label (shared reviewThemeSchema)', () => {
+    const audit = baseAudit();
+    audit.positive_review_themes = [{ observed_frequency: 'high' }];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+
+  it('accepts entries with extra keys (passthrough)', () => {
+    const audit = baseAudit();
+    audit.sentiment_context = [
+      { class: 'infrastructure', observation: 'x', source: 'google', extra: 'y' },
+    ];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+});

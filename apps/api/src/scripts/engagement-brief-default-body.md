@@ -64,7 +64,7 @@ Ranked worst-first. Each entry:
 
 ### `assets` — what already works, ranked by pitch leverage
 
-Promoted from `observed_assets` (and any other audit evidence of strength). Each entry:
+Promoted from `observed_assets` (and any other audit evidence of strength). The source audit's `sentiment_context` is context, not an asset list — read its `logistics` / `demand` / `gaps` / `infrastructure` observations to decide *how to lead* (a `demand` observation shapes the pitch; an `infrastructure` one shapes the gates), and promote only the entries that are genuinely strengths into `assets`. Each entry:
 * `asset`: short label.
 * `underexposure`: carries the audit's `underexposed` check — verified on some surface, absent from every surface the business controls.
 * `how_to_use`: one line — *lead with it* (the opener beat), *leverage it* (proof in the pitch), or *leave alone* (verified but not pitch material).

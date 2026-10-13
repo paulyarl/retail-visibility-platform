@@ -36,7 +36,7 @@ import type { BusinessAnalysisAuditData } from '../outreach-openers/archetype-se
 
 // Bump when the scoring weights or threshold change — persisted on every
 // stamped brief so the boundary is auditable and reclassification is visible.
-export const FOOTPRINT_SIDE_CLASSIFIER_VERSION = 1;
+export const FOOTPRINT_SIDE_CLASSIFIER_VERSION = 2;
 
 // The density boundary. Persisted density_score makes this tunable off real
 // sweeps rather than guessed (spec OQ8).
@@ -66,7 +66,18 @@ export interface FootprintSideResult {
 //   rendered channel, notable_activity        +1   (cap +2)
 //   claimed/likely_claimed primary platform   +1   (cap +2)
 //   primary platform with a rating            +1   (cap +2)
-//   observable_total_reviews                  +1 / +2 / +3  (>=1 / >=25 / >=100)
+//
+// AUDIENCE IS NOT A ROUTING INPUT (decided 2026-10-13). Review volume,
+// follower counts and traffic are deliberately excluded: the platform's
+// priorities are surface/presence, so the side routes on whether the
+// business owns or controls a surface it can be measured on — not on how
+// much attention it already attracts. A business with ~600 reviews and no
+// owned site needs presence built, not optimization; scoring audience
+// would route it away from the work it needs. "High audience, low
+// surface" is one of the platform's best prospect shapes, not a
+// competitive signal. Audience data stays available to Pass 2 through the
+// source audit the brief already embeds, so nothing is lost by excluding
+// it here.
 const POINTS_OWNED_SITE = 4;
 const POINTS_RENDERED_CHANNEL = 2;
 const CAP_RENDERED_CHANNELS = 6;
@@ -87,8 +98,8 @@ const PRIMARY_PLATFORMS = ['google', 'yelp', 'facebook', 'bbb'] as const;
  *
  * `asOf` is injectable for deterministic tests; defaults to now.
  *
- * Unclassifiable input (no channels, no website, no platform data, no
- * reviews) resolves to `emerging` with density_score 0 — the spec's
+ * Unclassifiable input (no channels, no website, no platform data)
+ * resolves to `emerging` with density_score 0 — the spec's
  * recommended default: in this market the thin case is the norm, and
  * instruments that presume surfaces cannot read it.
  */
@@ -189,13 +200,6 @@ export function classifyFootprintSide(
   score += Math.min(claimed.length * POINTS_CLAIMED_PLATFORM, CAP_CLAIMED_PLATFORMS);
   score += Math.min(rated.length * POINTS_RATED_PLATFORM, CAP_RATED_PLATFORMS);
   inputs.push(...claimed, ...rated);
-
-  // ── 6. Review volume (+1 / +2 / +3) ───────────────────────────────────
-  const reviews = data.combined_review_metrics?.observable_total_reviews;
-  if (typeof reviews === 'number' && reviews >= 1) {
-    score += reviews >= 100 ? 3 : reviews >= 25 ? 2 : 1;
-    inputs.push(`combined_review_metrics.observable_total_reviews=${reviews}`);
-  }
 
   return {
     side: score >= COMPETITIVE_DENSITY_THRESHOLD ? 'competitive' : 'emerging',
