@@ -140,8 +140,12 @@ export class MarketingAuditService extends BaseService {
 
   async deleteAudit(id: string, ctx?: RequestCtx): Promise<void> {
     try {
-      await this.prisma.mkt_audits_list.delete({ where: { id } });
-      logger.info('Audit deleted', ctx, { auditId: id });
+      // deleteMany, not delete — purge is idempotent. A stale sibling view can
+      // show an audit that was already deleted (or cascade-deleted with its
+      // owning campaign); delete() would throw P2025, deleteMany treats
+      // count: 0 as a quiet no-op.
+      const { count } = await this.prisma.mkt_audits_list.deleteMany({ where: { id } });
+      logger.info('Audit deleted', ctx, { auditId: id, deleted: count > 0 });
     } catch (error) {
       logger.error('Failed to delete audit', ctx, { error: (error as Error).message, auditId: id });
       throw this.handleError(error, ctx);

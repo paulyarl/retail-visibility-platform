@@ -456,10 +456,12 @@ export default function CampaignDetailClient({
     setPurgingAudit(audit.id);
     try {
       await marketingOpsService.deleteAudit(audit.id);
-      await fetchCampaign();
     } catch (err: any) {
       setError(err.message || 'Failed to purge audit');
     } finally {
+      // Refetch on success AND failure — a failed purge can mean the row was
+      // already gone (stale card), and the refetch clears the phantom.
+      await fetchCampaign();
       setPurgingAudit(null);
     }
   };

@@ -1694,7 +1694,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                   return (
                     <li
                       key={e.id}
-                      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                      className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg px-2 py-1.5 text-xs ${
                         promoted
                           ? 'bg-green-50/60 dark:bg-green-900/10'
                           : isHold
@@ -1702,7 +1702,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                             : 'hover:bg-gray-50 dark:hover:bg-neutral-700/30'
                       }`}
                     >
-                      <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+                      <label className="flex items-center gap-2 w-full min-w-0 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -1741,7 +1741,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                           </span>
                         )}
                       </label>
-                      <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5">
+                      <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5 ml-auto">
                         {dismissId === e.id ? (
                           <>
                             <select
