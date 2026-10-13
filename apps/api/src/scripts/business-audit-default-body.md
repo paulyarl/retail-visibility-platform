@@ -52,7 +52,7 @@ A CATEGORY INTELLIGENCE block is appended at the end of this prompt, after the a
 You MUST apply the Category Intelligence block throughout this audit. Specifically:
 
 Terminology — Use the category-specific terms listed in the block as corroboration signals when evaluating whether the business genuinely fits the requested category. A single term is never sufficient; require multiple category-specific indicators.
-Specialized Sources — Consult the Specialized Sources listed in the block in addition to the mainstream platforms listed in the Platforms section below. Record every consulted source in specialized_sources_audited and sources.
+Specialized Sources — Consult the Specialized Sources listed in the block in addition to the mainstream platforms listed in the Platforms section below. Channel surfaces consulted from the list are recorded per-surface in channels_scanned (the Channel & Offer Scan block below); non-channel sources (community lists, business records, case studies without a per-business public page) go in specialized_sources_audited; every consulted URL is also logged in sources.
 Evidence Rules — Obey every rule in the block's Category Evidence Rules section. These rules are binding and override any conflicting default behavior.
 Prohibited Inferences — Do NOT make any inference listed in the block's PROHIBITED INFERENCES section. These are category-specific guardrails that complement (and are stricter than) the general cautions in this template.
 Category Signals — Populate detected_signals with any INT_* codes from the block's Category Signals list when verified public evidence supports them. These are admissible alongside the RA_*, DS_*, WC_*, CP_*, and VP_* signal families defined later in this template. These INT_* taxonomy codes are distinct from the free-text category_signals list in the CATEGORY MARKET CONTEXT block — the former are codes you may emit, the latter is a qualitative checklist for your assessment.
@@ -109,13 +109,11 @@ Application rules:
 Do NOT mention "market context", "enrichment", "profile", "market intelligence", or these binding instructions in the visible audit output. Use the intelligence to inform your findings, gap analysis, and recommendations — not to narrate the intelligence itself. The business owner and interested parties see the audit results, not the intelligence inputs.
 
 If both Market Context blocks are missing or empty, proceed with the general audit instructions and note the absence in data_quality.limitations. The audit is still valid without market context — it runs in degraded mode without market-aware intelligence.
-### Market Intelligence Output Fields — REQUIRED when Market Context is present
+### Market Intelligence Output Fields
 
-When a Market Context block was provided above, populate these two top-level output fields in addition to gap_analysis and quality_gate_results:
+market_opportunities — an array of business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps (when a Market Context block was provided), website.conversion_opportunities, and observed_assets entries where underexposed is true. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Emit whenever the audit's own findings ground an opportunity — Market Context enriches the field but its absence does not suppress it. If nothing in the audit grounds an opportunity, omit the field entirely (do not emit an empty array) and record the suppression in data_quality.limitations.
 
-market_opportunities — an array of business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps, and website.conversion_opportunities. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Omit the field entirely (do not emit an empty array) when no market context was provided.
-
-signal_checklist — an array with one entry per category_signals item from the Category Market Context block, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was provided.
+signal_checklist — an array with one entry per category_signals item from the Category Market Context block, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was provided, and name signal_checklist in data_quality.limitations as suppressed.
 ### Operator Outreach Problems & Solutions — REQUIRED
 
 Produce `outreach_problems` — an array of ONE to THREE (1–3) problem-and-solution pairs the operator can use directly in outreach to the prospect (the business owner). Return only the most painful problems, ranked by severity: when the audit surfaces a single real issue, return just that one — never pad the count. Each entry ships two spoken lines — a plain professional statement and a hook alternative — followed by the solution. Shape:
@@ -216,7 +214,7 @@ Audit publicly available information from:
 When platform information is unavailable or cannot be verified, return null.
 
 Do not estimate review-response counts unless an authorized source explicitly provides an estimate.
-Additionally, consult the Specialized Sources listed in the Category Intelligence block. These may include delivery marketplaces, social platforms (Instagram, TikTok, WhatsApp), vertical directories, importer/wholesaler locators, community organizations, cultural event vendor lists, and business registration records. Record every source consulted in `specialized_sources_audited`.
+Additionally, consult the Specialized Sources listed in the Category Intelligence block. These may include delivery marketplaces, social platforms (Instagram, TikTok, WhatsApp), vertical directories, importer/wholesaler locators, community organizations, cultural event vendor lists, and business registration records. Channel surfaces you actually visit are recorded per-surface in `channels_scanned` (see the Channel & Offer Scan block) — including a `not_attempted` entry for each directed channel you skip. Non-channel sources consulted (community lists, business records, case studies without a per-business public page) go in `specialized_sources_audited`; every consulted URL is also logged in `sources`.
 
 Per the Category Intelligence evidence rules, do not treat absence from a platform as evidence that the business is inactive, nonexistent, or unqualified.
 ### Platform Availability Verification — REQUIRED
@@ -386,11 +384,11 @@ Beyond the sourced inventory above, recommend attribute chips the owner could en
 { "key": "<snake_case_key>", "label": "<display label>", "platform": "<platform or null>", "basis": "gold_standard_expected|category_intelligence|audit_evidence", "rationale": "<string|null>", "current_state": "not_observed|unverifiable|verify_with_owner" }
 
 Rules:
-* Basis — recommendations may draw on the Gold Standard block's per-platform expected attributes, the Category Intelligence block's required/recommended attribute lists, and verified audit evidence (e.g. a delivery page observed on the business website). Unlike sourced attributes, inference from category and benchmark context is the purpose of this field.
+* Basis — recommendations may draw on the Gold Standard block's per-platform expected attributes, the Category Intelligence block's required/recommended attribute lists, and verified audit evidence (e.g. a delivery offer observed on the business's Instagram, Apple Maps card, or site). Unlike sourced attributes, inference from category and benchmark context is the purpose of this field.
 * current_state — "not_observed" when the profile rendered and the chip was absent; "unverifiable" when the profile could not be fully rendered (JavaScript-gated, login-walled); "verify_with_owner" when the attribute depends on a fact only the owner can confirm (identity designations, certification status, payment-program enrollment).
 * Never recommend an attribute already recorded in `platforms.{platform}.attributes` — recommendations fill gaps; they do not restate observed chips.
 * Owner-designated identity attributes (e.g. Black-owned, women-led, veteran-owned) are framed as slots the owner MAY enable if applicable — never assert the identity as fact.
-* Evidence-gated attributes (e.g. SNAP/EBT, delivery) recommend verification — "verify authorization and enable the chip" — never assume the underlying fact.
+* Evidence-gated attributes (e.g. SNAP/EBT) recommend verification — "verify authorization and enable the chip" — never assume the underlying fact. An attribute already verified on a rendered surface under the Channel & Offer Scan standard (e.g. a delivery offer observed on the business's Instagram) may be recommended as "enable the chip" without the verification caveat.
 * Omit the field entirely when no recommendation is warranted — do not fabricate suggestions.
 * Recommended attributes are advisory only — they are not evidence the attribute is enabled, and they never appear in `platforms.{platform}.attributes`.
 
@@ -472,16 +470,78 @@ If the URL redirects to a bot-defense, notification-permission, login, or other 
 
 ### Product Visibility & Ordering — REQUIRED
 
-For a business that sells physical inventory, evaluate whether customers can see what is on the shelves before they visit — the audit's core product-visibility gap. Record on `website` (each true/false/null — null when there is no website or the page content cannot be verified):
+For a business that sells physical inventory, evaluate whether customers can see what is on the shelves before they visit — the audit's core product-visibility gap. The fields stay on `website` for schema stability, but the evidence scope is ANY verified public surface — the owned site, a social profile or post, a delivery or ordering marketplace, or a directory attribute chip. Each field is true/false/"unable_to_verify", and each carries a `{field}_observed_on` companion naming the channel the determination came from (a channel value from the Channel & Offer Scan vocabulary below, or null):
 
-* `has_product_browsing` — can customers browse products or categories on the website?
-* `has_availability_inquiry` — is there a way to check whether a specific product is in stock (WhatsApp, SMS, click-to-call to check stock, web form)?
-* `has_pickup_ordering` — can customers order online for pickup?
-* `has_delivery_option` — does the business offer delivery surfaced online (own site or marketplace)?
-* `product_categories_visible` — the product categories actually visible on the website or GBP (array of observed category names — never inferred).
+* `has_product_browsing` — can customers browse products or categories on any verified public surface?
+* `has_availability_inquiry` — is there a way to check whether a specific product is in stock (WhatsApp, SMS, Instagram DM, click-to-call to check stock, web form)?
+* `has_pickup_ordering` — can customers order online for pickup (own site, ordering page, marketplace storefront, or a stated offer on a rendered profile)?
+* `has_delivery_option` — does the business offer delivery surfaced on any verified public surface (own site, marketplace storefront, directory chip, or a stated offer such as a delivery-promo post)?
+* `product_categories_visible` — the product categories actually visible on the website, GBP, or another rendered public surface (array of observed category names — never inferred).
 
-Record true/false only when the website content was verified per the Website Accessibility Verification standard — a directory snippet or cached page is not proof. When `business_type` is `service`, these fields are null.
+Record each field as **true** when the offer is observed on any verified public surface and name the surface in `{field}_observed_on`. A directory snippet alone is not proof of website *content*; it is proof of a *stated offer*.
 
+Record **false** only on an explicit negative statement on a rendered surface (e.g. "in-store pickup only," "no shipping"). When no rendered surface addresses the question, emit `unable_to_verify` — absence of an observed offer is never a verified absence.
+
+The website-quality fields (`mobile_friendly`, `https`, `contact_information_visible`, `click_to_call_available`, `call_to_action_present`, `service_information_present`, `location_information_present`, `category_specific_content_present`) remain **website-scoped** and require verified site content per the Website Accessibility Verification standard.
+
+When `business_type` is `service`, the product-visibility fields are null.
+
+
+---
+
+## Channel & Offer Scan — REQUIRED
+
+For every public surface the business has beyond — or instead of — an owned website (social profiles, marketplace storefronts and order pages, directory and locator listings, registry records), record one entry per channel in the top-level `channels_scanned` array:
+
+{ "channel": "instagram|facebook|tiktok|whatsapp|google|yelp|apple_maps|bbb|owned_site|marketplace|order_ahead_platform|directory|locator|registry|third_party|other",
+  "url": "<string|null>",
+  "rendered": true|false,
+  "access_barrier": "none|js_required|bot_defense|captcha|login_wall|rate_limit|timeout|not_attempted",
+  "offers_observed": ["<offer, promotion, or stated capability the surface itself states — a shipping- or delivery-promo post IS a stated offer>", ...],
+  "notable_activity": ["<observed activity fact — posting cadence, review counts, engagement, community presence>", ...],
+  "fulfillment_modes": ["delivery|pickup|curbside|shipping|in_store", ...],
+  "payment_modes": ["card|contactless|apple_pay|cash|online_payment", ...],
+  "availability_channel": "whatsapp|dm|phone|web_form|none",
+  "last_activity": "<ISO date|null>",
+  "confidence": "verified_on_surface|inferred|verify_with_owner" }
+
+Rules:
+
+* One entry per channel actually attempted, whether or not it rendered — a login-walled channel is a recorded channel — PLUS one `access_barrier: "not_attempted"` entry for each channel the audit was directed to consult (Category Intelligence specialized sources, discovery leads) but skipped. The sweep boundary is explicit data, not an omission.
+* `rendered` and `access_barrier` for the four primary platforms (google, yelp, facebook, bbb) duplicate `platforms.{platform}`/`render_controls` and MUST agree when both are emitted. The ledgers answer different questions: `render_controls` records whose fault a non-render is; `channels_scanned` records what the surface contains. For non-primary channels, `channels_scanned` is the only ledger.
+* Channel vocabulary: `marketplace` is an intermediary where the merchant has a storefront or order page (DoorDash, Uber Eats, Grubhub); `order_ahead_platform` is the business's own ordering surface hosted by a provider (Square Online, Toast, Clover); `directory` is an attribute-bearing listing beyond the primary four (MapQuest, Yellow Pages); `locator` is a registry or authorization locator (USDA FNS retailer locator, importer/wholesaler directories); `registry` is an official record (SOS filing, permit); `other` for the rest.
+* `offers_observed` records only what the surface itself states — including promotions stated in posts. `notable_activity` records observed activity facts (posts, review counts, engagement, following). Never infer either from the business's category or name. A channel that did not render contributes neither — but its attempt is still recorded.
+* Every monetizable offer or asset fact recorded here MUST also land in `observed_assets` — `channels_scanned` is the per-surface raw record; `observed_assets` is the deduplicated cross-surface roll-up. Facts that are only observations stay here and are not promoted.
+* SNAP/EBT is NEVER recorded in `payment_modes` — it keeps its dedicated `snap_ebt_*` contract (the same carve-out as platform attributes). Its underexposure may still appear as an `observed_assets` entry.
+* `availability_channel` is single-valued — the primary way a customer checks stock; `none` means no observed channel. A business answering stock questions in Instagram DMs records `availability_channel: "dm"`.
+* Channel-level `confidence` states how the entry's facts stand; per-fact nuance lives on `observed_assets[].confidence`.
+* Emit `channels_scanned: []` when no channel was attempted — the block is REQUIRED, so an empty array is a real answer (the conditional-field omit rule in Output Rules does not apply to it).
+
+---
+
+## Observed Assets — REQUIRED
+
+The opportunities collector — what the business already does well, with provenance. Record top-level `observed_assets` entries:
+
+{ "asset": "<short label>",
+  "evidence": "<the observed fact>",
+  "source_url": "<string|null>",
+  "observed_on": "<channel>",
+  "also_seen_on": ["<channel>", ...],
+  "confidence": "verified_on_surface|inferred|verify_with_owner",
+  "underexposed": true|false,
+  "underexposure_note": "<string|null>" }
+
+`observed_on` names the primary surface; `also_seen_on` records corroborating surfaces — multi-surface agreement is what makes `verified_on_surface` defensible.
+
+Scope — assets, not gaps. Candidates include: fulfillment offers and their terms, payment modes, SNAP/EBT authorization, supply-chain relationships (direct import, wholesale partners), certifications (halal, kosher), community or social following, photo inventory, tenure, languages served, and counter services (butchery, remittance, money transfer).
+
+Rules:
+
+* `underexposed` is an OBSERVABLE check, not a judgment: the asset was verified on at least one surface AND is absent from every surface the business controls (owned site, claimed/active profiles). Whether it is worth pitching is a downstream decision — the flag only records that the business's own surfaces do not carry it; `underexposure_note` names which surfaces were checked. `underexposed: false` is a legitimate result — the asset is already doing its job.
+* Facts with dedicated contracts keep those fields as fact-of-record: `snap_ebt_reported` remains the SNAP home — an `observed_assets` entry for SNAP records the underexposure finding and cites the dedicated field; it does not restate the authorization. Platform attribute chips stay in `platforms.{platform}.attributes`; a monetizable chip is ALSO rolled into `observed_assets` — the duplication is intentional (different consumers), not drift. `operational_status.last_activity_*` remains the canonical business-activity field; `channels_scanned[].last_activity` is per-channel evidence feeding it, not a second source of truth.
+* Emit `observed_assets: []` when nothing qualifies — the block is REQUIRED, so an empty array is a real answer (the conditional-field omit rule does not apply).
+* Asset facts (`asset`, `evidence`) are public-safe material — `public_narrative` may draw on them. `underexposed`, `underexposure_note`, and `confidence` are internal-only and must never appear in `public_narrative` or any owner-facing output.
 
 ---
 
@@ -894,6 +954,7 @@ Include:
 * What it is known for (signature products, services, dishes, or community role — name the specific items verified in the audit, not generic categories; e.g. "frozen cassava leaves, dried beans, frozen fish" beats "spices and grains")
 * Community, cultural, or ownership context when verifiable (e.g. "Central African-owned," "Congolese-style prepared foods")
 * Services offered (catering, in-store pickup, online ordering, tax service) when verified
+* Verified strengths from `observed_assets` (fulfillment offers, certifications, supply chain, community following) — the `asset`/`evidence` facts only
 
 SEO guidance:
 * Surface category-defining terms (the niche/category label), culturally specific terms (regional cuisine, product names), and geo-modified terms (neighborhood + city + corridor) that a searcher would actually type.
@@ -907,6 +968,7 @@ Exclude (these are internal assessment content — never public):
 * Competitive benchmark comparisons
 * Any language that could embarrass the business owner or signal weakness
 * Health inspection outcomes, license status, closure/suspension reports
+* `observed_assets` internal fields — `underexposed`, `underexposure_note`, `confidence` — and any pitch or verification-gate language
 
 Tone: warm and professional — a knowledgeable local describing the business to a neighbor. Welcoming and plain-spoken, never casual or promotional: third person only, no exclamation marks, no superlatives, no hype. The business did not write this text and has not claimed the listing — write about the business, not as or for it.
 
@@ -936,6 +998,8 @@ Preserve the specified enum values exactly.
 Every element of a JSON array MUST be a bare JSON object or bare value separated by a comma — never prefix an array element with a label, key, or identifier ("source_2: { ... }" is invalid).
 
 Omit a conditional field entirely when its governing directive says to omit it (outreach_problems, market_opportunities, signal_checklist, render_controls, gap_analysis, quality_gate_results, recommended_attributes, platforms.{platform}.attributes) — never emit an empty array for a conditional field.
+
+`channels_scanned` and `observed_assets` are NOT conditional — always emit them; an empty array is a valid answer.
 
 ---
 
@@ -1062,6 +1126,33 @@ Omit a conditional field entirely when its governing directive says to omit it (
       "accessed_date": ""
     }
   ],
+  "channels_scanned": [
+    {
+      "channel": "",
+      "url": null,
+      "rendered": null,
+      "access_barrier": "none",
+      "offers_observed": [],
+      "notable_activity": [],
+      "fulfillment_modes": [],
+      "payment_modes": [],
+      "availability_channel": "none",
+      "last_activity": null,
+      "confidence": "verified_on_surface"
+    }
+  ],
+  "observed_assets": [
+    {
+      "asset": "",
+      "evidence": "",
+      "source_url": null,
+      "observed_on": "",
+      "also_seen_on": [],
+      "confidence": "verified_on_surface",
+      "underexposed": false,
+      "underexposure_note": null
+    }
+  ],
   "combined_review_metrics": {
     "observable_total_reviews": null,
     "observable_reviews_with_response": null,
@@ -1098,9 +1189,13 @@ Omit a conditional field entirely when its governing directive says to omit it (
     "category_specific_content_present": "unable_to_verify",
     "ordering_or_pickup_info_present": "unable_to_verify",
     "has_product_browsing": "unable_to_verify",
+    "has_product_browsing_observed_on": null,
     "has_availability_inquiry": "unable_to_verify",
+    "has_availability_inquiry_observed_on": null,
     "has_pickup_ordering": "unable_to_verify",
+    "has_pickup_ordering_observed_on": null,
     "has_delivery_option": "unable_to_verify",
+    "has_delivery_option_observed_on": null,
     "product_categories_visible": [],
     "issues": [],
     "conversion_opportunities": []
@@ -1271,4 +1366,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-10-presence-signals-4 -->
+<!-- seed-version: business-audit-default-2026-10-13-channel-scan-1 -->

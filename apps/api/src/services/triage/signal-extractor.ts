@@ -522,6 +522,13 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       // signal (WC_THIRD_PARTY_DOMAIN / WC_BUILDER_SUBDOMAIN). WC_BROKEN_WEBSITE
       // and WC_URL_MISMATCH still evaluate above — a third-party URL can itself
       // be dead.
+      //
+      // §A2 (AUDIT_CHANNEL_SCAN spec): WC_MISSING_PICKUP_DELIVERY is exempt —
+      // it is evaluated after the suppression block below. Under the rescoped
+      // product-visibility evidence rule, `false` is only reachable via an
+      // explicit negative statement on a rendered surface (owned site, social
+      // page, marketplace, directory chip), so the fields themselves carry the
+      // verification the suppression was proxying for.
       if (!frictionSuppressed) {
       // WC_MISSING_CTA — no call-to-action / click-to-call / booking
       if (!signals.has('WC_MISSING_CTA')) {
@@ -563,13 +570,19 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
         }
       }
 
-      // WC_MISSING_PICKUP_DELIVERY — no pickup or delivery option surfaced online
+      } // end !frictionSuppressed (conversion-friction signals)
+
+      // WC_MISSING_PICKUP_DELIVERY — no pickup or delivery option surfaced on
+      // any rendered public surface. §A2: exempt from frictionSuppressed —
+      // under the rescoped evidence rule, `false` requires an explicit
+      // negative statement on a rendered surface (any channel), so the fields
+      // carry their own verification. `null`/unset (no rendered surface
+      // addressed it) still fires nothing — absence is not a negative.
       if (!signals.has('WC_MISSING_PICKUP_DELIVERY')) {
         if (website.has_pickup_ordering === false && website.has_delivery_option === false) {
           signals.add('WC_MISSING_PICKUP_DELIVERY');
         }
       }
-      } // end !frictionSuppressed (conversion-friction signals)
     }
   } else if (!signals.has('WC_MISSING_WEBSITE')) {
     // No website audit block — fall back to the campaign columns. A social

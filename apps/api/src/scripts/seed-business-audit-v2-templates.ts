@@ -1896,14 +1896,19 @@ function transformBusinessAuditV1(body: string): string {
 //     special_hours_present)
 //   - ### Product Visibility & Ordering (website has_product_browsing /
 //     has_availability_inquiry / has_pickup_ordering / has_delivery_option /
-//     product_categories_visible)
+//     product_categories_visible — evidenced by any verified public surface,
+//     with {field}_observed_on provenance companions)
+//   - ### Channel & Offer Scan (channels_scanned — the per-surface evidence
+//     ledger covering every channel attempted, including non-primary surfaces)
+//   - ### Observed Assets (observed_assets — verified strengths roll-up with
+//     also_seen_on corroboration and internal-only underexposed/confidence)
 //   - a clean, deduplicated embedded schema carrying every contract field the
 //     V2 skeletons omit (outreach_problems, recommended_attributes,
 //     business_type, product-visibility fields, platform attributes arrays,
 //     canonical_city/state/zip)
 // The .md asset is the source of truth — edit it and bump
 // DEFAULT_AUDIT_MARKER when the canonical body changes.
-const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-10-presence-signals-4 -->';
+const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-13-channel-scan-1 -->';
 
 function transformSeedBusinessAudit(): string {
   const body = readFileSync(

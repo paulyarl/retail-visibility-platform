@@ -724,6 +724,12 @@ Task: Write the opener, ~80 words max body:
    - If has_availability_inquiry is false: "There's no way for a
      customer to check if a specific product is in stock before they
      come in — they have to drive there to find out."
+   Surface attribution: each *_observed_on field names the surface the
+   fact was verified on. "your website" is only honest when the
+   companion says owned_site — when it names a channel (instagram,
+   marketplace, directory, ...), name that surface instead ("your
+   Instagram page," "your DoorDash listing"). A true value on a channel
+   is a strength to credit, not a gap.
    When the fields show a signature item or specialty the shop carries,
    naming it makes the gap concrete ("when someone searches for
    [item] nearby, they get sent to a chain").

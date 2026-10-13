@@ -688,6 +688,120 @@ describe('archetype chapters (BA audit → sibling-scoped extracts)', () => {
     expect(ch.already_working.some((l) => l.includes('Halal meats'))).toBe(true);
   });
 
+  // §A (channel-scan spec): a `*_observed_on` companion naming a non-owned
+  // surface must surface as channel attribution in owner-facing copy —
+  // "Your site offers…" is only legal when the site verified the fact.
+  it('cta (A4): a channel-verified delivery offer names the surface, not the site', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_delivery_option: true,
+        has_delivery_option_observed_on: 'instagram',
+      },
+      channels_scanned: [
+        {
+          channel: 'instagram',
+          url: 'https://www.instagram.com/rajabazaar/',
+          rendered: true,
+          access_barrier: 'none',
+          offers_observed: ['Free delivery over $100'],
+        },
+      ],
+    };
+    const ch = prospectReportService.buildCtaChapter(audit, CTX);
+    expect(ch.already_working).toContain(
+      'Your Instagram profile advertises a delivery option.',
+    );
+    expect(
+      ch.already_working.every((l) => !l.includes('site offers a delivery option')),
+    ).toBe(true);
+  });
+
+  it('cta (A4): an explicit negative on a channel names that surface', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_delivery_option: false,
+        has_delivery_option_observed_on: 'facebook',
+      },
+      channels_scanned: [
+        {
+          channel: 'facebook',
+          url: 'https://www.facebook.com/rajabazaar',
+          rendered: true,
+          access_barrier: 'none',
+          offers_observed: ['In-store pickup only'],
+        },
+      ],
+    };
+    const ch = prospectReportService.buildCtaChapter(audit, CTX);
+    const finding = ch.costing_customers.find((i) =>
+      i.headline.includes('delivery'),
+    );
+    expect(finding?.headline).toBe(
+      'No delivery option — stated on your Facebook page',
+    );
+    expect(finding?.headline).not.toContain('the site');
+    // The evidence line cites the channel URL, not the website.
+    expect(finding?.evidence).toBe('https://www.facebook.com/rajabazaar');
+  });
+
+  it('cta (A4): an absent companion renders the legacy site phrasing', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_delivery_option: true,
+      },
+    };
+    const ch = prospectReportService.buildCtaChapter(audit, CTX);
+    expect(ch.already_working).toContain('Your site offers a delivery option.');
+  });
+
+  it('products (A6): delivery verified on Instagram advertises the channel', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      business_type: 'product',
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_product_browsing: true,
+        has_delivery_option: true,
+        has_delivery_option_observed_on: 'instagram',
+      },
+    };
+    const ch = prospectReportService.buildProductsChapter(audit, CTX);
+    expect(ch.already_working).toContain(
+      'Your Instagram profile advertises a delivery option.',
+    );
+    expect(
+      ch.already_working.every((l) => !l.includes('site offers a delivery option')),
+    ).toBe(true);
+  });
+
+  it('products (A6): pickup verified on a marketplace names the surface', () => {
+    const audit = {
+      ...RAJA_BA_AUDIT,
+      business_type: 'product',
+      website: {
+        url: 'https://rajabazaar.com',
+        status: 'working',
+        has_product_browsing: true,
+        has_pickup_ordering: true,
+        has_pickup_ordering_observed_on: 'order_ahead_platform',
+      },
+    };
+    const ch = prospectReportService.buildProductsChapter(audit, CTX);
+    expect(ch.already_working).toContain(
+      'Customers can order for pickup via your online ordering page.',
+    );
+  });
+
   it('redacts internal machinery across every archetype chapter', () => {
     for (const builder of [
       'buildDriftChapter',

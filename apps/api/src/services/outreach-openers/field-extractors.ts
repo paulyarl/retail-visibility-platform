@@ -181,6 +181,14 @@ export interface A6Fields extends CommonFields {
   has_availability_inquiry: boolean;
   has_pickup_option: boolean;
   has_delivery_option: boolean;
+  // Surface provenance for the channel-scoped fields above (Channel & Offer
+  // Scan spec §A) — 'owned_site' when verified on the business's own site,
+  // another channel value (instagram, marketplace, ...) when verified on a
+  // rendered public surface, null on legacy audits.
+  has_product_browsing_observed_on: string | null;
+  has_availability_inquiry_observed_on: string | null;
+  has_pickup_ordering_observed_on: string | null;
+  has_delivery_option_observed_on: string | null;
   photo_count: number;
   photo_types: string[];
   missing_photo_types: string[];         // ['storefront','product'] — what's absent
@@ -448,6 +456,10 @@ export function extractA6Fields(
     has_availability_inquiry: hasAvailabilityInquiry,
     has_pickup_option: hasPickup,
     has_delivery_option: hasDelivery,
+    has_product_browsing_observed_on: website?.has_product_browsing_observed_on ?? null,
+    has_availability_inquiry_observed_on: website?.has_availability_inquiry_observed_on ?? null,
+    has_pickup_ordering_observed_on: website?.has_pickup_ordering_observed_on ?? null,
+    has_delivery_option_observed_on: website?.has_delivery_option_observed_on ?? null,
     photo_count: photoCount,
     photo_types: photoTypes,
     missing_photo_types: missingPhotoTypes,

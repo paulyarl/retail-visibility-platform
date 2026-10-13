@@ -38,6 +38,7 @@ import {
   generateProspectReportLinkId,
 } from '../lib/id-generator';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import { surfaceNoun, surfaceRef } from '../lib/channel-surfaces';
 import {
   websitePositioningAuditSchema,
   type WebsitePositioningAudit,
@@ -282,9 +283,15 @@ export function archetypeFactSlice(
           ordering_or_pickup_info_present:
             audit.website?.ordering_or_pickup_info_present ?? null,
           has_pickup_ordering: audit.website?.has_pickup_ordering ?? null,
+          has_pickup_ordering_observed_on:
+            audit.website?.has_pickup_ordering_observed_on ?? null,
           has_delivery_option: audit.website?.has_delivery_option ?? null,
+          has_delivery_option_observed_on:
+            audit.website?.has_delivery_option_observed_on ?? null,
           has_availability_inquiry:
             audit.website?.has_availability_inquiry ?? null,
+          has_availability_inquiry_observed_on:
+            audit.website?.has_availability_inquiry_observed_on ?? null,
           conversion_opportunities:
             audit.website?.conversion_opportunities ?? [],
           issues: audit.website?.issues ?? [],
@@ -297,10 +304,16 @@ export function archetypeFactSlice(
         business_type: audit.business_type ?? null,
         product_visibility: {
           has_product_browsing: audit.website?.has_product_browsing ?? null,
+          has_product_browsing_observed_on:
+            audit.website?.has_product_browsing_observed_on ?? null,
           product_categories_visible:
             audit.website?.product_categories_visible ?? [],
           has_pickup_ordering: audit.website?.has_pickup_ordering ?? null,
+          has_pickup_ordering_observed_on:
+            audit.website?.has_pickup_ordering_observed_on ?? null,
           has_delivery_option: audit.website?.has_delivery_option ?? null,
+          has_delivery_option_observed_on:
+            audit.website?.has_delivery_option_observed_on ?? null,
           ordering_or_pickup_info_present:
             audit.website?.ordering_or_pickup_info_present ?? null,
         },
@@ -1158,7 +1171,17 @@ class ProspectReportService extends BaseService {
     const audit = businessAnalysisSchema.parse(auditData);
     const site = audit.website;
 
-    const flags: { key: keyof typeof site; label: string; missing: string }[] = [
+    const flags: {
+      key: keyof typeof site;
+      label: string;
+      missing: string;
+      // §A (channel-scan spec): the product-visibility keys carry an
+      // *_observed_on companion — the determination may have come from a
+      // rendered channel surface, not the site. `missingOnSurface` is the
+      // copy used when that companion names a non-owned surface.
+      observedOnKey?: keyof typeof site;
+      missingOnSurface?: (surface: string) => string;
+    }[] = [
       {
         key: 'call_to_action_present',
         label: 'a clear call to action',
@@ -1183,15 +1206,20 @@ class ProspectReportService extends BaseService {
         key: 'has_pickup_ordering',
         label: 'pickup ordering',
         missing: 'No way to order for pickup online',
+        observedOnKey: 'has_pickup_ordering_observed_on',
+        missingOnSurface: (s) => `No pickup ordering — stated on ${s}`,
       },
       {
         key: 'has_delivery_option',
         label: 'a delivery option',
         missing: 'No delivery option on the site',
+        observedOnKey: 'has_delivery_option_observed_on',
+        missingOnSurface: (s) => `No delivery option — stated on ${s}`,
       },
       {
         key: 'has_availability_inquiry',
         label: 'an availability inquiry',
+        observedOnKey: 'has_availability_inquiry_observed_on',
         missing: 'Customers can\u2019t ask whether something is in stock',
       },
     ];
@@ -1205,21 +1233,44 @@ class ProspectReportService extends BaseService {
           ? 'Your site gives visitors a clear next step — call, order, or visit.'
           : `Your site ${present.length > 0 ? `has ${present[0].label} but` : 'gives visitors'} ${missing.length > 0 ? 'missing ways to take the next step.' : 'no obvious next step.'}`;
 
-    const alreadyWorking = present.map(
-      (f) => `Your site offers ${f.label}.`,
-    );
+    // §A: attribute channel-scoped facts to the surface named in
+    // *_observed_on — an absent companion (legacy audits, where only the
+    // site could verify) renders the site phrasing.
+    const observedOn = (
+      f: (typeof flags)[number],
+    ): string | null | undefined =>
+      f.observedOnKey
+        ? (site[f.observedOnKey] as string | null | undefined)
+        : 'owned_site';
+    const channelUrl = (on: string | null | undefined): string | null =>
+      (audit.channels_scanned ?? []).find((c) => c.channel === on)?.url ??
+      null;
 
-    const costing: RepairChapterDto['costing_customers'] = missing.map((f) => ({
-      headline: f.missing,
+    const alreadyWorking = present.map((f) => {
+      const on = observedOn(f);
+      return on && on !== 'owned_site'
+        ? `Your ${surfaceNoun(on)} advertises ${f.label}.`
+        : `Your site offers ${f.label}.`;
+    });
+
+    const costing: RepairChapterDto['costing_customers'] = missing.map((f) => {
+      const on = observedOn(f);
+      const offSite = !!on && on !== 'owned_site';
+      return {
+      headline:
+        offSite && f.missingOnSurface
+          ? f.missingOnSurface(surfaceRef(on))
+          : f.missing,
       cost: 'A visitor who can\u2019t act leaves — the next search result is one tap away.',
-      evidence: site.url ?? null,
+      evidence: offSite ? channelUrl(on) : site.url ?? null,
       tier:
         f.key === 'call_to_action_present' ||
         f.key === 'click_to_call_available' ||
         f.key === 'contact_information_visible'
           ? 'now'
           : 'worth_fixing',
-    }));
+      };
+    });
     for (const opportunity of site.conversion_opportunities ?? []) {
       costing.push({
         headline: opportunity,
@@ -1423,7 +1474,7 @@ class ProspectReportService extends BaseService {
     }
     if ((site.product_categories_visible ?? []).length > 0) {
       alreadyWorking.push(
-        `Your site shows ${site.product_categories_visible!.length} product categor${site.product_categories_visible!.length === 1 ? 'y' : 'ies'}: ${site.product_categories_visible!.slice(0, 5).join(', ')}${site.product_categories_visible!.length > 5 ? '…' : ''}.`,
+        `Your online listings show ${site.product_categories_visible!.length} product categor${site.product_categories_visible!.length === 1 ? 'y' : 'ies'}: ${site.product_categories_visible!.slice(0, 5).join(', ')}${site.product_categories_visible!.length > 5 ? '…' : ''}.`,
       );
     }
     if (google?.photo_count != null && google.photo_count > 0) {
@@ -1431,11 +1482,24 @@ class ProspectReportService extends BaseService {
         `Your Google listing shows ${google.photo_count} photo${google.photo_count === 1 ? '' : 's'}.`,
       );
     }
+    // §A (channel-scan spec): pickup/delivery may be verified on a
+    // non-owned surface — name it via the *_observed_on companion rather
+    // than attributing the offer to the site.
     if (site.has_pickup_ordering === true) {
-      alreadyWorking.push('Customers can order for pickup online.');
+      const on = site.has_pickup_ordering_observed_on;
+      alreadyWorking.push(
+        on && on !== 'owned_site'
+          ? `Customers can order for pickup via ${surfaceRef(on)}.`
+          : 'Customers can order for pickup online.',
+      );
     }
     if (site.has_delivery_option === true) {
-      alreadyWorking.push('Your site offers a delivery option.');
+      const on = site.has_delivery_option_observed_on;
+      alreadyWorking.push(
+        on && on !== 'owned_site'
+          ? `Your ${surfaceNoun(on)} advertises a delivery option.`
+          : 'Your site offers a delivery option.',
+      );
     }
 
     const costing: RepairChapterDto['costing_customers'] = [];

@@ -70,6 +70,12 @@ export interface WebsiteAudit {
   has_pickup_ordering?: boolean | null;
   has_delivery_option?: boolean | null;
   product_categories_visible?: string[];
+  // Provenance companions (Channel & Offer Scan spec §A) — the surface the
+  // determination came from ('owned_site', 'instagram', 'marketplace', ...).
+  has_product_browsing_observed_on?: string | null;
+  has_availability_inquiry_observed_on?: string | null;
+  has_pickup_ordering_observed_on?: string | null;
+  has_delivery_option_observed_on?: string | null;
 }
 
 export interface PlatformAudit {
@@ -124,6 +130,38 @@ export interface BusinessAnalysisAuditData {
   // the presence/integrity family (A8) — absence evidence the platform map
   // cannot express (the profile_status enum has no "absent" state).
   detected_signals?: string[];
+  // Channel & Offer Scan — per-surface evidence ledger (spec §B). Entries
+  // for primary platforms must agree with render_controls/platforms.{p}.
+  channels_scanned?: ChannelScanEntry[];
+  // Observed Assets — deduplicated cross-surface roll-up of verified
+  // strengths/offers (spec §C). underexposed/underexposure_note/confidence
+  // are internal-only and never render publicly.
+  observed_assets?: ObservedAssetEntry[];
+}
+
+export interface ChannelScanEntry {
+  channel: string;
+  url?: string | null;
+  rendered?: boolean | null;
+  access_barrier?: string | null;
+  offers_observed?: string[];
+  notable_activity?: string[];
+  fulfillment_modes?: string[];
+  payment_modes?: string[];
+  availability_channel?: string | null;
+  last_activity?: string | null;
+  confidence?: string | null;
+}
+
+export interface ObservedAssetEntry {
+  asset: string;
+  evidence?: string | null;
+  source_url?: string | null;
+  observed_on?: string | null;
+  also_seen_on?: string[];
+  confidence?: string | null;
+  underexposed?: boolean | null;
+  underexposure_note?: string | null;
 }
 
 export interface RenderControlEntry {

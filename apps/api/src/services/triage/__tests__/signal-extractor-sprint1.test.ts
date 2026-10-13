@@ -221,6 +221,108 @@ describe('Sprint 1 — WC_MISSING_PICKUP_DELIVERY', () => {
     });
     expect(extractSignals(i)).not.toContain('WC_MISSING_PICKUP_DELIVERY');
   });
+
+  // Channel-scan spec §A: null is the lane the rescope introduces — "no
+  // rendered surface addressed the question" is not a verified negative.
+  it('does NOT fire when both fields are null (unable to verify)', () => {
+    const i = input({
+      website: {
+        ...baseAuditData().website!,
+        has_pickup_ordering: null,
+        has_delivery_option: null,
+      } as any,
+    });
+    expect(extractSignals(i)).not.toContain('WC_MISSING_PICKUP_DELIVERY');
+  });
+
+  it('does NOT fire on the null/false mix — one explicit negative is not enough', () => {
+    const i = input({
+      website: {
+        ...baseAuditData().website!,
+        has_pickup_ordering: false,
+        has_delivery_option: null,
+      } as any,
+    });
+    expect(extractSignals(i)).not.toContain('WC_MISSING_PICKUP_DELIVERY');
+  });
+});
+
+// ─── §A2 — WC_MISSING_PICKUP_DELIVERY exempt from frictionSuppressed ─────
+//
+// Channel-scan spec §A2 (resolved: option A): the fulfillment signal
+// evaluates whenever the fields carry a verified determination, even when
+// the recorded website is a social page or builder subdomain — `false` is
+// only reachable via an explicit negative statement on a rendered surface,
+// so the fields carry their own verification. The website-content friction
+// signals (browsing, availability inquiry) stay suppressed.
+
+describe('§A2 — WC_MISSING_PICKUP_DELIVERY exempt from frictionSuppressed', () => {
+  it('fires for a social-URL website with both fields verified false', () => {
+    const i = input({
+      website: {
+        url: 'https://www.facebook.com/dreamcast',
+        status: 'social_media_only',
+        has_pickup_ordering: false,
+        has_delivery_option: false,
+      } as any,
+    });
+    const signals = extractSignals(i);
+    expect(signals).toContain('WC_MISSING_PICKUP_DELIVERY');
+    // The absence-class code still fires — ownership gap is unchanged.
+    expect(signals).toContain('WC_THIRD_PARTY_DOMAIN');
+  });
+
+  it('fires for a builder-subdomain website with both fields verified false', () => {
+    const i = input({
+      website: {
+        url: 'https://dreamcast.business.site',
+        status: 'working',
+        has_pickup_ordering: false,
+        has_delivery_option: false,
+      } as any,
+    });
+    const signals = extractSignals(i);
+    expect(signals).toContain('WC_MISSING_PICKUP_DELIVERY');
+    expect(signals).toContain('WC_BUILDER_SUBDOMAIN');
+  });
+
+  it('does NOT fire on a social URL when the fields are null — evaluation, not manufacture', () => {
+    const i = input({
+      website: {
+        url: 'https://www.facebook.com/dreamcast',
+        status: 'social_media_only',
+        has_pickup_ordering: null,
+        has_delivery_option: null,
+      } as any,
+    });
+    expect(extractSignals(i)).not.toContain('WC_MISSING_PICKUP_DELIVERY');
+  });
+
+  it('does NOT fire on a social URL when only one field is false', () => {
+    const i = input({
+      website: {
+        url: 'https://www.facebook.com/dreamcast',
+        status: 'social_media_only',
+        has_pickup_ordering: false,
+        has_delivery_option: true,
+      } as any,
+    });
+    expect(extractSignals(i)).not.toContain('WC_MISSING_PICKUP_DELIVERY');
+  });
+
+  it('keeps the website-content friction signals suppressed on a social URL', () => {
+    const i = input({
+      website: {
+        url: 'https://www.facebook.com/dreamcast',
+        status: 'social_media_only',
+        has_product_browsing: false,
+        has_availability_inquiry: false,
+      } as any,
+    });
+    const signals = extractSignals(i);
+    expect(signals).not.toContain('WC_MISSING_PRODUCT_BROWSING');
+    expect(signals).not.toContain('WC_MISSING_AVAILABILITY_INQUIRY');
+  });
 });
 
 // ─── VP_MISSING_STOREFRONT_PHOTOS ────────────────────────────────────────

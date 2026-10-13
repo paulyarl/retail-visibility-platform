@@ -20,6 +20,7 @@ import OwnerVoiceService from './OwnerVoiceService';
 import BusinessContextService from './BusinessContextService';
 import { resolveCampaignArchetype } from '../OutreachOpenerService';
 import { MarketingBusinessTypeService } from '../MarketingBusinessTypeService';
+import { surfaceRef } from '../../lib/channel-surfaces';
 
 const DEFAULT_VOICE_FIELDS: OwnerVoiceFields = {
   person: 'first_person',
@@ -494,10 +495,24 @@ export class DeliverableSectionService extends BaseService {
         const website = auditData.website;
         const fulfillmentParts: string[] = [];
         if (website) {
-          if ((website as any).has_pickup_ordering === false) fulfillmentParts.push('No in-store/curbside pickup option');
-          if ((website as any).has_delivery_option === false) fulfillmentParts.push('No delivery option');
+          // §A (channel-scan spec): pickup/delivery are tri-state —
+          // true may be verified on any rendered surface (named by
+          // *_observed_on); false is an explicit negative statement;
+          // null means not assessed and must not read as "not offered".
+          const pickupOn = (website as any).has_pickup_ordering_observed_on as string | null | undefined;
+          const deliveryOn = (website as any).has_delivery_option_observed_on as string | null | undefined;
+          if ((website as any).has_pickup_ordering === true) {
+            fulfillmentParts.push(`Pickup ordering offered on ${surfaceRef(pickupOn)}`);
+          } else if ((website as any).has_pickup_ordering === false) {
+            fulfillmentParts.push(`No pickup ordering — stated on ${surfaceRef(pickupOn)}`);
+          }
+          if ((website as any).has_delivery_option === true) {
+            fulfillmentParts.push(`Delivery offered on ${surfaceRef(deliveryOn)}`);
+          } else if ((website as any).has_delivery_option === false) {
+            fulfillmentParts.push(`No delivery option — stated on ${surfaceRef(deliveryOn)}`);
+          }
         }
-        if (fulfillmentParts.length === 0) fulfillmentParts.push('No pickup or delivery options currently offered');
+        if (fulfillmentParts.length === 0) fulfillmentParts.push('Pickup and delivery options not verified on any observed surface');
         return {
           variables: { ...ctxVars, fulfillment_status: fulfillmentParts.join('\n') },
           title: 'Fulfillment Pathway',

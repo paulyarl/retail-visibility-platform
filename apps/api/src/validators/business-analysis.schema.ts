@@ -404,6 +404,17 @@ const websiteSchema = z.object({
   has_availability_inquiry: coercedBooleanNullableTolerant.optional(),
   has_pickup_ordering: coercedBooleanNullableTolerant.optional(),
   has_delivery_option: coercedBooleanNullableTolerant.optional(),
+  // Provenance companions (Audit Channel Scan & Opportunity Collection spec
+  // §A) — the fields stay namespaced under website.* for schema stability,
+  // but evidence scope is any verified public surface; the companion names
+  // the channel the determination came from (owned_site, instagram,
+  // marketplace, ...). Free string, not enum — the channel vocabulary is
+  // open-ended ("other" covers the tail) and a novel surface name must not
+  // fail the import.
+  has_product_browsing_observed_on: z.string().nullable().optional(),
+  has_availability_inquiry_observed_on: z.string().nullable().optional(),
+  has_pickup_ordering_observed_on: z.string().nullable().optional(),
+  has_delivery_option_observed_on: z.string().nullable().optional(),
   product_categories_visible: z.array(z.string()).optional(),
   // Category-integrated fields (template v2 Category-Integrated Variant)
   category_specific_content_present: coercedBooleanNullableTolerant.optional(),
@@ -622,6 +633,46 @@ const renderControlSchema = z.object({
   determination: renderControlDeterminationEnum,
 }).passthrough();
 
+// ---- Channel & Offer Scan + Observed Assets ----
+// (docs/AUDIT_CHANNEL_SCAN_AND_OPPORTUNITY_COLLECTION_SPEC.md §B/§C)
+// channels_scanned is the per-surface evidence ledger; observed_assets is
+// the deduplicated cross-surface roll-up of what the business already does
+// well. Both optional on this SHARED schema — REQUIRED at prompt level
+// (emit [] when nothing qualifies) on templates carrying the blocks.
+
+const evidenceConfidenceEnum = z.enum([
+  'verified_on_surface',
+  'inferred',
+  'verify_with_owner',
+]);
+
+const channelScanEntrySchema = z.object({
+  // Free string — the prompt documents the channel vocabulary (instagram,
+  // marketplace, locator, registry, ...) but "other" covers an open tail.
+  channel: z.string(),
+  url: z.string().nullable().optional(),
+  rendered: z.boolean().nullable().optional(),
+  access_barrier: renderControlAccessBarrierEnum.nullable().optional(),
+  offers_observed: z.array(z.string()).optional(),
+  notable_activity: z.array(z.string()).optional(),
+  fulfillment_modes: z.array(z.string()).optional(),
+  payment_modes: z.array(z.string()).optional(),
+  availability_channel: z.string().nullable().optional(),
+  last_activity: z.string().nullable().optional(),
+  confidence: evidenceConfidenceEnum.nullable().optional(),
+}).passthrough();
+
+const observedAssetEntrySchema = z.object({
+  asset: z.string(),
+  evidence: z.string().nullable().optional(),
+  source_url: z.string().nullable().optional(),
+  observed_on: z.string().nullable().optional(),
+  also_seen_on: z.array(z.string()).optional(),
+  confidence: evidenceConfidenceEnum.nullable().optional(),
+  underexposed: z.boolean().nullable().optional(),
+  underexposure_note: z.string().nullable().optional(),
+}).passthrough();
+
 // ---- Market intel sidebar fields (Seed Market Intel Sidebar — Phase 0) ----
 
 /**
@@ -690,6 +741,14 @@ export const businessAnalysisSchema = z.object({
   public_narrative: z.string().nullable().optional(),
   platforms: platformsSchema,
   specialized_sources_audited: z.array(specializedSourceSchema).optional(),
+  // Channel & Offer Scan — per-surface evidence ledger for non-owned
+  // surfaces (social, marketplace, directory, locator, registry). Entries
+  // for primary platforms must agree with render_controls/platforms.{p}.
+  channels_scanned: z.array(channelScanEntrySchema).optional(),
+  // Observed Assets — deduplicated cross-surface roll-up of verified
+  // strengths/offers. underexposed/underexposure_note/confidence are
+  // internal-only and never render publicly.
+  observed_assets: z.array(observedAssetEntrySchema).optional(),
   combined_review_metrics: combinedReviewMetricsSchema.optional(),
   alignment_scoring: alignmentScoringSchema.optional(),
   website: websiteSchema,
@@ -1089,19 +1148,22 @@ GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present i
 - quality_gate_results: for each gold-standard quality gate, record whether the business passed or failed, with the platform, gate name, passed boolean, severity, and notes.
 - render_controls: for each platform in scope where a render control was attempted, record the business profile URL requested and whether it rendered, the control business name and control URL and whether it rendered, the access barrier (none|js_required|bot_defense|captcha|login_wall|rate_limit|timeout|not_attempted), and the determination (business_specific_failure|platform_available|unable_to_verify). Emit DS_MISSING_PROFILE ONLY when determination is business_specific_failure on a primary platform (google, yelp, facebook, bbb). Non-primary platforms (bing, apple_maps, etc.) record the determination but emit no signal.
 
-MARKET INTEL SIDEBAR FIELDS (populate ONLY when a MARKET CONTEXT section is present in the prompt — i.e. category + location intelligence was injected):
-- market_opportunities: business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps, and website.conversion_opportunities. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Omit the field entirely (do not emit an empty array) when no market context was injected.
-- signal_checklist: one entry per category_signals item, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was injected.
+MARKET INTEL OUTPUT FIELDS:
+- market_opportunities: business-specific growth opportunities synthesized from gap_analysis, relevant market_gaps (when a MARKET CONTEXT section was injected), website.conversion_opportunities, and observed_assets entries where underexposed is true. Each entry: { "title": short label, "description": one-sentence rationale, "impact": "HIGH"|"MEDIUM"|"LOW" }. Rank by impact (HIGH first). Emit whenever audit findings ground an opportunity — omit entirely (and note the suppression in data_quality.limitations) when nothing grounds one.
+- signal_checklist: one entry per category_signals item, evaluated for THIS business. Each entry: { "signal": the signal label, "met": true|false|null (null when unable to verify), "evidence": one-sentence observed evidence or null }. The audit performs the evaluation against observed evidence — do not join signals to evidence generically. Omit the field entirely when no category context was injected and name it in data_quality.limitations.
 
 OUTREACH PROBLEMS FIELD (conditional — populate ONLY when the prompt body contains an Operator Outreach Problems & Solutions directive):
 - outreach_problems: 1–3 problem → solution pairs the operator can use directly in outreach to the prospect — the most painful problems, ranked by severity. Each entry: { "problem": the problem as the prospect experiences it (business consequence, not a technical label), "regular": the plain professional line that raises it, "hook": the alternative line — same fact, pattern-interrupt delivery, "solution": high-level summary of the fix (not a named package), "evidence": the audit-data observation grounding the problem (platform + observed fact), "outreach_use": how the operator deploys the pair (cold-call opener, email hook, objection response) }. Omit the field entirely when the prompt body carries no such directive — do not emit an empty array.
 
-PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types):
-- website.has_product_browsing: <boolean|null> — can customers browse products or categories on the website? (null when unable to verify or no website)
-- website.has_availability_inquiry: <boolean|null> — is there a way to check if a specific product is in stock (WhatsApp, SMS, click-to-call, web form)?
-- website.has_pickup_ordering: <boolean|null> — does the business offer pickup ordering online?
-- website.has_delivery_option: <boolean|null> — does the business offer delivery?
-- website.product_categories_visible: ["<string>", ...] — product categories visible on the website or GBP
+PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types; evidence scope is ANY verified public surface — owned site, social profile or post, marketplace, directory chip):
+- website.has_product_browsing: <boolean|null> — can customers browse products or categories on any verified public surface? (null when no rendered surface addresses it; false ONLY on an explicit negative statement)
+- website.has_availability_inquiry: <boolean|null> — is there a way to check if a specific product is in stock (WhatsApp, SMS, DM, click-to-call, web form)?
+- website.has_pickup_ordering: <boolean|null> — can customers order online for pickup on any verified public surface?
+- website.has_delivery_option: <boolean|null> — does the business offer delivery surfaced on any verified public surface?
+- website.{has_product_browsing|has_availability_inquiry|has_pickup_ordering|has_delivery_option}_observed_on: "<channel|null>" — companion per field naming the surface the determination came from (e.g. owned_site, instagram, marketplace)
+- website.product_categories_visible: ["<string>", ...] — product categories visible on the website, GBP, or another rendered public surface
+- channels_scanned: [{ "channel": "<surface>", "url": "<string|null>", "rendered": <boolean|null>, "access_barrier": "none|js_required|bot_defense|captcha|login_wall|rate_limit|timeout|not_attempted", "offers_observed": ["<string>"], "notable_activity": ["<string>"], "fulfillment_modes": ["<string>"], "payment_modes": ["<string>"], "availability_channel": "<string|null>", "last_activity": "<ISO date|null>", "confidence": "verified_on_surface|inferred|verify_with_owner" }, ...] — one entry per non-owned channel attempted, plus an access_barrier:"not_attempted" entry per directed-but-skipped channel. Always emit; [] is a valid answer.
+- observed_assets: [{ "asset": "<string>", "evidence": "<string>", "source_url": "<string|null>", "observed_on": "<channel>", "also_seen_on": ["<channel>"], "confidence": "verified_on_surface|inferred|verify_with_owner", "underexposed": <boolean|null>, "underexposure_note": "<string|null>" }, ...] — deduplicated roll-up of verified strengths/offers. Always emit; [] is a valid answer. underexposed/underexposure_note/confidence are internal-only — never public_narrative material.
 - platforms.google.photo_count: <number|null> — total number of photos on GBP
 - platforms.google.photo_types: ["storefront"|"exterior"|"interior"|"product"|"team"|"logo", ...] — categorize GBP photos by type
 - platforms.google.special_hours_present: <boolean|null> — are special/holiday hours present on GBP?
