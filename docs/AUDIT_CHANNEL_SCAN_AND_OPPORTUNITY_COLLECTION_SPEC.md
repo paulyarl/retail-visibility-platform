@@ -1,7 +1,7 @@
 # Audit Channel Scan & Opportunity Collection — Functional Spec
 
 **Injects into:** `apps/api/src/scripts/business-audit-default-body.md` (canonical body asset, template `mpt-seed-seek-001`, output schema `business_analysis`)
-**Status:** Draft for team review — no code or template changes applied
+**Status:** Implemented — Pass 1 shipped 2026-10-13 (evidence collection: `channels_scanned`, `observed_assets`, `{field}_observed_on`, §A2 gate). Pass 2 landed 2026-10-13 (engagement-brief template + `engagement_brief` schema/audit row + `classifyFootprintSide` side classifier + import stamp). Judgment migration (OQ7) and listing-column persistence (OQ1) remain open.
 **Date:** October 2026 (revised 2026-10-13 — review gaps folded in)
 **Triggering incident:** Dreamcast African Market audit (2026-10-13). The business's live delivery offer — verified on three public surfaces (Instagram bio, Apple Maps `Delivery` chip, MapQuest `Offers delivery`) — emitted as `unable_to_verify`, because the field definition is channel-scoped while its evidence rule is website-scoped.
 

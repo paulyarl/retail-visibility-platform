@@ -16,6 +16,7 @@ import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlag
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { applyRenderControlCoverageGate, BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
+import { ENGAGEMENT_BRIEF_SCHEMA_NAME } from '../validators/engagement-brief.schema';
 import { normalizeIntelligenceDiscoveryPayload, applyDiscoveryScanContractGate, INTELLIGENCE_DISCOVERY_SCHEMA_NAME } from '../validators/intelligence-discovery.schema';
 import { collectProfileSubstrateViolations } from '../validators/intelligence-profile.schema';
 import { CATEGORY_ENRICHMENT_SCHEMA_NAME, LOCATION_ENRICHMENT_SCHEMA_NAME, CATEGORY_SET_ENRICHMENT_SCHEMA_NAME } from '../validators/directory-enrichment.schema';
@@ -792,6 +793,22 @@ export class MarketingPromptService extends BaseService {
           parsedJson = schemaName === BUSINESS_ANALYSIS_SCHEMA_NAME
             ? applyRenderControlCoverageGate(candidateJson, platformSignalWeights)
             : candidateJson;
+
+          // Pass 2 engagement brief — the provenance fields are
+          // code-authoritative (spec: "prompt emits inputs, code stamps").
+          // source_audit_id cites the campaign's latest business_analysis
+          // audit row; side comes from classifyFootprintSide over that
+          // audit's evidence — the model may echo the injected value but
+          // never sets it. Same seam as the render-control gate: the import
+          // persists raw parsed JSON, so stamping happens here, not in the
+          // validator.
+          if (schemaName === ENGAGEMENT_BRIEF_SCHEMA_NAME) {
+            const { applyEngagementBriefStamp } = await import('./engagement-brief/engagement-brief-stamp');
+            parsedJson = await applyEngagementBriefStamp(parsedJson, {
+              prisma: this.prisma,
+              campaignId: input.campaignId,
+            });
+          }
 
           // Discovery Scan Contract (v1.3) — report-mode coverage gate on the
           // raw JSON (same seam as the render-control gate above): inject

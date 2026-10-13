@@ -34,6 +34,7 @@ import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatC
 import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { WEBSITE_POSITIONING_SCHEMA_NAME } from '../validators/website-positioning.schema';
+import { ENGAGEMENT_BRIEF_SCHEMA_NAME } from '../validators/engagement-brief.schema';
 import { discoveryContextSchema, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 
@@ -750,6 +751,26 @@ export class MarketingExecutionService extends BaseService {
               null,
               2,
             );
+          }
+        }
+
+        // 0b. Engagement Brief (Pass 2 — Audit Channel Scan spec): the brief
+        //     consumes the stored Pass-1 audit as evidence plus the
+        //     code-stamped footprint side. The audit read above already
+        //     resolved the latest business_analysis row — a
+        //     category_identification partial may NOT be cited (it lacks the
+        //     channel-scan/observed-assets blocks Pass 2 reads), so gate on
+        //     platform. With no business_analysis audit the variables get the
+        //     empty-evidence text and the body instructs the empty-brief
+        //     emission; the import stamp still resolves the side.
+        if (outputSchemaName === ENGAGEMENT_BRIEF_SCHEMA_NAME) {
+          const { buildEngagementBriefVariables } = await import('./engagement-brief/engagement-brief-stamp');
+          const sourceAudit = audit?.platform === 'business_analysis' ? audit : null;
+          const briefVars = buildEngagementBriefVariables(sourceAudit);
+          for (const key of ['source_audit', 'source_audit_id', 'footprint_side'] as const) {
+            if (!effectiveVariables[key] || !String(effectiveVariables[key]).trim()) {
+              effectiveVariables[key] = briefVars[key];
+            }
           }
         }
 

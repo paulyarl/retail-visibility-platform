@@ -110,6 +110,11 @@ import {
   REVIEW_INTAKE_PROMPT_SUFFIX,
   type ReviewIntake,
 } from './review-intake.schema';
+import {
+  engagementBriefSchema,
+  ENGAGEMENT_BRIEF_SCHEMA_NAME,
+  ENGAGEMENT_BRIEF_PROMPT_SUFFIX,
+} from './engagement-brief.schema';
 
 export {
   profileRepairTriageSchema,
@@ -429,6 +434,18 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     // set (spec §6.2).
     auditPlatform: 'website_positioning',
     promptSuffix: WEBSITE_POSITIONING_PROMPT_SUFFIX,
+  },
+  [ENGAGEMENT_BRIEF_SCHEMA_NAME]: {
+    validator: engagementBriefSchema,
+    // Pass 2 (Audit Channel Scan spec — "The brief must be stored to be a
+    // spine"). Imports land in mkt_audits_list with platform =
+    // 'engagement_brief'; audit_data carries the full brief JSON including
+    // source_audit_id (the business_analysis row it cites) and the
+    // code-stamped side. The import hook in
+    // MarketingPromptService.importExternalResult stamps side /
+    // source_audit_id / brief_version authoritatively post-validation.
+    auditPlatform: 'engagement_brief',
+    promptSuffix: ENGAGEMENT_BRIEF_PROMPT_SUFFIX,
   },
 };
 
