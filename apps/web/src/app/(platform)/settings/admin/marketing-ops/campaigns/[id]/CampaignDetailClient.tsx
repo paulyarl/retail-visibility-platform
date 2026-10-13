@@ -3226,6 +3226,9 @@ export default function CampaignDetailClient({
                     // artifact behind the mockup (site map, copy spec,
                     // domain/hosting, QA/launch checklist, profile cutover).
                     ['website_build_package', 'Website Build Package'],
+                    // PB-09 — profile presence & build plan: the flagship
+                    // A8 artifact (education + repair-vs-build order).
+                    ['profile_presence_plan', 'Profile Presence & Build Plan'],
                     // W6c/W8 — execution-driven (imported fulfill output) and
                     // assembled (platform_status grid) types, neither
                     // signal-gated. Offered on profile_repair campaigns —

@@ -81,6 +81,14 @@ const DEFAULT_SEVERITY: Record<string, SignalSeverity> = {
   WC_MISSING_WEBSITE: 'crisis',
   DS_BROKEN_PROFILE_LINK: 'crisis',
   DS_MISSING_PROFILE: 'crisis',
+  // Profile presence & integrity (PB-09 / A8) — invisibility is a crisis;
+  // a platform refusing the listing is close behind.
+  DS_ZERO_INDEXED_PRESENCE: 'crisis',
+  DS_PROFILE_SUSPENDED: 'crisis',
+  DS_HIJACKED_LISTING: 'material',
+  DS_OWNERSHIP_DISPUTE: 'material',
+  DS_DUPLICATE_LISTING: 'material',
+  DS_ADDRESS_VERIFICATION_BLOCK: 'material',
 
   // Material — real, felt problem (lost opportunity or ranking impact)
   RA_UNADDRESSED_NEGATIVE_BACKLOG: 'material',
@@ -429,6 +437,42 @@ export function computePrimarySignalSeverity(
       const detected = (auditData as any)?.detected_signals;
       if (Array.isArray(detected) &&
         (detected.includes('WC_PARKED_DOMAIN') || detected.includes('WC_UNFINISHED_SITE'))) {
+        return 'material';
+      }
+      return 'borderline';
+    }
+
+    case 'A8': {
+      // Profile presence — crisis when the business is invisible (zero
+      // indexed footprint, missing/suspended on a key platform, or no
+      // verified presence anywhere), material for unclaimed/integrity
+      // issues, else borderline.
+      const detected: string[] = Array.isArray((auditData as any)?.detected_signals)
+        ? (auditData as any).detected_signals
+        : [];
+      if (
+        detected.includes('DS_ZERO_INDEXED_PRESENCE') ||
+        detected.includes('DS_MISSING_PROFILE') ||
+        detected.includes('DS_PROFILE_SUSPENDED')
+      ) {
+        return 'crisis';
+      }
+      const confirmedAbsent = (auditData.render_controls ?? []).some(
+        (r) => r.determination === 'business_specific_failure',
+      );
+      if (confirmedAbsent) return 'crisis';
+      const platforms = Object.values(auditData.platforms ?? {});
+      const anyPresent = platforms.some(
+        (p: any) => p && ['claimed', 'likely_claimed', 'unclaimed', 'likely_unclaimed'].includes(p.profile_status),
+      );
+      if (!anyPresent) return 'crisis';
+      if (
+        detected.includes('DS_CLAIMED_STATUS') ||
+        detected.includes('DS_DUPLICATE_LISTING') ||
+        detected.includes('DS_HIJACKED_LISTING') ||
+        detected.includes('DS_OWNERSHIP_DISPUTE') ||
+        detected.includes('DS_ADDRESS_VERIFICATION_BLOCK')
+      ) {
         return 'material';
       }
       return 'borderline';

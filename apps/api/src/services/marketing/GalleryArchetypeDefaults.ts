@@ -56,6 +56,11 @@ const ARCHETYPE_DEFAULTS: Record<ArchetypeCode, Omit<GalleryArchetypeDefaults, '
     gallerySubtitle: "Customers can't find a real website for you. Here is the fix.",
     ctaLabel: 'See My Website Plan',
   },
+  A8: {
+    galleryTitle: 'Profile Presence Diagnostic',
+    gallerySubtitle: 'Customers are searching platforms where you have no profile — the fix is a footprint built to your category\u2019s standard.',
+    ctaLabel: 'See My Presence Plan',
+  },
 };
 
 /**
@@ -115,6 +120,12 @@ export function resolveGalleryArchetypeDefaults(
       frictionSummary = {
         pain: 'web_presence_gap',
         impact: "Customers searching for the business find a social page or no site — not a place to land and buy.",
+      };
+      break;
+    case 'A8':
+      frictionSummary = {
+        pain: 'profile_presence_gap',
+        impact: 'Every missing or unclaimed profile is a stream of searches that ends at a competitor.',
       };
       break;
   }

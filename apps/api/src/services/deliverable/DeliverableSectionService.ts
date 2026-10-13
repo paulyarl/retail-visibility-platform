@@ -49,6 +49,9 @@ const SECTION_TEMPLATE_IDS: Record<SectionType, string> = {
   positioning_report: 'mpt-deliverable-section-positioning-report',
   homepage_mockup: 'mpt-deliverable-section-homepage-mockup',
   domain_migration_plan: 'mpt-deliverable-section-domain-migration',
+  presence_map: 'mpt-deliverable-section-presence-map',
+  profile_build_plan: 'mpt-deliverable-section-profile-build',
+  ownership_claim_guide: 'mpt-deliverable-section-claim-guide',
 };
 
 export interface DeliverableSection {
@@ -80,7 +83,11 @@ export type SectionType =
   // PB-08 — website-gap sections (A7):
   | 'positioning_report'
   | 'homepage_mockup'
-  | 'domain_migration_plan';
+  | 'domain_migration_plan'
+  // PB-09 — profile-presence sections (A8):
+  | 'presence_map'
+  | 'profile_build_plan'
+  | 'ownership_claim_guide';
 
 export class DeliverableSectionService extends BaseService {
   private static instance: DeliverableSectionService;
@@ -122,6 +129,7 @@ export class DeliverableSectionService extends BaseService {
   //   A6    → mobile_catalog_preview + gbp_photo_optimization +
   //           availability_inquiry_flow + fulfillment_pathway + hours_sync_plan
   //   A7    → positioning_report + homepage_mockup + domain_migration_plan
+  //   A8    → presence_map + profile_build_plan + ownership_claim_guide
   //
   // The A3/A4/A5 additions are conditional on business type, so service-
   // business deliverables are byte-identical to pre-Sprint-2 behavior.
@@ -270,6 +278,25 @@ export class DeliverableSectionService extends BaseService {
           }
         }
         logger.info('A7 deliverable sections generated', ctx, { campaignId, archetype, generated, errors: errors.length });
+        return { generated, errors };
+      }
+
+      // ─── A8: Profile Presence — presence map + build plan + claim guide ─
+      if (archetype === 'A8') {
+        const a8Sections: SectionType[] = [
+          'presence_map',
+          'profile_build_plan',
+          'ownership_claim_guide',
+        ];
+        for (const sectionType of a8Sections) {
+          try {
+            await this.generateSection(campaignId, sectionType, ctx);
+            generated.push(sectionType);
+          } catch (e) {
+            errors.push(`${sectionType}: ${(e as Error).message}`);
+          }
+        }
+        logger.info('A8 deliverable sections generated', ctx, { campaignId, archetype, generated, errors: errors.length });
         return { generated, errors };
       }
 
@@ -542,9 +569,109 @@ export class DeliverableSectionService extends BaseService {
         };
       }
 
+      // ─── PB-09: Profile-presence sections (A8) ──────────────────────
+
+      case 'presence_map': {
+        const { platformStates, presenceSummary } = this.describeProfilePresence(auditData);
+        return {
+          variables: {
+            ...ctxVars,
+            platform_states: platformStates || 'No platform data recorded',
+            presence_summary: presenceSummary,
+          },
+          title: 'Profile Presence Map',
+          sectionIndex: 950,
+        };
+      }
+
+      case 'profile_build_plan': {
+        const { platformStates, missingPlatforms } = this.describeProfilePresence(auditData);
+        return {
+          variables: {
+            ...ctxVars,
+            platform_states: platformStates || 'No platform data recorded',
+            missing_platforms: missingPlatforms.join(', ') || 'None detected',
+          },
+          title: 'Profile Build Plan',
+          sectionIndex: 960,
+        };
+      }
+
+      case 'ownership_claim_guide': {
+        const { claimActions, integrityIssues } = this.describeProfilePresence(auditData);
+        return {
+          variables: {
+            ...ctxVars,
+            claim_actions: claimActions.join('\n') || 'No unclaimed or blocked profiles detected',
+            integrity_issues: integrityIssues.join('\n') || 'None detected',
+          },
+          title: 'Ownership & Claim Guide',
+          sectionIndex: 970,
+        };
+      }
+
       default:
         throw new Error(`Unknown section type: ${sectionType}`);
     }
+  }
+
+  /**
+   * Describe the business's directory/social profile footprint for A8
+   * section prompts. Reads the business audit's platforms block +
+   * detected_signals — the same deterministic evidence the presence report
+   * chapter and briefing extract use. Pure over its inputs.
+   */
+  private describeProfilePresence(auditData: any): {
+    platformStates: string;
+    presenceSummary: string;
+    missingPlatforms: string[];
+    claimActions: string[];
+    integrityIssues: string[];
+  } {
+    const platforms = auditData?.platforms ?? {};
+    const detected: string[] = Array.isArray(auditData?.detected_signals) ? auditData.detected_signals : [];
+    const missingPlatforms: string[] = [];
+    const claimActions: string[] = [];
+    const integrityIssues: string[] = [];
+    const stateLines: string[] = [];
+
+    for (const [key, raw] of Object.entries(platforms)) {
+      const p = raw as any;
+      const name = key.charAt(0).toUpperCase() + key.slice(1);
+      const status = String(p?.profile_status ?? 'unknown');
+      if (status === 'missing' || status === 'not_found' || status === 'none') {
+        missingPlatforms.push(name);
+        stateLines.push(`- ${name}: no profile found`);
+      } else {
+        const claimed = p?.claimed === false ? 'unclaimed' : p?.claimed === true ? 'claimed' : 'claim status unknown';
+        stateLines.push(`- ${name}: profile present (${claimed})`);
+        if (p?.claimed === false) claimActions.push(`Claim and verify the ${name} listing`);
+      }
+    }
+
+    if (detected.includes('DS_ZERO_INDEXED_PRESENCE')) {
+      integrityIssues.push('Business is effectively invisible — no indexed presence on any platform');
+    }
+    if (detected.includes('DS_PROFILE_SUSPENDED')) integrityIssues.push('A profile is suspended — suspended listings do not surface in search');
+    if (detected.includes('DS_DUPLICATE_LISTING')) integrityIssues.push('Duplicate listing detected — splits reviews and confuses search engines');
+    if (detected.includes('DS_HIJACKED_LISTING')) integrityIssues.push('Listing shows signs of third-party edits (possible hijack)');
+    if (detected.includes('DS_OWNERSHIP_DISPUTE')) integrityIssues.push('Ownership dispute on a listing — the business does not control its own profile');
+    if (detected.includes('DS_ADDRESS_VERIFICATION_BLOCK')) integrityIssues.push('Address verification is blocking profile activation');
+    if (detected.includes('DS_CLAIMED_STATUS')) claimActions.push('Claim and verify the Google Business Profile');
+    if (detected.includes('DS_BROKEN_PROFILE_LINK')) integrityIssues.push('A profile link is broken — customers clicking through land on a dead page');
+    if (detected.includes('CP_MISSING_CONTACT_INFO')) integrityIssues.push('Contact info is missing from the public footprint — customers cannot reach the business');
+
+    const presenceSummary = missingPlatforms.length > 0
+      ? `${missingPlatforms.length} platform(s) with no profile: ${missingPlatforms.join(', ')}`
+      : 'Profiles exist on the checked platforms — focus is claim status and integrity';
+
+    return {
+      platformStates: stateLines.join('\n'),
+      presenceSummary,
+      missingPlatforms,
+      claimActions,
+      integrityIssues,
+    };
   }
 
   /**

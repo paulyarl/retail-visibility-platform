@@ -4,8 +4,9 @@
  * Seeds 9 templates (spec §6.1):
  *   - mpt-review-intake                  (seek)   review_intake              §5.7
  *   - mpt-deliverable-source-material    (seek)   deliverable_source_material §5.1
- *   - mpt-seed-fulfill-004..010          (fulfill) raw_json                  §5.2
- *     (009 = Website Mockup, 010 = Website Build Package — PB-08 / A7)
+ *   - mpt-seed-fulfill-004..011          (fulfill) raw_json                  §5.2
+ *     (009 = Website Mockup, 010 = Website Build Package — PB-08 / A7;
+ *      011 = Profile Presence & Build Plan — PB-09 / A8)
  *
  * Idempotent — deterministic IDs, update-in-place. Bump SEED_VERSION_MARKER
  * to force a body re-sync on already-seeded rows.
@@ -114,7 +115,7 @@ block to null.
 Signal -> deliverable type:
 - review_responses          <- RA_UNADDRESSED_NEGATIVE_BACKLOG, RA_UNADDRESSED_POSITIVE_BACKLOG, RA_REVIEW_DROUGHT, RA_LOW_REVIEW_VOLUME
 - service_menu              <- DS_MISSING_SERVICE_MENU, WC_MISSING_SERVICE_PAGES
-- gbp_audit                 <- DS_CLAIMED_STATUS, DS_PHOTO_DEFICIT, DS_OUTDATED_HOURS, DS_OUTDATED_HOLIDAY_HOURS, DS_MISSING_PROFILE
+- gbp_audit                 <- DS_CLAIMED_STATUS, DS_PHOTO_DEFICIT, DS_OUTDATED_HOURS, DS_OUTDATED_HOLIDAY_HOURS, DS_MISSING_PROFILE, DS_ZERO_INDEXED_PRESENCE, DS_PROFILE_SUSPENDED, DS_DUPLICATE_LISTING, DS_HIJACKED_LISTING, DS_OWNERSHIP_DISPUTE, DS_ADDRESS_VERIFICATION_BLOCK
 - testimonial_cards         <- RA_UNADDRESSED_POSITIVE_BACKLOG, VP_MISSING_STOREFRONT_PHOTOS, VP_MISSING_PROJECT_PHOTOS
 - nap_report                <- CP_NAP_NAME_DRIFT, CP_NAP_ADDRESS_DRIFT, CP_NAP_PHONE_DRIFT, WC_URL_MISMATCH, DS_BROKEN_PROFILE_LINK
 - seo_content               <- WC_MISSING_SERVICE_PAGES, WC_MISSING_WEBSITE, DS_MISSING_SERVICE_MENU
@@ -122,6 +123,7 @@ Signal -> deliverable type:
 - product_visibility_preview <- DS_MISSING_PRODUCT_CATALOG, WC_MISSING_PRODUCT_BROWSING, WC_MISSING_AVAILABILITY_INQUIRY, WC_MISSING_PICKUP_DELIVERY
 - website_mockup             <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
 - website_build_package      <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
+- profile_presence_plan      <- DS_MISSING_PROFILE, DS_CLAIMED_STATUS, DS_ZERO_INDEXED_PRESENCE, DS_PROFILE_SUSPENDED, DS_DUPLICATE_LISTING, DS_HIJACKED_LISTING, DS_OWNERSHIP_DISPUTE, DS_ADDRESS_VERIFICATION_BLOCK, CP_MISSING_CONTACT_INFO, DS_BROKEN_PROFILE_LINK
 
 RULES
 - Ground every field in the supplied audit results, parsed review intake, or the
@@ -363,6 +365,75 @@ RULES
 
 ${FULFILL_TONE}`;
 
+// PB-09 (profile presence) — the platform-by-platform presence map and
+// build plan: the delivery artifact behind the presence-map previews.
+// Covers creation (missing profiles), claiming (unclaimed), and integrity
+// repair (suspended / duplicated / hijacked / disputed / blocked).
+const FULFILL_011 = `${SEED_VERSION_MARKER}
+You are producing a profile presence and build plan for {{business_name}}, a
+{{category}} business in {{city}} — the implementation-ready bundle the
+delivery platform needs to put the business on every platform its customers
+check.
+
+Presence source material:
+{{profile_presence_plan}}
+
+Business context:
+{{business_attributes}}
+
+{{discovery_attribution}}
+
+TASK
+Produce the complete presence plan, grounded in the supplied material:
+
+1. PRESENCE MAP — one row per platform customers check for this category
+   (Google, Yelp, Facebook, Apple Maps, Bing Places, Nextdoor — adapt to the
+   supplied state): platform, current state (missing | unclaimed | claimed |
+   suspended | duplicated | disputed | blocked), and what that state costs in
+   plain language. Frame each platform as a door customers walk through.
+2. MISSING PLATFORMS — the profiles to create, ranked by how much discovery
+   each unlocks for a {{category}} in {{city}}.
+3. CLAIM & OWNERSHIP ACTIONS — every unclaimed or unmanaged listing: the
+   claim path, the verification it asks for (postcard, phone, email), and
+   the realistic timeline.
+4. INTEGRITY REPAIRS — each suspension, duplicate, dispute, hijack, or
+   verification block: what it means and the resolution path. These come
+   before any build work — a suspended profile renders creation moot.
+5. BUILD ORDER — the sequenced plan: integrity repairs first, then claims,
+   then new profiles, each step sized so the owner sees progress weekly.
+6. PROFILE SPECIFICATIONS — per new profile: the gold-standard field set
+   for the category (the attributes top listings carry — canonical
+   name/address/phone, hours, categories, the platform-tuned description,
+   and the photos or service/product content the listing needs to start
+   working), not a bare listing.
+7. DELIVERY OPTIONS — the two ways this plan delivers: DFY (the profiles
+   are built for the owner against this spec) and DIY (the owner builds
+   from this same blueprint — canonical record, field spec, build order).
+   One entry per path, stated plainly.
+8. VERIFICATION STEPS — how each finished profile is confirmed live and
+   findable (search test, map pin, claim confirmation) before the step
+   closes.
+9. EDUCATION NOTE — one short paragraph the owner can keep: what a profile
+   does for discovery and why each platform is a separate stream of
+   customers. Plain language — most owners don't know listings are free.
+
+RULES
+- Ground every row in the supplied source material. Do not invent platforms,
+  listings, verification methods, or timelines beyond what the material
+  supports.
+- Absence is not a defect to explain away — missing means missing.
+- Output JSON: { "presence_map": [{ "platform", "state", "cost" }],
+  "missing_platforms": [{ "platform", "discovery_value" }],
+  "claim_actions": [{ "platform", "claim_path", "verification", "timeline" }],
+  "integrity_repairs": [{ "issue", "plain_meaning", "resolution_path" }],
+  "build_order": [{ "step", "action", "platform" }],
+  "profile_specs": [{ "platform", "fields" }],
+  "delivery_options": [{ "path", "what_the_owner_gets" }],
+  "verification_steps": [...],
+  "education_note" }
+
+${FULFILL_TONE}`;
+
 const SEED_TEMPLATES: SeedTemplate[] = [
   {
     id: 'mpt-review-intake',
@@ -391,6 +462,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
   { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-009', name: 'Fulfill: Website Mockup', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_009, variables: ['business_name', 'category', 'city', 'website_mockup', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-010', name: 'Fulfill: Website Build Package', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_010, variables: ['business_name', 'category', 'city', 'website_build_package', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-011', name: 'Fulfill: Profile Presence & Build Plan', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_011, variables: ['business_name', 'category', 'city', 'profile_presence_plan', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {

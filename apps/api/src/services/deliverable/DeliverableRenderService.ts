@@ -62,6 +62,9 @@ export class DeliverableRenderService extends BaseService {
         if (resolved.archetype === 'A6') {
           deliverableType = 'product_visibility_preview';
         }
+        if (resolved.archetype === 'A8') {
+          deliverableType = 'profile_presence_plan';
+        }
       } catch (e) {
         // Archetype resolution failed (no audit, no triage) — warn-log and
         // use the legacy default so the render doesn't hard-fail.

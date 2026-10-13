@@ -53,6 +53,13 @@ export const KNOWN_SIGNAL_CODES = [
   'DS_OUTDATED_HOURS',
   'DS_OUTDATED_HOLIDAY_HOURS',
   'DS_PHOTO_DEFICIT',
+  // Profile presence & integrity (PB-09 / A8)
+  'DS_ZERO_INDEXED_PRESENCE',
+  'DS_PROFILE_SUSPENDED',
+  'DS_DUPLICATE_LISTING',
+  'DS_HIJACKED_LISTING',
+  'DS_OWNERSHIP_DISPUTE',
+  'DS_ADDRESS_VERIFICATION_BLOCK',
   // Website & Conversion (WC)
   'WC_MISSING_WEBSITE',
   'WC_BROKEN_WEBSITE',
@@ -135,6 +142,10 @@ export function isRepairSignal(code: SignalCode): boolean {
   // The absence-class codes (WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN,
   // WC_PARKED_DOMAIN, WC_UNFINISHED_SITE) are deliberately NOT repair-class,
   // mirroring WC_MISSING_WEBSITE.
+  //
+  // PB-09 presence/integrity codes are repair-class: a missing, unclaimed,
+  // suspended, duplicated, hijacked, disputed, or unverifiable profile is a
+  // footprint defect to fix (PB-05 dual.groupA), not a website gap.
   if (code.startsWith('CP_')) return true;
   return (
     code === 'WC_URL_MISMATCH' ||
@@ -145,7 +156,15 @@ export function isRepairSignal(code: SignalCode): boolean {
     code === 'WC_POOR_SITE_QUALITY' ||
     code === 'WC_CATEGORY_MISMATCH' ||
     code === 'DS_BROKEN_PROFILE_LINK' ||
-    code === 'DS_OUTDATED_HOLIDAY_HOURS'
+    code === 'DS_OUTDATED_HOLIDAY_HOURS' ||
+    code === 'DS_MISSING_PROFILE' ||
+    code === 'DS_CLAIMED_STATUS' ||
+    code === 'DS_ZERO_INDEXED_PRESENCE' ||
+    code === 'DS_PROFILE_SUSPENDED' ||
+    code === 'DS_DUPLICATE_LISTING' ||
+    code === 'DS_HIJACKED_LISTING' ||
+    code === 'DS_OWNERSHIP_DISPUTE' ||
+    code === 'DS_ADDRESS_VERIFICATION_BLOCK'
   );
 }
 
@@ -282,6 +301,12 @@ export const SIGNAL_LABELS: Record<string, string> = {
   DS_OUTDATED_HOURS: 'Outdated Hours of Operation',
   DS_OUTDATED_HOLIDAY_HOURS: 'Missing Holiday Hours',
   DS_PHOTO_DEFICIT: 'Photo Deficit (<5 photos)',
+  DS_ZERO_INDEXED_PRESENCE: 'Zero Indexed Presence',
+  DS_PROFILE_SUSPENDED: 'Suspended Profile',
+  DS_DUPLICATE_LISTING: 'Duplicate Listing',
+  DS_HIJACKED_LISTING: 'Hijacked Listing',
+  DS_OWNERSHIP_DISPUTE: 'Listing Ownership Dispute',
+  DS_ADDRESS_VERIFICATION_BLOCK: 'Address Verification Block',
   WC_MISSING_WEBSITE: 'No Website Detected',
   WC_BROKEN_WEBSITE: 'Broken Website (dead URL)',
   WC_URL_MISMATCH: 'URL Mismatch (audit vs campaign)',

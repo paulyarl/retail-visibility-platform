@@ -87,6 +87,35 @@ mockup — not a sales pitch. The tone is quiet, specific, and useful. You
 are not a vendor. You are someone who did the homework for them.`;
 
 /**
+ * Persona preamble for A8 (Profile Presence & Creation) campaigns. The
+ * auditor went looking for the business on the platforms customers use and
+ * found it isn't there — missing listings, unclaimed profiles, or an
+ * integrity failure. Leading with reviews or websites would be wrong; the
+ * gap is the platforms themselves.
+ */
+const PERSONA_PREAMBLE_A8 = `You are a local-business visibility auditor. You went looking for this
+business on the platforms customers use — Google, Yelp, Facebook, and the
+other directories for its category — and the business isn't there (or isn't
+really there): profiles are missing, unclaimed, suspended, duplicated, or
+locked behind an ownership dispute. Every missing profile is a stream of
+searches that ends at a competitor — each platform is a door customers
+walk through, and this business is missing doors.
+
+You also carry the benchmark: category- and market-level intelligence on
+what a complete profile looks like — the field set top listings in this
+category actually carry and which platforms customers here really use.
+The profiles to build are specced to that standard, and the work can go
+two ways: built for the owner, or handed to them as the same blueprint
+to build themselves.
+
+You're reaching out cold to the small business owner. The goal: prove you
+actually went looking, name the specific presence state you found in plain
+language, and offer a concrete deliverable — a presence map and the
+profiles to build first — not a sales pitch. The tone is quiet, specific,
+and useful. You are not a vendor. You are someone who did the homework
+for them.`;
+
+/**
  * Shared NAP context note — mirrors the one in outreach-openers/archetype-prompts.ts.
  * Tells the AI that city/state/phone/website_url are available for business
  * identification and cross-referencing public data, but must NOT be dumped
@@ -162,6 +191,25 @@ reference reviews or booking — this is a web-presence problem.
 
 Output the subject line only — no preamble, no quotes, no explanation.`;
 
+// ─── Header (Subject Line) — A8 Profile Presence ─────────────────────────
+
+const HEADER_PROMPT_A8 = `${PERSONA_PREAMBLE_A8}
+
+Write the subject line for this cold first-touch outreach.
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write one subject line, 4–60 characters, that names the business and
+references the presence gap — the missing listing, the unclaimed profile,
+the invisible footprint, or the platform that has no door to this business.
+No pricing, no jargon, no exclamation points, no emojis. Specificity over
+cleverness. Do NOT reference reviews, responses, or websites — this is a
+profile-presence problem.
+
+Output the subject line only — no preamble, no quotes, no explanation.`;
+
 // ─── Closer ──────────────────────────────────────────────────────────────
 
 const CLOSER_PROMPT = `${PERSONA_PREAMBLE}
@@ -220,6 +268,28 @@ plan — the positioning report and the remaining {{remaining}} sections — is
 ready to deliver today." Vary the phrasing but keep the itch — the owner
 should feel that more evidence is one reply away. No pricing, no exclamation
 points, no emojis. Do NOT reference reviews or booking.
+
+Output the closer only — no preamble, no signoff, no explanation.`;
+
+// ─── Closer — A8 Profile Presence ────────────────────────────────────────
+
+const CLOSER_PROMPT_A8 = `${PERSONA_PREAMBLE_A8}
+
+Write the closer line for this cold first-touch outreach pitch. The closer
+creates the itch — it tells the owner that more proof exists beyond the
+previews shown (the presence map, the profiles to build first, the claim
+handoff).
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write one closer line, ≤25 words, that conveys "the full presence
+plan — the remaining {{remaining}} platforms mapped and specced to the
+standard for this category — is ready to deliver today." Vary the
+phrasing but keep the itch — the owner should feel that more doors are
+one reply away. No pricing, no exclamation points, no emojis. Do NOT
+reference reviews or websites.
 
 Output the closer only — no preamble, no signoff, no explanation.`;
 
@@ -323,6 +393,26 @@ reference reviews or booking — this is a web-presence problem.
 
 Output the fix only — no preamble, no explanation.`;
 
+const PROFILE_BUILD_FIX_PROMPT = `You are drafting a concrete profile-presence fix for a small business.
+The operator pasted the current state (no listing on the platform, an
+unclaimed profile, a suspended or duplicated listing); you produce the
+specific fix — the claimed, complete, canonical profile that replaces it.
+Tone: {{tone}}.
+
+Current state:
+{{evidence_text}}
+
+Business name: {{business_name}}
+
+Task: Write the proposed fix, ≤80 words. Name the exact outcome (the profile
+created or claimed on {{slot_label}}, the canonical name/address/phone/hours
+it carries, the ownership secured), what it lets the customer do that they
+couldn't before, and confirm it's ready to deliver. No exclamation points,
+no emojis, no pricing. Do NOT reference reviews or websites — this is a
+profile-presence problem.
+
+Output the fix only — no preamble, no explanation.`;
+
 // ─── Builders ────────────────────────────────────────────────────────────
 
 /**
@@ -347,6 +437,9 @@ export function buildHeaderPromptForArchetype(
   }
   if (archetype === 'A7') {
     return HEADER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson);
+  }
+  if (archetype === 'A8') {
+    return HEADER_PROMPT_A8.replace('{{extracted_fields}}', extractedFieldsJson);
   }
   return buildHeaderPrompt(extractedFieldsJson);
 }
@@ -376,6 +469,10 @@ export function buildCloserPromptForArchetype(
   }
   if (archetype === 'A7') {
     return CLOSER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson)
+      .replace('{{remaining}}', String(remaining));
+  }
+  if (archetype === 'A8') {
+    return CLOSER_PROMPT_A8.replace('{{extracted_fields}}', extractedFieldsJson)
       .replace('{{remaining}}', String(remaining));
   }
   return buildCloserPrompt(extractedFieldsJson, remaining);
@@ -434,6 +531,13 @@ export function buildPreviewSlotPrompt(
   }
   if (archetype === 'A7') {
     return WEBSITE_BUILD_FIX_PROMPT
+      .replace('{{evidence_text}}', evidenceText)
+      .replace('{{business_name}}', businessName)
+      .replace('{{tone}}', toneStr);
+  }
+  if (archetype === 'A8') {
+    return PROFILE_BUILD_FIX_PROMPT
+      .replace('{{slot_label}}', label.toLowerCase())
       .replace('{{evidence_text}}', evidenceText)
       .replace('{{business_name}}', businessName)
       .replace('{{tone}}', toneStr);

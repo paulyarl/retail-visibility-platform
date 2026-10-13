@@ -69,6 +69,7 @@ export default function ProjectPlanTab({ campaign }: { campaign: any }) {
           isPrimarySibling: !!(s.isPrimarySibling ?? s.is_primary_sibling),
           engagementCycle: s.engagementCycle ?? s.engagement_cycle ?? 1,
           archetype: s.archetype ?? null,
+          playbookCode: s.playbookCode ?? s.playbook_code ?? null,
         })),
       );
     } catch (e) {

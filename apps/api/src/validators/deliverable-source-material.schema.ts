@@ -141,6 +141,48 @@ const websiteBuildPackageSourceSchema = z.object({
   profile_cutover: z.array(z.string()).optional(),
 }).passthrough();
 
+// PB-09 (profile presence) — source block for the platform-by-platform
+// presence map + build plan. The delivery artifact behind the presence-map
+// previews: platform states, the profiles to create, claim/ownership actions,
+// and integrity repairs.
+const profilePresencePlanSourceSchema = z.object({
+  presence_map: z.array(z.object({
+    platform: z.string(),
+    state: z.string().nullable().optional(),
+    cost: z.string().nullable().optional(),
+  }).passthrough()).optional(),
+  missing_platforms: z.array(z.object({
+    platform: z.string(),
+    discovery_value: z.string().nullable().optional(),
+  }).passthrough()).optional(),
+  claim_actions: z.array(z.object({
+    platform: z.string(),
+    claim_path: z.string().nullable().optional(),
+    verification: z.string().nullable().optional(),
+    timeline: z.string().nullable().optional(),
+  }).passthrough()).optional(),
+  integrity_repairs: z.array(z.object({
+    issue: z.string(),
+    plain_meaning: z.string().nullable().optional(),
+    resolution_path: z.string().nullable().optional(),
+  }).passthrough()).optional(),
+  build_order: z.array(z.object({
+    step: z.union([z.number(), z.string()]),
+    action: z.string().nullable().optional(),
+    platform: z.string().nullable().optional(),
+  }).passthrough()).optional(),
+  profile_specs: z.array(z.object({
+    platform: z.string(),
+    fields: z.union([z.string(), z.record(z.string(), z.unknown())]).nullable().optional(),
+  }).passthrough()).optional(),
+  delivery_options: z.array(z.object({
+    path: z.string(),
+    what_the_owner_gets: z.string().nullable().optional(),
+  }).passthrough()).optional(),
+  verification_steps: z.array(z.string()).optional(),
+  education_note: z.string().nullable().optional(),
+}).passthrough();
+
 export const deliverableSourceMaterialSchema = z.object({
   // The canonical signal set the analyst consumed (filtered to deliverable-
   // relevant families — spec G-12).
@@ -157,6 +199,7 @@ export const deliverableSourceMaterialSchema = z.object({
     product_visibility_preview: productVisibilitySourceSchema.nullable().optional(),
     website_mockup: websiteMockupSourceSchema.nullable().optional(),
     website_build_package: websiteBuildPackageSourceSchema.nullable().optional(),
+    profile_presence_plan: profilePresencePlanSourceSchema.nullable().optional(),
   }).passthrough(),
 
   data_quality: z.object({
@@ -189,7 +232,8 @@ Return your response as JSON matching this exact schema:
     "lead_magnet": { "offer": { "title": "<string>", "promise": "<string>", "audience": "<string|null>" }, "friction_points": ["<string>"], "conversion_opportunities": ["<string>"] } | null,
     "product_visibility_preview": { "product_categories": ["<string>"], "catalog_gaps": ["<string>"], "browsing_gaps": ["<string>"], "availability_inquiry_present": <boolean|null>, "pickup_delivery_present": <boolean|null>, "photo_types_missing": ["<string>"] } | null,
     "website_mockup": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>" } | null,
-    "website_build_package": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>", "page_structure": [{ "page": "<string>", "purpose": "<string|null>", "key_content": ["<string>"] }], "nav_and_cta": ["<string>"], "domain_hosting_direction": "<string|null>", "asset_requirements": ["<string>"], "platform_notes": "<string|null>", "launch_checklist": ["<string>"], "profile_cutover": ["<string>"] } | null
+    "website_build_package": { "presence_state": "<string|null>", "ownership": "<string|null>", "positioning_gaps": ["<string>"], "category_expectations": ["<string>"], "must_have_pages": ["<string>"], "build_scope": "<string|null>", "page_structure": [{ "page": "<string>", "purpose": "<string|null>", "key_content": ["<string>"] }], "nav_and_cta": ["<string>"], "domain_hosting_direction": "<string|null>", "asset_requirements": ["<string>"], "platform_notes": "<string|null>", "launch_checklist": ["<string>"], "profile_cutover": ["<string>"] } | null,
+    "profile_presence_plan": { "presence_map": [{ "platform": "<string>", "state": "<string|null>", "cost": "<string|null>" }], "missing_platforms": [{ "platform": "<string>", "discovery_value": "<string|null>" }], "claim_actions": [{ "platform": "<string>", "claim_path": "<string|null>", "verification": "<string|null>", "timeline": "<string|null>" }], "integrity_repairs": [{ "issue": "<string>", "plain_meaning": "<string|null>", "resolution_path": "<string|null>" }], "build_order": [{ "step": <number>, "action": "<string|null>", "platform": "<string|null>" }], "profile_specs": [{ "platform": "<string>", "fields": "<string|object>" }], "delivery_options": [{ "path": "<string>", "what_the_owner_gets": "<string|null>" }], "verification_steps": ["<string>"], "education_note": "<string|null>" } | null
   },
   "data_quality": { "verified_fields": ["<string>"], "unavailable_fields": ["<string>"], "limitations": ["<string>"] }
 }

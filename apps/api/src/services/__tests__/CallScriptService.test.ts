@@ -250,8 +250,8 @@ describe('CallScriptService.assembleForCampaign', () => {
   it('returns every ranked hook option', async () => {
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    expect(result.hookOptions).toHaveLength(23);
-    for (let i = 0; i < 23; i++) {
+    expect(result.hookOptions).toHaveLength(24);
+    for (let i = 0; i < 24; i++) {
       expect(result.hookOptions[i].rank).toBe(i + 1);
     }
   });

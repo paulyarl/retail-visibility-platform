@@ -1910,6 +1910,22 @@ const syncFieldsSchema = z.object({
 router.get('/presence-seeds/:id/campaign-links', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    // Lazy family repair: prospects seeded before sibling auto-linking
+    // have only the primary attached. Same lazy-repair precedent as
+    // refreshSeedFidelityIfStale — idempotent, non-fatal.
+    try {
+      await DirectorySeedCampaignLinkService.ensureProspectSiblingLinks(id, {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+    } catch (err) {
+      logger.warn('ensureProspectSiblingLinks lazy repair failed (non-fatal)', undefined, {
+        seedId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     const links = await DirectorySeedCampaignLinkService.listLinks(id);
     res.json({ success: true, links });
   } catch (error: any) {

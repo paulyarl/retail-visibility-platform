@@ -69,6 +69,17 @@ const TYPE_LABELS: Partial<Record<DeliverableType, Record<string, string>>> = {
     cta: 'Call to Action',
   },
   product_visibility_preview: { sections: 'Sections' },
+  profile_presence_plan: {
+    presence_map: 'Presence Map',
+    missing_platforms: 'Profiles to Build',
+    claim_actions: 'Claim & Ownership Actions',
+    integrity_repairs: 'Integrity Repairs',
+    build_order: 'Build Order',
+    profile_specs: 'Profile Specifications',
+    delivery_options: 'Two Ways to Get There',
+    verification_steps: 'Verification Steps',
+    education_note: 'Why Profiles Matter',
+  },
 };
 
 // Sub-key labels shared across types — also the top-level fallback before
@@ -95,12 +106,13 @@ const COMMON_LABELS: Record<string, string> = {
   meta_description: 'Meta description',
   internal_links: 'Internal links',
   content: 'Content',
+  what_the_owner_gets: 'What you get',
 };
 
 // Fields that can title an object inside an array, in preference order.
 const TITLE_KEYS = [
   'page', 'title', 'name', 'service', 'platform', 'question', 'quote',
-  'theme', 'post', 'section', 'item', 'cta',
+  'theme', 'post', 'section', 'item', 'cta', 'path',
 ];
 
 // ─── Public entry point ──────────────────────────────────────────────────

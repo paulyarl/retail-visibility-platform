@@ -92,6 +92,9 @@ export interface PlanSiblingSummary {
   isPrimarySibling: boolean;
   engagementCycle: number;
   archetype?: string | null;
+  /** Accepted playbook code (e.g. 'PB-02') — the disambiguator between
+   *  same-named siblings, same pattern as the seed's Linked Campaigns. */
+  playbookCode?: string | null;
 }
 
 export interface PlanCockpitPanelProps {
@@ -220,6 +223,11 @@ function ProspectFamilyStrip({
           >
             {s.isPrimarySibling && <span className="text-amber-500" title="Primary sibling">★</span>}
             <span className="max-w-40 truncate">{s.businessName ?? s.id}</span>
+            {(s.playbookCode || s.archetype) && (
+              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                {[s.playbookCode, s.archetype].filter(Boolean).join(' · ')}
+              </span>
+            )}
             <StageBadge stage={s.stage} />
             {contributing.has(s.id) && (
               <span className="text-emerald-600 dark:text-emerald-400" title="Contributes to the plan">

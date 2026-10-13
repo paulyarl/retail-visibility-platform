@@ -39,7 +39,12 @@ export type DeliverableType =
   // PB-08 (website gap) — the platform-centric build package: page structure,
   // copy spec, domain/hosting direction, nav/CTA spec, asset requirements,
   // and QA/launch checklist. The delivery artifact behind the mockup preview.
-  | 'website_build_package';
+  | 'website_build_package'
+  // PB-09 (profile presence) — the platform-by-platform presence map and
+  // build plan: which profiles are missing/unclaimed/blocked, in what order
+  // to create them, and what each completed profile carries. The delivery
+  // artifact behind the presence-map previews.
+  | 'profile_presence_plan';
 
 export interface DeliverableTemplateInput {
   name: string;
@@ -504,6 +509,7 @@ export class MarketingDeliverableService extends BaseService {
       product_visibility_preview: 'Product Visibility Preview',
       website_mockup: 'Website Mockup',
       website_build_package: 'Website Build Package',
+      profile_presence_plan: 'Profile Presence & Build Plan',
     };
     return labels[type] || type;
   }

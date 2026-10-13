@@ -292,6 +292,51 @@ List anything that makes this harder than it looks:
     archetypeBinding:
       'every entry must be a shelf-visibility pair (unbrowsable products, missing categories, thin photos, unclear pickup/delivery) — even when the audit data contains a more painful off-archetype signal.',
   },
+  {
+    id: 'mpt-archetype-briefing-a8',
+    name: 'Seek: Archetype Briefing — Profile Presence & Integrity (A8)',
+    issueType: 'profile_presence',
+    extractFocus:
+      'The extract carries the presence picture: per-platform profile status (claimed / unclaimed / verified-failed), the render-control-confirmed absences (platforms where the business simply does not exist), the presence/integrity-scoped gap rows, plus the internal signal and outreach ammunition the owner-facing report redacts.',
+    instructions: `### 1. Scope
+
+Identify the presence gap's specific scope from the extract and audit data:
+- **summary**: 1-2 sentence plain-language summary (e.g., "The business exists on Google but nowhere else — no Yelp, no Facebook, and the Google listing is unclaimed.")
+- **affected_platforms**: which platforms are missing entirely (render_control_absences + profile_presence gap rows) vs. present-but-unclaimed vs. integrity-blocked
+- **specifics**: the exact state per platform — absent, unclaimed, suspended, duplicated, disputed, verification-blocked. Name the platform and the state, not just "weak presence."
+
+### 2. Impact
+
+Assess the business consequence of a missing or unmanaged profile footprint:
+- **primary_consequence**: the main business pain (e.g., "every platform without a profile is a stream of searches that ends at a competitor — the business is invisible where customers are actually looking")
+- **estimated_reach_loss**: qualitative estimate (e.g., "severe — the business only surfaces on one of the four platforms its customers use")
+- **competitive_gap**: how competitors present on every platform collect the customers this business never sees
+- **education angle**: the owner may not know these platforms exist or that profiles are free — frame the impact as discovery they're missing, not a defect they're guilty of
+
+### 3. Pitch
+
+Use the category intelligence block (appended below) as PRIMARY context for framing the pitch — it carries the benchmark for what a complete {category} profile looks like in this market. Craft:
+- **opener_hook**: 1-2 sentence opener the operator can use verbatim — name the missing door ("someone searching Yelp for a {category} in {city} finds three competitors and not you")
+- **pain_points**: 2-4 category-aware pain points that resonate for this business type
+- **value_preview**: what a complete, claimed footprint delivers — the specific value proposition (profiles created on every platform customers check, specced to the gold-standard field set for the category, claimed and under the owner's control, integrity failures cleared)
+- **delivery_paths**: the plan works two ways — we build the profiles (DFY) or the owner builds from the same benchmarked blueprint (DIY). Name both so the owner hears an option, not an all-or-nothing ask
+- **ops note**: the audit gets sharper as the operator confirms each platform by hand — supplementing per-platform evidence (URLs, claim states) back into the audit is part of the motion, not bookkeeping
+
+### 4. Risks
+
+List anything that makes presence-building harder than it looks:
+- Owner may not believe the platforms matter ("my customers find me by word of mouth") — counter with the discovery loss, never with platform jargon
+- Verification can stall (postcard delays, ownership disputes) — timeline is a promise risk
+- Integrity failures (suspension, hijack) may need platform appeals before any build work
+- Creating a profile the owner can't maintain can drift stale — the retainer is part of the answer
+
+### 5. Severity + Issue Type
+
+- **severityScore** (1-10): how damaging is the presence gap to discovery — missing platforms score higher than unclaimed ones; integrity failures score highest
+- **issueType**: "profile_presence"`,
+    archetypeBinding:
+      'every entry must be a presence/integrity pair (missing profiles, unclaimed listings, suspended/duplicated/disputed/blocked profiles, invisible footprint) — even when the audit data contains a more painful off-archetype signal.',
+  },
 ];
 
 function bodyFor(t: ArchetypeTemplate): string {

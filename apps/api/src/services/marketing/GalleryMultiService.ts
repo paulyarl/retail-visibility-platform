@@ -14,7 +14,7 @@
  *
  * Ordering:
  *   - Primary sibling first
- *   - Then by archetype priority (A2 > A1 > A6 > A3 > A4 > A7 > A5)
+ *   - Then by archetype priority (A2 > A8 > A1 > A6 > A3 > A4 > A7 > A5)
  *   - Then by created_at ascending
  *
  * Pattern: singleton extends BaseService.
@@ -109,12 +109,13 @@ export interface MultiGalleryData {
 
 const ARCHETYPE_PRIORITY: Record<ArchetypeCode, number> = {
   A2: 1, // BBB crisis — highest priority
-  A1: 2, // Review gap
-  A6: 3, // Product visibility
-  A3: 4, // Listing drift
-  A4: 5, // CTA gap
-  A7: 6, // Website gap
-  A5: 7, // Dual/triage (bundle)
+  A8: 2, // Profile presence — invisible beats under-maintained
+  A1: 3, // Review gap
+  A6: 4, // Product visibility
+  A3: 5, // Listing drift
+  A4: 6, // CTA gap
+  A7: 7, // Website gap
+  A5: 8, // Dual/triage (bundle)
 };
 
 const ELIGIBLE_STAGES = new Set(['preview_built', 'shown']);

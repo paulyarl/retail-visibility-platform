@@ -43,7 +43,8 @@ export type ProspectReportChapterId =
   | 'cta'
   | 'reviews'
   | 'recovery'
-  | 'products';
+  | 'products'
+  | 'presence';
 
 /**
  * Shared chapter body — every chapter renders the same owner-safe shape;

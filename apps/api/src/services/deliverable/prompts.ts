@@ -633,6 +633,123 @@ export function buildDomainMigrationPlanPrompt(
     .replace('{{build_scope}}', buildScope ? `Recommended build scope: ${buildScope}` : '');
 }
 
+// ─── Profile Presence (A8 — PB-09) ───────────────────────────────────────
+
+export const PRESENCE_MAP_PROMPT = `You are preparing a profile-presence map for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Platform-by-platform state:
+{{platform_states}}
+
+Summary: {{presence_summary}}
+
+Task: Write the presence map the owner reads first. Cover:
+
+## Where Customers Look — And Where You Are
+[A plain-language walk through each platform customers check for a {{business_category}} (Google, Yelp, Facebook, Apple Maps, Bing, Nextdoor): whether the business has a profile there, and what a customer experiences when they search — found, found-but-unclaimed, or nothing at all.]
+
+## Why Each Platform Is a Door
+[One line per missing or unclaimed platform on what it actually delivers: the searches it answers, the maps it appears in, the reviews it collects. Frame absence as discovery the business is missing — not a defect to feel guilty about. Most owners don't know these listings are free.]
+
+## The Compounding Cost
+[What an incomplete footprint costs: every missing profile is a stream of searches that ends at a competitor; every unclaimed profile is a listing anyone can edit.]
+
+Keep it specific to this business and category. No pricing.
+
+Output as structured text.`;
+
+export const PROFILE_BUILD_PLAN_PROMPT = `You are preparing a profile build plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Current platform state:
+{{platform_states}}
+
+Platforms with no profile: {{missing_platforms}}
+
+Task: Write the build plan — the profiles to create, in the order that builds discovery fastest. Cover:
+
+## Build Order
+[The platforms to build first, ranked by how much discovery they unlock for a {{business_category}} in {{business_city}}. Google first almost always — it feeds Maps and Search — then the category-relevant directories and the social platform where this business's customers actually are.]
+
+## What Each Profile Carries
+[Per platform, the complete profile spec built to the gold-standard field set for a {{business_category}}: the canonical name/address/phone, hours, categories, the description tuned to that platform, and the photos or content the benchmark listings carry (menu for restaurants, service list for contractors, product categories for retailers). The point is a complete profile, not a bare listing.]
+
+## Two Ways to Get There
+[The same blueprint delivers two ways: the profiles can be built for the owner, or the owner can build them with this plan in hand — same canonical record, same field spec, same order. Say it plainly so the owner knows the plan works either way.]
+
+## The First Week on Each Platform
+[What a new profile needs to start working — the first photos, the first post, asking the first happy customers for a review — so the listing doesn't sit empty.]
+
+Keep it practical — the owner should see a build sequence, not a lecture. No pricing.
+
+Output as structured text.`;
+
+export const OWNERSHIP_CLAIM_GUIDE_PROMPT = `You are preparing an ownership and claim guide for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Claim actions needed:
+{{claim_actions}}
+
+Integrity issues found:
+{{integrity_issues}}
+
+Task: Write the guide that puts every profile under the owner's control. Cover:
+
+## Claim What Already Exists
+[For each unclaimed or unmanaged listing: how the claim works on that platform, what verification it asks for (postcard, phone, email), and roughly how long each takes. Plain steps an owner can follow — no platform jargon.]
+
+## Clear the Integrity Blocks
+[For each integrity issue found — suspension, duplicate, dispute, hijack, verification block, broken link — what it means in plain language and the resolution path. Suspensions and disputes come first: no build work matters while a platform won't show the business.]
+
+## Keeping Control
+[What "claimed" protects: only the owner can edit hours, phone, and address; the owner sees customer questions and reviews first; competitors and strangers can't suggest changes.]
+
+Keep it practical — this is paperwork, not engineering. No pricing.
+
+Output as structured text.`;
+
+export function buildPresenceMapPrompt(
+  ctx: BusinessContextFields,
+  platformStates: string,
+  presenceSummary: string,
+): string {
+  return PRESENCE_MAP_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{platform_states}}', platformStates || 'No platform data recorded')
+    .replace('{{presence_summary}}', presenceSummary || 'Presence not assessed');
+}
+
+export function buildProfileBuildPlanPrompt(
+  ctx: BusinessContextFields,
+  platformStates: string,
+  missingPlatforms: string,
+): string {
+  return PROFILE_BUILD_PLAN_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{platform_states}}', platformStates || 'No platform data recorded')
+    .replace('{{missing_platforms}}', missingPlatforms || 'None detected');
+}
+
+export function buildOwnershipClaimGuidePrompt(
+  ctx: BusinessContextFields,
+  claimActions: string,
+  integrityIssues: string,
+): string {
+  return OWNERSHIP_CLAIM_GUIDE_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{claim_actions}}', claimActions || 'No unclaimed or blocked profiles detected')
+    .replace('{{integrity_issues}}', integrityIssues || 'None detected');
+}
+
 // ─── Execution-layer variable maps ─────────────────────────────────────────
 // The prompt constants above are seeded into mpt_prompt_templates_list (see
 // src/scripts/seed-deliverable-construction-templates.ts) and rendered through

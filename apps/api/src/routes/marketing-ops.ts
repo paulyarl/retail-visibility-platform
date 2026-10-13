@@ -862,9 +862,9 @@ const scorecardUpdateSchema = z.object({
 });
 
 // ─── Playbook Catalog + Triage schemas (Sprint 3) ───────────────────────
-const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07', 'PB-08']);
+const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05', 'PB-06', 'PB-07', 'PB-08', 'PB-09']);
 const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'profile_repair', 'triage_management']);
-const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7']);
+const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8']);
 
 // ─── Matching rules DSL schema (§6.4) ────────────────────────────────────
 // Structured validation for the any/all/none/dual set-membership DSL.
@@ -7338,6 +7338,26 @@ router.post('/:campaignId/siblings', async (req: any, res: Response) => {
       assignedTo: parsed.assigned_to,
       notes: parsed.notes,
     }, getCtx(req));
+    // If the prospect family already has a primary-linked seed, attach the
+    // new sibling to it with link_role='sibling' — Linked Campaigns shows
+    // the whole family, not just the seed owner. Non-fatal.
+    const prospectId = (sibling as any).business_prospect_id;
+    if (prospectId) {
+      try {
+        const { default: DirectorySeedCampaignLinkService } = await import('../services/DirectorySeedCampaignLinkService.js');
+        await DirectorySeedCampaignLinkService.ensureSeedLinksForProspect(prospectId, {
+          actorType: 'user',
+          actorId: (req as any).user?.userId || (req as any).user?.id,
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
+      } catch (err) {
+        logger.warn('ensureSeedLinksForProspect failed on sibling creation (non-fatal)', getCtx(req), {
+          prospectId,
+          error: (err as Error).message,
+        });
+      }
+    }
     res.status(201).json({ success: true, data: sibling });
   } catch (error) {
     if (error instanceof z.ZodError) {

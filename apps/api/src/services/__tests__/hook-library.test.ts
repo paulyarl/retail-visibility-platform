@@ -27,7 +27,7 @@ import { KNOWN_SIGNAL_CODES } from '../triage/signal-taxonomy';
 import { isRepairSignal } from '../triage/signal-taxonomy';
 import { computeSignalSeverity } from '../outreach-openers/signal-magnitude';
 
-const VALID_ARCHETYPES: ArchetypeCode[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
+const VALID_ARCHETYPES: ArchetypeCode[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'];
 
 // Signal codes registered in migrations 158 + 170
 const REGISTERED_SIGNALS = new Set([
@@ -76,11 +76,17 @@ const REGISTERED_SIGNALS = new Set([
   // DS_ZERO_INDEXED_PRESENCE is the registered signal code (migration 191).
   'EF_ZERO_INDEXED_PRESENCE',
   'DS_ZERO_INDEXED_PRESENCE',
+  // PB-09 presence/integrity codes (migration 334)
+  'DS_PROFILE_SUSPENDED',
+  'DS_DUPLICATE_LISTING',
+  'DS_HIJACKED_LISTING',
+  'DS_OWNERSHIP_DISPUTE',
+  'DS_ADDRESS_VERIFICATION_BLOCK',
 ]);
 
 describe('Hook Library catalog', () => {
-  it('has exactly 23 entries', () => {
-    expect(HOOK_LIBRARY).toHaveLength(23);
+  it('has exactly 24 entries', () => {
+    expect(HOOK_LIBRARY).toHaveLength(24);
   });
 
   it('every angle key is unique', () => {
@@ -89,7 +95,7 @@ describe('Hook Library catalog', () => {
   });
 
   it('HOOK_ANGLE_KEYS matches the library', () => {
-    expect(HOOK_ANGLE_KEYS).toHaveLength(23);
+    expect(HOOK_ANGLE_KEYS).toHaveLength(24);
     expect(HOOK_ANGLE_KEYS).toEqual(HOOK_LIBRARY.map((h) => h.angle));
   });
 
@@ -126,7 +132,7 @@ describe('Hook Library catalog', () => {
     }
   });
 
-  it('every archetype code is valid A1–A6', () => {
+  it('every archetype code is valid A1–A8', () => {
     for (const hook of HOOK_LIBRARY) {
       for (const archetype of hook.archetypes) {
         expect(VALID_ARCHETYPES).toContain(archetype);

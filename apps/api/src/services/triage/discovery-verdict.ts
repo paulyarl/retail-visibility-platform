@@ -470,9 +470,10 @@ export function discoveryOperationalStatus(
 // gate a semantic without a deploy. The routed playbook's ARCHETYPE names
 // the kind of problem the pattern describes:
 //
-//   visibility tilt (A7 website gap, A6 product-visibility, A4 CTA gap) —
-//     the routed problem is a visibility gap, which is exactly what a seed
-//     listing exists to fix. Positive seed-confidence influence — never
+//   visibility tilt (A7 website gap, A8 profile presence, A6 product-
+//     visibility, A4 CTA gap) — the routed problem is a visibility gap,
+//     which is exactly what a seed listing exists to fix. Positive
+//     seed-confidence influence — never
 //     doubt: a website-tilted route is a visibility issue, not an
 //     operational or identity one.
 //   doubt tilt (A3 listing drift) — the routed problem is identity
@@ -492,6 +493,7 @@ export type SeedSignalTilt = 'visibility' | 'doubt' | 'neutral';
 /** Routed-playbook archetype → seed tilt. */
 const PLAYBOOK_ARCHETYPE_TILT: Record<string, SeedSignalTilt> = {
   A7: 'visibility',
+  A8: 'visibility',
   A6: 'visibility',
   A4: 'visibility',
   A3: 'doubt',

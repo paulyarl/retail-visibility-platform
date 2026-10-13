@@ -137,7 +137,7 @@ export interface A4Fields extends CommonFields {
   conversion_opportunities: string[];
 }
 
-export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields | A6Fields | A7Fields;
+export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields | A6Fields | A7Fields | A8Fields;
 
 /**
  * A5: Dual-Signal Footprint Triage. Combines repair (NAP/URL) and review-gap
@@ -202,6 +202,29 @@ export interface A7Fields extends CommonFields {
   builder_host: string | null;
   /** Defect-class website issue labels that fired (WC_* repair codes). */
   issues: string[];
+  /** Resolved business category, when the caller supplies it. */
+  category: string | null;
+}
+
+/**
+ * A8: Profile Presence & Creation. For businesses absent, unclaimed, or
+ * integrity-blocked on the platforms customers check — missing Google/Yelp/
+ * Facebook listings, unclaimed GBP, zero indexed footprint, or a suspended/
+ * duplicated/hijacked/disputed/unverifiable profile. The field shape is a
+ * presence map: which platforms exist, which are missing, which are broken —
+ * so the opener can name the exact door customers can't walk through.
+ */
+export interface A8Fields extends CommonFields {
+  /** Platforms the business IS on (claimed or unclaimed) — display labels. */
+  present_platforms: string[];
+  /** Platforms confirmed absent (render-control failure or missing entry). */
+  missing_platforms: string[];
+  /** Platforms that exist but are unclaimed/likely-unclaimed. */
+  unclaimed_platforms: string[];
+  /** Integrity signal labels that fired (suspended, duplicate, hijacked, …). */
+  integrity_flags: string[];
+  /** True when the audit fired DS_ZERO_INDEXED_PRESENCE — invisible footprint. */
+  zero_indexed: boolean;
   /** Resolved business category, when the caller supplies it. */
   category: string | null;
 }
@@ -462,6 +485,84 @@ export function extractA7Fields(
   };
 }
 
+/**
+ * A8: Profile Presence & Creation. Derives the per-platform presence map
+ * from the audit's platforms block + render controls + detected signals.
+ * Absence has three evidence lanes because profile_status has no "absent"
+ * enum: a render-control `business_specific_failure`, a presence signal the
+ * extractor model-emitted, or a key platform simply missing from the map.
+ * Pure — no DB access.
+ */
+export function extractA8Fields(
+  auditData: BusinessAnalysisAuditData,
+  common: CommonFields,
+): A8Fields {
+  const platforms = auditData.platforms ?? {};
+  const triggeredCodes = new Set((common.triggered_signals ?? []).map((s) => s.code));
+  const detected: string[] = Array.isArray(auditData.detected_signals)
+    ? auditData.detected_signals
+    : [];
+
+  const label = (key: string) =>
+    key === 'google' ? 'Google Business Profile'
+      : key === 'yelp' ? 'Yelp'
+        : key === 'facebook' ? 'Facebook'
+          : key.charAt(0).toUpperCase() + key.slice(1);
+
+  // Present: the audit has a platform entry whose status isn't absent-ish.
+  const present: string[] = [];
+  const unclaimed: string[] = [];
+  for (const [key, p] of Object.entries(platforms)) {
+    if (!p || typeof p !== 'object' || !p.profile_status) continue;
+    if (p.profile_status === 'unclaimed' || p.profile_status === 'likely_unclaimed') {
+      unclaimed.push(label(key));
+    } else {
+      present.push(label(key));
+    }
+  }
+
+  // Confirmed absent: render-control business_specific_failure entries, plus
+  // key platforms with no audit entry at all when a missing-profile signal
+  // fired (the model saw absence but left no row to attribute it to).
+  const confirmedAbsent = new Set<string>();
+  for (const r of auditData.render_controls ?? []) {
+    if (r.determination === 'business_specific_failure' && r.platform) {
+      confirmedAbsent.add(label(r.platform.toLowerCase()));
+    }
+  }
+  const missingSignal =
+    detected.includes('DS_MISSING_PROFILE') || triggeredCodes.has('DS_MISSING_PROFILE');
+  if (missingSignal) {
+    for (const key of ['google', 'yelp', 'facebook']) {
+      if (!platforms[key]?.profile_status) confirmedAbsent.add(label(key));
+    }
+  }
+  // Platforms the audit actually verified present are never "missing" — a
+  // broad DS_MISSING_PROFILE for Yelp shouldn't tar a confirmed Google claim.
+  for (const name of [...present, ...unclaimed]) confirmedAbsent.delete(name);
+
+  const INTEGRITY_LABELS: Record<string, string> = {
+    DS_PROFILE_SUSPENDED: 'a suspended profile',
+    DS_DUPLICATE_LISTING: 'duplicate listings',
+    DS_HIJACKED_LISTING: 'a hijacked listing',
+    DS_OWNERSHIP_DISPUTE: 'a listing ownership dispute',
+    DS_ADDRESS_VERIFICATION_BLOCK: 'an address verification block',
+  };
+  const integrityFlags = Object.entries(INTEGRITY_LABELS)
+    .filter(([code]) => detected.includes(code) || triggeredCodes.has(code))
+    .map(([, labelText]) => labelText);
+
+  return {
+    ...common,
+    present_platforms: present,
+    missing_platforms: [...confirmedAbsent],
+    unclaimed_platforms: unclaimed,
+    integrity_flags: integrityFlags,
+    zero_indexed: detected.includes('DS_ZERO_INDEXED_PRESENCE') || triggeredCodes.has('DS_ZERO_INDEXED_PRESENCE'),
+    category: (auditData as any)?.category ?? null,
+  };
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────
 
 export function extractFields(
@@ -508,5 +609,7 @@ export function extractFields(
       return extractA6Fields(auditData, commonWithSeverity);
     case 'A7':
       return extractA7Fields(auditData, commonWithSeverity);
+    case 'A8':
+      return extractA8Fields(auditData, commonWithSeverity);
   }
 }

@@ -249,6 +249,7 @@ const ARCHETYPE_PHASE_MAP: Record<string, ProjectPhaseKey[]> = {
   A2: ['trust'],
   A6: ['findability'],
   A7: ['findability'],
+  A8: ['claim', 'findability'],
   A4: ['expansion'],
 };
 

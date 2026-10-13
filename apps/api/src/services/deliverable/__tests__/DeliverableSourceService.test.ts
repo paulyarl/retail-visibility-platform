@@ -22,7 +22,7 @@ import {
 const MODAL_TYPES = [
   'review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards',
   'nap_report', 'seo_content', 'lead_magnet', 'product_visibility_preview',
-  'website_mockup', 'website_build_package',
+  'website_mockup', 'website_build_package', 'profile_presence_plan',
 ];
 
 describe('signal → deliverable type mapping (§3.2)', () => {
@@ -102,7 +102,7 @@ describe('archetype ownership gate (playbook routing)', () => {
 
   it('generic types are never gated regardless of archetype', () => {
     const generic = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet'];
-    for (const archetype of ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7']) {
+    for (const archetype of ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8']) {
       const { kept } = gateTypesByOwnership(generic, { playbookCode: null, archetype });
       expect(kept).toEqual(generic);
     }

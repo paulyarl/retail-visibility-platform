@@ -46,6 +46,7 @@ const ARCHETYPE_TEMPLATES: Record<string, { templateId: string; label: string }>
   A3: { templateId: 'mpt-archetype-briefing-a3', label: 'Listing Drift & Visual Refresh' },
   A4: { templateId: 'mpt-archetype-briefing-a4', label: 'CTA & Friction Gap' },
   A6: { templateId: 'mpt-archetype-briefing-a6', label: 'Product Visibility' },
+  A8: { templateId: 'mpt-archetype-briefing-a8', label: 'Profile Presence & Integrity' },
 };
 
 interface Props {

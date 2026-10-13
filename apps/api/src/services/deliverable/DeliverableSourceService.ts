@@ -59,6 +59,7 @@ export const FULFILL_TEMPLATE_BY_TYPE: Record<string, string> = {
   product_visibility_preview: 'mpt-seed-fulfill-008',
   website_mockup: 'mpt-seed-fulfill-009',
   website_build_package: 'mpt-seed-fulfill-010',
+  profile_presence_plan: 'mpt-seed-fulfill-011',
 };
 
 // ─── Signal → deliverable type mapping (spec §3.2) ───────────────────────
@@ -72,6 +73,10 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
   gbp_audit: [
     'DS_CLAIMED_STATUS', 'DS_PHOTO_DEFICIT', 'DS_OUTDATED_HOURS',
     'DS_OUTDATED_HOLIDAY_HOURS', 'DS_MISSING_PROFILE',
+    // PB-09 presence/integrity family — a suspended, duplicated, or blocked
+    // GBP profile still warrants the audit-shaped fix recommendations.
+    'DS_ZERO_INDEXED_PRESENCE', 'DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING',
+    'DS_HIJACKED_LISTING', 'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK',
   ],
   testimonial_cards: [
     'RA_UNADDRESSED_POSITIVE_BACKLOG', 'VP_MISSING_STOREFRONT_PHOTOS',
@@ -116,6 +121,17 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
     'WC_UNSECURED_WEBSITE', 'WC_LEGACY_BUILDER_SITE', 'WC_STALE_WEBSITE',
     'WC_POOR_SITE_QUALITY', 'WC_CATEGORY_MISMATCH',
   ],
+  // PB-09 (profile presence) — the platform-by-platform presence map and
+  // build plan: the delivery artifact behind the presence-map previews.
+  // Fires for any presence or integrity signal — missing, unclaimed,
+  // zero-footprint, suspended, duplicated, hijacked, disputed, or
+  // verification-blocked profiles.
+  profile_presence_plan: [
+    'DS_MISSING_PROFILE', 'DS_CLAIMED_STATUS', 'DS_ZERO_INDEXED_PRESENCE',
+    'DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING', 'DS_HIJACKED_LISTING',
+    'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK',
+    'CP_MISSING_CONTACT_INFO', 'DS_BROKEN_PROFILE_LINK',
+  ],
 };
 
 /** Families the analyst consumes — OX (outreach state) is excluded (G-12). */
@@ -134,6 +150,7 @@ export const TYPE_PLAYBOOK_OWNERSHIP: Record<string, { playbook: string; archety
   product_visibility_preview: { playbook: 'PB-07', archetype: 'A6' },
   website_mockup: { playbook: 'PB-08', archetype: 'A7' },
   website_build_package: { playbook: 'PB-08', archetype: 'A7' },
+  profile_presence_plan: { playbook: 'PB-09', archetype: 'A8' },
 };
 
 export interface GatedDeliverableType {
@@ -814,6 +831,7 @@ export class DeliverableSourceService extends BaseService {
       case 'product_visibility_preview': return 'product_visibility';
       case 'website_mockup': return 'website_mockup';
       case 'website_build_package': return 'website_build_package';
+      case 'profile_presence_plan': return 'profile_presence_plan';
       case 'service_menu': return 'services';
       case 'gbp_audit': return 'gbp_audit';
       default: return 'source_material';

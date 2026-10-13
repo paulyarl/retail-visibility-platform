@@ -576,6 +576,80 @@ exclamation points, emojis, "just checking in", introducing new data.
 
 Output the follow-up only.`;
 
+// ─── A8: Profile Presence & Creation ─────────────────────────────────────
+//
+// Follow-up for businesses missing, unclaimed, or integrity-blocked on the
+// platforms customers check. 'doing' leads with any change in profile
+// presence (a listing appeared, got claimed, or went down); 'telling'
+// reminds the prospect of the presence map + profiles-to-build previews.
+
+const DOING_TEMPLATE_A8 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Data diff (what changed since the opener):
+{{data_diff}}
+
+Task: Write the follow-up, ~70 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Since the snapshot last week —"
+
+3. New proof (USE THE DATA DIFF):
+   - If a listing appeared or got claimed: "noticed [platform] has a
+     listing for you now — though [missing platforms] is still a door
+     customers can't find."
+   - If a profile went down or unclaimed: "the [platform] profile is still
+     sitting unclaimed — anyone can still suggest edits to it."
+   - If nothing changed: "the presence gap is still there — customers
+     looking on [missing platforms] still find your competitors instead."
+   - Do NOT stack numbers. Lead with the single most relevant change.
+
+4. One line: "Updated the presence map — the profiles to build first are attached."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "reviews," "responses," "online booking," "scheduling,"
+"service menu," stacking stats, repeating the opener's hook verbatim,
+pricing/tier jargon, exclamation points, emojis.
+
+Output the follow-up only.`;
+
+const TELLING_TEMPLATE_A8 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write the follow-up, ~60 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Following up on the visibility snapshot from
+   last week —"
+
+3. Reminder:
+   "the three previews are still there — the presence map, the profiles
+   we'd build first (specced to the standard for your category), and
+   what being findable everywhere looks like."
+
+4. Soft re-engagement: "Happy to walk through any of them if useful."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: "reviews," "responses," "online booking," "scheduling,"
+"service menu," repeating the opener's hook, pricing/tier jargon,
+exclamation points, emojis, "just checking in", introducing new data.
+
+Output the follow-up only.`;
+
 // ─── Template registry ──────────────────────────────────────────────────
 const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = {
   A1: { doing: DOING_TEMPLATE_A1, telling: TELLING_TEMPLATE_A1 },
@@ -585,4 +659,5 @@ const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = 
   A5: { doing: DOING_TEMPLATE_A5, telling: TELLING_TEMPLATE_A5 },
   A6: { doing: DOING_TEMPLATE_A6, telling: TELLING_TEMPLATE_A6 },
   A7: { doing: DOING_TEMPLATE_A7, telling: TELLING_TEMPLATE_A7 },
+  A8: { doing: DOING_TEMPLATE_A8, telling: TELLING_TEMPLATE_A8 },
 };

@@ -42,7 +42,7 @@ export const prospectReportTierSchema = z.enum(PROSPECT_REPORT_TIERS);
  *   A1 review gap → `reviews`    A2 negative recovery → `recovery`
  *   A3 listing drift → `drift`   A4 CTA gap → `cta`
  *   A5 multi-signal → `repair`   A6 product visibility → `products`
- *   A7 website gap → `website`
+ *   A7 website gap → `website`   A8 profile presence → `presence`
  *
  * A sibling with no declared archetype claims nothing; `repair`/`website`
  * additionally fall back to the audit's own campaign so legacy campaigns
@@ -52,6 +52,7 @@ export const PROSPECT_REPORT_CHAPTER_IDS = [
   'website',
   'repair',
   'drift',
+  'presence',
   'cta',
   'reviews',
   'recovery',

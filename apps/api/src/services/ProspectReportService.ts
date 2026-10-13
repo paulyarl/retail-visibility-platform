@@ -104,6 +104,13 @@ export const CHAPTER_BUILDERS: Record<ProspectReportChapterId, ChapterBuilder> =
     title: 'Your business details across listings',
     teaserTitle: 'Listing consistency',
   },
+  // A8 profile presence (PB-09) — which platforms the business exists on,
+  // claimed vs. missing, and integrity failures that block discovery.
+  presence: {
+    source: 'business_analysis',
+    title: 'Where customers can find you',
+    teaserTitle: 'Profile presence',
+  },
   // A4 CTA gap (PB-03) — the website's next-step options.
   cta: {
     source: 'business_analysis',
@@ -144,6 +151,7 @@ export const ARCHETYPE_CHAPTERS: Record<string, ProspectReportChapterId> = {
   A5: 'repair',
   A6: 'products',
   A7: 'website',
+  A8: 'presence',
 };
 
 // ─── Archetype briefing plumbing ──────────────────────────────────────────
@@ -186,6 +194,11 @@ export const ARCHETYPE_BRIEFING_TEMPLATES: Record<
     archetype: 'A6',
     issueType: 'product_visibility',
     label: 'Product Visibility',
+  },
+  'mpt-archetype-briefing-a8': {
+    archetype: 'A8',
+    issueType: 'profile_presence',
+    label: 'Profile Presence & Integrity',
   },
 };
 
@@ -298,6 +311,27 @@ export function archetypeFactSlice(
             }
           : null,
         gap_rows: gapRows(/product|photo|catalog|browse|pickup|delivery|availability|categor/i),
+        ...internal,
+      };
+    case 'A8':
+      return {
+        platform_presence: Object.fromEntries(
+          platformEntriesOf(audit).map(([k, p]) => [
+            k,
+            {
+              profile_status: p.profile_status ?? null,
+              claimed: p.claimed ?? null,
+              profile_url: p.profile_url ?? null,
+              rating: p.rating ?? null,
+              total_reviews: p.total_reviews ?? null,
+            },
+          ]),
+        ),
+        render_control_absences: (audit.render_controls ?? [])
+          .filter((r: any) => r?.determination === 'business_specific_failure')
+          .map((r: any) => r?.platform)
+          .filter(Boolean),
+        gap_rows: gapRows(/profile|listing|presence|claim|platform|directory|social|contact/i),
         ...internal,
       };
     default:
@@ -759,6 +793,8 @@ class ProspectReportService extends BaseService {
         return this.buildRecoveryChapter(auditData, ctx, opts);
       case 'products':
         return this.buildProductsChapter(auditData, ctx, opts);
+      case 'presence':
+        return this.buildPresenceChapter(auditData, ctx, opts);
     }
   }
 
@@ -1446,6 +1482,156 @@ class ProspectReportService extends BaseService {
       competitiveFrame: competitiveFrameLines(audit),
       fixHeadline:
         'Your real shelves, online — browsable products, clear pickup, photos that show what\u2019s in stock.',
+    });
+  }
+
+  /**
+   * A8 profile presence (PB-09) — "Where customers can find you": which
+   * platforms the business exists on, whether those profiles are claimed,
+   * and integrity failures that block discovery. The profile_status enum
+   * has no "absent" state, so missing platforms come from render-control
+   * determinations and profile_presence gap rows — the same deterministic
+   * evidence the A8 briefing fact slice carries. Internal signal codes are
+   * translated to owner-safe lines and never surface verbatim.
+   */
+  buildPresenceChapter(
+    auditData: unknown,
+    ctx: ChapterContext,
+    opts: ChapterBuildOpts = {},
+  ): RepairChapterDto {
+    const audit = businessAnalysisSchema.parse(auditData);
+    const platformEntries = platformEntriesOf(audit);
+    const signals: string[] = (audit as any).detected_signals ?? [];
+
+    // Missing platforms — render-control-confirmed absences plus
+    // profile_presence gap rows (the audit emits one per absent platform).
+    const missingPlatforms = new Set<string>();
+    for (const r of (audit as any).render_controls ?? []) {
+      if (r?.determination === 'business_specific_failure' && r?.platform) {
+        missingPlatforms.add(String(r.platform));
+      }
+    }
+    for (const gap of audit.gap_analysis?.gaps ?? []) {
+      if (gap?.field === 'profile_presence' && gap?.platform) {
+        missingPlatforms.add(String(gap.platform));
+      }
+    }
+    const missing = [...missingPlatforms];
+
+    const present = platformEntries.filter(([, p]) => isPresentPlatform(p));
+    const unclaimed = platformEntries.filter(([, p]) => isUnclaimedPlatform(p));
+
+    // Verdict — coverage line over the platforms customers actually check.
+    const checked = present.length + missing.length;
+    const verdict =
+      missing.length === 0 && checked > 0
+        ? `We found your business on all ${checked} platform${checked === 1 ? '' : 's'} we checked — the question is whether they're working for you.`
+        : missing.length > 0 && present.length > 0
+          ? `We found your business on ${present.length} platform${present.length === 1 ? '' : 's'} — but not on ${missing.map((k) => platformLabel(k)).join(', ')}, where customers are also looking.`
+          : missing.length > 0
+            ? 'We could not find your business on the platforms customers check — to anyone searching, the business effectively doesn\u2019t exist.'
+            : 'We could not fully verify where your business appears online.';
+
+    // Already working — present + claimed profiles, consistent identity.
+    const alreadyWorking: string[] = [];
+    for (const [key, p] of present) {
+      const label = platformLabel(key);
+      if (isClaimedPlatform(p)) {
+        alreadyWorking.push(`Your ${label} listing exists and is claimed — you control it.`);
+      } else {
+        alreadyWorking.push(`Your ${label} listing exists.`);
+      }
+    }
+    if (audit.nap_consistency?.overall_status === 'consistent') {
+      alreadyWorking.push(
+        'Your name, address, and phone agree across the listings we could check.',
+      );
+    }
+
+    // What's costing you customers — every missing profile is a door
+    // customers can't walk through; integrity failures are worse than
+    // absence (the platform shows the wrong business).
+    const costing: RepairChapterDto['costing_customers'] = [];
+    for (const key of missing) {
+      costing.push({
+        headline: `No ${platformLabel(key)} profile found`,
+        cost:
+          'Customers searching there find competitors instead — every missing profile is a stream of searches that ends somewhere else.',
+        evidence: null,
+        tier: 'now',
+      });
+    }
+    for (const [key, p] of unclaimed) {
+      costing.push({
+        headline: `Your ${platformLabel(key)} listing is unclaimed`,
+        cost:
+          'An unclaimed profile accepts edits from anyone — and reads as a business nobody is managing.',
+        evidence: p.profile_url ?? null,
+        tier: 'worth_fixing',
+      });
+    }
+    if (signals.includes('DS_PROFILE_SUSPENDED')) {
+      costing.push({
+        headline: 'A profile is suspended',
+        cost: 'Suspended listings disappear from search entirely — worse than having no profile, because the platform knows the business and won\u2019t show it.',
+        evidence: null,
+        tier: 'now',
+      });
+    }
+    if (signals.includes('DS_OWNERSHIP_DISPUTE') || signals.includes('DS_HIJACKED_LISTING')) {
+      costing.push({
+        headline: 'Someone else may control one of your listings',
+        cost: 'Ownership disputes and unauthorized edits mean the profile customers see isn\u2019t in your hands.',
+        evidence: null,
+        tier: 'now',
+      });
+    }
+    if (signals.includes('DS_DUPLICATE_LISTING')) {
+      costing.push({
+        headline: 'A duplicate listing exists',
+        cost: 'Duplicates split your reviews and confuse search — the weaker copy often wins.',
+        evidence: null,
+        tier: 'worth_fixing',
+      });
+    }
+    if (signals.includes('DS_ADDRESS_VERIFICATION_BLOCK')) {
+      costing.push({
+        headline: 'Address verification is blocking a profile',
+        cost: 'The profile can\u2019t activate until the address verifies — a paperwork stall that keeps you invisible.',
+        evidence: null,
+        tier: 'now',
+      });
+    }
+    if (signals.includes('DS_BROKEN_PROFILE_LINK')) {
+      costing.push({
+        headline: 'A profile link is broken',
+        cost: 'Customers who click through land on a dead page.',
+        evidence: null,
+        tier: 'worth_fixing',
+      });
+    }
+    if (signals.includes('CP_MISSING_CONTACT_INFO')) {
+      costing.push({
+        headline: 'No contact information in your public footprint',
+        cost: 'Customers who find you can\u2019t reach you — no phone, no way to ask.',
+        evidence: null,
+        tier: 'now',
+      });
+    }
+
+    const expectations = gapsMatching(
+      audit,
+      /profile|listing|presence|claim|platform|directory|social|contact/i,
+    ).map(gapToExpectation);
+
+    return this.baChapter('presence', ctx, opts, audit, {
+      verdict,
+      alreadyWorking,
+      costing,
+      expectations,
+      competitiveFrame: competitiveFrameLines(audit),
+      fixHeadline:
+        'A complete, claimed footprint — a real profile on every platform your customers check, under your control.',
     });
   }
 

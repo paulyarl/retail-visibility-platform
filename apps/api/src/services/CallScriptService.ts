@@ -988,15 +988,17 @@ export class CallScriptService extends BaseService {
   // ─── Ranking (phone hooks) ────────────────────────────────────────────
 
   /**
-   * Archetype-scoped objection set. Website (A7) and repair (A3/A5) campaigns
-   * get their own on-point objections prepended ahead of the generic five;
-   * every other archetype gets the generic set only.
+   * Archetype-scoped objection set. Website (A7) and repair/presence
+   * (A3/A5/A8) campaigns get their own on-point objections prepended ahead
+   * of the generic five; every other archetype gets the generic set only.
+   * A8 shares the repair objection set — the "I already have a listing" /
+   * "I don't need more platforms" pushbacks land in the same place.
    */
   private objectionsForArchetype(archetype: ArchetypeCode): ObjectionRow[] {
     if (archetype === 'A7') {
       return [...WEBSITE_CALL_SCRIPT_OBJECTIONS, ...CALL_SCRIPT_OBJECTIONS];
     }
-    if (archetype === 'A3' || archetype === 'A5') {
+    if (archetype === 'A3' || archetype === 'A5' || archetype === 'A8') {
       return [...REPAIR_CALL_SCRIPT_OBJECTIONS, ...CALL_SCRIPT_OBJECTIONS];
     }
     return CALL_SCRIPT_OBJECTIONS;

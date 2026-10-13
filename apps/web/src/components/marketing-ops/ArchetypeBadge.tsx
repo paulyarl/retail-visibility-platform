@@ -20,6 +20,7 @@ export const ARCHETYPE_LABELS: Record<string, string> = {
   A5: 'Multi-Signal Footprint',
   A6: 'Product Visibility Gap',
   A7: 'Website Gap',
+  A8: 'Profile Presence',
 };
 
 const ARCHETYPE_COLORS: Record<string, string> = {
@@ -30,6 +31,7 @@ const ARCHETYPE_COLORS: Record<string, string> = {
   A5: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   A6: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
   A7: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
+  A8: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
 };
 
 interface ArchetypeBadgeProps {

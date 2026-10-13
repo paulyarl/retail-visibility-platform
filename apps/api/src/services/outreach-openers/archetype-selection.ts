@@ -3,12 +3,12 @@
  *
  * Pure function over a campaign's latest `business_analysis` audit_data.
  * Selects one of the archetypes based on the strongest signal:
- *   A2 > A1 > A6 > A3 > A7 > A4
+ *   A2 > A8 > A1 > A6 > A3 > A7 > A4
  *
- * Specificity + urgency wins. A recurring-theme negative beats a raw volume
- * gap; volume beats product invisibility; product invisibility beats listing
- * drift; listing drift beats a website gap; a website gap beats a soft
- * conversion gap.
+ * Specificity + urgency wins. A recurring-theme negative beats a missing
+ * profile footprint; missing profiles beat a raw volume gap; volume beats
+ * product invisibility; product invisibility beats listing drift; listing
+ * drift beats a website gap; a website gap beats a soft conversion gap.
  *
  * A5_DUAL_TRIAGE is NOT produced by selectArchetype — it is only emitted by
  * the TriageEngineService (services/triage) for PB-05 multi-signal footprint
@@ -24,7 +24,7 @@
 import { isSocialPlatformHost, isBuilderSubdomainHost } from '../triage/website-host-classification';
 import { hasMaterialNapVariance } from './signal-magnitude';
 
-export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
+export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7' | 'A8';
 
 export interface NegativeReviewTheme {
   theme: string;
@@ -119,6 +119,11 @@ export interface BusinessAnalysisAuditData {
   // block was injected). Used by the signal extractor to gate DS_MISSING_PROFILE
   // on control-confirmed absence rather than bare render failure.
   render_controls?: RenderControlEntry[];
+  // Model-emitted triage signal codes (RA_*, DS_*, WC_*, CP_*, VP_*). The
+  // signal extractor copies these verbatim; selectArchetype reads them for
+  // the presence/integrity family (A8) — absence evidence the platform map
+  // cannot express (the profile_status enum has no "absent" state).
+  detected_signals?: string[];
 }
 
 export interface RenderControlEntry {
@@ -138,13 +143,39 @@ export interface ArchetypeSelection {
   theme?: NegativeReviewTheme;
 }
 
+// ─── A8 presence/integrity signal family (PB-09) ─────────────────────────
+//
+// The codes that mark a business as absent, unclaimed, invisible, or
+// integrity-blocked on a platform. Kept as a Set for O(1) membership in
+// selectArchetype; PB-09's matching_rules carry the same list (plus the
+// registry's primary_playbook wiring).
+export const PRESENCE_SIGNAL_CODES: ReadonlySet<string> = new Set([
+  'DS_MISSING_PROFILE',
+  'DS_CLAIMED_STATUS',
+  'DS_ZERO_INDEXED_PRESENCE',
+  'DS_PROFILE_SUSPENDED',
+  'DS_DUPLICATE_LISTING',
+  'DS_HIJACKED_LISTING',
+  'DS_OWNERSHIP_DISPUTE',
+  'DS_ADDRESS_VERIFICATION_BLOCK',
+]);
+
 // ─── Selection ──────────────────────────────────────────────────────────
 
 /**
  * Deterministically select the best opener archetype from audit data.
  * No LLM, no async, no side effects — pure function.
  *
- * Priority: A2 > A1 > A6 > A3 > A7 > A4
+ * Priority: A2 > A8 > A1 > A6 > A3 > A7 > A4
+ *
+ * A8 (Profile Presence) fires when the business is missing or unclaimed on
+ * the platforms customers check — absent listings, zero indexed presence, or
+ * an integrity failure (suspended / duplicated / hijacked / disputed /
+ * unverifiable profile). It sits just under A2 (a public complaint still
+ * trumps invisibility) and above A1 — a business that lacks the platforms
+ * customers search has a more fundamental gap than one with unanswered
+ * reviews on the platforms it has. Matches the PB-09 cascade position
+ * (rank 3, directly under PB-05's multi-signal dual).
  *
  * A6 (Product Visibility Gap) fires for product/hybrid businesses whose site
  * exists but has no product browsing. It sits above A3/A4 because product
@@ -175,6 +206,29 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
       reason: `recurring-theme negatives: "${themes[0].theme}" (${themes[0].supporting_review_count} reviews)`,
       theme: themes[0],
     };
+  }
+
+  // A8: profile presence — absent, unclaimed, or integrity-failed on a key
+  // platform. The profile_status enum has no "absent" state, so the evidence
+  // is the model-emitted signal + render-control-confirmed absences (the
+  // same two sources the signal extractor turns into DS_MISSING_PROFILE).
+  {
+    const detected = auditData.detected_signals ?? [];
+    const presenceHits = detected.filter((c) => PRESENCE_SIGNAL_CODES.has(c));
+    const confirmedAbsent = (auditData.render_controls ?? []).filter(
+      (r) => r.determination === 'business_specific_failure',
+    );
+    if (presenceHits.length > 0 || confirmedAbsent.length > 0) {
+      const detail = confirmedAbsent.length > 0
+        ? `absent from ${confirmedAbsent.map((r) => r.platform).join(', ')}`
+        : presenceHits.includes('DS_CLAIMED_STATUS')
+          ? 'unclaimed profile'
+          : `signal: ${presenceHits[0]}`;
+      return {
+        archetype: 'A8',
+        reason: `profile presence gap: ${detail}`,
+      };
+    }
   }
 
   // A1: review response gap — material on BOTH dimensions: a meaningful

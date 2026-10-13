@@ -65,7 +65,10 @@ export type HookAngle =
   | 'photo_content_setup'
   | 'click_to_call'
   | 'reputation_monitoring'
-  | 'zero_footprint';
+  | 'zero_footprint'
+  // Presence OFFERING angle (A8/PB-09) — integrity recovery: suspended,
+  // duplicated, hijacked, disputed, or verification-blocked listings.
+  | 'profile_rescue';
 
 export interface HookTemplate {
   angle: HookAngle;
@@ -417,7 +420,7 @@ Want me to send it over?
   {
     angle: 'profile_claim_service',
     label: 'Claim & verify your listing',
-    archetypes: ['A3', 'A5'],
+    archetypes: ['A3', 'A5', 'A8'],
     signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_PROFILE'],
     platforms: ['google'],
     subject: 'your Google listing isn\'t claimed yet',
@@ -614,7 +617,7 @@ Want me to show you what that'd look like?
   {
     angle: 'local_seo',
     label: 'Local SEO',
-    archetypes: ['A5', 'A6'],
+    archetypes: ['A5', 'A6', 'A8'],
     signals: ['RA_LOW_REVIEW_VOLUME', 'DS_MISSING_PROFILE'],
     platforms: ['google'],
     subject: 'a quick look at how easy you are to find',
@@ -643,7 +646,7 @@ Want me to send mine over?
   {
     angle: 'cross_platform_expansion',
     label: 'Cross-platform profile expansion',
-    archetypes: ['A3', 'A5'],
+    archetypes: ['A3', 'A5', 'A8'],
     signals: ['DS_MISSING_PROFILE', 'DS_BROKEN_PROFILE_LINK'],
     // Expansion lands on whichever weighted platforms the business is
     // missing — score across the full directory set so the boost follows
@@ -762,7 +765,7 @@ Want me to show you how it'd work for your shop?
   {
     angle: 'zero_footprint',
     label: 'Zero footprint — no online presence found',
-    archetypes: ['A3', 'A4'],
+    archetypes: ['A3', 'A4', 'A8'],
     signals: ['WC_MISSING_WEBSITE', 'DS_MISSING_PROFILE', 'CP_MISSING_CONTACT_INFO', 'EF_ZERO_INDEXED_PRESENCE', 'DS_ZERO_INDEXED_PRESENCE'],
     platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
     subject: 'couldn\'t find you online at all',
@@ -785,6 +788,37 @@ Want me to send it over?
       soft_cta: 'Want me to send it over?',
     },
     phone_hook: 'I went looking for {{business}} online — Google, your own website, the usual places — and honestly couldn\'t find much of anything. Not a knock on what you do — a lot of great local shops just never had a reason to be online before now. But it means when someone searches for {{category}} in {{city}}, you\'re invisible to them — they find your competitors instead, even if you\'re the better choice. I can put together a quick Online Footprint Audit that shows exactly what\'s missing and where to start. Want me to send it over?',
+  },
+
+  // 14. profile_rescue — presence OFFERING angle: integrity recovery for
+  //     suspended, duplicated, hijacked, disputed, or verification-blocked
+  //     listings. The profile exists — it just isn't working for the owner.
+  {
+    angle: 'profile_rescue',
+    label: 'Profile rescue — suspended, duplicated, or blocked listings',
+    archetypes: ['A8'],
+    signals: ['DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING', 'DS_HIJACKED_LISTING', 'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK'],
+    platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
+    subject: 'your listing is there — but it isn\'t working for you',
+    body: `{{salutation}} I found {{business}}'s listing — but something's off with it. It looks suspended, duplicated, or locked in a way that keeps it from working for you.
+
+This one's more common than you'd think — platforms freeze or split listings all the time, and the owner is usually the last to know.
+
+Until it's cleared, customers searching for {{category}} in {{city}} either see a broken listing or don't see you at all — while every review you've earned sits trapped on a profile you can't use.
+
+I can map out exactly which platform has the issue and what clearing it takes — reinstatement, merge, or an ownership claim. Takes about a day to scope.
+
+Want me to send it over?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'Your listing exists — but it\'s suspended, duplicated, or blocked',
+      reassurance: 'Platforms freeze or split listings all the time — owners are usually the last to know.',
+      quantified_upside: 'Until it\'s cleared, every review sits trapped on a profile you can\'t use',
+      audit_offer: 'A scoped rescue map — which platform, which block, and the path to clear it',
+      soft_cta: 'Want me to send it over?',
+    },
+    phone_hook: 'I found {{business}}\'s listing — but something\'s off with it. It looks suspended, duplicated, or locked in a way that keeps it from working for you. This is more common than you\'d think — platforms freeze or split listings all the time and the owner is usually the last to know. Until it\'s cleared, customers searching for {{category}} in {{city}} either see a broken listing or don\'t see you at all. I can map out exactly which platform has the issue and what clearing it takes — reinstatement, merge, or an ownership claim. Want me to send it over?',
   },
 ];
 

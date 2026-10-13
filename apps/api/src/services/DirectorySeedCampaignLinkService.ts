@@ -358,7 +358,90 @@ class DirectorySeedCampaignLinkService {
 
     const links = await this.listLinks(seedId);
     const link = links.find((l) => l.campaignId === campaignId)!;
+
+    // A seed that just gained its primary link belongs to the whole
+    // prospect family — attach every other sibling under the group's
+    // business_prospect_id with 'sibling' role so Linked Campaigns shows
+    // the full family, not just the seed owner.
+    if (role === 'primary') {
+      try {
+        await this.ensureProspectSiblingLinks(seedId, ctx);
+      } catch (err) {
+        logger.warn('ensureProspectSiblingLinks failed (non-fatal)', undefined, {
+          seedId, error: (err as Error).message,
+        });
+      }
+    }
+
     return { link, autoProjected, napMatch };
+  }
+
+  /**
+   * Attach every sibling campaign in the seed's prospect group that is not
+   * already linked, with link_role='sibling'. Idempotent — ON CONFLICT in
+   * linkCampaign makes a re-run a no-op. Called after a primary link is
+   * created, lazily on the campaign-links read (repairs families seeded
+   * before sibling auto-link existed), and when a new sibling joins a
+   * prospect that already has a seed.
+   */
+  async ensureProspectSiblingLinks(
+    seedId: string,
+    ctx?: LinkAuditCtx,
+  ): Promise<{ linked: string[] }> {
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT mc.business_prospect_id
+      FROM directory_seed_campaign_links dscl
+      JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+      WHERE dscl.seed_id = ${seedId} AND dscl.link_role = 'primary'
+      LIMIT 1
+    `;
+    const prospectId = seedRows[0]?.business_prospect_id;
+    if (!prospectId) return { linked: [] };
+
+    const siblings = await prisma.$queryRaw<any[]>`
+      SELECT id FROM mkt_campaigns_list
+      WHERE business_prospect_id = ${prospectId} AND scope = 'business'
+    `;
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT campaign_id FROM directory_seed_campaign_links
+      WHERE seed_id = ${seedId}
+    `;
+    const linkedSet = new Set(existing.map((e) => e.campaign_id));
+
+    const linked: string[] = [];
+    for (const s of siblings) {
+      if (linkedSet.has(s.id)) continue;
+      try {
+        await this.linkCampaign(seedId, s.id, 'sibling', ctx);
+        linked.push(s.id);
+      } catch (err) {
+        logger.warn('ensureProspectSiblingLinks — sibling link failed', undefined, {
+          seedId, campaignId: s.id, error: (err as Error).message,
+        });
+      }
+    }
+    return { linked };
+  }
+
+  /**
+   * The prospect-scoped entry: find the group's primary-linked seed and
+   * attach unlinked siblings. Used after sibling creation — the new
+   * sibling inherits the family's seed automatically.
+   */
+  async ensureSeedLinksForProspect(
+    businessProspectId: string,
+    ctx?: LinkAuditCtx,
+  ): Promise<{ linked: string[] }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT dscl.seed_id
+      FROM directory_seed_campaign_links dscl
+      JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+      WHERE mc.business_prospect_id = ${businessProspectId}
+        AND dscl.link_role = 'primary'
+      LIMIT 1
+    `;
+    if (!rows[0]) return { linked: [] };
+    return this.ensureProspectSiblingLinks(rows[0].seed_id, ctx);
   }
 
   /**

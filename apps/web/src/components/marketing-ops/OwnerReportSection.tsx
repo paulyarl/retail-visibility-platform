@@ -104,6 +104,7 @@ const CHAPTER_LABELS: Record<string, string> = {
   reviews: 'Reviews',
   recovery: 'Review recovery',
   products: 'Product visibility',
+  presence: 'Profile presence',
 };
 
 

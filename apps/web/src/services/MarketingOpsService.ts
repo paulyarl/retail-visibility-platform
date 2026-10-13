@@ -96,7 +96,8 @@ export type DeliverableType =
   | 'repair_completion_report'
   | 'product_visibility_preview'
   | 'website_mockup'
-  | 'website_build_package';
+  | 'website_build_package'
+  | 'profile_presence_plan';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 
@@ -538,7 +539,7 @@ export type ReviewLogStatus = 'scheduled' | 'completed' | 'skipped';
 export type FollowUpOutcome = 'converted_paid' | 'customer_responded' | 'no_response' | 'duplicate' | 'out_of_scope' | 'other';
 
 // ─── Outreach Opener Types ──────────────────────────────────────────────
-export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
+export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7' | 'A8';
 export type OpenerSource = 'ai' | 'external' | 'ai_briefing';
 export type CloseVariant = 'soft' | 'direct_paid';
 

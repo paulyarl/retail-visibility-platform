@@ -28,7 +28,7 @@ import { ARCHETYPE_LABELS, type ArchetypeCodeWithA6, type PlaybookCode, type Pla
 export interface CreateSiblingInput {
   /** The source campaign — must already have a business_prospect_id. */
   sourceCampaignId: string;
-  /** Archetype for the sibling (A1-A7). Used for display + validation. */
+  /** Archetype for the sibling (A1-A8). Used for display + validation. */
   archetype: ArchetypeCodeWithA6;
   /** For triage-driven siblings: the playbook code (sets category via playbook). */
   playbookCode?: PlaybookCode;
@@ -61,6 +61,9 @@ export interface SiblingSummary {
   estimatedFeeCents: number;
   amountPaidCents: number;
   archetype: ArchetypeCodeWithA6 | null;
+  /** The accepted playbook (e.g. 'PB-02') — with archetype this is the
+   *  Linked-Campaigns-style disambiguator between same-named siblings. */
+  playbookCode: string | null;
   createdAt: Date;
 }
 
@@ -68,12 +71,13 @@ export interface SiblingSummary {
 
 const ARCHETYPE_PRIORITY: Record<ArchetypeCodeWithA6, number> = {
   A2: 1, // BBB crisis — highest priority
-  A1: 2, // Review gap
-  A6: 3, // Product visibility
-  A3: 4, // Listing drift
-  A4: 5, // CTA gap
-  A7: 6, // Website gap
-  A5: 7, // Dual/triage (bundle)
+  A8: 2, // Profile presence — invisible beats under-maintained
+  A1: 3, // Review gap
+  A6: 4, // Product visibility
+  A3: 5, // Listing drift
+  A4: 6, // CTA gap
+  A7: 7, // Website gap
+  A5: 8, // Dual/triage (bundle)
 };
 
 // ─── Service ─────────────────────────────────────────────────────────────
@@ -360,7 +364,7 @@ export class BusinessProspectService extends BaseService {
     // Batch-resolve the declared archetype for each sibling from its
     // operator-accepted triage result's effective playbook. Siblings created
     // via triage have a pre-accepted triage result (see
-    // createSiblingTriageResult), so this resolves the A1–A7 code that
+    // createSiblingTriageResult), so this resolves the A1–A8 code that
     // disambiguates siblings sharing a business name. Manually-created
     // siblings with no triage result resolve to null.
     const archetypeByCampaign = await this.resolveSiblingArchetypes(
@@ -381,6 +385,7 @@ export class BusinessProspectService extends BaseService {
       estimatedFeeCents: c.estimated_fee_cents ?? 0,
       amountPaidCents: c.amount_paid_cents ?? 0,
       archetype: archetypeByCampaign.get(c.id) ?? null,
+      playbookCode: c.playbook_code ?? null,
       createdAt: c.created_at,
     }));
 
@@ -398,7 +403,7 @@ export class BusinessProspectService extends BaseService {
   }
 
   /**
-   * Batch-resolve the declared archetype (A1–A7) for sibling campaigns from
+   * Batch-resolve the declared archetype (A1–A8) for sibling campaigns from
    * their operator-accepted triage result's effective playbook (override if
    * present, otherwise recommendation). Mirrors the triage-precedence branch
    * of OutreachOpenerService.resolveCampaignArchetype without the audit

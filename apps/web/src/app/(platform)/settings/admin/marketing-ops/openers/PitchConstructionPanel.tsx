@@ -150,6 +150,24 @@ const HEADER_STARTERS: Record<OpenerArchetype, string[]> = {
     '{{business}} — just get found, or actually sell online?',
     '{{business}} — the pages that actually get you found',
   ],
+  // A8 — Profile Presence (missing / unclaimed / integrity-blocked profiles)
+  A8: [
+    'Preview - where customers can\'t find {{business}}',
+    '{{business}} — I looked for you on Yelp. You\'re not there',
+    '{{business}} — customers searching Facebook find your competitors',
+    'Quick note about {{business}}\'s online presence',
+    '{{business}} — your Google listing is unclaimed',
+    '{{business}} — no profile on {{remaining}} platforms your customers use',
+    'Preview - the doors customers can\'t walk through',
+    // Offering angles (education — most owners don\'t know listings are free)
+    '{{business}} — these listings are free. You\'re just not on them',
+    '{{business}} — every platform you\'re missing is a stream of customers',
+    '{{business}} — who set up your profiles last time? (Nobody did)',
+    // Intelligence-backed angles (the benchmark differentiator)
+    '{{business}} — your profiles vs. the standard for {{category}} businesses',
+    '{{business}} — we know what a complete {{category}} profile looks like',
+    'Preview - your footprint measured against the category benchmark',
+  ],
 };
 
 const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
@@ -207,6 +225,18 @@ const CLOSER_STARTERS: Record<OpenerArchetype, string[]> = {
     // Offering angle — tiers
     'The first tier\'s ready to go — the {{remaining}} pages beyond it whenever you are.',
   ],
+  A8: [
+    'The full presence map — all {{remaining}} platforms and the build order — is ready today.',
+    'I\'ve mapped the other {{remaining}} platforms and what each needs. Ready when you are.',
+    '{{remaining}} more profiles are specced and ready to build. Want the list?',
+    'There are {{remaining}} more doors to open. Say the word.',
+    'The other {{remaining}} listings are unclaimed — anyone can edit them right now. Let\'s get them claimed.',
+    // Offering angle — the build plan
+    'The first two profiles are ready to build — the {{remaining}} platforms after that whenever you are.',
+    // DFY / DIY fork — same blueprint, two delivery paths
+    'The full plan works two ways — we build the {{remaining}} profiles, or you build from the blueprint. Either way it\'s ready.',
+    'Every profile is specced to the standard for your category — the {{remaining}} remaining are mapped and ready.',
+  ],
 };
 
 const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
@@ -261,6 +291,15 @@ const CONTACT_STARTERS: Record<OpenerArchetype, string[]> = {
     // Offering angle — the build package
     'Text "build" to {{phone}} and I\'ll send the full build package. — {{name}}',
   ],
+  A8: [
+    '— {{name}} | {{email}} | {{phone}}',
+    '— {{name}}, VisibleShelf — {{email}}',
+    'Reply with "go" and I\'ll send the presence map. — {{name}}',
+    '— {{name}} | {{phone}}',
+    'Text "map" to {{phone}} and I\'ll send where you\'re missing. — {{name}}',
+    // Offering angle — the build plan
+    'Text "profiles" to {{phone}} and I\'ll send the build plan. — {{name}}',
+  ],
 };
 
 const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
@@ -271,6 +310,7 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A5: 'Multi-Signal Footprint',
   A6: 'Product Visibility Gap',
   A7: 'Website Gap',
+  A8: 'Profile Presence',
 };
 
 // ─── Structured footprint config (A5 + A3) ───────────────────────────
@@ -290,8 +330,9 @@ const FOOTPRINT_FOCUS_OPTIONS: { value: FootprintFocusAttribute; label: string }
 
 // Archetypes that render the structured footprint slot UI instead of the
 // generic two-textarea layout. A5 is the multi-signal footprint pitch;
-// A3 is listing inconsistency (same platform/profile/focus shape).
-const STRUCTURED_FOOTPRINT_ARCHETYPES: OpenerArchetype[] = ['A5', 'A3'];
+// A3 is listing inconsistency; A8 is profile presence — all three are
+// platform/profile/focus shaped.
+const STRUCTURED_FOOTPRINT_ARCHETYPES: OpenerArchetype[] = ['A5', 'A3', 'A8'];
 
 function usesStructuredFootprint(archetype: OpenerArchetype): boolean {
   return STRUCTURED_FOOTPRINT_ARCHETYPES.includes(archetype);
@@ -475,6 +516,21 @@ const PREVIEW_SLOT_CONFIGS: Record<OpenerArchetype, PreviewSlotConfig> = {
     evidencePlaceholder: 'Current web presence (paste what customers see today — no site, a social page, a dead link)...',
     fixPlaceholder: 'Proposed web-presence fix (AI-drafted or imported)...',
     slotLabels: ['The website itself', 'Homepage', 'Domain & profiles'],
+    useReviewEndpoint: false,
+  },
+  A8: {
+    sectionTitle: 'The Preview (3 profile fixes):',
+    sectionBlurb:
+      'Slot 1 is the highest-impact missing or unclaimed platform (rendered first). Paste the current state (no listing, an unclaimed profile, a suspended or duplicated listing), then AI-draft or import the proposed fix.',
+    firstSlotLabel: 'THE MISSING DOOR - The most costly absence goes first',
+    firstSlotBadge: 'MISSING FIRST',
+    firstSlotCheckboxLabel: 'most costly missing platform',
+    slotLabelPrefix: 'Platform #',
+    evidenceLabel: 'Current State',
+    fixLabel: 'Proposed Profile',
+    evidencePlaceholder: 'Current state on this platform (no listing found, unclaimed profile, suspended — paste what a customer sees today)...',
+    fixPlaceholder: 'Proposed profile (AI-drafted or imported — claimed, complete, canonical)...',
+    slotLabels: ['Google', 'Yelp', 'Facebook'],
     useReviewEndpoint: false,
   },
 };

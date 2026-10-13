@@ -1446,6 +1446,6 @@ describe('archetypeFactSlice', () => {
     const archetypes = Object.values(ARCHETYPE_BRIEFING_TEMPLATES).map(
       (t) => t.archetype,
     );
-    expect(archetypes.sort()).toEqual(['A1', 'A2', 'A3', 'A4', 'A6']);
+    expect(archetypes.sort()).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A8']);
   });
 });
