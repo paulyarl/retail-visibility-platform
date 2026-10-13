@@ -275,6 +275,8 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
 
   const { stages, hookOptions, objections, callContext, anchor } = script;
   const ammunition = script.ammunition ?? [];
+  const platformPriorities = callContext?.platform_priorities ?? [];
+  const platformPremise = callContext?.platform_premise ?? null;
 
   return (
     <div className="space-y-6">
@@ -509,6 +511,48 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
       {ammunition.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <OutreachProblemsSection problems={ammunition} title="Audit ammunition — from the business audit" />
+        </div>
+      )}
+
+      {/* Platform priority — the measured ranking of where this category's
+          customers look (signal_weight × gap_severity). Operator evidence:
+          the top platform(s) can be cited on the call as category fact
+          with their rationale; the owner never hears the raw weights. */}
+      {platformPriorities.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Platform priority — where this category&apos;s customers look
+          </h3>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Measured category intelligence, ranked by customer attention × this business&apos;s gap.
+            Cite the top platform{platformPriorities.length > 1 ? 's' : ''} as fact; keep the numbers to yourself.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {platformPriorities.map((p, i) => (
+              <li key={p.platform} className="flex items-start gap-2 text-sm">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  {i + 1}
+                </span>
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {p.display_name ?? p.platform}
+                  </span>
+                  {platformPremise?.platform === p.platform && (
+                    <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      lead
+                    </span>
+                  )}
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                    weight {p.signal_weight.toFixed(2)} · gap {p.gap_severity.toFixed(1)}
+                    {p.scope ? ` · ${p.scope}` : ''}
+                  </span>
+                  {p.basis && (
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{p.basis}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

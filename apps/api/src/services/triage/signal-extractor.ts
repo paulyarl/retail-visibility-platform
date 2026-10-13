@@ -330,6 +330,19 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       }
     }
 
+    // DS_PROFILE_NOT_PUBLIC — profile exists but the public cannot see it
+    // (data_status 'restricted'). Existence is verified; the pain is
+    // visibility — a business profile behind a wall is a defect to repair,
+    // not an absent profile and not an unverifiable one.
+    if (!signals.has('DS_PROFILE_NOT_PUBLIC')) {
+      const anyRestricted = Object.values(platforms).some(
+        (p) => p && p.data_status === 'restricted',
+      );
+      if (anyRestricted) {
+        signals.add('DS_PROFILE_NOT_PUBLIC');
+      }
+    }
+
     // DS_MISSING_SERVICE_MENU — GBP service menu not populated
     if (!signals.has('DS_MISSING_SERVICE_MENU')) {
       const services = (auditData as any).recommended_services;

@@ -642,6 +642,9 @@ export class DeliverableSectionService extends BaseService {
       if (status === 'missing' || status === 'not_found' || status === 'none') {
         missingPlatforms.push(name);
         stateLines.push(`- ${name}: no profile found`);
+      } else if (p?.data_status === 'restricted') {
+        stateLines.push(`- ${name}: profile exists but not publicly visible`);
+        integrityIssues.push(`${name} profile is hidden from the public — make it public before any other work on that platform`);
       } else {
         const claimed = p?.claimed === false ? 'unclaimed' : p?.claimed === true ? 'claimed' : 'claim status unknown';
         stateLines.push(`- ${name}: profile present (${claimed})`);
@@ -657,6 +660,7 @@ export class DeliverableSectionService extends BaseService {
     if (detected.includes('DS_HIJACKED_LISTING')) integrityIssues.push('Listing shows signs of third-party edits (possible hijack)');
     if (detected.includes('DS_OWNERSHIP_DISPUTE')) integrityIssues.push('Ownership dispute on a listing — the business does not control its own profile');
     if (detected.includes('DS_ADDRESS_VERIFICATION_BLOCK')) integrityIssues.push('Address verification is blocking profile activation');
+    if (detected.includes('DS_PROFILE_NOT_PUBLIC')) integrityIssues.push('A profile exists but is not publicly visible — being listed is not the same as being seen');
     if (detected.includes('DS_CLAIMED_STATUS')) claimActions.push('Claim and verify the Google Business Profile');
     if (detected.includes('DS_BROKEN_PROFILE_LINK')) integrityIssues.push('A profile link is broken — customers clicking through land on a dead page');
     if (detected.includes('CP_MISSING_CONTACT_INFO')) integrityIssues.push('Contact info is missing from the public footprint — customers cannot reach the business');

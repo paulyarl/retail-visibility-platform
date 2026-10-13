@@ -71,6 +71,22 @@ export interface CommonFields {
     scope: string | null;
     basis: string | null;
   } | null;
+  // ── Platform priority landscape (PB-09/A8) ──
+  // The full measured weight distribution for the category's platforms,
+  // highest first — the "category platform priority score" the analyst uses
+  // to educate: where this category's customers actually look and how they
+  // split across platforms. Resolved by the caller (OutreachOpenerService)
+  // from IntelligenceProfileService.resolveSignalWeightsForCampaign. Null/
+  // undefined when no weights resolved — prompts degrade gracefully.
+  platform_weights?: Array<{
+    platform: string;
+    weight: number;
+    scope: string | null;
+    // The measured basis behind the estimate (prevalence × depth) — the
+    // rationale the analyst can cite for why this platform ranks where it
+    // does.
+    basis?: string | null;
+  }> | null;
 }
 
 export interface A1Fields extends CommonFields {
@@ -221,6 +237,9 @@ export interface A8Fields extends CommonFields {
   missing_platforms: string[];
   /** Platforms that exist but are unclaimed/likely-unclaimed. */
   unclaimed_platforms: string[];
+  /** Platforms whose profile exists but the public cannot see it
+   *  (data_status 'restricted') — a visibility pain, not an absence. */
+  restricted_platforms: string[];
   /** Integrity signal labels that fired (suspended, duplicate, hijacked, …). */
   integrity_flags: string[];
   /** True when the audit fired DS_ZERO_INDEXED_PRESENCE — invisible footprint. */
@@ -510,10 +529,17 @@ export function extractA8Fields(
           : key.charAt(0).toUpperCase() + key.slice(1);
 
   // Present: the audit has a platform entry whose status isn't absent-ish.
+  // Restricted is tracked separately — the profile exists but the public
+  // cannot see it, so it belongs in neither the present nor absent list.
   const present: string[] = [];
   const unclaimed: string[] = [];
+  const restricted: string[] = [];
   for (const [key, p] of Object.entries(platforms)) {
     if (!p || typeof p !== 'object' || !p.profile_status) continue;
+    if (p.data_status === 'restricted') {
+      restricted.push(label(key));
+      continue;
+    }
     if (p.profile_status === 'unclaimed' || p.profile_status === 'likely_unclaimed') {
       unclaimed.push(label(key));
     } else {
@@ -547,6 +573,7 @@ export function extractA8Fields(
     DS_HIJACKED_LISTING: 'a hijacked listing',
     DS_OWNERSHIP_DISPUTE: 'a listing ownership dispute',
     DS_ADDRESS_VERIFICATION_BLOCK: 'an address verification block',
+    DS_PROFILE_NOT_PUBLIC: 'a profile the public cannot see',
   };
   const integrityFlags = Object.entries(INTEGRITY_LABELS)
     .filter(([code]) => detected.includes(code) || triggeredCodes.has(code))
@@ -557,6 +584,7 @@ export function extractA8Fields(
     present_platforms: present,
     missing_platforms: [...confirmedAbsent],
     unclaimed_platforms: unclaimed,
+    restricted_platforms: restricted,
     integrity_flags: integrityFlags,
     zero_indexed: detected.includes('DS_ZERO_INDEXED_PRESENCE') || triggeredCodes.has('DS_ZERO_INDEXED_PRESENCE'),
     category: (auditData as any)?.category ?? null,

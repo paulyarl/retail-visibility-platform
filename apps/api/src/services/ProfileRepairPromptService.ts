@@ -41,6 +41,9 @@ const SIGNAL_TO_TRIAGE_VOCAB: Record<string, string> = {
   DS_HIJACKED_LISTING: 'hijacked_listing',
   DS_OWNERSHIP_DISPUTE: 'ownership_dispute',
   DS_ADDRESS_VERIFICATION_BLOCK: 'address_verification_block',
+  // A hidden (exists-but-not-public) profile is a platform presence gap —
+  // the fix is making it visible, not a suspension appeal.
+  DS_PROFILE_NOT_PUBLIC: 'platform_gap',
   CP_NAP_NAME_DRIFT: 'nap_drift',
   CP_NAP_ADDRESS_DRIFT: 'nap_drift',
   CP_NAP_PHONE_DRIFT: 'nap_drift',

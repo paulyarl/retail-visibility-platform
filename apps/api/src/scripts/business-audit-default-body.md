@@ -229,7 +229,8 @@ Determine the outcome:
 
 * Control rendered AND the business profile did not render → the failure is specific to this business. Record the platform as unavailable for this business.
 * Control rendered AND the business profile rendered → the platform is available. Proceed with the normal platform audit.
-* Control did not render, or no control exists for this platform → the failure is not attributable to the business. Record the platform as unable_to_verify and emit NO missing-profile signal.
+* The business profile's EXISTENCE is verified AND evidence shows the ordinary public visitor cannot see it — an explicit non-public state (unpublished or private page, "this Page isn't available", a profile shell that withholds content, search-suppression), or operator-supplied evidence covering the platform only through an authenticated capture → record the platform as `restricted` (see below). A business is expected to have public profiles; a hidden business profile is a visibility defect in its own right, not an evidence question. CRITICAL: an access barrier thrown at the analyst — login_wall, bot_defense, captcha, rate_limit — is the platform blocking YOUR access, not the business hiding from customers. Directory platforms (Yelp, Facebook, Google) are public surfaces by design; a bare analyst-side barrier is never restricted — it stays the unable_to_verify / control lane unless a control or operator capture establishes what the public actually sees.
+* Control did not render, or no control exists for this platform, and no existence evidence separates absence from walled-off → the failure is not attributable to the business. Record the platform as unable_to_verify and emit NO missing-profile signal.
 
 If the Gold Standard block is absent, no control is available. Record every unrendered platform as unable_to_verify and note the absence of a control set in data_quality.limitations.
 
@@ -239,12 +240,13 @@ Record each control attempt in the top-level `render_controls` array (one entry 
 * `business_profile_url` — the business profile URL requested, and `business_rendered` — whether it rendered
 * `control_business` — the control business name, and `control_url` — the control URL requested, and `control_rendered` — whether it rendered
 * `access_barrier` — whether an access-blocking page appeared instead of profile content: none | js_required | bot_defense | captcha | login_wall | rate_limit | timeout | not_attempted
-* `determination` — the resulting outcome: business_specific_failure | platform_available | unable_to_verify
+* `determination` — the resulting outcome: business_specific_failure | platform_available | restricted | unable_to_verify
 
 When a determination is reached, set the platform object's `data_status` accordingly:
 
 * `business_specific_failure` → set `data_status: "unavailable"` (the profile is verified absent, not merely unrendered). Set `profile_status: "unable_to_verify"` and null out any positive fields (rating, reviews, hours, categories, attribute chips) — they cannot be observed on a profile that does not render.
 * `platform_available` → leave `data_status` to the normal platform audit (complete / partial / unavailable based on what loaded).
+* `restricted` → set `data_status: "restricted"` (the profile exists but the public cannot see it). Populate only what existence evidence established (profile URL, claim state if shown); null out content fields that did not render. Emit `DS_PROFILE_NOT_PUBLIC` and record a `gap_analysis` entry for the platform with `field: "profile_visibility"`, `expected: "publicly visible profile"`, `actual: "profile exists but not publicly renderable"`, `severity: "non_negotiable"` — to a searching customer the profile is as invisible as if it did not exist.
 * `unable_to_verify` → set `data_status: "unable_to_verify"` unless the profile partially loaded — in that case use `partial` and note the partial load in `data_quality.limitations`.
 
 For platforms beyond the four primary platforms (google, yelp, facebook, bbb) — e.g. bing, apple_maps — that are named in the Gold Standard block but have no platform object in the `platforms` block, record the control attempt in `render_controls` only. Do not create a platform object for them.
@@ -595,8 +597,9 @@ Evaluate the verified audit observations and populate the top-level `detected_si
 * `DS_HIJACKED_LISTING`: profile content appears controlled by a third party — a planted foreign website or phone number, different branding, or an unauthorized claim. Emit when profile content conflicts with the business's verified identity; stale or drifted info alone is drift, not hijack.
 * `DS_OWNERSHIP_DISPUTE`: ownership is contested — "this listing has already been claimed" states, pending or conflicting ownership requests, or control held by a former manager/agency.
 * `DS_ADDRESS_VERIFICATION_BLOCK`: the platform refuses verification at the stated address — postcard/video verification required, PO box / virtual office / residential address flagged.
+* `DS_PROFILE_NOT_PUBLIC`: the profile's existence is verified but it does not render to an ordinary public visitor — private or unpublished state, login-required to see basic listing data, a profile shell that withholds content, or search-suppression. Emit with `data_status: "restricted"`. A business profile behind a wall is a visibility pain — businesses are expected to be publicly discoverable — NOT an excuse for unable_to_verify. Do NOT emit it for a profile whose existence itself is unestablished (that is the render-control / unable_to_verify lane) or for verified absence (DS_MISSING_PROFILE).
 
-Emit the six codes above ONLY from observed evidence — a rendered notice, a visible duplicate, a displayed suspension or claim state. Never infer an integrity state from a profile that did not render: a non-rendering profile is an availability question (render_controls / DS_MISSING_PROFILE), not an integrity finding.
+Emit the codes above ONLY from observed evidence — a rendered notice, a visible duplicate, a displayed suspension or claim state, an existence-verified but non-public profile. Never infer an integrity state from a profile that did not render: a non-rendering profile is an availability question (render_controls / DS_MISSING_PROFILE), not an integrity finding — unless its existence is separately verified, in which case it is DS_PROFILE_NOT_PUBLIC.
 
 ### Website & Conversion Signals
 * `WC_MISSING_WEBSITE`: Business has no website URL listed on any profile.
@@ -1268,4 +1271,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-10-presence-signals-2 -->
+<!-- seed-version: business-audit-default-2026-10-10-presence-signals-4 -->

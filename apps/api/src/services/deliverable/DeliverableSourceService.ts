@@ -77,6 +77,7 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
     // GBP profile still warrants the audit-shaped fix recommendations.
     'DS_ZERO_INDEXED_PRESENCE', 'DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING',
     'DS_HIJACKED_LISTING', 'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK',
+    'DS_PROFILE_NOT_PUBLIC',
   ],
   testimonial_cards: [
     'RA_UNADDRESSED_POSITIVE_BACKLOG', 'VP_MISSING_STOREFRONT_PHOTOS',
@@ -124,12 +125,13 @@ export const TYPE_GOVERNING_SIGNALS: Record<string, string[]> = {
   // PB-09 (profile presence) — the platform-by-platform presence map and
   // build plan: the delivery artifact behind the presence-map previews.
   // Fires for any presence or integrity signal — missing, unclaimed,
-  // zero-footprint, suspended, duplicated, hijacked, disputed, or
-  // verification-blocked profiles.
+  // zero-footprint, suspended, duplicated, hijacked, disputed,
+  // verification-blocked, or public-invisible profiles.
   profile_presence_plan: [
     'DS_MISSING_PROFILE', 'DS_CLAIMED_STATUS', 'DS_ZERO_INDEXED_PRESENCE',
     'DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING', 'DS_HIJACKED_LISTING',
     'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK',
+    'DS_PROFILE_NOT_PUBLIC',
     'CP_MISSING_CONTACT_INFO', 'DS_BROKEN_PROFILE_LINK',
   ],
 };

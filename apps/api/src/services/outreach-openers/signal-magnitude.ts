@@ -89,6 +89,9 @@ const DEFAULT_SEVERITY: Record<string, SignalSeverity> = {
   DS_OWNERSHIP_DISPUTE: 'material',
   DS_DUPLICATE_LISTING: 'material',
   DS_ADDRESS_VERIFICATION_BLOCK: 'material',
+  // Exists but public-invisible — functionally absent to customers, but the
+  // asset exists and the fix is unlocking it, not starting over.
+  DS_PROFILE_NOT_PUBLIC: 'material',
 
   // Material — real, felt problem (lost opportunity or ranking impact)
   RA_UNADDRESSED_NEGATIVE_BACKLOG: 'material',
@@ -465,13 +468,18 @@ export function computePrimarySignalSeverity(
       const anyPresent = platforms.some(
         (p: any) => p && ['claimed', 'likely_claimed', 'unclaimed', 'likely_unclaimed'].includes(p.profile_status),
       );
-      if (!anyPresent) return 'crisis';
+      const anyRestricted = platforms.some(
+        (p: any) => p && p.data_status === 'restricted',
+      );
+      if (!anyPresent && !anyRestricted) return 'crisis';
       if (
         detected.includes('DS_CLAIMED_STATUS') ||
         detected.includes('DS_DUPLICATE_LISTING') ||
         detected.includes('DS_HIJACKED_LISTING') ||
         detected.includes('DS_OWNERSHIP_DISPUTE') ||
-        detected.includes('DS_ADDRESS_VERIFICATION_BLOCK')
+        detected.includes('DS_ADDRESS_VERIFICATION_BLOCK') ||
+        detected.includes('DS_PROFILE_NOT_PUBLIC') ||
+        anyRestricted
       ) {
         return 'material';
       }

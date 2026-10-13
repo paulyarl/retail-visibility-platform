@@ -25,7 +25,7 @@
  * OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION when the directive text
  * changes so execution logs can identify which version produced a run.
  */
-export const OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION = 'operator_profile_evidence_v2';
+export const OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION = 'operator_profile_evidence_v6';
 
 /** Caller-supplied variable carrying the workstation path of the evidence file. */
 export const OPERATOR_PROFILE_EVIDENCE_VARIABLE = 'operator_profile_evidence_file';
@@ -47,11 +47,47 @@ where present, review text.
 
 FILE: ${filePath}
 
+The file may be plain select-all page text (Ctrl+A / Ctrl+C / paste): raw
+DOM-order content with page furniture mixed in — navigation, footers,
+cookie banners, unrelated links. That is a legitimate capture. Extract
+the profile content from the noise; do not treat page chrome as business
+data, and do not penalize the evidence for being unstructured.
+
 READ FIRST — if your environment can read local files, open FILE before
 attempting to render these platforms yourself. It is the intended primary
 evidence source for the profiles it covers: it sidesteps login walls and
 bot defenses, and its review text is legitimate input for sentiment,
 narrative, and reputation findings.
+
+NOT IN FILE = MISSING — be assertive, not hedged. The operator performed
+the capture sweep for this prospect's directory and social profiles before
+supplying the file: what they could capture is in it. When a platform or
+profile this audit is expected to verify is NOT represented in the file,
+record it as missing — business_specific_failure / verified absent and the
+accompanying missing-profile signal — NOT unable_to_verify. The operator's
+sweep substitutes for your live-render attempt on those platforms; their
+inability to produce a page IS the render outcome (attempted_by: operator).
+Do not spend an unable_to_verify on a profile the operator hunted and
+could not capture. Reserve unable_to_verify for evidence the file and the
+sweep were not positioned to answer at all — and do not extend the rule to
+platforms outside the audit's verification scope: absence from the file is
+a verdict on the platforms the audit checks, not on the open web.
+
+HIDDEN IS NOT MISSING — an authenticated-only capture is existence
+evidence, not absence. The operator is the public proxy: if THEY could
+see it, it is public; if a platform section could only be captured
+logged-in (visibility_condition: authenticated), or the profile renders
+a shell but withholds public content, the verdict is restricted /
+DS_PROFILE_NOT_PUBLIC — a business profile the public cannot see is a
+visibility defect to repair, not a missing profile to create. Record it
+with attempted_by: operator and the capture condition stated.
+
+Conversely, YOUR access is not the public's access. A login wall, bot
+defense, or captcha thrown at the analyst (Yelp's bot policy, Facebook's
+login gate) says nothing about what customers see — directory platforms
+are public surfaces by design. Never classify a bare analyst-side
+barrier as restricted or missing; without operator or control evidence
+of what the public sees, it remains unable_to_verify.
 
 BEYOND PRESENCE — the file is not only for profile-presence verdicts.
 The categories platforms assign, profile copy, service lists, and review

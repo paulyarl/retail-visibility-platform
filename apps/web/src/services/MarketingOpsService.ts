@@ -756,6 +756,27 @@ export interface CallScriptContext {
   /** Linked directory-presence seed (primary link preferred) — drives the
    *  seed-scoped preview-storefront action on PB-08 campaigns (spec §4, D-5). */
   linked_seed_id?: string | null;
+  /** Lead platform for the pitch (signal_weight × gap_severity argmax) —
+   *  where this category's customers are AND the audit shows gaps. */
+  platform_premise?: {
+    platform: string;
+    display_name: string | null;
+    signal_weight: number;
+    gap_severity: number;
+    scope: string | null;
+    basis: string | null;
+  } | null;
+  /** All gapped platforms ranked by signal_weight × gap_severity — the
+   *  priority order the analyst uses to educate on the call. */
+  platform_priorities?: Array<{
+    platform: string;
+    display_name: string | null;
+    score: number;
+    signal_weight: number;
+    gap_severity: number;
+    scope: string | null;
+    basis: string | null;
+  }>;
 }
 
 export interface ObjectionRow {

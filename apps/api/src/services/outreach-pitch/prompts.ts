@@ -25,6 +25,27 @@
  *      docs/LocalBiz/marketing_ops_universal_recalibration_sprint_plan.md §5.6
  */
 
+import {
+  buildPlatformPremiseInstruction,
+  buildPlatformPriorityInstruction,
+} from '../outreach-openers/archetype-prompts';
+
+/**
+ * Append the platform-signal-weight instruction tail (premise + ranked
+ * landscape) shared with the opener prompts — the analyst gets the same
+ * "where this category's customers look" evidence on the pitch surfaces.
+ * No-op when the extracted fields carry no resolved weights.
+ */
+function withPlatformInstructions(extractedFieldsJson: string, prompt: string): string {
+  let fields: any = {};
+  try {
+    fields = JSON.parse(extractedFieldsJson);
+  } catch {
+    return prompt;
+  }
+  return prompt + buildPlatformPremiseInstruction(fields) + buildPlatformPriorityInstruction(fields);
+}
+
 /**
  * Shared persona preamble for review-management archetypes (A1–A5) — mirrors
  * the one in outreach-openers/archetype-prompts.ts.
@@ -420,7 +441,10 @@ Output the fix only — no preamble, no explanation.`;
  * fields as a JSON block.
  */
 export function buildHeaderPrompt(extractedFieldsJson: string): string {
-  return HEADER_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson);
+  return withPlatformInstructions(
+    extractedFieldsJson,
+    HEADER_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson),
+  );
 }
 
 /**
@@ -433,13 +457,22 @@ export function buildHeaderPromptForArchetype(
   extractedFieldsJson: string,
 ): string {
   if (archetype === 'A6') {
-    return HEADER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson);
+    return withPlatformInstructions(
+      extractedFieldsJson,
+      HEADER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson),
+    );
   }
   if (archetype === 'A7') {
-    return HEADER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson);
+    return withPlatformInstructions(
+      extractedFieldsJson,
+      HEADER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson),
+    );
   }
   if (archetype === 'A8') {
-    return HEADER_PROMPT_A8.replace('{{extracted_fields}}', extractedFieldsJson);
+    return withPlatformInstructions(
+      extractedFieldsJson,
+      HEADER_PROMPT_A8.replace('{{extracted_fields}}', extractedFieldsJson),
+    );
   }
   return buildHeaderPrompt(extractedFieldsJson);
 }
@@ -449,8 +482,11 @@ export function buildHeaderPromptForArchetype(
  * computed remaining count.
  */
 export function buildCloserPrompt(extractedFieldsJson: string, remaining: number): string {
-  return CLOSER_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson)
-    .replace('{{remaining}}', String(remaining));
+  return withPlatformInstructions(
+    extractedFieldsJson,
+    CLOSER_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson)
+      .replace('{{remaining}}', String(remaining)),
+  );
 }
 
 /**
@@ -464,16 +500,25 @@ export function buildCloserPromptForArchetype(
   remaining: number,
 ): string {
   if (archetype === 'A6') {
-    return CLOSER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson)
-      .replace('{{remaining}}', String(remaining));
+    return withPlatformInstructions(
+      extractedFieldsJson,
+      CLOSER_PROMPT_A6.replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{remaining}}', String(remaining)),
+    );
   }
   if (archetype === 'A7') {
-    return CLOSER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson)
-      .replace('{{remaining}}', String(remaining));
+    return withPlatformInstructions(
+      extractedFieldsJson,
+      CLOSER_PROMPT_A7.replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{remaining}}', String(remaining)),
+    );
   }
   if (archetype === 'A8') {
-    return CLOSER_PROMPT_A8.replace('{{extracted_fields}}', extractedFieldsJson)
-      .replace('{{remaining}}', String(remaining));
+    return withPlatformInstructions(
+      extractedFieldsJson,
+      CLOSER_PROMPT_A8.replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{remaining}}', String(remaining)),
+    );
   }
   return buildCloserPrompt(extractedFieldsJson, remaining);
 }

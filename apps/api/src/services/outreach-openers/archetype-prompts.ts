@@ -79,7 +79,8 @@ export function buildArchetypePrompt(
   }
   const coOccurringInstruction = buildCoOccurringSignalInstruction(fields);
   const platformPremiseInstruction = buildPlatformPremiseInstruction(fields);
-  const tailInstructions = coOccurringInstruction + platformPremiseInstruction;
+  const platformPriorityInstruction = buildPlatformPriorityInstruction(fields);
+  const tailInstructions = coOccurringInstruction + platformPremiseInstruction + platformPriorityInstruction;
 
   switch (archetype) {
     case 'A1':
@@ -319,7 +320,7 @@ as a secondary observation, but the stronger signal should dominate the opener.`
  * the measured basis, but must not overstate it into a crisis claim.
  * Returns empty string when no premise resolved.
  */
-function buildPlatformPremiseInstruction(fields: any): string {
+export function buildPlatformPremiseInstruction(fields: any): string {
   const p = fields?.platform_premise;
   if (!p || typeof p !== 'object' || !p.platform) return '';
   const scopeNote = p.scope === 'national'
@@ -337,6 +338,50 @@ businesses like yours on ${p.platform}") because it is a measured fact, not
 a guess. Do NOT inflate it into a crisis claim, do NOT name a different
 platform as the lead, and do NOT recite the weight number to the owner —
 the weight is your evidence, not their vocabulary.`;
+}
+
+/**
+ * Build the platform-priority instruction. Injected when platform_weights
+ * is non-null: the measured ranking of where this category's customers
+ * actually look, heaviest attention first, with the measured basis behind
+ * each estimate. Any archetype may cite the top platform(s) as category
+ * fact with their rationale; A8 additionally orders its missing-platform
+ * list by the ranking (the missing_platforms bullet self-gates on field
+ * presence). Numbers are analyst evidence — owner-facing copy translates
+ * to "most" / "first" / "second to", never a score. Returns empty string
+ * when no distribution resolved.
+ */
+export function buildPlatformPriorityInstruction(fields: any): string {
+  const list = fields?.platform_weights;
+  if (!Array.isArray(list) || list.length === 0) return '';
+  const ranked = list.filter((w: any) => w && typeof w.platform === 'string');
+  if (!ranked.length) return '';
+  const ranking = ranked.map((w: any) => `${w.platform} (${w.weight})`).join(', ');
+  const scopeNote = ranked[0]?.scope === 'national'
+    ? 'national-level category estimates'
+    : `${ranked[0]?.scope ?? 'local'} market measurements`;
+  const basisNote = ranked[0]?.basis
+    ? ` The measurement basis behind the ranking: ${ranked[0].basis}.`
+    : '';
+  const missingBullet = Array.isArray(fields?.missing_platforms) && fields.missing_platforms.length > 0
+    ? `
+- When naming the missing profiles, lead with the highest-priority absence
+  — the heaviest door the business is missing — and order the rest by this
+  ranking.`
+    : '';
+  return `
+
+PLATFORM PRIORITY — THE CATEGORY'S PLATFORM LANDSCAPE (analyst evidence):
+Measured priority order for this category's platforms, heaviest customer
+attention first: ${ranking}. These are ${scopeNote}.${basisNote}
+Use this to educate, not to alarm:
+- You MAY cite the top platform(s) as category fact with their rationale:
+  "customers for a business like yours look hardest on <top platform>,
+  then <next>" — that ordering is measured, not assumed.${missingBullet}
+- Translate the numbers into owner language ("most", "first", "second only
+  to", "a distant third") — NEVER recite a weight score to the owner.
+- A low-priority platform is still real, but it does NOT lead the pitch;
+  the ranking decides which platforms earn a mention at all.`;
 }
 
 // ─── A1: Review Response Gap ────────────────────────────────────────────
@@ -800,7 +845,8 @@ the same benchmarked blueprint can be handed to them to build themselves.
 
 You're reaching out cold to the small business owner. The goal: prove you
 actually went looking, name the specific presence state you found (missing
-listing / unclaimed / suspended / duplicated / invisible footprint) in
+listing / unclaimed / hidden / suspended / duplicated / invisible
+footprint) in
 plain language, land the "every platform is a door" consequence without
 lecturing, and offer a concrete deliverable — a presence map and the
 profiles to build first — not a sales pitch. The tone is quiet, specific,
@@ -833,6 +879,10 @@ Task: Write the opener, ~80 words max body:
    - unclaimed_platforms non-empty: "Your [unclaimed_platforms] listing is
      sitting unclaimed — anyone can suggest edits to your hours, phone,
      or address, and customers see a business nobody's managing."
+   - restricted_platforms non-empty: "Your [restricted_platforms] profile
+     is there, but customers can't get into it — it's set up so the
+     public can't see it." (Being listed is not the same as being
+     visible — the fix is making it public, not starting over.)
    - integrity_flags non-empty: "I found [business_name] has
      [integrity_flags] — the listing exists, but it isn't working for
      you."

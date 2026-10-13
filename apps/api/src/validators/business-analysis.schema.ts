@@ -175,7 +175,12 @@ const napStatusEnum = z.enum([
 ]);
 const tierEnum = z.enum(['tier_1', 'tier_2', 'tier_3']);
 const confidenceEnum = z.enum(['high', 'medium', 'low']);
-const dataStatusEnum = z.enum(['complete', 'partial', 'unavailable', 'unable_to_verify']);
+// 'restricted' — the profile exists but the public cannot see it (private/
+// unpublished page, login-gated basic listing data, search-suppressed).
+// Existence is verified; the pain is visibility. Distinct from
+// 'unavailable' (verified absent) and 'unable_to_verify' (existence
+// indeterminate). Emitted with DS_PROFILE_NOT_PUBLIC.
+const dataStatusEnum = z.enum(['complete', 'partial', 'unavailable', 'unable_to_verify', 'restricted']);
 
 // ---- Category-integrated enums (template v2 Category-Integrated Variant) ----
 
@@ -588,6 +593,10 @@ const qualityGateResultsSchema = z.object({
 const renderControlDeterminationEnum = z.enum([
   'business_specific_failure',
   'platform_available',
+  // 'restricted' — existence verified, public render denied (private/
+  // unpublished, login-gated basic data, search-suppressed). Maps to
+  // platform data_status 'restricted' + DS_PROFILE_NOT_PUBLIC.
+  'restricted',
   'unable_to_verify',
 ]);
 
@@ -927,7 +936,7 @@ Return your response as JSON matching this exact schema:
         { "key": "<snake_case_key>", "label": "<display label>",
           "source_url": "<url or null>", "as_of": "<ISO date or null>" }
       ],
-      "data_status": "complete|partial|unavailable|unable_to_verify"
+      "data_status": "complete|partial|unavailable|unable_to_verify|restricted"
     },
     "yelp": { ...same per-platform structure minus primary_category/additional_categories/category_fit_assessment... },
     "facebook": { "profile_status": "...", "rating_or_recommendation": "<string|null>", ...same per-platform structure... }

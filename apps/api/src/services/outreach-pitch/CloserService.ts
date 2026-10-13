@@ -160,6 +160,18 @@ export class CloserService extends BaseService {
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const common = this.buildCommonFields(campaign);
 
+    // Category platform-signal weights — premise + ranked landscape for
+    // the "where this category's customers look" instruction tail. Same
+    // resolver the opener uses; nulls when nothing resolves.
+    try {
+      const { resolveOutreachPlatformContext } = await import('../outreach-openers/platform-context');
+      const platformCtx = await resolveOutreachPlatformContext(campaign, auditResult.auditData, ctx);
+      common.platform_premise = platformCtx.platform_premise;
+      common.platform_weights = platformCtx.platform_weights;
+    } catch {
+      // best-effort — prompt degrades to no premise
+    }
+
     // Sprint 2 (§5.6): Use the shared archetype resolver so the closer
     // matches the operator-accepted triage result (honors overrides).
     let selection: ArchetypeSelection;

@@ -60,6 +60,7 @@ export const KNOWN_SIGNAL_CODES = [
   'DS_HIJACKED_LISTING',
   'DS_OWNERSHIP_DISPUTE',
   'DS_ADDRESS_VERIFICATION_BLOCK',
+  'DS_PROFILE_NOT_PUBLIC',
   // Website & Conversion (WC)
   'WC_MISSING_WEBSITE',
   'WC_BROKEN_WEBSITE',
@@ -144,8 +145,10 @@ export function isRepairSignal(code: SignalCode): boolean {
   // mirroring WC_MISSING_WEBSITE.
   //
   // PB-09 presence/integrity codes are repair-class: a missing, unclaimed,
-  // suspended, duplicated, hijacked, disputed, or unverifiable profile is a
-  // footprint defect to fix (PB-05 dual.groupA), not a website gap.
+  // suspended, duplicated, hijacked, disputed, unverifiable, or
+  // public-invisible profile is a footprint defect to fix (PB-05
+  // dual.groupA), not a website gap. A business profile that exists but the
+  // public cannot see is a visibility pain — not absence, not unverifiable.
   if (code.startsWith('CP_')) return true;
   return (
     code === 'WC_URL_MISMATCH' ||
@@ -164,7 +167,8 @@ export function isRepairSignal(code: SignalCode): boolean {
     code === 'DS_DUPLICATE_LISTING' ||
     code === 'DS_HIJACKED_LISTING' ||
     code === 'DS_OWNERSHIP_DISPUTE' ||
-    code === 'DS_ADDRESS_VERIFICATION_BLOCK'
+    code === 'DS_ADDRESS_VERIFICATION_BLOCK' ||
+    code === 'DS_PROFILE_NOT_PUBLIC'
   );
 }
 
@@ -307,6 +311,7 @@ export const SIGNAL_LABELS: Record<string, string> = {
   DS_HIJACKED_LISTING: 'Hijacked Listing',
   DS_OWNERSHIP_DISPUTE: 'Listing Ownership Dispute',
   DS_ADDRESS_VERIFICATION_BLOCK: 'Address Verification Block',
+  DS_PROFILE_NOT_PUBLIC: 'Profile Not Publicly Visible',
   WC_MISSING_WEBSITE: 'No Website Detected',
   WC_BROKEN_WEBSITE: 'Broken Website (dead URL)',
   WC_URL_MISMATCH: 'URL Mismatch (audit vs campaign)',

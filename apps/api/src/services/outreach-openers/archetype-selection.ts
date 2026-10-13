@@ -158,6 +158,7 @@ export const PRESENCE_SIGNAL_CODES: ReadonlySet<string> = new Set([
   'DS_HIJACKED_LISTING',
   'DS_OWNERSHIP_DISPUTE',
   'DS_ADDRESS_VERIFICATION_BLOCK',
+  'DS_PROFILE_NOT_PUBLIC',
 ]);
 
 // ─── Selection ──────────────────────────────────────────────────────────

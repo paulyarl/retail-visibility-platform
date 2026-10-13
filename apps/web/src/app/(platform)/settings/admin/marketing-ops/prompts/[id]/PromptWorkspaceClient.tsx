@@ -896,11 +896,12 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                 className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                Save page copies of the prospect's directory profiles (Google, Yelp, Facebook — including
-                reviews) into a text/markdown file on the analyst's workstation and enter its path here.
-                The rendered prompt directs the analyst to read the file instead of hunting profiles
-                live — label each section with platform, profile URL, and logged-in/out state. Applies on
-                the server render; blank is a normal run.
+                The simplest capture works: open each profile in a browser, Ctrl+A, Ctrl+C, paste into a
+                text/markdown file (Google, Yelp, Facebook — including reviews). One section per platform
+                with a one-line header — platform, profile URL, logged-in or logged-out — then enter the
+                file's path here. The rendered prompt directs the analyst to read the file instead of
+                hunting profiles live; a profile the operator can see is public, one they can't reach
+                logged-out is a visibility finding. Applies on the server render; blank is a normal run.
               </p>
             </div>
           </div>

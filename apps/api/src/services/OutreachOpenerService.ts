@@ -286,20 +286,16 @@ export class OutreachOpenerService extends BaseService {
     try {
       const { extractSignals } = await import('./triage/signal-extractor');
       const { buildTriggeredSignalContext } = await import('./outreach-openers/signal-magnitude');
-      const {
-        IntelligenceProfileService,
-        selectLeadPlatform,
-      } = await import('./intelligence/IntelligenceProfileService');
-      // Phase 6/7 — resolve the full signal-weight resolution once; derive
-      // the number map for the gap gate AND the lead-platform premise from
-      // the same resolution (one interpretation of signal weight).
-      const resolvedWeights = await IntelligenceProfileService.getInstance()
-        .resolveSignalWeightsForCampaign(campaign as any, auditResult.auditData, ctx);
-      let platformSignalWeights: Record<string, number> | undefined;
-      if (resolvedWeights) {
-        platformSignalWeights = {};
-        for (const [k, v] of resolvedWeights) platformSignalWeights[k] = v.weight;
-      }
+      const { resolveOutreachPlatformContext } = await import('./outreach-openers/platform-context');
+      // Phase 6/7 — resolve the full signal-weight context once; the number
+      // map feeds the gap gate, the premise + ranked landscape feed the
+      // prompt (one interpretation of signal weight, shared with the pitch
+      // and follow-up surfaces via the same resolver).
+      const platformCtx = await resolveOutreachPlatformContext(
+        campaign, auditResult.auditData, ctx,
+      );
+      common.platform_premise = platformCtx.platform_premise;
+      common.platform_weights = platformCtx.platform_weights;
       const signalCodes = extractSignals({
         campaign: {
           last_review_date: (campaign as any).last_review_date ?? null,
@@ -310,25 +306,10 @@ export class OutreachOpenerService extends BaseService {
           gbp_claimed: (campaign as any).gbp_claimed ?? null,
         },
         auditData: auditResult.auditData,
-        platformSignalWeights,
+        platformSignalWeights: platformCtx.platformSignalWeights,
       });
       const signalContext = buildTriggeredSignalContext(signalCodes, auditResult.auditData);
       common.triggered_signals = signalContext.signals;
-      // Phase 7 — the reported "where" fact (spec §2): the platform that
-      // matters AND where the business is weak. Read-only premise for the
-      // pitch; null when nothing qualifies.
-      if (resolvedWeights) {
-        const lead = selectLeadPlatform(auditResult.auditData, resolvedWeights);
-        if (lead) {
-          common.platform_premise = {
-            platform: lead.platform,
-            signal_weight: lead.signalWeight,
-            gap_severity: lead.gapSeverity,
-            scope: lead.scope,
-            basis: lead.basis,
-          };
-        }
-      }
     } catch {
       // Signal extraction is best-effort — if it fails, the prompt still
       // works with empty triggered_signals (the dispatcher fills in

@@ -112,6 +112,9 @@ export interface CallContext {
     score: number;
     signal_weight: number;
     gap_severity: number;
+    scope: string | null;
+    /** Measured basis behind the weight — the rationale the operator cites. */
+    basis: string | null;
   }>;
   /**
    * The linked directory-presence seed resolved for link/QR variables
@@ -480,6 +483,8 @@ export class CallScriptService extends BaseService {
           score: p.score,
           signal_weight: p.signalWeight,
           gap_severity: p.gapSeverity,
+          scope: p.scope,
+          basis: p.basis,
         })),
         linked_seed_id: seedId,
       },

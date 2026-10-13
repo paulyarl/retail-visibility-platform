@@ -32,7 +32,13 @@
  */
 
 import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
-import { CLOSE_VARIANTS, DEFAULT_CLOSE_VARIANT, type CloseVariant } from '../outreach-openers/archetype-prompts';
+import {
+  CLOSE_VARIANTS,
+  DEFAULT_CLOSE_VARIANT,
+  buildPlatformPremiseInstruction,
+  buildPlatformPriorityInstruction,
+  type CloseVariant,
+} from '../outreach-openers/archetype-prompts';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -77,10 +83,24 @@ export function buildFollowUpPrompt(
 
   const template = FOLLOWUP_TEMPLATES[archetype]?.[followUpType] ?? FOLLOWUP_TEMPLATES.A1[followUpType];
 
+  // Platform-signal-weight instruction tail — the same "where this
+  // category's customers look" evidence the opener/pitch get, so the
+  // follow-up can name the top platform(s) with their rationale instead
+  // of generic "where customers look" phrasing. No-op when the extracted
+  // fields carry no resolved weights.
+  let fields: any = {};
+  try {
+    fields = JSON.parse(extractedFieldsJson);
+  } catch {
+    // malformed JSON — skip the platform instructions
+  }
+  const platformInstructions =
+    buildPlatformPremiseInstruction(fields) + buildPlatformPriorityInstruction(fields);
+
   return template
     .replace('{{extracted_fields}}', extractedFieldsJson)
     .replace('{{data_diff}}', diffJson)
-    .replace('{{close_line}}', closeLine);
+    .replace('{{close_line}}', closeLine) + platformInstructions;
 }
 
 // ─── Shared persona for follow-ups ──────────────────────────────────────

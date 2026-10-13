@@ -166,6 +166,19 @@ export class OutreachFollowUpService extends BaseService {
     // 3. Deterministic archetype selection + field extraction (same as opener).
     const selection = selectArchetype(auditData);
     const common = this.buildCommonFields(campaign);
+
+    // Category platform-signal weights — premise + ranked landscape for the
+    // "where this category's customers look" instruction tail. Same resolver
+    // the opener uses; nulls when nothing resolves.
+    try {
+      const { resolveOutreachPlatformContext } = await import('./outreach-openers/platform-context');
+      const platformCtx = await resolveOutreachPlatformContext(campaign, auditData, ctx);
+      common.platform_premise = platformCtx.platform_premise;
+      common.platform_weights = platformCtx.platform_weights;
+    } catch {
+      // best-effort — prompt degrades to no premise
+    }
+
     const extractedFields = extractFields(
       selection.archetype,
       auditData,

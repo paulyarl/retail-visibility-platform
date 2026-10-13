@@ -32,7 +32,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V10 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V11 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -123,7 +123,7 @@ Signal -> deliverable type:
 - product_visibility_preview <- DS_MISSING_PRODUCT_CATALOG, WC_MISSING_PRODUCT_BROWSING, WC_MISSING_AVAILABILITY_INQUIRY, WC_MISSING_PICKUP_DELIVERY
 - website_mockup             <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
 - website_build_package      <- WC_MISSING_WEBSITE, WC_THIRD_PARTY_DOMAIN, WC_BUILDER_SUBDOMAIN, WC_PARKED_DOMAIN, WC_UNFINISHED_SITE, WC_BROKEN_WEBSITE, WC_UNSECURED_WEBSITE, WC_LEGACY_BUILDER_SITE, WC_STALE_WEBSITE, WC_POOR_SITE_QUALITY, WC_CATEGORY_MISMATCH
-- profile_presence_plan      <- DS_MISSING_PROFILE, DS_CLAIMED_STATUS, DS_ZERO_INDEXED_PRESENCE, DS_PROFILE_SUSPENDED, DS_DUPLICATE_LISTING, DS_HIJACKED_LISTING, DS_OWNERSHIP_DISPUTE, DS_ADDRESS_VERIFICATION_BLOCK, CP_MISSING_CONTACT_INFO, DS_BROKEN_PROFILE_LINK
+- profile_presence_plan      <- DS_MISSING_PROFILE, DS_CLAIMED_STATUS, DS_ZERO_INDEXED_PRESENCE, DS_PROFILE_SUSPENDED, DS_DUPLICATE_LISTING, DS_HIJACKED_LISTING, DS_OWNERSHIP_DISPUTE, DS_ADDRESS_VERIFICATION_BLOCK, DS_PROFILE_NOT_PUBLIC, CP_MISSING_CONTACT_INFO, DS_BROKEN_PROFILE_LINK
 
 RULES
 - Ground every field in the supplied audit results, parsed review intake, or the
@@ -389,16 +389,24 @@ Produce the complete presence plan, grounded in the supplied material:
 1. PRESENCE MAP — one row per platform customers check for this category
    (Google, Yelp, Facebook, Apple Maps, Bing Places, Nextdoor — adapt to the
    supplied state): platform, current state (missing | unclaimed | claimed |
-   suspended | duplicated | disputed | blocked), and what that state costs in
-   plain language. Frame each platform as a door customers walk through.
+   hidden | suspended | duplicated | disputed | blocked), and what that
+   state costs in plain language. Frame each platform as a door customers
+   walk through — a hidden profile is a locked door: it exists, but
+   customers can't get in.
 2. MISSING PLATFORMS — the profiles to create, ranked by how much discovery
    each unlocks for a {{category}} in {{city}}.
 3. CLAIM & OWNERSHIP ACTIONS — every unclaimed or unmanaged listing: the
    claim path, the verification it asks for (postcard, phone, email), and
    the realistic timeline.
-4. INTEGRITY REPAIRS — each suspension, duplicate, dispute, hijack, or
-   verification block: what it means and the resolution path. These come
-   before any build work — a suspended profile renders creation moot.
+4. INTEGRITY REPAIRS — each suspension, duplicate, dispute, hijack,
+   verification block, or hidden profile: what it means and the resolution
+   path. These come before any build work — a suspended profile renders
+   creation moot, and a hidden one needs unlocking, not rebuilding. For a
+   hidden profile the resolution is making it public: publish the
+   unpublished page, lift the restricted visibility setting, or claim and
+   configure the listing so it renders to ordinary visitors — verify the
+   public render afterward, because being listed is not the same as being
+   seen.
 5. BUILD ORDER — the sequenced plan: integrity repairs first, then claims,
    then new profiles, each step sized so the owner sees progress weekly.
 6. PROFILE SPECIFICATIONS — per new profile: the gold-standard field set
@@ -415,7 +423,9 @@ Produce the complete presence plan, grounded in the supplied material:
    closes.
 9. EDUCATION NOTE — one short paragraph the owner can keep: what a profile
    does for discovery and why each platform is a separate stream of
-   customers. Plain language — most owners don't know listings are free.
+   customers. Plain language — most owners don't know listings are free,
+   and fewer know that being listed is not the same as being visible: a
+   profile the public can't see does the business no good at all.
 
 RULES
 - Ground every row in the supplied source material. Do not invent platforms,

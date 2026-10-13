@@ -1518,8 +1518,27 @@ class ProspectReportService extends BaseService {
     }
     const missing = [...missingPlatforms];
 
-    const present = platformEntries.filter(([, p]) => isPresentPlatform(p));
-    const unclaimed = platformEntries.filter(([, p]) => isUnclaimedPlatform(p));
+    // Restricted — the profile exists but the public cannot see it
+    // (data_status 'restricted' or a render-control 'restricted' verdict).
+    // Not "working" (excluded from present) and not absent — a distinct
+    // visibility failure that educates: being listed is not being seen.
+    const restrictedKeys = new Set<string>();
+    for (const [key, p] of platformEntries) {
+      if (p.data_status === 'restricted') restrictedKeys.add(key);
+    }
+    for (const r of (audit as any).render_controls ?? []) {
+      if (r?.determination === 'restricted' && r?.platform) {
+        restrictedKeys.add(String(r.platform));
+      }
+    }
+    const restricted = platformEntries.filter(([key]) => restrictedKeys.has(key));
+
+    const present = platformEntries.filter(
+      ([key, p]) => isPresentPlatform(p) && !restrictedKeys.has(key),
+    );
+    const unclaimed = platformEntries.filter(
+      ([key, p]) => isUnclaimedPlatform(p) && !restrictedKeys.has(key),
+    );
 
     // Verdict — coverage line over the platforms customers actually check.
     const checked = present.length + missing.length;
@@ -1568,6 +1587,27 @@ class ProspectReportService extends BaseService {
           'An unclaimed profile accepts edits from anyone — and reads as a business nobody is managing.',
         evidence: p.profile_url ?? null,
         tier: 'worth_fixing',
+      });
+    }
+    for (const [key, p] of restricted) {
+      costing.push({
+        headline: `Your ${platformLabel(key)} profile exists — but the public can\u2019t see it`,
+        cost:
+          'Being listed is not the same as being visible. A profile behind a wall is a door customers can see but can\u2019t open — making it public is the fix, not building a new one.',
+        evidence: p.profile_url ?? null,
+        tier: 'now',
+      });
+    }
+    // A restricted platform flagged only by render_controls (no platform
+    // entry — non-primary platforms live there) still earns its line.
+    for (const key of restrictedKeys) {
+      if (restricted.some(([k]) => k === key)) continue;
+      costing.push({
+        headline: `Your ${platformLabel(key)} profile exists — but the public can\u2019t see it`,
+        cost:
+          'Being listed is not the same as being visible — a hidden profile sends searching customers elsewhere. The fix is making it public.',
+        evidence: null,
+        tier: 'now',
       });
     }
     if (signals.includes('DS_PROFILE_SUSPENDED')) {

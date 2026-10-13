@@ -65,6 +65,42 @@ describe('buildOperatorProfileEvidencePreamble', () => {
     expect(preamble).toContain('category identification');
   });
 
+  it('encodes the not-in-file = missing rule, bounded to audit scope', () => {
+    const preamble = buildOperatorProfileEvidencePreamble({
+      [OPERATOR_PROFILE_EVIDENCE_VARIABLE]: PATH,
+    });
+    expect(preamble).toContain('NOT IN FILE = MISSING');
+    expect(preamble).toContain('business_specific_failure');
+    expect(preamble).toContain('NOT unable_to_verify');
+    expect(preamble).toContain("the audit's verification scope");
+  });
+
+  it('encodes the hidden-is-not-missing rule — authenticated capture = restricted', () => {
+    const preamble = buildOperatorProfileEvidencePreamble({
+      [OPERATOR_PROFILE_EVIDENCE_VARIABLE]: PATH,
+    });
+    expect(preamble).toContain('HIDDEN IS NOT MISSING');
+    expect(preamble).toContain('DS_PROFILE_NOT_PUBLIC');
+    expect(preamble).toContain('restricted');
+  });
+
+  it('encodes the public-proxy rule — analyst-side barriers are not hidden', () => {
+    const preamble = buildOperatorProfileEvidencePreamble({
+      [OPERATOR_PROFILE_EVIDENCE_VARIABLE]: PATH,
+    });
+    expect(preamble).toContain('public proxy');
+    expect(preamble).toContain('bot policy');
+    expect(preamble).toContain('unable_to_verify');
+  });
+
+  it('encodes the raw-paste expectation — select-all text is a legitimate capture', () => {
+    const preamble = buildOperatorProfileEvidencePreamble({
+      [OPERATOR_PROFILE_EVIDENCE_VARIABLE]: PATH,
+    });
+    expect(preamble).toContain('select-all page text');
+    expect(preamble).toContain('legitimate capture');
+  });
+
   it('is independent of interactive_verification — emits with the toggle off', () => {
     const preamble = buildOperatorProfileEvidencePreamble({
       interactive_verification: 'off',
@@ -102,6 +138,6 @@ describe('caller-supplied variable vs renderTemplate scope check', () => {
 
 describe('directive version', () => {
   it('is stamped for execution metadata', () => {
-    expect(OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION).toBe('operator_profile_evidence_v2');
+    expect(OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION).toBe('operator_profile_evidence_v6');
   });
 });
