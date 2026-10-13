@@ -98,6 +98,12 @@ const createSeedSchema = z.object({
   snapEbtAsOf: z.string().datetime().optional(),
   snapEbtSource: z.string().optional(),
   snapEbtSourceName: z.string().optional(),
+  // OQ1 fulfillment columns (migration 337) — tri-state; null = unobserved.
+  deliveryOffered: z.boolean().nullable().optional(),
+  pickupOffered: z.boolean().nullable().optional(),
+  fulfillmentAsOf: z.string().datetime().optional(),
+  fulfillmentSource: z.string().max(32).optional(),
+  fulfillmentSourceName: z.string().optional(),
   attributes: z.array(z.object({
     key: z.string().min(1).max(64),
     label: z.string().min(1).max(100),
@@ -133,6 +139,13 @@ const updateFieldsSchema = z.object({
   snapEbtAsOf: z.string().datetime().nullable().optional(),
   snapEbtSource: z.string().nullable().optional(),
   snapEbtSourceName: z.string().nullable().optional(),
+  // OQ1 — tri-state; explicit null clears an observed value back to
+  // unobserved (migration 337 semantics).
+  deliveryOffered: z.boolean().nullable().optional(),
+  pickupOffered: z.boolean().nullable().optional(),
+  fulfillmentAsOf: z.string().datetime().nullable().optional(),
+  fulfillmentSource: z.string().max(32).nullable().optional(),
+  fulfillmentSourceName: z.string().nullable().optional(),
   attributes: z.array(z.object({
     key: z.string().min(1).max(64),
     label: z.string().min(1).max(100),
@@ -1158,6 +1171,14 @@ router.post('/presence-seeds', requirePlatformAdmin, async (req: Request, res: R
       snapEbtAsOf: input.snapEbtAsOf ? new Date(input.snapEbtAsOf) : undefined,
       snapEbtSource: input.snapEbtSource,
       snapEbtSourceName: input.snapEbtSourceName,
+      deliveryOffered: input.deliveryOffered,
+      pickupOffered: input.pickupOffered,
+      fulfillmentAsOf: input.fulfillmentAsOf ? new Date(input.fulfillmentAsOf) : undefined,
+      // Operator-entered fulfillment defaults to 'ops_review' provenance.
+      fulfillmentSource:
+        input.fulfillmentSource ??
+        (input.deliveryOffered != null || input.pickupOffered != null ? 'ops_review' : undefined),
+      fulfillmentSourceName: input.fulfillmentSourceName,
       attributes: input.attributes,
       description: input.description,
       keywords: input.keywords,
@@ -1402,6 +1423,13 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
         snapEbtAsOf: data.snapEbtAsOf ? new Date(data.snapEbtAsOf) : data.snapEbtAsOf === null ? null : undefined,
         snapEbtSource: data.snapEbtSource,
         snapEbtSourceName: data.snapEbtSourceName,
+        deliveryOffered: data.deliveryOffered,
+        pickupOffered: data.pickupOffered,
+        fulfillmentAsOf: data.fulfillmentAsOf ? new Date(data.fulfillmentAsOf) : data.fulfillmentAsOf === null ? null : undefined,
+        fulfillmentSource:
+          data.fulfillmentSource ??
+          (data.deliveryOffered !== undefined || data.pickupOffered !== undefined ? 'ops_review' : undefined),
+        fulfillmentSourceName: data.fulfillmentSourceName,
         attributes: data.attributes !== undefined ? (data.attributes ?? []) : undefined,
         phone: data.phone,
         website: data.website,

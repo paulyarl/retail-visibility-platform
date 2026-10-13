@@ -244,6 +244,12 @@ export interface DirectoryPresenceSeedSummary {
   snapEbtAsOf: string | null;
   snapEbtSource: string | null;
   snapEbtSourceName: string | null;
+  /** OQ1 — listing fulfillment columns (migration 337), tri-state. */
+  deliveryOffered: boolean | null;
+  pickupOffered: boolean | null;
+  fulfillmentAsOf: string | null;
+  fulfillmentSource: string | null;
+  fulfillmentSourceName: string | null;
   hasClaimToken: boolean;
   claimTokenExpiresAt: string | null;
   createdAt: string;
@@ -298,6 +304,11 @@ export interface CreateSeedRequest {
   snapEbtAsOf?: string;
   snapEbtSource?: string;
   snapEbtSourceName?: string;
+  deliveryOffered?: boolean | null;
+  pickupOffered?: boolean | null;
+  fulfillmentAsOf?: string;
+  fulfillmentSource?: string;
+  fulfillmentSourceName?: string;
   attributes?: DirectoryListingAttribute[];
   seedBatch: string;
   identityConfidence: 'high' | 'medium';
@@ -2013,6 +2024,11 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       snapEbtAsOf?: string | null;
       snapEbtSource?: string | null;
       snapEbtSourceName?: string | null;
+      deliveryOffered?: boolean | null;
+      pickupOffered?: boolean | null;
+      fulfillmentAsOf?: string | null;
+      fulfillmentSource?: string | null;
+      fulfillmentSourceName?: string | null;
       attributes?: DirectoryListingAttribute[] | null;
       phone?: string;
       website?: string;

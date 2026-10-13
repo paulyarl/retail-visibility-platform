@@ -24,6 +24,15 @@
  * are both "one social channel" — they must not classify identically).
  * last_activity recency and notable_activity presence each contribute.
  *
+ * Surface semantics (review F4): a claimed/likely_claimed primary-platform
+ * profile counts as a CONTROLLED surface — "surface" is owned OR claimed,
+ * not owned-site-only. Consequence: with zero owned site, rendered
+ * primaries (+6 cap) + claimed (+2) + rated (+2) can reach the threshold on
+ * platform evidence alone — deliberate, since a claimed profile is a
+ * surface the business can act on (post, respond, update). If the team
+ * decides claimed ≠ surface, revisit the claimed cap — it can carry a
+ * business to the threshold unaided.
+ *
  * Never public: the side is a routing input. It must never reach
  * public_narrative or any owner-facing surface.
  */
@@ -48,11 +57,26 @@ export const RECENT_ACTIVITY_WINDOW_DAYS = 90;
 
 export type FootprintSide = 'emerging' | 'competitive';
 
+export interface FootprintDensityComponent {
+  /** Contributing evidence entries observed (uncapped). */
+  observed: number;
+  /** Points actually awarded after the component cap. */
+  awarded: number;
+  /** The component's point cap; null for the uncapped owned-site anchor. */
+  cap: number | null;
+}
+
 export interface FootprintSideResult {
   side: FootprintSide;
   density_score: number;
-  /** The audit field paths (with per-input detail) that produced the score. */
+  /** The audit field paths (with per-input detail) that produced the score.
+   *  Uncapped by design — every contributing entry, not just the ones that
+   *  earned points. `density_breakdown` records what actually scored
+   *  (review F3). */
   inputs_used: string[];
+  /** Per-component { observed, awarded, cap } — makes density_score
+   *  reproducible without re-running the classifier. */
+  density_breakdown: Record<string, FootprintDensityComponent>;
   classifier_version: number;
 }
 
@@ -134,6 +158,8 @@ export function classifyFootprintSide(
     (c) => c.channel === 'owned_site' && c.rendered === true,
   );
 
+  const breakdown: Record<string, FootprintDensityComponent> = {};
+
   if (ownedSiteViaWebsite) {
     score += POINTS_OWNED_SITE;
     inputs.push(`website.status=${websiteStatus}`, `website.url`);
@@ -141,6 +167,11 @@ export function classifyFootprintSide(
     score += POINTS_OWNED_SITE;
     inputs.push('channels_scanned[owned_site].rendered');
   }
+  breakdown.owned_site = {
+    observed: ownedSiteViaWebsite || ownedSiteChannel ? 1 : 0,
+    awarded: ownedSiteViaWebsite || ownedSiteChannel ? POINTS_OWNED_SITE : 0,
+    cap: null,
+  };
 
   // ── 2. Rendered channels (+2 each, cap +6) ────────────────────────────
   // not_attempted / non-rendered entries contribute nothing but the
@@ -155,6 +186,11 @@ export function classifyFootprintSide(
       ...renderedChannels.map((c) => `channels_scanned[${c.channel}].rendered`),
     );
   }
+  breakdown.rendered_channels = {
+    observed: renderedChannels.length,
+    awarded: renderedPoints,
+    cap: CAP_RENDERED_CHANNELS,
+  };
 
   // ── 3. Recent activity on rendered channels (+1 each, cap +3) ─────────
   const windowMs = RECENT_ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -163,25 +199,37 @@ export function classifyFootprintSide(
     const ts = Date.parse(c.last_activity);
     return !Number.isNaN(ts) && asOf.getTime() - ts <= windowMs && ts <= asOf.getTime() + windowMs;
   });
+  const recentPoints = Math.min(recentChannels.length * POINTS_RECENT_CHANNEL, CAP_RECENT_CHANNELS);
   if (recentChannels.length > 0) {
-    score += Math.min(recentChannels.length * POINTS_RECENT_CHANNEL, CAP_RECENT_CHANNELS);
+    score += recentPoints;
     inputs.push(
       ...recentChannels.map(
         (c) => `channels_scanned[${c.channel}].last_activity=${c.last_activity}`,
       ),
     );
   }
+  breakdown.recent_channel_activity = {
+    observed: recentChannels.length,
+    awarded: recentPoints,
+    cap: CAP_RECENT_CHANNELS,
+  };
 
   // ── 4. Notable activity on rendered channels (+1 each, cap +2) ────────
   const notableChannels = renderedChannels.filter(
     (c) => Array.isArray(c.notable_activity) && c.notable_activity.length > 0,
   );
+  const notablePoints = Math.min(notableChannels.length * POINTS_NOTABLE_CHANNEL, CAP_NOTABLE_CHANNELS);
   if (notableChannels.length > 0) {
-    score += Math.min(notableChannels.length * POINTS_NOTABLE_CHANNEL, CAP_NOTABLE_CHANNELS);
+    score += notablePoints;
     inputs.push(
       ...notableChannels.map((c) => `channels_scanned[${c.channel}].notable_activity`),
     );
   }
+  breakdown.notable_channel_activity = {
+    observed: notableChannels.length,
+    awarded: notablePoints,
+    cap: CAP_NOTABLE_CHANNELS,
+  };
 
   // ── 5. Claimed / rated primary platforms (+1 each, caps +2/+2) ────────
   const platforms = data.platforms ?? {};
@@ -197,14 +245,27 @@ export function classifyFootprintSide(
       rated.push(`platforms.${p}.rating`);
     }
   }
-  score += Math.min(claimed.length * POINTS_CLAIMED_PLATFORM, CAP_CLAIMED_PLATFORMS);
-  score += Math.min(rated.length * POINTS_RATED_PLATFORM, CAP_RATED_PLATFORMS);
+  const claimedPoints = Math.min(claimed.length * POINTS_CLAIMED_PLATFORM, CAP_CLAIMED_PLATFORMS);
+  const ratedPoints = Math.min(rated.length * POINTS_RATED_PLATFORM, CAP_RATED_PLATFORMS);
+  score += claimedPoints;
+  score += ratedPoints;
   inputs.push(...claimed, ...rated);
+  breakdown.claimed_platforms = {
+    observed: claimed.length,
+    awarded: claimedPoints,
+    cap: CAP_CLAIMED_PLATFORMS,
+  };
+  breakdown.rated_platforms = {
+    observed: rated.length,
+    awarded: ratedPoints,
+    cap: CAP_RATED_PLATFORMS,
+  };
 
   return {
     side: score >= COMPETITIVE_DENSITY_THRESHOLD ? 'competitive' : 'emerging',
     density_score: score,
     inputs_used: inputs,
+    density_breakdown: breakdown,
     classifier_version: FOOTPRINT_SIDE_CLASSIFIER_VERSION,
   };
 }

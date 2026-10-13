@@ -2,12 +2,19 @@
  * Seed Outreach No-Response Job tests
  *
  * Verifies:
- * - Kill switch: startSeedOutreachNoResponseJob is a no-op when disabled
+ * - Kill switch: DISABLE_SEED_OUTREACH_NO_RESPONSE_JOB is handed to the
+ *   registry as envDisableVar (the job no longer self-schedules — the
+ *   job registry owns the timer; see jobs/registry.ts)
  * - Stale seeds are marked no_response
  * - Fresh seeds (within courtesy window) are not marked
  * - setOutreachState errors are caught per-seed (don't abort the sweep)
  * - noResponseDays comes from unifiedConfig
- * - stopSeedOutreachNoResponseJob clears the interval
+ * - stopSeedOutreachNoResponseJob delegates to the registry's stopJob
+ *
+ * The sweep runs through `scheduleJob`'s captured handler — mocking
+ * global.setTimeout can't reach the handler anymore because the registry's
+ * armTimer guards on an always-future delay (`Date.now() < targetAt` →
+ * re-arm), which an immediate-fire setTimeout loops forever.
  *
  * See: docs/LocalBiz/seed_outreach_courtesy_window_sprint_plan.md §11
  */
@@ -18,13 +25,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const {
   mockQueryRaw,
   mockSetOutreachState,
-  mockDisableJob,
   mockNoResponseDays,
+  mockScheduleJob,
+  mockStopJob,
 } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
   mockSetOutreachState: vi.fn(),
-  mockDisableJob: vi.fn(() => false),
   mockNoResponseDays: vi.fn(() => 14),
+  mockScheduleJob: vi.fn(),
+  mockStopJob: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -39,9 +48,13 @@ vi.mock('../../logger', () => ({
 
 vi.mock('../../config/unifiedConfig', () => ({
   unifiedConfig: {
-    get disableSeedOutreachNoResponseJob() { return mockDisableJob(); },
     get seedOutreachNoResponseDays() { return mockNoResponseDays(); },
   },
+}));
+
+vi.mock('../../jobs/registry', () => ({
+  scheduleJob: (...args: any[]) => mockScheduleJob(...args),
+  stopJob: (...args: any[]) => mockStopJob(...args),
 }));
 
 vi.mock('../DirectoryPresenceSeedService', () => ({
@@ -62,9 +75,23 @@ function makeStaleSeeds(ids: string[] = ['seed-001', 'seed-002']) {
   return ids.map((id) => ({ id }));
 }
 
+/** Register the job via the mocked registry and invoke the captured handler
+ *  directly — no timer gymnastics. */
+async function startAndRunOnce() {
+  await startSeedOutreachNoResponseJob();
+  const opts = mockScheduleJob.mock.calls[0]?.[0];
+  if (!opts?.handler) throw new Error('scheduleJob captured no handler');
+  await opts.handler({
+    jobName: opts.name,
+    runId: 'test-run',
+    trigger: 'manual',
+    startedAt: new Date(),
+  });
+  return opts;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mockDisableJob.mockReturnValue(false);
   mockNoResponseDays.mockReturnValue(14);
   mockSetOutreachState.mockResolvedValue(undefined);
   mockQueryRaw.mockResolvedValue(makeStaleSeeds());
@@ -76,71 +103,43 @@ afterEach(() => {
 
 // ─── Tests ───────────────────────────────────────────────────────────────
 
-// We test the runSeedOutreachNoResponse function indirectly by calling
-// startSeedOutreachNoResponseJob and waiting for the setTimeout (5min delay).
-// Since that's too long for tests, we directly invoke the internal function
-// by importing the module and calling the function via a workaround.
-//
-// Instead, we test the job's behavior by mocking setTimeout/setInterval
-// to fire immediately.
-
 describe('Seed Outreach No-Response Job', () => {
   describe('kill switch', () => {
-    it('startSeedOutreachNoResponseJob is a no-op when disabled', async () => {
-      mockDisableJob.mockReturnValue(true);
+    it('registers DISABLE_SEED_OUTREACH_NO_RESPONSE_JOB as the env kill switch', async () => {
       await startSeedOutreachNoResponseJob();
-      // Should not set any timers — verified by no query calls
-      expect(mockQueryRaw).not.toHaveBeenCalled();
+      // Disablement is the registry's contract now (env var at schedule
+      // time + DB `enabled` flag), not a check inside the job body.
+      expect(mockScheduleJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'seed-outreach-no-response',
+          envDisableVar: 'DISABLE_SEED_OUTREACH_NO_RESPONSE_JOB',
+        }),
+      );
     });
   });
 
   describe('stale seed marking', () => {
     it('marks all stale seeds as no_response', async () => {
-      // Mock setTimeout to fire immediately (startup delay), but use a no-op
-      // setInterval so the sweep only runs once.
-      const originalSetInterval = global.setInterval;
-      const originalSetTimeout = global.setTimeout;
-      global.setTimeout = ((cb: any) => { cb(); return 0 as any; }) as any;
-      global.setInterval = (() => 0 as any) as any;
+      await startAndRunOnce();
 
-      try {
-        await startSeedOutreachNoResponseJob();
-        // Wait for the microtask queue to flush
-        await new Promise((r) => originalSetTimeout(r, 100));
-
-        expect(mockSetOutreachState).toHaveBeenCalledTimes(2);
-        expect(mockSetOutreachState).toHaveBeenCalledWith(
-          'seed-001',
-          'no_response',
-          { actorId: 'system', actorType: 'system' },
-        );
-        expect(mockSetOutreachState).toHaveBeenCalledWith(
-          'seed-002',
-          'no_response',
-          { actorId: 'system', actorType: 'system' },
-        );
-      } finally {
-        global.setInterval = originalSetInterval;
-        global.setTimeout = originalSetTimeout;
-      }
+      expect(mockSetOutreachState).toHaveBeenCalledTimes(2);
+      expect(mockSetOutreachState).toHaveBeenCalledWith(
+        'seed-001',
+        'no_response',
+        { actorId: 'system', actorType: 'system' },
+      );
+      expect(mockSetOutreachState).toHaveBeenCalledWith(
+        'seed-002',
+        'no_response',
+        { actorId: 'system', actorType: 'system' },
+      );
     });
 
     it('does not mark seeds when query returns empty', async () => {
       mockQueryRaw.mockResolvedValue([]);
 
-      const originalSetInterval = global.setInterval;
-      const originalSetTimeout = global.setTimeout;
-      global.setTimeout = ((cb: any) => { cb(); return 0 as any; }) as any;
-      global.setInterval = (() => 0 as any) as any;
-
-      try {
-        await startSeedOutreachNoResponseJob();
-        await new Promise((r) => originalSetTimeout(r, 100));
-        expect(mockSetOutreachState).not.toHaveBeenCalled();
-      } finally {
-        global.setInterval = originalSetInterval;
-        global.setTimeout = originalSetTimeout;
-      }
+      await startAndRunOnce();
+      expect(mockSetOutreachState).not.toHaveBeenCalled();
     });
   });
 
@@ -150,26 +149,16 @@ describe('Seed Outreach No-Response Job', () => {
         .mockRejectedValueOnce(new Error('DB error for seed-001'))
         .mockResolvedValueOnce(undefined);
 
-      const originalSetInterval = global.setInterval;
-      const originalSetTimeout = global.setTimeout;
-      global.setTimeout = ((cb: any) => { cb(); return 0 as any; }) as any;
-      global.setInterval = (() => 0 as any) as any;
-
-      try {
-        await startSeedOutreachNoResponseJob();
-        await new Promise((r) => originalSetTimeout(r, 100));
-        // Both seeds were attempted
-        expect(mockSetOutreachState).toHaveBeenCalledTimes(2);
-      } finally {
-        global.setInterval = originalSetInterval;
-        global.setTimeout = originalSetTimeout;
-      }
+      await startAndRunOnce();
+      // Both seeds were attempted
+      expect(mockSetOutreachState).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('stopSeedOutreachNoResponseJob', () => {
-    it('can be called without starting (no-op)', () => {
-      expect(() => stopSeedOutreachNoResponseJob()).not.toThrow();
+    it('delegates to the registry stopJob', () => {
+      stopSeedOutreachNoResponseJob();
+      expect(mockStopJob).toHaveBeenCalledWith('seed-outreach-no-response');
     });
   });
 });

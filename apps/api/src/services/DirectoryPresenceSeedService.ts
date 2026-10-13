@@ -52,6 +52,10 @@ import {
   extractAttributesFromAudits,
   type DirectoryListingAttribute,
 } from './directory/listingAttributes';
+import {
+  extractFulfillmentFromAuditData,
+  extractSeedObservedAssets,
+} from './directory/fulfillmentFacts';
 import IntelligenceProfileService, {
   normalizeCategoryKey,
   normalizeReferenceCity,
@@ -122,6 +126,22 @@ export interface CreateSeedInput {
   snapEbtSource?: string;
   snapEbtSourceName?: string;
   /**
+   * OQ1 fulfillment facts (migration 337). Tri-state: null = unobserved,
+   * false = explicit rendered negative, true = observed/owner-confirmed.
+   * Public filters only match `= true`.
+   */
+  deliveryOffered?: boolean | null;
+  pickupOffered?: boolean | null;
+  fulfillmentAsOf?: Date | null;
+  fulfillmentSource?: string | null;
+  fulfillmentSourceName?: string | null;
+  /**
+   * OQ5 internal metadata — verified_on_surface observed_assets[] from the
+   * audit. Stored on directory_presence_seeds.observed_assets for operator
+   * review; never rendered on public surfaces.
+   */
+  observedAssets?: any[] | null;
+  /**
    * Sourced attribute chips (payments accepted, accessibility, ownership,
    * service options). Each entry carries its own evidence — never inferred
    * from category labels. SNAP/EBT stays in its dedicated snap_ebt_* columns.
@@ -175,6 +195,12 @@ export interface SeedSummary {
   snapEbtAsOf: Date | null;
   snapEbtSource: string | null;
   snapEbtSourceName: string | null;
+  /** OQ1 — listing-level fulfillment columns (migration 337). */
+  deliveryOffered: boolean | null;
+  pickupOffered: boolean | null;
+  fulfillmentAsOf: Date | null;
+  fulfillmentSource: string | null;
+  fulfillmentSourceName: string | null;
   hasClaimToken: boolean;
   claimTokenExpiresAt: Date | null;
   createdAt: Date;
@@ -305,6 +331,11 @@ class DirectoryPresenceSeedService {
         dl.snap_ebt_as_of,
         dl.snap_ebt_source,
         dl.snap_ebt_source_name,
+        dl.delivery_offered,
+        dl.pickup_offered,
+        dl.fulfillment_as_of,
+        dl.fulfillment_source,
+        dl.fulfillment_source_name,
         (SELECT 1 FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL LIMIT 1) AS has_claim_token,
         (SELECT dct.expires_at FROM directory_claim_tokens dct WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL ORDER BY dct.created_at DESC LIMIT 1) AS claim_token_expires_at,
         dps.outreach_state,
@@ -333,6 +364,11 @@ class DirectoryPresenceSeedService {
       snapEbtAsOf: s.snap_ebt_as_of ? new Date(s.snap_ebt_as_of) : null,
       snapEbtSource: s.snap_ebt_source ?? null,
       snapEbtSourceName: s.snap_ebt_source_name ?? null,
+      deliveryOffered: s.delivery_offered ?? null,
+      pickupOffered: s.pickup_offered ?? null,
+      fulfillmentAsOf: s.fulfillment_as_of ? new Date(s.fulfillment_as_of) : null,
+      fulfillmentSource: s.fulfillment_source ?? null,
+      fulfillmentSourceName: s.fulfillment_source_name ?? null,
       hasClaimToken: !!s.has_claim_token,
       claimTokenExpiresAt: s.claim_token_expires_at ? new Date(s.claim_token_expires_at) : null,
       createdAt: new Date(s.created_at),
@@ -466,6 +502,8 @@ class DirectoryPresenceSeedService {
         phone, website, primary_category, secondary_categories,
         latitude, longitude, business_hours, is_published, listing_origin, public_disclaimer,
         snap_ebt_reported, snap_ebt_as_of, snap_ebt_source, snap_ebt_source_name,
+        delivery_offered, pickup_offered,
+        fulfillment_as_of, fulfillment_source, fulfillment_source_name,
         attributes,
         subscription_tier, product_count, description, keywords, same_as,
         created_at, updated_at
@@ -492,6 +530,11 @@ class DirectoryPresenceSeedService {
         ${input.snapEbtAsOf || null},
         ${input.snapEbtSource || null},
         ${input.snapEbtSourceName || null},
+        ${input.deliveryOffered ?? null},
+        ${input.pickupOffered ?? null},
+        ${input.fulfillmentAsOf || null},
+        ${input.fulfillmentSource || null},
+        ${input.fulfillmentSourceName || null},
         ${JSON.stringify(input.attributes || [])}::jsonb,
         'directory_presence',
         0,
@@ -560,7 +603,7 @@ class DirectoryPresenceSeedService {
         seed_batch, status, identity_confidence, category_fit, notes,
         owner_name, owner_email, owner_phone, owner_contact_consent, seo_enrichment,
         contact_status, contact_status_derived_at,
-        name_variants,
+        name_variants, observed_assets,
         created_at, updated_at
       ) VALUES (
         ${seedId},
@@ -582,6 +625,7 @@ class DirectoryPresenceSeedService {
         ${contactStatus},
         now(),
         ARRAY[${input.businessName}]::text[],
+        ${input.observedAssets && input.observedAssets.length > 0 ? JSON.stringify(input.observedAssets) : null}::jsonb,
         now(), now()
       )
     `;
@@ -1089,6 +1133,11 @@ class DirectoryPresenceSeedService {
       snapEbtAsOf?: Date | null;
       snapEbtSource?: string | null;
       snapEbtSourceName?: string | null;
+      deliveryOffered?: boolean | null;
+      pickupOffered?: boolean | null;
+      fulfillmentAsOf?: Date | null;
+      fulfillmentSource?: string | null;
+      fulfillmentSourceName?: string | null;
       attributes?: DirectoryListingAttribute[] | null;
       phone?: string;
       email?: string | null;
@@ -1248,6 +1297,26 @@ class DirectoryPresenceSeedService {
     if (fields.snapEbtSourceName !== undefined) {
       setClauses.push('snap_ebt_source_name = $' + (params.length + 1));
       params.push(fields.snapEbtSourceName);
+    }
+    if (fields.deliveryOffered !== undefined) {
+      setClauses.push('delivery_offered = $' + (params.length + 1));
+      params.push(fields.deliveryOffered);
+    }
+    if (fields.pickupOffered !== undefined) {
+      setClauses.push('pickup_offered = $' + (params.length + 1));
+      params.push(fields.pickupOffered);
+    }
+    if (fields.fulfillmentAsOf !== undefined) {
+      setClauses.push('fulfillment_as_of = $' + (params.length + 1));
+      params.push(fields.fulfillmentAsOf);
+    }
+    if (fields.fulfillmentSource !== undefined) {
+      setClauses.push('fulfillment_source = $' + (params.length + 1));
+      params.push(fields.fulfillmentSource);
+    }
+    if (fields.fulfillmentSourceName !== undefined) {
+      setClauses.push('fulfillment_source_name = $' + (params.length + 1));
+      params.push(fields.fulfillmentSourceName);
     }
     if (fields.attributes !== undefined) {
       setClauses.push('attributes = $' + (params.length + 1) + '::jsonb');
@@ -2705,6 +2774,13 @@ class DirectoryPresenceSeedService {
       primaryCategory: campaign.category,
       secondaryCategories: campaignSecondary.length > 0 ? campaignSecondary : undefined,
       snapEbtReported: false,
+      // OQ1 — tri-state fulfillment facts from the audit's product-visibility
+      // block. The extractor returns null when the audit observed neither
+      // field, so a stub/discovery blob writes nothing.
+      ...(extractFulfillmentFromAuditData(d, (audit ?? stubAudit)?.created_at) ?? {}),
+      // OQ5 — verified_on_surface observed_assets ride the seed as internal
+      // operator metadata (directory_presence_seeds.observed_assets).
+      observedAssets: extractSeedObservedAssets(d),
       attributes: sourcedAttributes.length > 0 ? sourcedAttributes : undefined,
       seedBatch: `from-campaign-${campaign.display_id || campaignId}`,
       identityConfidence,
@@ -4070,6 +4146,128 @@ class DirectoryPresenceSeedService {
       payload: { campaignId, sharpened, skipped },
     });
     return { sharpened, skipped };
+  }
+
+  /**
+   * OQ1/OQ5 — project the latest REAL business_analysis audit's fulfillment
+   * facts (listing delivery_offered/pickup_offered + provenance) and
+   * verified_on_surface observed_assets (seed column) onto live primary-
+   * linked seeds. Covers seeds that predate the audit — the seed-born-with
+   * path is createFromCampaign.
+   *
+   *  - 'claimed' / 'suppressed' seeds are skipped (owner-managed / retired)
+   *  - a listing whose fulfillment_source = 'owner_confirmed' keeps its
+   *    values — owner confirmation outranks audit writes
+   *  - a NULL determination never overwrites: COALESCE preserves a prior
+   *    sourced value when the latest audit didn't address that field
+   *
+   * Fire-and-forget by contract: callers wrap in try/catch — a sync failure
+   * must never roll back the audit that triggered it.
+   */
+  async syncFulfillmentForCampaign(
+    campaignId: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<{ synced: string[]; skipped: string[] }> {
+    const seeds = await prisma.$queryRaw<
+      {
+        seed_id: string;
+        campaign_id: string;
+        listing_id: string;
+        fulfillment_source: string | null;
+      }[]
+    >`
+      SELECT dscl.seed_id, dscl.campaign_id, dps.listing_id, dl.fulfillment_source
+      FROM directory_seed_campaign_links dscl
+      JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dscl.link_role = 'primary'
+        AND dps.status IS DISTINCT FROM 'claimed'
+        AND dps.status IS DISTINCT FROM 'suppressed'
+        AND dscl.campaign_id IN (
+          SELECT c.id FROM mkt_campaigns_list c
+          WHERE c.id = ${campaignId} OR c.parent_campaign_id = ${campaignId}
+        )
+    `;
+    if (seeds.length === 0) return { synced: [], skipped: [] };
+
+    // Resolve the audit facts ONCE per linked campaign — several seeds may
+    // share the same parent (successor children post-swap).
+    const factsByCampaign = new Map<
+      string,
+      { facts: ReturnType<typeof extractFulfillmentFromAuditData>; assets: any[] }
+    >();
+    const forCampaign = async (campId: string) => {
+      const cached = factsByCampaign.get(campId);
+      if (cached) return cached;
+      const auditCandidates = await prisma.mkt_audits_list.findMany({
+        where: { campaign_id: campId, platform: 'business_analysis' },
+        orderBy: { created_at: 'desc' },
+        take: 10,
+      });
+      const audit =
+        (Array.isArray(auditCandidates) ? auditCandidates : []).find(
+          (a: any) => !isStubBusinessAnalysisAudit(a),
+        ) ?? null;
+      const d = (audit?.audit_data ?? {}) as any;
+      const entry = {
+        facts: audit
+          ? extractFulfillmentFromAuditData(d, audit.created_at)
+          : null,
+        assets: audit ? extractSeedObservedAssets(d) : [],
+      };
+      factsByCampaign.set(campId, entry);
+      return entry;
+    };
+
+    const synced: string[] = [];
+    const skipped: string[] = [];
+    for (const s of seeds) {
+      const { facts, assets } = await forCampaign(s.campaign_id);
+      if (!facts && assets.length === 0) {
+        skipped.push(s.seed_id);
+        continue;
+      }
+
+      // Owner-confirmed fulfillment outranks audit writes — the guard is on
+      // the listing's current fulfillment_source, not the value itself.
+      if (facts && s.fulfillment_source !== 'owner_confirmed') {
+        await prisma.$executeRaw`
+          UPDATE directory_listings_list
+          SET delivery_offered = COALESCE(${facts.deliveryOffered}, delivery_offered),
+              pickup_offered = COALESCE(${facts.pickupOffered}, pickup_offered),
+              fulfillment_as_of = ${facts.fulfillmentAsOf},
+              fulfillment_source = ${facts.fulfillmentSource},
+              fulfillment_source_name = ${facts.fulfillmentSourceName},
+              updated_at = now()
+          WHERE id = ${s.listing_id}
+        `;
+      }
+
+      // observed_assets is audit-derived internal metadata — always
+      // reprojected from the latest audit (never owner-edited).
+      if (assets.length > 0) {
+        await prisma.$executeRaw`
+          UPDATE directory_presence_seeds
+          SET observed_assets = ${JSON.stringify(assets)}::jsonb,
+              updated_at = now()
+          WHERE id = ${s.seed_id}
+        `;
+      }
+      synced.push(s.seed_id);
+    }
+
+    logger.info('DirectoryPresenceSeedService.syncFulfillmentForCampaign', undefined, {
+      campaignId,
+      synced: synced.length,
+      skipped: skipped.length,
+    });
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType || 'system',
+      action: 'directory_presence_seed.fulfillment_sync',
+      payload: { campaignId, synced, skipped },
+    });
+    return { synced, skipped };
   }
 
   /**

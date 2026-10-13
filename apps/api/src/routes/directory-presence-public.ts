@@ -840,6 +840,10 @@ router.get('/places/search', async (req: Request, res: Response) => {
     const category = req.query.category as string | undefined;
     const city = req.query.city as string | undefined;
     const snapEbt = req.query.snapEbt === 'true';
+    // OQ1 — public fulfillment filters (migration 337). Only `= true`
+    // matches; NULL (unobserved) and false (explicit negative) both exclude.
+    const delivery = req.query.delivery === 'true';
+    const pickup = req.query.pickup === 'true';
     const sort = (req.query.sort as string) || 'name';
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const perPage = Math.min(48, Math.max(1, parseInt(req.query.perPage as string) || 24));
@@ -880,6 +884,12 @@ router.get('/places/search', async (req: Request, res: Response) => {
     if (snapEbt) {
       whereClause += ` AND dll.snap_ebt_reported = true`;
     }
+    if (delivery) {
+      whereClause += ` AND dll.delivery_offered = true`;
+    }
+    if (pickup) {
+      whereClause += ` AND dll.pickup_offered = true`;
+    }
 
     let orderBy = 'dll.business_name ASC';
     if (sort === 'city') orderBy = 'dll.city ASC, dll.business_name ASC';
@@ -899,6 +909,7 @@ router.get('/places/search', async (req: Request, res: Response) => {
         dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
         dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
         dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
+        dll.delivery_offered, dll.pickup_offered,
         dll.attributes, dll.public_disclaimer,
         dps.category, dps.city as seed_city, dps.state as seed_state,
         pc.slug AS category_slug, pc.icon_emoji
@@ -928,6 +939,8 @@ router.get('/places/search', async (req: Request, res: Response) => {
       description: row.description,
       snapEbtReported: row.snap_ebt_reported,
       snapEbtSource: row.snap_ebt_source,
+      deliveryOffered: row.delivery_offered === true,
+      pickupOffered: row.pickup_offered === true,
       attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
@@ -993,6 +1006,8 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
          dll.description,
          dll.snap_ebt_reported,
          dll.snap_ebt_source,
+         dll.delivery_offered,
+         dll.pickup_offered,
          dll.attributes,
          dll.public_disclaimer,
          dps.category,
@@ -1043,6 +1058,8 @@ router.get('/places/:categorySlug', async (req: Request, res: Response) => {
       description: row.description,
       snapEbtReported: row.snap_ebt_reported,
       snapEbtSource: row.snap_ebt_source,
+      deliveryOffered: row.delivery_offered === true,
+      pickupOffered: row.pickup_offered === true,
       attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,
@@ -1296,6 +1313,7 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
          dll.id, dll.tenant_id, dll.business_name, dll.slug, dll.address,
          dll.city, dll.state, dll.zip_code, dll.phone, dll.latitude, dll.longitude,
          dll.logo_url, dll.description, dll.snap_ebt_reported, dll.snap_ebt_source,
+         dll.delivery_offered, dll.pickup_offered,
          dll.attributes, dll.public_disclaimer, dll.secondary_categories,
          dps.category, dps.city as seed_city, dps.state as seed_state,
          pc.slug AS category_slug, pc.id AS category_id, pc.icon_emoji
@@ -1326,6 +1344,8 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       description: row.description,
       snapEbtReported: row.snap_ebt_reported,
       snapEbtSource: row.snap_ebt_source,
+      deliveryOffered: row.delivery_offered === true,
+      pickupOffered: row.pickup_offered === true,
       attributes: Array.isArray(row.attributes) ? row.attributes : [],
       publicDisclaimer: row.public_disclaimer,
       category: row.category,

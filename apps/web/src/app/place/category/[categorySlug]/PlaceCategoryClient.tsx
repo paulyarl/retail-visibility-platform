@@ -560,6 +560,21 @@ function PlaceCard({
           )}
         </div>
 
+        {(place.deliveryOffered || place.pickupOffered) && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {place.deliveryOffered && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                Delivery
+              </span>
+            )}
+            {place.pickupOffered && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                Pickup
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400 mb-3">
           <Tag className="w-3 h-3" />
           {categoryName}

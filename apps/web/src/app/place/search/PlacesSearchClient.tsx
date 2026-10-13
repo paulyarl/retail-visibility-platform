@@ -14,6 +14,8 @@ interface PlaceResult {
   state: string;
   phone: string | null;
   snapEbtReported: boolean;
+  deliveryOffered: boolean;
+  pickupOffered: boolean;
   category: string;
   categorySlug: string;
   iconEmoji: string | null;
@@ -37,12 +39,14 @@ class PlacesSearchService extends PublicApiSingleton {
     return PlacesSearchService.instance;
   }
 
-  async search(params: { q?: string; category?: string; city?: string; snapEbt?: boolean; sort?: string; page?: number }): Promise<SearchResponse | null> {
+  async search(params: { q?: string; category?: string; city?: string; snapEbt?: boolean; delivery?: boolean; pickup?: boolean; sort?: string; page?: number }): Promise<SearchResponse | null> {
     const qs = new URLSearchParams();
     if (params.q) qs.set('q', params.q);
     if (params.category) qs.set('category', params.category);
     if (params.city) qs.set('city', params.city);
     if (params.snapEbt) qs.set('snapEbt', 'true');
+    if (params.delivery) qs.set('delivery', 'true');
+    if (params.pickup) qs.set('pickup', 'true');
     if (params.sort) qs.set('sort', params.sort);
     if (params.page) qs.set('page', String(params.page));
     qs.set('perPage', '24');
@@ -85,6 +89,8 @@ export default function PlacesSearchClient() {
   const category = searchParams.get('category') || '';
   const city = searchParams.get('city') || '';
   const snapEbt = searchParams.get('snapEbt') === 'true';
+  const delivery = searchParams.get('delivery') === 'true';
+  const pickup = searchParams.get('pickup') === 'true';
   const sort = searchParams.get('sort') || 'name';
   const page = parseInt(searchParams.get('page') || '1');
 
@@ -94,7 +100,7 @@ export default function PlacesSearchClient() {
 
   const doSearch = useCallback(async () => {
     setLoading(true);
-    const data = await searchService.search({ q, category, city, snapEbt, sort, page });
+    const data = await searchService.search({ q, category, city, snapEbt, delivery, pickup, sort, page });
     setResults(data);
     setLoading(false);
 
@@ -111,7 +117,7 @@ export default function PlacesSearchClient() {
         // Silently fail — demand logging is best-effort
       }
     }
-  }, [q, category, city, snapEbt, sort, page]);
+  }, [q, category, city, snapEbt, delivery, pickup, sort, page]);
 
   useEffect(() => { doSearch(); }, [doSearch]);
 
@@ -172,6 +178,24 @@ export default function PlacesSearchClient() {
             />
             SNAP/EBT only
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={delivery}
+              onChange={(e) => updateParam('delivery', e.target.checked ? 'true' : '')}
+              className="rounded"
+            />
+            Delivery only
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={pickup}
+              onChange={(e) => updateParam('pickup', e.target.checked ? 'true' : '')}
+              className="rounded"
+            />
+            Pickup only
+          </label>
           <select
             value={sort}
             onChange={(e) => updateParam('sort', e.target.value)}
@@ -211,6 +235,16 @@ export default function PlacesSearchClient() {
                       {p.snapEbtReported && (
                         <span className="inline-block mt-2 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
                           SNAP/EBT
+                        </span>
+                      )}
+                      {p.deliveryOffered && (
+                        <span className="inline-block mt-2 ml-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                          Delivery
+                        </span>
+                      )}
+                      {p.pickupOffered && (
+                        <span className="inline-block mt-2 ml-1 text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
+                          Pickup
                         </span>
                       )}
                     </div>

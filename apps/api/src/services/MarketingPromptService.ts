@@ -971,6 +971,32 @@ export class MarketingPromptService extends BaseService {
             campaignId: input.campaignId,
           });
         }
+
+        // OQ1/OQ5 — project the audit's fulfillment facts + verified
+        // observed_assets onto live primary-linked seeds (covers seeds that
+        // predate the audit; createFromCampaign covers seed birth). Same
+        // best-effort contract as the sharpen — never fails the import.
+        if (resolved.auditPlatform === 'business_analysis') {
+          try {
+            const { default: DirectoryPresenceSeedService } =
+              await import('./DirectoryPresenceSeedService.js');
+            await DirectoryPresenceSeedService.syncFulfillmentForCampaign(
+              input.campaignId,
+              {
+                actorType: 'user',
+                actorId: ctx?.userId,
+                ip: ctx?.ip,
+                userAgent: ctx?.userAgent,
+              },
+            );
+          } catch (fulfillErr) {
+            logger.error('Post-audit fulfillment sync failed (best-effort)', ctx, {
+              error: (fulfillErr as Error).message,
+              auditId: result.audit.id,
+              campaignId: input.campaignId,
+            });
+          }
+        }
       }
 
       // Sprint 4: best-effort auto-sync of business_analysis audits onto

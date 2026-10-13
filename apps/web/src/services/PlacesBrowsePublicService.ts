@@ -35,6 +35,8 @@ export interface PlaceListing {
   description: string | null;
   snapEbtReported: boolean;
   snapEbtSource: string | null;
+  deliveryOffered: boolean;
+  pickupOffered: boolean;
   publicDisclaimer: string | null;
   category: string;
   categorySlug: string;

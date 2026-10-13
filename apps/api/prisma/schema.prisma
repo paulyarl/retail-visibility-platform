@@ -1771,6 +1771,11 @@ model directory_listings_list {
   snap_ebt_as_of           DateTime?                 @db.Date
   snap_ebt_source          String?                   @db.VarChar(32)
   snap_ebt_source_name     String?
+  delivery_offered         Boolean?
+  pickup_offered           Boolean?
+  fulfillment_as_of        DateTime?                 @db.Date
+  fulfillment_source       String?                   @db.VarChar(32)
+  fulfillment_source_name  String?
   listing_origin           String?                   @default("claimed") @db.VarChar(32)
   public_disclaimer        String?
   same_as                  String[]                  @default([])
@@ -1874,6 +1879,7 @@ model directory_presence_seeds {
   seed_fidelity                     String                              @default("unknown") @db.VarChar(20)
   seed_fidelity_audit_id            String?                             @db.VarChar(60)
   seed_fidelity_checked_at          DateTime?                           @db.Timestamptz(6)
+  observed_assets                   Json?
   directory_claim_requests          directory_claim_requests[]
   directory_claim_tokens            directory_claim_tokens[]
   directory_enrichment_tokens       directory_enrichment_tokens[]

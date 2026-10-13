@@ -32,6 +32,8 @@ interface PlaceResult {
   logoUrl: string | null;
   description: string | null;
   snapEbtReported: boolean;
+  deliveryOffered: boolean;
+  pickupOffered: boolean;
   category: string;
   categorySlug: string;
   iconEmoji: string | null;
@@ -371,6 +373,17 @@ function CityPlaceCard({ place, citySlug }: { place: PlaceResult; citySlug: stri
           </span>
         )}
       </div>
+
+      {(place.deliveryOffered || place.pickupOffered) && (
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {place.deliveryOffered && (
+            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Delivery</span>
+          )}
+          {place.pickupOffered && (
+            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">Pickup</span>
+          )}
+        </div>
+      )}
 
       {place.description && (
         <p className="text-sm text-neutral-600 line-clamp-2 mb-2">{place.description}</p>

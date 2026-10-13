@@ -297,6 +297,12 @@ function PresenceSeedDetailClient() {
   const [editSnapAsOf, setEditSnapAsOf] = useState('');
   const [editSnapSource, setEditSnapSource] = useState('');
   const [editSnapSourceName, setEditSnapSourceName] = useState('');
+  // OQ1 fulfillment — tri-state select values: '' = unobserved (NULL),
+  // 'true' = observed, 'false' = explicit negative (migration 337).
+  const [editDelivery, setEditDelivery] = useState<'' | 'true' | 'false'>('');
+  const [editPickup, setEditPickup] = useState<'' | 'true' | 'false'>('');
+  const [editFulfillmentAsOf, setEditFulfillmentAsOf] = useState('');
+  const [editFulfillmentSourceName, setEditFulfillmentSourceName] = useState('');
   const [editAttributes, setEditAttributes] = useState<DirectoryListingAttribute[]>([]);
   const [attributeDefs, setAttributeDefs] = useState<DirectoryAttributeDefinition[]>([]);
   const [attributeDefsLoading, setAttributeDefsLoading] = useState(false);
@@ -1081,6 +1087,16 @@ function PresenceSeedDetailClient() {
     setEditSnapAsOf(asOf);
     setEditSnapSource(listing?.snap_ebt_source ?? '');
     setEditSnapSourceName(listing?.snap_ebt_source_name ?? '');
+    const triState = (v: any): '' | 'true' | 'false' =>
+      v === true ? 'true' : v === false ? 'false' : '';
+    setEditDelivery(triState(listing?.delivery_offered));
+    setEditPickup(triState(listing?.pickup_offered));
+    setEditFulfillmentAsOf(
+      listing?.fulfillment_as_of
+        ? new Date(listing.fulfillment_as_of).toISOString().slice(0, 10)
+        : '',
+    );
+    setEditFulfillmentSourceName(listing?.fulfillment_source_name ?? '');
     setEditAttributes(
       Array.isArray(listing?.attributes) ? listing.attributes.map((a: any) => ({ ...a })) : [],
     );
@@ -1259,6 +1275,29 @@ function PresenceSeedDetailClient() {
         fields.snapEbtAsOf = null;
         fields.snapEbtSource = null;
         fields.snapEbtSourceName = null;
+      }
+
+      // OQ1 fulfillment — tri-state; a change to either determination also
+      // restamps the shared provenance columns as ops_review.
+      const toTri = (v: '' | 'true' | 'false') =>
+        v === 'true' ? true : v === 'false' ? false : null;
+      const newDelivery = toTri(editDelivery);
+      const newPickup = toTri(editPickup);
+      if (newDelivery !== (listing?.delivery_offered ?? null)) {
+        fields.deliveryOffered = newDelivery;
+      }
+      if (newPickup !== (listing?.pickup_offered ?? null)) {
+        fields.pickupOffered = newPickup;
+      }
+      if (fields.deliveryOffered !== undefined || fields.pickupOffered !== undefined) {
+        if (editFulfillmentAsOf) {
+          const d = new Date(`${editFulfillmentAsOf}T00:00:00.000Z`);
+          fields.fulfillmentAsOf = Number.isNaN(d.getTime()) ? null : d.toISOString();
+        } else {
+          fields.fulfillmentAsOf = null;
+        }
+        fields.fulfillmentSource = 'ops_review';
+        fields.fulfillmentSourceName = editFulfillmentSourceName.trim() || null;
       }
 
       // Sourced attributes — serialize the structured picker state. Each
@@ -1815,6 +1854,39 @@ function PresenceSeedDetailClient() {
               </>
             )}
             <div className="pt-2 border-t border-gray-100">
+              <dt className="text-gray-500">Delivery offered</dt>
+              <dd className="text-gray-900">
+                {listing?.delivery_offered === true
+                  ? 'Yes'
+                  : listing?.delivery_offered === false
+                    ? 'No (explicit negative)'
+                    : '— unobserved'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Pickup ordering</dt>
+              <dd className="text-gray-900">
+                {listing?.pickup_offered === true
+                  ? 'Yes'
+                  : listing?.pickup_offered === false
+                    ? 'No (explicit negative)'
+                    : '— unobserved'}
+              </dd>
+            </div>
+            {(listing?.delivery_offered != null || listing?.pickup_offered != null) && (
+              <div>
+                <dt className="text-gray-500">Fulfillment provenance</dt>
+                <dd className="text-gray-900">
+                  {formatDate(listing.fulfillment_as_of)}
+                  {' · '}
+                  {listing.fulfillment_source || '—'}
+                  {listing.fulfillment_source_name
+                    ? ` (${listing.fulfillment_source_name})`
+                    : ''}
+                </dd>
+              </div>
+            )}
+            <div className="pt-2 border-t border-gray-100">
               <dt className="text-gray-500">Created</dt>
               <dd className="text-gray-900">{formatDate(seed.created_at)}</dd>
             </div>
@@ -1898,6 +1970,48 @@ function PresenceSeedDetailClient() {
           </div>
         )}
       </section>
+
+      {/* OQ5 — observed_assets (migration 337): verified_on_surface audit
+          assets stored as internal seed metadata. Underexposed entries are
+          the pitch-worthy ones — none of this renders publicly. */}
+      {Array.isArray(seed.observed_assets) && seed.observed_assets.length > 0 && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Observed Assets</h2>
+          <ul className="space-y-3">
+            {seed.observed_assets.map((a: any, i: number) => (
+              <li key={i} className="border-b border-gray-100 pb-3 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">{a.asset || '—'}</span>
+                  {a.underexposed === true && (
+                    <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                      underexposed
+                    </span>
+                  )}
+                  {a.observed_on && (
+                    <span className="text-xs text-gray-500">· {a.observed_on}</span>
+                  )}
+                </div>
+                {a.evidence && (
+                  <p className="text-sm text-gray-600 mt-1">{a.evidence}</p>
+                )}
+                {a.underexposure_note && (
+                  <p className="text-xs text-amber-700 mt-1">{a.underexposure_note}</p>
+                )}
+                {a.source_url && (
+                  <a
+                    href={a.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-blue-600 hover:underline break-all"
+                  >
+                    {a.source_url}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Owner verification (migration 274) — the consent-of-record plus
           owner-proposed categories awaiting operator acceptance */}
@@ -3625,6 +3739,60 @@ function PresenceSeedDetailClient() {
               sourced from the SNAP retailer list, owner confirmation, or an
               in-store photo reviewed by ops.
             </p>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Fulfillment (OQ1)</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Delivery/pickup observed on a verified public surface — tri-state:
+              &quot;Unobserved&quot; means no rendered surface addressed it, &quot;No&quot;
+              means an explicit rendered negative. Owner-confirmed values
+              (source = owner_confirmed) outrank audit writes.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery offered</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editDelivery}
+                  onChange={(e) => setEditDelivery(e.target.value as '' | 'true' | 'false')}
+                >
+                  <option value="">Unobserved</option>
+                  <option value="true">Yes — observed/confirmed</option>
+                  <option value="false">No — explicit negative</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pickup ordering</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editPickup}
+                  onChange={(e) => setEditPickup(e.target.value as '' | 'true' | 'false')}
+                >
+                  <option value="">Unobserved</option>
+                  <option value="true">Yes — observed/confirmed</option>
+                  <option value="false">No — explicit negative</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">As of</label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editFulfillmentAsOf}
+                  onChange={(e) => setEditFulfillmentAsOf(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observed on / source name</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editFulfillmentSourceName}
+                  onChange={(e) => setEditFulfillmentSourceName(e.target.value)}
+                  placeholder="owned_site, instagram, ..."
+                />
+              </div>
+            </div>
           </div>
 
           <div className="border-t border-gray-100 pt-4">

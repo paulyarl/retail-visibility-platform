@@ -1,7 +1,7 @@
 # Audit Channel Scan & Opportunity Collection — Functional Spec
 
 **Injects into:** `apps/api/src/scripts/business-audit-default-body.md` (canonical body asset, template `mpt-seed-seek-001`, output schema `business_analysis`)
-**Status:** Implemented — Pass 1 shipped 2026-10-13 (evidence collection: `channels_scanned`, `observed_assets`, `{field}_observed_on`, §A2 gate). Pass 2 landed 2026-10-13 (engagement-brief template + `engagement_brief` schema/audit row + `classifyFootprintSide` side classifier + import stamp). Judgment migration (OQ7) and listing-column persistence (OQ1) remain open.
+**Status:** Implemented — Pass 1 shipped 2026-10-13 (evidence collection: `channels_scanned`, `observed_assets`, `{field}_observed_on`, §A2 gate). Pass 2 landed 2026-10-13 (engagement-brief template + `engagement_brief` schema/audit row + `classifyFootprintSide` side classifier + import stamp). OQ1/OQ5 shipped 2026-10-13 (migration 337 — first-class fulfillment columns + public filters + seed `observed_assets`). Judgment migration (OQ7) remains open.
 **Date:** October 2026 (revised 2026-10-13 — review gaps folded in)
 **Triggering incident:** Dreamcast African Market audit (2026-10-13). The business's live delivery offer — verified on three public surfaces (Instagram bio, Apple Maps `Delivery` chip, MapQuest `Offers delivery`) — emitted as `unable_to_verify`, because the field definition is channel-scoped while its evidence rule is website-scoped.
 
@@ -320,7 +320,8 @@ Two rules make the projections trustworthy:
   "side": {
     "value": "emerging|competitive",
     "density_score": 0,                      // the computed score — boundary is auditable and tunable
-    "inputs_used": [],                       // which audit evidence produced it
+    "inputs_used": [],                       // which audit evidence produced it (uncapped ledger)
+    "density_breakdown": {},                 // per-component { observed, awarded, cap } — score is reproducible
     "classifier_version": 1
   },
 
@@ -474,7 +475,7 @@ Pass 1 `business_analysis` output + a `PLATFORM CAPABILITIES` block (custom doma
 1. **`business_analysis` validator** — declare `channels_scanned[]` and `observed_assets[]` as `.optional()` (`business_analysis` is a *shared* schema — the review-response template also emits it, so nothing may be required). Correction to an earlier claim in this section: undeclared keys are **not** dropped on import — `importExternalResult` persists the raw parsed JSON (`audit_data: parsedJson`) and every level of the schema is `.passthrough()`, so undeclared keys land in `audit_data` anyway (precedent: `social_activity`, read by `signal-extractor` but declared nowhere). What they don't get is coercion, enum validation, or a slot on the `BusinessAnalysisAuditData` type — so declare first anyway, or the new arrays ingest unvalidated and stay invisible to typed consumers. `business_analysis` also sits in `LEGACY_NO_SUFFIX_SCHEMAS`, so `BUSINESS_ANALYSIS_PROMPT_SUFFIX` is never appended to rendered prompts — update it anyway to prevent drift, but the embedded body schema is the operative output contract.
 2. **Body schema block** — the embedded JSON schema (around **L1103**, where `has_delivery_option` is declared) must gain the new arrays **and** the `{field}_observed_on` companions **before** the directives land: Output Rules L932 ("Do not add properties outside the schema") otherwise forbids the model from emitting them at all. Also state the empty-vs-omit contract: `channels_scanned`/`observed_assets` are REQUIRED blocks — `[]` is a valid emission, not a conditional-field omission.
 3. **Template columns** — `output_schema` must remain `{ name: 'business_analysis' }`; the seeder already force-applies this even when the body marker is present.
-4. **Persistence (open question).** Decide whether underexposed assets flow into `directory_listings_list` the way `snap_ebt_reported` does. If delivery/fulfillment is to become a public filter the way SNAP/EBT is, it needs columns, a migration, a provenance row, and an owner-confirmation path — mirroring migration `207`. If not, keep assets audit-only and skip the persistence layer entirely.
+4. **Persistence.** DECIDED + SHIPPED (2026-10-13): see Open Questions 1 and 5 — fulfillment facts became first-class listing columns (migration 337); underexposed assets land on the seed as internal metadata, not listing chips.
 5. **Consumer copy pass (blocking, small).** `ProspectReportService` ("Your site offers a delivery option" L1438, "Customers can order for pickup online" L1435, and the `missing:` strings at L1183–1190 — "No delivery option on the site", "No way to order for pickup online"), `DeliverableSectionService` fulfillment copy ("No delivery option" L498, catch-all L500), and archetype opener phrasing all attribute `website.*` facts to the site. Once `{field}_observed_on` exists these must name the real surface — or the owner-facing report states something false. Gate "your site" phrasing on `observed_on === 'owned_site'`; otherwise say "found online" / name the surface.
 
 ---
@@ -518,16 +519,74 @@ Pass 1 `business_analysis` output + a `PLATFORM CAPABILITIES` block (custom doma
 
 ---
 
+## Known Minor Issues — classifier & stamp (review findings 3–5)
+
+Findings against **shipped** code, recorded for team review. None is a correctness bug; all three are legibility or consistency issues. Finding 2 (the `source_audit_id` trust boundary) is closed — the stamp no longer preserves a model- or operator-emitted id, and OQ8 is decided. Line numbers are current as of 2026-10-13.
+
+### F3 — `inputs_used` is uncapped while the score is capped
+
+**Location.** `apps/api/src/services/engagement-brief/footprint-side.ts` §2 L152–157, §3 L166–173, §4 L179–184.
+
+**Mechanism.** Each component awards a capped number of points but pushes **every** contributing entry:
+
+```ts
+score += Math.min(renderedChannels.length * POINTS_RENDERED_CHANNEL, CAP_RENDERED_CHANNELS);
+inputs.push(...renderedChannels.map((c) => `channels_scanned[${c.channel}].rendered`));
+```
+
+**Reproduction.** 16 rendered channels → awarded 6 points (the cap), 16 input strings pushed. Same shape for recent activity (cap 3) and notable activity (cap 2). No current test pins `inputs_used.length` — they all use `toContain`.
+
+**Why it matters.** `side.inputs_used` is persisted on every brief and is the artifact the spec calls *"what makes the boundary auditable and tunable."* As written it over-reports: a reviewer reading 16 `rendered` entries would reasonably infer all 16 scored. Anyone tuning the threshold off `inputs_used`, or reading it to explain why a business landed `emerging`, gets inflated component counts. The array is also unbounded — roughly `3N + 10` entries for `N` rendered channels.
+
+**Options.**
+1. Push only what earned points (slice each group to its cap). Cheapest; loses the raw observed count.
+2. Push all entries **and** add a `density_breakdown` object recording per-component `{ observed, awarded, cap }`. Makes the score fully reproducible and the caps visible.
+3. Leave as-is; document `inputs_used` as "inputs observed," not "inputs scored."
+
+**Recommendation: option 2.** The reason to persist the score at all is explainability — a breakdown makes `emerging` vs `competitive` defensible without re-running the classifier, and it preserves the raw counts the distribution script wants.
+
+**Test to add.** A fixture with more channels than the cap (e.g. 6 rendered) asserting both `density_score` and the breakdown, so the cap behaviour is pinned rather than incidental.
+
+**Status: closed 2026-10-13** — option 2 implemented. `FootprintSideResult.density_breakdown` records `{ observed, awarded, cap }` per component (`owned_site` / `rendered_channels` / `recent_channel_activity` / `notable_channel_activity` / `claimed_platforms` / `rated_platforms`); `inputs_used` stays the uncapped observed ledger, and the sum of `awarded` equals `density_score`. Persisted on the stamped `side` block; pinned in `footprint-side.test.ts` and `engagement-brief-stamp.test.ts`.
+
+### F4 — one platform contributes across three inputs; `owned_site` is guarded, platforms are not
+
+**Location.** The `owned_site` guard at `footprint-side.ts` L128–135 versus the platform scoring at L145–202.
+
+**Mechanism.** `owned_site` is deliberately excluded from `renderedChannels` — *"one surface, one contribution."* A primary platform is not: `channels_scanned[google].rendered` (+2), `platforms.google.profile_status` (+1), and `platforms.google.rating` (+1) can all fire for the same surface — up to 4 points.
+
+**Is it double-counting?** Arguably not — three distinct facts (the surface rendered; the profile is claimed; it carries a rating). But the code guards one form of double-counting and not the other, and nothing states which behaviour is intended. A reviewer cannot distinguish design from oversight.
+
+**Consequence worth confirming explicitly.** With **zero owned surface**, four rendered primaries plus two claimed and two rated scores exactly `6 + 2 + 2 = 10` — precisely `COMPETITIVE_DENSITY_THRESHOLD`. So `competitive` is reachable on primary-platform evidence alone.
+
+That is defensible under "surface is the priority" **if a claimed profile counts as a controlled surface** — which is the difference between *surface = owned site* and *surface = owned or claimed*. The scoring already assumes the second reading; it just never says so.
+
+**Recommendation.** State the equivalence in the module docstring (a `claimed`/`likely_claimed` profile is a controlled surface, and therefore anchors density the way an owned site does) and add a test pinning the intended per-platform maximum. No scoring change unless the team decides claimed profiles should **not** count as surface — in which case the claimed cap needs revisiting, since it can carry a business to the threshold unaided.
+
+**Status: closed 2026-10-13** — DECIDED: "surface = owned OR claimed" is confirmed. A `claimed`/`likely_claimed` primary profile is a controlled surface (the business can post, respond, update — and for claimed businesses the emerging playbook's claim-invitation step is already moot). The module docstring states the semantics explicitly, and tests pin both the per-platform maximum (+4: rendered + claimed + rated) and the claimed-only path to the threshold (4 rendered primaries + 2 claimed + 2 rated = exactly 10 → `competitive`). No scoring change.
+
+### F5 — `buildEngagementBriefVariables` omits `inputs_used` from the injected variable
+
+**Location.** `engagement-brief-stamp.ts` L74–82 injects `{ value, density_score, classifier_version }`; `applyEngagementBriefStamp` writes `{ value, density_score, inputs_used, classifier_version }`.
+
+**Assessment.** Almost certainly deliberate and correct. The model does not need the input list — it reads the raw evidence directly from `{{source_audit}}`, and `inputs_used` can run to dozens of entries, which would be prompt bloat for no gain. The only cost is that the two shapes diverge, so a reader comparing them cannot tell which is canonical.
+
+**Recommendation.** Keep the omission and name it deliberate in a one-line comment: `inputs_used` is the persisted audit record, not prompt material — the model sees the evidence itself via `{{source_audit}}`. Note this interacts with F3: if option 2 is taken there, the breakdown belongs on the persisted stamp only, not the render variable.
+
+**Status: closed 2026-10-13** — the injected `footprint_side` variable carries a comment naming the omission deliberate; `inputs_used` and `density_breakdown` persist on the stamped `side` only.
+
+---
+
 ## Open Questions
 
-1. **Fulfillment persistence.** Do delivery/pickup facts become first-class listing columns and public filters (mirroring the SNAP/EBT contract), or stay audit-only? This is the largest scope fork in the spec.
+1. **Fulfillment persistence.** DECIDED (2026-10-13): first-class listing columns + public filters, mirroring migration 207's SNAP/EBT contract. Migration `337_listing_fulfillment_and_seed_assets.sql` adds `delivery_offered`/`pickup_offered` (tri-state: NULL = unobserved, false = explicit rendered negative, true = observed/owner-confirmed — only `= true` matches a public filter) plus `fulfillment_as_of`/`fulfillment_source`/`fulfillment_source_name` provenance to `directory_listings_list`, with partial `= true` indexes. The fact-of-record is the audit's any-verified-surface rollup — `website.has_delivery_option`/`has_pickup_ordering` + the `*_observed_on` companions — not `channels_scanned[].fulfillment_modes` (the raw per-surface record). Extraction lives in `services/directory/fulfillmentFacts.ts` (`extractFulfillmentFromAuditData` returns null when the audit addressed neither field, so a "didn't look" audit can't erase prior evidence). Two write paths: `createFromCampaign` at seed birth, and `syncFulfillmentForCampaign` (best-effort from `importExternalResult` after a real `business_analysis` import, same lane as `resharpenSeedsForCampaign`) for seeds that predate the audit — per-field COALESCE keeps a prior sourced value when the new audit left that field null, and `fulfillment_source='owner_confirmed'` outranks audit writes. Operator edits via the seed editor default to `fulfillment_source='ops_review'`. Public surface: `delivery=true`/`pickup=true` params on `/api/public/directory/places/search`, `deliveryOffered`/`pickupOffered` on the search/category/city payloads, and chips on the `/place` cards. Deliberately NO `features_list`/tier wiring — these are directory-seed filter columns, not a claimed-merchant badge (207's tier machinery gated the owner-facing SNAP badge toggle; no equivalent exists for fulfillment).
 2. **EBT and the deposit flow.** The store is a SNAP-authorized retail point. EBT generally cannot fund deposits or delivery fees, and online EBT requires separate FNS approval. If a meaningful share of a store's customers pay with EBT, a deposit-first BOPIS flow excludes them. Does the offering need an EBT-aware path, and is that a product question or an outreach-caveat question?
 3. **Pass 2 identity.** New prompt job name, template id, seed script, and output schema? Does it reuse `mpt-seed-seek-001`'s pattern (single default template, marker-gated seed) or take a different shape? The brief's storage home is part of this question — dedicated table keyed to `source_audit_id`, a new `mkt_audits_list` platform row, or execution metadata — and it is load-bearing: "rank once" is unenforceable without a persisted spine.
 4. **Sweep budget.** How many channels per audit, and what is the latency/cost ceiling? The render-control discipline (business + control per platform) does not scale to a dozen channels without a budget. The `not_attempted` entry type makes the boundary self-recording — every channel the audit was directed to consult but skipped shows up as data, so the budget can be tuned off real sweeps rather than guessed.
-5. **Asset → listing flow.** `DirectoryPresenceSeedService` already maps `snap_ebt_reported` and friends into seeds. Do underexposed assets feed the seed the same way, or are they operator-only intelligence?
+5. **Asset → listing flow.** DECIDED (2026-10-13): internal seed metadata, not public chips. `extractSeedObservedAssets` (same module) gates to `confidence === 'verified_on_surface'`, caps at 20, and stores the entries — `underexposed`/`underexposure_note`/`confidence` included — on `directory_presence_seeds.observed_assets` (migration 337). Written at `createFromCampaign` birth and refreshed by `syncFulfillmentForCampaign` on audit import. Operator-visible on the seed detail page ("Observed Assets" section); never rendered publicly — these entries are intentionally NOT `attributes[]` chips: a public listing chip needs owner-facing copy, which an asset's `evidence`/underexposure note doesn't carry.
 6. **Backfill.** Do existing stored audits get a re-run, or does the new collection apply only going forward?
 7. **Judgment migration sequencing.** Moving `market_opportunities`, `outreach_problems`, `primary_outreach_hook`, `recommended_services`, `recommended_tier`, and `estimated_monthly_service_fee` from Pass 1 to Pass 2 is the correct target, but `lead_disposition` and triage already consume Pass 1 output. Stage it (dual-emit during transition, then remove) or accept a breaking change?
-8. **Side-classifier boundary and default.** Where exactly does footprint density flip from emerging to competitive, and does an unclassifiable footprint default to `emerging`? Recommended: `emerging`, with `density_score` persisted so the boundary is tunable off real sweeps rather than guessed. See "The side" above.
+8. **Side-classifier boundary and default.** DECIDED (2026-10-13): unclassifiable → `emerging`; `COMPETITIVE_DENSITY_THRESHOLD = 10` in `footprint-side.ts`. Measured via `apps/api/src/scripts/footprint-side-distribution.ts` (doppler, classifier v2): local 35 audits max score 8, prd 32 audits max score 5 — nothing has crossed 10 because pre-Pass-2 audits carry no `channels_scanned`/activity inputs (website + claimed/rated platforms alone cap at 8). `competitive` is therefore reachable only on rendered-channel evidence, which is the intended semantics — a real measured surface, not mere existence. Re-run the script once channel-scan audits accumulate; bump `FOOTPRINT_SIDE_CLASSIFIER_VERSION` if the boundary moves.
 
 ---
 

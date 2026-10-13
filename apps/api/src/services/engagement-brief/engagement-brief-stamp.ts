@@ -28,6 +28,7 @@
 
 import { classifyFootprintSide } from './footprint-side';
 import { isStubBusinessAnalysisAudit } from '../../lib/marketing-audits';
+import { logger } from '../../logger';
 
 export const ENGAGEMENT_BRIEF_VERSION = 1;
 
@@ -75,6 +76,9 @@ export function buildEngagementBriefVariables(audit: SourceAuditRow | null | und
         value: side.side,
         density_score: side.density_score,
         classifier_version: side.classifier_version,
+        // inputs_used / density_breakdown are deliberately omitted — they
+        // are the persisted audit record, not prompt material; the model
+        // reads the raw evidence itself from {{source_audit}} (review F5).
       },
       null,
       2,
@@ -130,9 +134,11 @@ export async function assertEngagementBriefSourceAudit(
  *   - brief_version    → ENGAGEMENT_BRIEF_VERSION
  *
  * When no source audit exists the stamp still writes side (classifying the
- * empty footprint → 'emerging') and preserves a model-emitted
- * source_audit_id if the operator hand-assembled the payload — but emits
- * null rather than a fabricated id when the model left it blank.
+ * empty footprint → 'emerging') and emits null for source_audit_id. A
+ * model-emitted or hand-assembled id is never trusted: when the campaign
+ * lookup resolves nothing, a claimed id is unverifiable by construction —
+ * it can only point at another campaign's audit or a non-business_analysis
+ * row — so it is dropped (warned), never preserved.
  */
 export async function applyEngagementBriefStamp<T extends Record<string, any>>(
   parsedJson: T,
@@ -147,15 +153,22 @@ export async function applyEngagementBriefStamp<T extends Record<string, any>>(
     typeof parsedJson.source_audit_id === 'string' && parsedJson.source_audit_id.trim()
       ? parsedJson.source_audit_id
       : null;
+  if (!sourceAudit && modelSourceAuditId) {
+    logger.warn('Engagement brief stamp dropped unverifiable source_audit_id', undefined, {
+      campaignId: opts.campaignId,
+      sourceAuditId: modelSourceAuditId,
+    });
+  }
 
   return {
     ...parsedJson,
     brief_version: ENGAGEMENT_BRIEF_VERSION,
-    source_audit_id: sourceAudit?.id ?? modelSourceAuditId,
+    source_audit_id: sourceAudit?.id ?? null,
     side: {
       value: side.side,
       density_score: side.density_score,
       inputs_used: side.inputs_used,
+      density_breakdown: side.density_breakdown,
       classifier_version: side.classifier_version,
     },
   };

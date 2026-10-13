@@ -10,6 +10,10 @@
  *   - deterministic: same input → same output
  *   - audience (review volume) does NOT affect the side — surface routes
  *     (decided 2026-10-13: the platform's priorities are surface/presence)
+ *   - density_breakdown pins per-component { observed, awarded, cap } so the
+ *     score is reproducible from the persisted record (review F3)
+ *   - a claimed primary profile is a controlled surface: platform evidence
+ *     alone can reach the threshold (review F4 — deliberate semantics)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -220,6 +224,70 @@ describe('classifyFootprintSide', () => {
     );
     expect(r.density_score).toBe(0);
     expect(r.side).toBe('emerging');
+  });
+
+  it('density_breakdown records observed vs awarded per component (review F3)', () => {
+    const r = classifyFootprintSide(
+      audit({
+        channels_scanned: [
+          { channel: 'google', rendered: true, last_activity: RECENT, notable_activity: ['photos'] },
+          { channel: 'yelp', rendered: true, last_activity: RECENT, notable_activity: ['weekly'] },
+          { channel: 'facebook', rendered: true, last_activity: RECENT, notable_activity: ['posts'] },
+          { channel: 'instagram', rendered: true, last_activity: RECENT },
+          { channel: 'tiktok', rendered: true },
+          { channel: 'nextdoor', rendered: true },
+        ],
+      }),
+      NOW,
+    );
+    // 6 rendered observed, but only 3 channels' worth of points (cap 6).
+    expect(r.density_breakdown.rendered_channels).toEqual({ observed: 6, awarded: 6, cap: 6 });
+    expect(r.density_breakdown.recent_channel_activity).toEqual({ observed: 4, awarded: 3, cap: 3 });
+    expect(r.density_breakdown.notable_channel_activity).toEqual({ observed: 3, awarded: 2, cap: 2 });
+    expect(r.density_breakdown.owned_site).toEqual({ observed: 0, awarded: 0, cap: null });
+    expect(r.density_score).toBe(11);
+    // inputs_used stays the full observed ledger — uncapped by design.
+    expect(r.inputs_used.filter((i) => i.endsWith('.rendered'))).toHaveLength(6);
+    // The breakdown reproduces the score — no hidden points.
+    const awarded = Object.values(r.density_breakdown).reduce((s, c) => s + c.awarded, 0);
+    expect(awarded).toBe(r.density_score);
+  });
+
+  it('a claimed profile is a controlled surface — platform evidence alone can reach the threshold (F4)', () => {
+    const r = classifyFootprintSide(
+      audit({
+        channels_scanned: [
+          { channel: 'google', rendered: true },
+          { channel: 'yelp', rendered: true },
+          { channel: 'facebook', rendered: true },
+          { channel: 'instagram', rendered: true },
+        ],
+        platforms: {
+          google: { profile_status: 'claimed', rating: 4.8 },
+          yelp: { profile_status: 'claimed', rating: 4.2 },
+        },
+      }),
+      NOW,
+    );
+    // 4 rendered primaries (cap +6) + 2 claimed (+2) + 2 rated (+2) = 10 —
+    // exactly the threshold with ZERO owned site. Deliberate: "surface" is
+    // owned OR claimed (module docstring). Pinned so a change is visible.
+    expect(r.density_score).toBe(10);
+    expect(r.side).toBe('competitive');
+    expect(r.density_breakdown.owned_site.observed).toBe(0);
+  });
+
+  it('pins the per-platform maximum — rendered + claimed + rated = +4 (F4)', () => {
+    const r = classifyFootprintSide(
+      audit({
+        channels_scanned: [{ channel: 'google', rendered: true }],
+        platforms: { google: { profile_status: 'claimed', rating: 4.9 } },
+      }),
+      NOW,
+    );
+    // Three distinct facts about one platform (unlike owned_site, which is
+    // one surface guarded to one contribution). Pinned at +4.
+    expect(r.density_score).toBe(4);
   });
 
   it('is deterministic — same input, same output', () => {

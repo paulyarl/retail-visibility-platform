@@ -8,8 +8,9 @@
  *   - side is recomputed from the source audit — a model-emitted side is
  *     overwritten, never trusted
  *   - brief_version is stamped
- *   - no source audit → emerging + null source_audit_id (or a preserved
- *     model-provided id for hand-assembled payloads)
+ *   - no source audit → emerging + null source_audit_id; a model- or
+ *     operator-emitted id is unverifiable in that case and is dropped,
+ *     never preserved (the spine must not cite foreign evidence)
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -78,6 +79,9 @@ describe('applyEngagementBriefStamp', () => {
     expect(out.side.value).toBe('emerging');
     expect(out.side.density_score).toBe(4);
     expect(out.side.inputs_used).toContain('channels_scanned[instagram].rendered');
+    // density_breakdown rides the persisted stamp (F3) — reproducible score.
+    expect(out.side.density_breakdown.rendered_channels).toEqual({ observed: 1, awarded: 2, cap: 6 });
+    expect(out.side.density_breakdown.recent_channel_activity.awarded).toBe(1);
     // model payload otherwise untouched
     expect(out.business.name).toBe('Dreamcast');
     expect(out.pains).toEqual([{ ref_id: 'p1' }]);
@@ -94,13 +98,24 @@ describe('applyEngagementBriefStamp', () => {
     expect(out.source_audit_id).toBeNull();
   });
 
-  it('preserves a hand-assembled source_audit_id when no audit row exists', async () => {
+  it('drops a hand-assembled source_audit_id when no audit row exists', async () => {
+    // Unverifiable by construction: if the id named a business_analysis row
+    // on this campaign, the latest-audit lookup would have found it.
     const prisma = prismaWithAudit(null);
     const out = await applyEngagementBriefStamp(
       { source_audit_id: 'aud_manual_9' },
       { prisma, campaignId: 'camp_3' },
     );
-    expect(out.source_audit_id).toBe('aud_manual_9');
+    expect(out.source_audit_id).toBeNull();
+  });
+
+  it('ignores a model-emitted id naming a foreign audit — the campaign row wins', async () => {
+    const prisma = prismaWithAudit(SOURCE_AUDIT);
+    const out = await applyEngagementBriefStamp(
+      { source_audit_id: 'aud_other_campaign' },
+      { prisma, campaignId: 'camp_1' },
+    );
+    expect(out.source_audit_id).toBe('aud_source_1');
   });
 });
 
