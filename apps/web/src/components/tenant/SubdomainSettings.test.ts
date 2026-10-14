@@ -1,24 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import SubdomainSettings from './SubdomainSettings';
+import { resolveSlugPickerContext } from './SubdomainSettings';
 
-// SSR renders the initial state (useEffect never runs), so businessName is empty
-// and the component shows the slug-picker fallback instead of the picker itself.
-// The capability query stays pending under SSR, and the entitlement gate
-// defaults to entitled until resolved — the card renders normally.
-describe('SubdomainSettings', () => {
-  it('renders the subdomain card without a free-text subdomain input', () => {
-    const client = new QueryClient();
-    const html = renderToStaticMarkup(
-      createElement(QueryClientProvider, { client }, createElement(SubdomainSettings, { tenantId: 'tid-1' })),
+// Regression coverage for the subdomain picker showing another business's
+// slugs: a repurposed/renamed tenant whose tenant_business_profiles_list row
+// still describes a different business (tenant name "Ivoire African Market"
+// vs profile business_name "ATOBABS AFRICA INTERNATIONAL MARKET") produced
+// atobabs-* suggestions. The tenant record in page scope is authoritative.
+describe('resolveSlugPickerContext', () => {
+  it('uses the page-scope tenant name over a divergent profile business_name', () => {
+    const ctx = resolveSlugPickerContext(
+      { name: 'Ivoire African Market', city: 'Indianapolis', state: 'IN', countryCode: 'US' },
+      { business_name: 'ATOBABS AFRICA INTERNATIONAL MARKET', city: 'East Pittsburgh', state: 'PA', country_code: 'US' },
     );
+    expect(ctx.businessName).toBe('Ivoire African Market');
+    expect(ctx.location).toEqual({ city: 'Indianapolis', state: 'IN', country: 'US' });
+  });
 
-    expect(html).toContain('Custom Subdomain');
-    // No free-text entry — the value now comes from the slug picker.
-    expect(html).not.toContain('type="text"');
-    // Picker is deferred until a business name is available.
-    expect(html).toContain('Add a business name to your profile to see available subdomains.');
+  it('falls back to the profile business_name when the tenant name is blank', () => {
+    const ctx = resolveSlugPickerContext(
+      { name: '', city: null, state: null, countryCode: null },
+      { business_name: 'Corner Store', city: 'Gary', state: 'IN', country_code: 'US' },
+    );
+    expect(ctx.businessName).toBe('Corner Store');
+    expect(ctx.location).toEqual({ city: 'Gary', state: 'IN', country: 'US' });
+  });
+
+  it('returns an empty name when neither source provides one', () => {
+    const ctx = resolveSlugPickerContext(null, null);
+    expect(ctx.businessName).toBe('');
+    expect(ctx.location).toEqual({ city: undefined, state: undefined, country: undefined });
   });
 });

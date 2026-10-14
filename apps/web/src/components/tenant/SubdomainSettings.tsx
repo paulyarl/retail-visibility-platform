@@ -16,6 +16,28 @@ interface SubdomainSettingsProps {
   tenantId: string;
 }
 
+/**
+ * Resolve the slug picker's suggestion inputs from the tenant in page scope.
+ * The tenant record (`name` — the same label the header and storefront show)
+ * is authoritative; the business profile only fills gaps, since its
+ * `business_name` can hold a different legal/DBA name — or stale data left
+ * behind after a tenant rename — which previously made the picker suggest
+ * another business's slugs.
+ */
+export function resolveSlugPickerContext(
+  tenant: { name?: string | null; city?: string | null; state?: string | null; countryCode?: string | null } | null,
+  profile: { business_name?: string | null; city?: string | null; state?: string | null; country_code?: string | null } | null,
+): { businessName: string; location: { city?: string; state?: string; country?: string } } {
+  return {
+    businessName: tenant?.name || profile?.business_name || '',
+    location: {
+      city: tenant?.city || profile?.city || undefined,
+      state: tenant?.state || profile?.state || undefined,
+      country: tenant?.countryCode || profile?.country_code || undefined,
+    },
+  };
+}
+
 export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) {
   // D12/3.2: the assignment UI mirrors the 1.8 route gate — when the tenant
   // isn't entitled, show an upsell instead of a dead form.
@@ -93,26 +115,22 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     }
   };
 
-  // The slug picker generates patterns from the business name + location, so
-  // fetch the business profile to feed it (tenant name is the fallback).
+  // The slug picker generates patterns from the tenant in page scope — the
+  // tenant record's `name`, not the business profile's `business_name` (they
+  // can diverge). The tenant endpoint already surfaces the profile's
+  // city/state/country; the profile is only fetched as a name fallback.
   const loadBusinessContext = async () => {
     try {
-      const profile = await tenantProfileService.getTenantProfile(tenantId);
-      setLocation({
-        city: profile?.city || undefined,
-        state: profile?.state || undefined,
-        country: profile?.country || undefined,
-      });
-
-      let name = profile?.business_name || '';
-      if (!name) {
-        const raw = await tenantInfoService.getTenantSubdomain(tenantId).catch(() => null);
-        const tenant = raw?.data ?? raw;
-        name = tenant?.name || '';
-      }
-      setBusinessName(name);
+      const raw = await tenantInfoService.getTenantSubdomain(tenantId);
+      const tenant = raw?.data ?? raw;
+      const profile = tenant?.name
+        ? null
+        : await tenantProfileService.getTenantProfile(tenantId).catch(() => null);
+      const { businessName, location } = resolveSlugPickerContext(tenant, profile);
+      setBusinessName(businessName);
+      setLocation(location);
     } catch (error) {
-      clientLogger.error('Failed to load business profile for slug picker:', { detail: error });
+      clientLogger.error('Failed to load tenant context for slug picker:', { detail: error });
     }
   };
 

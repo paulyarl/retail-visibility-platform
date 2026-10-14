@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 
@@ -28,7 +28,7 @@ const tenantProfileSchema = z.object({
   map_privacy_mode: z.enum(["precise", "neighborhood"]).optional(),
   hours: z.any().optional(),
 });
-router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
+router.post("/api/tenant/profile", authenticateToken, checkTenantAccess, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     logger.error('[POST /tenant/profile] Validation failed:', req.ctx, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
@@ -100,7 +100,7 @@ router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenant/profile
-router.get("/api/tenant/profile", authenticateToken, async (req, res) => {
+router.get("/api/tenant/profile", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const tenant_id = (req.query.tenant_id as string) || (req.query.tenant_id as string);
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
@@ -158,7 +158,7 @@ router.get("/api/tenant/profile", authenticateToken, async (req, res) => {
 });
 
 // PUT /api/tenant/gbp-category
-router.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
+router.put("/api/tenant/gbp-category", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, primary, secondary } = req.body;
 
