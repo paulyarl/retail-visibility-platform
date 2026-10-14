@@ -15,8 +15,12 @@ import { logger } from '../logger';
 const router = Router();
 
 // Authenticate all routes in this router so req.user is populated
-// before checkTenantAccess / requireTenantAdmin check it
-router.use(authenticateToken);
+// before checkTenantAccess / requireTenantAdmin check it.
+// Auth must be PER-ROUTE (AUTH_SCOPE_ISOLATION_SPEC NFR-3): a router-level
+// router.use(authenticateToken) runs for every request that reaches this
+// router — mounted at '/' — and would 401 the public endpoints
+// (resolve-subdomain, resolve-custom-domain, storefront-canonical) that
+// live in tenantsRoutes mounted after us in tenant.routes.ts.
 
 /**
  * Check if a tenant can add more users (seat limit enforcement)
@@ -64,7 +68,7 @@ async function checkTenantUserLimit(tenantId: string): Promise<{ allowed: boolea
  * GET /tenants/:tenantId/users - List all users in a tenant
  * Requires: Tenant access (platform users bypass) using checkTenantAccess
  */
-router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
+router.get('/:tenantId/users', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -180,7 +184,7 @@ const addUserToTenantSchema = z.object({
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER', 'SUPPORT']),
 });
 
-router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
+router.post('/:tenantId/users', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const parsed = addUserToTenantSchema.safeParse(req.body);
@@ -285,7 +289,7 @@ const updateUserRoleSchema = z.object({
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER', 'SUPPORT']),
 });
 
-router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
+router.put('/:tenantId/users/:userId', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId, userId } = req.params;
     const parsed = updateUserRoleSchema.safeParse(req.body);
@@ -420,7 +424,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
 });
 
 // PATCH alias for the same role update (frontend TenantUserService uses PATCH)
-router.patch('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
+router.patch('/:tenantId/users/:userId', authenticateToken, requireTenantAdmin, async (req, res) => {
   // Forward to the same handler logic by reusing the request
   try {
     const { tenantId, userId } = req.params;
@@ -551,7 +555,7 @@ router.patch('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =>
  * DELETE /tenants/:tenantId/users/:userId - Remove user from tenant
  * Requires: TENANT_OWNER or TENANT_ADMIN role
  */
-router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
+router.delete('/:tenantId/users/:userId', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId, userId } = req.params;
 
@@ -623,7 +627,7 @@ const inviteUserSchema = z.object({
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER', 'SUPPORT']).default('MEMBER'),
 });
 
-router.post('/:tenantId/users/invite', requireTenantAdmin, async (req, res) => {
+router.post('/:tenantId/users/invite', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const parsed = inviteUserSchema.safeParse(req.body);
@@ -749,7 +753,7 @@ router.post('/:tenantId/users/invite', requireTenantAdmin, async (req, res) => {
  * List pending invitations for this tenant
  * Requires: TENANT_OWNER or TENANT_ADMIN role
  */
-router.get('/:tenantId/invitations', requireTenantAdmin, async (req, res) => {
+router.get('/:tenantId/invitations', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const invitations = await prisma.invitations.findMany({
@@ -776,7 +780,7 @@ router.get('/:tenantId/invitations', requireTenantAdmin, async (req, res) => {
  * Cancel a pending invitation
  * Requires: TENANT_OWNER or TENANT_ADMIN role
  */
-router.delete('/:tenantId/invitations/:id', requireTenantAdmin, async (req, res) => {
+router.delete('/:tenantId/invitations/:id', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
     await prisma.invitations.deleteMany({
