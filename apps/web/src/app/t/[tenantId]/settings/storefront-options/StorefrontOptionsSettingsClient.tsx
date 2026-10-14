@@ -165,6 +165,25 @@ function getQuickActions(settings: StorefrontOptionsSettings, tenantId: string):
   return actions;
 }
 
+// Mirrors typeLabels in apps/web/src/app/tenant/[id]/page.tsx generateMetadata —
+// shown as the default title suffix when the merchant leaves the override blank.
+const DEFAULT_TITLE_LABELS: Record<string, string> = {
+  retail: 'Store Catalog',
+  online: 'Online Store',
+  service: 'Services',
+  social: 'Shop',
+  flexible: 'Store & Services',
+  none: 'Storefront',
+};
+
+const TITLE_GUIDELINES = [
+  'Aim for 50–60 characters — Google truncates longer titles',
+  'Start with your business name, then describe what you offer',
+  'Mention your city or neighborhood if you serve local customers',
+  'Use words shoppers actually search (e.g. "African groceries" not "exotic foods")',
+  'Leave blank to use the platform default shown below',
+];
+
 const GROUP_ICONS: Record<StorefrontOptGroup, React.ReactNode> = {
   hours: <Clock className="w-5 h-5 text-blue-600" />,
   category: <LayoutGrid className="w-5 h-5 text-purple-600" />,
@@ -183,6 +202,7 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
 
   const [settings, setSettings] = useState<StorefrontOptionsSettings>(DEFAULT_SETTINGS);
   const [seoTitle, setSeoTitle] = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -203,6 +223,7 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
         setSettings({ ...DEFAULT_SETTINGS, ...data });
       }
       setSeoTitle(profile?.seo_title || '');
+      setBusinessName(profile?.business_name || '');
     } catch (err) {
       clientLogger.error('Failed to load storefront options settings:', { detail: err });
     } finally {
@@ -255,6 +276,8 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
 
   // Check tier-level gates for each group
   const cap = storefrontCap.data;
+  const storefrontTypeKey = (allCaps.data as any)?.storefront?.effectiveType || 'retail';
+  const defaultTitle = `${businessName || 'Your store'} - ${DEFAULT_TITLE_LABELS[storefrontTypeKey] || DEFAULT_TITLE_LABELS.retail}`;
   const tierAllowsCategory = cap?.allowedCategoryTypes.length ?? 0 > 0;
   const tierAllowsRecommend = cap?.allowedRecommendTypes.length ?? 0 > 0;
   const tierAllowsRecentlyViewed = cap?.recentlyViewedEnabled ?? false;
@@ -500,17 +523,31 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
               <div>
                 <p className="font-medium">Storefront Page Title</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  Custom browser tab and search-result title. Leave blank to use the default.
+                  Custom browser tab and search-result title for your storefront.
                 </p>
                 <input
                   type="text"
                   value={seoTitle}
                   onChange={(e) => setSeoTitle(e.target.value)}
                   maxLength={160}
-                  placeholder="e.g. Ivoire African Market – African Groceries & Home Goods"
+                  placeholder={defaultTitle}
                   disabled={!settings.storefront_opt_enabled || !settings.enhanced_seo}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
                 />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="font-medium">Preview:</span> {seoTitle.trim() || defaultTitle}
+                  {seoTitle.trim() === '' && ' (default)'}
+                </p>
+                <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20 p-3">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1.5">
+                    Title guidelines
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
+                    {TITLE_GUIDELINES.map((g) => (
+                      <li key={g}>{g}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             )}
             {cap?.allowedAdvancedTypes.includes('storefront_actions') && (
