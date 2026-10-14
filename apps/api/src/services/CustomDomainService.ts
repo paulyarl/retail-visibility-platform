@@ -439,22 +439,24 @@ export class CustomDomainService extends BaseService {
 
   /**
    * Our own TLS check (H4) — Vercel exposes no cert field, so "certificate
-   * ready" means the canonical host answers 2xx/3xx over HTTPS. Canonical
-   * host only — never the www companion (it 301s to apex anyway).
+   * ready" means the canonical host completes an HTTPS exchange. Any HTTP
+   * response qualifies: the fetch validates the cert chain + hostname and
+   * throws on failure, and the proxy deliberately serves a fail-closed 404
+   * on hosts whose row isn't `active` yet — so gating on 2xx/3xx deadlocks
+   * `verified → active` (the row can't serve 2xx until the probe it gates
+   * has already passed). Canonical host only — never the www companion
+   * (it 301s to apex anyway).
    */
   private async probeHttps(host: string): Promise<{ ok: true } | { ok: false; message: string }> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HTTPS_PROBE_TIMEOUT_MS);
     try {
-      const response = await fetch(`https://${host}/`, {
+      await fetch(`https://${host}/`, {
         method: 'GET',
         redirect: 'follow',
         signal: controller.signal,
       });
-      if (response.status >= 200 && response.status < 400) {
-        return { ok: true };
-      }
-      return { ok: false, message: `HTTPS ${response.status}` };
+      return { ok: true };
     } catch (error: any) {
       return { ok: false, message: error?.name === 'AbortError' ? 'probe timeout' : (error?.message || 'probe failed') };
     } finally {
