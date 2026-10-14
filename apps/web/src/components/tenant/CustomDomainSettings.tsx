@@ -399,7 +399,7 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
 
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Your platform address keeps working — your custom domain becomes the primary address once it&apos;s live.
-          One domain per storefront.
+          One custom domain per storefront.
         </p>
       </CardContent>
     </Card>

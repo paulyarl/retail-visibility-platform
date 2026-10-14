@@ -12,7 +12,7 @@ export default async function SubdomainSettingsPage({ params }: { params: Promis
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Storefront Domains</h1>
           <p className="mt-2 text-lg text-gray-600">
-            Your storefront address — a platform subdomain, or a domain you own.
+            Your storefront address — a platform subdomain, a domain you own, or both.
           </p>
         </div>
         <div className="space-y-8">
