@@ -419,6 +419,19 @@ export interface AdminCustomDomainListResult {
   total: number;
   page: number;
   limit: number;
+  /** Row counts per status (unfiltered by status) for the filter chips. */
+  statusCounts?: Record<string, number>;
+}
+
+/** Custom-domain adoption metrics for the admin dashboard header. */
+export interface AdminCustomDomainStats {
+  totalTenants: number;
+  totalCustomDomains: number;
+  /** Distinct tenants with a domain in `active` or `verified`. */
+  tenantsWithCustomDomains: number;
+  adoptionRate: number;
+  /** Domains attached in the last 30 days. */
+  recentAttachments: number;
 }
 
 export interface AdminTenantDomainDetail {
@@ -1906,7 +1919,13 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     if (params.limit) qs.set('limit', String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
 
-    const result = await this.makeDefaultRequest<{ data: AdminCustomDomainRow[]; total: number; page: number; limit: number }>(
+    const result = await this.makeDefaultRequest<{
+      data: AdminCustomDomainRow[];
+      total: number;
+      page: number;
+      limit: number;
+      statusCounts?: Record<string, number>;
+    }>(
       `/api/admin/custom-domains${suffix}`,
       {},
       `platform-admin-custom-domains:${suffix}`,
@@ -1923,6 +1942,31 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     return result.data || null;
+  }
+
+  /**
+   * Custom-domain adoption metrics (users, adoption rate, 30-day attachments)
+   * for the dashboard header. Sibling of getAdminSubdomainStats, which only
+   * ever measured `tenants.subdomain`.
+   */
+  async getAdminCustomDomainStats(): Promise<AdminCustomDomainStats | null> {
+    const result = await this.makeDefaultRequest<AdminCustomDomainStats>(
+      '/api/analytics/custom-domain-stats',
+      {},
+      'platform-admin-custom-domain-stats',
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    if (!result.success) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get custom domain stats:', { detail: result.error });
+      return null;
+    }
+
+    return unwrapApiBody<AdminCustomDomainStats>(result);
   }
 
   /**

@@ -32,19 +32,23 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     const page = Math.max(1, parseInt(String(req.query.page ?? ''), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? ''), 10) || 20));
 
+    // Search predicate kept separate from the status filter: the per-status
+    // chip counts describe the current search, but never the current status.
+    const searchWhere: any = search
+      ? {
+          OR: [
+            { domain: { contains: search, mode: 'insensitive' } },
+            { tenants: { name: { contains: search, mode: 'insensitive' } } },
+          ],
+        }
+      : {};
+
     const where: any = {
       ...(status ? { status } : {}),
-      ...(search
-        ? {
-            OR: [
-              { domain: { contains: search, mode: 'insensitive' } },
-              { tenants: { name: { contains: search, mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
+      ...searchWhere,
     };
 
-    const [rows, total] = await Promise.all([
+    const [rows, total, statusGroups] = await Promise.all([
       prisma.custom_domains.findMany({
         where,
         include: { tenants: { select: { id: true, name: true, slug: true, subdomain: true } } },
@@ -53,6 +57,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
         take: limit,
       }),
       prisma.custom_domains.count({ where }),
+      prisma.custom_domains.groupBy({ by: ['status'], where: searchWhere, _count: { _all: true } }),
     ]);
 
     return res.json({
@@ -78,6 +83,8 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
       total,
       page,
       limit,
+      // Row counts per status for the filter chips (unfiltered by status).
+      statusCounts: Object.fromEntries(statusGroups.map((g) => [g.status, g._count._all])),
     });
   } catch (error: any) {
     logger.error('[GET /api/admin/custom-domains] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });

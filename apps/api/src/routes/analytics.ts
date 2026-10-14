@@ -111,4 +111,54 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
   }
 });
 
+/** Domain states where a custom domain actually serves the storefront. */
+const LIVE_CUSTOM_DOMAIN_STATUSES = ['active', 'verified'];
+
+/**
+ * GET /api/analytics/custom-domain-stats
+ * Custom-domain adoption for the admin dashboard header — the sibling of
+ * /subdomain-stats, which only ever counted `tenants.subdomain`.
+ *
+ * Recency comes straight from `custom_domains.created_at` (the row is inserted
+ * when the domain is attached), so unlike the subdomain side this needs no extra
+ * stamp. `custom_domains.updated_at` is a plain default that nothing maintains,
+ * so it is deliberately unused.
+ */
+router.get('/custom-domain-stats', async (req: Request, res: Response) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [totalTenants, totalCustomDomains, liveRows, recentAttachments] = await Promise.all([
+      prisma.tenants.count(),
+      prisma.custom_domains.count(),
+      // Distinct tenants with a domain that resolves — pending/error/disabled
+      // rows are attachments, not adoptions.
+      prisma.custom_domains.findMany({
+        where: { status: { in: LIVE_CUSTOM_DOMAIN_STATUSES } },
+        select: { tenant_id: true },
+        distinct: ['tenant_id'],
+      }),
+      prisma.custom_domains.count({ where: { created_at: { gte: thirtyDaysAgo } } }),
+    ]);
+
+    const tenantsWithCustomDomains = liveRows.length;
+    const adoptionRate = totalTenants > 0 ? (tenantsWithCustomDomains / totalTenants) * 100 : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalTenants,
+        totalCustomDomains,
+        tenantsWithCustomDomains,
+        adoptionRate: Math.round(adoptionRate * 100) / 100,
+        recentAttachments
+      }
+    });
+  } catch (error: any) {
+    logger.error('[Analytics] Error getting custom domain stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
 export default router;

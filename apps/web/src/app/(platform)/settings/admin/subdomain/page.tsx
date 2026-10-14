@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isPlatformAdmin } from '@/lib/auth/access-control';
 import {
   platformHomeService,
+  type AdminCustomDomainStats,
   type AdminRateLimits,
   type AdminSubdomainRow,
   type SubdomainStats,
@@ -27,21 +28,12 @@ import {
   CheckCircle,
   Clock,
   ArrowUpRight,
-  Pencil,
   Trash2,
   Search,
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
-type Availability = { available: boolean; reason: string | null; takenBy: { tenantId: string; tenantName: string | null } | null };
-
 const PAGE_SIZE = 20;
-
-const AVAILABILITY_MESSAGE: Record<string, string> = {
-  invalid_subdomain: 'Invalid format — 2–30 chars, lowercase letters, numbers, hyphens.',
-  reserved_subdomain: 'This name is reserved by the platform.',
-  subdomain_taken: 'Already taken by another tenant.',
-};
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -50,6 +42,7 @@ export default function AdminSubdomainPage() {
   const { user } = useAuth();
 
   const [stats, setStats] = useState<SubdomainStats | null>(null);
+  const [domainStats, setDomainStats] = useState<AdminCustomDomainStats | null>(null);
   const [rateLimits, setRateLimits] = useState<AdminRateLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -59,14 +52,6 @@ export default function AdminSubdomainPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [listLoading, setListLoading] = useState(false);
-
-  // Rename modal
-  const [renameTarget, setRenameTarget] = useState<AdminSubdomainRow | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [renameReason, setRenameReason] = useState('');
-  const [renameAvailability, setRenameAvailability] = useState<Availability | null>(null);
-  const [renameChecking, setRenameChecking] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   // Remove modal
   const [removeTarget, setRemoveTarget] = useState<AdminSubdomainRow | null>(null);
@@ -113,6 +98,17 @@ export default function AdminSubdomainPage() {
     }
   }, []);
 
+  // Custom-domain adoption — the subdomain-stats endpoint cannot see
+  // custom_domains at all, so the header read 0 adoptions on a page that also
+  // tracks tenant-owned domains.
+  const fetchDomainStats = useCallback(async () => {
+    try {
+      setDomainStats(await platformHomeService.getAdminCustomDomainStats());
+    } catch (err) {
+      clientLogger.error('Failed to fetch custom domain stats:', { detail: err });
+    }
+  }, []);
+
   const fetchRows = useCallback(async (nextSearch: string, nextPage: number) => {
     setListLoading(true);
     try {
@@ -138,9 +134,10 @@ export default function AdminSubdomainPage() {
   useEffect(() => {
     if (!hasAccess) return;
     fetchRateLimits();
+    fetchDomainStats();
     fetchSubdomainStats().finally(() => setLoading(false));
     fetchRows('', 1);
-  }, [hasAccess, fetchSubdomainStats, fetchRows, fetchRateLimits]);
+  }, [hasAccess, fetchSubdomainStats, fetchRows, fetchRateLimits, fetchDomainStats]);
 
   // Debounced search
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,57 +152,6 @@ export default function AdminSubdomainPage() {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
   }, [search, hasAccess, fetchRows]);
-
-  // Debounced availability check for the rename modal
-  useEffect(() => {
-    if (!renameTarget) return;
-    const value = renameValue.trim().toLowerCase();
-    if (!value || value === renameTarget.subdomain) {
-      setRenameAvailability(null);
-      return;
-    }
-    setRenameChecking(true);
-    const timer = setTimeout(async () => {
-      const result = await platformHomeService.checkAdminSubdomainAvailability(value, renameTarget.tenantId);
-      setRenameAvailability(result);
-      setRenameChecking(false);
-    }, 350);
-    return () => {
-      clearTimeout(timer);
-      setRenameChecking(false);
-    };
-  }, [renameValue, renameTarget]);
-
-  const openRename = (row: AdminSubdomainRow) => {
-    setRenameTarget(row);
-    setRenameValue(row.subdomain ?? '');
-    setRenameReason('');
-    setRenameAvailability(null);
-    setError('');
-  };
-
-  const submitRename = async () => {
-    if (!renameTarget) return;
-    const value = renameValue.trim().toLowerCase();
-    if (!value) {
-      setError('Enter a subdomain');
-      return;
-    }
-    if (renameAvailability && !renameAvailability.available) {
-      setError(AVAILABILITY_MESSAGE[renameAvailability.reason ?? ''] ?? 'That subdomain is not available');
-      return;
-    }
-    setSaving(true);
-    const result = await platformHomeService.assignAdminSubdomain(renameTarget.tenantId, value, renameReason || undefined);
-    setSaving(false);
-    if (!result.success) {
-      setError(AVAILABILITY_MESSAGE[result.error ?? ''] ?? `Failed to update subdomain (${result.error ?? 'unknown'})`);
-      return;
-    }
-    setRenameTarget(null);
-    await fetchRows(search, page);
-    await fetchSubdomainStats();
-  };
 
   const submitRemove = async () => {
     if (!removeTarget) return;
@@ -248,7 +194,6 @@ export default function AdminSubdomainPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const renameValueChanged = !!renameTarget && renameValue.trim().toLowerCase() !== (renameTarget.subdomain ?? '');
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -271,7 +216,9 @@ export default function AdminSubdomainPage() {
 
       <div className="space-y-6">
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Subdomain metrics and custom-domain metrics are separate surfaces —
+            labelled explicitly so neither reads as the whole picture. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="dark:bg-gray-800 dark:border-gray-700">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
               <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Total Tenants</CardTitle>
@@ -285,18 +232,18 @@ export default function AdminSubdomainPage() {
 
           <Card className="dark:bg-gray-800 dark:border-gray-700">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
-              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Subdomain Users</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Platform Subdomain Users</CardTitle>
               <Globe className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="dark:bg-gray-800">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.tenantsWithSubdomains || 0}</div>
-              <p className="text-xs text-muted-foreground dark:text-gray-400">With custom subdomains</p>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">With a subdomain assigned</p>
             </CardContent>
           </Card>
 
           <Card className="dark:bg-gray-800 dark:border-gray-700">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
-              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Adoption Rate</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Subdomain Adoption Rate</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="dark:bg-gray-800">
@@ -307,11 +254,33 @@ export default function AdminSubdomainPage() {
 
           <Card className="dark:bg-gray-800 dark:border-gray-700">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
-              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Recent Adoptions</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Recent Subdomain Adoptions</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="dark:bg-gray-800">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.recentAdoptions || 0}</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">Last 30 days</p>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Custom Domain Users</CardTitle>
+              <Globe className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="dark:bg-gray-800">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{domainStats?.tenantsWithCustomDomains || 0}</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">With a live domain</p>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 dark:bg-gray-800">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">Recent Domain Attachments</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="dark:bg-gray-800">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{domainStats?.recentAttachments || 0}</div>
               <p className="text-xs text-muted-foreground dark:text-gray-400">Last 30 days</p>
             </CardContent>
           </Card>
@@ -324,7 +293,8 @@ export default function AdminSubdomainPage() {
               <div>
                 <CardTitle className="text-gray-900 dark:text-white">Active Subdomains</CardTitle>
                 <CardDescription className="text-gray-600 dark:text-gray-300">
-                  Tenants with configured subdomains
+                  Tenants with configured subdomains. To rename one, use the tenant&apos;s own slug tools —
+                  the subdomain mirrors the slug, so the two move together.
                 </CardDescription>
               </div>
               <div className="relative w-full sm:w-72">
@@ -390,10 +360,6 @@ export default function AdminSubdomainPage() {
                           {item.assignedAt ? new Date(item.assignedAt).toLocaleDateString() : '—'}
                         </Badge>
                       </span>
-                      <Button variant="secondary" size="sm" onClick={() => openRename(item)}>
-                        <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                        Rename
-                      </Button>
                       <Button variant="secondary" size="sm" onClick={() => setRemoveTarget(item)}>
                         <Trash2 className="w-3.5 h-3.5 mr-1.5 text-red-600" />
                         Remove
@@ -440,7 +406,7 @@ export default function AdminSubdomainPage() {
                 <p className="text-sm text-neutral-500 dark:text-gray-400">Update subdomain usage statistics</p>
               </div>
               <Button
-                onClick={() => { fetchSubdomainStats(); fetchRows(search, page); fetchRateLimits(); }}
+                onClick={() => { fetchSubdomainStats(); fetchDomainStats(); fetchRows(search, page); fetchRateLimits(); }}
                 variant="secondary"
                 size="sm"
                 disabled={listLoading}
@@ -482,72 +448,6 @@ export default function AdminSubdomainPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Rename modal */}
-      <Modal
-        isOpen={!!renameTarget}
-        onClose={() => setRenameTarget(null)}
-        title="Rename subdomain"
-        description={renameTarget ? `Tenant: ${renameTarget.tenantName ?? renameTarget.tenantId}` : undefined}
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Subdomain</label>
-            <div className="flex items-center gap-2">
-              <Input
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                placeholder="my-business"
-                autoFocus
-              />
-              <span className="text-sm text-neutral-500 whitespace-nowrap">.{platformUrl}</span>
-            </div>
-            {renameValueChanged && (
-              <p className="text-xs mt-1">
-                {renameChecking ? (
-                  <span className="text-neutral-500">Checking availability…</span>
-                ) : renameAvailability ? (
-                  renameAvailability.available ? (
-                    <span className="text-green-600">Available</span>
-                  ) : (
-                    <span className="text-red-600">
-                      {AVAILABILITY_MESSAGE[renameAvailability.reason ?? ''] ??
-                        `Not available${renameAvailability.takenBy?.tenantName ? ` — taken by ${renameAvailability.takenBy.tenantName}` : ''}`}
-                    </span>
-                  )
-                ) : null}
-              </p>
-            )}
-          </div>
-
-          {renameValueChanged && (
-            <Alert className="border-amber-200 bg-amber-50">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800 text-sm">
-                Renaming changes this tenant's public URLs — the subdomain, the slug, and the directory
-                listing all move together. Existing links to the old name will stop working.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-            <Input value={renameReason} onChange={(e) => setRenameReason(e.target.value)} placeholder="e.g. rebrand request #1234" />
-          </div>
-
-          <ModalFooter>
-            <Button variant="secondary" onClick={() => setRenameTarget(null)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button
-              onClick={submitRename}
-              disabled={saving || renameChecking || !renameValue.trim() || (!!renameAvailability && !renameAvailability.available)}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </ModalFooter>
-        </div>
-      </Modal>
 
       {/* Remove modal */}
       <Modal

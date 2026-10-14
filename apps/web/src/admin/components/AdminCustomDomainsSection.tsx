@@ -82,10 +82,26 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={conf.variant}>{conf.label}</Badge>;
 }
 
+/**
+ * Count shown on a status chip. "All" is the sum across statuses; a status the
+ * server didn't report returns undefined so the chip renders without a number —
+ * never a misleading 0, and null (not yet loaded) shows nothing at all.
+ */
+export function statusChipCount(
+  filterValue: string,
+  statusCounts: Record<string, number> | null | undefined,
+): number | undefined {
+  if (!statusCounts) return undefined;
+  if (filterValue === '') return Object.values(statusCounts).reduce((sum, n) => sum + n, 0);
+  return statusCounts[filterValue];
+}
+
 export default function AdminCustomDomainsSection() {
   // List state
   const [rows, setRows] = useState<AdminCustomDomainRow[]>([]);
   const [total, setTotal] = useState(0);
+  // null until the first list response lands — avoids flashing "0" per chip.
+  const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -130,6 +146,9 @@ export default function AdminCustomDomainsSection() {
       }
       setRows(result.data);
       setTotal(result.total);
+      // Counts per status (respecting the current search, not the status
+      // filter) so the chips show how much is pending / errored.
+      setStatusCounts(result.statusCounts ?? null);
     } catch (err) {
       clientLogger.error('Failed to fetch admin custom domains:', { detail: err });
       setError('Failed to load custom domains');
@@ -292,19 +311,24 @@ export default function AdminCustomDomainsSection() {
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5 pt-3">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setStatus(f.value)}
-                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
-                  status === f.value
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
-                    : 'border-neutral-200 text-neutral-500 hover:border-neutral-300 dark:border-neutral-700 dark:text-neutral-400'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+            {STATUS_FILTERS.map((f) => {
+              const count = statusChipCount(f.value, statusCounts);
+              return (
+                <button
+                  key={f.value}
+                  onClick={() => setStatus(f.value)}
+                  aria-label={count == null ? f.label : `${f.label}, ${count}`}
+                  className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                    status === f.value
+                      ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                      : 'border-neutral-200 text-neutral-500 hover:border-neutral-300 dark:border-neutral-700 dark:text-neutral-400'
+                  }`}
+                >
+                  {f.label}
+                  {count != null && <span className="ml-1 opacity-70">{count}</span>}
+                </button>
+              );
+            })}
           </div>
         </CardHeader>
         <CardContent className="dark:bg-gray-800">
