@@ -384,6 +384,37 @@ export class FeatureOverridesService extends AdminApiSingleton {
   }
 
   /**
+   * Update a feature override — reason, expiration, granted flag.
+   * API contract: PUT /api/admin/feature-overrides/:id with snake expires_at
+   * (nullable — null clears the expiry).
+   */
+  async updateFeatureOverride(
+    overrideId: string,
+    data: { reason?: string; expiresAt?: string | null; granted?: boolean }
+  ): Promise<Override | null> {
+    const body: Record<string, unknown> = {};
+    if (data.reason !== undefined) body.reason = data.reason;
+    if (data.granted !== undefined) body.granted = data.granted;
+    if (data.expiresAt !== undefined) {
+      body.expires_at = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59Z`).toISOString() : null;
+    }
+
+    const response = await this.makeDefaultRequest<Override>(
+      `/api/admin/feature-overrides/${overrideId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      },
+      'feature-overrides-update',
+      0
+    );
+
+    await this.invalidateCacheAcrossContexts('feature-overrides', [AppContext.ADMIN], [CacheIsolation.ADMIN]);
+
+    return response?.data || null;
+  }
+
+  /**
    * Delete override
    */
   async deleteOverride(overrideId: string): Promise<void> {

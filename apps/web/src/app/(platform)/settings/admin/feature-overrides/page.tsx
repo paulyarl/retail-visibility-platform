@@ -23,6 +23,9 @@ export default function FeatureOverridesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedType, setSelectedType] = useState<OverrideType>('feature');
   const [processing, setProcessing] = useState(false);
+  const [editingOverride, setEditingOverride] = useState<Override | null>(null);
+  const [deletingOverride, setDeletingOverride] = useState<Override | null>(null);
+  const [editForm, setEditForm] = useState({ reason: '', expiresAt: '', granted: true });
   
   // Dropdown data
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -386,6 +389,52 @@ export default function FeatureOverridesPage() {
     }
   };
 
+  const handleOpenEdit = (override: Override) => {
+    setEditingOverride(override);
+    setEditForm({
+      reason: override.reason || '',
+      expiresAt: override.expiresAt ? override.expiresAt.slice(0, 10) : '',
+      granted: override.status !== 'revoked',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingOverride) return;
+    try {
+      setProcessing(true);
+      const result = await featureOverridesService.updateFeatureOverride(editingOverride.id, {
+        reason: editForm.reason,
+        expiresAt: editForm.expiresAt || null,
+        granted: editForm.granted,
+      });
+      if (result === null) throw new Error('Failed to update override');
+      notifications.show({ title: 'Success', message: 'Override updated', color: 'green' });
+      setEditingOverride(null);
+      await fetchOverrides();
+    } catch (error: any) {
+      clientLogger.error('Failed to update override:', { detail: error });
+      notifications.show({ title: 'Error', message: error.message || 'Failed to update override', color: 'red' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDeleteOverride = async () => {
+    if (!deletingOverride) return;
+    try {
+      setProcessing(true);
+      await featureOverridesService.deleteOverride(deletingOverride.id);
+      notifications.show({ title: 'Success', message: 'Override deleted', color: 'green' });
+      setDeletingOverride(null);
+      await fetchOverrides();
+    } catch (error: any) {
+      clientLogger.error('Failed to delete override:', { detail: error });
+      notifications.show({ title: 'Error', message: error.message || 'Failed to delete override', color: 'red' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const resetForm = () => {
     setNewOverride({
       organizationId: '',
@@ -598,10 +647,18 @@ export default function FeatureOverridesPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    <button className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded">
+                    <button
+                      onClick={() => handleOpenEdit(override)}
+                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      title="Edit override"
+                    >
                       <Edit className="h-4 w-4" />
                     </button>
-                    <button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded">
+                    <button
+                      onClick={() => setDeletingOverride(override)}
+                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Delete override"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -900,6 +957,73 @@ export default function FeatureOverridesPage() {
             loading={processing}
           >
             {processing ? 'Creating...' : 'Create Override'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Override Modal */}
+      <Modal
+        isOpen={!!editingOverride}
+        onClose={() => setEditingOverride(null)}
+        title="Edit Override"
+        description={editingOverride ? `${editingOverride.type === 'feature' ? editingOverride.featureName : editingOverride.type} — ${editingOverride.tenantName || editingOverride.organizationName || ''}` : undefined}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <Select
+              value={editForm.granted ? 'active' : 'revoked'}
+              onChange={(e) => setEditForm(prev => ({ ...prev, granted: e.target.value === 'active' }))}
+            >
+              <option value="active">Active (granted)</option>
+              <option value="revoked">Revoked</option>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+            <textarea
+              value={editForm.reason}
+              onChange={(e) => setEditForm(prev => ({ ...prev, reason: e.target.value }))}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Expiration Date (blank = never)</label>
+            <Input
+              type="date"
+              value={editForm.expiresAt}
+              onChange={(e) => setEditForm(prev => ({ ...prev, expiresAt: e.target.value }))}
+            />
+          </div>
+        </div>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setEditingOverride(null)} disabled={processing}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEdit} disabled={processing} loading={processing}>
+            {processing ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!deletingOverride}
+        onClose={() => setDeletingOverride(null)}
+        title="Delete Override"
+        description="This permanently removes the override — the tenant immediately falls back to tier defaults."
+      >
+        <p className="text-sm text-gray-700">
+          Delete the <span className="font-medium">{deletingOverride?.type === 'feature' ? deletingOverride.featureName : deletingOverride?.type}</span> override
+          for <span className="font-medium">{deletingOverride?.tenantName || deletingOverride?.organizationName || 'this entry'}</span>?
+        </p>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setDeletingOverride(null)} disabled={processing}>
+            Cancel
+          </Button>
+          <Button color="red" onClick={handleDeleteOverride} disabled={processing} loading={processing}>
+            {processing ? 'Deleting...' : 'Delete Override'}
           </Button>
         </ModalFooter>
       </Modal>
