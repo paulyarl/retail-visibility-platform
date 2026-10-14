@@ -17,6 +17,7 @@ const tenantProfileSchema = z.object({
   business_name: z.string().min(1).optional(),
   slug: z.string().optional().nullable().transform(v => v || undefined),
   business_description: z.string().optional(),
+  seo_title: z.string().max(160).nullable().optional(),
   address_line1: z.string().optional(),
   address_line2: z.string().optional(),
   city: z.string().optional(),
@@ -110,7 +111,7 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
 
       // Get updated profile (exclude geography column to avoid Prisma deserialization error)
       result = await basePrisma.$queryRaw`
-        SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
+        SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, seo_title, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
       `;
       console.log(`[PATCH /tenant/profile] Retrieved updated profile:`, result);
     } else {
@@ -137,6 +138,7 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
         logo_url: delta.logo_url,
         banner_url: delta.banner_url,
         business_description: delta.business_description,
+        seo_title: delta.seo_title,
       };
 
       Object.entries(optionalMappings).forEach(([field, value]) => {
@@ -160,7 +162,7 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
       console.log(`[PATCH /tenant/profile] Insert values:`, insertValues);
 
       result = await basePrisma.$executeRawUnsafe(insertQuery, ...insertValues).then(() =>
-        basePrisma.$queryRaw`SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
+        basePrisma.$queryRaw`SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, seo_title, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}`
       );
       console.log(`[PATCH /tenant/profile] Created new profile:`, result);
     }

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { tenantProfileService } from '@/services/TenantProfileService';
 import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -181,6 +182,7 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
   const allCaps = useAllCapabilities(tenantId);
 
   const [settings, setSettings] = useState<StorefrontOptionsSettings>(DEFAULT_SETTINGS);
+  const [seoTitle, setSeoTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -193,10 +195,14 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const data = await tenantInfoService.getStorefrontOptionsSettings(tenantId);
+      const [data, profile] = await Promise.all([
+        tenantInfoService.getStorefrontOptionsSettings(tenantId),
+        tenantProfileService.getTenantProfile(tenantId),
+      ]);
       if (data) {
         setSettings({ ...DEFAULT_SETTINGS, ...data });
       }
+      setSeoTitle(profile?.seo_title || '');
     } catch (err) {
       clientLogger.error('Failed to load storefront options settings:', { detail: err });
     } finally {
@@ -227,7 +233,13 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
       setSaving(true);
       setMessage(null);
 
-      const result = await tenantInfoService.updateStorefrontOptionsSettings(tenantId, settings);
+      const [result] = await Promise.all([
+        tenantInfoService.updateStorefrontOptionsSettings(tenantId, settings),
+        tenantProfileService.updateTenantProfile(tenantId, {
+          tenant_id: tenantId,
+          seo_title: seoTitle.trim(),
+        }),
+      ]);
 
       if (!result) {
         throw new Error('Failed to save storefront options settings');
@@ -481,6 +493,23 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
                   checked={settings.enhanced_seo}
                   onCheckedChange={() => handleToggle('enhanced_seo')}
                   disabled={!settings.storefront_opt_enabled}
+                />
+              </div>
+            )}
+            {cap?.allowedAdvancedTypes.includes('enhanced_seo') && (
+              <div>
+                <p className="font-medium">Storefront Page Title</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  Custom browser tab and search-result title. Leave blank to use the default.
+                </p>
+                <input
+                  type="text"
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  maxLength={160}
+                  placeholder="e.g. Ivoire African Market – African Groceries & Home Goods"
+                  disabled={!settings.storefront_opt_enabled || !settings.enhanced_seo}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
                 />
               </div>
             )}

@@ -1771,15 +1771,15 @@ model directory_listings_list {
   snap_ebt_as_of           DateTime?                 @db.Date
   snap_ebt_source          String?                   @db.VarChar(32)
   snap_ebt_source_name     String?
+  listing_origin           String?                   @default("claimed") @db.VarChar(32)
+  public_disclaimer        String?
+  same_as                  String[]                  @default([])
+  attributes               Json                      @default("[]")
   delivery_offered         Boolean?
   pickup_offered           Boolean?
   fulfillment_as_of        DateTime?                 @db.Date
   fulfillment_source       String?                   @db.VarChar(32)
   fulfillment_source_name  String?
-  listing_origin           String?                   @default("claimed") @db.VarChar(32)
-  public_disclaimer        String?
-  same_as                  String[]                  @default([])
-  attributes               Json                      @default("[]")
   directory_photos         directory_photos[]
   directory_presence_seeds directory_presence_seeds?
 
@@ -6372,6 +6372,7 @@ model tenant_business_profiles_list {
   gbp_category_sync_status   String?
   updated_at                 DateTime
   geolocation                Unsupported("geography")?
+  seo_title                  String?                   @db.VarChar(160)
   gbp_categories_list        gbp_categories_list?      @relation(fields: [gbp_category_id], references: [id])
   tenants                    tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 

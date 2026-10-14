@@ -531,6 +531,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     none:     { title: 'Storefront',          desc: 'View store',                schemaType: 'Store' },
   };
   const typeLabel = typeLabels[storefrontType] || typeLabels.retail;
+  const customTitle = tenant.profileData?.seo_title?.trim() || null;
 
   // Canonical ladder (sprint plan 4.2): active custom domain → platform
   // subdomain → platform path. Tenant-based, not request-host — the SAME
@@ -546,7 +547,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   // Basic metadata — always emitted
   const basicMetadata: Metadata = {
-    title: `${businessName} - ${typeLabel.title}`,
+    title: customTitle || `${businessName} - ${typeLabel.title}`,
     description: `${typeLabel.desc} from ${businessName}.`,
     alternates: { canonical: canonicalUrl },
   };
@@ -583,12 +584,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 
   return {
-    title: `${businessName} - ${typeLabel.title}`,
+    title: customTitle || `${businessName} - ${typeLabel.title}`,
     description: enhancedDescription as string,
     keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: businessName,
+      title: customTitle || businessName,
       description: `${typeLabel.desc} from ${businessName}`,
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
       type: 'website',

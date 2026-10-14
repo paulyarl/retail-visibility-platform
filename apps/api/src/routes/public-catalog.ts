@@ -777,7 +777,8 @@ router.get('/tenant/:identifier', async (req, res) => {
             country_code: true,
             postal_code: true,
             contact_person: true,
-            seo_tags: true
+            seo_tags: true,
+            seo_title: true
           }
         });
 

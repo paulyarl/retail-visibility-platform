@@ -19,8 +19,10 @@ export interface GeocodeResult {
 
 export interface TenantProfile {
   id: string;
+  tenant_id?: string;
   business_name?: string;
   business_description?: string;
+  seo_title?: string;
   address_line1?: string;
   address_line2?: string;
   city?: string;

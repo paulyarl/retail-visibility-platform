@@ -12,6 +12,7 @@ const tenantProfileSchema = z.object({
   tenant_id: z.string(),
   business_name: z.string().min(1).optional(),
   business_description: z.string().optional(),
+  seo_title: z.string().max(160).nullable().optional(),
   address_line1: z.string().optional(),
   address_line2: z.string().optional(),
   city: z.string().optional(),
@@ -48,6 +49,7 @@ router.post("/api/tenant/profile", authenticateToken, checkTenantAccess, async (
         data: {
           business_name: profileData.business_name,
           business_description: profileData.business_description,
+          seo_title: profileData.seo_title,
           address_line1: profileData.address_line1,
           address_line2: profileData.address_line2,
           city: profileData.city,
@@ -73,6 +75,7 @@ router.post("/api/tenant/profile", authenticateToken, checkTenantAccess, async (
           tenant_id,
           business_name: profileData.business_name || '',
           business_description: profileData.business_description || null,
+          seo_title: profileData.seo_title || null,
           address_line1: profileData.address_line1 || '',
           address_line2: profileData.address_line2 || null,
           city: profileData.city || '',
