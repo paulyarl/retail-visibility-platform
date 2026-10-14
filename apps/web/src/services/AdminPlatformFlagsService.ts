@@ -30,6 +30,11 @@ export interface EffectiveFlag {
     allow_override: boolean;
     platform_override?: boolean;
   };
+  // Present only on tenant-scoped responses (/effective-flags/:tenantId) —
+  // effectiveOn/effectiveSource describe the PLATFORM state; these carry the
+  // tenant's actual decision after override resolution.
+  tenantEffectiveOn?: boolean;
+  tenantEffectiveSource?: 'tenant_override' | 'tenant_db' | 'blocked';
 }
 
 export interface FlagUpdateRequest {

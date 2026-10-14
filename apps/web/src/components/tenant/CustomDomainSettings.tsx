@@ -84,7 +84,10 @@ function DnsRecordRow({ type, name, value }: { type: string; name: string; value
 export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsProps) {
   const { data: storefrontDomains, isLoading: capsLoading } = useEffectiveStorefrontDomains(tenantId);
   const { data: tenantFlags } = useEffectiveTenantFlags(tenantId);
-  const flagOn = tenantFlags?.['custom_domains']?.effectiveOn ?? false;
+  // Tenant-scoped payload: the tenant's decision is tenantEffectiveOn;
+  // effectiveOn is the platform-level state (misleading in beta posture).
+  const customDomainsFlag = tenantFlags?.['custom_domains'];
+  const flagOn = customDomainsFlag?.tenantEffectiveOn ?? customDomainsFlag?.effectiveOn ?? false;
   const entitled = storefrontDomains?.customDomainEnabled ?? false;
 
   const [domains, setDomains] = useState<CustomDomain[]>([]);
@@ -95,8 +98,10 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // The list route is entitlement/flag-agnostic (checkTenantAccess only) —
+  // always fetch so an admin-attached domain stays visible even when the
+  // rollout flag or capability gate is off.
   const load = useCallback(async () => {
-    if (!entitled || !flagOn) return;
     setLoading(true);
     try {
       const data = await tenantInfoService.listCustomDomains(tenantId);
@@ -106,7 +111,7 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
     } finally {
       setLoading(false);
     }
-  }, [tenantId, entitled, flagOn]);
+  }, [tenantId]);
 
   useEffect(() => {
     load();
@@ -175,8 +180,14 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
     }
   };
 
-  // Not entitled → upsell (capability-authoritative per D12, not a tier-name check)
-  if (!capsLoading && !entitled) {
+  const liveDomain = domains.find((d) => d.status !== 'disabled') ?? domains[0];
+  const hasDomain = domains.length > 0;
+
+  // A domain already attached (incl. DFY-attached by a platform admin) is
+  // always shown — the rollout flag only gates NEW attaches, never
+  // visibility or management of an existing domain.
+  // Not entitled + no domain → upsell (capability-authoritative per D12, not a tier-name check)
+  if (!capsLoading && !loading && !hasDomain && !entitled) {
     return (
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
@@ -204,8 +215,9 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
     );
   }
 
-  // Entitled but the platform flag (beta rollout) is off for this tenant
-  if (entitled && !flagOn) {
+  // Entitled but the platform flag (beta rollout) is off for this tenant,
+  // and nothing is attached yet
+  if (!loading && !hasDomain && entitled && !flagOn) {
     return (
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
@@ -223,7 +235,6 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
     );
   }
 
-  const liveDomain = domains.find((d) => d.status !== 'disabled');
   const isApexSetup = liveDomain ? liveDomain.attachedHosts.length > 1 : domainKind === 'apex';
 
   return (
@@ -290,8 +301,8 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
               </div>
             </div>
 
-            {/* DNS instruction card — only while the domain isn't live */}
-            {liveDomain.status !== 'active' && (
+            {/* DNS instruction card — only while the domain is still being set up */}
+            {liveDomain.status !== 'active' && liveDomain.status !== 'disabled' && (
               <div className="p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-900/20 space-y-3">
                 <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
                   Add these records at your domain registrar
