@@ -250,6 +250,15 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
             <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="font-medium text-green-800">{currentSubdomain}.{platformDomain}</span>
+              <a
+                href={getSubdomainUrl(currentSubdomain)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Visit
+              </a>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
               Your products will be accessible at {getSubdomainUrl(currentSubdomain)}
@@ -270,6 +279,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
               businessName={businessName}
               location={location}
               tenantId={tenantId}
+              namespace="subdomain"
               selectedSlug={selectedSlug}
               onSlugSelect={setSelectedSlug}
               label="Choose your subdomain *"

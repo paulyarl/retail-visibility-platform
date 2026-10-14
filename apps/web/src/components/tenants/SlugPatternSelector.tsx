@@ -15,6 +15,7 @@ interface SlugPattern {
   isAvailable: boolean;
   isOwnSlug: boolean;
   description: string;
+  unavailableReason?: string;
 }
 
 interface SlugPatternSelectorProps {
@@ -28,6 +29,12 @@ interface SlugPatternSelectorProps {
   selectedSlug: string;
   onSlugSelect: (slug: string) => void;
   className?: string;
+  /**
+   * 'subdomain' runs candidates through the platform subdomain ruleset
+   * (format, reserved names, cross-namespace uniqueness) — use it for pickers
+   * that feed PUT /api/tenants/:id/subdomain. Default 'directory'.
+   */
+  namespace?: 'directory' | 'subdomain';
   /** Heading copy. Defaults to the shop-URL wording. */
   label?: string;
   /** Preview line label. Defaults to "Your shop URL:". */
@@ -43,6 +50,7 @@ export default function SlugPatternSelector({
   selectedSlug,
   onSlugSelect,
   className = '',
+  namespace = 'directory',
   label = 'Choose Your Shop URL *',
   urlLabel = 'Your shop URL:',
   urlTemplate = (slug) => `/shops/${slug}`,
@@ -73,6 +81,7 @@ export default function SlugPatternSelector({
           businessName: businessName.trim(),
           location: location || {},
           tenantId,
+          namespace,
         });
 
         setPatterns(patterns);
@@ -104,7 +113,7 @@ export default function SlugPatternSelector({
     // Debounce the API call
     const timeoutId = setTimeout(fetchPatterns, 500);
     return () => clearTimeout(timeoutId);
-  }, [businessName, location?.city, location?.state, location?.country, tenantId]);
+  }, [businessName, location?.city, location?.state, location?.country, tenantId, namespace]);
 
   if (!businessName || businessName.trim().length < 2) {
     return (
@@ -222,7 +231,11 @@ export default function SlugPatternSelector({
                       ) : (
                         <Badge variant="error" className="text-xs">
                           <AlertCircle className="h-3 w-3 mr-1" />
-                          Taken
+                          {pattern.unavailableReason === 'invalid_subdomain'
+                            ? 'Too long'
+                            : pattern.unavailableReason === 'reserved_subdomain'
+                              ? 'Reserved'
+                              : 'Taken'}
                         </Badge>
                       )}
                     </div>

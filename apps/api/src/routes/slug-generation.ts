@@ -323,7 +323,10 @@ router.post('/slugify', deprecate({ ...RETIREMENT, replacement: '/api/slugs/patt
  * {
  *   "businessName": "Coffee Shop",
  *   "location": { "city": "Seattle", "state": "Washington", "country": "United States" },
- *   "tenantId": "tid-12345"
+ *   "tenantId": "tid-12345",
+ *   "namespace": "subdomain"   // optional — enforces the platform subdomain
+ *                            // ruleset (format/reserved/cross-namespace) so
+ *                            // subdomain pickers only offer assignable values
  * }
  * 
  * Response:
@@ -338,7 +341,7 @@ router.post('/slugify', deprecate({ ...RETIREMENT, replacement: '/api/slugs/patt
  */
 router.post('/patterns', searchRateLimit, authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { businessName, location, tenantId } = req.body;
+    const { businessName, location, tenantId, namespace } = req.body;
 
     if (!businessName || typeof businessName !== 'string') {
       return res.status(400).json({ error: 'business_name_required' });
@@ -347,7 +350,8 @@ router.post('/patterns', searchRateLimit, authenticateToken, async (req: Request
     const patterns = await slugSingletonService.getAllSlugPatterns(
       businessName,
       location || {},
-      tenantId
+      tenantId,
+      namespace === 'subdomain' ? 'subdomain' : 'directory'
     );
 
     return res.json({ patterns });

@@ -14,6 +14,8 @@ export interface SlugPattern {
   isAvailable: boolean;
   isOwnSlug: boolean;
   description: string;
+  /** Populated when unavailable — e.g. 'invalid_subdomain', 'reserved_subdomain', 'subdomain_taken'. */
+  unavailableReason?: string;
 }
 
 export interface SlugPatternParams {
@@ -24,6 +26,12 @@ export interface SlugPatternParams {
     country?: string;
   };
   tenantId?: string;
+  /**
+   * 'subdomain' applies the platform subdomain ruleset (the same check
+   * PUT /api/tenants/:id/subdomain runs) so pickers that feed that route
+   * never offer an unassignable candidate. Default 'directory'.
+   */
+  namespace?: 'directory' | 'subdomain';
 }
 
 export interface TenantSlug {
@@ -86,9 +94,10 @@ class TenantSlugService extends TenantApiSingleton {
             businessName: params.businessName,
             location: params.location || {},
             tenantId: params.tenantId,
+            namespace: params.namespace,
           }),
         },
-        `slug-patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}:${params.tenantId || ''}`
+        `slug-patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}:${params.tenantId || ''}:${params.namespace || 'directory'}`
       );
 
       // console.log('[TenantSlugService] Slug patterns API response:', response);

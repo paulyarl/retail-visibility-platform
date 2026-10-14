@@ -33,7 +33,7 @@ import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingl
 import { logger } from '../logger';
 import { basePrisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
-import { isReservedSubdomain } from '../lib/subdomain';
+import { checkSubdomainAvailability, isReservedSubdomain, isValidSubdomainFormat } from '../lib/subdomain';
 import { 
   generateUniqueDirectorySlug, 
   getTenantLocation, 
@@ -54,6 +54,25 @@ export interface LocationInfo {
   city?: string;
   state?: string;
   country?: string;
+}
+
+/**
+ * Which namespace a slug-picker candidate will be written into.
+ * `directory` keeps the historical directory_settings_list-only check;
+ * `subdomain` runs the full platform subdomain ruleset (format, reserved
+ * names, cross-namespace uniqueness) so the picker never offers a candidate
+ * that PUT /api/tenants/:id/subdomain would reject.
+ */
+export type SlugNamespace = 'directory' | 'subdomain';
+
+export interface SlugPatternOption {
+  pattern: string;
+  slug: string;
+  isAvailable: boolean;
+  isOwnSlug: boolean;
+  description: string;
+  /** Populated when unavailable — a SubdomainFailureCode or 'subdomain_taken'. */
+  unavailableReason?: string;
 }
 
 /**
@@ -358,8 +377,8 @@ class SlugSingletonService extends UniversalSingleton {
         select: { subdomain: true },
       });
       if (current?.subdomain && current.subdomain !== newSlug) {
-        if (isReservedSubdomain(newSlug)) {
-          logger.warn(`[SlugSingletonService] Refusing to mirror reserved slug "${newSlug}" into subdomain for tenant ${tenantId}`);
+        if (isReservedSubdomain(newSlug) || !isValidSubdomainFormat(newSlug)) {
+          logger.warn(`[SlugSingletonService] Refusing to mirror unmirrorable slug "${newSlug}" into subdomain for tenant ${tenantId}`);
         } else {
           await basePrisma.tenants.update({ where: { id: tenantId }, data: { subdomain: newSlug } });
         }
@@ -582,36 +601,35 @@ class SlugSingletonService extends UniversalSingleton {
    * @param businessName - The business name
    * @param location - Location information
    * @param tenantId - Optional tenant ID to check availability
+   * @param namespace - 'directory' (default, historical check) or 'subdomain'
+   *   (full subdomain ruleset — pickers that feed PUT /tenants/:id/subdomain)
    * @returns Array of slug patterns with availability status
    */
   async getAllSlugPatterns(
     businessName: string,
     location: LocationInfo = {},
-    tenantId?: string
-  ): Promise<Array<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }>> {
-    const patterns: Array<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }> = [];
+    tenantId?: string,
+    namespace: SlugNamespace = 'directory'
+  ): Promise<SlugPatternOption[]> {
+    const patterns: SlugPatternOption[] = [];
     const baseSlug = slugify(businessName);
 
     // Pattern 1: Business name only
     const pattern1 = baseSlug;
-    const ownership1 = await this.getSlugOwnership(pattern1, tenantId);
     patterns.push({
       pattern: 'business_name',
       slug: pattern1,
-      isAvailable: ownership1.isAvailable,
-      isOwnSlug: ownership1.isOwnSlug,
+      ...(await this.evaluateSlugCandidate(pattern1, tenantId, namespace)),
       description: 'Business name only (shortest, most memorable)',
     });
 
     // Pattern 2: Business name + city
     if (location.city) {
       const pattern2 = `${baseSlug}-${slugify(location.city)}`;
-      const ownership2 = await this.getSlugOwnership(pattern2, tenantId);
       patterns.push({
         pattern: 'business_name_city',
         slug: pattern2,
-        isAvailable: ownership2.isAvailable,
-        isOwnSlug: ownership2.isOwnSlug,
+        ...(await this.evaluateSlugCandidate(pattern2, tenantId, namespace)),
         description: `${businessName} in ${location.city}`,
       });
     }
@@ -620,12 +638,10 @@ class SlugSingletonService extends UniversalSingleton {
     if (location.state) {
       const stateAbbr = this.getStateAbbreviation(location.state);
       const pattern3 = `${baseSlug}-${stateAbbr.toLowerCase()}`;
-      const ownership3 = await this.getSlugOwnership(pattern3, tenantId);
       patterns.push({
         pattern: 'business_name_state',
         slug: pattern3,
-        isAvailable: ownership3.isAvailable,
-        isOwnSlug: ownership3.isOwnSlug,
+        ...(await this.evaluateSlugCandidate(pattern3, tenantId, namespace)),
         description: `${businessName} in ${location.state}`,
       });
     }
@@ -634,12 +650,10 @@ class SlugSingletonService extends UniversalSingleton {
     if (location.city && location.state) {
       const stateAbbr = this.getStateAbbreviation(location.state);
       const pattern4 = `${baseSlug}-${slugify(location.city)}-${stateAbbr.toLowerCase()}`;
-      const ownership4 = await this.getSlugOwnership(pattern4, tenantId);
       patterns.push({
         pattern: 'business_name_city_state',
         slug: pattern4,
-        isAvailable: ownership4.isAvailable,
-        isOwnSlug: ownership4.isOwnSlug,
+        ...(await this.evaluateSlugCandidate(pattern4, tenantId, namespace)),
         description: `${businessName} in ${location.city}, ${location.state}`,
       });
     }
@@ -649,12 +663,10 @@ class SlugSingletonService extends UniversalSingleton {
       const stateAbbr = this.getStateAbbreviation(location.state);
       const countryAbbr = this.getCountryAbbreviation(location.country);
       const pattern5 = `${baseSlug}-${slugify(location.city)}-${stateAbbr.toLowerCase()}-${countryAbbr.toLowerCase()}`;
-      const ownership5 = await this.getSlugOwnership(pattern5, tenantId);
       patterns.push({
         pattern: 'business_name_city_state_country',
         slug: pattern5,
-        isAvailable: ownership5.isAvailable,
-        isOwnSlug: ownership5.isOwnSlug,
+        ...(await this.evaluateSlugCandidate(pattern5, tenantId, namespace)),
         description: `${businessName} in ${location.city}, ${location.state}, ${location.country}`,
       });
     }
@@ -663,16 +675,49 @@ class SlugSingletonService extends UniversalSingleton {
     if (tenantId) {
       const autoId = this.generateAutoId(tenantId);
       const pattern6 = `${baseSlug}-${autoId.toLowerCase()}`;
+      const evaluation6 = namespace === 'subdomain'
+        // The subdomain write path enforces format — an autoId suffix on a long
+        // base can still exceed the limit, so evaluate it honestly.
+        ? await this.evaluateSlugCandidate(pattern6, tenantId, namespace)
+        : { isAvailable: true, isOwnSlug: false };
       patterns.push({
         pattern: 'business_name_autoid',
         slug: pattern6,
-        isAvailable: true, // Always available with autoId
-        isOwnSlug: false, // New slug, not owned yet
+        ...evaluation6,
         description: `${businessName} (unique ID)`,
       });
     }
 
     return patterns;
+  }
+
+  /**
+   * Evaluate one picker candidate. 'directory' keeps the historical
+   * directory_settings_list-only availability check; 'subdomain' delegates to
+   * the shared subdomain helper (format + reserved + cross-namespace) so the
+   * picker can never offer a candidate PUT /tenants/:id/subdomain rejects.
+   * `isOwnSlug` always comes from the directory check — that is the table the
+   * badge has historically described.
+   */
+  private async evaluateSlugCandidate(
+    slug: string,
+    tenantId: string | undefined,
+    namespace: SlugNamespace
+  ): Promise<{ isAvailable: boolean; isOwnSlug: boolean; unavailableReason?: string }> {
+    const ownership = await this.getSlugOwnership(slug, tenantId);
+    if (namespace === 'directory') {
+      return {
+        isAvailable: ownership.isAvailable,
+        isOwnSlug: ownership.isOwnSlug,
+        unavailableReason: ownership.isAvailable ? undefined : 'subdomain_taken',
+      };
+    }
+    const availability = await checkSubdomainAvailability(slug, tenantId);
+    return {
+      isAvailable: availability.available,
+      isOwnSlug: ownership.isOwnSlug,
+      unavailableReason: availability.available ? undefined : availability.code,
+    };
   }
 
   /**
