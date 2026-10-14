@@ -107,3 +107,74 @@ export function managePathSuffix(pathname: string): string | null {
   if (pathname.startsWith('/manage/')) return pathname.slice('/manage'.length);
   return null;
 }
+
+/**
+ * Canonicalization of platform-internal /tenant/{id} paths on a tenant host
+ * (subdomain or custom domain). On a tenant host the storefront IS "/" —
+ * /tenant/{id} is the platform's internal path leaking into the tenant's URL
+ * space, and /tenant/{otherId} would serve a DIFFERENT tenant's storefront
+ * under this host (cross-tenant leak).
+ *
+ * Returns:
+ *  - { kind: 'self', path } — strip the prefix: /tenant/{id} → '/',
+ *    /tenant/{id}/policies/x → '/policies/x' (prefix roots only). The proxy
+ *    301s to it so the canonical URL is host-relative.
+ *  - { kind: 'foreign' } — another tenant's internal path; proxy redirects
+ *    to the platform origin's canonical /tenant/{otherId}.
+ *  - null — not a /tenant/ path, or a non-storefront subpath under the
+ *    resolved tenant (e.g. /tenant/{id}/junk) — left to pass through and
+ *    404 naturally in the app router.
+ */
+/**
+ * True when the hostname is a tenant storefront host — a platform subdomain
+ * or a tenant-owned custom domain. If a page renders on such a host it has
+ * already survived the proxy's resolve-or-404 gate, so the host IS a tenant
+ * host whenever this returns true.
+ */
+export function isTenantHostName(hostname: string): boolean {
+  const h = (hostname || '').split(':')[0].toLowerCase();
+  if (!h) return false;
+  return !!isPlatformSubdomain(h) || isCandidateCustomHost(h);
+}
+
+/**
+ * The storefront URL delegate — the single place that knows how a
+ * storefront-relative path maps to an href.
+ *
+ * `path` is the tenant-host-canonical form:
+ *   '' or '/'        → storefront home
+ *   '/policies/x'    → a storefront prefix-root page
+ *   '?category=x'    → storefront home with query
+ *
+ * On a tenant host the storefront IS the origin, so paths stay as-is.
+ * On the platform app they need the /tenant/{id} prefix.
+ */
+export function storefrontPath(tenantHost: boolean, tenantId: string, path = ''): string {
+  let p = path || '/';
+  if (p.startsWith('/?')) p = p.slice(1); // '/?q' → '?q'
+  if (tenantHost) {
+    if (p === '/' || p === '') return '/';
+    if (p.startsWith('?')) return `/${p}`;
+    return p.startsWith('/') ? p : `/${p}`;
+  }
+  const base = `/tenant/${tenantId}`;
+  if (p === '/' || p === '') return base;
+  if (p.startsWith('?')) return `${base}${p}`;
+  return `${base}${p.startsWith('/') ? '' : '/'}${p}`;
+}
+
+export type TenantHostCanonical =
+  | { kind: 'self'; path: string }
+  | { kind: 'foreign'; tenantId: string };
+
+export function tenantHostCanonicalPath(pathname: string, tenantId: string): TenantHostCanonical | null {
+  const m = pathname.match(/^\/tenant\/([^/]+)(\/.*)?$/);
+  if (!m) return null;
+  const [, pathTenantId, rest = ''] = m;
+  if (pathTenantId !== tenantId) return { kind: 'foreign', tenantId: pathTenantId };
+  if (rest === '' || rest === '/') return { kind: 'self', path: '/' };
+  if (STOREFRONT_PREFIX_ROOTS.some((r) => rest === r || rest.startsWith(`${r}/`))) {
+    return { kind: 'self', path: rest };
+  }
+  return null;
+}

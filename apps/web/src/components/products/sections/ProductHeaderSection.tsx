@@ -4,6 +4,7 @@ import Image from 'next/image';
 import DirectoryActions from '@/components/directory/DirectoryActions';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { SocialProofBadges } from '../type-sections/SocialProofBadges';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface ProductHeaderSectionProps {
   product: any;
@@ -26,6 +27,7 @@ export function ProductHeaderSection({
   storefrontType,
   socialCommerceFlags,
 }: ProductHeaderSectionProps) {
+  const sp = useStorefrontPath(product.tenantId);
   const isSocialStorefront = storefrontType === 'social';
   const showSocialProof = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseSocialProof) || isSocialStorefront;
   return (
@@ -73,7 +75,7 @@ export function ProductHeaderSection({
                 <a
                   title={`Browse to store's ${product.category.name} products`}
                   className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
-                  href={`/tenant/${product.tenantId}?category=${product.category.slug}`}
+                  href={sp(`/?category=${product.category.slug}`)}
                 >
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     {product.category.name}
@@ -119,7 +121,7 @@ export function ProductHeaderSection({
           <div className="hidden sm:flex justify-end mt-3">
             {tenantProfile?.slug && (
               <a
-                href={`/tenant/${product.tenantId}`}
+                href={sp('/')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

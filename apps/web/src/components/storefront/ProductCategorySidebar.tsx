@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface Category {
   id: string;
@@ -40,6 +41,7 @@ export default function ProductCategorySidebar({
 }: ProductCategorySidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
   const currentCategory = searchParams.get('category');
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -63,7 +65,7 @@ export default function ProductCategorySidebar({
       <nav className="space-y-1">
         {/* All Products */}
         <Link
-          href={`/tenant/${tenantId}`}
+          href={sp('/')}
           className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
             !currentCategory
               ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'
@@ -84,7 +86,7 @@ export default function ProductCategorySidebar({
         {visibleCategories.map((category) => (
           <Link
             key={category.id}
-            href={`/tenant/${tenantId}?category=${category.slug}`}
+            href={sp(`/?category=${category.slug}`)}
             className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
               currentCategory === category.slug
                 ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'

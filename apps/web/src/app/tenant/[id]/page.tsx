@@ -790,6 +790,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // console.log(`TenantStorefrontPage: storefrontOptionFlags ${JSON.stringify(storefrontOptionFlags)}`);
   // console.log(`TenantStorefrontPage: mapLocation ${JSON.stringify(mapLocation)}`);
 
+  // Storefront URL delegate context is mounted by this segment's layout.tsx —
+  // it covers this page plus /services and /policies/* subroutes.
+
   return (
     <ProductSingletonProvider>
       {tenant.isDemo && <DemoBanner expiresAt={tenant.demoExpiresAt} />}

@@ -10,6 +10,7 @@ import StickySearchBar from '@/app/tenant/[id]/layouts/shared/StickySearchBar';
 import TrustSignalsBar from '@/app/tenant/[id]/layouts/shared/TrustSignalsBar';
 import { StorefrontLayoutKey } from '@/app/products/[id]/layouts/types';
 import DemoBadge from '@/components/shared/DemoBadge';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface StorefrontHeaderProps {
   tenantId: string;
@@ -381,6 +382,7 @@ function ImmersiveHeader({
 }: Pick<StorefrontHeaderProps, 'tenantId' | 'tenant' | 'businessName' | 'logoUrl' | 'storefrontStatus' | 'cartTotalItems' | 'handleViewCart' | 'showsHoursStatus' | 'hoursStatus' | 'showsAnimatedHours' | 'primaryColor' | 'shippingText'>) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sp = useStorefrontPath(tenantId);
 
   React.useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 8);
@@ -397,7 +399,7 @@ function ImmersiveHeader({
     }`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
         <div className="flex items-center justify-between h-14 gap-3">
-          <Link href={`/tenant/${tenantId}`} className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
+          <Link href={sp('/')} className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
             {logoUrl ? (
               <div className="relative w-8 h-8 flex-shrink-0">
                 <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" sizes="32px" />

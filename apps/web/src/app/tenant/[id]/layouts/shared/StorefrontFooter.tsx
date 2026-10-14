@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontPolicyService } from '@/services/PublicStorefrontPolicyService';
+import { platformOrigin } from '@/lib/storefront-routing';
+import { useStorefrontPath, useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface SocialLink {
   platform: string;
@@ -103,6 +105,15 @@ export default function StorefrontFooter({
   const platformName = platformSettings?.platformName || 'VisibleShelf';
   const platformLogo = platformSettings?.logoUrl;
   const removeBranding = features?.removePlatformBranding ?? false;
+  // Platform-surface links (directory, shops, branding, CCPA) must be absolute
+  // to the platform origin — on a tenant's custom domain a relative link
+  // resolves to the merchant's host, where these routes either serve
+  // platform content under the wrong domain or loop back to the storefront.
+  const platformBase = platformOrigin();
+  // Storefront URL delegate — tenant policies live at /policies/* on tenant
+  // hosts and /tenant/{id}/policies/* on the platform app.
+  const sp = useStorefrontPath(tenantId);
+  const storefrontUrl = useStorefrontUrl(tenantId);
 
   // Fetch policies if not passed as prop
   const [policies, setPolicies] = useState(storefrontPolicies);
@@ -148,39 +159,39 @@ export default function StorefrontFooter({
                 {directoryPublished && tenantSlug && isRetailStore && (
                   <>
                     <li>
-                      <Link href={`/directory/${tenantSlug}?source=storefront`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                      <Link href={`${platformBase}/directory/${tenantSlug}?source=storefront`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                         Directory
                       </Link>
                     </li>
                     <li>
-                      <Link href={`/shops/${tenantSlug}`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                      <Link href={`${platformBase}/shops/${tenantSlug}`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                         Shop
                       </Link>
                     </li>
                   </>
                 )}
                 <li>
-                  <Link href="/directory" className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                  <Link href={`${platformBase}/directory`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                     Browse Directory
                   </Link>
                 </li>
                 {policies?.return_policy && (
-                  <li><Link href={`/tenant/${tenantId}/policies/return_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Returns</Link></li>
+                  <li><Link href={sp('/policies/return_policy')} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Returns</Link></li>
                 )}
                 {policies?.shipping_policy && (
-                  <li><Link href={`/tenant/${tenantId}/policies/shipping_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Shipping</Link></li>
+                  <li><Link href={sp('/policies/shipping_policy')} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Shipping</Link></li>
                 )}
                 {policies?.privacy_policy && (
-                  <li><Link href={`/tenant/${tenantId}/policies/privacy_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Privacy</Link></li>
+                  <li><Link href={sp('/policies/privacy_policy')} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Privacy</Link></li>
                 )}
                 {policies?.terms_of_service && (
-                  <li><Link href={`/tenant/${tenantId}/policies/terms_of_service`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Terms</Link></li>
+                  <li><Link href={sp('/policies/terms_of_service')} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Terms</Link></li>
                 )}
                 {policies?.refund_policy && (
-                  <li><Link href={`/tenant/${tenantId}/policies/refund_policy`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Refunds</Link></li>
+                  <li><Link href={sp('/policies/refund_policy')} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">Refunds</Link></li>
                 )}
                 <li>
-                  <Link href="/privacy/ccpa" className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                  <Link href={`${platformBase}/privacy/ccpa`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                     Do Not Sell My Info
                   </Link>
                 </li>
@@ -230,7 +241,7 @@ export default function StorefrontFooter({
               <div className="mt-4 flex flex-col items-start sm:items-end">
                 <h4 className="font-semibold text-white mb-2 text-sm">Share This Store</h4>
                 <TenantQRCode
-                  url={currentUrl || `/tenant/${tenantId}`}
+                  url={currentUrl || storefrontUrl('')}
                   tenantId={tenantId}
                   label="Scan to Share"
                   downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
@@ -247,7 +258,7 @@ export default function StorefrontFooter({
           {/* Platform branding */}
           {!removeBranding && (
             <div className="mt-6 pt-6 border-t border-neutral-700 dark:border-neutral-800 text-center text-xs text-neutral-400 dark:text-neutral-500">
-              <Link href="/" title={platformName} className="no-underline">
+              <Link href={`${platformBase}/`} title={platformName} className="no-underline">
                 <div className="flex items-center justify-center gap-2">
                   <span>Powered by</span>
                   {platformLogo && (
@@ -305,44 +316,44 @@ export default function StorefrontFooter({
               {directoryPublished && tenantSlug && isRetailStore && (
                 <>
                   <li>
-                    <Link href={`/directory/${tenantSlug}?source=storefront`} className="text-neutral-400 hover:text-white transition-colors">
+                    <Link href={`${platformBase}/directory/${tenantSlug}?source=storefront`} className="text-neutral-400 hover:text-white transition-colors">
                       Directory
                     </Link>
                   </li>
                   <li>
-                    <Link href={`/shops/${tenantSlug}`} className="text-neutral-400 hover:text-white transition-colors">
+                    <Link href={`${platformBase}/shops/${tenantSlug}`} className="text-neutral-400 hover:text-white transition-colors">
                       Shop
                     </Link>
                   </li>
                 </>
               )}
               <li>
-                <Link href="/directory" className="text-neutral-400 hover:text-white transition-colors">
+                <Link href={`${platformBase}/directory`} className="text-neutral-400 hover:text-white transition-colors">
                   Browse Directory
                 </Link>
               </li>
               <li>
-                <Link href="/shops" className="text-neutral-400 hover:text-white transition-colors">
+                <Link href={`${platformBase}/shops`} className="text-neutral-400 hover:text-white transition-colors">
                   Browse Shops
                 </Link>
               </li>
               {policies?.return_policy && (
-                <li><Link href={`/tenant/${tenantId}/policies/return_policy`} className="text-neutral-400 hover:text-white transition-colors">Return Policy</Link></li>
+                <li><Link href={sp('/policies/return_policy')} className="text-neutral-400 hover:text-white transition-colors">Return Policy</Link></li>
               )}
               {policies?.shipping_policy && (
-                <li><Link href={`/tenant/${tenantId}/policies/shipping_policy`} className="text-neutral-400 hover:text-white transition-colors">Shipping Policy</Link></li>
+                <li><Link href={sp('/policies/shipping_policy')} className="text-neutral-400 hover:text-white transition-colors">Shipping Policy</Link></li>
               )}
               {policies?.refund_policy && (
-                <li><Link href={`/tenant/${tenantId}/policies/refund_policy`} className="text-neutral-400 hover:text-white transition-colors">Refund Policy</Link></li>
+                <li><Link href={sp('/policies/refund_policy')} className="text-neutral-400 hover:text-white transition-colors">Refund Policy</Link></li>
               )}
               {policies?.privacy_policy && (
-                <li><Link href={`/tenant/${tenantId}/policies/privacy_policy`} className="text-neutral-400 hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link href={sp('/policies/privacy_policy')} className="text-neutral-400 hover:text-white transition-colors">Privacy Policy</Link></li>
               )}
               {policies?.terms_of_service && (
-                <li><Link href={`/tenant/${tenantId}/policies/terms_of_service`} className="text-neutral-400 hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link href={sp('/policies/terms_of_service')} className="text-neutral-400 hover:text-white transition-colors">Terms of Service</Link></li>
               )}
               <li>
-                <Link href="/privacy/ccpa" className="text-neutral-400 hover:text-white transition-colors">
+                <Link href={`${platformBase}/privacy/ccpa`} className="text-neutral-400 hover:text-white transition-colors">
                   Do Not Sell My Info
                 </Link>
               </li>
@@ -399,7 +410,7 @@ export default function StorefrontFooter({
           <div className="flex flex-col items-start lg:items-center">
             <h4 className="font-semibold text-white mb-4">Share This Store</h4>
             <TenantQRCode
-              url={currentUrl || `/tenant/${tenantId}`}
+              url={currentUrl || storefrontUrl('')}
               tenantId={tenantId}
               label="Scan to Share"
               downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
@@ -415,7 +426,7 @@ export default function StorefrontFooter({
         {/* Platform branding */}
         {!removeBranding && (
           <div className="mt-10 pt-8 border-t border-neutral-800 text-center text-sm text-neutral-500">
-            <Link href="/" title={platformName} style={{ textDecoration: 'none' }}>
+            <Link href={`${platformBase}/`} title={platformName} style={{ textDecoration: 'none' }}>
               <div className="flex items-center justify-center gap-2">
                 <span>Powered by</span>
                 {platformLogo && (

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
 import StorefrontBadgeFilter from '@/components/storefront/StorefrontBadgeFilter';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface CollapsibleCatalogSidebarProps {
   tenantId: string;
@@ -40,6 +41,7 @@ export default function CollapsibleCatalogSidebar({
   const [isCollapsed, setIsCollapsed] = useState(true); // Default to collapsed
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
 
   // Handle view mode change with anchoring
   const handleViewModeChange = (newView: string) => {
@@ -47,7 +49,7 @@ export default function CollapsibleCatalogSidebar({
     params.set('view', newView);
     
     // Navigate to the same page with new view parameter and anchor
-    const newUrl = `/tenant/${tenantId}?${params.toString()}#catalog-banner`;
+    const newUrl = sp(`/?${params.toString()}#catalog-banner`);
     router.push(newUrl);
   };
 
@@ -67,7 +69,7 @@ export default function CollapsibleCatalogSidebar({
         break;
     }
     
-    const newUrl = `/tenant/${tenantId}?${params.toString()}#catalog-banner`;
+    const newUrl = sp(`/?${params.toString()}#catalog-banner`);
     router.push(newUrl);
   };
 
@@ -77,7 +79,7 @@ export default function CollapsibleCatalogSidebar({
     const params = new URLSearchParams(searchParams.toString());
     params.delete('featured');
     
-    const newUrl = `/tenant/${tenantId}?${params.toString()}`;
+    const newUrl = sp(`/?${params.toString()}`);
     router.push(newUrl);
     
     // Scroll to the featured section after navigation

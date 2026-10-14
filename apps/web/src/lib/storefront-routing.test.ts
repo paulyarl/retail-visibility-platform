@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix } from './storefront-routing';
+import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, tenantHostCanonicalPath, isTenantHostName, storefrontPath } from './storefront-routing';
 
 describe('isPlatformSubdomain', () => {
   it('detects tenant subdomains on platform domains', () => {
@@ -106,5 +106,87 @@ describe('managePathSuffix (D13 workspace entry)', () => {
     expect(managePathSuffix('/manage-extra')).toBeNull();
     expect(managePathSuffix('/admin')).toBeNull();
     expect(managePathSuffix('/products/1')).toBeNull();
+  });
+});
+
+describe('tenantHostCanonicalPath (custom-domain canonicalization)', () => {
+  const TID = 'tid-8622qs2t';
+
+  // On a tenant host "/" IS the storefront — the platform-internal
+  // /tenant/{id} must canonicalize to host-relative paths.
+  it.each([
+    ['/tenant/tid-8622qs2t', '/'],
+    ['/tenant/tid-8622qs2t/', '/'],
+    ['/tenant/tid-8622qs2t/policies', '/policies'],
+    ['/tenant/tid-8622qs2t/policies/return_policy', '/policies/return_policy'],
+    ['/tenant/tid-8622qs2t/services', '/services'],
+    ['/tenant/tid-8622qs2t/services/delivery', '/services/delivery'],
+  ])('maps %s → %s for the resolved tenant', (input, expected) => {
+    expect(tenantHostCanonicalPath(input, TID)).toEqual({ kind: 'self', path: expected });
+  });
+
+  // Cross-tenant leak: a different tenant's internal path on this host must
+  // bounce to the platform origin, not render under this domain.
+  it('flags foreign tenant paths', () => {
+    expect(tenantHostCanonicalPath('/tenant/tid-r6cccpag', TID)).toEqual({ kind: 'foreign', tenantId: 'tid-r6cccpag' });
+    expect(tenantHostCanonicalPath('/tenant/tid-r6cccpag/policies/privacy_policy', TID)).toEqual({ kind: 'foreign', tenantId: 'tid-r6cccpag' });
+  });
+
+  it('passes through unknown subpaths of the resolved tenant (app 404s)', () => {
+    expect(tenantHostCanonicalPath('/tenant/tid-8622qs2t/junk', TID)).toBeNull();
+    expect(tenantHostCanonicalPath('/tenant/tid-8622qs2t/cart', TID)).toBeNull();
+  });
+
+  it('ignores non-/tenant paths and bare /tenant/', () => {
+    expect(tenantHostCanonicalPath('/', TID)).toBeNull();
+    expect(tenantHostCanonicalPath('/products/p1', TID)).toBeNull();
+    expect(tenantHostCanonicalPath('/tenant', TID)).toBeNull();
+    expect(tenantHostCanonicalPath('/tenant/', TID)).toBeNull();
+  });
+});
+
+describe('isTenantHostName (storefront URL delegate)', () => {
+  it.each(['ivoire.visibleshelf.com', 'ivoire.visibleshelf.store', 'placeshelf.store', 'www.placeshelf.store', 'dev.localhost'])(
+    'accepts tenant host %s',
+    (host) => expect(isTenantHostName(host)).toBe(true),
+  );
+
+  it.each(['visibleshelf.com', 'www.visibleshelf.com', 'visibleshelf.store', 'localhost', '127.0.0.1', 'rvp-web.vercel.app', ''])(
+    'rejects platform/non-tenant host %s',
+    (host) => expect(isTenantHostName(host)).toBe(false),
+  );
+
+  it('strips ports before classifying', () => {
+    expect(isTenantHostName('dev.localhost:3000')).toBe(true);
+    expect(isTenantHostName('localhost:3000')).toBe(false);
+  });
+});
+
+describe('storefrontPath (URL delegate mapping)', () => {
+  const TID = 'tid-8622qs2t';
+
+  it('emits host-relative paths on a tenant host', () => {
+    expect(storefrontPath(true, TID, '/')).toBe('/');
+    expect(storefrontPath(true, TID, '')).toBe('/');
+    expect(storefrontPath(true, TID, '/policies/return_policy')).toBe('/policies/return_policy');
+    expect(storefrontPath(true, TID, '/services')).toBe('/services');
+  });
+
+  it('emits /tenant/{id}-prefixed paths on the platform app', () => {
+    expect(storefrontPath(false, TID, '/')).toBe(`/tenant/${TID}`);
+    expect(storefrontPath(false, TID, '')).toBe(`/tenant/${TID}`);
+    expect(storefrontPath(false, TID, '/policies/return_policy')).toBe(`/tenant/${TID}/policies/return_policy`);
+  });
+
+  it('preserves query strings and hashes on both surfaces', () => {
+    expect(storefrontPath(true, TID, '?category=books')).toBe('/?category=books');
+    expect(storefrontPath(true, TID, '/?category=books')).toBe('/?category=books');
+    expect(storefrontPath(true, TID, '/?x=1#catalog')).toBe('/?x=1#catalog');
+    expect(storefrontPath(false, TID, '?category=books')).toBe(`/tenant/${TID}?category=books`);
+    expect(storefrontPath(false, TID, '/?category=books')).toBe(`/tenant/${TID}?category=books`);
+  });
+
+  it('accepts a slug as the tenant key for platform paths', () => {
+    expect(storefrontPath(false, 'ivoire-market', '/')).toBe('/tenant/ivoire-market');
   });
 });

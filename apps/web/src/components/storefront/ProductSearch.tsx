@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface ProductSearchProps {
   tenantId: string;
@@ -21,6 +22,7 @@ export default function ProductSearch({
 }: ProductSearchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
   const [isPending, startTransition] = useTransition();
   const [searchValue, setSearchValue] = useState(searchParams.get('search') || '');
 
@@ -36,7 +38,7 @@ export default function ProductSearch({
     }
 
     startTransition(() => {
-      router.push(`/tenant/${tenantId}?${params.toString()}`);
+      router.push(sp(`/?${params.toString()}`));
     });
   };
 
@@ -47,7 +49,7 @@ export default function ProductSearch({
     params.delete('page');
 
     startTransition(() => {
-      router.push(`/tenant/${tenantId}?${params.toString()}`);
+      router.push(sp(`/?${params.toString()}`));
     });
   };
 

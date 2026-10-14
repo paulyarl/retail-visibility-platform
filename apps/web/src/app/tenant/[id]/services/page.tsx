@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import type { Metadata } from 'next';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
@@ -11,6 +12,7 @@ import { StorefrontHeader } from '@/components/storefront/sections/StorefrontHea
 import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { clientLogger } from '@/lib/client-logger';
+import { isTenantHostName, platformOrigin, storefrontPath } from '@/lib/storefront-routing';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -87,6 +89,15 @@ export default async function TenantServicesPage({ params }: ServicesPageProps) 
   const businessName = tenant?.metadata?.businessName || tenant?.name || 'Store';
   const tenantSlug = tenant?.slug || id;
 
+  // Storefront URL delegate (server-side form — this is a server component):
+  // host-relative paths on tenant hosts, /tenant/{id}-prefixed on the app.
+  const reqHost = ((await headers()).get('x-forwarded-host') ?? (await headers()).get('host') ?? '').split(':')[0];
+  const tenantHost = isTenantHostName(reqHost);
+  const sp = (p: string) => storefrontPath(tenantHost, id, p);
+  const storefrontOrigin = tenantHost
+    ? `${reqHost.includes('localhost') ? 'http' : 'https'}://${reqHost}`
+    : platformOrigin();
+
   const showServices = !!(productOptionFlags?.merchantPreferences?.product_service_enabled);
 
   if (services.length === 0) {
@@ -98,7 +109,7 @@ export default async function TenantServicesPage({ params }: ServicesPageProps) 
             {businessName} doesn&apos;t have any service offerings available at this time.
           </p>
           <a
-            href={`/tenant/${id}`}
+            href={sp('/')}
             className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors"
           >
             Back to Store
@@ -134,7 +145,7 @@ export default async function TenantServicesPage({ params }: ServicesPageProps) 
           showsSocialMedia={true}
           cartTotalItems={0}
           handleViewCart={() => {}}
-          currentUrl={`/tenant/${id}/services`}
+          currentUrl={`${storefrontOrigin}${sp('/services')}`}
         />
 
         <ServiceSection
@@ -150,7 +161,7 @@ export default async function TenantServicesPage({ params }: ServicesPageProps) 
         <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
             <a
-              href={`/tenant/${id}`}
+              href={sp('/')}
               className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
             >
               ← Back to {businessName}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FeaturedBucket from './FeaturedBucket';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface FeaturedBucketsShowcaseProps {
   featuredData: Record<string, any> & {
@@ -47,6 +48,7 @@ export default function FeaturedBucketsShowcase({
   allowedFeaturedTypes,
 }: FeaturedBucketsShowcaseProps) {
   const [activeTab, setActiveTab] = useState(0);
+  const sp = useStorefrontPath(tenantId);
   if (!featuredData) {
     return null;
   }
@@ -252,7 +254,7 @@ export default function FeaturedBucketsShowcase({
               </div>
               {bucket.totalCount > 3 && (
                 <a
-                  href={`/tenant/${tenantId}?featured=${bucket.bucketType}&products_only=true`}
+                  href={sp(`/?featured=${bucket.bucketType}&products_only=true`)}
                   className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                 >
                   View All →

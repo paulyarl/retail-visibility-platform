@@ -41,6 +41,7 @@ import {
 } from '@tabler/icons-react';
 import { locationAvailabilityService, LocationAvailability, MultiLocationAvailability } from '@/services/LocationAvailabilityService';
 import { clientLogger } from '@/lib/client-logger';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 interface LocationAvailabilitySectionProps {
   productSlug: string;
@@ -325,12 +326,13 @@ interface LocationCardProps {
  * Generate storefront URL - uses tenantId as primary, slug as fallback
  */
 function getStorefrontUrl(tenantId: string, tenantSlug?: string): string {
-  // Primary: use tenantId
-  // Secondary: use slug if available
+  // These are cross-tenant discovery links (a location card can name a
+  // different store), so they always resolve on the platform origin —
+  // never host-relative on a tenant's custom domain.
   if (tenantSlug) {
-    return `/directory/${tenantSlug}?source=storefront`;
+    return `${platformOrigin()}/directory/${tenantSlug}?source=storefront`;
   }
-  return `/tenant/${tenantId}`;
+  return `${platformOrigin()}/tenant/${tenantId}`;
 }
 
 function LocationCard({

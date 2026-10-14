@@ -17,6 +17,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { StorefrontLayoutKey } from '@/app/products/[id]/layouts/types';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { SocialShareButtons } from '@/components/storefront/SocialShareButtons';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 
 interface ProductSectionProps {
@@ -123,6 +124,7 @@ function ClassicProductSection({
   isSocialStore,
   socialCommerceFlags,
 }: ProductSectionProps) {
+  const sp = useStorefrontPath(tenantId);
   const showShareButtons = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseShareButtons) && isSocialStore;
   return (
     <>
@@ -275,7 +277,7 @@ function ClassicProductSection({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {featured && (
             <div className="flex items-center gap-3 mb-6">
-              <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+              <Link href={sp('/')} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
               <span className="text-neutral-300 dark:text-neutral-600">|</span>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
                 {featured === 'true' || featured === '1' ? 'All Featured Products' : 'Featured'}
@@ -347,6 +349,7 @@ function EditorialProductSection({
 }: ProductSectionProps) {
   const collectionRef = useRef<HTMLDivElement>(null);
   const scrollToCollection = () => collectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const sp = useStorefrontPath(tenantId);
   const showShareButtons = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseShareButtons) && isSocialStore;
 
   const spotlightProducts = useMemo(() => {
@@ -445,9 +448,9 @@ function EditorialProductSection({
             {showsCategoryProduct && categories.length > 0 && (
               <div className="mb-8">
                 <div className="hidden sm:flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                  <a href={`/tenant/${tenantId}`} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${!category ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700'}`}>All</a>
+                  <a href={sp('/')} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${!category ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700'}`}>All</a>
                   {categories.map((cat: any) => (
-                    <a key={cat.id || cat.slug} href={getCategoryUrl(cat, `/tenant/${tenantId}`)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${category === cat.slug ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700'}`}>
+                    <a key={cat.id || cat.slug} href={getCategoryUrl(cat, sp('/'))} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${category === cat.slug ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700'}`}>
                       {cat.name}
                       {cat.productCount != null && <span className="ml-1.5 text-neutral-400 dark:text-neutral-500">({cat.productCount})</span>}
                     </a>
@@ -501,7 +504,7 @@ function EditorialProductSection({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             {featured && (
               <div className="flex items-center gap-3 mb-6">
-                <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+                <Link href={sp('/')} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
                 <span className="text-neutral-300 dark:text-neutral-600">|</span>
                 <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">{featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}</h1>
               </div>
@@ -575,6 +578,7 @@ function ImmersiveProductSection({
 }: ProductSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
   const showShareButtons = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseShareButtons) && isSocialStore;
 
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'name'>('featured');
@@ -608,13 +612,13 @@ function ImmersiveProductSection({
     const params = new URLSearchParams(searchParams.toString());
     if (slug) { params.set('category', slug); } else { params.delete('category'); }
     params.delete('page');
-    router.push(`/tenant/${tenantId}?${params.toString()}`);
+    router.push(sp(`/?${params.toString()}`));
   };
 
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());
     if (page > 1) { params.set('page', String(page)); } else { params.delete('page'); }
-    router.push(`/tenant/${tenantId}?${params.toString()}`);
+    router.push(sp(`/?${params.toString()}`));
   };
 
   return (
@@ -625,7 +629,7 @@ function ImmersiveProductSection({
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-white uppercase tracking-wide">Trending Now</h2>
-              <Link href={`/tenant/${tenantId}?featured=true&products_only=true`} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
+              <Link href={sp('/?featured=true&products_only=true')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
             </div>
             <EnhancedProductDisplay
               products={heroProducts as any}
@@ -690,7 +694,7 @@ function ImmersiveProductSection({
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
         {isProductsOnly && featured && (
           <div className="flex items-center gap-3 mb-4">
-            <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+            <Link href={sp('/')} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
             <span className="text-neutral-300 dark:text-neutral-600">|</span>
             <h1 className="text-lg font-semibold text-neutral-900 dark:text-white">{featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}</h1>
           </div>
@@ -715,7 +719,7 @@ function ImmersiveProductSection({
                 onClick={() => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.delete('search');
-                  router.push(`/tenant/${tenantId}?${params.toString()}`);
+                  router.push(sp(`/?${params.toString()}`));
                 }}
                 className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
               >

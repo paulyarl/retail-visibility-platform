@@ -6,6 +6,7 @@ import { BookOpen, MessageSquare, ShoppingCart } from 'lucide-react';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import ProductActions from './ProductActions';
 import { PublicTenantInfo } from '@/services/TenantPublicService';
+import { useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface StorefrontActionsProps {
   tenantId: string;
@@ -21,6 +22,7 @@ interface StorefrontActionsProps {
 export default function StorefrontActions({ tenantId, businessName, tenantSlug, subscriptionStatus, directoryPublished, tenant }: StorefrontActionsProps) {
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
+  const sUrl = useStorefrontUrl(tenantId);
 
   const handleReview = () => {
     const reviewsSection = document.getElementById('storefront-reviews-section');
@@ -87,7 +89,7 @@ export default function StorefrontActions({ tenantId, businessName, tenantSlug, 
           tenantId,
         }}
         tenant={tenant || {} as PublicTenantInfo}
-        productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/tenant/${tenantId}`}
+        productUrl={sUrl('')}
         variant="storefront"
       />
     </div>

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ChevronLeft, ShoppingCart } from 'lucide-react';
 import { useProductLayoutState } from './layouts/hooks/useProductLayoutState';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 import { ProductBreadcrumb } from './layouts/shared/ProductBreadcrumb';
 import { ProductGalleryPanel } from '@/components/products/sections/ProductGalleryPanel';
 import { ProductBottomSections } from '@/components/products/sections/ProductBottomSections';
@@ -47,6 +48,7 @@ export default function ProductDigitalLayout({
   funnelPreview,
 }: ProductDigitalLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl, productOptFlags });
+  const sp = useStorefrontPath(product.tenantId);
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(product.tenantId, 'product', { productId: product.id });
@@ -60,7 +62,7 @@ export default function ProductDigitalLayout({
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 h-12 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Link
-              href={`/tenant/${product.tenantId}`}
+              href={sp('/')}
               className="flex-shrink-0 p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               aria-label="Back to store"
             >
@@ -71,13 +73,13 @@ export default function ProductDigitalLayout({
                 <Image src={s.storeLogoUrl} alt={s.displayName || ''} fill className="object-contain rounded" sizes="28px" />
               </div>
             )}
-            <Link href={`/tenant/${product.tenantId}`} className="text-sm font-medium text-neutral-900 dark:text-white truncate hover:underline">
+            <Link href={sp('/')} className="text-sm font-medium text-neutral-900 dark:text-white truncate hover:underline">
               {s.displayName || tenant.name || 'Store'}
             </Link>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             <Link
-              href={`/tenant/${product.tenantId}?search=`}
+              href={sp('/?search=')}
               className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               aria-label="Search"
             >

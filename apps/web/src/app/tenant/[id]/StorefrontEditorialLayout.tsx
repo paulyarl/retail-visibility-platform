@@ -28,6 +28,7 @@ import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 
 // Status panel
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 // Shared
@@ -170,7 +171,11 @@ export default function StorefrontEditorialLayout({
     initialProductOptionFlags,
     initialSocialCommerceFlags,
   });
-  
+
+  // Storefront URL delegate — host-relative on tenant hosts, /tenant/{id}
+  // prefixed on the platform app.
+  const sp = useStorefrontPath(tenantId);
+
   // DEBUG
   // console.log(`StorefrontEditorialLayout: hoursStatus ${JSON.stringify(hoursStatus)}`);
   // console.log(`StorefrontEditorialLayout: logoUrl ${JSON.stringify(logoUrl)}`);
@@ -622,7 +627,7 @@ export default function StorefrontEditorialLayout({
                 {/* Desktop: horizontal pills */}
                 <div className="hidden sm:flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
                   <a
-                    href={`/tenant/${tenantId}`}
+                    href={sp('/')}
                     className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                       !category
                         ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
@@ -634,7 +639,7 @@ export default function StorefrontEditorialLayout({
                   {categories.map((cat: any) => (
                     <a
                       key={cat.id || cat.slug}
-                      href={getCategoryUrl(cat, `/tenant/${tenantId}`)}
+                      href={getCategoryUrl(cat, sp('/'))}
                       className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                         category === cat.slug
                           ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
@@ -721,7 +726,7 @@ export default function StorefrontEditorialLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             {featured && (
               <div className="flex items-center gap-3 mb-6">
-                <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+                <Link href={sp('/')} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
                 <span className="text-neutral-300 dark:text-neutral-600">|</span>
                 <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
                   {featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}

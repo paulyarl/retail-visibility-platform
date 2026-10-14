@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import SmartProductCard from '@/components/products/SmartProductCard';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface FeaturedBucketProps {
   title: string;
@@ -41,6 +42,7 @@ export default function FeaturedBucket({
   allowedFeaturedTypes,
 }: FeaturedBucketProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const sp = useStorefrontPath(tenantId);
   const productsPerPage = initialLimit;
   
   // Calculate pagination
@@ -85,7 +87,7 @@ export default function FeaturedBucket({
         {/* View More Link */}
         {totalCount > productsPerPage && (
           <a
-            href={`/tenant/${tenantId}?featured=${bucketType}&products_only=true`}
+            href={sp(`/?featured=${bucketType}&products_only=true`)}
             className="text-blue-600 hover:text-blue-700 font-medium text-sm"
           >
             View All →

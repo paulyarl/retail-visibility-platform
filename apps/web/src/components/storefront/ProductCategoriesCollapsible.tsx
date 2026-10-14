@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useStorefrontPath } from "@/components/storefront/StorefrontUrlContext";
 
 interface Category {
   id: string;
@@ -25,6 +26,7 @@ export default function ProductCategoriesCollapsible({
   totalProducts,
 }: ProductCategoriesCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const sp = useStorefrontPath(tenantId);
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden mb-6">
@@ -54,7 +56,7 @@ export default function ProductCategoriesCollapsible({
           <div className="pt-4 space-y-1">
             {/* All Products */}
             <Link
-              href={`/tenant/${tenantId}`}
+              href={sp('/')}
               className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
             >
               <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -69,7 +71,7 @@ export default function ProductCategoriesCollapsible({
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/tenant/${tenantId}?category=${category.slug}`}
+                href={sp(`/?category=${category.slug}`)}
                 className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
               >
                 <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 truncate flex-1 mr-2">

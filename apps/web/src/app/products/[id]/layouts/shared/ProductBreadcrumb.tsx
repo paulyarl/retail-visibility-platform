@@ -12,6 +12,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { SafeImage } from '@/components/SafeImage';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 export interface ProductBreadcrumbProps {
   storeName: string;
@@ -36,9 +37,11 @@ export function ProductBreadcrumb({
   variant = 'default',
 }: ProductBreadcrumbProps) {
   const isCompact = variant === 'compact';
-  const storeHref = `/tenant/${tenantSlug || tenantId}`;
+  // Prefer the slug for the platform-prefixed path — prettier public URL.
+  const sp = useStorefrontPath(tenantSlug || tenantId);
+  const storeHref = sp('/');
   const categoryHref = categorySlug
-    ? `${storeHref}?category=${categorySlug}`
+    ? sp(`/?category=${categorySlug}`)
     : undefined;
 
   // Truncate product title on mobile

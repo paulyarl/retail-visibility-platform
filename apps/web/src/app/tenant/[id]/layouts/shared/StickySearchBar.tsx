@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface StickySearchBarProps {
   tenantId: string;
@@ -27,6 +28,7 @@ export default function StickySearchBar({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [searchValue, setSearchValue] = useState(searchParams.get('search') || '');
+  const sp = useStorefrontPath(tenantId);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +42,7 @@ export default function StickySearchBar({
     }
 
     startTransition(() => {
-      router.push(`/tenant/${tenantId}?${params.toString()}`);
+      router.push(sp(`?${params.toString()}`));
     });
   };
 
@@ -51,7 +53,7 @@ export default function StickySearchBar({
     params.delete('page');
 
     startTransition(() => {
-      router.push(`/tenant/${tenantId}?${params.toString()}`);
+      router.push(sp(`?${params.toString()}`));
     });
   };
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface Category {
   id: string;
@@ -21,6 +22,7 @@ interface StoreCategorySidebarProps {
 export default function StoreCategorySidebar({ tenantId, categories, totalProducts }: StoreCategorySidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
   const currentCategory = searchParams.get('category');
 
   // Sort categories: primary first, then secondary alphabetically
@@ -50,7 +52,7 @@ export default function StoreCategorySidebar({ tenantId, categories, totalProduc
       <nav className="space-y-1">
         {/* All Products */}
         <Link
-          href={`/tenant/${tenantId}`}
+          href={sp('/')}
           className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
             !currentCategory
               ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'
@@ -71,7 +73,7 @@ export default function StoreCategorySidebar({ tenantId, categories, totalProduc
         {sortedCategories.map((category) => (
           <Link
             key={category.id}
-            href={`/tenant/${tenantId}?category=${category.slug}`}
+            href={sp(`/?category=${category.slug}`)}
             className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
               currentCategory === category.slug
                 ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'

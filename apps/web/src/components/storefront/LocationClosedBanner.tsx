@@ -1,5 +1,7 @@
 'use client';
 
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
+
 interface LocationClosedBannerProps {
   title: string;
   message: string;
@@ -13,6 +15,7 @@ export default function LocationClosedBanner({
   tenantId, 
   businessName 
 }: LocationClosedBannerProps) {
+  const sp = useStorefrontPath(tenantId);
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full bg-white dark:bg-neutral-800 rounded-lg shadow-lg p-8">
@@ -68,7 +71,7 @@ export default function LocationClosedBanner({
               Browse Other Stores
             </a>
             <a
-              href={`/tenant/${tenantId}`}
+              href={sp('/')}
               className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
             >
               Try Again

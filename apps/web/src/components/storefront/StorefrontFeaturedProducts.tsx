@@ -9,6 +9,7 @@ import { storefrontSingletonService } from '@/services/StorefrontSingletonServic
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { usePublicFeaturedOptionsCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface FeaturedProduct {
   id: string;
@@ -353,6 +354,7 @@ interface FeaturedSectionWithProductsProps {
 }
 
 function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, defaultGatewayType, instanceId = 'default', allowedFeaturedTypes }: FeaturedSectionWithProductsProps) {
+  const sp = useStorefrontPath(tenantId);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
   const contextPayment = useTenantPaymentOptional();
@@ -442,7 +444,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
               </Button>
             </div>
             <Link
-              href={`/tenant/${tenantId}?view=grid&featured=${type}&products_only=true`}
+              href={sp(`/?view=grid&featured=${type}&products_only=true`)}
               className={`px-4 py-2 rounded-lg text-white font-medium ${config.buttonColor} transition-colors`}
             >
               View All

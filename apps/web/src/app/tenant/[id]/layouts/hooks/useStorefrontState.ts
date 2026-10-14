@@ -25,6 +25,7 @@ import { usePublicFeaturedOptionsCapability } from '@/hooks/tenant-access/usePub
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
 import { clientLogger } from '@/lib/client-logger';
+import { useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 export interface SocialCommerceFlags {
   enabled?: boolean;
@@ -101,13 +102,10 @@ export function useStorefrontState({
     null;
 
   // ---- Resolved URL ----
-  const baseUrl =
-    process.env.NEXT_PUBLIC_WEB_URL ||
-    (typeof window !== 'undefined'
-      ? window.location.origin
-      : process.env.WEB_URL) ||
-    'http://localhost:3000';
-  const currentUrl = `${baseUrl}/tenant/${tenantId}`;
+  // Via the storefront URL delegate: on a tenant host the share URL is the
+  // domain root ('/'), never the platform-internal /tenant/{id} path.
+  const storefrontUrl = useStorefrontUrl(tenantId);
+  const currentUrl = storefrontUrl('');
 
   // ---- Tenant info for status panel (memoized) ----
   const tenantInfoForStatus = useMemo(
@@ -352,7 +350,6 @@ export function useStorefrontState({
 
     // URLs
     currentUrl,
-    baseUrl,
 
     // Status
     tenantInfoForStatus,

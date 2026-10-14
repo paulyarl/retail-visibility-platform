@@ -3,7 +3,7 @@ import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 import { clientLogger } from '@/lib/client-logger';
-import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, STOREFRONT_PREFIX_ROOTS } from '@/lib/storefront-routing';
+import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, STOREFRONT_PREFIX_ROOTS, tenantHostCanonicalPath } from '@/lib/storefront-routing';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
@@ -150,12 +150,25 @@ export async function proxy(req: NextRequest) {
           // Rewrite (never redirect) so the subdomain stays canonical in the URL.
           const tenantId = subdomainData.tenantId;
 
-          // Paths already under /tenant/ (absolute storefront links emitted by
-          // components) and allowlisted global routes (/products/[id], /place,
-          // etc.) pass through untouched — only storefront-root paths get the
-          // tenant prefix.
+          // Paths already under /tenant/ are canonicalized, not passed through:
+          // on a tenant host "/" IS the storefront — /tenant/{id} is the
+          // platform's internal path leaking into the tenant's URL space, and
+          // /tenant/{otherId} would serve a DIFFERENT tenant's storefront
+          // under this host. Self → 301 to the host-relative canonical;
+          // foreign → 301 to the platform origin.
           let destPath: string;
           if (pathname.startsWith('/tenant/')) {
+            const canon = tenantHostCanonicalPath(pathname, tenantId);
+            if (canon?.kind === 'foreign') {
+              const dest = new URL(`${pathname}${req.nextUrl.search}`, PLATFORM_APP_ORIGIN);
+              console.log(`[Proxy] Subdomain foreign-tenant bounce: ${hostname}${pathname} → ${dest.toString()}`);
+              return NextResponse.redirect(dest, { status: 301 });
+            }
+            if (canon?.kind === 'self') {
+              const dest = new URL(`${canon.path}${req.nextUrl.search}`, req.url);
+              console.log(`[Proxy] Subdomain canonicalize: ${hostname}${pathname} → ${dest.toString()}`);
+              return NextResponse.redirect(dest, { status: 301 });
+            }
             destPath = pathname;
           } else if (pathname === '/' || STOREFRONT_PREFIX_ROOTS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
             destPath = `/tenant/${tenantId}${pathname === '/' ? '' : pathname}`;
@@ -229,8 +242,23 @@ export async function proxy(req: NextRequest) {
           return NextResponse.rewrite(new URL('/404', req.url));
         }
 
+        // Same canonicalization as the subdomain branch: /tenant/{resolvedId}
+        // is a platform-internal path on the tenant's own domain — 301 to the
+        // host-relative canonical. A foreign tenant's path 301s to the
+        // platform origin instead of serving cross-tenant content here.
         let destPath: string;
         if (pathname.startsWith('/tenant/')) {
+          const canon = tenantHostCanonicalPath(pathname, resolved.tenantId);
+          if (canon?.kind === 'foreign') {
+            const dest = new URL(`${pathname}${req.nextUrl.search}`, PLATFORM_APP_ORIGIN);
+            console.log(`[Proxy] Custom-host foreign-tenant bounce: ${hostname}${pathname} → ${dest.toString()}`);
+            return NextResponse.redirect(dest, { status: 301 });
+          }
+          if (canon?.kind === 'self') {
+            const dest = new URL(`${canon.path}${req.nextUrl.search}`, req.url);
+            console.log(`[Proxy] Custom-host canonicalize: ${hostname}${pathname} → ${dest.toString()}`);
+            return NextResponse.redirect(dest, { status: 301 });
+          }
           destPath = pathname;
         } else if (pathname === '/' || STOREFRONT_PREFIX_ROOTS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
           destPath = `/tenant/${resolved.tenantId}${pathname === '/' ? '' : pathname}`;

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ProductCard, ProductData } from '@/components/products/ProductCardLayouts';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 import { clientLogger } from '@/lib/client-logger';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface FeaturedBucketSimpleProps {
   title: string;
@@ -47,6 +48,7 @@ export default function FeaturedBucketSimple({
 }: FeaturedBucketSimpleProps) {
   const { variant, setVariant } = useProductLayout();
   const [currentPage, setCurrentPage] = useState(1);
+  const sp = useStorefrontPath(tenantId);
   
   // Helper function to get default gateway type for a tenant
   const getDefaultGatewayType = (tenantId: string): string => {
@@ -173,7 +175,7 @@ export default function FeaturedBucketSimple({
         {/* View More Link */}
         {validProducts.length > productsPerPage && (
           <a
-            href={`/tenant/${tenantId}?featured=${bucketType}&products_only=true`}
+            href={sp(`/?featured=${bucketType}&products_only=true`)}
             className="text-blue-600 hover:text-blue-700 font-medium text-sm"
           >
             View All →

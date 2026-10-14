@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import BadgeFilterBar from './BadgeFilterBar';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface StorefrontBadgeFilterProps {
   tenantId: string;
@@ -11,6 +12,7 @@ interface StorefrontBadgeFilterProps {
 export default function StorefrontBadgeFilter({ tenantId, className = '' }: StorefrontBadgeFilterProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
 
   const selectedBadges = searchParams.get('badge')?.split(',').filter(Boolean) || [];
 
@@ -28,14 +30,14 @@ export default function StorefrontBadgeFilter({ tenantId, className = '' }: Stor
       params.delete('badge');
     }
     params.delete('page');
-    router.push(`/tenant/${tenantId}?${params.toString()}`);
+    router.push(sp(`/?${params.toString()}`));
   };
 
   const handleClearAll = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('badge');
     params.delete('page');
-    router.push(`/tenant/${tenantId}?${params.toString()}`);
+    router.push(sp(`/?${params.toString()}`));
   };
 
   return (

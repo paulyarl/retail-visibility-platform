@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface BackToInventoryButtonProps {
   tenantId: string;
@@ -14,6 +15,7 @@ interface BackToInventoryButtonProps {
 
 export function BackToInventoryButton({ tenantId, directorySlug, className = '' }: BackToInventoryButtonProps) {
   const { user } = useAuth();
+  const sp = useStorefrontPath(tenantId);
   
   // Check if user belongs to this item's tenant
   const userBelongsToTenant = user?.tenants?.some(
@@ -33,7 +35,7 @@ export function BackToInventoryButton({ tenantId, directorySlug, className = '' 
         </Link>
       )}
       
-      <Link href={`/tenant/${tenantId}`}>
+      <Link href={sp('/')}>
         <Button variant="ghost" size="sm">
           <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />

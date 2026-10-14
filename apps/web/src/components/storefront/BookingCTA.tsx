@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface BookingCTAProps {
   service: any;
@@ -12,7 +13,7 @@ interface BookingCTAProps {
 export function BookingCTA({ service, tenantId, layoutVariant = 'classic' }: BookingCTAProps) {
   const bookingUrl = service.metadata?.bookingUrl || service.metadata?.booking_url || service.bookingUrl;
   const bookingPhone = service.metadata?.bookingPhone || service.metadata?.booking_phone || service.bookingPhone;
-  const contactUrl = `/tenant/${tenantId}#contact`;
+  const contactUrl = useStorefrontPath(tenantId)('/#contact');
 
   const baseClass =
     layoutVariant === 'immersive'

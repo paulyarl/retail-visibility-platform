@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface Category {
   id: string;
@@ -27,13 +28,14 @@ interface CategoryMobileDropdownProps {
 export default function CategoryMobileDropdown({ tenantId, categories, totalProducts }: CategoryMobileDropdownProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sp = useStorefrontPath(tenantId);
   const currentCategory = searchParams.get('category');
 
   const handleCategoryChange = (slug: string) => {
     if (slug === '') {
-      router.push(`/tenant/${tenantId}`);
+      router.push(sp('/'));
     } else {
-      router.push(`/tenant/${tenantId}?category=${slug}`);
+      router.push(sp(`/?category=${slug}`));
     }
   };
 

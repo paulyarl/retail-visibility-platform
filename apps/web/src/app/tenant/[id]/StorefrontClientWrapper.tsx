@@ -37,6 +37,8 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
+import { platformOrigin } from '@/lib/storefront-routing';
+import { useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 // Extracted storefront section components
 import { StorefrontHeader } from '@/components/storefront/sections/StorefrontHeader';
@@ -172,8 +174,14 @@ export default function StorefrontClientWrapper({
   const { totalItems: cartTotalItems } = useMultiCart();
   const router = useRouter();
 
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
-  const currentUrl = `${baseUrl}/tenant/${tenantId}`;
+  // Via the storefront URL delegate — on a tenant host the share/QR URL is the
+  // domain root, never the platform-internal /tenant/{id} path.
+  const currentUrl = useStorefrontUrl(tenantId)('');
+  // Platform-surface links (directory, shops, branding) must be absolute to the
+  // platform origin — on a tenant custom domain a relative link resolves to the
+  // merchant's host, serving platform pages under the wrong domain or looping
+  // back to the storefront ("/" on a custom host IS the storefront).
+  const platformBase = platformOrigin();
   // console.log(`Storefront CurrentUrl: ${currentUrl}`);
   // console.log(`Storefront CurrentUrl: ${typeof window !== 'undefined' ? window.location.href : 'window not defined'}`);
 
@@ -688,7 +696,7 @@ export default function StorefrontClientWrapper({
                   <><h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
                     Quick Links
                   </h3><Link
-                    href={`/directory/${tenantSlug}?source=storefront`}
+                    href={`${platformBase}/directory/${tenantSlug}?source=storefront`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
                   >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -699,7 +707,7 @@ export default function StorefrontClientWrapper({
                 )}
                 {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
                   <Link
-                    href={`/shops/${tenantSlug}`}
+                    href={`${platformBase}/shops/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -710,7 +718,7 @@ export default function StorefrontClientWrapper({
                 )}
                 {!storefrontStatus.shouldShowPanel && isRetailStore && (
                   <><Link
-                    href="/directory"
+                    href={`${platformBase}/directory`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -718,7 +726,7 @@ export default function StorefrontClientWrapper({
                     </svg>
                     Browse Directory
                   </Link><Link
-                    href="/shops"
+                    href={`${platformBase}/shops`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
                   >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -733,7 +741,7 @@ export default function StorefrontClientWrapper({
           {/* Platform Branding */}
           {!features.removePlatformBranding && (
             <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500">
-              <Link href="/" title={platformSettings?.platformName || 'VisibleShelf'} style={{ textDecoration: 'none' }}>
+              <Link href={`${platformBase}/`} title={platformSettings?.platformName || 'VisibleShelf'} style={{ textDecoration: 'none' }}>
                 <div className="flex items-center justify-center gap-2">
                   <span>⚡Powered by</span>
                   <img

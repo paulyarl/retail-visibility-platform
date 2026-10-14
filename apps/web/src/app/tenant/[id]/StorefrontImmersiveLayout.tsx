@@ -32,6 +32,7 @@ import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import StickySearchBar from './layouts/shared/StickySearchBar';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 export default function StorefrontImmersiveLayout({
   tenantId,
@@ -254,6 +255,10 @@ export default function StorefrontImmersiveLayout({
     return links;
   }, [tenant]);
 
+  // Storefront URL delegate — host-relative on tenant hosts, /tenant/{id}
+  // prefixed on the platform app.
+  const sp = useStorefrontPath(tenantId);
+
   const handleCategoryClick = (slug: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (slug) {
@@ -262,7 +267,7 @@ export default function StorefrontImmersiveLayout({
       params.delete('category');
     }
     params.delete('page');
-    router.push(`/tenant/${tenantId}?${params.toString()}`);
+    router.push(sp(`?${params.toString()}`));
   };
 
   const handlePageChange = (page: number) => {
@@ -272,7 +277,7 @@ export default function StorefrontImmersiveLayout({
     } else {
       params.delete('page');
     }
-    router.push(`/tenant/${tenantId}?${params.toString()}`);
+    router.push(sp(`?${params.toString()}`));
   };
 
   // Closed banner is handled by page.tsx before layout selection
@@ -304,7 +309,7 @@ export default function StorefrontImmersiveLayout({
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between h-14 gap-3">
-            <Link href={`/tenant/${tenantId}`} className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
+            <Link href={sp('/')} className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
               {logoUrl ? (
                 <div className="relative w-8 h-8 flex-shrink-0">
                   <Image src={logoUrl} alt={businessName} fill className="object-contain rounded" sizes="32px" />
@@ -375,7 +380,7 @@ export default function StorefrontImmersiveLayout({
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-white uppercase tracking-wide">{activeFeatured?.hasActive ? 'Featured' : 'Trending Now'}</h2>
-              <Link href={`/tenant/${tenantId}?featured=true&products_only=true`} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
+              <Link href={sp('?featured=true&products_only=true')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</Link>
             </div>
             <EnhancedProductDisplay
               products={heroProducts as any}
@@ -453,7 +458,7 @@ export default function StorefrontImmersiveLayout({
         <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
           {isProductsOnly && featured && (
             <div className="flex items-center gap-3 mb-4">
-              <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+              <Link href={sp('/')} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
               <span className="text-neutral-300 dark:text-neutral-600">|</span>
               <h1 className="text-lg font-semibold text-neutral-900 dark:text-white">
                 {featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}
@@ -477,7 +482,7 @@ export default function StorefrontImmersiveLayout({
                   onClick={() => {
                     const params = new URLSearchParams(searchParams.toString());
                     params.delete('search');
-                    router.push(`/tenant/${tenantId}?${params.toString()}`);
+                    router.push(sp(`?${params.toString()}`));
                   }}
                   className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
                 >

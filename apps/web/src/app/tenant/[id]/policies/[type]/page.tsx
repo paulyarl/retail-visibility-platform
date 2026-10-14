@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { publicStorefrontPolicyService, PolicyType } from '@/services/PublicStorefrontPolicyService';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 import { clientLogger } from '@/lib/client-logger';
 
 const POLICY_META: Record<string, { title: string; fallback: string }> = {
@@ -25,6 +26,9 @@ export default function PublicPolicyPage() {
   const [notFound, setNotFound] = useState(false);
 
   const meta = POLICY_META[policyType] || { title: 'Policy', fallback: 'Policy not found.' };
+  // Storefront URL delegate — host-relative on tenant hosts, /tenant/{id}
+  // prefixed on the platform app (provided by the /tenant/[id] segment layout).
+  const sp = useStorefrontPath(tenantId);
 
   useEffect(() => {
     if (!tenantId || !policyType) return;
@@ -63,7 +67,7 @@ export default function PublicPolicyPage() {
     <div className="min-h-screen bg-white flex flex-col">
       <header className="bg-white border-b border-neutral-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-          <Link href={`/tenant/${tenantId}`} className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors">
+          <Link href={sp('/')} className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm font-medium">Back to Store</span>
           </Link>
@@ -98,7 +102,7 @@ export default function PublicPolicyPage() {
                 key !== policyType && (
                   <Link
                     key={key}
-                    href={`/tenant/${tenantId}/policies/${key}`}
+                    href={sp(`/policies/${key}`)}
                     className="px-3 py-1.5 text-sm text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
                   >
                     {m.title}
