@@ -234,7 +234,7 @@ const logoDataUrlSchema = z.object({
   contentType: z.string().min(1),
 });
 
-router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, res) => {
+router.post("/api/tenants/:id/logo", authenticateToken, checkTenantAccess, logoUploadMulter.single("file"), async (req, res) => {
   try {
     const tenant_id = req.params.id;
     console.log(`[Logo Upload] Starting upload for tenant ${tenant_id}`, {
@@ -382,7 +382,7 @@ router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req
 });
 
 // Banner upload endpoint (similar to logo but for wide banners)
-router.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, res) => {
+router.post("/api/tenant/:id/banner", authenticateToken, checkTenantAccess, logoUploadMulter.single("file"), async (req, res) => {
   try {
     const tenant_id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     console.log(`[Banner Upload] Starting upload for tenant ${tenant_id}`);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generatePaymentGatewaySettingsId } from '../lib/id-generator';
@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS = {
 };
 
 // Get payment gateway settings for a tenant
-router.get('/:tenantId/payment-gateway-settings', authenticateToken, async (req, res) => {
+router.get('/:tenantId/payment-gateway-settings', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -63,7 +63,7 @@ router.get('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
 });
 
 // Update payment gateway settings for a tenant
-router.put('/:tenantId/payment-gateway-settings', authenticateToken, async (req, res) => {
+router.put('/:tenantId/payment-gateway-settings', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

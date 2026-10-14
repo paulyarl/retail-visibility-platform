@@ -21,7 +21,7 @@ import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
 import { unifiedConfig } from '../config/unifiedConfig';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import BotConfigurationService from '../services/BotConfigurationService';
 import BotConversationService from '../services/BotConversationService';
@@ -95,7 +95,7 @@ const skillConfigSchema = z.object({
 });
 
 // GET /api/tenants/:tenantId/bot/config
-router.get('/config', authenticateToken, async (req, res) => {
+router.get('/config', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const config = await configService.getOrCreate(tenantId);
@@ -124,7 +124,7 @@ router.put('/config', authenticateToken, requireTenantAdmin, async (req, res) =>
 });
 
 // GET /api/tenants/:tenantId/bot/conversations
-router.get('/conversations', authenticateToken, async (req, res) => {
+router.get('/conversations', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
@@ -141,7 +141,7 @@ router.get('/conversations', authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenants/:tenantId/bot/conversations/:id
-router.get('/conversations/:id', authenticateToken, async (req, res) => {
+router.get('/conversations/:id', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
     const conversation = await BotConversationService.getInstance()['getConversationBySession'](id);
@@ -182,7 +182,7 @@ router.get('/conversations/:id', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/tenants/:tenantId/bot/conversations/:id/status — Update conversation status
-router.put('/conversations/:id/status', authenticateToken, async (req, res) => {
+router.put('/conversations/:id/status', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
     const { status } = req.body || {};
@@ -207,7 +207,7 @@ router.put('/conversations/:id/status', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/conversations/:id/escalate — Convert conversation to CRM support ticket
-router.post('/conversations/:id/escalate', authenticateToken, async (req, res) => {
+router.post('/conversations/:id/escalate', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
     const { reason, summary } = req.body || {};
@@ -247,7 +247,7 @@ router.post('/conversations/:id/escalate', authenticateToken, async (req, res) =
 });
 
 // GET /api/tenants/:tenantId/bot/skills
-router.get('/skills', authenticateToken, async (req, res) => {
+router.get('/skills', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const skills = await skillService.listSkills(tenantId);
@@ -259,7 +259,7 @@ router.get('/skills', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/tenants/:tenantId/bot/skills/:skillId
-router.put('/skills/:skillId', authenticateToken, async (req, res) => {
+router.put('/skills/:skillId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, skillId } = req.params;
     const validation = skillConfigSchema.safeParse(req.body);
@@ -276,7 +276,7 @@ router.put('/skills/:skillId', authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenants/:tenantId/bot/dashboard
-router.get('/dashboard', authenticateToken, async (req, res) => {
+router.get('/dashboard', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const stats = await conversationService.getDashboardStats(tenantId);
@@ -288,7 +288,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenants/:tenantId/bot/analytics
-router.get('/analytics', authenticateToken, async (req, res) => {
+router.get('/analytics', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const stats = await conversationService.getDashboardStats(tenantId);
@@ -307,7 +307,7 @@ router.get('/analytics', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/gdpr-erase — GDPR right-to-erase customer data
-router.post('/gdpr-erase', authenticateToken, async (req, res) => {
+router.post('/gdpr-erase', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { email, phone } = req.body || {};
@@ -325,7 +325,7 @@ router.post('/gdpr-erase', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/retention — Run conversation retention policy
-router.post('/retention', authenticateToken, async (req, res) => {
+router.post('/retention', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const archived = await conversationService.archiveOldConversations(tenantId);
@@ -340,7 +340,7 @@ router.post('/retention', authenticateToken, async (req, res) => {
 // POST /api/tenants/:tenantId/bot/faq-webhook — FAQ mutation webhook (internal)
 // Called when FAQs are created/updated/deleted to trigger bot knowledge base refresh.
 // Phase 3A: triggers embedding regeneration via BotRagService.
-router.post('/faq-webhook', authenticateToken, async (req, res) => {
+router.post('/faq-webhook', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { action, faqId } = req.body || {};
@@ -362,7 +362,7 @@ router.post('/faq-webhook', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/embeddings/refresh — Manually refresh FAQ embeddings
-router.post('/embeddings/refresh', authenticateToken, async (req, res) => {
+router.post('/embeddings/refresh', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const result = await ragService.refreshEmbeddings(tenantId);
@@ -374,7 +374,7 @@ router.post('/embeddings/refresh', authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenants/:tenantId/bot/embeddings/status — Check FAQ + product + knowledge embedding status
-router.get('/embeddings/status', authenticateToken, async (req, res) => {
+router.get('/embeddings/status', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const hasFaqEmbeddings = await ragService.hasEmbeddings(tenantId);
@@ -410,7 +410,7 @@ router.get('/embeddings/status', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/product-embeddings/refresh — Manually refresh product catalog embeddings
-router.post('/product-embeddings/refresh', authenticateToken, async (req, res) => {
+router.post('/product-embeddings/refresh', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const result = await ragService.refreshProductEmbeddings(tenantId);
@@ -422,7 +422,7 @@ router.post('/product-embeddings/refresh', authenticateToken, async (req, res) =
 });
 
 // POST /api/tenants/:tenantId/bot/embeddings/knowledge/refresh — Refresh knowledge embeddings (badge registry + policies)
-router.post('/embeddings/knowledge/refresh', authenticateToken, async (req, res) => {
+router.post('/embeddings/knowledge/refresh', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { sourceType } = req.body;
@@ -436,7 +436,7 @@ router.post('/embeddings/knowledge/refresh', authenticateToken, async (req, res)
 });
 
 // GET /api/tenants/:tenantId/bot/product-embeddings/status — Check product embedding status
-router.get('/product-embeddings/status', authenticateToken, async (req, res) => {
+router.get('/product-embeddings/status', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const hasProductEmbeddings = await ragService.hasProductEmbeddings(tenantId);
@@ -448,7 +448,7 @@ router.get('/product-embeddings/status', authenticateToken, async (req, res) => 
 });
 
 // POST /api/tenants/:tenantId/bot/dashboard-chat/start — Start a dashboard bot conversation
-router.post('/dashboard-chat/start', authenticateToken, async (req, res) => {
+router.post('/dashboard-chat/start', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -471,7 +471,7 @@ router.post('/dashboard-chat/start', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/dashboard-chat/message — Send a message in dashboard chat
-router.post('/dashboard-chat/message', authenticateToken, async (req, res) => {
+router.post('/dashboard-chat/message', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { sessionId, message } = req.body || {};
@@ -604,7 +604,7 @@ router.post('/dashboard-chat/message', authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenants/:tenantId/bot/platform-guide — Get platform guide context for the tenant
-router.get('/platform-guide', authenticateToken, async (req, res) => {
+router.get('/platform-guide', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const ctx = await platformGuideService.buildContext(tenantId, 'dashboard');
@@ -616,7 +616,7 @@ router.get('/platform-guide', authenticateToken, async (req, res) => {
 });
 
 // POST /api/tenants/:tenantId/bot/avatar — Upload bot avatar image
-router.post('/avatar', authenticateToken, async (req, res) => {
+router.post('/avatar', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { dataUrl, contentType } = req.body;

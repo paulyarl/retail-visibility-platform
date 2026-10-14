@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Check, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -50,6 +50,13 @@ export default function SlugPatternSelector({
   const [patterns, setPatterns] = useState<SlugPattern[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The debounced fetch resolves after more keystrokes; always call the latest props
+  const onSlugSelectRef = useRef(onSlugSelect);
+  const selectedSlugRef = useRef(selectedSlug);
+  useEffect(() => {
+    onSlugSelectRef.current = onSlugSelect;
+    selectedSlugRef.current = selectedSlug;
+  });
 
   useEffect(() => {
     if (!businessName || businessName.trim().length < 2) {
@@ -71,18 +78,18 @@ export default function SlugPatternSelector({
         setPatterns(patterns);
 
         // Auto-select first available pattern if none selected
-        if (!selectedSlug && patterns && patterns.length > 0) {
+        if (!selectedSlugRef.current && patterns && patterns.length > 0) {
           const firstAvailable = patterns.find((p: SlugPattern) => p.isAvailable);
           if (firstAvailable) {
-            onSlugSelect(firstAvailable.slug);
+            onSlugSelectRef.current(firstAvailable.slug);
           }
-        } else if (selectedSlug && patterns) {
+        } else if (selectedSlugRef.current && patterns) {
           // If current selection is no longer available (taken by another), select first available
-          const currentPattern = patterns.find((p: SlugPattern) => p.slug === selectedSlug);
+          const currentPattern = patterns.find((p: SlugPattern) => p.slug === selectedSlugRef.current);
           if (!currentPattern?.isAvailable) {
             const firstAvailable = patterns.find((p: SlugPattern) => p.isAvailable);
             if (firstAvailable) {
-              onSlugSelect(firstAvailable.slug);
+              onSlugSelectRef.current(firstAvailable.slug);
             }
           }
         }

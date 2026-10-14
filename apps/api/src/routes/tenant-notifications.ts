@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
@@ -28,7 +28,7 @@ const markAsReadSchema = z.object({
  * GET /api/tenants/:tenantId/notifications
  * Get tenant notifications with filtering and pagination
  */
-router.get('/:tenantId/notifications', authenticateToken, async (req, res) => {
+router.get('/:tenantId/notifications', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const filters = notificationFiltersSchema.parse(req.query);
@@ -112,7 +112,7 @@ router.get('/:tenantId/notifications', authenticateToken, async (req, res) => {
  * PATCH /api/tenants/:tenantId/notifications/:notificationId/read
  * Mark notification as read (using sent field as proxy)
  */
-router.patch('/:tenantId/notifications/:notificationId/read', authenticateToken, async (req, res) => {
+router.patch('/:tenantId/notifications/:notificationId/read', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, notificationId } = req.params;
 
@@ -145,7 +145,7 @@ router.patch('/:tenantId/notifications/:notificationId/read', authenticateToken,
  * PATCH /api/tenants/:tenantId/notifications/mark-all-read
  * Mark all notifications as read for tenant
  */
-router.patch('/:tenantId/notifications/mark-all-read', authenticateToken, async (req, res) => {
+router.patch('/:tenantId/notifications/mark-all-read', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -174,7 +174,7 @@ router.patch('/:tenantId/notifications/mark-all-read', authenticateToken, async 
  * DELETE /api/tenants/:tenantId/notifications/:notificationId
  * Delete notification
  */
-router.delete('/:tenantId/notifications/:notificationId', authenticateToken, async (req, res) => {
+router.delete('/:tenantId/notifications/:notificationId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, notificationId } = req.params;
 
@@ -204,7 +204,7 @@ router.delete('/:tenantId/notifications/:notificationId', authenticateToken, asy
  * GET /api/tenants/:tenantId/notifications/stats
  * Get notification statistics for tenant
  */
-router.get('/:tenantId/notifications/stats', authenticateToken, async (req, res) => {
+router.get('/:tenantId/notifications/stats', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -250,7 +250,7 @@ router.get('/:tenantId/notifications/stats', authenticateToken, async (req, res)
  * GET /api/tenants/:tenantId/notifications/unread-count
  * Get unread count for tenant
  */
-router.get('/:tenantId/notifications/unread-count', authenticateToken, async (req, res) => {
+router.get('/:tenantId/notifications/unread-count', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

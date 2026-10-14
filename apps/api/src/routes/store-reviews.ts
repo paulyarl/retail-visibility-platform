@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getDirectPool } from '../utils/db-pool';
 import { z } from 'zod';
 import { logger } from '../logger';
@@ -774,7 +774,7 @@ router.get('/:tenantId/reviews/user', authenticateToken, async (req: Request, re
     });
   }
 });
-router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/reviews/pending', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { limit = '20', offset = '0', reviewType = 'all' } = req.query;
@@ -892,7 +892,7 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
 });
 
 // POST /api/stores/:tenantId/reviews/:reviewId/approve - Approve a pending review
-router.post('/:tenantId/reviews/:reviewId/approve', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/reviews/:reviewId/approve', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, reviewId } = req.params;
     const userId = req.user?.userId || req.user?.user_id;
@@ -952,7 +952,7 @@ router.post('/:tenantId/reviews/:reviewId/approve', authenticateToken, async (re
 });
 
 // POST /api/stores/:tenantId/reviews/:reviewId/reject - Reject a pending review
-router.post('/:tenantId/reviews/:reviewId/reject', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/reviews/:reviewId/reject', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, reviewId } = req.params;
     const { reason } = req.body;
@@ -1508,7 +1508,7 @@ router.get('/:tenantId/products/:productId/reviews/user', authenticateToken, asy
 });
 
 // GET /api/stores/:tenantId/reviews/approved - Get approved store reviews (for admin management)
-router.get('/:tenantId/reviews/approved', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/reviews/approved', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { page = '1', limit = '20', sort = 'newest', reviewType = 'all' } = req.query;

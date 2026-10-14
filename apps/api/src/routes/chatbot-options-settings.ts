@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { resolveEffectiveCapabilities, invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { logger } from '../logger';
@@ -58,7 +58,7 @@ const TIER_GATE_MAP: Record<string, string[]> = {
 };
 
 // Get chatbot options settings for a tenant
-router.get('/:tenantId/chatbot-options', authenticateToken, async (req, res) => {
+router.get('/:tenantId/chatbot-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const caps = await resolveEffectiveCapabilities(tenantId);
@@ -101,7 +101,7 @@ router.get('/:tenantId/chatbot-options', authenticateToken, async (req, res) => 
 });
 
 // Update chatbot options settings for a tenant
-router.put('/:tenantId/chatbot-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/chatbot-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validationResult = chatbotOptionsSettingsSchema.safeParse(req.body);
@@ -210,7 +210,7 @@ router.get('/public/tenant/:tenantId/chatbot-options', async (req, res) => {
 });
 
 // Get chatbot options capability state for a tenant
-router.get('/:tenantId/chatbot-options/capability', authenticateToken, async (req, res) => {
+router.get('/:tenantId/chatbot-options/capability', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const caps = await resolveEffectiveCapabilities(tenantId);

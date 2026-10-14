@@ -141,7 +141,7 @@ router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Re
 
 // Quick start endpoint for platform categories (aligned with tenant quick-start)
 // Access: Platform users OR tenant members (tenant access)
-router.post('/categories/quick-start', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+router.post('/categories/quick-start', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { businessType = 'general', categoryCount = 15 } = req.body;
     const { prisma } = await import('../prisma');

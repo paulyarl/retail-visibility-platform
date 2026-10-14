@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { RefundService } from '../services/refunds/RefundService';
 import { generateOrderItemHistoryId } from '../lib/id-generator';
 import { generateTrackingUrl } from '../utils/tracking-url-generator';
@@ -27,7 +27,7 @@ function getStatusChangeReason(status: string, shippingProvider?: string, cancel
 }
 
 // GET /api/tenants/:tenantId/orders - Get all orders for a tenant
-router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/orders', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { 
@@ -278,7 +278,7 @@ router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
 });
 
 // GET /api/tenants/:tenantId/orders/:orderId - Get single order detail
-router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, orderId } = req.params;
 
@@ -450,7 +450,7 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
 });
 
 // PUT /api/tenants/:tenantId/orders/:orderId/fulfillment - Update fulfillment status
-router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, orderId } = req.params;
     const { fulfillmentStatus, trackingNumber, cancellationReason, shippingProvider } = req.body;
@@ -760,7 +760,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
 });
 
 // PUT /api/tenants/:tenantId/orders/:orderId/archive - Archive an order
-router.put('/tenants/:tenantId/orders/:orderId/archive', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/orders/:orderId/archive', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, orderId } = req.params;
     const { archived } = req.body;
@@ -820,7 +820,7 @@ router.put('/tenants/:tenantId/orders/:orderId/archive', authenticateToken, asyn
 });
 
 // GET /api/tenants/:tenantId/orders/:orderId/service-bookings - Get service bookings for an order
-router.get('/tenants/:tenantId/orders/:orderId/service-bookings', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/orders/:orderId/service-bookings', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, orderId } = req.params;
 
@@ -844,7 +844,7 @@ router.get('/tenants/:tenantId/orders/:orderId/service-bookings', authenticateTo
 });
 
 // PUT /api/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId - Update a service booking
-router.put('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, orderId, bookingId } = req.params;
     const { scheduledDate, scheduledTime, durationMinutes, providerId, providerName, serviceLocation, status, notes } = req.body;
@@ -907,7 +907,7 @@ router.put('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId', aut
 });
 
 // POST /api/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assign-provider - Assign provider
-router.post('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assign-provider', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assign-provider', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, orderId, bookingId } = req.params;
     const { providerId, providerName } = req.body;

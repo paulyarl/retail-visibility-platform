@@ -6,7 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import slugSingletonService from '../services/SlugSingletonService';
 import { z } from 'zod';
 import { logger } from '../logger';
@@ -139,7 +139,7 @@ router.post('/generate', deprecate({ ...RETIREMENT, replacement: '/api/slugs/pat
  *   "updatedAt": "2024-01-01T00:00:00.000Z"
  * }
  */
-router.get('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
+router.get('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
@@ -195,7 +195,7 @@ router.get('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/te
  *   "slug": "new-business-name"
  * }
  */
-router.put('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
+router.put('/tenant/:tenantId', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { slug } = req.body;
@@ -435,7 +435,7 @@ router.post('/generate-with-pattern', deprecate({ ...RETIREMENT, replacement: '/
  *   "message": "Slug regenerated from business name"
  * }
  */
-router.post('/tenant/:tenantId/regenerate', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
+router.post('/tenant/:tenantId/regenerate', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { forceUpdate } = req.body;
@@ -473,7 +473,7 @@ router.post('/tenant/:tenantId/regenerate', deprecate({ ...RETIREMENT, replaceme
  *   "message": "Cache invalidated for tenant tid-12345"
  * }
  */
-router.delete('/tenant/:tenantId/cache', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, async (req: Request, res: Response) => {
+router.delete('/tenant/:tenantId/cache', deprecate({ ...RETIREMENT, replacement: '/api/tenant/profile' }), authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 

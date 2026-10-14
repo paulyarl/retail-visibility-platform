@@ -135,6 +135,13 @@ export default function StoreIdentityStep({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [geocoding, setGeocoding] = useState(false);
   const lastInitialDataRef = useRef<string>('');
+  // Always-current form data for async/stale-closure updaters (e.g. SlugPatternSelector's
+  // debounced auto-select resolves after more keystrokes and must not revert typing)
+  const formDataRef = useRef<Partial<BusinessProfile>>(sanitizedInitialData);
+
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   // Update form data when initialData changes (e.g., when navigating back from another step)
   useEffect(() => {
@@ -147,6 +154,7 @@ export default function StoreIdentityStep({
         if (sanitized.phone_number) {
           sanitized.phone_number = normalizePhoneInput(sanitized.phone_number);
         }
+        formDataRef.current = sanitized;
         setFormData(sanitized);
       }
     }
@@ -194,7 +202,8 @@ export default function StoreIdentityStep({
   };
 
   const handleChange = (name: keyof BusinessProfile, value: any) => {
-    const newData = { ...formData, [name]: value };
+    const newData = { ...formDataRef.current, [name]: value };
+    formDataRef.current = newData;
     setFormData(newData);
     onDataChangeRef.current(newData);
 
@@ -267,7 +276,8 @@ export default function StoreIdentityStep({
       const parsed = addressParser.parse(value);
       
       // Update all fields at once
-      const newData = { ...formData, ...parsed };
+      const newData = { ...formDataRef.current, ...parsed };
+      formDataRef.current = newData;
       setFormData(newData);
       onDataChange(newData);
       
@@ -317,10 +327,11 @@ export default function StoreIdentityStep({
       if (coordinates) {
         // console.log('[StoreIdentityStep] Got coordinates:', coordinates);
         const newData = {
-          ...formData,
+          ...formDataRef.current,
           latitude: coordinates.latitude,
           longitude: coordinates.longitude,
         };
+        formDataRef.current = newData;
         setFormData(newData);
         onDataChange(newData);
       }

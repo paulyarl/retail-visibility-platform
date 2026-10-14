@@ -6,13 +6,13 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import wholesaleMatchingService from '../services/WholesaleMatchingService';
 
 const router = Router();
 
 // GET /:tenantId/wholesale/check?gtin=... — check supplier match
-router.get('/:tenantId/wholesale/check', authenticateToken, async (req, res) => {
+router.get('/:tenantId/wholesale/check', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { gtin } = req.query;
@@ -32,7 +32,7 @@ router.get('/:tenantId/wholesale/check', authenticateToken, async (req, res) => 
 });
 
 // POST /:tenantId/wholesale/search — Faire supplier search
-router.post('/:tenantId/wholesale/search', authenticateToken, async (req, res) => {
+router.post('/:tenantId/wholesale/search', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { query, page } = req.body;
 
@@ -51,7 +51,7 @@ router.post('/:tenantId/wholesale/search', authenticateToken, async (req, res) =
 });
 
 // GET /:tenantId/wholesale/suppliers — list known suppliers for tenant products
-router.get('/:tenantId/wholesale/suppliers', authenticateToken, async (req, res) => {
+router.get('/:tenantId/wholesale/suppliers', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { limit, offset } = req.query;
     const result = await wholesaleMatchingService.getAllSuppliers(
@@ -68,7 +68,7 @@ router.get('/:tenantId/wholesale/suppliers', authenticateToken, async (req, res)
 });
 
 // GET /:tenantId/wholesale/dashboard — distributor dashboard data
-router.get('/:tenantId/wholesale/dashboard', authenticateToken, async (req, res) => {
+router.get('/:tenantId/wholesale/dashboard', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const [analytics, suppliers] = await Promise.all([
@@ -85,7 +85,7 @@ router.get('/:tenantId/wholesale/dashboard', authenticateToken, async (req, res)
 });
 
 // POST /:tenantId/wholesale/affiliate-link — build affiliate link for a supplier
-router.post('/:tenantId/wholesale/affiliate-link', authenticateToken, async (req, res) => {
+router.post('/:tenantId/wholesale/affiliate-link', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { supplierId, gtin } = req.body;

@@ -11,7 +11,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { FulfillmentService } from '../services/FulfillmentService';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { canPerformSupportActions } from '../utils/platform-admin';
 import { z } from 'zod';
 import { logger } from '../logger';
@@ -54,7 +54,7 @@ const createNotificationSchema = z.object({
  * Create time slots for a location
  * Permission: Tenant admin/owner or platform admin
  */
-router.post('/time-slots/:tenantId', authenticateToken, async (req: Request, res: Response) => {
+router.post('/time-slots/:tenantId', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
     const user = (req as any).user;
@@ -117,7 +117,7 @@ router.post('/time-slots/:tenantId', authenticateToken, async (req: Request, res
  * Get available time slots for a location
  * Permission: Tenant members or platform admin
  */
-router.get('/time-slots/:tenantId', authenticateToken, async (req: Request, res: Response) => {
+router.get('/time-slots/:tenantId', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
     const user = (req as any).user;
@@ -255,7 +255,7 @@ router.post('/schedule/:orderId', authenticateToken, async (req: Request, res: R
  * Get fulfillment schedules for a location
  * Permission: Tenant members or platform admin
  */
-router.get('/schedules/:tenantId', authenticateToken, async (req: Request, res: Response) => {
+router.get('/schedules/:tenantId', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
     const user = (req as any).user;
@@ -397,7 +397,7 @@ router.post('/notifications', authenticateToken, async (req: Request, res: Respo
  * Get location fulfillment statistics
  * Permission: Tenant members or platform admin
  */
-router.get('/stats/:tenantId', authenticateToken, async (req: Request, res: Response) => {
+router.get('/stats/:tenantId', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
     const user = (req as any).user;

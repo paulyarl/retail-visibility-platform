@@ -6,7 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
-import { authenticateToken } from '../../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../../middleware/auth';
 import { requireTierFeature } from '../../middleware/tier-access';
 import { unifiedConfig } from '../../config/unifiedConfig';
 import { 
@@ -41,7 +41,7 @@ const router = Router();
  * Enable demo mode for a tenant
  * Creates a CloverIntegration record and imports demo items
  */
-router.post('/:tenantId/clover/demo/enable', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/enable', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = (req as any).user;
@@ -249,7 +249,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, requireTierFeatu
  * Disable demo mode for a tenant
  * Removes demo items and deactivates integration
  */
-router.post('/:tenantId/clover/demo/disable', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/disable', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { keepItems = false } = req.body; // Option to keep demo items
@@ -343,7 +343,7 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, requireTierFeat
 /**
  * Get Clover integration status for a tenant
  */
-router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/status', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = (req as any).user;
@@ -430,7 +430,7 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
  * Get OAuth authorization URL
  * Initiates the OAuth flow by generating the Clover authorization URL
  */
-router.get('/:tenantId/clover/oauth/authorize', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/oauth/authorize', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = (req as any).user;
@@ -608,7 +608,7 @@ const activeSimulations = new Map<string, SimulationEvent>();
  * Get available simulation scenarios
  * Returns list of scenarios user can trigger to learn the sync flow
  */
-router.get('/:tenantId/clover/demo/scenarios', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/demo/scenarios', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     
@@ -641,7 +641,7 @@ router.get('/:tenantId/clover/demo/scenarios', authenticateToken, async (req: Re
  * Trigger a simulation scenario
  * Creates a simulated sync event that the user can observe
  */
-router.post('/:tenantId/clover/demo/simulate', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/simulate', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { scenario } = req.body as { scenario: SimulationScenario };
@@ -705,7 +705,7 @@ router.post('/:tenantId/clover/demo/simulate', authenticateToken, async (req: Re
 /**
  * Get simulation event status
  */
-router.get('/:tenantId/clover/demo/simulate/:eventId/status', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/demo/simulate/:eventId/status', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     
@@ -728,7 +728,7 @@ router.get('/:tenantId/clover/demo/simulate/:eventId/status', authenticateToken,
 /**
  * Execute a simulation - apply the simulated changes to the database
  */
-router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, eventId } = req.params;
     
@@ -1362,7 +1362,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
 /**
  * Cancel a simulation
  */
-router.post('/:tenantId/clover/demo/simulate/:eventId/cancel', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/simulate/:eventId/cancel', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     
@@ -1392,7 +1392,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/cancel', authenticateToken
  * Get item mappings for demo mode
  * Shows how Clover items are mapped to VisibleShelf items
  */
-router.get('/:tenantId/clover/demo/mappings', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/demo/mappings', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { status, limit = 50, offset = 0 } = req.query;
@@ -1461,7 +1461,7 @@ router.get('/:tenantId/clover/demo/mappings', authenticateToken, async (req: Req
  * Resolve a mapping conflict
  * User chooses which value to keep: clover, rvp, or custom
  */
-router.post('/:tenantId/clover/demo/mappings/:mappingId/resolve', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/demo/mappings/:mappingId/resolve', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, mappingId } = req.params;
     const { resolution, customValues } = req.body;
@@ -1564,7 +1564,7 @@ router.post('/:tenantId/clover/demo/mappings/:mappingId/resolve', authenticateTo
 /**
  * Get sync history for demo mode
  */
-router.get('/:tenantId/clover/demo/sync-history', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/demo/sync-history', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { limit = 20 } = req.query;
@@ -1698,7 +1698,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
  * Imports items and categories from connected Clover account into VisibleShelf inventory
  * Supports 2-way category sync
  */
-router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { 
@@ -1998,7 +1998,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
 /**
  * Disconnect Clover integration (Production Mode)
  */
-router.post('/:tenantId/clover/disconnect', authenticateToken, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/disconnect', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { keepItems = true } = req.body;
@@ -2045,7 +2045,7 @@ router.post('/:tenantId/clover/disconnect', authenticateToken, requireTierFeatur
  * Get item mappings (Production Mode)
  * Works for both demo and production - returns all Clover↔VisibleShelf item mappings
  */
-router.get('/:tenantId/clover/mappings', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/mappings', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { status } = req.query;
@@ -2098,7 +2098,7 @@ router.get('/:tenantId/clover/mappings', authenticateToken, async (req: Request,
 /**
  * Resolve mapping conflict (Production Mode)
  */
-router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, mappingId } = req.params;
     const { resolution, customValues } = req.body as {
@@ -2182,7 +2182,7 @@ router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, 
  * Get category mappings (Production Mode)
  * Returns all Clover↔VisibleShelf category mappings for 2-way category sync
  */
-router.get('/:tenantId/clover/category-mappings', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/category-mappings', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { status } = req.query;
@@ -2243,7 +2243,7 @@ router.get('/:tenantId/clover/category-mappings', authenticateToken, async (req:
 /**
  * Get sync history (Production Mode)
  */
-router.get('/:tenantId/clover/sync-history', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/clover/sync-history', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { limit = 20 } = req.query;

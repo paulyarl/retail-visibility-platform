@@ -8,7 +8,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { taxService } from '../services/TaxService';
 import { generateTenantCommerceSettingsId } from '../lib/id-generator';
@@ -88,7 +88,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
  * GET /api/tenants/:tenantId/tax-settings
  * Authenticated — merchant reads their tax configuration
  */
-router.get('/:tenantId/tax-settings', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/tax-settings', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
@@ -127,7 +127,7 @@ router.get('/:tenantId/tax-settings', authenticateToken, async (req: Request, re
  * PUT /api/tenants/:tenantId/tax-settings
  * Authenticated — merchant updates their tax configuration
  */
-router.put('/:tenantId/tax-settings', authenticateToken, async (req: Request, res: Response) => {
+router.put('/:tenantId/tax-settings', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 

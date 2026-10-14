@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import CrmOptionsService from '../services/CrmOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
@@ -83,7 +83,7 @@ const CRM_FEATURE_KEYS = [
 ] as const;
 
 // Get CRM options settings for a tenant
-router.get('/:tenantId/crm-options', authenticateToken, async (req, res) => {
+router.get('/:tenantId/crm-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const crmService = CrmOptionsService.getInstance();
@@ -161,7 +161,7 @@ router.get('/:tenantId/crm-options', authenticateToken, async (req, res) => {
 });
 
 // Update CRM options settings for a tenant
-router.put('/:tenantId/crm-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/crm-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const validationResult = crmOptionsSettingsSchema.safeParse(req.body);
@@ -332,7 +332,7 @@ router.get('/public/tenant/:tenantId/crm-options', async (req, res) => {
 });
 
 // Get CRM options capability state for a tenant
-router.get('/:tenantId/crm-options/capability', authenticateToken, async (req, res) => {
+router.get('/:tenantId/crm-options/capability', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const crmService = CrmOptionsService.getInstance();

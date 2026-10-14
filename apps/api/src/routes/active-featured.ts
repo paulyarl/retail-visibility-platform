@@ -15,7 +15,7 @@ import {
   getPlatformActiveFeatured,
   invalidateActiveFeaturedCache,
 } from '../services/ActiveFeaturedResolver';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { logger } from '../logger';
 
 const router = express.Router();
@@ -79,7 +79,7 @@ router.get('/active-featured', async (req, res) => {
  * Invalidates the in-memory cache. Call after featured product CRUD operations.
  * Admin auth required.
  */
-router.post('/admin/active-featured/invalidate-cache', authenticateToken, async (req, res) => {
+router.post('/admin/active-featured/invalidate-cache', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const tenantId = req.body?.tenantId as string | undefined;
     const surface = req.body?.surface as string | undefined;

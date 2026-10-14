@@ -20,7 +20,7 @@ import {
   getConflictPairs,
 } from '../services/BadgeRegistryService';
 import { evaluateBadgeRulesForTenant } from '../services/BadgeRuleEngine';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess, requireAdmin } from '../middleware/auth';
 import FeaturedOptionsService from '../services/FeaturedOptionsService';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 import { logger } from '../logger';
@@ -47,7 +47,7 @@ router.get('/public/badge-registry', async (_req, res) => {
  * Returns all active badges for a tenant (system + tenant custom).
  * Auth required — tenant context.
  */
-router.get('/tenants/:tenantId/badge-registry', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-registry', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const badges = await getTenantBadges(tenantId);
@@ -63,7 +63,7 @@ router.get('/tenants/:tenantId/badge-registry', authenticateToken, async (req, r
  * Returns badges with auto-assign/remove rules and conflict pairs.
  * Auth required — tenant context.
  */
-router.get('/tenants/:tenantId/badge-registry/rules', authenticateToken, async (_req, res) => {
+router.get('/tenants/:tenantId/badge-registry/rules', authenticateToken, checkTenantAccess, async (_req, res) => {
   try {
     const [badgesWithRules, conflictPairs] = await Promise.all([
       getBadgesWithRules(),
@@ -82,7 +82,7 @@ router.get('/tenants/:tenantId/badge-registry/rules', authenticateToken, async (
  * Used by FeaturedProductsManager UI to show validation warnings.
  * Auth required — tenant context.
  */
-router.get('/tenants/:tenantId/badge-registry/validation', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-registry/validation', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const evaluation = await evaluateBadgeRulesForTenant(tenantId);
@@ -98,7 +98,7 @@ router.get('/tenants/:tenantId/badge-registry/validation', authenticateToken, as
  * Returns all custom (non-system) badges for a tenant.
  * Auth required — tenant context.
  */
-router.get('/tenants/:tenantId/badge-registry/custom', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-registry/custom', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const badges = await getTenantCustomBadges(tenantId);
@@ -116,7 +116,7 @@ router.get('/tenants/:tenantId/badge-registry/custom', authenticateToken, async 
  * Create a custom badge for a tenant. Tier-gated: requires custom_badge_slots capability.
  * Auth required — tenant context.
  */
-router.post('/tenants/:tenantId/badge-registry/custom', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/badge-registry/custom', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { key, label, description, icon, color, priority, sortOrder } = req.body;
@@ -166,7 +166,7 @@ router.post('/tenants/:tenantId/badge-registry/custom', authenticateToken, async
  * Update a custom badge for a tenant.
  * Auth required — tenant context.
  */
-router.put('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, badgeId } = req.params;
     const { label, description, icon, color, priority, sortOrder, isActive } = req.body;
@@ -200,7 +200,7 @@ router.put('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToke
  * Delete a custom badge for a tenant.
  * Auth required — tenant context.
  */
-router.delete('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToken, async (req, res) => {
+router.delete('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, badgeId } = req.params;
     const deleted = await deleteTenantBadge(tenantId, badgeId);
@@ -224,7 +224,7 @@ router.delete('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateT
  * Returns auto-promotion suggestions based on badge rule evaluation.
  * Lists products that should be assigned or removed badges based on declarative rules.
  */
-router.get('/tenants/:tenantId/badge-suggestions', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-suggestions', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -257,7 +257,7 @@ router.get('/tenants/:tenantId/badge-suggestions', authenticateToken, async (req
  * Invalidates the in-memory cache. Call after manual DB updates.
  * Admin auth required.
  */
-router.post('/admin/badge-registry/invalidate-cache', authenticateToken, async (_req, res) => {
+router.post('/admin/badge-registry/invalidate-cache', authenticateToken, requireAdmin, async (_req, res) => {
   try {
     invalidateBadgeRegistryCache();
     res.json({ success: true, message: 'Badge registry cache invalidated' });

@@ -23,7 +23,7 @@ const router = express.Router();
 /**
  * GET /api/tenants/:tenantId/funnels
  */
-router.get('/tenants/:tenantId/funnels', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/funnels', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const includeInactive = req.query.includeInactive === 'true';
@@ -39,7 +39,7 @@ router.get('/tenants/:tenantId/funnels', authenticateToken, async (req, res) => 
 /**
  * POST /api/tenants/:tenantId/funnels
  */
-router.post('/tenants/:tenantId/funnels', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/funnels', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const service = FunnelService.getInstance();
@@ -84,7 +84,7 @@ router.put('/tenants/:tenantId/funnels/options', authenticateToken, checkTenantA
 /**
  * GET /api/tenants/:tenantId/funnels/:funnelId
  */
-router.get('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/funnels/:funnelId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, funnelId } = req.params;
     const service = FunnelService.getInstance();
@@ -104,7 +104,7 @@ router.get('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (req
 /**
  * PUT /api/tenants/:tenantId/funnels/:funnelId
  */
-router.put('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/funnels/:funnelId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, funnelId } = req.params;
     const service = FunnelService.getInstance();
@@ -119,7 +119,7 @@ router.put('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (req
 /**
  * DELETE /api/tenants/:tenantId/funnels/:funnelId
  */
-router.delete('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (req, res) => {
+router.delete('/tenants/:tenantId/funnels/:funnelId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, funnelId } = req.params;
     const service = FunnelService.getInstance();
@@ -134,7 +134,7 @@ router.delete('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (
 /**
  * GET /api/tenants/:tenantId/funnels/:funnelId/analytics
  */
-router.get('/tenants/:tenantId/funnels/:funnelId/analytics', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/funnels/:funnelId/analytics', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, funnelId } = req.params;
     const analytics = FunnelAnalyticsService.getInstance();

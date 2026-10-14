@@ -7,13 +7,13 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { abandonedCartService } from '../services/AbandonedCartService';
 import { logger } from '../logger';
 
 const router = Router();
 
-router.get('/:tenantId/abandoned-carts', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/abandoned-carts', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { converted, recoveryEmailSent, limit, offset } = req.query;
@@ -32,7 +32,7 @@ router.get('/:tenantId/abandoned-carts', authenticateToken, async (req: Request,
   }
 });
 
-router.get('/:tenantId/abandoned-carts/summary', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/abandoned-carts/summary', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const summary = await abandonedCartService.getSummary(tenantId);
@@ -43,7 +43,7 @@ router.get('/:tenantId/abandoned-carts/summary', authenticateToken, async (req: 
   }
 });
 
-router.post('/:tenantId/abandoned-carts/:cartId/resend', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/abandoned-carts/:cartId/resend', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId, cartId } = req.params;
 

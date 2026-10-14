@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { user_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser, canViewAllTenants, canPerformSupportActions } from '../utils/platform-admin';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
@@ -125,7 +125,7 @@ const quickStartSchema = z.object({
   storefrontType: z.enum(['online', 'retail', 'service', 'social', 'flexible', 'none']).optional(),
 });
 
-router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritableSubscription, requireTierFeature('quickstart_enabled'), validateSKULimits, async (req, res) => {
+router.post('/tenants/:tenantId/quick-start', authenticateToken, checkTenantAccess, requireWritableSubscription, requireTierFeature('quickstart_enabled'), validateSKULimits, async (req, res) => {
   try {
     console.log('[Quick Start] POST request received');
     const { tenantId } = req.params;
@@ -359,7 +359,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
  * Capability-aware: checks if tenant's tier includes quickstart_options.
  * If not, returns capabilityTiers listing which tiers offer Quick Start.
  */
-router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;
@@ -534,7 +534,7 @@ const categoryQuickStartSchema = z.object({
   storefrontType: z.enum(['online', 'retail', 'service', 'social', 'flexible', 'none']).optional(),
 });
 
-router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requireWritableSubscription, async (req, res) => {
+router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, checkTenantAccess, requireWritableSubscription, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId;

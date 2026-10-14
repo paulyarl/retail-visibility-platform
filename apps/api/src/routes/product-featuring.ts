@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { requireInventoryAccess } from '../middleware/permissions';
 import FeaturedProductsSingletonService from '../services/FeaturedProductsSingletonService';
 import { prisma } from '../prisma';
@@ -522,7 +522,7 @@ router.patch('/tenants/:tenantId/products/:productId/feature/priority', authenti
 });
 
 // Admin: Get all featured products across platform
-router.get('/admin/products/featured', authenticateToken, async (req, res) => {
+router.get('/admin/products/featured', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // Check if user is platform admin
     const user = (req as any).user;
@@ -669,7 +669,7 @@ router.get('/admin/products/featured', authenticateToken, async (req, res) => {
 });
 
 // Admin: Get featuring statistics
-router.get('/admin/products/featuring/stats', authenticateToken, async (req, res) => {
+router.get('/admin/products/featuring/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // Check if user is platform admin
     const user = (req as any).user;
@@ -882,7 +882,7 @@ router.get('/tenants/:tenantId/products/featured/out-of-stock', authenticateToke
 });
 
 // DELETE /api/admin/products/featured/:id - Unfeature a specific featured product
-router.delete('/admin/products/featured/:id', authenticateToken, async (req, res) => {
+router.delete('/admin/products/featured/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;

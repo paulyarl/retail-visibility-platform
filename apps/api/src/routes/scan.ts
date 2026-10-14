@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess, requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { getEffectivePlatform } from '../utils/effectiveFlags';
@@ -838,7 +838,7 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
 });
 
 // Admin endpoints for enrichment stats
-router.get('/admin/enrichment/cache-stats', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/cache-stats', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -852,7 +852,7 @@ router.get('/admin/enrichment/cache-stats', authenticateToken, async (req: Reque
   }
 });
 
-router.get('/admin/enrichment/rate-limits', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/rate-limits', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -866,7 +866,7 @@ router.get('/admin/enrichment/rate-limits', authenticateToken, async (req: Reque
   }
 });
 
-router.post('/admin/enrichment/clear-cache', authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/enrichment/clear-cache', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     if (!isPlatformAdmin(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_admin_required' });
@@ -886,7 +886,7 @@ router.post('/admin/enrichment/clear-cache', authenticateToken, async (req: Requ
 });
 
 // Comprehensive enrichment analytics
-router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/analytics', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -990,7 +990,7 @@ router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request
 });
 
 // Search and browse cached products
-router.get('/admin/enrichment/search', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/search', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -1064,7 +1064,7 @@ router.get('/admin/enrichment/search', authenticateToken, async (req: Request, r
 });
 
 // Get detailed product enrichment data
-router.get('/admin/enrichment/:barcode', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/enrichment/:barcode', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     if (!canViewAllTenants(req.user as any)) {
       return res.status(403).json({ success: false, error: 'platform_access_required' });
@@ -1088,7 +1088,7 @@ router.get('/admin/enrichment/:barcode', authenticateToken, async (req: Request,
 });
 
 // Tenant-specific enrichment analytics
-router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Request, res: Response) => {
+router.get('/scan/tenant/:tenantId/analytics', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const user = req.user as any;

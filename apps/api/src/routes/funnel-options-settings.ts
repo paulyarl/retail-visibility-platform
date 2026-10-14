@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { logger } from '../logger';
@@ -35,7 +35,7 @@ const FUNNEL_FEATURE_KEYS = [
 ] as const;
 
 // GET /tenants/:tenantId/funnels/settings
-router.get('/tenants/:tenantId/funnels/settings', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/funnels/settings', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -58,7 +58,7 @@ router.get('/tenants/:tenantId/funnels/settings', authenticateToken, async (req,
 });
 
 // PUT /tenants/:tenantId/funnels/settings
-router.put('/tenants/:tenantId/funnels/settings', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/funnels/settings', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

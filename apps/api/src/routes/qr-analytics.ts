@@ -15,7 +15,7 @@
  */
 
 import express from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess, requireAdmin } from '../middleware/auth';
 import { logger } from '../logger';
 import {
   trackQrScanEvent,
@@ -41,7 +41,7 @@ const router = express.Router();
  * Returns aggregated QR analytics dashboard for the tenant.
  * Query params: period (day|week|month, default: day), daysBack (default: 30)
  */
-router.get('/tenants/:tenantId/qr-analytics', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/qr-analytics', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const period = (req.query.period as PeriodType) || 'day';
@@ -60,7 +60,7 @@ router.get('/tenants/:tenantId/qr-analytics', authenticateToken, async (req, res
  * Returns time-series data for a specific QR surface.
  * Query params: surface (required), period (default: day), daysBack (default: 30)
  */
-router.get('/tenants/:tenantId/qr-analytics/timeseries', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/qr-analytics/timeseries', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const surface = req.query.surface as QrSurfaceType;
@@ -83,7 +83,7 @@ router.get('/tenants/:tenantId/qr-analytics/timeseries', authenticateToken, asyn
  * Manually trigger aggregation for the tenant.
  * Body: { period?: 'day' | 'week' | 'month' }
  */
-router.post('/tenants/:tenantId/qr-analytics/aggregate', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/qr-analytics/aggregate', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const period = (req.body.period as PeriodType) || 'day';
@@ -176,7 +176,7 @@ router.post('/public/qr-events/batch', async (req, res) => {
  * Cross-tenant QR analytics for platform consumers.
  * Query params: consumer?, surface?, tenantId?, daysBack?
  */
-router.get('/admin/qr-analytics', authenticateToken, async (req, res) => {
+router.get('/admin/qr-analytics', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const consumer = req.query.consumer as QrConsumerType | undefined;
     const surface = req.query.surface as QrSurfaceType | undefined;

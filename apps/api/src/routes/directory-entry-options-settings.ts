@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
@@ -49,7 +49,7 @@ export const DEFAULT_DIRECTORY_ENTRY_SETTINGS = {
 };
 
 // Get directory entry options settings for a tenant
-router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, res) => {
+router.get('/:tenantId/directory-entry-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -149,7 +149,7 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
 });
 
 // Update directory entry options settings for a tenant
-router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/directory-entry-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 

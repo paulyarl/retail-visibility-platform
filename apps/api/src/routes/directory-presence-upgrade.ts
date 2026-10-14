@@ -22,7 +22,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { buildTenantUpgradeOptions } from '../services/DirectoryPresenceUpgradeOptionsService';
 
@@ -32,7 +32,7 @@ const router = Router();
  * GET /api/tenant/:tenantId/upgrade/options
  * Returns the current tier and all upgrade-eligible tiers with feature deltas.
  */
-router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:tenantId/upgrade/options', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId || (req as any).user?.id;
@@ -84,7 +84,7 @@ router.get('/:tenantId/upgrade/options', authenticateToken, async (req: Request,
  * - Free tiers (billing_type = 'none') upgrade instantly via updateTenantTier.
  * - Paid tiers go through Stripe via SubscriptionBillingService.subscribe.
  */
-router.post('/:tenantId/upgrade', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:tenantId/upgrade', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const userId = (req as any).user?.userId || (req as any).user?.id;

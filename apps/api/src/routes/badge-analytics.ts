@@ -14,7 +14,7 @@
  */
 
 import express from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { logger } from '../logger';
 import {
   trackBadgeEvent,
@@ -33,7 +33,7 @@ const router = express.Router();
  * Returns aggregated badge analytics dashboard for the tenant.
  * Query params: period (day|week|month, default: day), daysBack (default: 30)
  */
-router.get('/tenants/:tenantId/badge-analytics', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-analytics', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const period = (req.query.period as PeriodType) || 'day';
@@ -52,7 +52,7 @@ router.get('/tenants/:tenantId/badge-analytics', authenticateToken, async (req, 
  * Returns time-series data for a specific badge.
  * Query params: badgeKey (required), period (default: day), daysBack (default: 30)
  */
-router.get('/tenants/:tenantId/badge-analytics/timeseries', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-analytics/timeseries', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const badgeKey = req.query.badgeKey as string;
@@ -75,7 +75,7 @@ router.get('/tenants/:tenantId/badge-analytics/timeseries', authenticateToken, a
  * Returns badge ROI comparison report.
  * Query params: period (default: day), daysBack (default: 30)
  */
-router.get('/tenants/:tenantId/badge-analytics/roi', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/badge-analytics/roi', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const period = (req.query.period as PeriodType) || 'day';
@@ -93,7 +93,7 @@ router.get('/tenants/:tenantId/badge-analytics/roi', authenticateToken, async (r
  * POST /api/tenants/:tenantId/badge-analytics/aggregate
  * Manually trigger badge analytics aggregation for the tenant.
  */
-router.post('/tenants/:tenantId/badge-analytics/aggregate', authenticateToken, async (req, res) => {
+router.post('/tenants/:tenantId/badge-analytics/aggregate', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const period = (req.query.period as PeriodType) || 'day';

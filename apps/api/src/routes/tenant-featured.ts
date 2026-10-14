@@ -1,7 +1,7 @@
 import express from 'express';
 import { prisma } from '../prisma';
 import { isValidFeaturedType, getValidFeaturedTypes } from '../services/FeaturedProductsService';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { logger } from '../logger';
 
 interface FeaturedProduct {
@@ -24,7 +24,7 @@ interface FeaturedProduct {
 const router = express.Router();
 
 // Get all featured products by type for a tenant
-router.get('/tenants/:tenantId/featured', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/featured', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { type } = req.query; // 'store_selection', 'new_arrival', 'seasonal', 'sale'
@@ -75,7 +75,7 @@ router.get('/tenants/:tenantId/featured', authenticateToken, async (req, res) =>
 });
 
 // Update featured products by type
-router.put('/tenants/:tenantId/featured/:type', authenticateToken, async (req, res) => {
+router.put('/tenants/:tenantId/featured/:type', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, type } = req.params;
     const { productIds, priorities } = req.body;
@@ -133,7 +133,7 @@ router.put('/tenants/:tenantId/featured/:type', authenticateToken, async (req, r
 });
 
 // Get available products for featuring (not already featured of this type)
-router.get('/tenants/:tenantId/available-featured', authenticateToken, async (req, res) => {
+router.get('/tenants/:tenantId/available-featured', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { type, search, category } = req.query;

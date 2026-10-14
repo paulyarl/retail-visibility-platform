@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import FaqOptionsService from '../services/FaqOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
@@ -78,7 +78,7 @@ const FAQ_FEATURE_KEYS = [
 ] as const;
 
 // Get FAQ options settings for a tenant
-router.get('/:tenantId/faq-options', authenticateToken, async (req, res) => {
+router.get('/:tenantId/faq-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -161,7 +161,7 @@ router.get('/:tenantId/faq-options', authenticateToken, async (req, res) => {
 });
 
 // Update FAQ options settings for a tenant
-router.put('/:tenantId/faq-options', authenticateToken, async (req, res) => {
+router.put('/:tenantId/faq-options', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -420,7 +420,7 @@ router.get('/public/tenant/:tenantId/faq-options', async (req, res) => {
 });
 
 // Get FAQ options capability state for a tenant
-router.get('/:tenantId/faq-options/capability', authenticateToken, async (req, res) => {
+router.get('/:tenantId/faq-options/capability', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const faqService = FaqOptionsService.getInstance();
