@@ -73,7 +73,7 @@ export function ProductHeaderSection({
               </div>
               {product.category && (
                 <a
-                  title={`Browse to store's ${product.category.name} products`}
+                  title={`Browse ${product.category.name} at ${businessName}`}
                   className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
                   href={sp(`/?category=${product.category.slug}`)}
                 >

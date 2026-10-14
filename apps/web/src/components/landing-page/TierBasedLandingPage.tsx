@@ -50,6 +50,7 @@ import DirectoryActions from '@/components/directory/DirectoryActions';
 import {TenantInfo} from '@/services/PublicTenantInfoService';
 
 import { StorefrontStatusPanel, useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 import { tenantPublicService, PublicTenantInfo, LocationStatusInfo } from '@/services/TenantPublicService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -1334,6 +1335,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   
   const displayLogo = enterpriseLogo || businessLogo || (features && !loading ? platformLogo : null);
   const displayName = metadata?.businessName || tenant.name || platformSettings?.platformName;
+  const sp = useStorefrontPath(product.tenantId);
   const showLogo = !!displayLogo;
 
   
@@ -1444,8 +1446,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           )}
           {product.tenantCategory && (
             <div className="mt-2 mb-1">
-              <a title={`Browse to store's ${product.tenantCategory?.name} products`} className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
-              href={`/tenant/${product.tenantId}?category=${product.tenantCategory?.slug}`}>
+              <a title={`Browse ${product.tenantCategory?.name} at ${displayName}`} className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
+              href={sp(`/?category=${product.tenantCategory?.slug}`)}>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -1923,7 +1925,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 </p>
               </div>
               <Button
-                onClick={() => window.location.href = `/tenant/${tenantSlug ? tenantSlug : tenant.id}`}
+                onClick={() => window.location.href = sp('/')}
                 variant="gradient" style={{ color: 'white' }} size='lg'
                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
               >
