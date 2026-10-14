@@ -46,6 +46,7 @@ class TenantInfoService extends TenantApiSingleton {
     return [
       'tenant-gateways-{tenantId}*',
       'tenant-subdomain-{tenantId}*',
+      'tenant-info-{tenantId}*',
       'tenant-update-subdomain-{tenantId}*',
       'tenant-delete-subdomain-{tenantId}*'
     ];
@@ -60,6 +61,10 @@ class TenantInfoService extends TenantApiSingleton {
       // Invalidate specific tenant info caches
       await this.invalidateCachePattern(`tenant-gateways-${tenantId}*`);
       await this.invalidateCachePattern(`tenant-subdomain-${tenantId}*`);
+      // tenant-info-* serves the same GET /:id payload — it carries `subdomain`
+      // and must not outlive a subdomain write (subdomain settings + verify
+      // pages both read it).
+      await this.invalidateCachePattern(`tenant-info-${tenantId}*`);
     } else {
       // Invalidate all tenant info caches
       await this.invalidateCachePattern('tenant*');

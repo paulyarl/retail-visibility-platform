@@ -43,6 +43,7 @@ const TENANT_SELECT = {
   reopening_date: true,
   closure_reason: true,
   slug: true,
+  subdomain: true,
   google_sync_enabled: true,
   google_last_sync: true,
   google_product_count: true,
@@ -99,6 +100,8 @@ export interface TenantDetailResponse {
   monthly_sku_quota?: number;
   skus_added_this_month?: number;
   slug: string;
+  /** Platform subdomain — NULL unless the tenant claimed one (slug mirrors it). */
+  subdomain?: string | null;
   hasPublishedDirectory: boolean;
   statusInfo: ReturnType<typeof getLocationStatusInfo>;
   manualSubscriptionControl?: boolean;
