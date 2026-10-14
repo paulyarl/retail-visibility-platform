@@ -154,6 +154,45 @@ export class FeatureOverridesService extends AdminApiSingleton {
   }
 
   /**
+   * Normalize a raw API row (tenant_feature_overrides_list, snake_case + joined tenant)
+   * into the Override shape the UI consumes.
+   */
+  private normalizeOverride(raw: any): Override {
+    const isExpired =
+      raw.isExpired ??
+      (raw.expires_at ? new Date(raw.expires_at) < new Date() : false);
+    const status: OverrideStatus =
+      raw.granted === false ? 'revoked' : isExpired ? 'expired' : 'active';
+    const featureKey = raw.feature ?? raw.feature_key ?? '';
+    return {
+      id: String(raw.id),
+      organizationId: raw.organization_id ?? raw.organizationId,
+      tenantId: raw.tenant_id ?? raw.tenantId,
+      organizationName: raw.organizationName,
+      tenantName: raw.tenants?.name ?? raw.tenantName,
+      type: (raw.type as OverrideType) ?? 'feature',
+      status,
+      reason: raw.reason ?? '',
+      approvedBy: raw.granted_by ?? raw.approvedBy ?? '',
+      approvedAt: (raw.created_at ?? raw.approvedAt ?? '').toString(),
+      createdAt: (raw.created_at ?? raw.createdAt ?? '').toString(),
+      updatedAt: (raw.updated_at ?? raw.updatedAt ?? '').toString(),
+      expiresAt: raw.expires_at ?? raw.expiresAt ?? null,
+      feature: featureKey,
+      featureName:
+        raw.featureName ||
+        featureKey
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c: string) => c.toUpperCase()),
+    } as Override;
+  }
+
+  private normalizeList(data: any): Override[] {
+    const arr = Array.isArray(data) ? data : data?.overrides ?? [];
+    return arr.map((o: any) => this.normalizeOverride(o));
+  }
+
+  /**
    * Get all overrides
    */
   async getOverrides(): Promise<Override[] | null> {
@@ -165,13 +204,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
     );
 
     if (response?.data) {
-      const data = response.data;
-      // Handle both response formats
-      if (Array.isArray(data)) {
-        return data;
-      } else if (data.overrides && Array.isArray(data.overrides)) {
-        return data.overrides;
-      }
+      return this.normalizeList(response.data);
     }
 
     return null;
@@ -188,7 +221,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
       15 * 60 * 1000
     );
 
-    return response?.data || null;
+    return response?.data ? this.normalizeList(response.data) : null;
   }
 
   /**
@@ -202,7 +235,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
       15 * 60 * 1000
     );
 
-    return response?.data || null;
+    return response?.data ? this.normalizeList(response.data) : null;
   }
 
   /**
@@ -216,7 +249,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
       15 * 60 * 1000
     );
 
-    return response?.data || null;
+    return response?.data ? this.normalizeList(response.data) : null;
   }
 
   /**
@@ -369,7 +402,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
       5 * 60 * 1000 // 5 minutes cache
     );
 
-    const overrides = response?.data?.overrides || [];
+    const overrides = response?.data ? this.normalizeList(response.data) : [];
     
     // Find active override for this specific target
     return overrides.find((override: Override) => {
@@ -418,7 +451,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
       5 * 60 * 1000
     );
 
-    const overrides = response?.data?.overrides || [];
+    const overrides = response?.data ? this.normalizeList(response.data) : [];
     const activeOverrides = overrides.filter((o: Override) => o.status === 'active') as FeaturedProductsOverride[];
     
     if (activeOverrides.length === 0) return null;

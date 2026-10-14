@@ -1,6 +1,6 @@
 # Custom Domain Smoke Test — `placeshelf.store`
 
-**Status**: Runbook (ready to execute)
+**Status**: **Executed 2026-10-14 — all 7 assertions passed** (see Findings)
 **Domain under test**: `placeshelf.store` (purchased at Namecheap for this purpose)
 **Environment**: **Production only** — custom domains are prod-only (sprint plan D1)
 
@@ -20,7 +20,8 @@ A purchased throwaway domain exercises the real end-to-end path (Vercel attach �
 
 - [ ] **API env**: `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` set on the production API. Missing → `VercelUnconfiguredError` → every attach returns 503 `unconfigured`.
 - [ ] **Web env**: `NEXT_PUBLIC_FF_CUSTOM_DOMAINS=true` on the production Vercel project. If off, `proxy.ts` skips the custom-host branch entirely and the domain serves the platform app — a misleading "pass".
-- [ ] **DB flag**: `custom_domains` platform flag on. Confirmed later in one shot via `GET /api/admin/custom-domains/:tenantId` → `entitlement: { entitled, flagOn }`.
+- [ ] **DB flag**: `custom_domains` platform flag is **off** but `allow_tenant_override=true` — the tenant needs its own `tenant_feature_flags_list` row (enabled via the attach modal's "Enable flag" or `PUT /api/admin/tenant-flags/:tenantId/custom_domains`).
+- [ ] **Public resolve endpoints reachable**: `GET /api/tenants/resolve-custom-domain/<host>` and `GET /api/tenants/resolve-subdomain/<slug>` must return a real response (200/404), **not 401**. The proxy calls them unauthenticated — a `router.use(authenticateToken)` anywhere upstream in the tenants router silently kills all tenant-host routing (both subdomains and custom domains). See Findings #2.
 - [ ] Domain `placeshelf.store` purchased at Namecheap; **Namecheap BasicDNS** in use; record TTLs set to minimum for fast revert.
 
 ---
@@ -36,16 +37,21 @@ POST /api/admin/demo-tenants
 
 A demo tenant gives a realistic storefront (products, hours) plus a built-in expiry/delete path. Record the returned `tenantId`.
 
-### 1.2 Grant the capability
+> **Gotcha (observed)**: if the tenant doesn't appear in `/settings/admin/demo-tenants`, check `location_status` — the list only shows `active` tenants. In the 2026-10 run, an existing tenant (`tid-8622qs2t`) was converted to a demo and needed `PATCH /api/tenants/:id/status` → `active` before it surfaced.
 
-The attach gate requires BOTH the `custom_domains` platform flag and the `storefront_domains_custom_domain` capability. Grant the capability via admin override (`tenant_feature_overrides_list` — the live union read in `CustomDomainService.isEntitled` makes it effective immediately, no MV-refresh wait):
+### 1.2 Grant the capability + enable the tenant flag
+
+The attach gate requires BOTH the tenant flag (`custom_domains`, since the platform flag is off with `allow_tenant_override`) and the `storefront_domains_custom_domain` capability. The admin UI's **Attach Domain modal** at `/settings/admin/subdomain` does both from the tenant's entitlement card — "Grant via BSaaS" (prefilled `ComplimentaryAccessForm`, submits to `POST /api/admin/feature-purchases/grant-complimentary`) and "Enable flag" (`PUT /api/admin/tenant-flags/:tenantId/custom_domains`). Equivalent API calls:
 
 ```bash
-POST /api/v1/admin/feature-overrides
-{ "tenant_id": "<TENANT_ID>", "feature": "storefront_domains_custom_domain", "granted": true }
+POST /api/admin/feature-purchases/grant-complimentary
+{ "tenant_id": "<TENANT_ID>", "feature_key": "storefront_domains_custom_domain", "reason": "smoke test" }
+
+PUT /api/admin/tenant-flags/<TENANT_ID>/custom_domains
+{ "enabled": true, "rollout": "tenant" }
 ```
 
-(`storefront_domains_flexible` also satisfies the gate.)
+(`storefront_domains_flexible` also satisfies the capability gate.)
 
 ### 1.3 Attach the domain
 
@@ -85,6 +91,8 @@ POST /api/admin/custom-domains/<TENANT_ID>/<DOMAIN_ID>/check
 Runs the full lifecycle: `verify` → `verified && !misconfigured` → our HTTPS probe → `active`, with `certificate_status: "issued"`. Alternatively wait ≤15 min — `custom-domain-sweeper` runs the identical path every 15 minutes.
 
 > **Gotcha**: the proxy caches host resolutions for 60s per isolate (including negative results). If you visited `placeshelf.store` while it was `pending_verification`, allow ~a minute after activation before re-testing.
+
+> **Probe semantics (post-fix)**: `probeHttps` treats **any completed HTTPS exchange** as cert-ready — undici validates the chain + hostname and throws on failure, so even a fail-closed 404 response proves TLS works. Before this fix, `verified → active` was a deadlock: the probe required 2xx/3xx but the proxy intentionally 404s non-`active` hosts. A `verified` row with `certificate_error: 'HTTPS 404'` (or any 4xx) on a domain whose cert is issued means the TLS handshake is fine — on the current build the sweeper self-heals it to `active`; on older builds a manual flip is needed (see Troubleshooting).
 
 ---
 
@@ -129,9 +137,25 @@ Cleanup leaves no residue: Vercel project domains detached, `custom_domains` row
 | `403 not_entitled` on attach | Capability override not granted, or `custom_domains` platform flag off — check `GET /api/admin/custom-domains/:tenantId` `entitlement` |
 | `400 platform_domain` on attach | Wrong domain — `*visibleshelf.com`/`*visibleshelf.store` are refused by design |
 | Domain serves the **platform app**, not the storefront | `NEXT_PUBLIC_FF_CUSTOM_DOMAINS` not `true` on prod web — the custom-host branch never ran |
-| Domain serves the platform **404** after activation | 60s per-isolate negative-resolve cache — wait a minute and retry |
-| Stuck at `verified`, never `active` | HTTPS probe failing — cert still issuing or DNS not fully propagated; check `certificate_error` and re-`check` |
+| Domain serves the platform **404** after activation | (a) 60s per-isolate negative-resolve cache — wait a minute; (b) resolve endpoints 401ing — probe `GET /api/tenants/resolve-custom-domain/<host>` directly; a `router.use(authenticateToken)` regression in `tenant-users.ts` caused exactly this in prod (Findings #2) |
+| Stuck at `verified`, never `active` | `certificate_error: 'HTTPS 404'` on an issued cert = the old probe deadlock (Findings #1) — fixed; sweeper self-heals. Other probe errors = cert still issuing or DNS not propagated; re-`check` |
+| Storefront header shows a **stale business name** after a profile edit | Not a domain problem — the header reads `tenant_business_profiles_list.business_name` (`apps/web/src/app/tenant/[id]/page.tsx`) and the page is ISR-cached; wait for revalidation or hard-refresh. The product MVs don't carry the business name at all |
 | `verify` returns a TXT challenge | Domain needs an ownership TXT (rare for fresh domains) — value is stored in `verification_token`; add it at Namecheap and re-`check` |
+
+---
+
+## Findings — 2026-10-14 run
+
+**Result: 7/7 assertions passed.** Apex 200 with `tcx` tenant cookie, `www`→apex 301, `/manage`→platform-origin 302, `/admin` fail-closed 404, unattached-subdomain edge rejection, storefront render correct, domain row `active`/`issued`.
+
+The run caught two real production bugs — exactly what the throwaway-domain exercise was for:
+
+1. **`verified → active` lifecycle deadlock** (`CustomDomainService.probeHttps`): the probe required a 2xx/3xx response before flipping `active`, but the proxy fail-closes non-`active` hosts to `/_not-found` (404) by design — so `active` was unreachable through the only path that could grant it. Fixed: any completed HTTPS exchange counts as cert-ready.
+2. **Auth wall killing all tenant-host routing** (`tenant-users.ts`): `router.use(authenticateToken)` on a router mounted at `/` in the tenants orchestrator 401'd every unauthenticated `/api/tenants/*` request — including `resolve-subdomain`, `resolve-custom-domain`, and `storefront-canonical`. **All subdomain storefronts were 404ing in production**, not just custom domains. Fixed: per-route `authenticateToken` (the same `AUTH_SCOPE_ISOLATION_SPEC.md` NFR-3 violation class as a prior incident).
+
+Two follow-on discoveries during the run also got fixed: a cross-tenant profile-write authorization gap (`POST/GET /api/tenant/profile`, `PUT /api/tenant/gbp-category` had no `checkTenantAccess`), and a storefront slug picker sourcing suggestions from `profile.business_name` instead of the page-scope tenant record.
+
+Data note: `placeshelf.store` was attached to demo tenant `tid-8622qs2t` ("Ivoire African Market"), whose `tenant_business_profiles_list` row happened to contain stale "ATOBABS AFRICA INTERNATIONAL MARKET" data — a useful illustration that profile and tenant records can diverge, not a routing bug.
 
 ---
 

@@ -347,7 +347,19 @@ export default function AdminDashboardPage() {
       title: 'Feature Flags & Overrides',
       description: 'Control feature rollout and custom tenant access',
       sections: [
-       
+
+        {
+          title: 'Platform Feature Flags',
+          description: 'Control platform-wide feature rollout defaults (e.g. custom_domains)',
+          href: '/settings/admin/platform-flags',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 5 3 5h-8.5l-1-1H5a2 2 0 00-2 2zm0 0h4" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'Global rollout switches',
+        },
         {
           title: 'Feature Overrides',
           description: 'Grant or revoke tier features for specific tenants',
