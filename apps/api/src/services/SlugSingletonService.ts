@@ -65,6 +65,9 @@ export interface LocationInfo {
  */
 export type SlugNamespace = 'directory' | 'subdomain';
 
+/** Hard limit enforced by the platform subdomain ruleset (SUBDOMAIN_REGEX). */
+const SUBDOMAIN_MAX_LENGTH = 30;
+
 export interface SlugPatternOption {
   pattern: string;
   slug: string;
@@ -688,7 +691,67 @@ class SlugSingletonService extends UniversalSingleton {
       });
     }
 
+    // A base name longer than the subdomain limit overflows EVERY pattern
+    // above — without shortened variants the picker would offer zero usable
+    // options. Emit word-boundary-shortened candidates (plus a guaranteed-
+    // unique autoId fallback) so there's always something selectable.
+    if (namespace === 'subdomain' && baseSlug.length > SUBDOMAIN_MAX_LENGTH) {
+      const shortened = this.shortenToLength(baseSlug, SUBDOMAIN_MAX_LENGTH);
+      if (!patterns.some((p) => p.slug === shortened)) {
+        patterns.push({
+          pattern: 'business_name_shortened',
+          slug: shortened,
+          ...(await this.evaluateSlugCandidate(shortened, tenantId, namespace)),
+          description: `${businessName} (shortened to fit)`,
+        });
+      }
+
+      if (location.state) {
+        const stateAbbr = this.getStateAbbreviation(location.state).toLowerCase();
+        const shortenedState = `${this.shortenToLength(baseSlug, SUBDOMAIN_MAX_LENGTH - stateAbbr.length - 1)}-${stateAbbr}`;
+        if (!patterns.some((p) => p.slug === shortenedState)) {
+          patterns.push({
+            pattern: 'business_name_state_shortened',
+            slug: shortenedState,
+            ...(await this.evaluateSlugCandidate(shortenedState, tenantId, namespace)),
+            description: `${businessName} in ${location.state} (shortened to fit)`,
+          });
+        }
+      }
+
+      if (tenantId) {
+        const autoId = this.generateAutoId(tenantId);
+        const shortenedAuto = `${this.shortenToLength(baseSlug, SUBDOMAIN_MAX_LENGTH - autoId.length - 1)}-${autoId.toLowerCase()}`;
+        if (!patterns.some((p) => p.slug === shortenedAuto)) {
+          patterns.push({
+            pattern: 'business_name_autoid_shortened',
+            slug: shortenedAuto,
+            ...(await this.evaluateSlugCandidate(shortenedAuto, tenantId, namespace)),
+            description: `${businessName} (unique ID, shortened to fit)`,
+          });
+        }
+      }
+    }
+
     return patterns;
+  }
+
+  /**
+   * Word-boundary truncation for length-capped slug namespaces (subdomain).
+   * Drops trailing hyphen-separated words until the slug fits; a single
+   * overlong word is hard-truncated as a last resort.
+   */
+  private shortenToLength(slug: string, maxLen: number): string {
+    if (slug.length <= maxLen) return slug;
+    const words = slug.split('-');
+    if (words[0].length > maxLen) return words[0].slice(0, maxLen);
+    let result = words[0];
+    for (let i = 1; i < words.length; i++) {
+      const next = `${result}-${words[i]}`;
+      if (next.length > maxLen) break;
+      result = next;
+    }
+    return result;
   }
 
   /**

@@ -133,4 +133,51 @@ describe('SlugSingletonService.getAllSlugPatterns', () => {
     expect(autoId?.isAvailable).toBe(false);
     expect(autoId?.unavailableReason).toBe('invalid_subdomain');
   });
+
+  it('emits a word-boundary-shortened candidate when the base name overflows', async () => {
+    const patterns = await slugSingletonService.getAllSlugPatterns(
+      'A Really Quite Extremely Long Business Name',
+      {},
+      TENANT,
+      'subdomain'
+    );
+    const shortened = patterns.find((p) => p.pattern === 'business_name_shortened');
+
+    // Longest word-prefix under 30 chars — 'business' would take it to 38.
+    expect(shortened?.slug).toBe('a-really-quite-extremely-long');
+    expect(shortened?.isAvailable).toBe(true);
+    expect(shortened?.unavailableReason).toBeUndefined();
+  });
+
+  it('emits a shortened state variant that leaves room for the suffix', async () => {
+    const patterns = await slugSingletonService.getAllSlugPatterns(
+      'A Really Quite Extremely Long Business Name',
+      { state: 'Pennsylvania' },
+      TENANT,
+      'subdomain'
+    );
+    const shortenedState = patterns.find((p) => p.pattern === 'business_name_state_shortened');
+
+    expect(shortenedState?.slug).toBe('a-really-quite-extremely-pa');
+    expect(shortenedState?.isAvailable).toBe(true);
+  });
+
+  it('always offers a valid shortened autoId fallback', async () => {
+    const patterns = await slugSingletonService.getAllSlugPatterns(
+      'A Really Quite Extremely Long Business Name',
+      {},
+      TENANT,
+      'subdomain'
+    );
+    const auto = patterns.find((p) => p.pattern === 'business_name_autoid_shortened');
+
+    expect(auto?.slug).toMatch(/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]$/);
+    expect(auto?.isAvailable).toBe(true);
+  });
+
+  it('emits no shortened candidates when the base name already fits', async () => {
+    const patterns = await slugSingletonService.getAllSlugPatterns(BUSINESS, LOCATION, TENANT, 'subdomain');
+
+    expect(patterns.some((p) => p.pattern.endsWith('_shortened'))).toBe(false);
+  });
 });
