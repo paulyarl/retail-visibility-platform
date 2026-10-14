@@ -52,7 +52,8 @@ class TenantSlugService extends TenantApiSingleton {
     return [
       'tenant-slug-service*',
       'tenant-slugs*',
-      'slug-operations*'
+      'slug-operations*',
+      'slug-patterns*'
     ];
   }
 
@@ -63,6 +64,8 @@ class TenantSlugService extends TenantApiSingleton {
     await this.invalidateCachePattern('tenant-slug-service*');
     await this.invalidateCachePattern('tenant-slugs*');
     await this.invalidateCachePattern('slug-operations*');
+    // Pattern availability/ownership goes stale on every slug write.
+    await this.invalidateCachePattern('slug-patterns*');
   }
 
   protected constructor() {

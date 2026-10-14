@@ -41,6 +41,11 @@ interface SlugPatternSelectorProps {
   urlLabel?: string;
   /** Renders the selected slug as a URL. Defaults to `/shops/{slug}`. */
   urlTemplate?: (slug: string) => string;
+  /**
+   * Bump to force a pattern refetch — availability/ownership is stale after
+   * the tenant writes a slug (e.g. PUT /tenants/:id/subdomain renames it).
+   */
+  refreshKey?: string | number;
 }
 
 export default function SlugPatternSelector({
@@ -54,6 +59,7 @@ export default function SlugPatternSelector({
   label = 'Choose Your Shop URL *',
   urlLabel = 'Your shop URL:',
   urlTemplate = (slug) => `/shops/${slug}`,
+  refreshKey,
 }: SlugPatternSelectorProps) {
   const [patterns, setPatterns] = useState<SlugPattern[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,7 +119,7 @@ export default function SlugPatternSelector({
     // Debounce the API call
     const timeoutId = setTimeout(fetchPatterns, 500);
     return () => clearTimeout(timeoutId);
-  }, [businessName, location?.city, location?.state, location?.country, tenantId, namespace]);
+  }, [businessName, location?.city, location?.state, location?.country, tenantId, namespace, refreshKey]);
 
   if (!businessName || businessName.trim().length < 2) {
     return (

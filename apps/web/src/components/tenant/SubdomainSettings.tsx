@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, RefreshCw } from 'lucide-react';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { tenantSlugService } from '@/services/TenantSlugService';
 import { tenantProfileService } from '@/services/TenantProfileService';
 import { useEffectiveStorefrontDomains } from '@/hooks/useEffectiveCapabilities';
 import { clientLogger } from '@/lib/client-logger';
@@ -52,6 +53,9 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  // Bumped after a subdomain write so the picker refetches — the write renames
+  // the slug, which changes both availability and "Yours" ownership badges.
+  const [patternsRefreshKey, setPatternsRefreshKey] = useState(0);
   const [userSubdomains, setUserSubdomains] = useState<any[]>([]);
   const [loadingSubdomains, setLoadingSubdomains] = useState(false);
 
@@ -144,6 +148,8 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     try {
       await tenantInfoService.updateTenantSubdomain(tenantId, selectedSlug);
       setCurrentSubdomain(selectedSlug);
+      await tenantSlugService.invalidateServiceCaches(tenantId);
+      setPatternsRefreshKey((k) => k + 1);
       setSuccess('Subdomain updated successfully!');
     } catch (error: any) {
       clientLogger.error('Failed to update subdomain:', { detail: error });
@@ -169,6 +175,8 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       await tenantInfoService.deleteTenantSubdomain(tenantId);
       setCurrentSubdomain('');
       setSelectedSlug('');
+      await tenantSlugService.invalidateServiceCaches(tenantId);
+      setPatternsRefreshKey((k) => k + 1);
       setSuccess('Subdomain removed successfully!');
     } catch (error) {
       clientLogger.error('Failed to remove subdomain:', { detail: error });
@@ -280,6 +288,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
               location={location}
               tenantId={tenantId}
               namespace="subdomain"
+              refreshKey={patternsRefreshKey}
               selectedSlug={selectedSlug}
               onSlugSelect={setSelectedSlug}
               label="Choose your subdomain *"
@@ -290,15 +299,6 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Add a business name to your profile to see available subdomains.
             </p>
-          )}
-
-          {selectedSlug && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-900">
-                <strong>Your subdomain:</strong>{' '}
-                <code className="font-mono bg-white px-2 py-0.5 rounded">{selectedSlug}.{platformUrl}</code>
-              </p>
-            </div>
           )}
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
