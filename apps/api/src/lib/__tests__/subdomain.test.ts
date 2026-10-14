@@ -19,6 +19,9 @@ import {
   isReservedSubdomain,
   checkSubdomainAvailability,
   clearSubdomain,
+  readSubdomainAssignedAt,
+  wasSubdomainAssignedSince,
+  withSubdomainAssignedAt,
 } from '../subdomain';
 
 const tenantsMock = prisma.tenants as any;
@@ -96,11 +99,81 @@ describe('subdomain helper', () => {
       before: { slug: 'joes-market', subdomain: 'joes-market' },
       after: { slug: 'joes-market', subdomain: null },
     });
-    expect(tenantsMock.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { subdomain: null } });
+    expect(tenantsMock.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { subdomain: null, metadata: {} } });
   });
 
   it('clearSubdomain reports tenant_not_found', async () => {
     tenantsMock.findUnique.mockResolvedValue(null);
     expect(await clearSubdomain('missing')).toEqual({ ok: false, code: 'tenant_not_found' });
+  });
+});
+
+// `tenants.updated_at` is not `@updatedAt` and there is no dedicated column, so
+// the adoption date lives in metadata. Adoption analytics used to filter on
+// `tenants.created_at`, which could only ever count brand-new tenants that
+// happened to have a subdomain.
+describe('subdomain assignment stamp', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('reads the stamp and ignores unparseable values', () => {
+    expect(readSubdomainAssignedAt({ subdomainAssignedAt: '2026-10-15T12:00:00.000Z' })).toBe('2026-10-15T12:00:00.000Z');
+    expect(readSubdomainAssignedAt({ subdomainAssignedAt: 'not-a-date' })).toBeNull();
+    expect(readSubdomainAssignedAt({ subdomainAssignedAt: 123 })).toBeNull();
+    expect(readSubdomainAssignedAt({})).toBeNull();
+    expect(readSubdomainAssignedAt(null)).toBeNull();
+    expect(readSubdomainAssignedAt(undefined)).toBeNull();
+  });
+
+  it('measures recency from the stamp, so an old tenant adopting today counts', () => {
+    const since = new Date('2026-09-15T00:00:00.000Z');
+    // Ivoire: created 2025-12-29, adopted 2026-10-15 — the exact case the
+    // created_at filter dropped.
+    expect(wasSubdomainAssignedSince({ subdomainAssignedAt: '2026-10-15T12:00:00.000Z' }, since)).toBe(true);
+    expect(wasSubdomainAssignedSince({ subdomainAssignedAt: '2026-08-01T12:00:00.000Z' }, since)).toBe(false);
+    // Unrecorded is never "recent".
+    expect(wasSubdomainAssignedSince({}, since)).toBe(false);
+    expect(wasSubdomainAssignedSince(null, since)).toBe(false);
+  });
+
+  it('preserves every other metadata key when stamping', () => {
+    expect(
+      withSubdomainAssignedAt(
+        { isHeroLocation: false, stripeSubscriptionId: 'sub_123' },
+        '2026-10-15T12:00:00.000Z',
+      ),
+    ).toEqual({
+      isHeroLocation: false,
+      stripeSubscriptionId: 'sub_123',
+      subdomainAssignedAt: '2026-10-15T12:00:00.000Z',
+    });
+  });
+
+  it('clears only the stamp when passed null', () => {
+    expect(withSubdomainAssignedAt({ isHeroLocation: true, subdomainAssignedAt: '2026-10-15T12:00:00.000Z' }, null)).toEqual({
+      isHeroLocation: true,
+    });
+  });
+
+  it('handles absent and non-object metadata without throwing', () => {
+    expect(withSubdomainAssignedAt(null, null)).toEqual({});
+    expect(withSubdomainAssignedAt('garbage', '2026-10-15T12:00:00.000Z')).toEqual({
+      subdomainAssignedAt: '2026-10-15T12:00:00.000Z',
+    });
+    expect(withSubdomainAssignedAt(['array'], null)).toEqual({});
+  });
+
+  it('clearSubdomain drops the stamp and keeps other metadata keys', async () => {
+    tenantsMock.findUnique.mockResolvedValue({
+      slug: 'joes-market',
+      subdomain: 'joes-market',
+      metadata: { isHeroLocation: true, subdomainAssignedAt: '2026-10-15T12:00:00.000Z' },
+    });
+    tenantsMock.update.mockResolvedValue({});
+    const result = await clearSubdomain('t1');
+    expect(result.ok).toBe(true);
+    expect(tenantsMock.update).toHaveBeenCalledWith({
+      where: { id: 't1' },
+      data: { subdomain: null, metadata: { isHeroLocation: true } },
+    });
   });
 });

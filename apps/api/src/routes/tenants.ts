@@ -10,6 +10,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { assignSubdomain, checkSubdomainAvailability, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
 import { customDomainService } from '../services/CustomDomainService';
+import { RATE_LIMITS, type RateLimitOperation } from '../config/rate-limits';
 
 // HTTP-facing copy for the shared subdomain helper's failure codes.
 const SUBDOMAIN_ERROR_MESSAGES: Record<SubdomainFailureCode, string> = {
@@ -26,19 +27,10 @@ import { z } from 'zod';
 // Rate limiting store (simple in-memory for now, could be Redis in production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-// Rate limiting configuration
-const RATE_LIMITS = {
-  subdomainCheck: { maxRequests: 10, windowMs: 60 * 1000 }, // 10 checks per minute
-  subdomainCreate: { maxRequests: 3, windowMs: 60 * 60 * 1000 }, // 3 creations per hour per tenant
-  subdomainResolve: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 resolutions per minute (for middleware)
-  customDomainResolve: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 resolutions per minute (for middleware)
-  customDomainAction: { maxRequests: 10, windowMs: 60 * 60 * 1000 }, // 10 add/check/remove actions per hour per tenant
-};
-
 /**
  * Check rate limit for a given key and operation
  */
-function checkRateLimit(key: string, operation: keyof typeof RATE_LIMITS): { allowed: boolean; remaining: number; resetTime: number } {
+function checkRateLimit(key: string, operation: RateLimitOperation): { allowed: boolean; remaining: number; resetTime: number } {
   const config = RATE_LIMITS[operation];
   const now = Date.now();
   const storeKey = `${operation}:${key}`;

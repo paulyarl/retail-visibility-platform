@@ -6,8 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isPlatformAdmin } from '@/lib/auth/access-control';
 import {
   platformHomeService,
+  type AdminRateLimits,
   type AdminSubdomainRow,
+  type SubdomainStats,
 } from '@/services/PlatformHomeSingletonService';
+import { describeRateLimit } from '@/lib/rate-limit-format';
 import AdminCustomDomainsSection from '@/admin/components/AdminCustomDomainsSection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -30,25 +33,6 @@ import {
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
-interface SubdomainStats {
-  totalTenants: number;
-  tenantsWithSubdomains: number;
-  adoptionRate: number;
-  recentAdoptions: number;
-  subdomainList: Array<{
-    subdomain: string;
-    tenantId: string;
-    tenantName?: string;
-    createdAt: string;
-  }>;
-}
-
-interface RateLimitConfig {
-  subdomainCheck: { maxRequests: number; windowMs: number };
-  subdomainCreate: { maxRequests: number; windowMs: number };
-  subdomainResolve: { maxRequests: number; windowMs: number };
-}
-
 type Availability = { available: boolean; reason: string | null; takenBy: { tenantId: string; tenantName: string | null } | null };
 
 const PAGE_SIZE = 20;
@@ -66,7 +50,7 @@ export default function AdminSubdomainPage() {
   const { user } = useAuth();
 
   const [stats, setStats] = useState<SubdomainStats | null>(null);
-  const [rateLimits, setRateLimits] = useState<RateLimitConfig | null>(null);
+  const [rateLimits, setRateLimits] = useState<AdminRateLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
@@ -118,6 +102,17 @@ export default function AdminSubdomainPage() {
     }
   }, []);
 
+  // Read the enforced limits from the backend — the panel used to hardcode them
+  // while claiming they came from the server, so any config change silently made
+  // the dashboard wrong.
+  const fetchRateLimits = useCallback(async () => {
+    try {
+      setRateLimits(await platformHomeService.getAdminRateLimits());
+    } catch (err) {
+      clientLogger.error('Failed to fetch rate limits:', { detail: err });
+    }
+  }, []);
+
   const fetchRows = useCallback(async (nextSearch: string, nextPage: number) => {
     setListLoading(true);
     try {
@@ -142,14 +137,10 @@ export default function AdminSubdomainPage() {
 
   useEffect(() => {
     if (!hasAccess) return;
-    setRateLimits({
-      subdomainCheck: { maxRequests: 10, windowMs: 60 * 1000 },
-      subdomainCreate: { maxRequests: 3, windowMs: 60 * 60 * 1000 },
-      subdomainResolve: { maxRequests: 100, windowMs: 60 * 1000 },
-    });
+    fetchRateLimits();
     fetchSubdomainStats().finally(() => setLoading(false));
     fetchRows('', 1);
-  }, [hasAccess, fetchSubdomainStats, fetchRows]);
+  }, [hasAccess, fetchSubdomainStats, fetchRows, fetchRateLimits]);
 
   // Debounced search
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -386,7 +377,19 @@ export default function AdminSubdomainPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="default">{new Date(item.createdAt).toLocaleDateString()}</Badge>
+                      {/* The assignment date, not the tenant's creation date —
+                          `createdAt` is when the tenant row was created. */}
+                      <span
+                        title={
+                          item.assignedAt
+                            ? `Subdomain assigned ${new Date(item.assignedAt).toLocaleDateString()}`
+                            : 'Assignment date not recorded (assigned before dates were tracked)'
+                        }
+                      >
+                        <Badge variant="default">
+                          {item.assignedAt ? new Date(item.assignedAt).toLocaleDateString() : '—'}
+                        </Badge>
+                      </span>
                       <Button variant="secondary" size="sm" onClick={() => openRename(item)}>
                         <Pencil className="w-3.5 h-3.5 mr-1.5" />
                         Rename
@@ -437,7 +440,7 @@ export default function AdminSubdomainPage() {
                 <p className="text-sm text-neutral-500 dark:text-gray-400">Update subdomain usage statistics</p>
               </div>
               <Button
-                onClick={() => { fetchSubdomainStats(); fetchRows(search, page); }}
+                onClick={() => { fetchSubdomainStats(); fetchRows(search, page); fetchRateLimits(); }}
                 variant="secondary"
                 size="sm"
                 disabled={listLoading}
@@ -452,26 +455,26 @@ export default function AdminSubdomainPage() {
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white">Rate Limiting</h3>
                 <p className="text-xs text-neutral-500 dark:text-gray-400 mt-1">
-                  Values are configured in the backend; shown here for reference.
+                  Read from the backend configuration — the same limits the write routes enforce.
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                   <h4 className="font-medium text-sm text-gray-900 dark:text-white">Subdomain Checks</h4>
                   <p className="text-sm text-neutral-500 dark:text-gray-400 mt-1">
-                    {rateLimits?.subdomainCheck.maxRequests} requests per {Math.floor(rateLimits?.subdomainCheck.windowMs! / 1000 / 60)} minutes
+                    {describeRateLimit(rateLimits?.subdomainCheck)}
                   </p>
                 </div>
                 <div className="p-4 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                   <h4 className="font-medium text-sm text-gray-900 dark:text-white">Subdomain Creation</h4>
                   <p className="text-sm text-neutral-500 dark:text-gray-400 mt-1">
-                    {rateLimits?.subdomainCreate.maxRequests} requests per {Math.floor(rateLimits?.subdomainCreate.windowMs! / 1000 / 60 / 60)} hours
+                    {describeRateLimit(rateLimits?.subdomainCreate)}
                   </p>
                 </div>
                 <div className="p-4 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                   <h4 className="font-medium text-sm text-gray-900 dark:text-white">Subdomain Resolution</h4>
                   <p className="text-sm text-neutral-500 dark:text-gray-400 mt-1">
-                    {rateLimits?.subdomainResolve.maxRequests} requests per {Math.floor(rateLimits?.subdomainResolve.windowMs! / 1000 / 60)} minutes
+                    {describeRateLimit(rateLimits?.subdomainResolve)}
                   </p>
                 </div>
               </div>

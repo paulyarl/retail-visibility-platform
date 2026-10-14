@@ -4,6 +4,7 @@ import { user_role } from '@prisma/client';
 import { prisma, basePrisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requireAdmin } from '../middleware/auth';
 import { isPlatformUser } from '../utils/platform-admin';
+import { readSubdomainAssignedAt } from '../lib/subdomain';
 import { requireRoleGroup } from '../middleware/role-validation';
 import { USER_ROLES } from '../config/role-groups';
 import { TRIAL_CONFIG } from '../config/tenant-limits';
@@ -172,11 +173,14 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
       }
     }
 
-    const toEntry = (tenant: { id: string; name: string; subdomain: string | null; created_at: Date }) => ({
+    const toEntry = (tenant: { id: string; name: string; subdomain: string | null; created_at: Date; metadata: unknown }) => ({
       tenantId: tenant.id,
       tenantName: tenant.name,
       subdomain: tenant.subdomain,
       createdAt: tenant.created_at,
+      // When the subdomain was assigned — `createdAt` is the tenant's creation
+      // date, which is not the subdomain's date.
+      assignedAt: readSubdomainAssignedAt(tenant.metadata),
       url: `${protocol}://${tenant.subdomain}.${platformDomain}${port}`,
       platformDomain,
       isCurrentTenant: requestedTenantId ? tenant.id === requestedTenantId : false
@@ -190,7 +194,8 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
             id: true,
             name: true,
             subdomain: true,
-            created_at: true
+            created_at: true,
+            metadata: true
           }
         }
       }
@@ -215,7 +220,7 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
     if (requestedTenantId && !subdomains.some(s => s.tenantId === requestedTenantId) && isPlatformUser(user)) {
       const tenant = await prisma.tenants.findUnique({
         where: { id: requestedTenantId },
-        select: { id: true, name: true, subdomain: true, created_at: true }
+        select: { id: true, name: true, subdomain: true, created_at: true, metadata: true }
       });
       if (tenant?.subdomain) {
         subdomains.push(toEntry(tenant));

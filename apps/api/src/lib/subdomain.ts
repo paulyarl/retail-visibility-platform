@@ -14,6 +14,7 @@
  * Callers: PUT /api/tenants/:id/subdomain (self-service) and the admin
  * /api/admin/subdomains routes. See docs/SLUG_API_RETIREMENT.md.
  */
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
@@ -99,6 +100,47 @@ export interface SubdomainState {
   subdomain: string | null;
 }
 
+/**
+ * `tenants.metadata` key recording WHEN the subdomain was assigned.
+ *
+ * There is no dedicated column and `tenants.updated_at` is not `@updatedAt` (it
+ * is only written by a few ad-hoc raw statements), so adoption analytics that
+ * filtered on `tenants.created_at` could only ever count brand-new tenants that
+ * happened to have a subdomain — a tenant created last year that adopts one
+ * today was invisible. The stamp lives in metadata (no migration) and is the
+ * only source for "when did this tenant adopt a subdomain".
+ */
+export const SUBDOMAIN_ASSIGNED_AT_KEY = 'subdomainAssignedAt';
+
+/** ISO timestamp from `tenants.metadata.subdomainAssignedAt`, or null when unrecorded. */
+export function readSubdomainAssignedAt(metadata: unknown): string | null {
+  const value = (metadata as Record<string, unknown> | null | undefined)?.[SUBDOMAIN_ASSIGNED_AT_KEY];
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : null;
+}
+
+/** True when the subdomain was assigned at/after `since`. Unrecorded → false. */
+export function wasSubdomainAssignedSince(metadata: unknown, since: Date): boolean {
+  const assignedAt = readSubdomainAssignedAt(metadata);
+  return assignedAt !== null && new Date(assignedAt) >= since;
+}
+
+/**
+ * `metadata` with the assignment stamp set (or cleared when `assignedAt` is
+ * null), preserving every other key — tenants.metadata also carries
+ * `isHeroLocation`, `stripeSubscriptionId`, and operator-set flags.
+ */
+export function withSubdomainAssignedAt(metadata: unknown, assignedAt: string | null): Record<string, unknown> {
+  const base =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? { ...(metadata as Record<string, unknown>) }
+      : {};
+
+  if (assignedAt === null) delete base[SUBDOMAIN_ASSIGNED_AT_KEY];
+  else base[SUBDOMAIN_ASSIGNED_AT_KEY] = assignedAt;
+
+  return base;
+}
+
 export type AssignSubdomainResult =
   | { ok: true; before: SubdomainState; after: SubdomainState }
   | { ok: false; code: SubdomainFailureCode };
@@ -117,7 +159,7 @@ export async function assignSubdomain(tenantId: string, rawValue: string): Promi
 
   const before = await prisma.tenants.findUnique({
     where: { id: tenantId },
-    select: { slug: true, subdomain: true },
+    select: { slug: true, subdomain: true, metadata: true },
   });
   if (!before) {
     return { ok: false, code: 'tenant_not_found' };
@@ -136,9 +178,19 @@ export async function assignSubdomain(tenantId: string, rawValue: string): Promi
     throw error;
   }
 
-  await prisma.tenants.update({ where: { id: tenantId }, data: { subdomain } });
+  await prisma.tenants.update({
+    where: { id: tenantId },
+    data: {
+      subdomain,
+      metadata: withSubdomainAssignedAt(before.metadata, new Date().toISOString()) as Prisma.InputJsonValue,
+    },
+  });
 
-  return { ok: true, before, after: { slug: subdomain, subdomain } };
+  return {
+    ok: true,
+    before: { slug: before.slug, subdomain: before.subdomain },
+    after: { slug: subdomain, subdomain },
+  };
 }
 
 export type ClearSubdomainResult =
@@ -152,14 +204,26 @@ export type ClearSubdomainResult =
 export async function clearSubdomain(tenantId: string): Promise<ClearSubdomainResult> {
   const before = await prisma.tenants.findUnique({
     where: { id: tenantId },
-    select: { slug: true, subdomain: true },
+    select: { slug: true, subdomain: true, metadata: true },
   });
   if (!before) {
     return { ok: false, code: 'tenant_not_found' };
   }
 
-  await prisma.tenants.update({ where: { id: tenantId }, data: { subdomain: null } });
+  await prisma.tenants.update({
+    where: { id: tenantId },
+    data: {
+      subdomain: null,
+      // Drop the stamp with the subdomain — a later re-assignment gets a fresh
+      // one, so the adoption date never describes a removed subdomain.
+      metadata: withSubdomainAssignedAt(before.metadata, null) as Prisma.InputJsonValue,
+    },
+  });
   logger.info(`[Subdomain] Cleared subdomain for tenant ${tenantId} (slug retained: ${before.slug ?? 'none'})`);
 
-  return { ok: true, before, after: { slug: before.slug, subdomain: null } };
+  return {
+    ok: true,
+    before: { slug: before.slug, subdomain: before.subdomain },
+    after: { slug: before.slug, subdomain: null },
+  };
 }

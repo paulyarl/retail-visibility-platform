@@ -13,8 +13,10 @@ import {
   assignSubdomain,
   clearSubdomain,
   checkSubdomainAvailability,
+  readSubdomainAssignedAt,
   type SubdomainFailureCode,
 } from '../lib/subdomain';
+import { RATE_LIMITS } from '../config/rate-limits';
 import { audit } from '../audit';
 import { logger } from '../logger';
 
@@ -64,7 +66,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     const [rows, total] = await Promise.all([
       prisma.tenants.findMany({
         where,
-        select: { id: true, name: true, slug: true, subdomain: true, created_at: true, updated_at: true },
+        select: { id: true, name: true, slug: true, subdomain: true, created_at: true, updated_at: true, metadata: true },
         orderBy: { created_at: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -80,6 +82,9 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
         slug: r.slug,
         subdomain: r.subdomain,
         createdAt: r.created_at,
+        // When the subdomain was assigned (metadata stamp) — NOT the tenant's
+        // creation date, which is what the list used to render as "the date".
+        assignedAt: readSubdomainAssignedAt(r.metadata),
         updatedAt: r.updated_at,
       })),
       total,
@@ -115,6 +120,16 @@ router.get('/check', requirePlatformAdmin, async (req: Request, res: Response) =
     logger.error('[GET /api/admin/subdomains/check] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to check availability' });
   }
+});
+
+/**
+ * GET /api/admin/subdomains/rate-limits
+ * The limits the write routes actually enforce (config/rate-limits.ts), so the
+ * admin dashboard's "Rate Limiting" panel reflects the backend instead of a
+ * hardcoded copy that silently drifts.
+ */
+router.get('/rate-limits', requirePlatformAdmin, (_req: Request, res: Response) => {
+  return res.json({ success: true, data: RATE_LIMITS });
 });
 
 /**

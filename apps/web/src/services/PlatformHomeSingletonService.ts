@@ -13,6 +13,7 @@ import TenantApiSingleton from '@/providers/base/TenantApiSingleton';
 import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { unifiedCapabilityService } from './UnifiedCapabilityService';
 import { clientLogger } from '@/lib/client-logger';
+import { unwrapApiBody } from '@/lib/api-envelope';
 
 export interface Tenant {
   id: string;
@@ -352,6 +353,8 @@ export interface SubdomainStats {
     tenantId: string;
     tenantName?: string;
     createdAt: string;
+    /** When the subdomain was assigned — null when unrecorded (pre-stamp rows). */
+    assignedAt: string | null;
   }>;
 }
 
@@ -361,7 +364,16 @@ export interface AdminSubdomainRow {
   slug: string | null;
   subdomain: string | null;
   createdAt: string;
+  /** When the subdomain was assigned — null when unrecorded (pre-stamp rows). */
+  assignedAt: string | null;
   updatedAt: string | null;
+}
+
+/** The limits the write routes actually enforce (config/rate-limits.ts). */
+export interface AdminRateLimits {
+  subdomainCheck: { maxRequests: number; windowMs: number };
+  subdomainCreate: { maxRequests: number; windowMs: number };
+  subdomainResolve: { maxRequests: number; windowMs: number };
 }
 
 export interface AdminSubdomainListResult {
@@ -1778,6 +1790,30 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     return result.data || null;
+  }
+
+  /**
+   * Admin subdomain rate limits — read from the backend config so the dashboard
+   * panel reflects what is enforced instead of a hardcoded copy.
+   */
+  async getAdminRateLimits(): Promise<AdminRateLimits | null> {
+    const result = await this.makeDefaultRequest<AdminRateLimits>(
+      '/api/admin/subdomains/rate-limits',
+      {},
+      'platform-admin-subdomain-rate-limits',
+      60 * 1000,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
+    );
+
+    if (!result.success) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin rate limits:', { detail: result.error });
+      return null;
+    }
+
+    return unwrapApiBody<AdminRateLimits>(result);
   }
 
   /**

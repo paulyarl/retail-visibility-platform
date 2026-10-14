@@ -408,7 +408,9 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
                       {subdomain.tenantName}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-neutral-500">
-                      Created {new Date(subdomain.createdAt).toLocaleDateString()}
+                      {subdomain.assignedAt
+                        ? `Assigned ${new Date(subdomain.assignedAt).toLocaleDateString()}`
+                        : 'Assignment date not recorded'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

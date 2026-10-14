@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { readSubdomainAssignedAt, wasSubdomainAssignedSince } from '../lib/subdomain';
 
 const router = Router();
 
@@ -65,6 +66,7 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
         name: true,
         subdomain: true,
         created_at: true,
+        metadata: true,
       },
       orderBy: {
         created_at: 'desc'
@@ -76,12 +78,15 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
     const tenantsWithSubdomains = subdomainStats.length;
     const adoptionRate = totalTenants > 0 ? (tenantsWithSubdomains / totalTenants) * 100 : 0;
 
-    // Recent subdomain adoptions (last 30 days)
+    // Recent subdomain adoptions (last 30 days) — measured from the assignment
+    // stamp, not `tenants.created_at`: filtering on creation date only ever
+    // counted new tenants that happened to have a subdomain, so an established
+    // tenant adopting one today was invisible.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const recentAdoptions = subdomainStats.filter((tenant: { created_at: Date }) =>
-      tenant.created_at >= thirtyDaysAgo
+    const recentAdoptions = subdomainStats.filter((tenant) =>
+      wasSubdomainAssignedSince(tenant.metadata, thirtyDaysAgo)
     ).length;
 
     res.json({
@@ -91,11 +96,12 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
         tenantsWithSubdomains,
         adoptionRate: Math.round(adoptionRate * 100) / 100,
         recentAdoptions,
-        subdomainList: subdomainStats.map((tenant: { subdomain: string | null; id: string; name: string; created_at: Date }) => ({
+        subdomainList: subdomainStats.map((tenant) => ({
           subdomain: tenant.subdomain,
           tenantId: tenant.id,
           tenantName: tenant.name,
-          createdAt: tenant.created_at
+          createdAt: tenant.created_at,
+          assignedAt: readSubdomainAssignedAt(tenant.metadata)
         }))
       }
     });
