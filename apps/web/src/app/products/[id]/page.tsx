@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { Metadata } from 'next';
+import { isTenantHostName } from '@/lib/storefront-routing';
 import ProductGallery from '@/components/products/ProductGallery';
 
 // Tier Based Landing Page
@@ -530,7 +532,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';
   const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== 'undefined' ? window.location.origin : '') || 'http://localhost:3000';
+  // Share/QR URL is host-aware: on a tenant host (platform subdomain or
+  // custom domain) it encodes that host's origin so the canonical URL stays
+  // on the merchant surface; on the platform app it's the platform origin.
+  const requestHost = (await headers()).get('host') || '';
+  const baseUrl = isTenantHostName(requestHost)
+    ? `https://${requestHost}`
+    : process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/products/${product.id}`;
 
   // Enhanced structured data with business profile and SEO tags

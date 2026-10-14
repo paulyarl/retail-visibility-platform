@@ -6,6 +6,7 @@ import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@m
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
 import { PublicTenantInfo, LocationStatusInfo } from '@/services/TenantPublicService';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface Product {
   id: string;
@@ -41,6 +42,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
 
   const productTitle = product.title || product.name;
   const businessName = tenant.metadata?.businessName || tenant.name;
+  const sp = useStorefrontPath(product.tenantId);
   const shareText = variant === 'product'
     ? `Check out "${productTitle}" from ${businessName} - $${product.price}`
     : `Check out ${businessName} - great products and deals!`;
@@ -167,9 +169,9 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
           {/* Visit Storefront Link - Only on product pages */}
           {variant === 'product' && (
             <a
-              href={`/tenant/${tenant.slug ? tenant.slug : product.tenantId}`}
+              href={sp('/')}
               className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              title="Visit the full storefront"
+              title={`Visit ${businessName} — full storefront`}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

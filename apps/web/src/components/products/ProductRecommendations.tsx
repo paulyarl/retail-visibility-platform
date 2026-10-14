@@ -7,6 +7,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { Button } from '../ui';
 import { clientLogger } from '@/lib/client-logger';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface RecommendedProduct {
   id: string;
@@ -41,6 +42,7 @@ interface ProductRecommendationsProps {
 export function ProductRecommendations({ productId, tenantId, tenantSlug, productCategory, productCategorySlug, priority }: ProductRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const sp = useStorefrontPath(tenantId);
 
   useEffect(() => {
     let abortController = new AbortController();
@@ -215,7 +217,7 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
       {/* Browse More Link */}
       {recommendations.length >= 6 && (
         <div className="mt-8 text-center">           
-          <Button    onClick={() => window.location.href = `/tenant/${tenantSlug ? tenantSlug : tenantId}`}
+          <Button    onClick={() => window.location.href = sp('/')}
                           variant="gradient" style={{ color: 'white' }} size='lg'
                           className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
                         >

@@ -21,6 +21,7 @@ import { AddToCartButton } from './AddToCartButton';
 import VariantPopupModal from './VariantPopupModal';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 // Enhanced product interface matching the new API response
 export interface EnhancedProductData {
@@ -135,6 +136,7 @@ export default function EnhancedStorefrontProductCard({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
+  const sp = useStorefrontPath(tenantId);
 
   // Get payment gateway status from context with same priority as SmartProductCard
   // Priority: context (when loaded) > prop > product data
@@ -326,12 +328,11 @@ export default function EnhancedStorefrontProductCard({
                     radius="sm"
                     leftSection={<Tag size={10} />}
                     component="a"
-                    href={`/tenant/${tenantSlug}?category=${product.categorySlug}`}
+                    href={sp(`/?category=${product.categorySlug}`)}
                     style={{ textDecoration: 'none' }}
                     onClick={(e) => {
                       e.preventDefault();
-                      // Navigate to category filter using tenant ID (not slug)
-                      window.location.href = `/tenant/${tenantId}?category=${product.categorySlug}`;
+                      window.location.href = sp(`/?category=${product.categorySlug}`);
                     }}
                   >
                     {product.categoryName}
@@ -498,12 +499,11 @@ export default function EnhancedStorefrontProductCard({
                     radius="md"
                     leftSection={<Tag size={12} />}
                     component="a"
-                    href={`/tenant/${tenantSlug}?category=${product.categorySlug}`}
+                    href={sp(`/?category=${product.categorySlug}`)}
                     style={{ textDecoration: 'none' }}
                     onClick={(e) => {
                       e.preventDefault();
-                      // Navigate to category filter using tenant ID (not slug)
-                      window.location.href = `/tenant/${tenantId}?category=${product.categorySlug}`;
+                      window.location.href = sp(`/?category=${product.categorySlug}`);
                     }}
                   >
                     {product.categoryName}
@@ -775,12 +775,11 @@ export default function EnhancedStorefrontProductCard({
                     radius="md"
                     leftSection={<Tag size={12} />}
                     component="a"
-                    href={`/tenant/${tenantSlug}?category=${product.categorySlug}`}
+                    href={sp(`/?category=${product.categorySlug}`)}
                     style={{ textDecoration: 'none' }}
                     onClick={(e) => {
                       e.preventDefault();
-                      // Navigate to category filter using tenant ID (not slug)
-                      window.location.href = `/tenant/${tenantId}?category=${product.categorySlug}`;
+                      window.location.href = sp(`/?category=${product.categorySlug}`);
                     }}
                   >
                     {product.categoryName}

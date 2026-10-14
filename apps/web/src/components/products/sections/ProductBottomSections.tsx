@@ -6,6 +6,7 @@ import { ProductDetailTabs } from '@/app/products/[id]/layouts/shared/ProductDet
 import ProductActions from '@/components/products/ProductActions';
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { ChevronDown, MapPin, Phone, Clock } from 'lucide-react';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 type LayoutVariant = 'classic' | 'showcase' | 'quick-commerce';
 
@@ -37,6 +38,7 @@ export function ProductBottomSections({
   hoursStatus,
 }: ProductBottomSectionsProps) {
   const isQuickCommerce = layoutVariant === 'quick-commerce';
+  const sp = useStorefrontPath(product.tenantId);
   const sectionClass = isQuickCommerce
     ? 'bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden'
     : 'bg-white dark:bg-neutral-900 rounded-xl shadow-sm overflow-hidden';
@@ -103,7 +105,7 @@ export function ProductBottomSections({
                 </p>
               )}
               <Link
-                href={`/tenant/${product.tenantId}`}
+                href={sp('/')}
                 className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline text-sm font-medium"
               >
                 Visit store page →

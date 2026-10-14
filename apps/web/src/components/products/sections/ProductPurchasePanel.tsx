@@ -11,6 +11,7 @@ import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { LocationAvailabilitySection } from '@/components/products/LocationAvailabilitySection';
 import { Package, Download, Globe, Calendar } from 'lucide-react';
 import { SocialShareButtons } from '../type-sections/SocialShareButtons';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 type LayoutVariant = 'classic' | 'showcase' | 'quick-commerce';
 
@@ -117,6 +118,8 @@ export function ProductPurchasePanel({
   const isDigitalProduct = product.productType === 'digital';
   const isPhysicalProduct = !product.productType || product.productType === 'physical';
   const isSocialStorefront = storefrontType === 'social';
+  const sp = useStorefrontPath(product.tenantId);
+  const storefrontName = tenant?.businessName || tenant?.metadata?.businessName || tenant?.name || 'the store';
   const canShare = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseShareButtons) || isSocialStorefront;
   const spaceY = isQuickCommerce ? 'space-y-4' : 'space-y-6';
   const titleClass = isQuickCommerce
@@ -172,8 +175,8 @@ export function ProductPurchasePanel({
       {/* Category badge link */}
       {product.tenantCategory && (
         <Link
-          title={`Browse to store's ${categoryName} products`}
-          href={`/tenant/${product.tenantId}?category=${categorySlug}`}
+          title={`Browse ${categoryName} at ${storefrontName}`}
+          href={sp(`/?category=${categorySlug}`)}
           className={
             isQuickCommerce
               ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors no-underline'

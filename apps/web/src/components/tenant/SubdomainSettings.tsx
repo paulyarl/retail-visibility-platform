@@ -262,10 +262,11 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
                 href={getSubdomainUrl(currentSubdomain)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-auto inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                className="ml-auto inline-flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                title={`Visit ${businessName || 'your'} storefront at ${currentSubdomain}.${platformDomain}`}
               >
                 <ExternalLink className="w-3 h-3" />
-                Visit
+                Visit your subdomain storefront
               </a>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">

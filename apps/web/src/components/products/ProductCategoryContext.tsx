@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronRight, Package, DollarSign, Image } from 'lucide-react';
+import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
 
 interface Category {
   id: string;
@@ -27,6 +28,7 @@ export default function ProductCategoryContext({
   allCategories, 
   totalProducts 
 }: ProductCategoryContextProps) {
+  const sp = useStorefrontPath(tenantId);
   // Find related categories (same parent or similar price range)
   const relatedCategories = allCategories
     .filter(cat => cat.id !== currentCategory.id)
@@ -103,7 +105,7 @@ export default function ProductCategoryContext({
             {relatedCategories.map((category) => (
               <Link
                 key={category.id}
-                href={`/tenant/${tenantId}?category=${category.slug}`}
+                href={sp(`/?category=${category.slug}`)}
                 className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -129,7 +131,7 @@ export default function ProductCategoryContext({
       {/* Browse All Categories */}
       <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
         <Link
-          href={`/tenant/${tenantId}`}
+          href={sp('/')}
           className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
         >
           Browse All Categories ({totalProducts} products)
