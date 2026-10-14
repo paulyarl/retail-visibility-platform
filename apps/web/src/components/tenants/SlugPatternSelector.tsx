@@ -64,6 +64,14 @@ export default function SlugPatternSelector({
   const [patterns, setPatterns] = useState<SlugPattern[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Free-text entry — a tenant may type their own slug; it gets the same
+  // availability ruleset as the generated patterns before it can be selected.
+  const [customInput, setCustomInput] = useState('');
+  const [customStatus, setCustomStatus] = useState<{
+    state: 'idle' | 'checking' | 'available' | 'unavailable';
+    reason?: string;
+    own?: boolean;
+  }>({ state: 'idle' });
   // The debounced fetch resolves after more keystrokes; always call the latest props
   const onSlugSelectRef = useRef(onSlugSelect);
   const selectedSlugRef = useRef(selectedSlug);
@@ -120,6 +128,36 @@ export default function SlugPatternSelector({
     const timeoutId = setTimeout(fetchPatterns, 500);
     return () => clearTimeout(timeoutId);
   }, [businessName, location?.city, location?.state, location?.country, tenantId, namespace, refreshKey]);
+
+  const customSlug = customInput
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  // Debounced availability check for the free-text entry. An available typed
+  // slug auto-selects so the tenant can just type and hit save.
+  useEffect(() => {
+    if (!customSlug) {
+      setCustomStatus({ state: 'idle' });
+      return;
+    }
+    setCustomStatus({ state: 'checking' });
+    const timeoutId = setTimeout(async () => {
+      try {
+        const result = await tenantSlugService.checkSlugAvailability(customSlug, tenantId, namespace);
+        setCustomStatus(
+          result.available
+            ? { state: 'available', own: result.ownedByCurrentUser }
+            : { state: 'unavailable', reason: result.code }
+        );
+        if (result.available) onSlugSelectRef.current(customSlug);
+      } catch (err) {
+        clientLogger.error('Error checking slug availability:', { detail: err });
+        setCustomStatus({ state: 'idle' });
+      }
+    }, 600);
+    return () => clearTimeout(timeoutId);
+  }, [customSlug, tenantId, namespace]);
 
   if (!businessName || businessName.trim().length < 2) {
     return (
@@ -254,6 +292,75 @@ export default function SlugPatternSelector({
               </div>
             );
           })}
+
+          {/* Free-text entry — same availability ruleset as the suggestions */}
+          <div
+            className={`
+              relative flex items-start p-4 rounded-lg border-2 transition-all
+              ${customSlug && selectedSlug === customSlug
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-dashed border-gray-300 bg-white'
+              }
+            `}
+          >
+            <div className="flex items-center h-5">
+              <RadioGroupItem
+                value={customSlug || '__custom__'}
+                id="slug-custom"
+                disabled={!customSlug || customStatus.state !== 'available'}
+                className="mt-0.5"
+              />
+            </div>
+            <div className="ml-3 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <code className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
+                  {customSlug || 'custom-slug'}
+                </code>
+                {customStatus.state === 'checking' && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Checking
+                  </Badge>
+                )}
+                {customStatus.state === 'available' && (
+                  customStatus.own ? (
+                    <Badge variant="success" className="text-xs bg-purple-600">
+                      <Check className="h-3 w-3 mr-1" />
+                      Yours
+                    </Badge>
+                  ) : (
+                    <Badge variant="success" className="text-xs bg-green-600">
+                      <Check className="h-3 w-3 mr-1" />
+                      Available
+                    </Badge>
+                  )
+                )}
+                {customStatus.state === 'unavailable' && (
+                  <Badge variant="error" className="text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {customStatus.reason === 'invalid_subdomain'
+                      ? 'Invalid'
+                      : customStatus.reason === 'reserved_subdomain'
+                        ? 'Reserved'
+                        : 'Taken'}
+                  </Badge>
+                )}
+              </div>
+              <input
+                type="text"
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onFocus={() => {
+                  if (customSlug && customStatus.state === 'available') onSlugSelect(customSlug);
+                }}
+                placeholder="Or type your own…"
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Lowercase letters, numbers, and hyphens{namespace === 'subdomain' ? ', up to 30 characters' : ''} — checked for availability as you type.
+              </p>
+            </div>
+          </div>
         </div>
       </RadioGroup>
 

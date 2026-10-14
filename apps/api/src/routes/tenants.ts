@@ -8,7 +8,7 @@ import { Router, Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
-import { assignSubdomain, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
+import { assignSubdomain, checkSubdomainAvailability, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
 import { customDomainService } from '../services/CustomDomainService';
 
 // HTTP-facing copy for the shared subdomain helper's failure codes.
@@ -546,26 +546,13 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
       });
     }
 
-    // Basic validation
-    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]$/;
-    const isValid = subdomainRegex.test(subdomain);
+    // Delegate to the shared ruleset — format + reserved + cross-namespace
+    // (tenants.subdomain, tenants.slug, directory_settings_list.slug). This
+    // endpoint previously only probed tenants.subdomain, which could report
+    // "available" for a value the PUT write path would reject.
+    const availability = await checkSubdomainAvailability(subdomain);
 
-    if (!isValid) {
-      return res.json({
-        available: false,
-        valid: false,
-        message: 'Invalid subdomain format'
-      });
-    }
-
-    // Check if subdomain exists
-    const existingTenant = await prisma.tenants.findFirst({
-      where: { subdomain },
-      select: { id: true, name: true }
-    });
-
-    // If no tenant has this subdomain, it's available
-    if (!existingTenant) {
+    if (availability.available) {
       return res.json({
         available: true,
         valid: true,
@@ -575,8 +562,38 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
       });
     }
 
-    // If the existing tenant is owned by the current user, they can reuse it
-    const ownedByCurrentUser = tenantIds.includes(existingTenant.id);
+    if (availability.code === 'invalid_subdomain') {
+      return res.json({
+        available: false,
+        valid: false,
+        subdomain,
+        code: 'invalid_subdomain',
+        message: 'Invalid subdomain format'
+      });
+    }
+
+    if (availability.code === 'reserved_subdomain') {
+      return res.json({
+        available: false,
+        valid: true,
+        subdomain,
+        code: 'reserved_subdomain',
+        message: 'This subdomain is reserved'
+      });
+    }
+
+    // Taken — but if the holder is one of the caller's own tenants (via
+    // tenants.subdomain/slug or the directory slug mirror), they can reuse it.
+    let ownedByCurrentUser = availability.takenBy
+      ? tenantIds.includes(availability.takenBy.tenantId)
+      : false;
+    if (!ownedByCurrentUser && !availability.takenBy) {
+      const settingsRow = await prisma.directory_settings_list.findFirst({
+        where: { slug: subdomain },
+        select: { tenant_id: true },
+      });
+      ownedByCurrentUser = !!settingsRow && tenantIds.includes(settingsRow.tenant_id);
+    }
 
     if (ownedByCurrentUser) {
       return res.json({
@@ -585,15 +602,15 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
         subdomain,
         message: 'This is your current subdomain',
         ownedByCurrentUser: true,
-        tenantName: existingTenant.name
+        tenantName: availability.takenBy?.tenantName
       });
     }
 
-    // Subdomain is taken by another tenant
     res.json({
       available: false,
       valid: true,
       subdomain,
+      code: 'subdomain_taken',
       message: 'Subdomain is already taken by another tenant',
       ownedByCurrentUser: false
     });

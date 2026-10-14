@@ -34,6 +34,14 @@ export interface SlugPatternParams {
   namespace?: 'directory' | 'subdomain';
 }
 
+export interface SlugAvailabilityResult {
+  available: boolean;
+  valid?: boolean;
+  /** 'invalid_subdomain' | 'reserved_subdomain' | 'subdomain_taken' when not available. */
+  code?: string;
+  ownedByCurrentUser?: boolean;
+}
+
 export interface TenantSlug {
   slug: string;
   tenantId: string;
@@ -139,6 +147,38 @@ class TenantSlugService extends TenantApiSingleton {
   }
 
   /**
+   * Check a free-text slug for availability. Uncached — availability is
+   * inherently time-sensitive and both backing endpoints are rate-limited.
+   * 'subdomain' hits GET /api/tenants/check-subdomain (full subdomain
+   * ruleset); 'directory' hits POST /api/slugs/check-availability.
+   */
+  async checkSlugAvailability(
+    slug: string,
+    tenantId?: string,
+    namespace: 'directory' | 'subdomain' = 'directory'
+  ): Promise<SlugAvailabilityResult> {
+    if (namespace === 'subdomain') {
+      const response = await this.makeDefaultRequest<any>(
+        `/api/tenants/check-subdomain/${encodeURIComponent(slug)}`
+      );
+      const d = response?.data ?? response;
+      return {
+        available: !!d?.available,
+        valid: d?.valid,
+        code: d?.code,
+        ownedByCurrentUser: d?.ownedByCurrentUser,
+      };
+    }
+
+    const response = await this.makeDefaultRequest<any>('/api/slugs/check-availability', {
+      method: 'POST',
+      body: JSON.stringify({ slug, excludeTenantId: tenantId }),
+    });
+    const d = response?.data ?? response;
+    return { available: !!d?.isAvailable };
+  }
+
+  /**
    * Generate slug patterns for tenant URL
    * Uses the /api/slugs/patterns endpoint
    */
@@ -187,24 +227,6 @@ class TenantSlugService extends TenantApiSingleton {
     } catch (error) {
       clientLogger.error('[TenantSlugService] Failed to get slug patterns:', { detail: error });
       throw error;
-    }
-  }
-
-  /**
-   * Check if a specific slug is available
-   */
-  async checkSlugAvailability(slug: string): Promise<boolean> {
-    try {
-      const patterns = await this.getSlugPatterns({
-        businessName: slug,
-        location: {}
-      });
-
-      const pattern = patterns.find(p => p.slug === slug);
-      return pattern ? pattern.isAvailable : false;
-    } catch (error) {
-      clientLogger.error('[TenantSlugService] Failed to check slug availability:', { detail: error });
-      return false;
     }
   }
 }
