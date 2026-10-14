@@ -304,6 +304,9 @@ export default function FeatureOverridesPage() {
       let result;
       switch (selectedType) {
         case 'feature':
+          if (!newOverride.tenantId || !newOverride.feature) {
+            throw new Error('Tenant and feature are required');
+          }
           result = await featureOverridesService.createFeatureOverride({
             organizationId: newOverride.organizationId || undefined,
             tenantId: newOverride.tenantId || undefined,
@@ -623,26 +626,38 @@ export default function FeatureOverridesPage() {
         description="Create a new feature, pricing, or limits override"
       >
         <div className="space-y-4">
-          {/* Override Type Selection */}
+          {/* Override Type Selection — only 'feature' is wired to a live API
+              contract; pricing/limits/featured require fields this form doesn't
+              collect, and tenant_limits has no backend route at all */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Override Type *</label>
-            <div className="flex gap-2">
-              {(['feature', 'pricing', 'limits', 'featured_products', 'tenant_limits'] as OverrideType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => handleTypeChange(type)}
-                  className={`px-3 py-2 rounded-lg border text-sm ${
-                    selectedType === type
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {type === 'featured_products' ? 'Featured Products' : 
-                   type === 'tenant_limits' ? 'Tenant Limits' :
-                   type.charAt(0).toUpperCase() + type.slice(1)}
-                </button>
-              ))}
+            <div className="flex gap-2 flex-wrap">
+              {(['feature', 'pricing', 'limits', 'featured_products', 'tenant_limits'] as OverrideType[]).map((type) => {
+                const supported = type === 'feature';
+                return (
+                  <button
+                    key={type}
+                    onClick={() => supported && handleTypeChange(type)}
+                    disabled={!supported}
+                    title={supported ? undefined : 'Not yet supported by the overrides API'}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      !supported
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                        : selectedType === type
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {type === 'featured_products' ? 'Featured Products' :
+                     type === 'tenant_limits' ? 'Tenant Limits' :
+                     type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                );
+              })}
             </div>
+            <p className="mt-1.5 text-xs text-gray-500">
+              Only feature overrides are currently supported by the API. Pricing, limits, and featured overrides require backend contract work.
+            </p>
           </div>
 
           {/* Organization/Tenant Selection */}
@@ -663,13 +678,14 @@ export default function FeatureOverridesPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tenant</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tenant *</label>
             <Select
               value={newOverride.tenantId}
               onChange={(e) => setNewOverride(prev => ({ ...prev, tenantId: e.target.value }))}
               disabled={loadingDropdowns}
+              required
             >
-              <option value="">Select tenant (optional)</option>
+              <option value="">Select tenant</option>
               {tenants.map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
                   {tenant.name} ({tenant.subscription_tier})

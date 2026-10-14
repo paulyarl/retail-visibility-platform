@@ -254,13 +254,22 @@ export class FeatureOverridesService extends AdminApiSingleton {
 
   /**
    * Create feature override
+   * API contract: POST /api/admin/feature-overrides (root path), snake expires_at,
+   * requires granted boolean. Feature overrides are tenant-scoped only —
+   * tenant_feature_overrides_list has no organization_id column.
    */
   async createFeatureOverride(data: CreateFeatureOverrideData): Promise<FeatureOverride | null> {
     const response = await this.makeDefaultRequest<FeatureOverride>(
-      '/api/admin/feature-overrides/feature',
+      '/api/admin/feature-overrides',
       {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          tenantId: data.tenantId,
+          feature: data.feature,
+          granted: true,
+          reason: data.reason,
+          expires_at: data.expiresAt ? new Date(`${data.expiresAt}T23:59:59Z`).toISOString() : undefined,
+        }),
       },
       'feature-overrides-create',
       0 // No cache for create operations
@@ -317,7 +326,7 @@ export class FeatureOverridesService extends AdminApiSingleton {
    */
   async createFeaturedProductsOverride(data: CreateFeaturedProductsOverrideData): Promise<FeaturedProductsOverride | null> {
     const response = await this.makeDefaultRequest<FeaturedProductsOverride>(
-      '/api/admin/feature-overrides/featured-products',
+      '/api/admin/feature-overrides/featured',
       {
         method: 'POST',
         body: JSON.stringify(data),
@@ -354,13 +363,15 @@ export class FeatureOverridesService extends AdminApiSingleton {
 
   /**
    * Update override status
+   * API contract: PUT /api/admin/feature-overrides/:id with { granted, reason }
+   * — the table models status as a granted boolean.
    */
   async updateOverrideStatus(overrideId: string, status: OverrideStatus, reason?: string): Promise<Override | null> {
     const response = await this.makeDefaultRequest<Override>(
-      `/api/admin/feature-overrides/${overrideId}/status`,
+      `/api/admin/feature-overrides/${overrideId}`,
       {
         method: 'PUT',
-        body: JSON.stringify({ status, reason }),
+        body: JSON.stringify({ granted: status === 'active', reason }),
       },
       `feature-overrides-update-${overrideId}`,
       0
