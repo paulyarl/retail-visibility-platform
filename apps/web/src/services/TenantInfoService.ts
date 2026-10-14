@@ -12,6 +12,7 @@ import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { unifiedCapabilityService } from './UnifiedCapabilityService';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { clientLogger } from '@/lib/client-logger';
+import { unwrapApiBody } from '@/lib/api-envelope';
 
 export interface PaymentGateway {
   id: string;
@@ -1151,7 +1152,9 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
-   * Get tenant subdomain
+   * Get the tenant record (including its platform subdomain).
+   * Returns the unwrapped tenant object, not the response envelope — the
+   * envelope shape is ApiResult → body → body.data.
    */
   async getTenantSubdomain(tenantId: string): Promise<any> {
     try {
@@ -1166,7 +1169,12 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      if (!result.success) {
+        clientLogger.error('[TenantInfoService] Failed to get tenant subdomain:', { detail: result.error });
+        throw new Error(getErrorMessage(result.error) || 'Failed to get tenant subdomain');
+      }
+
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[TenantInfoService] Failed to get tenant subdomain:', { detail: error });
       throw error;
@@ -1193,7 +1201,7 @@ class TenantInfoService extends TenantApiSingleton {
         throw new Error(getErrorMessage(result.error) || 'Failed to get user subdomains');
       }
 
-      return result.data;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[TenantInfoService] Failed to get user subdomains:', { detail: error });
       throw error;

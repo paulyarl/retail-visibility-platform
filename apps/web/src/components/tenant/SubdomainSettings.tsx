@@ -94,11 +94,11 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
 
   const loadCurrentSubdomain = async () => {
     try {
-      const raw = await tenantInfoService.getTenantSubdomain(tenantId);
-      const data = raw?.data ?? raw;
-      setCurrentSubdomain(data?.subdomain || '');
+      // Service returns the unwrapped tenant record (ApiResult → body → tenant).
+      const tenant = await tenantInfoService.getTenantSubdomain(tenantId);
+      setCurrentSubdomain(tenant?.subdomain || '');
       // Seed the picker with the current value so it shows as "Yours".
-      if (data?.subdomain) setSelectedSlug(data.subdomain);
+      if (tenant?.subdomain) setSelectedSlug(tenant.subdomain);
     } catch (error) {
       clientLogger.error('Failed to load current subdomain:', { detail: error });
     }
@@ -108,10 +108,12 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     try {
       setLoadingSubdomains(true);
       const data = await tenantInfoService.getUserSubdomains(tenantId);
-      // Use API-provided URLs directly - they are dynamically detected based on request host
-      setUserSubdomains(data.subdomains || []);
-      setPlatformDomain(data.platformDomain || 'visibleshelf.com');
-      setPlatformUrl(data.platformUrl || 'visibleshelf.com');
+      setUserSubdomains(data?.subdomains || []);
+      // Only override the hostname-derived platform domain when the API actually
+      // reports one — a hardcoded fallback would mislabel .store installs.
+      const apiPlatformDomain = data?.platformDomain || data?.subdomains?.[0]?.platformDomain;
+      if (apiPlatformDomain) setPlatformDomain(apiPlatformDomain);
+      if (data?.platformUrl) setPlatformUrl(data.platformUrl);
     } catch (error) {
       clientLogger.error('Failed to load user subdomains:', { detail: error });
     } finally {
@@ -125,8 +127,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
   // city/state/country; the profile is only fetched as a name fallback.
   const loadBusinessContext = async () => {
     try {
-      const raw = await tenantInfoService.getTenantSubdomain(tenantId);
-      const tenant = raw?.data ?? raw;
+      const tenant = await tenantInfoService.getTenantSubdomain(tenantId);
       const profile = tenant?.name
         ? null
         : await tenantProfileService.getTenantProfile(tenantId).catch(() => null);

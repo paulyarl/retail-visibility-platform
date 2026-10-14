@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { user_role } from '@prisma/client';
 import { prisma, basePrisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requireAdmin } from '../middleware/auth';
+import { isPlatformUser } from '../utils/platform-admin';
 import { requireRoleGroup } from '../middleware/role-validation';
 import { USER_ROLES } from '../config/role-groups';
 import { TRIAL_CONFIG } from '../config/tenant-limits';
@@ -153,6 +154,34 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
     const userId = user?.userId || user?.user_id || user?.id;
     const requestedTenantId = req.query.tenantId as string;
 
+    // Platform domain for display/URLs, derived from the host this request hit.
+    let platformDomain = 'visibleshelf.com';
+    let protocol = 'https';
+    let port = '';
+
+    if (req.headers.host) {
+      const hostname = req.headers.host.split(':')[0];
+      if (hostname.endsWith('.visibleshelf.com')) {
+        platformDomain = 'visibleshelf.com';
+      } else if (hostname.endsWith('.visibleshelf.store')) {
+        platformDomain = 'visibleshelf.store';
+      } else if (hostname.endsWith('.localhost') || hostname === 'localhost') {
+        platformDomain = 'localhost';
+        protocol = 'http';
+        port = ':3000';
+      }
+    }
+
+    const toEntry = (tenant: { id: string; name: string; subdomain: string | null; created_at: Date }) => ({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      subdomain: tenant.subdomain,
+      createdAt: tenant.created_at,
+      url: `${protocol}://${tenant.subdomain}.${platformDomain}${port}`,
+      platformDomain,
+      isCurrentTenant: requestedTenantId ? tenant.id === requestedTenantId : false
+    });
+
     const userTenants = await prisma.user_tenants.findMany({
       where: { user_id: userId },
       include: {
@@ -175,34 +204,23 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
 
     const subdomains = filteredUserTenants
       .filter(ut => ut.tenants.subdomain)
-      .map(ut => {
-        let platformDomain = 'visibleshelf.com';
-        let protocol = 'https';
-        let port = '';
+      .map(ut => toEntry(ut.tenants));
 
-        if (req.headers.host) {
-          const hostname = req.headers.host.split(':')[0];
-          if (hostname.endsWith('.visibleshelf.com')) {
-            platformDomain = 'visibleshelf.com';
-          } else if (hostname.endsWith('.visibleshelf.store')) {
-            platformDomain = 'visibleshelf.store';
-          } else if (hostname.endsWith('.localhost') || hostname === 'localhost') {
-            platformDomain = 'localhost';
-            protocol = 'http';
-            port = ':3000';
-          }
-        }
-
-        return {
-          tenantId: ut.tenants.id,
-          tenantName: ut.tenants.name,
-          subdomain: ut.tenants.subdomain,
-          createdAt: ut.tenants.created_at,
-          url: `${protocol}://${ut.tenants.subdomain}.${platformDomain}${port}`,
-          platformDomain,
-          isCurrentTenant: requestedTenantId ? ut.tenants.id === requestedTenantId : false
-        };
+    // Platform staff (admin/support/viewer) are authorized on every tenant
+    // (see checkTenantAccess) but hold no user_tenants row, so the membership
+    // query reports "no subdomain" for a tenant that plainly has one — the
+    // settings page then renders an empty list next to a live subdomain.
+    // Fall back to the tenant record for the requested tenant only; callers
+    // without membership and without a platform role still get nothing.
+    if (requestedTenantId && !subdomains.some(s => s.tenantId === requestedTenantId) && isPlatformUser(user)) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: requestedTenantId },
+        select: { id: true, name: true, subdomain: true, created_at: true }
       });
+      if (tenant?.subdomain) {
+        subdomains.push(toEntry(tenant));
+      }
+    }
 
     res.json({
       success: true,
