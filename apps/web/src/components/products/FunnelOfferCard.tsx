@@ -30,14 +30,18 @@ const STEP_BADGE_COLORS: Record<string, string> = {
   coupon_offer: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
 };
 
-function formatCouponDiscount(coupon: NonNullable<ProductFunnelStep['coupon']>) {
-  if (coupon.discount_type === 'percentage') {
-    return `${coupon.discount_value}% OFF`;
+// coupon_offer steps are backed by tenant_coupons (see FunnelEngine.getProductFunnelPreview),
+// so discount_type is the canonical percent_off | fixed_amount | free_shipping | bogo — not
+// 'percentage'. The old checks never matched, so a 15% coupon rendered as "15 OFF" and
+// free-shipping/BOGO rendered as "0 OFF".
+export function formatCouponDiscount(coupon: NonNullable<ProductFunnelStep['coupon']>) {
+  switch (coupon.discount_type) {
+    case 'percent_off': return `${coupon.discount_value}% OFF`;
+    case 'fixed_amount': return `$${(coupon.discount_value ?? 0).toFixed(2)} OFF`;
+    case 'free_shipping': return 'FREE SHIPPING';
+    case 'bogo': return 'BUY ONE GET ONE';
+    default: return 'SPECIAL OFFER';
   }
-  if (coupon.discount_type === 'fixed_amount') {
-    return `$${(coupon.discount_value / 100).toFixed(2)} OFF`;
-  }
-  return `${coupon.discount_value} OFF`;
 }
 
 export function FunnelOfferCard({ step, productType, onClick, onBuyNow }: FunnelOfferCardProps) {
