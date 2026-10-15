@@ -277,6 +277,17 @@ export function hasMaterialNapVariance(nap: NapData | undefined | null): boolean
 // ─── Per-signal severity ─────────────────────────────────────────────────
 
 /**
+ * Platform keys the audit verified ABSENT — `data_status: 'unavailable'` on
+ * the platform block. Restricted profiles are deliberately excluded: they
+ * exist, they are simply not publicly visible (a different finding with a
+ * different fix).
+ */
+function absentPlatformKeys(auditData: BusinessAnalysisAuditData): string[] {
+  const platforms = (auditData.platforms ?? {}) as Record<string, any>;
+  return Object.keys(platforms).filter((k) => platforms[k]?.data_status === 'unavailable');
+}
+
+/**
  * Compute the severity of a single signal code based on the actual audit data.
  *
  * For most signals, the default severity is used. For signals where the
@@ -287,6 +298,21 @@ export function computeSignalSeverity(
   code: SignalCode,
   auditData: BusinessAnalysisAuditData,
 ): SignalSeverity {
+  // DS_MISSING_PROFILE — severity depends on WHICH platform is absent, not
+  // merely that one is. Google carries the category's customer traffic, so a
+  // missing Google profile is a crisis; a missing Yelp or BBB profile is a
+  // material gap at most, and in some categories absence there is the norm
+  // (zero Yelp presence across 55 observed Indianapolis African grocers).
+  // The default map called every absent platform a crisis, which inverted the
+  // ranking on a prospect whose duplicated Google identity — splitting 30
+  // reviews and two category labels — scored lower than its absent Yelp page.
+  if (code === 'DS_MISSING_PROFILE') {
+    const absent = absentPlatformKeys(auditData);
+    // Google absent, or nothing identifiable as absent → crisis (preserve the
+    // default rather than silently downgrade when the data doesn't say).
+    return absent.includes('google') || absent.length === 0 ? 'crisis' : 'material';
+  }
+
   // CP_NAP_*_DRIFT — upgrade to "material" when the variations are genuinely
   // different (not just formatting). Downgrade to "cosmetic" when they're
   // formatting-only.
@@ -453,17 +479,31 @@ export function computePrimarySignalSeverity(
       const detected: string[] = Array.isArray((auditData as any)?.detected_signals)
         ? (auditData as any).detected_signals
         : [];
+      // Genuine invisibility — crisis on sight.
       if (
         detected.includes('DS_ZERO_INDEXED_PRESENCE') ||
-        detected.includes('DS_MISSING_PROFILE') ||
         detected.includes('DS_PROFILE_SUSPENDED')
       ) {
         return 'crisis';
       }
-      const confirmedAbsent = (auditData.render_controls ?? []).some(
-        (r) => r.determination === 'business_specific_failure',
+      // A missing profile is a crisis only when GOOGLE is the absent platform.
+      // A missing Yelp or BBB page is a gap — and in some categories absence
+      // there is the norm (zero Yelp presence across 55 observed Indianapolis
+      // African grocers). Treating every absent platform as a crisis put a
+      // category-normal absence ahead of the business's real problem: a
+      // duplicated Google identity splitting 30 reviews scored lower than an
+      // absent Yelp page.
+      if (detected.includes('DS_MISSING_PROFILE') && absentPlatformKeys(auditData).includes('google')) {
+        return 'crisis';
+      }
+      // Render-control-confirmed absence is a crisis only for Google. The
+      // non-primary platforms (apple_maps, bing) also record
+      // `business_specific_failure` there and must not drive the archetype's
+      // severity.
+      const googleConfirmedAbsent = (auditData.render_controls ?? []).some(
+        (r) => r.platform === 'google' && r.determination === 'business_specific_failure',
       );
-      if (confirmedAbsent) return 'crisis';
+      if (googleConfirmedAbsent) return 'crisis';
       const platforms = Object.values(auditData.platforms ?? {});
       const anyPresent = platforms.some(
         (p: any) => p && ['claimed', 'likely_claimed', 'unclaimed', 'likely_unclaimed'].includes(p.profile_status),

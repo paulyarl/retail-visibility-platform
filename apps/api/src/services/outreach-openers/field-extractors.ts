@@ -265,11 +265,34 @@ const PLATFORM_LABELS: Record<string, string> = {
   facebook: 'Facebook',
 };
 
+/**
+ * Platforms the business actually HAS a listing on, for the "shows up
+ * differently across …" clause in the A3 and A5 openers.
+ *
+ * Keyed on the block's `data_status`, NOT on key-presence. The audit always
+ * emits all four platform blocks (google, yelp, facebook, bbb are required in
+ * the schema), so `Object.keys(auditData.platforms)` is effectively constant —
+ * keying on it made this list the same for every business and told owners they
+ * "show up differently across Yelp, Google and Facebook" when no Yelp listing
+ * existed. `PLATFORM_LABELS` has no `bbb` entry, so BBB was the only block the
+ * old filter ever dropped.
+ *
+ * Included: `complete` (content rendered) and `partial` (rendered via a
+ * syndication path). Excluded: `unavailable` (verified absent) and
+ * `restricted` (exists, but the public cannot see it — nothing to compare
+ * against a customer's view).
+ *
+ * Falls back to key-presence when NO block carries a positive status, so an
+ * all-unknown payload (older audits, or a model that left `data_status` unset)
+ * keeps the legacy list rather than rendering an empty one.
+ */
 function platformLabels(auditData: BusinessAnalysisAuditData): string[] {
-  const platforms = auditData.platforms ?? {};
-  return Object.keys(platforms)
-    .filter((k) => PLATFORM_LABELS[k])
-    .map((k) => PLATFORM_LABELS[k]);
+  const platforms = (auditData.platforms ?? {}) as Record<string, any>;
+  const keys = Object.keys(platforms).filter((k) => PLATFORM_LABELS[k]);
+  const evidenced = keys.filter((k) =>
+    ['complete', 'partial'].includes(String(platforms[k]?.data_status ?? '')),
+  );
+  return (evidenced.length > 0 ? evidenced : keys).map((k) => PLATFORM_LABELS[k]);
 }
 
 /** Pick the highest-impact missing CTA from the website audit. */

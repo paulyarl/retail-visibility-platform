@@ -1,0 +1,586 @@
+{
+  "audit_metadata": {
+    "audit_date": "2026-10-15",
+    "requested_business": {
+      "business_name": "Arsema G Food Mart LLC",
+      "city": "Indianapolis",
+      "state": "IN",
+      "category": "African Grocery Store",
+      "address": "",
+      "phone": ""
+    },
+    "matched_business": {
+      "business_name": "Arsema G Food Mart LLC",
+      "category": "African Grocery Store",
+      "store_format": "grocery",
+      "hybrid_role": null,
+      "address": "6667 W Washington St, Indianapolis, IN 46241",
+      "phone": "(317) 603-3274",
+      "website": "https://arsemamart.square.site/"
+    },
+    "identity_status": "confirmed",
+    "identity_confidence": "high",
+    "identity_corroboration_sources": [
+      "Google Business Profile — Arsema Food Mart (6667 W Washington St / (317) 603-3274)",
+      "Google Business Profile — Ethiopian Eritrean Store (same address, same phone, plus code PPVF+PC vs PPVF+P9)",
+      "Facebook — Ethiopian Eritrean Store page, publishing the same address and africanmerkato@gmail.com",
+      "Indiana Secretary of State (INBiz) — Arsema G Food Mart LLC, active entity, principal office 2724 W 10th St",
+      "USDA FNS SNAP Retailer Locator — authorized retail food point at 2724 W 10th St",
+      "US customs import manifest (ImportGenius) — importer of record: Arsema G Food Mart LLC",
+      "Owner phone verification 2026-10-01 and 2026-10-15 — name, address, phone, website confirmed operational"
+    ],
+    "limitations": [
+      "All profile evidence is operator-captured (attempted_by: operator), not analyst-verified render. Google Maps and the Square storefront are JavaScript-gated to automated reads.",
+      "The Square storefront returned no server-rendered content to a non-JavaScript fetch; its published state was read from the operator's Google-indexed capture.",
+      "The 'Arsema mini market' result in Birkirkara, Malta is a different business sharing the Arsema token and is excluded from every finding."
+    ]
+  },
+
+  "detected_signals": [
+    "DS_DUPLICATE_LISTING",
+    "DS_MISSING_PROFILE",
+    "DS_OUTDATED_HOURS",
+    "CP_NAP_NAME_DRIFT",
+    "CP_NAP_ADDRESS_DRIFT",
+    "CP_NAP_PHONE_DRIFT",
+    "RA_UNADDRESSED_POSITIVE_BACKLOG",
+    "WC_BUILDER_SUBDOMAIN",
+    "INT_MULTISOURCE_IDENTITY",
+    "INT_ACTIVE_OPERATIONAL_EVIDENCE",
+    "INT_CATEGORY_SPECIALIZATION",
+    "INT_UNDEREXPOSED_CREDENTIAL",
+    "INT_VERTICAL_SOURCE_DISCOVERY",
+    "INT_POSSIBLE_CATEGORY_MISALIGNMENT",
+    "INT_RECENT_BUSINESS_EVIDENCE",
+    "INT_LOW_VISIBILITY",
+    "INT_WEAK_MAINSTREAM_INDEXING",
+    "INT_HIDDEN_TRUST"
+  ],
+
+  "summary": "Arsema G Food Mart LLC is an operating Ethiopian and Eritrean grocery at 6667 W Washington St, verified as a physical walk-in storefront by two owner calls, current daily hours, a working store line, and a USDA SNAP authorization at the premises. Its Google presence is duplicated: two live listings share the address, the phone (317) 603-3274 and the same website — 'Arsema Food Mart', filed as a convenience store with 4.5 stars across 8 reviews, and 'Ethiopian Eritrean Store', filed correctly as a grocery store with 5.0 across 22 reviews and a description naming injera, berbere, shiro, spices and coffee. The business's 30 reviews are split between the two listings and no owner response is displayed on any of them. Yelp and BBB carry no record of the business at all; the Facebook page that exists publishes the correct address and a contact email but is small (12 followers) and carries no website or phone. The owned web presence is a Square Online subdomain whose shop states plainly that items are not yet available for sale. The primary opportunity is consolidating one duplicated Google identity into a single claimed, correctly-categorized listing and putting the imported assortment — the store's differentiator — where customers can see it.",
+
+  "public_narrative": "Arsema G Food Mart is an Ethiopian and Eritrean grocery store on West Washington Street in west Indianapolis, serving the city's East African community. The market carries imported pantry staples — injera, berbere, shiro, teff, spices and coffee — alongside fresh meat, African goods and cultural items, and it accepts SNAP/EBT. Open daily from 10:00 AM to 9:30 PM, the store is a walk-in neighborhood market for customers shopping for the ingredients of Habesha cooking.",
+
+  "business_type": "product",
+
+  "platforms": {
+    "google": {
+      "profile_status": "likely_claimed",
+      "rating": 4.5,
+      "total_reviews": 8,
+      "reviews_with_observable_response": 0,
+      "observable_unanswered_reviews": 8,
+      "observable_unanswered_negative_reviews": 0,
+      "observable_unanswered_positive_reviews": 8,
+      "observable_response_rate_percent": 0,
+      "oldest_observable_unanswered_review": "4 years ago",
+      "newest_observable_unanswered_review": "2 weeks ago",
+      "primary_category": "Convenience store",
+      "additional_categories": [],
+      "category_fit_assessment": "Mismatched. The listing carrying the business's own name is filed as 'Convenience store' while the verified assortment is Ethiopian and Eritrean grocery — corroborated by the second listing's 'Grocery store' label, the profile description naming injera, berbere, shiro, spices and coffee, the Facebook bio, and US customs manifests naming the LLC as importer of record. The correct category label is stranded on the differently-named duplicate.",
+      "displayed_name": "Arsema Food Mart",
+      "displayed_address": "6667 W Washington St, Indianapolis, IN 46241",
+      "displayed_phone": "(317) 603-3274",
+      "displayed_website": "arsemamart.square.site",
+      "profile_issues": [
+        "Two live listings for one business at the same address and phone (PPVF+P9 and PPVF+PC — the same map point).",
+        "The listing under the business's own name carries the wrong primary category and no business description.",
+        "Review equity is split 8 / 22 across the two listings instead of consolidating on one.",
+        "No owner response is displayed on any of the 8 reviews on this listing.",
+        "Directly observed only through the operator capture; claim state is inferred from owner-provided profile elements, not from a rendered claim prompt."
+      ],
+      "photo_count": null,
+      "photo_types": [],
+      "special_hours_present": "unable_to_verify",
+      "attributes": [
+        { "key": "in_store_shopping", "label": "In-store shopping", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "delivery", "label": "Delivery", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "wheelchair_accessible_parking_lot", "label": "Wheelchair accessible parking lot", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "credit_cards", "label": "Credit cards", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "debit_cards", "label": "Debit cards", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "nfc_mobile_payments", "label": "NFC mobile payments", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "free_parking_lot", "label": "Free parking lot", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "free_street_parking", "label": "Free street parking", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "as_of": "2026-10-15" },
+        { "key": "in_store_pickup", "label": "In-store pickup", "source_url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "as_of": "2026-10-15" },
+        { "key": "onsite_services", "label": "Onsite services", "source_url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "as_of": "2026-10-15" },
+        { "key": "small_business", "label": "Small business", "source_url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "as_of": "2026-10-15" },
+        { "key": "great_produce", "label": "Great produce", "source_url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "as_of": "2026-10-15" }
+      ],
+      "alternate_profiles": [
+        {
+          "name": "Ethiopian Eritrean Store",
+          "url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store",
+          "category": "Grocery store",
+          "rating": 5,
+          "review_count": 22,
+          "first_seen": "oldest observable review ~2 years ago; plus code PPVF+PC",
+          "plus_code": "PPVF+PC Indianapolis, Indiana"
+        }
+      ],
+      "profile_url": "https://www.google.com/maps/place/Arsema+Food+Mart",
+      "data_status": "complete"
+    },
+
+    "yelp": {
+      "profile_status": "unable_to_verify",
+      "rating": null,
+      "total_reviews": null,
+      "reviews_with_observable_response": null,
+      "observable_unanswered_reviews": null,
+      "observable_unanswered_negative_reviews": null,
+      "observable_unanswered_positive_reviews": null,
+      "observable_response_rate_percent": null,
+      "oldest_observable_unanswered_review": null,
+      "newest_observable_unanswered_review": null,
+      "displayed_name": null,
+      "displayed_address": null,
+      "displayed_phone": null,
+      "displayed_website": null,
+      "attributes": [],
+      "alternate_profiles": [],
+      "profile_url": null,
+      "data_status": "unavailable"
+    },
+
+    "facebook": {
+      "profile_status": "likely_claimed",
+      "rating_or_recommendation": null,
+      "total_reviews": null,
+      "reviews_with_observable_response": null,
+      "observable_unanswered_reviews": null,
+      "observable_unanswered_negative_reviews": null,
+      "observable_unanswered_positive_reviews": null,
+      "observable_response_rate_percent": null,
+      "oldest_observable_unanswered_review": null,
+      "newest_observable_unanswered_review": null,
+      "displayed_name": "Ethiopian Eritrean Store",
+      "displayed_address": "6667 W WASHINGTON ST INDIANAPOLIS IN 46241",
+      "displayed_phone": null,
+      "displayed_website": null,
+      "attributes": [],
+      "alternate_profiles": [],
+      "profile_url": "https://www.facebook.com/profile.php?id=61575040912212",
+      "data_status": "partial"
+    },
+
+    "bbb": {
+      "profile_status": "unable_to_verify",
+      "letter_grade": null,
+      "numeric_grade": null,
+      "accreditation_status": "unknown",
+      "customer_rating": null,
+      "total_reviews": null,
+      "unanswered_complaints": null,
+      "displayed_name": null,
+      "displayed_address": null,
+      "displayed_phone": null,
+      "displayed_website": null,
+      "attributes": [],
+      "profile_url": null,
+      "data_status": "unavailable"
+    }
+  },
+
+  "specialized_sources_audited": [
+    { "source": "Indiana Secretary of State Business Services Division (INBiz)", "tier": 1, "source_type": "certification", "consulted": true, "findings": "Arsema G Food Mart LLC is an active registered entity; principal office recorded at 2724 W 10th St, Indianapolis — the registered address, not the storefront.", "url": "https://indiana-company.com/co/arsema-g-food-mart-llc", "accessed_date": "2026-02-18" },
+    { "source": "USDA FNS SNAP Retailer Locator", "tier": 1, "source_type": "vertical_directory", "consulted": true, "findings": "Authorized SNAP retail food point at 2724 W 10th St, Indianapolis, corroborating an operating licensed retail food point for the entity.", "url": "https://www.affordablehousing411.com/food-assistances/snap-retailer-details-arsema-g-foodmart-llc-001-2724-w-10th-st-indianapolis-in-46222/", "accessed_date": "2026-02-18" },
+    { "source": "US customs bill-of-lading / import manifest (ImportGenius)", "tier": 1, "source_type": "service_history", "consulted": true, "findings": "Arsema G Food Mart LLC is named importer of record; the manifest line describes pepper and red pepper, trade value $52.79K — direct-import specialization evidence.", "url": "https://www.importgenius.com/importers/arsema-g-food-mart-llc", "accessed_date": "2026-02-18" },
+    { "source": "Atly storefront listing", "tier": 5, "source_type": "vertical_directory", "consulted": true, "findings": "Long-tail stub naming the store at 6667 W Washington St, describing cultural-goods shelves, credit-card/mobile payment acceptance, limited street parking, and monthly cultural events on the first Saturday.", "url": "https://www.atly.com/location/EthiopianEritreanStore", "accessed_date": "2026-10-15" },
+    { "source": "SharedBowl directory", "tier": 4, "source_type": "mainstream_directory", "consulted": true, "findings": "Files the business as Grocery store / Eritrean restaurant / Ethiopian restaurant / Market at 5.0 (17 reviews), 10 photos, 75% profile completeness, and publishes an unclaimed 'Claim This Restaurant' affordance.", "url": "https://www.sharedbowl.com/indiana/indianapolis/ethiopian-eritrean-store", "accessed_date": "2026-10-15" },
+    { "source": "Waze", "tier": 4, "source_type": "mainstream_directory", "consulted": true, "findings": "Publishes Arsema Food Mart at 6667 W Washington St with (317) 603-3274 and daily 10:00–21:30 hours.", "url": "https://www.waze.com/live-map/directions/us/in/indianapolis/arsema-food-mart-llc", "accessed_date": "2026-10-15" }
+  ],
+
+  "channels_scanned": [
+    { "channel": "google", "url": "https://www.google.com/maps/place/Arsema+Food+Mart", "rendered": true, "access_barrier": "none", "offers_observed": ["Delivery", "In-store shopping", "In-store pickup (on the duplicate listing)", "Onsite services (on the duplicate listing)"], "notable_activity": ["4.5 stars across 8 reviews on this listing", "Second live listing at 5.0 across 22 reviews", "Newest review 2 weeks ago", "Oldest review 4 years ago"], "fulfillment_modes": ["delivery", "in_store", "pickup"], "payment_modes": ["card", "contactless"], "availability_channel": "phone", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "facebook", "url": "https://www.facebook.com/profile.php?id=61575040912212", "rendered": true, "access_barrier": "none", "offers_observed": ["Authentic Ethiopian and Eritrean products — from food to spices and more", "Messenger contact channel", "Published contact email africanmerkato@gmail.com", "Hours 11:00am - 9:30pm"], "notable_activity": ["12 followers", "0 following"], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "dm", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "owned_site", "url": "https://arsemamart.square.site/", "rendered": false, "access_barrier": "js_required", "offers_observed": ["Shop navigation exposes All Items, Foods, Appliances, Decor", "Site states items are not available for sale yet"], "notable_activity": [], "fulfillment_modes": ["shipping"], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "inferred" },
+    { "channel": "order_ahead_platform", "url": "https://arsemamart.square.site/", "rendered": false, "access_barrier": "js_required", "offers_observed": ["Square Online storefront with catalog categories and cart; catalog carries no sellable items"], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "inferred" },
+    { "channel": "directory", "url": "https://www.sharedbowl.com/indiana/indianapolis/ethiopian-eritrean-store", "rendered": true, "access_barrier": "none", "offers_observed": [], "notable_activity": ["5.0 across 17 reviews", "10 photos", "Profile completeness 75%", "Listed Nov 2025", "Unclaimed listing affordance present"], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "phone", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "directory", "url": "https://www.atly.com/location/EthiopianEritreanStore", "rendered": true, "access_barrier": "none", "offers_observed": ["Cultural goods reflecting Ethiopian and Eritrean heritage", "Credit cards and mobile payments accepted", "Cultural events on the first Saturday of the month"], "notable_activity": ["Atly score 8.3"], "fulfillment_modes": [], "payment_modes": ["card", "contactless"], "availability_channel": "phone", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "directory", "url": "https://www.waze.com/live-map/directions/us/in/indianapolis/arsema-food-mart-llc", "rendered": true, "access_barrier": "none", "offers_observed": [], "notable_activity": ["Publishes 6667 W Washington St with (317) 603-3274 and daily 10:00–21:30"], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "yelp", "url": null, "rendered": false, "access_barrier": "not_attempted", "offers_observed": [], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "bbb", "url": null, "rendered": false, "access_barrier": "not_attempted", "offers_observed": [], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "registry", "url": "https://indiana-company.com/co/arsema-g-food-mart-llc", "rendered": true, "access_barrier": "none", "offers_observed": [], "notable_activity": ["Active LLC registration; principal office 2724 W 10th St"], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "locator", "url": "https://www.affordablehousing411.com/food-assistances/snap-retailer-details-arsema-g-foodmart-llc-001-2724-w-10th-st-indianapolis-in-46222/", "rendered": true, "access_barrier": "none", "offers_observed": ["Authorized SNAP retail food point at the entity's registered address"], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "apple_maps", "url": null, "rendered": false, "access_barrier": "not_attempted", "offers_observed": [], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "instagram", "url": null, "rendered": false, "access_barrier": "not_attempted", "offers_observed": [], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" },
+    { "channel": "marketplace", "url": null, "rendered": false, "access_barrier": "not_attempted", "offers_observed": [], "notable_activity": [], "fulfillment_modes": [], "payment_modes": [], "availability_channel": "none", "last_activity": null, "confidence": "verified_on_surface" }
+  ],
+
+  "observed_assets": [
+    { "asset": "SNAP/EBT authorization", "evidence": "Google displays a SNAP/EBT payment chip on the Arsema Food Mart listing, and USDA FNS lists the LLC as an authorized retail food point.", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "observed_on": "google", "also_seen_on": ["locator"], "confidence": "verified_on_surface", "underexposed": true, "underexposure_note": "Displayed on the Arsema Food Mart listing only. Absent from the duplicate listing's payment chips, from the Facebook About, and from the storefront's own copy." },
+    { "asset": "Direct-import supply chain", "evidence": "Named importer of record on US customs manifests for pepper and red pepper lines, trade value $52.79K.", "source_url": "https://www.importgenius.com/importers/arsema-g-food-mart-llc", "observed_on": "registry", "also_seen_on": [], "confidence": "verified_on_surface", "underexposed": true, "underexposure_note": "Verified on the customs record only. Not stated on the Google description, the Facebook About, or the storefront." },
+    { "asset": "In-store pickup offer", "evidence": "The Ethiopian Eritrean Store Google listing publishes In-store pickup as a service option.", "source_url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "observed_on": "google", "also_seen_on": [], "confidence": "verified_on_surface", "underexposed": false, "underexposure_note": null },
+    { "asset": "Delivery offer", "evidence": "The Arsema Food Mart Google listing publishes Delivery as a service option.", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "observed_on": "google", "also_seen_on": [], "confidence": "verified_on_surface", "underexposed": false, "underexposure_note": null },
+    { "asset": "Published contact email and Messenger channel", "evidence": "The Facebook page publishes africanmerkato@gmail.com and a Messenger channel under the Ethiopian Eritrean Store name.", "source_url": "https://www.facebook.com/profile.php?id=61575040912212", "observed_on": "facebook", "also_seen_on": [], "confidence": "verified_on_surface", "underexposed": false, "underexposure_note": null },
+    { "asset": "Cultural-goods assortment", "evidence": "Shelves of Ethiopian and Eritrean handicrafts, weaving, basketry and woodcarving, corroborated by Atly's description of cultural goods reflecting Ethiopian and Eritrean heritage.", "source_url": "https://www.atly.com/location/EthiopianEritreanStore", "observed_on": "directory", "also_seen_on": ["owned_site"], "confidence": "verified_on_surface", "underexposed": true, "underexposure_note": "Stated on the storefront's own snippet and a directory stub. Not named on either Google listing's description or the Facebook About." },
+    { "asset": "Monthly cultural events", "evidence": "Atly records that the store hosts cultural events on the first Saturday of every month.", "source_url": "https://www.atly.com/location/EthiopianEritreanStore", "observed_on": "directory", "also_seen_on": [], "confidence": "verified_on_surface", "underexposed": true, "underexposure_note": "Carried only on a third-party directory stub. Not published on any surface the business controls." },
+    { "asset": "Fresh meat counter", "evidence": "A reviewer states the store has fresh clean meat; another describes getting almost everything in the store.", "source_url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "observed_on": "reviews", "also_seen_on": [], "confidence": "verified_on_surface", "underexposed": true, "underexposure_note": "Evidenced in customer reviews only. Not stated in either Google description or the storefront's product copy." },
+    { "asset": "Daily opening hours", "evidence": "Both listings and the Waze record publish 10:00 AM – 9:30 PM seven days a week, corroborated by reviewers noting the store is open every day.", "source_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "observed_on": "google", "also_seen_on": ["directory", "reviews"], "confidence": "verified_on_surface", "underexposed": false, "underexposure_note": null },
+    { "asset": "Long tenure and active registration", "evidence": "The LLC is an active Indiana entity and the Google listing carries reviews dating back roughly four years.", "source_url": "https://indiana-company.com/co/arsema-g-food-mart-llc", "observed_on": "registry", "also_seen_on": ["google"], "confidence": "verified_on_surface", "underexposed": true, "underexposure_note": "No surface the business controls states its tenure or import history." }
+  ],
+
+  "combined_review_metrics": {
+    "observable_total_reviews": 30,
+    "observable_reviews_with_response": 0,
+    "observable_unanswered_reviews": 30,
+    "observable_unanswered_negative_reviews": 0,
+    "observable_unanswered_positive_reviews": 30,
+    "observable_response_rate_percent": 0,
+    "observable_unanswered_rate_percent": 100,
+    "oldest_unanswered_review": "4 years ago",
+    "newest_unanswered_review": "2 weeks ago",
+    "counts_complete": true
+  },
+
+  "alignment_scoring": {
+    "misalignment_index": null,
+    "action_classification": null,
+    "lead_disposition": null,
+    "primary_outreach_hook": "Look up your own address on Google sometime: it shows two different stores at 6667 W Washington — 'Arsema Food Mart' filed as a convenience store, and 'Ethiopian Eritrean Store' holding most of your reviews. A customer searching for berbere or injera nearby meets two half-stores instead of one.",
+    "alignment_breakdown": {
+      "admin_score": null,
+      "public_sentiment_score": 3.8,
+      "delta": null
+    }
+  },
+
+  "website": {
+    "url": "https://arsemamart.square.site/",
+    "status": "working",
+    "mobile_friendly": "unable_to_verify",
+    "https": "unable_to_verify",
+    "contact_information_visible": "unable_to_verify",
+    "click_to_call_available": "unable_to_verify",
+    "call_to_action_present": "unable_to_verify",
+    "service_information_present": "unable_to_verify",
+    "location_information_present": "unable_to_verify",
+    "category_specific_content_present": "unable_to_verify",
+    "ordering_or_pickup_info_present": "unable_to_verify",
+    "has_product_browsing": false,
+    "has_product_browsing_observed_on": "owned_site",
+    "has_availability_inquiry": true,
+    "has_availability_inquiry_observed_on": "facebook",
+    "has_pickup_ordering": true,
+    "has_pickup_ordering_observed_on": "google",
+    "has_delivery_option": true,
+    "has_delivery_option_observed_on": "google",
+    "product_categories_visible": ["Foods", "Appliances", "Decor"],
+    "issues": [
+      "Requested URL https://arsemamart.square.site/ returned no server-rendered content to a non-JavaScript fetch — the storefront is client-side rendered, so its content could not be verified by an ordinary visitor read.",
+      "The storefront's own published copy states that items are not available for sale yet, and the shop navigation exposes only empty categories (Foods, Appliances, Decor) — a customer can reach a cart but cannot see or buy a product.",
+      "No owned domain: the store's entire web presence sits on a Square Online subdomain.",
+      "The site's snippet describes Ethiopian and Eritrean handicrafts (weaving, basketry, woodcarving) and does not name the grocery staples the store is known for.",
+      "Hours and address were not observable from the storefront itself; they are carried on Google, Waze and Facebook instead."
+    ],
+    "conversion_opportunities": [
+      "Populate the existing Square catalog so the categories that are already built carry sellable items.",
+      "Publish the store's real phone, address and daily hours on the storefront so a shopper can confirm the drive.",
+      "Name the imported assortment — injera, berbere, shiro, teff, spices, coffee, fresh meat — in the site's copy instead of only handicrafts.",
+      "Surface the in-store pickup option the Google listing already advertises."
+    ]
+  },
+
+  "nap_consistency": {
+    "overall_status": "major_inconsistencies",
+    "canonical_name": "Arsema G Food Mart LLC",
+    "canonical_address": "6667 W Washington St, Indianapolis, IN 46241",
+    "canonical_city": "Indianapolis",
+    "canonical_state": "IN",
+    "canonical_zip": "46241",
+    "canonical_phone": "(317) 603-3274",
+    "name_variations": [
+      "Arsema G Food Mart LLC (registry, customs, SNAP)",
+      "Arsema Food Mart (Google display, Waze)",
+      "Arsema Food Mart Llc (Waze)",
+      "Ethiopian Eritrean Store (a second live Google listing at the same address and phone, and the Facebook page name)"
+    ],
+    "address_variations": [
+      "6667 W Washington St, Indianapolis, IN 46241 (Google both listings, Waze, Atly, SharedBowl, Facebook)",
+      "2724 W 10th St, Indianapolis, IN 46222 (Indiana registry principal office, USDA SNAP authorized address, a directory record)"
+    ],
+    "phone_variations": [
+      "(317) 603-3274 (Google both listings, Waze, Facebook-linked profiles)",
+      "(317) 929-1859 (a directory record tied to the 2724 W 10th St address)",
+      "(317) 632-2113 (a second number on the same directory record)"
+    ],
+    "material_issues": [
+      "A second trading name is live as a separate Google listing at the same address and phone, splitting categories and reviews.",
+      "The registered principal-office address differs from the storefront address on registry and SNAP records.",
+      "Three phone numbers circulate across consumer and directory surfaces.",
+      "Google publishes 10:00 AM opening hours while the Facebook page publishes 11:00 AM."
+    ]
+  },
+
+  "operational_status": {
+    "status": "active",
+    "last_activity_evidence": "Newest Google review posted approximately two weeks before capture; two owner-verified phone calls (2026-10-01 and 2026-10-15) confirming name, address, phone and website as operational; current daily hours published consistently on Google and Waze; active LLC registration; authorized SNAP retail food point.",
+    "last_activity_date": "2026-10-15",
+    "evidence_sources": ["google", "facebook", "registry", "locator"]
+  },
+
+  "competitive_benchmarks": [
+    {
+      "business_name": "senay habesha (Ethiopian & Eritrean) store",
+      "store_format": "grocery",
+      "geographic_reach": "neighborhood",
+      "product_breadth": "moderate",
+      "prepared_food_component": false,
+      "delivery_model": "unknown",
+      "regional_specialization": "Ethiopian and Eritrean groceries with cultural clothing",
+      "google_rating": 4.7,
+      "google_review_count": 35,
+      "yelp_rating": null,
+      "yelp_review_count": null,
+      "profile_completeness_score": 6,
+      "format_context_note": "The nearest like-for-like comparator — an independent Ethiopian and Eritrean grocery two blocks away on the same street, with a larger Google review base than either of this business's listings.",
+      "specialization_evidence_direct": true
+    },
+    {
+      "business_name": "Redias African Market",
+      "store_format": "grocery",
+      "geographic_reach": "regional",
+      "product_breadth": "broad",
+      "prepared_food_component": false,
+      "delivery_model": "both",
+      "regional_specialization": null,
+      "google_rating": 4.4,
+      "google_review_count": 50,
+      "yelp_rating": null,
+      "yelp_review_count": null,
+      "profile_completeness_score": 7,
+      "format_context_note": "Independent African supermarket in the metro advertising in-store shopping, in-store pickup and delivery — a comparator for the fulfillment surfaces this business only partly carries.",
+      "specialization_evidence_direct": true
+    },
+    {
+      "business_name": "Saraga International Grocery",
+      "store_format": "grocery",
+      "geographic_reach": "regional",
+      "product_breadth": "broad",
+      "prepared_food_component": false,
+      "delivery_model": "unknown",
+      "regional_specialization": null,
+      "google_rating": null,
+      "google_review_count": null,
+      "yelp_rating": null,
+      "yelp_review_count": null,
+      "profile_completeness_score": null,
+      "format_context_note": "The International Marketplace district anchor on the same corridor and the category's visibility ceiling locally; included as the market's benchmark-of-scale, though its African assortment is a department rather than the store's identity, so category fit is broad rather than specialized.",
+      "specialization_evidence_direct": false
+    }
+  ],
+
+  "unanswered_negative_review_examples": [],
+
+  "negative_review_themes": [],
+
+  "positive_review_themes": [
+    { "theme": "Assortment breadth", "observed_frequency": "high", "supporting_review_count": null, "summary": "Reviewers repeatedly state they can get almost everything at the store, and that it carries every Habesha item." },
+    { "theme": "Fresh meat counter", "observed_frequency": "medium", "supporting_review_count": null, "summary": "A reviewer notes the store has fresh clean meat — a meat-counter expectation for the category." },
+    { "theme": "Owner and staff service", "observed_frequency": "high", "supporting_review_count": null, "summary": "Multiple reviews name the owner and staff as nice and attentive, including on the duplicate listing." },
+    { "theme": "Cleanliness", "observed_frequency": "medium", "supporting_review_count": null, "summary": "Reviewers describe the store as nice and clean." },
+    { "theme": "Injera quality", "observed_frequency": "low", "supporting_review_count": null, "summary": "One detailed review calls the injera the best the reviewer has eaten and highlights the range of Ethiopian goods." },
+    { "theme": "Open daily", "observed_frequency": "medium", "supporting_review_count": null, "summary": "Reviewers note the store is open every day and prices are good." }
+  ],
+
+  "sentiment_context": [
+    { "class": "demand", "observation": "Customers arrive expecting the full Habesha pantry in one stop — the store's stated strength is breadth, not a narrow specialty.", "evidence": "Reviewers state 'U can get almost everything in this store' and 'they have every habesha stuff'.", "source": "google", "confidence": "verified_on_surface" },
+    { "class": "demand", "observation": "Fresh meat is an expected purchase, not a secondary one — a meat counter is part of how customers judge this store.", "evidence": "A reviewer calls out 'fresh clean meat' alongside assortment and service.", "source": "google", "confidence": "verified_on_surface" },
+    { "class": "logistics", "observation": "Daily availability is a purchase driver — customers note being open every day as a reason the store works for them.", "evidence": "Two reviewers state the store is open every day; a third pairs it with good prices.", "source": "google", "confidence": "verified_on_surface" },
+    { "class": "infrastructure", "observation": "Street parking is workable but limited, and a parking lot is also available — arrival logistics matter at this location.", "evidence": "Both Google listings publish free parking lot and free street parking; Atly notes street parking 'can be limited'.", "source": "directory", "confidence": "verified_on_surface" }
+  ],
+
+  "digital_opportunity_score": {
+    "score": 6,
+    "classification": "medium",
+    "components": {
+      "google_profile_maintenance": 1,
+      "review_response_opportunity": 3,
+      "unanswered_negative_reviews": 0,
+      "website_opportunity": 1,
+      "nap_consistency": 1
+    },
+    "rationale": "Google maintenance scores 1 rather than 2 because one listing carries owner-provided elements (a description, a 'From the business' section and highlights), so substantial neglect is not verified — but the profile is split across two listings and the one bearing the business's own name carries the wrong primary category and no description. Review response scores the maximum 3: 30 of 30 observable reviews across the two listings display no owner response. Unanswered negative reviews score 0 — no review at or below 3 stars was observed. Website scores 1: the storefront is live and secure with a built cart, but its catalog carries no sellable items and its copy does not name the assortment. NAP scores 1 on verified material inconsistencies — a second live trading name at the same address, a conflicting registered address, and three phone numbers in circulation."
+  },
+
+  "high_attention": true,
+  "high_attention_reasons": ["More than 15 observable unanswered reviews (30)"],
+  "recommended_tier": "tier_2",
+  "tier_rationale": "Digital opportunity score of 6 places this in the focused-needs band: the work is concentrated on consolidating one duplicated Google identity, responding to an existing 30-review base, correcting category and NAP, and finishing a storefront whose catalog is already scaffolded — not a multi-location or broad service-area engagement.",
+  "estimated_monthly_service_fee": {
+    "minimum": 750,
+    "maximum": 1500,
+    "currency": "USD"
+  },
+
+  "recommended_services": [
+    "Google Business Profile optimization",
+    "Duplicate-listing suppression",
+    "Business listing cleanup",
+    "NAP correction",
+    "Review-response management",
+    "Review monitoring",
+    "Local SEO",
+    "Reputation reporting"
+  ],
+
+  "recommended_attributes": [
+    { "key": "wheelchair_accessible_entrance", "label": "Wheelchair accessible entrance", "platform": "google", "basis": "gold_standard_expected", "rationale": "Both listings display wheelchair accessible parking lot but no accessible entrance chip; the benchmark lists an accessible entrance as a required Google attribute.", "current_state": "not_observed" },
+    { "key": "offers_delivery", "label": "Offers delivery", "platform": "google", "basis": "audit_evidence", "rationale": "The Arsema Food Mart listing already publishes Delivery; enabling the delivery attribute makes the offer filterable rather than buried in service options.", "current_state": "not_observed" },
+    { "key": "halal_products", "label": "Halal products", "platform": "google", "basis": "gold_standard_expected", "rationale": "The category benchmark lists halal products as a recommended Google attribute and the store carries fresh meat; whether the meat is halal-certified is a fact only the owner can confirm.", "current_state": "verify_with_owner" },
+    { "key": "same_day_delivery", "label": "Same-day delivery", "platform": "google", "basis": "gold_standard_expected", "rationale": "Delivery is already offered on the Arsema Food Mart listing; same-day delivery is a benchmark-recommended attribute the owner would need to confirm applies.", "current_state": "verify_with_owner" },
+    { "key": "messaging_enabled", "label": "Messaging enabled", "platform": "facebook", "basis": "gold_standard_expected", "rationale": "The Facebook About exposes a Messenger channel, which the category benchmark lists as a recommended attribute for the platform's top operators.", "current_state": "not_observed" },
+    { "key": "posted_hours", "label": "Posted hours", "platform": "facebook", "basis": "audit_evidence", "rationale": "The Facebook page publishes 11:00am - 9:30pm while Google publishes 10:00 AM — the posted hours need aligning to one value.", "current_state": "not_observed" },
+    { "key": "in_store_shopping", "label": "In-store shopping", "platform": "google", "basis": "gold_standard_expected", "rationale": "A required Google attribute for the category; the duplicate listing publishes it but the Arsema Food Mart listing does not.", "current_state": "not_observed" },
+    { "key": "accepts_snap_ebt", "label": "Accepts SNAP/EBT", "platform": "google", "basis": "audit_evidence", "rationale": "Already displayed on the Arsema Food Mart listing. Verify the authorization and enable the chip on the surviving consolidated listing so the credential is not lost in the merge.", "current_state": "verify_with_owner" }
+  ],
+
+  "data_quality": {
+    "confidence": "high",
+    "verified_fields": [
+      "business identity across two live Google listings (entity IDs, plus codes, address, phone, website)",
+      "Google primary category on both listings",
+      "Google ratings and review counts (4.5/8 and 5.0/22)",
+      "absence of owner responses on all observable reviews",
+      "Google sourced attribute chips on both listings",
+      "Google service options (delivery on one listing, in-store pickup on the other)",
+      "Facebook About contents, published email and Messenger channel",
+      "Facebook published hours",
+      "storefront URL, shop category navigation, and the site's own 'not available for sale yet' statement",
+      "Yelp absence and BBB absence (operator sweep)",
+      "registry entity status and registered principal-office address",
+      "USDA SNAP authorization at the registered address",
+      "customs importer-of-record record",
+      "directory NAP variants (Waze, Atly, SharedBowl, a directory record with the 2724 W 10th St address)"
+    ],
+    "unavailable_fields": [
+      "Google photo count and photo types (not observable from the capture)",
+      "special/holiday hours",
+      "claim state (no claim prompt captured; inferred from owner-provided profile elements only)",
+      "review dates as exact calendar dates (capture shows relative ages)",
+      "storefront rendered content, contact block, and checkout behavior (client-side rendered)",
+      "item-level product list and pricing",
+      "Apple Maps and Bing presence",
+      "Instagram and marketplace presence",
+      "owner response counts on Yelp and Facebook (no profiles)"
+    ],
+    "conflicts": [
+      "Two live Google listings for one business at the same street address and phone number, under different trading names.",
+      "Registered principal-office address (2724 W 10th St, 46222) versus the storefront address (6667 W Washington St, 46241) across registry and SNAP records versus consumer surfaces.",
+      "Three phone numbers in circulation: (317) 603-3274, (317) 929-1859 and (317) 632-2113.",
+      "Opening hours: Google publishes 10:00 AM daily; the Facebook page publishes 11:00 AM.",
+      "Review counts disagree across sources: 8 + 22 across the two Google listings, versus 17 on SharedBowl."
+    ],
+    "limitations": [
+      "All profile evidence is operator-supplied (attempted_by: operator) rather than analyst-verified render. Google Maps and the Square storefront are JavaScript-gated, so a direct automated read was not possible.",
+      "Yelp and BBB are recorded as verified absent on the strength of the operator's completed sweep, which found no listing for either trading name. Per the category intelligence, zero Yelp presence is the norm for this category in Indianapolis (0 of 55 observed businesses) and carries no negative information about the business.",
+      "Apple Maps, Bing, Instagram and marketplace surfaces were directed channels that were not attempted; their absence from this audit is a sweep boundary, not a finding.",
+      "The storefront was reachable (HTTP 200) but returned no server-rendered content, so website content and conversion fields are recorded unable_to_verify; its published catalog state was read from the operator's Google-indexed capture.",
+      "signal_checklist was suppressed: no CATEGORY MARKET CONTEXT block was provided for this audit (only a CITY MARKET CONTEXT block), so no category_signals list was available to evaluate.",
+      "A Google result for 'Arsema mini market' in Birkirkara, Malta is an unrelated business sharing the Arsema token; it is excluded from identity, NAP and competitive findings."
+    ]
+  },
+
+  "sources": [
+    { "platform": "google", "source_type": "profile", "url": "https://www.google.com/maps/place/Arsema+Food+Mart", "accessed_date": "2026-10-15" },
+    { "platform": "google", "source_type": "profile", "url": "https://www.google.com/maps/place/Ethiopian+Eritrean+Store", "accessed_date": "2026-10-15" },
+    { "platform": "google", "source_type": "search_results", "url": "https://www.google.com/search?q=Ethiopian+Eritrean+Store", "accessed_date": "2026-10-15" },
+    { "platform": "facebook", "source_type": "profile", "url": "https://www.facebook.com/profile.php?id=61575040912212", "accessed_date": "2026-10-15" },
+    { "platform": "owned_site", "source_type": "website", "url": "https://arsemamart.square.site/", "accessed_date": "2026-10-15" },
+    { "platform": "yelp", "source_type": "search_results", "url": "https://www.yelp.com/search?find_desc=Ethiopian+Grocery&find_loc=Indianapolis%2C+IN", "accessed_date": "2026-10-15" },
+    { "platform": "bbb", "source_type": "search_results", "url": "https://www.bbb.org/search?find_text=Arsema+G+Food+Mart&find_loc=Indianapolis%2C+IN", "accessed_date": "2026-10-15" },
+    { "platform": "directory", "source_type": "directory", "url": "https://www.sharedbowl.com/indiana/indianapolis/ethiopian-eritrean-store", "accessed_date": "2026-10-15" },
+    { "platform": "directory", "source_type": "directory", "url": "https://www.atly.com/location/EthiopianEritreanStore", "accessed_date": "2026-10-15" },
+    { "platform": "directory", "source_type": "directory", "url": "https://www.waze.com/live-map/directions/us/in/indianapolis/arsema-food-mart-llc", "accessed_date": "2026-10-15" },
+    { "platform": "registry", "source_type": "certification", "url": "https://indiana-company.com/co/arsema-g-food-mart-llc", "accessed_date": "2026-02-18" },
+    { "platform": "locator", "source_type": "vertical_directory", "url": "https://www.affordablehousing411.com/food-assistances/snap-retailer-details-arsema-g-foodmart-llc-001-2724-w-10th-st-indianapolis-in-46222/", "accessed_date": "2026-02-18" },
+    { "platform": "registry", "source_type": "service_history", "url": "https://www.importgenius.com/importers/arsema-g-food-mart-llc", "accessed_date": "2026-02-18" }
+  ],
+
+  "gap_analysis": {
+    "gaps": [
+      { "platform": "google", "field": "primary_category", "expected": "African goods store", "actual": "Convenience store", "gap_description": "The listing carrying the business's own name is filed as a convenience store, so a shopper searching for an African grocery is routed past it. The correct grocery label sits on the differently-named duplicate listing.", "severity": "non_negotiable" },
+      { "platform": "google", "field": "profile_presence", "expected": "One live listing per business", "actual": "Two live listings at one address and phone", "gap_description": "The business resolves to two Google listings, splitting 30 reviews and two category labels across two half-profiles.", "severity": "non_negotiable" },
+      { "platform": "google", "field": "description", "expected": "Region and product-line description", "actual": "No description on the listing carrying the business's own name", "gap_description": "The description naming injera, berbere, shiro, spices and coffee exists on the duplicate listing only, so the staples customers search for are absent from the listing under the store's own name.", "severity": "recommended" },
+      { "platform": "facebook", "field": "about_complete", "expected": "Address, phone, hours and website populated", "actual": "Address, hours, email and Messenger present; no website and no phone published", "gap_description": "The About section carries the address, hours and a contact email but omits the website and phone number, so a customer reaching the page cannot tap to call or visit the storefront.", "severity": "non_negotiable" },
+      { "platform": "facebook", "field": "hours", "expected": "Hours matching the canonical record", "actual": "11:00am - 9:30pm, against 10:00 AM - 9:30 PM published on Google and Waze", "gap_description": "The Facebook page opens an hour later than every other surface, so customers arriving before 11:00 may find the store open when the page said otherwise.", "severity": "recommended" },
+      { "platform": "yelp", "field": "profile_presence", "expected": "Profile exists and renders", "actual": "No Yelp listing for either trading name (operator sweep)", "gap_description": "Yelp carries no record of the business. Category-wide this is the norm rather than a defect, so the gap is one of coverage rather than of performance.", "severity": "non_negotiable" },
+      { "platform": "bbb", "field": "listing_present", "expected": "BBB record exists with correct NAP", "actual": "No BBB record found", "gap_description": "No BBB record exists for the business, so a customer who cross-checks finds no second source.", "severity": "recommended" },
+      { "platform": "apple_maps", "field": "place_card", "expected": "Apple Maps place card with correct NAP", "actual": "Not attempted in this sweep", "gap_description": "Apple Maps was a directed channel that this sweep did not cover, so presence there is unestablished rather than absent.", "severity": "non_negotiable" },
+      { "platform": "website", "field": "product_department_overview", "expected": "Category-specific browse naming regions and product lines", "actual": "Empty catalog categories Foods, Appliances, Decor; no staples named; site states items are not available for sale yet", "gap_description": "The storefront's categories carry no sellable items and no staple names, so the imported assortment that differentiates the store is invisible on its own site.", "severity": "recommended" },
+      { "platform": "website", "field": "website_url", "expected": "Owned website URL", "actual": "arsemamart.square.site — Square Online builder subdomain", "gap_description": "The business's entire web presence sits on a free builder subdomain, so the name owns no part of the web.", "severity": "recommended" },
+      { "platform": "universal", "field": "canonical_nap_consistent", "expected": "Name, address and phone identical across Google, Facebook, website and directories", "actual": "Two live trading names, two addresses and three phone numbers across surfaces", "gap_description": "Name, address and phone disagree across the surfaces a customer may check.", "severity": "non_negotiable" },
+      { "platform": "universal", "field": "hours_present", "expected": "Published opening hours, consistent across primary platforms", "actual": "Published on Google, Waze and Facebook, but Facebook opens at 11:00 AM against 10:00 AM elsewhere", "gap_description": "Hours are published but disagree between platforms.", "severity": "non_negotiable" },
+      { "platform": "universal", "field": "ordering_channel", "expected": "At least one remote-order channel", "actual": "In-store pickup published on Google; delivery published on the other listing; the storefront's own catalog carries no sellable items", "gap_description": "The business advertises pickup and delivery on Google, but its own storefront cannot take an order for anything.", "severity": "recommended" }
+    ],
+    "summary": "The verified gaps concentrate on one problem with several faces: the business's identity is split across two live Google listings, so its category, description and reviews are divided, and its name is attached to the weaker half. Beyond Google, the business is absent from Yelp and BBB, its Facebook page omits the website and phone, and its owned storefront is scaffolded but empty. The registered-versus-storefront address difference and the multiple phone numbers are the category-typical dual-address pattern rather than errors in themselves, but they need one canonical value chosen and propagated."
+  },
+
+  "quality_gate_results": {
+    "results": [
+      { "platform": "google", "gate": "primary_category_correct", "passed": false, "severity": "non_negotiable", "notes": "The listing under the business's own name is filed as Convenience store, not an African grocery category. The correct label is present only on the duplicate listing." },
+      { "platform": "google", "gate": "reviews_volume", "passed": false, "severity": "recommended", "notes": "30 observable reviews combined across both listings, against the benchmark's 100+; the count is also split 8/22 rather than consolidated." },
+      { "platform": "google", "gate": "photos_fresh", "passed": null, "severity": "recommended", "notes": "Not verified — photo count and photo types were not observable from the capture." },
+      { "platform": "google", "gate": "attributes_set", "passed": false, "severity": "recommended", "notes": "Payment, accessibility and service attributes are populated on both listings, but SNAP/EBT appears only on the Arsema Food Mart listing and no accessible-entrance or halal attribute is displayed." },
+      { "platform": "facebook", "gate": "about_complete", "passed": false, "severity": "non_negotiable", "notes": "Address and hours are published, but no website and no phone number appear in the About section." },
+      { "platform": "facebook", "gate": "posting_cadence", "passed": null, "severity": "recommended", "notes": "Not verified — no post dates were observable in the capture, so a 30-day cadence cannot be assessed." },
+      { "platform": "yelp", "gate": "claimed_profile", "passed": false, "severity": "recommended", "notes": "No Yelp listing exists for either trading name per the operator sweep." },
+      { "platform": "yelp", "gate": "review_presence", "passed": false, "severity": "recommended", "notes": "No Yelp listing exists, so there is no review presence. Category-wide, zero Yelp coverage is the norm in this market." },
+      { "platform": "bbb", "gate": "profile_exists", "passed": false, "severity": "recommended", "notes": "No BBB record found for either trading name per the operator sweep." },
+      { "platform": "bbb", "gate": "no_open_complaints", "passed": null, "severity": "recommended", "notes": "Not applicable — no BBB record exists, so there are no complaints to assess." },
+      { "platform": "apple_maps", "gate": "listing_present", "passed": null, "severity": "non_negotiable", "notes": "Not verified — Apple Maps was a directed channel this sweep did not cover." },
+      { "platform": "universal", "gate": "canonical_nap_consistent", "passed": false, "severity": "non_negotiable", "notes": "Two live trading names at one address, a conflicting registered address, and three phone numbers in circulation." },
+      { "platform": "universal", "gate": "hours_present", "passed": false, "severity": "non_negotiable", "notes": "Hours are published on Google, Waze and Facebook, but Facebook opens at 11:00 AM against 10:00 AM elsewhere." },
+      { "platform": "universal", "gate": "physical_storefront", "passed": true, "severity": "non_negotiable", "notes": "Verified: street address with storefront listing, published daily hours, a working store line, and two owner calls confirming the business is operational." },
+      { "platform": "universal", "gate": "website_present", "passed": false, "severity": "recommended", "notes": "A storefront exists but on a builder subdomain with an empty catalog and no owned domain." },
+      { "platform": "universal", "gate": "ordering_channel", "passed": true, "severity": "recommended", "notes": "In-store pickup is published on one Google listing and delivery on the other — at least one remote-order channel is stated, though the storefront itself cannot fulfil an order." },
+      { "platform": "universal", "gate": "community_language_accessibility", "passed": true, "severity": "recommended", "notes": "The Facebook bio and both listing descriptions use Ethiopian and Eritrean product language, and the store is named in the community's terms." }
+    ],
+    "summary": "Three of the six non-negotiable gates fail on verified evidence: the Google primary category is wrong on the listing carrying the business's name, the Facebook About omits the website and phone, and canonical NAP is inconsistent across surfaces. The physical-storefront gate passes on strong evidence — address, hours, phone and two owner confirmations. Apple Maps' non-negotiable listing gate could not be assessed because the sweep did not cover it."
+  },
+
+  "market_opportunities": [
+    { "title": "Consolidate the duplicated Google identity", "description": "Merging or retiring the second listing reunites 30 reviews and two category labels under one profile, so the store competes as one established grocer instead of two thin listings.", "impact": "HIGH" },
+    { "title": "Put the imported assortment on a browseable surface", "description": "The store's direct imports — injera, berbere, shiro, teff, spices, coffee and fresh meat — are named on neither listing's description nor the storefront, while the market shows unmet demand for full-service international grocery on the west side.", "impact": "HIGH" },
+    { "title": "Respond to an existing 30-review base", "description": "Thirty reviews at 4.5–5.0 stars sit with no owner response; replying converts a passive rating into visible owner engagement for a category whose customers rely on word of mouth.", "impact": "MEDIUM" },
+    { "title": "Establish the missing second sources", "description": "No BBB record exists and the Facebook page omits the website and phone, so a customer who cross-checks the business finds nothing to corroborate it.", "impact": "MEDIUM" },
+    { "title": "Surface the credentials the store already holds", "description": "SNAP/EBT authorization, the direct-import supply chain and a monthly cultural event are each verified on some surface but absent from the ones the business controls.", "impact": "MEDIUM" }
+  ],
+
+  "render_controls": [
+    { "platform": "google", "business_profile_url": "https://www.google.com/maps/place/Arsema+Food+Mart", "business_rendered": true, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "none", "determination": "platform_available" },
+    { "platform": "facebook", "business_profile_url": "https://www.facebook.com/profile.php?id=61575040912212", "business_rendered": true, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "none", "determination": "platform_available" },
+    { "platform": "yelp", "business_profile_url": null, "business_rendered": false, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "not_attempted", "determination": "business_specific_failure" },
+    { "platform": "bbb", "business_profile_url": null, "business_rendered": false, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "not_attempted", "determination": "business_specific_failure" },
+    { "platform": "apple_maps", "business_profile_url": null, "business_rendered": false, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "not_attempted", "determination": "business_specific_failure" },
+    { "platform": "bing", "business_profile_url": null, "business_rendered": false, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "not_attempted", "determination": "business_specific_failure" },
+    { "platform": "owned_site", "business_profile_url": "https://arsemamart.square.site/", "business_rendered": false, "control_business": null, "control_url": null, "control_rendered": null, "access_barrier": "js_required", "determination": "unable_to_verify" }
+  ],
+
+  "outreach_problems": [
+    {
+      "problem": "Customers find two different store names at one address — and the listing with the bigger review base and the right category is not the one carrying the store's own name.",
+      "regular": "I noticed Google lists your store twice at 6667 W Washington — once as Arsema Food Mart filed under convenience store, and again as Ethiopian Eritrean Store — and your customer reviews are split between the two.",
+      "hook": "Look up your own address on Google sometime: it shows two different stores at 6667 W Washington, and most of your reviews sit on the one that doesn't say Arsema.",
+      "solution": "Settle on one storefront name, claim that listing, correct its primary category to the African grocery shelf, and merge or retire the duplicate so every review, photo and link lives under one identity — then make sure the same name, address and phone appear on every directory that currently carries a variant.",
+      "evidence": "Two live Google listings sharing 6667 W Washington St and (317) 603-3274: Arsema Food Mart (Convenience store, 4.5 across 8 reviews, plus code PPVF+P9) and Ethiopian Eritrean Store (Grocery store, 5.0 across 22 reviews, plus code PPVF+PC).",
+      "outreach_use": "Cold-call opener or first-touch email — the duplicate is verifiable in one search and the owner can confirm it in thirty seconds."
+    },
+    {
+      "problem": "Thirty customers have left five-star reviews and not one has a reply from the store — the goodwill is there but nothing shows the owner is present.",
+      "regular": "You have thirty reviews across the two listings, almost all five stars, and none of them has a response from you. Replying is the cheapest way to show new customers the store is run by someone who cares.",
+      "hook": "Thirty people took the time to write that your injera and your shelves are the best around — and none of them heard back. That's thirty conversations left on the table.",
+      "solution": "Claim the surviving listing and work through the existing reviews with owner responses, then set a habit of replying to each new one — starting with the recent reviewers who named the owner and the staff by name.",
+      "evidence": "Thirty observable reviews across the two Google listings (8 + 22) at 4.5 and 5.0 stars, with zero owner responses displayed on any of them; observable response rate 0 percent.",
+      "outreach_use": "Second touch or objection response — concrete, checkable, and it lands hardest after the duplicate finding because the reviews are the asset being split."
+    },
+    {
+      "problem": "A customer who checks beyond Google finds nothing — no BBB record, and the Facebook page that exists doesn't carry the store's phone or website.",
+      "regular": "Outside Google, the trail goes cold: there's no BBB record for the store, and the Facebook page has your address and hours but no phone number or website on it.",
+      "hook": "Try to call your store from your own Facebook page — the number isn't there, and there's no BBB record for a business that's been importing direct for years.",
+      "solution": "Build the missing second sources: add the phone and website to the Facebook About, align its hours with Google's, and establish a BBB record — each populated with the same name, address, phone and hours as the consolidated listing.",
+      "evidence": "Operator sweep found no Yelp or BBB listing for either trading name; the Facebook About publishes the address, hours, an email and Messenger, but no phone and no website; Facebook hours read 11:00am - 9:30pm against 10:00 AM - 9:30 PM on Google and Waze.",
+      "outreach_use": "Email hook or follow-on pain — frames the fix as one consistent footprint and pairs naturally with the claim invitation."
+    }
+  ]
+}
