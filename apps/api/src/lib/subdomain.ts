@@ -103,12 +103,17 @@ export interface SubdomainState {
 /**
  * `tenants.metadata` key recording WHEN the subdomain was assigned.
  *
- * There is no dedicated column and `tenants.updated_at` is not `@updatedAt` (it
- * is only written by a few ad-hoc raw statements), so adoption analytics that
- * filtered on `tenants.created_at` could only ever count brand-new tenants that
- * happened to have a subdomain — a tenant created last year that adopts one
- * today was invisible. The stamp lives in metadata (no migration) and is the
- * only source for "when did this tenant adopt a subdomain".
+ * There is no dedicated column, and adoption analytics filtered on
+ * `tenants.created_at` — which could only ever count brand-new tenants that
+ * happened to have a subdomain, leaving a tenant created last year that adopts
+ * one today invisible.
+ *
+ * `tenants.updated_at` is not the answer either: a `BEFORE UPDATE` trigger does
+ * maintain it (see AGENTS.md — the trigger is not in the migrations), but that
+ * makes it "last modified", not "subdomain assigned". It moves on unrelated
+ * edits (name syncs, location_status / subscription_tier changes, metadata
+ * writes), so a later edit would make an old adoption read as recent. The stamp
+ * lives in metadata (no migration) and is the only source for the adoption date.
  */
 export const SUBDOMAIN_ASSIGNED_AT_KEY = 'subdomainAssignedAt';
 

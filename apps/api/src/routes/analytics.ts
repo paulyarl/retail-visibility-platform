@@ -121,8 +121,10 @@ const LIVE_CUSTOM_DOMAIN_STATUSES = ['active', 'verified'];
  *
  * Recency comes straight from `custom_domains.created_at` (the row is inserted
  * when the domain is attached), so unlike the subdomain side this needs no extra
- * stamp. `custom_domains.updated_at` is a plain default that nothing maintains,
- * so it is deliberately unused.
+ * stamp. `updated_at` is deliberately unused: a `BEFORE UPDATE` trigger does
+ * maintain it (see AGENTS.md — the trigger is not in the migrations), but it
+ * tracks the LAST modification — verification checks, certificate refreshes,
+ * status changes — not the attach.
  */
 router.get('/custom-domain-stats', async (req: Request, res: Response) => {
   try {
