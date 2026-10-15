@@ -189,6 +189,9 @@ export function SubscriptionDisplayOptionsModal({
                       <Checkbox
                         checked={isFieldSelected(field)}
                         onChange={() => handleToggleField(field)}
+                        // Without this the click bubbles to the Paper's onClick and toggles
+                        // twice, which cancels out — the checkbox would appear unresponsive.
+                        onClick={(e) => e.stopPropagation()}
                         aria-label={meta.label}
                       />
                       <Box>
