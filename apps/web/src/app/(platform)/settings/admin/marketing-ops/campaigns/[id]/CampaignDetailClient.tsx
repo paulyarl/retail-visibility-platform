@@ -2776,6 +2776,7 @@ export default function CampaignDetailClient({
               <OutreachIntelligenceTab
                 campaignId={campaign.id}
                 campaignName={campaign.business_name}
+                campaign={campaign}
               />
             )}
 

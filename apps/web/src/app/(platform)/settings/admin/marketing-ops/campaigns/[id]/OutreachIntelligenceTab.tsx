@@ -32,6 +32,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Save, Trash2, AlertCircle, Info, User, Mail, Users, MessageSquare, ExternalLink, Wand2 } from 'lucide-react';
 import marketingOpsService, {
+  type Campaign,
   type OutreachIntelligenceResult,
   type OutreachIntelligenceInput,
   type SourcedField,
@@ -39,10 +40,16 @@ import marketingOpsService, {
   type SourceConfidence,
   type TeamSignalValue,
 } from '@/services/MarketingOpsService';
+import ProspectChannelTargets from '@/components/marketing-ops/ProspectChannelTargets';
 
 interface Props {
   campaignId: string;
   campaignName?: string | null;
+  // The campaign record, when the caller has it (CampaignDetailClient does).
+  // Renders the reachable contact channels — the same block the Log Contact
+  // modal shows — so the worksheet is prepared against the channels the
+  // prospect can actually be reached on.
+  campaign?: Campaign | null;
 }
 
 const CONFIDENCE_OPTIONS: { value: SourceConfidence; label: string }[] = [
@@ -78,7 +85,7 @@ function emptyInput(): OutreachIntelligenceInput {
   };
 }
 
-export default function OutreachIntelligenceTab({ campaignId, campaignName }: Props) {
+export default function OutreachIntelligenceTab({ campaignId, campaignName, campaign }: Props) {
   const [data, setData] = useState<OutreachIntelligenceResult | null>(null);
   const [form, setForm] = useState<OutreachIntelligenceInput>(emptyInput());
   const [loading, setLoading] = useState(true);
@@ -258,6 +265,23 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName }: Pr
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Reachable contact channels — the same block the Log Contact modal
+          renders, so the worksheet is prepared against the channels the
+          prospect can actually be reached on. Reference only: these are the
+          campaign's business-published values, not the personal phone numbers
+          the guardrail above forbids. */}
+      {campaign && (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Reachable contact channels</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              The values behind each channel, from the campaign record — the same set the Log Contact modal shows.
+            </p>
+          </div>
+          <ProspectChannelTargets campaign={campaign} />
         </div>
       )}
 
