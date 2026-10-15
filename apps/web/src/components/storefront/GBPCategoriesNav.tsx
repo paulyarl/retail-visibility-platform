@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface Category {
   id: string;
@@ -18,6 +19,7 @@ interface GBPCategoriesNavProps {
 }
 
 export default function GBPCategoriesNav({ tenantId, categories, title = "Browse Store Types" }: GBPCategoriesNavProps) {
+  const platformUrl = usePlatformUrl();
   // Sort categories: primary first, then secondary alphabetically
   const sortedCategories = [...categories].sort((a, b) => {
     if (a.is_primary && !b.is_primary) return -1; // a comes first
@@ -46,7 +48,7 @@ export default function GBPCategoriesNav({ tenantId, categories, title = "Browse
         {sortedCategories.map((category) => (
           <Link
             key={category.id}
-            href={`/directory/stores/${category.slug}`}
+            href={platformUrl(`/directory/stores/${category.slug}`)}
             className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-primary-600 dark:hover:text-primary-400`}
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">

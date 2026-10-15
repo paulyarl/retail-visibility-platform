@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
-import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
+import { usePlatformUrl, useTenantStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface ProductNavigationProps {
   tenantId: string;
@@ -15,7 +15,11 @@ interface ProductNavigationProps {
 export function ProductNavigation({ tenantId, directorySlug }: ProductNavigationProps) {
   // Prefer the directory slug for the platform-prefixed path — it resolves
   // through the same slug lookup and is a prettier public URL.
-  const sp = useStorefrontPath(directorySlug || tenantId);
+  // Cross-tenant: on a tenant host the product's tenant may differ from the
+  // host's tenant, so the storefront link resolves that tenant's canonical
+  // surface rather than host-relative '/'.
+  const storefrontUrl = useTenantStorefrontUrl(directorySlug || tenantId);
+  const platformUrl = usePlatformUrl();
   // Try to get auth context, but don't fail if not available
   let user = null;
   let isAuthenticated = false;
@@ -51,7 +55,7 @@ export function ProductNavigation({ tenantId, directorySlug }: ProductNavigation
       )}
       
       <Link
-      href={sp('/')}>
+      href={storefrontUrl}>
         <Button variant="ghost" size="sm">
           <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -61,7 +65,7 @@ export function ProductNavigation({ tenantId, directorySlug }: ProductNavigation
       </Link>
       
       {directorySlug && (
-        <Link href={`/directory/${directorySlug}?source=storefront`}>
+        <Link href={platformUrl(`/directory/${directorySlug}?source=storefront`)}>
           <Button variant="ghost" size="sm">
             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

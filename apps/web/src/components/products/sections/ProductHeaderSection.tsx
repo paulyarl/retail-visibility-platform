@@ -4,7 +4,7 @@ import Image from 'next/image';
 import DirectoryActions from '@/components/directory/DirectoryActions';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { SocialProofBadges } from '../type-sections/SocialProofBadges';
-import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
+import { useStorefrontPath, usePlatformUrl, useTenantStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface ProductHeaderSectionProps {
   product: any;
@@ -28,6 +28,11 @@ export function ProductHeaderSection({
   socialCommerceFlags,
 }: ProductHeaderSectionProps) {
   const sp = useStorefrontPath(product.tenantId);
+  // "Store" links to the PRODUCT's tenant storefront — on a tenant host that
+  // may differ from this host's tenant, so resolve its canonical surface.
+  const storefrontUrl = useTenantStorefrontUrl(tenantProfile?.slug || product.tenantId);
+  // Directory entries live only on the platform host.
+  const platformUrl = usePlatformUrl();
   const isSocialStorefront = storefrontType === 'social';
   const showSocialProof = !!(socialCommerceFlags?.enabled && socialCommerceFlags?.canUseSocialProof) || isSocialStorefront;
   return (
@@ -121,7 +126,7 @@ export function ProductHeaderSection({
           <div className="hidden sm:flex justify-end mt-3">
             {tenantProfile?.slug && (
               <a
-                href={sp('/')}
+                href={storefrontUrl}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +137,7 @@ export function ProductHeaderSection({
             )}
             {tenantProfile?.slug && (
               <a
-                href={`/directory/${tenantProfile.slug}?source=storefront`}
+                href={platformUrl(`/directory/${tenantProfile.slug}?source=storefront`)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

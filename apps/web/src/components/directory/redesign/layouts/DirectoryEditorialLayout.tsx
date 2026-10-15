@@ -29,12 +29,14 @@ import PromotedStoresCarousel from '@/components/directory/PromotedStoresCarouse
 import LastViewed from '@/components/directory/LastViewed';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 import type { DirectoryLayoutProps } from '../types';
 
 export default function DirectoryEditorialLayout({ data }: DirectoryLayoutProps) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const platformUrl = usePlatformUrl();
 
   const currentPage = data.pagination?.page ?? 1;
   const totalPages = data.pagination?.totalPages ?? 1;
@@ -245,7 +247,7 @@ export default function DirectoryEditorialLayout({ data }: DirectoryLayoutProps)
                   Discover the zero-effort magic behind this directory.
                 </p>
                 <Link
-                  href="/directory/about"
+                  href={platformUrl('/directory/about')}
                   className="inline-flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
                 >
                   See the Magic →

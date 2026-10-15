@@ -193,6 +193,18 @@ export function useTenantStorefrontUrl(idOrSlug: string | undefined): string {
   return resolved ?? `${platformOrigin()}${pathHref}`;
 }
 
+/**
+ * Platform-surface URL resolver — for links to surfaces that live ONLY on
+ * the platform host (directory entries, marketing pages). Emits the path
+ * relative on the platform app (client nav intact) and platform-origin
+ * absolute on a tenant host, where a host-relative /directory would render
+ * the platform directory under the tenant's domain.
+ */
+export function usePlatformUrl(): (path: string) => string {
+  const tenantHost = useIsTenantHost();
+  return (path: string) => (tenantHost ? `${platformOrigin()}${path}` : path);
+}
+
 interface StorefrontLinkProps extends Omit<LinkProps, 'href'> {
   /** Storefront-relative path: '/', '/policies/x', '?category=x' */
   to: string;

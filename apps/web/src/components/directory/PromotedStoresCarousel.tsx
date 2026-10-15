@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Star, MapPin, Package } from 'lucide-react';
 import { directorySingletonService } from '@/services/DirectorySingletonService';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface PromotedStore {
   tenantId: string;
@@ -30,6 +31,7 @@ export default function PromotedStoresCarousel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const impressionFired = useRef(false);
+  const platformUrl = usePlatformUrl();
 
   useEffect(() => {
     const fetchPromoted = async () => {
@@ -85,7 +87,7 @@ export default function PromotedStoresCarousel() {
           </h2>
         </div>
         <Link
-          href="/directory/stores"
+          href={platformUrl('/directory/stores')}
           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
         >
           View all →
@@ -98,7 +100,7 @@ export default function PromotedStoresCarousel() {
           return (
             <Link
               key={store.tenantId}
-              href={`/directory/${store.slug || store.tenantId}?source=promoted`}
+              href={platformUrl(`/directory/${store.slug || store.tenantId}?source=promoted`)}
               className="flex-shrink-0 w-64 snap-start group"
               onClick={() => DirectoryPromotionService.trackClick(store.tenantId)}
             >

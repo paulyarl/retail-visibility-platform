@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { clientLogger } from '@/lib/client-logger';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface RelatedStore {
   id: string;
@@ -45,6 +46,7 @@ export default function RelatedStores({
   const [stores, setStores] = useState<RelatedStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const platformUrl = usePlatformUrl();
 
   useEffect(() => {
     const fetchRelatedStores = async () => {
@@ -121,7 +123,7 @@ export default function RelatedStores({
             {title}
           </h2>
           <Link
-            href="/directory"
+            href={platformUrl('/directory')}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium"
           >
             Browse All Stores →
@@ -158,7 +160,7 @@ export default function RelatedStores({
         {!loading && stores.length > 0 && (
           <div className="mt-8 text-center">
             <a
-              href="/directory"
+              href={platformUrl('/directory')}
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               Browse All Stores

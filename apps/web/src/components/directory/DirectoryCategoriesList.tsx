@@ -10,6 +10,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useDirectoryCategories } from '@/hooks/useDirectoryCategories';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 import { Grid3x3, List, Package, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface DirectoryCategoriesListProps {
@@ -41,6 +42,7 @@ export default function DirectoryCategoriesList({
     includeChildren: showHierarchy,
     includeProductCount: showProductCount,
   });
+  const platformUrl = usePlatformUrl();
 
   // Limit categories if specified
   const displayCategories = maxCategories 
@@ -53,7 +55,7 @@ export default function DirectoryCategoriesList({
   const renderCategoryCard = (category: any) => (
     <Link
       key={category.id}
-      href={`/directory/categories/${category.slug}`}
+      href={platformUrl(`/directory/categories/${category.slug}`)}
       className="group block bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
     >
       <div className="p-6">
@@ -95,7 +97,7 @@ export default function DirectoryCategoriesList({
               {category.children.slice(0, 3).map((child: any) => (
                 <Link
                   key={child.id}
-                  href={`/directory/categories/${child.slug}`}
+                  href={platformUrl(`/directory/categories/${child.slug}`)}
                   className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -119,7 +121,7 @@ export default function DirectoryCategoriesList({
       {categories.map((category) => (
         <Link
           key={category.id}
-          href={`/directory/categories/${category.slug}`}
+          href={platformUrl(`/directory/categories/${category.slug}`)}
           className="group flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200"
         >
           <div className="flex items-center space-x-4">
@@ -297,7 +299,7 @@ export default function DirectoryCategoriesList({
           {maxCategories && categories.length > maxCategories && (
             <div className="text-center mt-8">
               <Link
-                href="/directory/categories"
+                href={platformUrl('/directory/categories')}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 View all {categories.length} categories

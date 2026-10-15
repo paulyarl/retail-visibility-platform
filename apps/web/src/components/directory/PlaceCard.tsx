@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MapPin, Phone, ArrowLeft, Info, ShieldCheck } from 'lucide-react';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 /**
  * PlaceCard — minimal shopper-facing card for directory presence seeds
@@ -38,13 +39,14 @@ export default function PlaceCard({
   currentUrl,
 }: PlaceCardProps) {
   const fullAddress = [address, city, state, zipCode].filter(Boolean).join(', ');
-  const claimHref = claimToken ? `/place/claim/${claimToken}` : '/directory';
+  // Claim flow + directory are platform surfaces — always on the platform host.
+  const claimHref = `${platformOrigin()}${claimToken ? `/place/claim/${claimToken}` : '/directory'}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
-          href="/directory"
+          href={`${platformOrigin()}/directory`}
           className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />

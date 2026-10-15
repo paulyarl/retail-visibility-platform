@@ -29,10 +29,12 @@ import PromotedStoresCarousel from '@/components/directory/PromotedStoresCarouse
 import LastViewed from '@/components/directory/LastViewed';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 import type { DirectoryLayoutProps } from '../types';
 
 export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const platformUrl = usePlatformUrl();
 
   const currentPage = data.pagination?.page ?? 1;
   const totalPages = data.pagination?.totalPages ?? 1;
@@ -166,7 +168,7 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
                     Featured Stores
                   </h2>
                   <Link
-                    href="/directory/stores"
+                    href={platformUrl('/directory/stores')}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                   >
                     View all stores →
@@ -237,7 +239,7 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
                   No manual curation, just pure automation.
                 </p>
                 <Link
-                  href="/directory/about"
+                  href={platformUrl('/directory/about')}
                   className="inline-flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
                 >
                   See the Magic →

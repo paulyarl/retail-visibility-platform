@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import { clientLogger } from '@/lib/client-logger';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 interface DirectoryListing {
   id: string;
@@ -205,7 +206,7 @@ export default function DirectoryMap({
                   ${listing.ratingAvg > 0 ? `<span>⭐ ${listing.ratingAvg.toFixed(1)}</span>` : ''}
                   ${listing.productCount > 0 ? `<span>📦 ${listing.productCount} products</span>` : ''}
                 </div>
-                <a href="/directory/${listing.slug}" class="popup-link">View Store →</a>
+                <a href="${platformOrigin()}/directory/${listing.slug}" class="popup-link">View Store →</a>
               </div>
             `;
 

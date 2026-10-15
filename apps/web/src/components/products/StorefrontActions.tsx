@@ -6,7 +6,7 @@ import { BookOpen, MessageSquare, ShoppingCart } from 'lucide-react';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import ProductActions from './ProductActions';
 import { PublicTenantInfo } from '@/services/TenantPublicService';
-import { useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
+import { usePlatformUrl, useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface StorefrontActionsProps {
   tenantId: string;
@@ -23,6 +23,7 @@ export default function StorefrontActions({ tenantId, businessName, tenantSlug, 
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const sUrl = useStorefrontUrl(tenantId);
+  const platformUrl = usePlatformUrl();
 
   const handleReview = () => {
     const reviewsSection = document.getElementById('storefront-reviews-section');
@@ -41,7 +42,7 @@ export default function StorefrontActions({ tenantId, businessName, tenantSlug, 
       <div className="flex items-center gap-2">
         {directoryPublished && tenantSlug && (
           <Link
-            href={`/directory/${tenantSlug}?source=storefront`}
+            href={platformUrl(`/directory/${tenantSlug}?source=storefront`)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
             title="View this store's full directory listing"
           >

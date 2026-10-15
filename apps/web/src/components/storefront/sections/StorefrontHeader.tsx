@@ -10,7 +10,7 @@ import StickySearchBar from '@/app/tenant/[id]/layouts/shared/StickySearchBar';
 import TrustSignalsBar from '@/app/tenant/[id]/layouts/shared/TrustSignalsBar';
 import { StorefrontLayoutKey } from '@/app/products/[id]/layouts/types';
 import DemoBadge from '@/components/shared/DemoBadge';
-import { useStorefrontPath } from '@/components/storefront/StorefrontUrlContext';
+import { useStorefrontPath, usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface StorefrontHeaderProps {
   tenantId: string;
@@ -157,6 +157,10 @@ function ClassicHeader({
   handleViewCart,
   currentUrl,
 }: Omit<StorefrontHeaderProps, 'layoutVariant' | 'primaryColor' | 'shippingText'>) {
+  // Directory/shops are platform surfaces — always resolve on the platform
+  // host, never host-relative on this storefront's tenant domain.
+  const platformUrl = usePlatformUrl();
+
   return (
     <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -195,13 +199,13 @@ function ClassicHeader({
           <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
             <div className="hidden sm:flex items-center gap-2 flex-wrap">
               {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
-                <a href={`/directory/${tenantSlug}?source=storefront`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap" title="View Store in Directory">
+                <a href={platformUrl(`/directory/${tenantSlug}?source=storefront`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap" title="View Store in Directory">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" /></svg>
                   <span className="hidden lg:inline">Directory</span>
                 </a>
               )}
               {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
-                <a href={`/shops/${tenantSlug}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap" title="View Store in Shops">
+                <a href={platformUrl(`/shops/${tenantSlug}`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap" title="View Store in Shops">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" /></svg>
                   <span className="hidden lg:inline">Shop</span>
                 </a>
@@ -238,13 +242,13 @@ function ClassicHeader({
         {/* Mobile Navigation */}
         <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
           {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
-            <a href={`/directory/${tenantSlug}?source=storefront`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0">
+            <a href={platformUrl(`/directory/${tenantSlug}?source=storefront`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
               <span>Directory</span>
             </a>
           )}
           {!storefrontStatus.shouldShowPanel && directoryPublished && tenantSlug && isRetailStore && (
-            <a href={`/shops/${tenantSlug}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0">
+            <a href={platformUrl(`/shops/${tenantSlug}`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" /></svg>
               <span>Shop</span>
             </a>

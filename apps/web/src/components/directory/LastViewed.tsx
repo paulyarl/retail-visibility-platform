@@ -8,6 +8,7 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 // Types for last viewed items
 interface LastViewedStore {
@@ -133,6 +134,7 @@ export default function LastViewed({
   // console.log(`Items: `,items);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const platformUrl = usePlatformUrl();
 
   useEffect(() => {
     const fetchLastViewed = async () => {
@@ -620,7 +622,7 @@ export default function LastViewed({
         {!loading && items.length > 0 && (
           <div className="mt-6 text-center">
             <a
-              href="/directory"
+              href={platformUrl('/directory')}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800"
             >
               Browse All Stores →

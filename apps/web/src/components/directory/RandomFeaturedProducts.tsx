@@ -8,6 +8,7 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { useRandomFeaturedProducts, useProductSingleton } from '@/providers/data/ProductSingleton';
 import type { PublicProduct } from '@/providers/data/ProductSingleton';
 import { distanceUtils } from '@/lib/utils';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 export default function RandomFeaturedProducts() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -18,6 +19,7 @@ export default function RandomFeaturedProducts() {
   const { products, loading, error, refetch } = useRandomFeaturedProducts(userLocation || undefined, 20);
   // console.log(`RandomFeaturedProducts products:`, products);
   const { actions } = useProductSingleton();
+  const platformUrl = usePlatformUrl();
 
   // Get user location on component mount
   useEffect(() => {
@@ -444,7 +446,7 @@ export default function RandomFeaturedProducts() {
         {/* View More Link */}
         <div className="text-center mt-8">
           <Link
-            href="/directory"
+            href={platformUrl('/directory')}
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             Browse All Stores

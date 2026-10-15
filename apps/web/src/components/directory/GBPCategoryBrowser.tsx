@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { calculatePopularityScore, SCORING_PRESETS, type CategoryMetrics, useSortedCategories } from '@/utils/popularityScoring';
+import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 interface GBPCategory {
   categorySlug: string;
@@ -38,6 +39,7 @@ export default function GBPCategoryBrowser({ gbpCategories, className = '' }: GB
     12, 
     SCORING_PRESETS.LOCATION_AWARE
   );
+  const platformUrl = usePlatformUrl();
 
   if (!gbpCategories || gbpCategories.length === 0) {
     return null;
@@ -50,7 +52,7 @@ export default function GBPCategoryBrowser({ gbpCategories, className = '' }: GB
           Business Categories
         </h2>
         <Link
-          href="/directory/categories"
+          href={platformUrl('/directory/categories')}
           className="text-purple-600 dark:text-purple-400 hover:underline text-sm font-medium"
         >
           Browse all →
@@ -69,7 +71,7 @@ export default function GBPCategoryBrowser({ gbpCategories, className = '' }: GB
           return (
             <Link
               key={category.categorySlug}
-              href={`/directory/categories/${category.categorySlug}`}
+              href={platformUrl(`/directory/categories/${category.categorySlug}`)}
               className="flex items-center gap-3 p-3 rounded-lg border border-purple-200 dark:border-purple-700/50 bg-linear-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 hover:shadow-md transition-all duration-200 group"
             >
               <div className="flex items-center gap-2 flex-1">
@@ -107,7 +109,7 @@ export default function GBPCategoryBrowser({ gbpCategories, className = '' }: GB
       {gbpCategories.length > 12 && (
         <div className="mt-4 text-center">
           <Link
-            href="/directory/categories"
+            href={platformUrl('/directory/categories')}
             className="inline-flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:underline text-sm font-medium"
           >
             View all {gbpCategories.length} categories →
