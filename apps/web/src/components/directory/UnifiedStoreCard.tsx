@@ -12,6 +12,8 @@ import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 import DemoBadge from '@/components/shared/DemoBadge';
 import { getDirectoryListingUrl } from '@/utils/slug';
+import { platformOrigin } from '@/lib/storefront-routing';
+import { useIsTenantHost, useTenantStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 
 export interface DirectoryListing {
@@ -131,10 +133,24 @@ export function UnifiedStoreCard({
     }
   }, [isPromoted, listing.tenantId]);
 
-  // Determine link destination based on linkType
+  // Determine link destination based on linkType — the destination surface
+  // follows the journey's origin surface:
+  //  - 'storefront' (cards on storefront/products surfaces): the tenant's
+  //    storefront on its canonical host — custom domain → subdomain →
+  //    platform /tenant/{slug}, resolved by useTenantStorefrontUrl.
+  //  - 'directory' (cards on directory surfaces): the directory entry, which
+  //    is always the platform host — host-relative on the platform app,
+  //    platform-origin absolute on a tenant host.
+  const onTenantHost = useIsTenantHost();
+  const storefrontUrl = useTenantStorefrontUrl(
+    linkType === 'storefront' ? listing.slug || listing.tenantId : undefined
+  );
+  const directoryPath = getDirectoryListingUrl(listing);
   const linkHref = linkType === 'storefront'
-    ? `/tenant/${listing.slug || listing.tenantId}`
-    : getDirectoryListingUrl(listing);
+    ? storefrontUrl
+    : onTenantHost
+      ? `${platformOrigin()}${directoryPath}`
+      : directoryPath;
 
   // Shelf→entry attribution — stamp the referring shelf onto internal entry links.
   // `sourceRef` stamps the entry SOURCE instead (non-shelf surfaces that still
@@ -258,7 +274,7 @@ export function UnifiedStoreCard({
                               key={category.id}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.location.href = `/tenant/${listing.tenantId}?category=${category.slug}`;
+                                window.location.href = `${storefrontUrl}?category=${category.slug}`;
                               }}
                               className="text-xs hover:bg-blue-100 cursor-pointer transition-colors px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200"
                             >
@@ -269,7 +285,7 @@ export function UnifiedStoreCard({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.location.href = `/tenant/${listing.tenantId}?featured=false`;
+                                window.location.href = `${storefrontUrl}?featured=false`;
                               }}
                               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                             >

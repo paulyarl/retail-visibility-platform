@@ -18,6 +18,7 @@ import { distanceUtils } from '@/lib/utils';
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
 import { PromotedBadge, promotedCardClass } from './PromotedBadge';
 import { clientLogger } from '@/lib/client-logger';
+import { useCrossTenantUrl, useTenantStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 
 // Type-aware CTA: renders the correct button based on productType
 function TypeAwareCTA({
@@ -32,6 +33,7 @@ function TypeAwareCTA({
   commerceDisabled,
   className,
   compact = false,
+  productHref,
 }: {
   product: ProductData;
   tenantName: string;
@@ -44,6 +46,7 @@ function TypeAwareCTA({
   commerceDisabled: boolean;
   className?: string;
   compact?: boolean;
+  productHref: string;
 }) {
   const productType = product.productType || 'physical';
 
@@ -51,7 +54,7 @@ function TypeAwareCTA({
   if (productType === 'digital') {
     return (
       <Link
-        href={`/products/${product.id}`}
+        href={productHref}
         className={`inline-flex items-center justify-center w-full rounded-md border border-blue-300 bg-blue-50 ${compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors`}
       >
         <Download className={`mr-2 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
@@ -64,7 +67,7 @@ function TypeAwareCTA({
   if (productType === 'service') {
     return (
       <Link
-        href={`/products/${product.id}`}
+        href={productHref}
         className={`inline-flex items-center justify-center w-full rounded-md border border-green-300 bg-green-50 ${compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium text-green-700 hover:bg-green-100 hover:border-green-400 transition-colors`}
       >
         <Calendar className={`mr-2 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
@@ -77,7 +80,7 @@ function TypeAwareCTA({
   if (product.has_variants === true && !commerceDisabled) {
     return (
       <Link
-        href={`/products/${product.id}`}
+        href={productHref}
         className={`inline-flex items-center justify-center w-full rounded-md border border-gray-300 bg-white ${compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors ${className || ''}`}
       >
         View Options
@@ -728,6 +731,17 @@ export default function SmartProductCard({
   const productType = product.productType || 'physical';
   const showStock = shouldShowStock(productType);
 
+  // Cross-tenant resolution: on a tenant host, a card naming a DIFFERENT
+  // tenant's product must escape to that tenant's canonical surface —
+  // host-relative /products/{id} would render the foreign product under
+  // this store's domain. Same-tenant and platform-host cases stay relative.
+  const productTenantId = product.tenantId || tenantId;
+  const productHref = useCrossTenantUrl(productTenantId, `/products/${product.id}`);
+  // "Visit store" from a products/storefront surface lands on the tenant's
+  // STOREFRONT surface — canonical host ladder (custom → subdomain →
+  // /tenant/{slug}), or '/' when the card names this host's own tenant.
+  const storeHref = useTenantStorefrontUrl(tenantSlug || productTenantId);
+
   // console.log(`[SmartProductCard] product: ${JSON.stringify(product, null, 2)}`)
  
   // console.log(`[SmartProductCard] hoursStatus: ${JSON.stringify(hoursStatus, null, 2)}`)
@@ -765,7 +779,7 @@ export default function SmartProductCard({
 
         <div className="relative">
           {/* Featured Image - Larger */}
-          <Link href={`/products/${product.id}`} className="relative block aspect-square bg-neutral-100 dark:bg-neutral-700">
+          <Link href={productHref} className="relative block aspect-square bg-neutral-100 dark:bg-neutral-700">
             {product.imageUrl ? (
               <Image
                 src={product.imageUrl}
@@ -811,7 +825,7 @@ export default function SmartProductCard({
             {/* Store Information for Directory Context */}
             {tenantName && (
               <Link 
-                href={tenantSlug ? `/directory/${tenantSlug}?source=storefront` : `/shops/${tenantSlug ? tenantSlug : tenantId}`}
+                href={storeHref}
                 className="flex items-center gap-2 mb-3 p-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
                 title={`Visit ${tenantName} store`}
               >
@@ -851,7 +865,7 @@ export default function SmartProductCard({
               </Link>
             )}
             
-            <Link href={`/products/${product.id}`}>
+            <Link href={productHref}>
               <h3 className="font-bold text-lg text-neutral-900 dark:text-white line-clamp-2 mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                 {displayTitle}
               </h3>
@@ -997,6 +1011,7 @@ export default function SmartProductCard({
                   buttonLayout={buttonLayout}
                   commerceDisabled={commerceDisabled}
                   className="w-full"
+                  productHref={productHref}
                 />
               </div>
             )}
@@ -1011,7 +1026,7 @@ export default function SmartProductCard({
       <div className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 hover:shadow-md transition-shadow ${className}`}>
         <div className="flex gap-3">
           {/* Compact Image */}
-          <Link href={`/products/${product.id}`} className="relative w-16 h-16 shrink-0 bg-neutral-100 dark:bg-neutral-700 rounded">
+          <Link href={productHref} className="relative w-16 h-16 shrink-0 bg-neutral-100 dark:bg-neutral-700 rounded">
             {product.imageUrl ? (
               <Image
                 src={product.imageUrl}
@@ -1031,7 +1046,7 @@ export default function SmartProductCard({
 
           {/* Compact Info */}
           <div className="flex-1 min-w-0">
-            <Link href={`/products/${product.id}`}>
+            <Link href={productHref}>
               <h4 className="font-medium text-sm text-neutral-900 dark:text-white truncate">
               
              
@@ -1221,6 +1236,7 @@ export default function SmartProductCard({
                   buttonLayout={buttonLayout}
                   commerceDisabled={commerceDisabled}
                   compact
+                  productHref={productHref}
                 />
               </div>
             )}
@@ -1234,7 +1250,7 @@ export default function SmartProductCard({
     return (
       <div className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow flex ${className}`}>
         {/* List Image */}
-        <Link href={`/products/${product.id}`} className="relative w-32 h-32 shrink-0 bg-neutral-100 dark:bg-neutral-700 block overflow-hidden">
+        <Link href={productHref} className="relative w-32 h-32 shrink-0 bg-neutral-100 dark:bg-neutral-700 block overflow-hidden">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
@@ -1325,7 +1341,7 @@ export default function SmartProductCard({
                     </div>
                   </div>
                 )}
-                <Link href={`/products/${product.id}`}>
+                <Link href={productHref}>
                   <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
                     
                     {displayTitle}
@@ -1409,6 +1425,7 @@ export default function SmartProductCard({
                 propDefaultGatewayType={propDefaultGatewayType}
                 buttonLayout={buttonLayout}
                 commerceDisabled={commerceDisabled}
+                productHref={productHref}
               />
             )}
           </div>
@@ -1423,7 +1440,7 @@ export default function SmartProductCard({
     <div className={`group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow ${product.promotional_priority ? promotedCardClass() : ''} ${className}`}>
       {/* Grid Image */}
       <div className={`block relative ${aspectClass} bg-neutral-100 dark:bg-neutral-700 overflow-hidden`}>
-        <Link href={`/products/${product.id}`} className="absolute inset-0">
+        <Link href={productHref} className="absolute inset-0">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
@@ -1474,7 +1491,7 @@ export default function SmartProductCard({
           <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex items-center justify-center gap-2 z-20">
             {showQuickView && (
               <Link
-                href={`/products/${product.id}`}
+                href={productHref}
                 className="p-2 rounded-full bg-white/90 text-neutral-700 hover:bg-white transition-colors"
                 aria-label="Quick view"
                 title="Quick view"
@@ -1499,7 +1516,7 @@ export default function SmartProductCard({
             )}
             {showQuickAdd && product.has_variants && (
               <Link
-                href={`/products/${product.id}`}
+                href={productHref}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 text-neutral-700 text-xs font-medium hover:bg-white transition-colors"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1528,7 +1545,7 @@ export default function SmartProductCard({
           )}
         </div>
 
-        <Link href={`/products/${product.id}`}>
+        <Link href={productHref}>
           <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
             {truncateText(displayTitle, truncateTitle)}
           </h3>
@@ -1617,6 +1634,7 @@ export default function SmartProductCard({
             buttonLayout={buttonLayout}
             commerceDisabled={commerceDisabled}
             className="w-full"
+            productHref={productHref}
           />
         )}
       </div>

@@ -19,9 +19,10 @@
  *   const url = useStorefrontUrl(); url('')        // absolute share URL
  */
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import Link, { type LinkProps } from 'next/link';
-import { storefrontPath, platformOrigin } from '@/lib/storefront-routing';
+import { storefrontPath, platformOrigin, platformApexHost, isTenantHostName } from '@/lib/storefront-routing';
+import { tenantPublicService } from '@/services/TenantPublicService';
 
 export interface StorefrontUrlValue {
   tenantId: string;
@@ -69,6 +70,127 @@ export function useStorefrontUrl(fallbackTenantId?: string): (path?: string) => 
   const origin = ctx?.origin ?? platformOrigin();
   const sp = useStorefrontPath(fallbackTenantId);
   return (path = '') => `${origin}${sp(path)}`;
+}
+
+/** True when rendering on a tenant storefront host (subdomain or custom
+ *  domain). Provider value wins (SSR-deterministic); falls back to a
+ *  post-mount hostname check for pages that never mounted the provider. */
+export function useIsTenantHost(): boolean {
+  const ctx = useContext(StorefrontUrlContext);
+  const [tenantHost, setTenantHost] = useState(ctx?.tenantHost ?? false);
+  useEffect(() => {
+    if (!ctx) setTenantHost(isTenantHostName(window.location.hostname));
+  }, [ctx]);
+  return tenantHost;
+}
+
+/**
+ * Cross-tenant URL resolver — the delegator's delegator.
+ *
+ * `useStorefrontPath` only knows the CURRENT host's tenant, so cards that
+ * link to a DIFFERENT tenant's content (recommendations, recently viewed)
+ * can't use it: on a tenant host a host-relative path stamps this
+ * storefront's domain onto a foreign tenant's page. This hook resolves the
+ * TARGET tenant's canonical surface (custom domain → platform subdomain →
+ * platform path) via the public canonical API and prepends it to `path`.
+ *
+ * Use for PASSTHROUGH paths only — paths valid verbatim on every surface
+ * (/products/{id}, /directory/{slug}, /shops/{slug}). For a tenant's
+ * storefront HOME use `useTenantStorefrontUrl`, whose layer-1 path differs.
+ *
+ * Returns `path` unchanged when the current surface is the platform app or
+ * the target IS this host's tenant (or resolves back to this host). While a
+ * foreign target's canonical is still loading, emits the platform-origin URL
+ * — never a foreign host-relative path.
+ */
+export function useCrossTenantUrl(targetTenantId: string | undefined, path: string): string {
+  const ctx = useContext(StorefrontUrlContext);
+  // '' = resolved back to this host (same tenant) — keep host-relative
+  const [origin, setOrigin] = useState<string | null>(null);
+
+  const tenantHost = ctx?.tenantHost ?? false;
+  const foreign = !!targetTenantId && tenantHost && ctx?.tenantId !== targetTenantId;
+
+  useEffect(() => {
+    const host = ctx?.tenantHost ?? isTenantHostName(window.location.hostname);
+    if (!targetTenantId || !host || ctx?.tenantId === targetTenantId) {
+      setOrigin(null);
+      return;
+    }
+
+    let cancelled = false;
+    tenantPublicService
+      .getStorefrontCanonical(targetTenantId)
+      .then((canon) => {
+        if (cancelled) return;
+        const resolved =
+          canon?.kind === 'custom' && canon.host
+            ? `https://${canon.host}`
+            : canon?.kind === 'subdomain' && canon.host
+              ? `https://${canon.host}.${platformApexHost()}`
+              : platformOrigin();
+        // Canonical may land back on this host (same tenant, unknown to the
+        // provider) — keep the href relative so client nav stays intact.
+        const sameHost =
+          new URL(resolved).host.toLowerCase() === window.location.host.toLowerCase();
+        setOrigin(sameHost ? '' : resolved);
+      })
+      .catch(() => setOrigin(platformOrigin()));
+
+    return () => { cancelled = true; };
+  }, [ctx?.tenantHost, ctx?.tenantId, targetTenantId]);
+
+  if (!foreign || origin === '') return path;
+  return `${origin ?? platformOrigin()}${path}`;
+}
+
+/**
+ * Storefront-surface URL for a tenant — the Visit-Store destination when the
+ * journey starts on a storefront/products surface. Resolves the canonical
+ * ladder: custom domain → platform subdomain → platform path.
+ *   - platform host:        /tenant/{idOrSlug}   (relative)
+ *   - tenant host, self:    /                    (the storefront IS this host)
+ *   - tenant host, foreign: {canonical origin}/  (platform /tenant/{idOrSlug}
+ *                           until the lookup lands, and for path-kind tenants)
+ */
+export function useTenantStorefrontUrl(idOrSlug: string | undefined): string {
+  const ctx = useContext(StorefrontUrlContext);
+  const pathHref = idOrSlug ? `/tenant/${idOrSlug}` : '/';
+  const tenantHost = ctx?.tenantHost ?? false;
+  const self = tenantHost && !!ctx?.tenantId && ctx.tenantId === idOrSlug;
+  const [resolved, setResolved] = useState<string | null>(null);
+
+  useEffect(() => {
+    const host = ctx?.tenantHost ?? isTenantHostName(window.location.hostname);
+    if (!idOrSlug || !host || ctx?.tenantId === idOrSlug) {
+      setResolved(null);
+      return;
+    }
+
+    let cancelled = false;
+    tenantPublicService
+      .getStorefrontCanonical(idOrSlug)
+      .then((canon) => {
+        if (cancelled) return;
+        const url =
+          canon?.kind === 'custom' && canon.host
+            ? `https://${canon.host}/`
+            : canon?.kind === 'subdomain' && canon.host
+              ? `https://${canon.host}.${platformApexHost()}/`
+              : `${platformOrigin()}${pathHref}`;
+        // Canonical landed back on this host → the storefront IS the host root.
+        setResolved(
+          new URL(url).host.toLowerCase() === window.location.host.toLowerCase() ? '/' : url
+        );
+      })
+      .catch(() => setResolved(`${platformOrigin()}${pathHref}`));
+
+    return () => { cancelled = true; };
+  }, [ctx?.tenantHost, ctx?.tenantId, idOrSlug, pathHref]);
+
+  if (!tenantHost) return pathHref;
+  if (self) return '/';
+  return resolved ?? `${platformOrigin()}${pathHref}`;
 }
 
 interface StorefrontLinkProps extends Omit<LinkProps, 'href'> {
