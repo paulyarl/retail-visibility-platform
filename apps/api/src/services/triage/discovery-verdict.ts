@@ -118,7 +118,12 @@ const BRONZE_REASON_SIGNAL_MAP: Record<string, SignalCode[]> = {
   community_only_no_reviews: ['RA_LOW_REVIEW_VOLUME'],
   thin_photo_surface: ['DS_PHOTO_DEFICIT'],
   misaligned_platform_category: ['WC_CATEGORY_MISMATCH'],
-  alternate_identity: ['CP_NAP_NAME_DRIFT'],
+  // A second trading name at the same address/phone is a name-drift
+  // (CP_NAP_NAME_DRIFT) AND, when the platform carries two live profiles for
+  // one business, a duplicate listing (DS_DUPLICATE_LISTING). The second code
+  // is what makes the scan's find actionable — it routes to PB-09/A8 presence
+  // instead of dying as a doubt marker with no playbook.
+  alternate_identity: ['CP_NAP_NAME_DRIFT', 'DS_DUPLICATE_LISTING'],
   hosted_storefront_only: ['WC_THIRD_PARTY_DOMAIN'],
   // Hunt-mechanism reasons with no audit-family defect equivalent:
   //   trade_manifest_only, wholesale_or_hybrid_role, non_english_signage_only,

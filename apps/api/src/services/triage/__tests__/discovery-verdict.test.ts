@@ -75,6 +75,18 @@ describe('deriveDiscoverySignals', () => {
     ]));
   });
 
+  it('maps alternate_identity to both name drift and duplicate listing', () => {
+    // A second trading name at the same address/phone IS the duplicate-listing
+    // case (the reason catalog's own canonical example: "Ethiopian Eritrean
+    // Store" at Arsema's address). It must yield DS_DUPLICATE_LISTING so the
+    // find routes to PB-09/A8 presence — CP_NAP_NAME_DRIFT alone is a doubt
+    // marker with no playbook of its own.
+    const { signals } = deriveDiscoverySignals({
+      bronzeAttribution: [{ reason_key: 'alternate_identity' }],
+    });
+    expect(signals).toEqual(expect.arrayContaining(['CP_NAP_NAME_DRIFT', 'DS_DUPLICATE_LISTING']));
+  });
+
   it('leaves hunt-mechanism reasons and unknown keys unmapped', () => {
     const { signals } = deriveDiscoverySignals({
       bronzeAttribution: [
