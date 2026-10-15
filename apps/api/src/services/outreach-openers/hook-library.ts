@@ -791,13 +791,13 @@ Want me to send it over?
   },
 
   // 14. profile_rescue — presence OFFERING angle: integrity recovery for
-  //     suspended, duplicated, hijacked, disputed, or verification-blocked
-  //     listings. The profile exists — it just isn't working for the owner.
+  //     suspended, duplicated, hijacked, disputed, verification-blocked, or
+  //     hidden listings. The profile exists — it just isn't working for the owner.
   {
     angle: 'profile_rescue',
     label: 'Profile rescue — suspended, duplicated, or blocked listings',
     archetypes: ['A8'],
-    signals: ['DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING', 'DS_HIJACKED_LISTING', 'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK'],
+    signals: ['DS_PROFILE_SUSPENDED', 'DS_DUPLICATE_LISTING', 'DS_HIJACKED_LISTING', 'DS_OWNERSHIP_DISPUTE', 'DS_ADDRESS_VERIFICATION_BLOCK', 'DS_PROFILE_NOT_PUBLIC'],
     platforms: ['google', 'yelp', 'facebook', 'apple', 'bbb'],
     subject: 'your listing is there — but it isn\'t working for you',
     body: `{{salutation}} I found {{business}}'s listing — but something's off with it. It looks suspended, duplicated, or locked in a way that keeps it from working for you.
@@ -966,5 +966,9 @@ export const REPAIR_CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
   {
     objection: 'Isn\'t that Google\'s job?',
     response: 'Google mostly reflects what the other directories feed it — so the fix is on the listing side, not something you can call Google about. That\'s the part we handle.',
+  },
+  {
+    objection: 'I want to keep both listings',
+    response: 'Fair — the second one earned its keep. But two listings means two half-profiles: they split your reviews, they split your categories, and neither ranks like one strong one would. You pay that every day, whether or not anything ever happens. And a duplicate is reportable — a competitor can file any time, and it\'s usually the newer listing that goes, with whatever it collected. If you don\'t control that second listing, anyone can claim or edit it. Consolidating on your terms beats losing it on theirs, and you pick which name survives. Want me to show you what each looks like merged?',
   },
 ];

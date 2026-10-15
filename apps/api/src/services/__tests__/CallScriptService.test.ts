@@ -480,10 +480,25 @@ describe('CallScriptService.assembleForCampaign', () => {
 
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    // 5 generic + 5 repair rows, repair first.
-    expect(result.objections).toHaveLength(10);
+    // 5 generic + 6 repair rows, repair first.
+    expect(result.objections).toHaveLength(11);
     expect(result.objections.some((o) => /my listing'?s fine/i.test(o.objection))).toBe(true);
     expect(result.objections.some((o) => /google'?s job/i.test(o.objection))).toBe(true);
+    expect(result.objections.some((o) => /keep both listings/i.test(o.objection))).toBe(true);
+  });
+
+  it('prepends the repair-playbook objections (incl. the duplicate pushback) for A8', async () => {
+    mockResolveCampaignArchetype.mockResolvedValue({
+      archetype: 'A8',
+      source: 'fallback',
+      reason: 'test',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    // A8 shares the repair objection set — the duplicate objection is its
+    // most on-point pushback.
+    expect(result.objections.some((o) => /keep both listings/i.test(o.objection))).toBe(true);
   });
 
   it('priority order — the hook matching the highest-severity repair signal leads (A3 repair bundle)', async () => {

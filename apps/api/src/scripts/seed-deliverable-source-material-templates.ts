@@ -32,7 +32,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V12 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V13 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -406,7 +406,16 @@ Produce the complete presence plan, grounded in the supplied material:
    unpublished page, lift the restricted visibility setting, or claim and
    configure the listing so it renders to ordinary visitors — verify the
    public render afterward, because being listed is not the same as being
-   seen.
+   seen. For a DUPLICATE, present the fork: MERGE into one owner-approved
+   profile, or RETIRE the duplicate. The OWNER picks the survivor — give the
+   criteria (older = likely the platform's original; claimed = the one you
+   can act on; review count; the name that matches the signage and website)
+   and say plainly that review transfer on a merge is not guaranteed: the
+   reviews that count are the ones on the survivor. Note the cross-platform
+   consequence — a duplicate usually holds the business's linked social and
+   directory profiles on one listing and none on the other, so
+   missing-profile findings on the bare listing are the SPLIT, not real
+   absence, and consolidating restores them.
 5. BUILD ORDER — the sequenced plan: integrity repairs first, then claims,
    then new profiles, each step sized so the owner sees progress weekly.
 6. PROFILE SPECIFICATIONS — per new profile: the gold-standard field set

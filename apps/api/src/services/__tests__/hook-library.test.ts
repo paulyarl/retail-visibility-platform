@@ -82,6 +82,9 @@ const REGISTERED_SIGNALS = new Set([
   'DS_HIJACKED_LISTING',
   'DS_OWNERSHIP_DISPUTE',
   'DS_ADDRESS_VERIFICATION_BLOCK',
+  // PB-09 integrity code (migration 336) — registered but never added to a
+  // hook's signals list until the profile_rescue angle picked it up.
+  'DS_PROFILE_NOT_PUBLIC',
 ]);
 
 describe('Hook Library catalog', () => {

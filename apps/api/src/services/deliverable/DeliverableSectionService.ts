@@ -749,7 +749,11 @@ export class DeliverableSectionService extends BaseService {
       productCategories: Array.isArray(auditData?.website?.product_categories_visible)
         ? auditData.website.product_categories_visible
         : [],
-      alternateProfiles: Array.isArray(google?.alternate_profiles) ? google.alternate_profiles : [],
+      // Per-platform — a duplicate can exist on any platform, not just Google
+      // (matches the A8 archetypeFactSlice scope).
+      alternateProfiles: Object.values(platforms).flatMap((p: any) =>
+        Array.isArray(p?.alternate_profiles) ? p.alternate_profiles : [],
+      ),
       hasDuplicateListing: detected.includes('DS_DUPLICATE_LISTING'),
     });
 

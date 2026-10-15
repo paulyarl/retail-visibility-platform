@@ -95,6 +95,17 @@ export interface PlatformAudit {
   photo_count?: number | null;
   photo_types?: string[];
   special_hours_present?: boolean | null;
+  // Alternate listings observed for this same business on the platform — a
+  // duplicate under a different trading name (DS_DUPLICATE_LISTING). Carries
+  // the structured facts (review count, rating, age) a bare name cannot.
+  alternate_profiles?: Array<{
+    name?: string | null;
+    url?: string | null;
+    category?: string | null;
+    rating?: number | null;
+    review_count?: number | null;
+    first_seen?: string | null;
+  }> | null;
 }
 
 export interface BusinessAnalysisAuditData {
