@@ -62,7 +62,10 @@ import {
   loadPlaybookSignalPools,
   loadPredicates,
 } from '../project-phase-resolution';
-import { PROJECT_PHASE_PREDICATES_V1 } from '../../../lib/project-phase-predicates';
+import {
+  PROJECT_PHASE_PREDICATES_CURRENT,
+  PROJECT_PHASE_PREDICATES_VERSION,
+} from '../../../lib/project-phase-predicates';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
 
@@ -469,10 +472,10 @@ describe('loadPlaybookSignalPools', () => {
 });
 
 describe('loadPredicates', () => {
-  it('falls back to the v1 constant when no rows exist for the seed version', async () => {
+  it('falls back to the current constant when no rows exist for the seed version', async () => {
     mockQueryRaw.mockResolvedValueOnce([]);
-    const rows = await loadPredicates(1);
-    expect(rows).toBe(PROJECT_PHASE_PREDICATES_V1);
+    const rows = await loadPredicates(PROJECT_PHASE_PREDICATES_VERSION);
+    expect(rows).toBe(PROJECT_PHASE_PREDICATES_CURRENT);
   });
 
   it('returns empty for an unknown version with no rows', async () => {

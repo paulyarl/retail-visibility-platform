@@ -52,7 +52,7 @@ import {
   KEYWORD_SURFACE_PLAN_PROMPT,
 } from '../services/deliverable/prompts';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_CONSTRUCTION_SEED_V2 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_CONSTRUCTION_SEED_V3 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -109,6 +109,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
       'business_phone',
       'business_website',
       'campaign_tone',
+      'delivery_mode',
       'review_platform',
       'review_rating',
       'review_date',

@@ -24,7 +24,7 @@ import type { BusinessAnalysisAuditData } from './archetype-selection';
 import type { PhaseEvidenceRow } from './project-phase-evidence';
 import {
   PROJECT_PHASE_CATALOG_ORDER,
-  PROJECT_PHASE_PREDICATES_V1,
+  PROJECT_PHASE_PREDICATES_CURRENT,
   type ProjectPhaseKey,
   type ProjectPhasePredicateSeed,
 } from '../../lib/project-phase-predicates';
@@ -403,7 +403,7 @@ export function selectProjectPhases(
   input: ProjectPhaseInput,
   ctx: EvaluationContext = {},
 ): ProjectPhasePlan {
-  const predicates = ctx.predicates ?? PROJECT_PHASE_PREDICATES_V1;
+  const predicates = ctx.predicates ?? PROJECT_PHASE_PREDICATES_CURRENT;
   const pools = ctx.playbookSignalPools ?? {};
   const audit = (input.audit ?? {}) as BusinessAnalysisAuditData;
   const signalSet = new Set(input.signals);

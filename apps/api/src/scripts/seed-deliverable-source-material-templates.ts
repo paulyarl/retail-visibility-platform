@@ -32,7 +32,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V13 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V14 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -426,7 +426,11 @@ Produce the complete presence plan, grounded in the supplied material:
 7. DELIVERY OPTIONS — the two ways this plan delivers: DFY (the profiles
    are built for the owner against this spec) and DIY (the owner builds
    from this same blueprint — canonical record, field spec, build order).
-   One entry per path, stated plainly.
+   One entry per path, stated plainly. The campaign's SETTLED LANE is
+   {{delivery_mode}} — when it names a lane, lead with that one and say
+   plainly that this plan is written for it (the other path stays available);
+   when it is blank, the lane is not settled yet, so present both evenly and
+   let the owner choose.
 8. VERIFICATION STEPS — how each finished profile is confirmed live and
    findable (search test, map pin, claim confirmation) before the step
    closes.
@@ -495,7 +499,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
   { id: 'mpt-seed-fulfill-008', name: 'Fulfill: Product Visibility Preview', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_008, variables: ['business_name', 'category', 'city', 'product_visibility', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-009', name: 'Fulfill: Website Mockup', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_009, variables: ['business_name', 'category', 'city', 'website_mockup', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
   { id: 'mpt-seed-fulfill-010', name: 'Fulfill: Website Build Package', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_010, variables: ['business_name', 'category', 'city', 'website_build_package', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
-  { id: 'mpt-seed-fulfill-011', name: 'Fulfill: Profile Presence & Build Plan', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_011, variables: ['business_name', 'category', 'city', 'profile_presence_plan', 'business_attributes', 'discovery_attribution', 'claim_cta'], outputSchema: RAW_JSON, isDefault: false },
+  { id: 'mpt-seed-fulfill-011', name: 'Fulfill: Profile Presence & Build Plan', promptType: 'fulfill', category: 'Deliverables', body: FULFILL_011, variables: ['business_name', 'category', 'city', 'profile_presence_plan', 'business_attributes', 'discovery_attribution', 'claim_cta', 'delivery_mode'], outputSchema: RAW_JSON, isDefault: false },
 ];
 
 async function main() {

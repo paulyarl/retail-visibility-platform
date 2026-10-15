@@ -175,6 +175,39 @@ export interface WebsiteGapDecision {
   delivery_mode_decided_by?: string | null;
 }
 
+/**
+ * Review lane (PB-02 / A1) delivery decision — same `playbook_decision` column,
+ * namespaced by `kind`. The dfy/diy vocabulary is shared with PB-08, but the
+ * division of labour is the review lane's own:
+ *   DIY — the platform obtained the reviews and drafted the responses; the
+ *         OWNER posts them.
+ *   DFY — the platform posts the responses on the owner's behalf, on delegated
+ *         access.
+ */
+export interface ReviewDeliveryDecision {
+  kind: 'review_delivery_mode';
+  delivery_mode: WebsiteBuildDeliveryMode;
+  decided_at: string;
+  decided_by: string | null;
+  reason?: string;
+}
+
+/**
+ * Recovery lane (PB-04 / A2) delivery decision — same `playbook_decision`
+ * column, namespaced by `kind`. Same shape as the review lane one step further
+ * along the same road: the platform produces the written case either way, and
+ * the fork is who *files* it.
+ *   DIY — the platform drafted the resolution and appeal; the OWNER submits.
+ *   DFY — the platform files it on the owner's behalf, on delegated access.
+ */
+export interface RecoveryDeliveryDecision {
+  kind: 'recovery_delivery_mode';
+  delivery_mode: WebsiteBuildDeliveryMode;
+  decided_at: string;
+  decided_by: string | null;
+  reason?: string;
+}
+
 // PB-08 / A7 — post-decision execution read model
 // (GET /campaigns/:id/website-build-execution). The counterpart of
 // RepairExecutionReadModel for the website-gap motion.
@@ -248,7 +281,10 @@ export interface Campaign {
   // PB-08 / A7 (migration 309) — operator-confirmed build scope, the decision
   // analog of repair track confirmation. The column is playbook-agnostic;
   // the PB-08 writer namespaces payloads kind='website_build_scope'.
-  playbook_decision?: WebsiteGapDecision | null;
+  // The review lane (PB-02 / A1) and recovery lane (PB-04 / A2) write the same
+  // column with their own `kind` — one decision per campaign, discriminated by
+  // `kind`.
+  playbook_decision?: WebsiteGapDecision | ReviewDeliveryDecision | RecoveryDeliveryDecision | null;
   // Profile Repair Fulfillment Sprint (migration 301) — Track A package state.
   repair_fulfillment?: RepairFulfillment | null;
   pipeline?: 'review' | 'recovery';
@@ -444,6 +480,18 @@ export interface RepairExecutionReadModel {
     viewed_count: number;
     expires_at: string | null;
     attachment_count: number;
+  } | null;
+  /**
+   * Delivery-lane suggestion derived from the worksheet's team signal
+   * (`recommendDeliveryMode`). Advisory — the operator still sets the mode;
+   * `strength: 'strong'` means capacity decides it, `'lean'` means both lanes
+   * are viable and the team is only the lean. Null when the team signal is
+   * still `unknown`.
+   */
+  recommended_mode: {
+    mode: 'dfy' | 'diy';
+    strength: 'strong' | 'lean';
+    reason: string;
   } | null;
 }
 
@@ -2722,6 +2770,42 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to set delivery mode');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  // Review lane (PB-02 / A1) — set the delivery mode for review responses.
+  // Same dfy/diy vocabulary as PB-08, different division of labour:
+  // DIY = the platform drafts the responses and the OWNER posts them;
+  // DFY = the platform posts on the owner's behalf on delegated access.
+  async setReviewDeliveryMode(id: string, deliveryMode: WebsiteBuildDeliveryMode): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/review-delivery-mode`,
+      { method: 'PATCH', body: JSON.stringify({ delivery_mode: deliveryMode }) },
+      `mkt-ops-campaign-review-mode-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to set review delivery mode');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  // Recovery lane (PB-04 / A2) — set the delivery mode for resolution/appeal
+  // packages. The platform produces the written case either way; the fork is
+  // who FILES it: DIY = the owner submits; DFY = the platform files on
+  // delegated access.
+  async setRecoveryDeliveryMode(id: string, deliveryMode: WebsiteBuildDeliveryMode): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/recovery-delivery-mode`,
+      { method: 'PATCH', body: JSON.stringify({ delivery_mode: deliveryMode }) },
+      `mkt-ops-campaign-recovery-mode-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to set recovery delivery mode');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;

@@ -23,6 +23,7 @@ import type { OwnerVoiceFields, BusinessContextFields } from './prompts';
 import OwnerVoiceService, { type OwnerVoiceProfile } from './OwnerVoiceService';
 import BusinessContextService from './BusinessContextService';
 import DeliverableSourceService from './DeliverableSourceService';
+import { reviewDeliveryBrief } from '../../lib/delivery-mode';
 
 /**
  * Prompt-execution template for per-slot response drafting (seeded by
@@ -254,6 +255,9 @@ export class ReviewSlotService extends BaseService {
       // Get business context
       const businessCtx = await BusinessContextService.getBusinessContext(campaignId, ctx);
 
+      // Delivery lane, resolved once — every slot in this run shares it.
+      const deliveryMode = await this.resolveReviewDeliveryMode(campaignId);
+
       // Get all draft slots
       const slots = await this.prisma.mkt_deliverable_review_slot.findMany({
         where: { campaign_id: campaignId, status: 'draft' },
@@ -280,7 +284,7 @@ export class ReviewSlotService extends BaseService {
           const execution = await MarketingExecutionService.getInstance().executeSingle({
             campaignId,
             templateId: REVIEW_RESPONSE_TEMPLATE_ID,
-            variables: this.slotResponseVariables(voiceFields, businessCtx, slot),
+            variables: this.slotResponseVariables(voiceFields, businessCtx, slot, deliveryMode),
             executedBy: ctx?.userId,
           }, ctx);
 
@@ -332,11 +336,12 @@ export class ReviewSlotService extends BaseService {
         : DEFAULT_VOICE_FIELDS;
 
       const businessCtx = await BusinessContextService.getBusinessContext(slot.campaign_id, ctx);
+      const deliveryMode = await this.resolveReviewDeliveryMode(slot.campaign_id);
 
       const execution = await MarketingExecutionService.getInstance().executeSingle({
         campaignId: slot.campaign_id,
         templateId: REVIEW_RESPONSE_TEMPLATE_ID,
-        variables: this.slotResponseVariables(voiceFields, businessCtx, slot),
+        variables: this.slotResponseVariables(voiceFields, businessCtx, slot, deliveryMode),
         executedBy: ctx?.userId,
       }, ctx);
 
@@ -381,15 +386,38 @@ export class ReviewSlotService extends BaseService {
         : DEFAULT_VOICE_FIELDS;
 
       const businessCtx = await BusinessContextService.getBusinessContext(slot.campaign_id, ctx);
+      const deliveryMode = await this.resolveReviewDeliveryMode(slot.campaign_id);
 
       return MarketingExecutionService.getInstance().renderPrompt({
         campaignId: slot.campaign_id,
         templateId: REVIEW_RESPONSE_TEMPLATE_ID,
-        variables: this.slotResponseVariables(voiceFields, businessCtx, slot),
+        variables: this.slotResponseVariables(voiceFields, businessCtx, slot, deliveryMode),
       }, ctx);
     } catch (error) {
       logger.error('Failed to render slot prompt', ctx, { error: (error as Error).message, slotId });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * The review lane's settled delivery lane, as the one-line brief the draft
+   * prompt renders, or '' when unsettled. Reads `playbook_decision` — the
+   * playbook-agnostic decision column (migration 309) — with
+   * kind='review_delivery_mode'. Best-effort: a read failure just means no
+   * delivery instruction, never a failed draft.
+   */
+  private async resolveReviewDeliveryMode(campaignId: string): Promise<string> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { playbook_decision: true },
+      });
+      const decision = (campaign?.playbook_decision as Record<string, any> | null) ?? null;
+      return decision?.kind === 'review_delivery_mode'
+        ? reviewDeliveryBrief(decision.delivery_mode)
+        : '';
+    } catch {
+      return '';
     }
   }
 
@@ -401,10 +429,13 @@ export class ReviewSlotService extends BaseService {
     voiceFields: OwnerVoiceFields,
     businessCtx: BusinessContextFields,
     slot: { platform: string | null; review_rating: number | null; review_date: Date | null; review_text: string | null },
+    deliveryMode: string,
   ): Record<string, string> {
     return {
       ...businessContextVariables(businessCtx),
       ...ownerVoiceVariables(voiceFields),
+      // Who posts this response — '' when the lane is unsettled.
+      delivery_mode: deliveryMode,
       review_platform: slot.platform ?? 'unknown',
       review_rating: String(slot.review_rating ?? 'N/A'),
       review_date: slot.review_date ? slot.review_date.toISOString().split('T')[0] : 'N/A',

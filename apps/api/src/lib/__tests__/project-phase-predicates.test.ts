@@ -11,6 +11,7 @@ import { KNOWN_SIGNAL_CODES } from '../../services/triage/signal-taxonomy';
 import {
   PHASE_PREDICATE_UNMAPPED_SIGNALS,
   PROJECT_PHASE_CATALOG_ORDER,
+  PROJECT_PHASE_PREDICATES_CURRENT,
   PROJECT_PHASE_PREDICATES_V1,
   PROJECT_PHASE_PREDICATES_VERSION,
 } from '../project-phase-predicates';
@@ -18,9 +19,9 @@ import { assertSignalCoverage } from '../../scripts/seed-project-phase-predicate
 
 const KNOWN = new Set<string>(KNOWN_SIGNAL_CODES);
 const allTriggerSignals = () =>
-  new Set(PROJECT_PHASE_PREDICATES_V1.flatMap((row) => row.signals));
+  new Set(PROJECT_PHASE_PREDICATES_CURRENT.flatMap((row) => row.signals));
 
-describe('project-phase predicate seed (v1)', () => {
+describe('project-phase predicate seed (current)', () => {
   it('covers every known signal: in a predicate or the unmapped list', () => {
     const triggers = allTriggerSignals();
     const unmapped = new Set(PHASE_PREDICATE_UNMAPPED_SIGNALS);
@@ -61,7 +62,7 @@ describe('project-phase predicate seed (v1)', () => {
   it('INT_* codes never trigger a phase — rank modifiers only', () => {
     const triggers = allTriggerSignals();
     expect([...triggers].filter((code) => code.startsWith('INT_'))).toEqual([]);
-    for (const row of PROJECT_PHASE_PREDICATES_V1) {
+    for (const row of PROJECT_PHASE_PREDICATES_CURRENT) {
       expect(row.intRankModifiers.every((code) => code.startsWith('INT_'))).toBe(true);
     }
   });
@@ -72,19 +73,52 @@ describe('project-phase predicate seed (v1)', () => {
     expect(triggers.has('RA_UNADDRESSED_POSITIVE_BACKLOG')).toBe(false);
   });
 
-  it('all five catalog phases seeded at v1 with copy keys', () => {
-    expect(PROJECT_PHASE_PREDICATES_V1.map((r) => r.phaseKey)).toEqual([
+  it('all five catalog phases seeded with copy keys', () => {
+    expect(PROJECT_PHASE_PREDICATES_CURRENT.map((r) => r.phaseKey)).toEqual([
       ...PROJECT_PHASE_CATALOG_ORDER,
     ]);
-    for (const row of PROJECT_PHASE_PREDICATES_V1) {
+    for (const row of PROJECT_PHASE_PREDICATES_CURRENT) {
       for (const slot of ['name', 'goal', 'evidence', 'actions', 'exit_criterion'] as const) {
         expect(row.copyKeys[slot]).toBe(`project_phase.${row.phaseKey}.${slot}`);
       }
     }
   });
 
-  it('v1 ships no min_severity floors (D10)', () => {
-    expect(PROJECT_PHASE_PREDICATES_V1.every((r) => r.minSeverity === null)).toBe(true);
-    expect(PROJECT_PHASE_PREDICATES_VERSION).toBe(1);
+  it('current seed ships no min_severity floors (D10)', () => {
+    expect(PROJECT_PHASE_PREDICATES_CURRENT.every((r) => r.minSeverity === null)).toBe(true);
+    expect(PROJECT_PHASE_PREDICATES_VERSION).toBe(2);
+  });
+
+  it('v2 places the PB-09 presence/integrity family on its phases', () => {
+    // Migrations 334/336 registered these; v1 never placed them, and the
+    // coverage invariant above is what caught it.
+    const signalsFor = (key: string) =>
+      PROJECT_PHASE_PREDICATES_CURRENT.find((r) => r.phaseKey === key)?.signals ?? [];
+
+    expect(signalsFor('foundation')).toContain('DS_DUPLICATE_LISTING');
+    expect(signalsFor('claim')).toEqual(
+      expect.arrayContaining([
+        'DS_HIJACKED_LISTING',
+        'DS_OWNERSHIP_DISPUTE',
+        'DS_ADDRESS_VERIFICATION_BLOCK',
+      ]),
+    );
+    expect(signalsFor('findability')).toEqual(
+      expect.arrayContaining([
+        'DS_ZERO_INDEXED_PRESENCE',
+        'DS_PROFILE_NOT_PUBLIC',
+        'DS_PROFILE_SUSPENDED',
+      ]),
+    );
+  });
+
+  it('v2 is v1 plus the additions — no v1 trigger was dropped', () => {
+    for (const v1Row of PROJECT_PHASE_PREDICATES_V1) {
+      const v2Row = PROJECT_PHASE_PREDICATES_CURRENT.find((r) => r.phaseKey === v1Row.phaseKey);
+      expect(v2Row).toBeTruthy();
+      for (const code of v1Row.signals) {
+        expect(v2Row!.signals).toContain(code);
+      }
+    }
   });
 });

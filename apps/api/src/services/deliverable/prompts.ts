@@ -70,6 +70,11 @@ Business context:
 
 Campaign tone: {{campaign_tone}}
 
+Delivery lane (who posts this response):
+{{delivery_mode}}
+When that is blank the lane is not settled — write the response as finished
+copy the owner can post either way.
+
 Customer review ({{review_platform}}, {{review_rating}} stars, {{review_date}}):
 {{review_text}}
 

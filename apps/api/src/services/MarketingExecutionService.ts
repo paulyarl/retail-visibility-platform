@@ -11,6 +11,7 @@
 
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
+import { recoveryDeliveryBrief } from '../lib/delivery-mode';
 import type { RequestCtx } from '../context';
 import { MarketingPromptService, extractJsonCandidates, stripLlmJsonArtifacts } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
@@ -876,6 +877,26 @@ export class MarketingExecutionService extends BaseService {
                 fileType: a.file_type,
               })),
             );
+          }
+          // Who files the package — the recovery lane's settled decision
+          // (`playbook_decision`, kind='recovery_delivery_mode'). '' when
+          // unsettled, and the template states the blank case. Read here too,
+          // not only in RecoveryResolutionService's enqueue path, because this
+          // auto-source branch serves every other render of the template.
+          if (!effectiveVariables.delivery_mode || !String(effectiveVariables.delivery_mode).trim()) {
+            try {
+              const decisionRow = await this.prisma.mkt_campaigns_list.findUnique({
+                where: { id: input.campaign.id },
+                select: { playbook_decision: true },
+              });
+              const decision = (decisionRow?.playbook_decision as Record<string, any> | null) ?? null;
+              effectiveVariables.delivery_mode =
+                decision?.kind === 'recovery_delivery_mode'
+                  ? recoveryDeliveryBrief(decision.delivery_mode)
+                  : '';
+            } catch {
+              effectiveVariables.delivery_mode = '';
+            }
           }
         }
         // 3. Fulfill templates (Review responses, Service menus, GBP optimizations)

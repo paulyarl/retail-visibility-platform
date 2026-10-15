@@ -616,6 +616,10 @@ export class DeliverableSourceService extends BaseService {
       public_narrative: auditData?.public_narrative ?? '',
       discovery_attribution: MarketingExecutionService.getInstance()
         .renderProspectOriginBlock(await this.campaignWithResolvedAttribution(campaign, ctx)),
+      // Settled delivery lane (dfy/diy) — the profile-repair package's mode,
+      // which A8 rides. Only the presence plan references it: when set, the
+      // plan leads with that lane; when blank, it presents the fork evenly.
+      delivery_mode: this.resolveDeliveryMode(campaign),
       ...linkVars,
     };
 
@@ -934,6 +938,18 @@ export class DeliverableSourceService extends BaseService {
     const secondary = Array.isArray(campaign?.secondary_categories) ? campaign.secondary_categories.filter((c: any) => typeof c === 'string' && c.trim()) : [];
     if (secondary.length > 0) lines.push(`Secondary categories: ${secondary.join(', ')}`);
     return lines.length > 0 ? lines.join('\n') : '(none recorded)';
+  }
+
+  /**
+   * The campaign's settled delivery lane, uppercased for the prompt, or '' when
+   * unset. Reads `repair_fulfillment.mode` — the profile-repair package's
+   * dfy/diy mode, which A8 rides. Only the presence plan prompt consumes it:
+   * a settled lane makes the deliverable lead with that lane, an unset one
+   * makes it present the fork evenly.
+   */
+  private resolveDeliveryMode(campaign: any): string {
+    const mode = campaign?.repair_fulfillment?.mode;
+    return typeof mode === 'string' && mode.trim() ? mode.trim().toUpperCase() : '';
   }
 
   /** Street address assembled for prompt display; '' when unrecorded. */

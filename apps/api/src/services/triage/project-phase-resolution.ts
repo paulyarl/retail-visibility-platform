@@ -27,7 +27,7 @@ import type { DetectedSignal } from './types';
 import { refreshSeedFidelityIfStale } from '../seed-fidelity';
 import {
   PROJECT_PHASE_PREDICATES_VERSION,
-  PROJECT_PHASE_PREDICATES_V1,
+  PROJECT_PHASE_PREDICATES_CURRENT,
   type ProjectPhasePredicateSeed,
 } from '../../lib/project-phase-predicates';
 import { selectProjectPhases } from '../outreach-openers/project-phases';
@@ -420,7 +420,7 @@ export async function loadPredicates(
   `;
   if (rows.length === 0) {
     return predicateSeedVersion === PROJECT_PHASE_PREDICATES_VERSION
-      ? PROJECT_PHASE_PREDICATES_V1
+      ? PROJECT_PHASE_PREDICATES_CURRENT
       : [];
   }
   return rows.map((r) => ({

@@ -97,7 +97,10 @@ export default function RepairExecutionCard({ campaign, onRefresh }: RepairExecu
   const openConfigEditor = () => {
     const tier = (fulfillment?.tier as RepairTier) || 'standard';
     setCfgTier(tier);
-    setCfgMode((fulfillment?.mode as RepairMode) || 'diy');
+    // A saved mode always wins; the team-signal suggestion only fills a blank.
+    setCfgMode(
+      (fulfillment?.mode as RepairMode) || (execution?.recommended_mode?.mode as RepairMode) || 'diy',
+    );
     setCfgPlatforms((fulfillment?.platforms as RepairPlatform[]) || [...REPAIR_TIER_CATALOG[tier].platforms]);
     setEditingConfig(true);
     setError(null);
@@ -249,6 +252,16 @@ export default function RepairExecutionCard({ campaign, onRefresh }: RepairExecu
                 <option value="diy">DIY — customer applies fixes</option>
                 <option value="dfy">DFY — operator applies fixes</option>
               </select>
+              {execution?.recommended_mode && !fulfillment?.mode && (
+                <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+                  Suggested:{' '}
+                  <span className="font-medium">
+                    {execution.recommended_mode.mode.toUpperCase()}
+                  </span>
+                  {execution.recommended_mode.strength === 'lean' ? ' (lean)' : ''} —{' '}
+                  {execution.recommended_mode.reason}
+                </p>
+              )}
             </div>
           </div>
           <div>

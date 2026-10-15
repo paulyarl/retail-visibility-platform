@@ -35,6 +35,59 @@ export interface DeliveryModeRecommendation {
 }
 
 /**
+ * What each lane means for the REVIEW lane (PB-02 / A1 review responses).
+ *
+ * The dfy/diy vocabulary is shared with the repair and website lanes, but the
+ * division of labour differs per lane — so each lane names its own split rather
+ * than assuming the repair package's.
+ *
+ *   DIY — the platform obtains the reviews and drafts the responses (with an
+ *         analyst), then hands them to the prospect, who posts them.
+ *   DFY — the platform posts the responses on the owner's behalf, on delegated
+ *         access.
+ */
+export const REVIEW_DELIVERY_LANES: Record<DeliveryMode, string> = {
+  diy:
+    'diy — the platform obtained the reviews and drafted the responses; the OWNER posts them. '
+    + 'Write each response as finished copy the owner can paste in, with no platform-side action implied.',
+  dfy:
+    'dfy — the platform posts the responses on the OWNER\'S behalf on delegated access. '
+    + 'Write each response as ready-to-publish copy; the owner takes no action.',
+};
+
+/**
+ * The one-line lane brief for the review lane's drafting prompt, or '' when the
+ * lane is unsettled (the draft then carries no delivery instruction).
+ */
+export function reviewDeliveryBrief(mode?: string | null): string {
+  return mode === 'dfy' || mode === 'diy' ? REVIEW_DELIVERY_LANES[mode] : '';
+}
+
+/**
+ * What each lane means for the RECOVERY lane (PB-04 / A2 — BBB complaints,
+ * suspensions, ownership disputes, reinstatement appeals).
+ *
+ * Same shape as the review lane, one step further along the same road: the
+ * platform produces the written case either way, and the fork is who *files* it.
+ *
+ *   DIY — the platform drafted the resolution / appeal; the OWNER submits it.
+ *   DFY — the platform files it on the owner's behalf, on delegated access.
+ */
+export const RECOVERY_DELIVERY_LANES: Record<DeliveryMode, string> = {
+  diy:
+    'diy — the platform drafted the resolution and appeal; the OWNER submits them. '
+    + 'Write the package as finished copy the owner can send, with no platform-side action implied.',
+  dfy:
+    'dfy — the platform files the resolution and appeal on the OWNER\'S behalf on delegated access. '
+    + 'Write the package as ready-to-file copy; the owner takes no action.',
+};
+
+/** The one-line lane brief for the recovery lane's drafting prompt, or ''. */
+export function recoveryDeliveryBrief(mode?: string | null): string {
+  return mode === 'dfy' || mode === 'diy' ? RECOVERY_DELIVERY_LANES[mode] : '';
+}
+
+/**
  * Recommend a delivery lane from the team signal.
  *
  *   sole_owner                → DFY  (strong — no one to execute in-house)

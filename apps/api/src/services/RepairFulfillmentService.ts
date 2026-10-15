@@ -31,6 +31,7 @@ import {
 } from '../lib/repair-tiers';
 import { generateCampaignId, generateStageHistoryId, generateBusinessProspectId } from '../lib/id-generator';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
+import { recommendDeliveryMode, type DeliveryModeRecommendation } from '../lib/delivery-mode';
 
 export interface RepairFulfillmentPatch {
   tier?: RepairTier;
@@ -566,6 +567,24 @@ export class RepairFulfillmentService extends BaseService {
         };
       }
 
+      // Delivery-lane suggestion from the worksheet's team signal — the
+      // capacity question the walk-in/call settles. Advisory: the operator
+      // sets the mode. Non-fatal: a missing worksheet simply yields no
+      // suggestion, and the card renders the blank selector as before.
+      let recommendedMode: DeliveryModeRecommendation | null = null;
+      try {
+        const { default: OutreachIntelligenceService } = await import(
+          './OutreachIntelligenceService.js'
+        );
+        const worksheet = await OutreachIntelligenceService.getForCampaign(campaignId, ctx);
+        recommendedMode = recommendDeliveryMode(worksheet?.team_signal);
+      } catch (recErr) {
+        logger.warn('repair-execution team-signal recommendation failed (non-fatal)', ctx, {
+          campaignId,
+          error: (recErr as Error).message,
+        });
+      }
+
       return {
         campaign_id: campaignId,
         stage: campaign.stage,
@@ -590,6 +609,7 @@ export class RepairFulfillmentService extends BaseService {
             }
           : null,
         access_intake: accessIntake,
+        recommended_mode: recommendedMode,
       };
     } catch (error) {
       throw this.handleError(error, ctx);

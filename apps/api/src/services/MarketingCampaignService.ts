@@ -3819,6 +3819,98 @@ export class MarketingCampaignService extends BaseService {
     }
   }
 
+  /**
+   * Set the REVIEW lane's delivery mode (PB-02 / A1 review responses).
+   *
+   * The dfy/diy vocabulary is shared with the repair and website lanes, but the
+   * division of labour is the review lane's own:
+   *   DIY — the platform obtained the reviews and drafted the responses; the
+   *         OWNER posts them.
+   *   DFY — the platform posts the responses on the owner's behalf, on
+   *         delegated access.
+   *
+   * Stored in `playbook_decision` — the playbook-agnostic decision column
+   * (migration 309) — namespaced `kind='review_delivery_mode'`, exactly as
+   * PB-08 namespaces `kind='website_build_scope'`. One campaign holds one
+   * decision, which is fine: a review-lane campaign has no website decision.
+   */
+  async setReviewDeliveryMode(
+    campaignId: string,
+    mode: 'dfy' | 'diy',
+    changedBy?: string,
+    ctx?: RequestCtx,
+  ): Promise<any> {
+    return this.writeDeliveryDecision(campaignId, 'review_delivery_mode', mode, changedBy, ctx);
+  }
+
+  /**
+   * Set the RECOVERY lane's delivery mode (PB-04 / A2 — BBB complaints,
+   * suspensions, ownership disputes, reinstatement appeals).
+   *
+   * Same shape as the review lane, one step further along the same road: the
+   * platform produces the written case either way, and the fork is who *files*
+   * it.
+   *   DIY — the platform drafted the resolution and appeal; the OWNER submits.
+   *   DFY — the platform files it on the owner's behalf, on delegated access.
+   */
+  async setRecoveryDeliveryMode(
+    campaignId: string,
+    mode: 'dfy' | 'diy',
+    changedBy?: string,
+    ctx?: RequestCtx,
+  ): Promise<any> {
+    return this.writeDeliveryDecision(campaignId, 'recovery_delivery_mode', mode, changedBy, ctx);
+  }
+
+  /**
+   * Write a delivery-lane decision into `playbook_decision` — the
+   * playbook-agnostic decision column (migration 309), namespaced by `kind`,
+   * exactly as PB-08 namespaces `kind='website_build_scope'`. One campaign
+   * holds one decision, which is fine: the lanes that write here (PB-02
+   * review, PB-04 recovery) are mutually exclusive on a campaign.
+   */
+  private async writeDeliveryDecision(
+    campaignId: string,
+    kind: 'review_delivery_mode' | 'recovery_delivery_mode',
+    mode: 'dfy' | 'diy',
+    changedBy?: string,
+    ctx?: RequestCtx,
+  ): Promise<any> {
+    try {
+      if (mode !== 'dfy' && mode !== 'diy') {
+        throw new ValidationError(`Unknown delivery mode '${mode}'`);
+      }
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { id: true, playbook_decision: true },
+      });
+      if (!campaign) throw new NotFoundError(`Campaign ${campaignId} not found`);
+
+      const prior = (campaign.playbook_decision as Record<string, any> | null) ?? null;
+      const decision = {
+        kind,
+        delivery_mode: mode,
+        decided_at: new Date().toISOString(),
+        decided_by: changedBy ?? null,
+        // Carry a prior same-kind decision's reason forward when re-setting.
+        ...(prior?.kind === kind && prior.reason ? { reason: prior.reason } : {}),
+      };
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { playbook_decision: decision },
+      });
+
+      logger.info('Delivery mode set', ctx, { campaignId, kind, mode });
+      return updated;
+    } catch (error) {
+      logger.error('Failed to set delivery mode', ctx, {
+        error: (error as Error).message, campaignId, kind, mode,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
   private async logStageTransition(params: {
     campaignId: string;
     fromStage: string | null;

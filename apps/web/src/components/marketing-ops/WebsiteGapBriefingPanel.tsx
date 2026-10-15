@@ -77,7 +77,12 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
   const recommendedScope: BuildScopeChoice | null = BUILD_SCOPE_CHOICES.includes(auditData.build_scope?.recommended)
     ? auditData.build_scope.recommended
     : null;
-  const decision = campaign.playbook_decision ?? null;
+  // The column is playbook-agnostic and discriminated by `kind` — this panel
+  // is PB-08's, so it reads only a website_build_scope payload.
+  const decision =
+    campaign.playbook_decision?.kind === 'website_build_scope'
+      ? campaign.playbook_decision
+      : null;
 
   const handleOpenScopeForm = () => {
     setScopeChoice(decision?.confirmed_scope ?? recommendedScope ?? 'new_build');

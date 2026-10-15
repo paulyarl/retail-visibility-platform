@@ -1777,6 +1777,51 @@ router.patch('/:id/website-gap/delivery-mode', async (req: any, res: Response) =
   }
 });
 
+// Review lane (PB-02 / A1) — the delivery mode for review responses. Same
+// dfy/diy vocabulary as the repair package and PB-08, but the division of
+// labour is the review lane's own: DIY = the platform drafts the responses and
+// the OWNER posts them; DFY = the platform posts on the owner's behalf on
+// delegated access. Reuses the website-gap mode schema — same two-value enum.
+router.patch('/:id/review-delivery-mode', async (req: any, res: Response) => {
+  try {
+    const parsed = deliveryModeSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.setReviewDeliveryMode(
+      req.params.id,
+      parsed.delivery_mode,
+      req.user?.id,
+      getCtx(req),
+    );
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Recovery lane (PB-04 / A2) — the delivery mode for resolution/appeal
+// packages. Same shape as the review lane one step further along: the platform
+// produces the written case either way; the fork is who FILES it.
+// DIY = the owner submits; DFY = the platform files on delegated access.
+router.patch('/:id/recovery-delivery-mode', async (req: any, res: Response) => {
+  try {
+    const parsed = deliveryModeSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.setRecoveryDeliveryMode(
+      req.params.id,
+      parsed.delivery_mode,
+      req.user?.id,
+      getCtx(req),
+    );
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Website Gap (PB-08) — execution read model for the WebsiteBuildExecutionCard.
 router.get('/:id/website-build-execution', async (req: any, res: Response) => {
   try {

@@ -28,14 +28,14 @@ import {
   PHASE_PREDICATE_UNMAPPED_SIGNALS,
   PROJECT_PHASE_CATALOG_ORDER,
   PROJECT_PHASE_PREDICATES_SEED_MARKER,
-  PROJECT_PHASE_PREDICATES_V1,
+  PROJECT_PHASE_PREDICATES_CURRENT,
   PROJECT_PHASE_PREDICATES_VERSION,
 } from '../lib/project-phase-predicates';
 
 /** 3.3 coverage invariant — throws on a silently unmapped known code. */
 export function assertSignalCoverage(): void {
   const mapped = new Set<string>();
-  for (const row of PROJECT_PHASE_PREDICATES_V1) {
+  for (const row of PROJECT_PHASE_PREDICATES_CURRENT) {
     for (const code of row.signals) mapped.add(code);
   }
   const unmapped = new Set<string>(PHASE_PREDICATE_UNMAPPED_SIGNALS);
@@ -53,7 +53,7 @@ export async function seedProjectPhasePredicates(): Promise<void> {
   logger.info('Starting project-phase predicates seed...', undefined, {
     marker: PROJECT_PHASE_PREDICATES_SEED_MARKER,
     version: PROJECT_PHASE_PREDICATES_VERSION,
-    count: PROJECT_PHASE_PREDICATES_V1.length,
+    count: PROJECT_PHASE_PREDICATES_CURRENT.length,
   });
 
   assertSignalCoverage();
@@ -62,7 +62,7 @@ export async function seedProjectPhasePredicates(): Promise<void> {
   let updated = 0;
   let skipped = 0;
 
-  for (const row of PROJECT_PHASE_PREDICATES_V1) {
+  for (const row of PROJECT_PHASE_PREDICATES_CURRENT) {
     const payload = {
       signals: row.signals,
       min_severity: row.minSeverity,

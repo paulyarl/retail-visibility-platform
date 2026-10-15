@@ -15,9 +15,9 @@
  * signal triggers its phase. Floors are a seed bump, not a code change.
  */
 
-export const PROJECT_PHASE_PREDICATES_VERSION = 1;
+export const PROJECT_PHASE_PREDICATES_VERSION = 2;
 export const PROJECT_PHASE_PREDICATES_SEED_MARKER =
-  'project-phase-predicates-v1-initial';
+  'project-phase-predicates-v2-presence-integrity';
 
 export type ProjectPhaseKey =
   | 'foundation'
@@ -145,6 +145,51 @@ export const PROJECT_PHASE_PREDICATES_V1: readonly ProjectPhasePredicateSeed[] =
     copyKeys: copyKeys('expansion'),
   },
 ];
+
+/**
+ * Seed v2 — the PB-09 presence/integrity family joins the phases they belong
+ * to (spec §5, revised). Migrations 334/336 registered seven codes that v1
+ * never placed; the §3.3 coverage invariant caught it, exactly as designed
+ * ("Any future admin-registered signal code is unmapped until added to the
+ * predicate seed with a version bump").
+ *
+ *   foundation   DS_DUPLICATE_LISTING
+ *                one business, two listings at one address — an identity /
+ *                NAP-consistency defect, the phase's own subject.
+ *   claim        DS_HIJACKED_LISTING, DS_OWNERSHIP_DISPUTE,
+ *                DS_ADDRESS_VERIFICATION_BLOCK
+ *                all three are about who controls (or can prove they control)
+ *                the profile — the claim phase's subject.
+ *   findability  DS_ZERO_INDEXED_PRESENCE, DS_PROFILE_NOT_PUBLIC,
+ *                DS_PROFILE_SUSPENDED
+ *                the profile is absent, hidden, or not surfacing — the same
+ *                discovery loss `DS_MISSING_PROFILE` already carries here.
+ *
+ * v1 stays exported: a plan's `predicateSeedVersion` is reproducible
+ * provenance, and the DB keeps the v1 rows.
+ */
+const V2_ADDITIONS: Partial<Record<ProjectPhaseKey, string[]>> = {
+  foundation: ['DS_DUPLICATE_LISTING'],
+  claim: [
+    'DS_HIJACKED_LISTING',
+    'DS_OWNERSHIP_DISPUTE',
+    'DS_ADDRESS_VERIFICATION_BLOCK',
+  ],
+  findability: [
+    'DS_ZERO_INDEXED_PRESENCE',
+    'DS_PROFILE_NOT_PUBLIC',
+    'DS_PROFILE_SUSPENDED',
+  ],
+};
+
+export const PROJECT_PHASE_PREDICATES_V2: readonly ProjectPhasePredicateSeed[] =
+  PROJECT_PHASE_PREDICATES_V1.map((row) => ({
+    ...row,
+    signals: [...row.signals, ...(V2_ADDITIONS[row.phaseKey] ?? [])],
+  }));
+
+/** The version currently in force — what an unseeded environment falls back to. */
+export const PROJECT_PHASE_PREDICATES_CURRENT = PROJECT_PHASE_PREDICATES_V2;
 
 /**
  * Explicitly unmapped codes — never trigger a phase (spec §5):

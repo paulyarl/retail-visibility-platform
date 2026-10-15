@@ -42,6 +42,7 @@ import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessW
 import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
 import RepairBriefingCard from '@/components/marketing-ops/RepairBriefingCard';
 import RepairExecutionCard from '@/components/marketing-ops/RepairExecutionCard';
+import LaneDeliveryModePanel from '@/components/marketing-ops/LaneDeliveryModePanel';
 import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageCard';
 import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
@@ -1728,6 +1729,11 @@ export default function CampaignDetailClient({
                     per-platform verification tracking (W2/W7). Only renders
                     for profile_repair campaigns. */}
                 <RepairExecutionCard campaign={campaign} onRefresh={fetchCampaign} />
+                {/* Delivery lane — the DFY/DIY fork for the review (PB-02) and
+                    recovery (PB-04) motions. `campaign.pipeline` picks the lane;
+                    the website lane keeps its own home (WebsiteBuildExecutionCard,
+                    scope-gated). Self-silences outside a business-scope lane. */}
+                <LaneDeliveryModePanel campaign={campaign} onRefresh={fetchCampaign} />
                 {/* Outreach & Follow-Up card — only for business-scope campaigns
                     in outreach stages (preview_built/shown/paid). */}
                 {campaign.scope === 'business'

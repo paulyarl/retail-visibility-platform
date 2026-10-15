@@ -20,6 +20,7 @@ import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
 import MarketingPromptService from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
+import { recoveryDeliveryBrief } from '../lib/delivery-mode';
 import { generateDeliverableId, generateDeliverableSectionId, generateFilterFlagId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { RECOVERY_RESOLUTION_PROMPT_SUFFIX } from '../validators/recovery-resolution.schema';
@@ -112,6 +113,8 @@ export class RecoveryResolutionService extends BaseService {
         intakePayload,
         attachmentMeta,
         intakeId,
+        // Who files the package — '' when the lane is unsettled.
+        delivery_mode: await this.resolveRecoveryDeliveryMode(campaignId),
       };
 
       // Create a pending prompt execution
@@ -797,6 +800,8 @@ export class RecoveryResolutionService extends BaseService {
         intakePayload,
         attachmentMeta,
         intakeId: intake.id,
+        // Who files the package — '' when the lane is unsettled.
+        delivery_mode: await this.resolveRecoveryDeliveryMode(campaignId),
       };
 
       const interpolated = this.interpolateTemplate(template.body, variablesUsed);
@@ -868,6 +873,8 @@ export class RecoveryResolutionService extends BaseService {
         intakePayload,
         attachmentMeta,
         intakeId: intake.id,
+        // Who files the package — '' when the lane is unsettled.
+        delivery_mode: await this.resolveRecoveryDeliveryMode(campaignId),
       };
 
       // Create a completed execution record (external source)
@@ -1067,6 +1074,28 @@ export class RecoveryResolutionService extends BaseService {
   // ====================
   // HELPERS
   // ====================
+
+  /**
+   * The recovery lane's settled delivery lane, as the one-line brief the
+   * drafting prompt renders, or '' when unsettled. Reads `playbook_decision` —
+   * the playbook-agnostic decision column (migration 309) — with
+   * kind='recovery_delivery_mode'. Best-effort: a read failure just means no
+   * delivery instruction, never a failed draft.
+   */
+  private async resolveRecoveryDeliveryMode(campaignId: string): Promise<string> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { playbook_decision: true },
+      });
+      const decision = (campaign?.playbook_decision as Record<string, any> | null) ?? null;
+      return decision?.kind === 'recovery_delivery_mode'
+        ? recoveryDeliveryBrief(decision.delivery_mode)
+        : '';
+    } catch {
+      return '';
+    }
+  }
 
   private interpolateTemplate(body: string, variables: Record<string, any>): string {
     let result = body;
