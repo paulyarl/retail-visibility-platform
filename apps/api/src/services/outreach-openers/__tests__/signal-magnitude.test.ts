@@ -304,22 +304,45 @@ describe('computePrimarySignalSeverity — per archetype', () => {
     expect(computePrimarySignalSeverity('A1', audit)).toBe('borderline');
   });
 
-  it('A2: crisis at 5+ theme reviews', () => {
+  // A2 severity reads the OBSERVED negative backlog, not
+  // `negative_review_themes[].supporting_review_count`: the audit directive
+  // tells the model to leave that field null ("Do NOT estimate
+  // supporting_review_count"), so the old read pinned every A2 campaign at
+  // `material` regardless of how large the exposure was.
+  it('A2: crisis at 10+ unanswered negatives', () => {
     const audit = baseAudit({
-      negative_review_themes: [
-        { theme: 'Pricing', summary: 'test', supporting_review_count: 7 },
-      ],
+      combined_review_metrics: {
+        observable_unanswered_reviews: 12,
+        observable_unanswered_rate_percent: 60,
+        observable_unanswered_negative_reviews: 12,
+      },
     });
     expect(computePrimarySignalSeverity('A2', audit)).toBe('crisis');
   });
 
-  it('A2: material at 3-4 theme reviews', () => {
+  it('A2: material at 3-9 unanswered negatives', () => {
     const audit = baseAudit({
-      negative_review_themes: [
-        { theme: 'Pricing', summary: 'test', supporting_review_count: 3 },
-      ],
+      combined_review_metrics: {
+        observable_unanswered_reviews: 5,
+        observable_unanswered_rate_percent: 30,
+        observable_unanswered_negative_reviews: 5,
+      },
     });
     expect(computePrimarySignalSeverity('A2', audit)).toBe('material');
+  });
+
+  it('A2: crisis on a BBB grade suppression signal', () => {
+    const audit = baseAudit({ detected_signals: ['RA_BBB_GRADE_SUPPRESSION'] } as any);
+    expect(computePrimarySignalSeverity('A2', audit)).toBe('crisis');
+  });
+
+  it('A2: borderline when no negative backlog is observed', () => {
+    const audit = baseAudit({
+      negative_review_themes: [
+        { theme: 'Pricing', summary: 'test', supporting_review_count: null },
+      ],
+    });
+    expect(computePrimarySignalSeverity('A2', audit)).toBe('borderline');
   });
 
   it('A3: material when NAP drift is genuine', () => {

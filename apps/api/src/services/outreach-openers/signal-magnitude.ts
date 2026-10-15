@@ -328,6 +328,18 @@ export function computeSignalSeverity(
     return count >= 10 ? 'crisis' : 'material';
   }
 
+  // RA_UNADDRESSED_POSITIVE_BACKLOG — the positive sibling had no
+  // magnitude-aware case, so it fell to the default and 30 unanswered
+  // five-star reviews read as `borderline`. That matters beyond the label:
+  // `formatSignalContextForPrompt` filters to `severity >= primarySeverity`,
+  // so at borderline the review signal was dropped from the prompt's signal
+  // list entirely. Thresholds mirror A1's review-response case (30+ = crisis).
+  if (code === 'RA_UNADDRESSED_POSITIVE_BACKLOG') {
+    const count = auditData.combined_review_metrics?.observable_unanswered_positive_reviews ?? 0;
+    if (count >= 30) return 'crisis';
+    return count >= 5 ? 'material' : 'borderline';
+  }
+
   // RA_REVIEW_DROUGHT — crisis at 365+ days, material at 180-364
   if (code === 'RA_REVIEW_DROUGHT') {
     // The drought duration is computed by the signal extractor from
@@ -410,12 +422,20 @@ export function computePrimarySignalSeverity(
     }
 
     case 'A2': {
-      // Negative review recovery — severity based on theme cluster size
-      const themes = auditData.negative_review_themes ?? [];
-      const topTheme = themes[0];
-      const count = topTheme?.supporting_review_count ?? 0;
-      if (count >= 5) return 'crisis';
-      return 'material';
+      // Negative review recovery — severity from the OBSERVED negative backlog.
+      // The old read used `negative_review_themes[0].supporting_review_count`,
+      // which the audit directive explicitly tells the model to leave null
+      // ("Do NOT estimate supporting_review_count") — so every A2 campaign was
+      // pinned at `material` no matter how large the exposure was.
+      const detected: string[] = Array.isArray((auditData as any)?.detected_signals)
+        ? (auditData as any).detected_signals
+        : [];
+      if (detected.includes('RA_BBB_GRADE_SUPPRESSION')) return 'crisis';
+      const negatives =
+        auditData.combined_review_metrics?.observable_unanswered_negative_reviews ?? 0;
+      if (negatives >= 10) return 'crisis';
+      if (negatives >= 3) return 'material';
+      return 'borderline';
     }
 
     case 'A3': {
@@ -445,10 +465,19 @@ export function computePrimarySignalSeverity(
     }
 
     case 'A6': {
-      // Product visibility gap — crisis if no website, material if website
-      // exists but no product browsing
-      const hasWebsite = !!auditData.website?.url || auditData.website?.status === 'working';
-      return hasWebsite ? 'material' : 'crisis';
+      // Product visibility gap — crisis when there is no usable site to browse
+      // (none at all, or explicitly broken / social-only), material when a site
+      // exists but the shelves are not browseable. The old
+      // `!!website.url || status === 'working'` read a PRESENT-BUT-BROKEN url as
+      // a healthy website, scoring a dead site the same as a live one that
+      // simply has no catalog.
+      const w = auditData.website;
+      if (!w?.url) return 'crisis';
+      const status = w.status?.toLowerCase();
+      if (status === 'broken' || status === 'none_found' || status === 'social_media_only') {
+        return 'crisis';
+      }
+      return 'material';
     }
 
     case 'A7': {

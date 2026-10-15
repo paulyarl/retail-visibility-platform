@@ -557,11 +557,20 @@ export function extractA8Fields(
     ? auditData.detected_signals
     : [];
 
+  // Owner-facing platform names. The old fallback title-cased the raw key, so
+  // `bbb` rendered as "Bbb" and `apple_maps` as "Apple_maps" — straight into
+  // the prompt, where the writer could echo them back to the owner.
+  const PLATFORM_DISPLAY: Record<string, string> = {
+    google: 'Google Business Profile',
+    yelp: 'Yelp',
+    facebook: 'Facebook',
+    bbb: 'BBB',
+    apple_maps: 'Apple Maps',
+    bing: 'Bing',
+  };
   const label = (key: string) =>
-    key === 'google' ? 'Google Business Profile'
-      : key === 'yelp' ? 'Yelp'
-        : key === 'facebook' ? 'Facebook'
-          : key.charAt(0).toUpperCase() + key.slice(1);
+    PLATFORM_DISPLAY[key]
+    ?? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   // Present: the audit has a platform entry whose status isn't absent-ish.
   // Restricted is tracked separately — the profile exists but the public
@@ -571,15 +580,25 @@ export function extractA8Fields(
   const restricted: string[] = [];
   for (const [key, p] of Object.entries(platforms)) {
     if (!p || typeof p !== 'object' || !p.profile_status) continue;
+    // A block the audit verified ABSENT is not a presence — its absence is
+    // carried by render_controls below. The old `else` put every
+    // non-unclaimed status (including `unable_to_verify`) into `present`, and
+    // the delete below then erased render-control-confirmed absences — so a
+    // business verified missing from Yelp and BBB read as being ON Yelp and
+    // BBB, inverting A8's entire presence map.
+    if (p.data_status === 'unavailable') continue;
     if (p.data_status === 'restricted') {
       restricted.push(label(key));
       continue;
     }
     if (p.profile_status === 'unclaimed' || p.profile_status === 'likely_unclaimed') {
       unclaimed.push(label(key));
-    } else {
+    } else if (p.profile_status === 'claimed' || p.profile_status === 'likely_claimed') {
       present.push(label(key));
     }
+    // Anything else (`unable_to_verify`, or no data_status at all) attributes
+    // nothing: presence needs a claim verdict, and absence comes from
+    // render_controls. `unable_to_verify` is the absence of a finding.
   }
 
   // Confirmed absent: render-control business_specific_failure entries, plus
