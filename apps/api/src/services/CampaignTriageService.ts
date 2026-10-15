@@ -272,8 +272,22 @@ export class CampaignTriageService extends BaseService {
     });
     if (!campaign) throw new NotFoundError('Campaign not found');
 
+    // Prospect-scoped evidence: an audit describes the BUSINESS, not the
+    // campaign row it was filed under. Siblings share one business, so the
+    // prospect's best audit is the signal base regardless of which sibling it
+    // hangs on — a sibling campaign evaluates against the primary's
+    // business_analysis audit and keeps its alternatives consistent with the
+    // rest of the sibling set.
+    const prospectId = (campaign as any).business_prospect_id as string | null;
+    const auditCampaignIds = prospectId
+      ? ((await this.prisma.mkt_campaigns_list.findMany({
+          where: { business_prospect_id: prospectId, scope: 'business' } as any,
+          select: { id: true },
+        })) as any[]).map((c) => c.id)
+      : [campaignId];
+
     const allAudits = await this.prisma.mkt_audits_list.findMany({
-      where: { campaign_id: campaignId },
+      where: { campaign_id: { in: auditCampaignIds } },
       orderBy: { created_at: 'desc' },
     });
     const selectedAudit = this.selectAuditForTriage(allAudits);
@@ -370,6 +384,12 @@ export class CampaignTriageService extends BaseService {
    * pre-accepted triage result from createSiblingCampaign; without this guard,
    * loading the IntelligentTriageCard on a sibling would overwrite the
    * pre-accepted PB-05 result with a fresh PB-01 evaluation + null decision.
+   *
+   * The alternatives themselves are matched against a FRESH signal
+   * extraction (prospect-scoped — audits across the sibling group), not the
+   * stored detected_signals: stored signals are decision-time evidence and
+   * go stale when audits arrive or are superseded. The stored set is only a
+   * fallback when extraction yields no signals at all.
    */
   async evaluateAllForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<MultiArchetypeTriageResult> {
     // Scope guard — see evaluateTriageForCampaign. Placed before the
@@ -386,12 +406,23 @@ export class CampaignTriageService extends BaseService {
       ? existing!
       : await this.evaluateTriageForCampaign(input, ctx);
 
-    // 2. Load signals + playbooks for the all-matches computation.
-    //    When decided, use the stored detected_signals (not a fresh extraction)
-    //    so alternatives reflect what the operator saw at decision time.
-    const signals: SignalCode[] = isDecided
-      ? (existing!.detectedSignals.map((s) => s.code) as SignalCode[])
-      : (await this.loadSignalsAndPlaybooks(input, ctx)).signals;
+    // 2. Signals for the all-matches computation come from the prospect's
+    //    best CURRENT evidence — fresh extraction via loadSignalsAndPlaybooks,
+    //    which reads audits across the whole sibling group. Stored
+    //    detected_signals are decision-time evidence: they go stale when a new
+    //    audit lands, and a decided sibling's stored set is whatever the
+    //    source campaign saw at creation time (so the sibling's alternatives
+    //    would keep matching against signals that no longer exist). The
+    //    alternatives answer "what else fits this prospect today" — the
+    //    stored winner row is untouched, so a GET still can't reset the
+    //    operator's decision.
+    //    Fallback: when fresh extraction yields nothing (e.g. a campaign
+    //    triaged purely on operator-added signals with no audit anywhere in
+    //    the group), keep the stored set so the panel doesn't blank out.
+    const extracted = await this.loadSignalsAndPlaybooks(input, ctx);
+    const storedSignals = existing?.detectedSignals.map((s) => s.code) as SignalCode[] | undefined;
+    const signals: SignalCode[] =
+      extracted.signals.length > 0 ? extracted.signals : storedSignals ?? [];
     // Same proving_ground exclusion as loadSignalsAndPlaybooks — PG playbooks
     // are aggregate-campaign checklists, not business triage candidates. This
     // path loads playbooks directly (not via the loader), so the filter must
