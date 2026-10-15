@@ -10,8 +10,9 @@
  *
  * For coupon_options the group is "discount_types" and the features are the discount types.
  *
- * Merchant gates: each feature has a merchant toggle (default true). The effective
- * can_use_* flag is tier-allowed AND merchant-enabled. This mirrors FunnelResolver.
+ * Merchant gates: each feature has a merchant toggle (default true), but the master
+ * coupon_enabled switch is opt-in (default false). The effective can_use_* flag is
+ * tier-allowed AND merchant-enabled. This mirrors FunnelResolver.
  */
 
 import type {
@@ -55,15 +56,17 @@ export function resolveCouponOptions(
 
   const tierEnabled = masterEnabled && !disabled && tierAllowedDiscountTypes.length > 0;
 
-  // Merchant gate helper (default true if no prefs)
-  const merchantGate = (toggleKey: keyof CouponOptionsMerchantSettings): boolean => {
-    if (!merchantPrefs) return true;
+  // Merchant gate helper. Feature toggles default true once coupons are on; the master
+  // switch defaults false — coupons are opt-in, mirroring the tenant_coupon_options_settings
+  // coupon_enabled DB default and the settings UI, where absent settings mean disabled.
+  const merchantGate = (toggleKey: keyof CouponOptionsMerchantSettings, defaultWhenUnset = true): boolean => {
+    if (!merchantPrefs) return defaultWhenUnset;
     const val = merchantPrefs[toggleKey];
-    return val === null || val === undefined ? true : !!val;
+    return val === null || val === undefined ? defaultWhenUnset : !!val;
   };
 
-  // Merchant preference soft toggle (default: enabled if tier allows)
-  const prefEnabled = merchantGate('coupon_enabled');
+  // Merchant preference master switch — the opt-in trigger for coupon creation
+  const prefEnabled = merchantGate('coupon_enabled', false);
   const effectiveEnabled = tierEnabled && prefEnabled;
 
   // Apply merchant gates to each feature

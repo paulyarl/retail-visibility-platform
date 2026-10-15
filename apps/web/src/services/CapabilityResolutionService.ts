@@ -2900,7 +2900,8 @@ export function resolveCouponOptionsState(
 
   // Merchant gate helper (default true if no prefs)
   const mGate = (val: boolean | null | undefined): boolean => val === null || val === undefined ? true : !!val;
-  const mCouponEnabled = mGate(merchantPrefs?.coupon_enabled);
+  // Master switch is opt-in — absent prefs mean disabled, mirroring the settings DB default
+  const mCouponEnabled = merchantPrefs?.coupon_enabled ?? false;
   const mPercentOff = mGate(merchantPrefs?.percent_off_enabled);
   const mFixedAmount = mGate(merchantPrefs?.fixed_amount_enabled);
   const mFreeShipping = mGate(merchantPrefs?.free_shipping_enabled);
