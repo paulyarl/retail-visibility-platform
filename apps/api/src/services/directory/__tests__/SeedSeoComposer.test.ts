@@ -1174,5 +1174,33 @@ describe('SeedSeoComposer', () => {
 
       expect(packet.sameAs.filter((u) => u === 'https://maps.google.com/example')).toHaveLength(1);
     });
+
+    it('strips analyst language annotations from profile synonyms', () => {
+      // Profile synonyms are language-annotated; the tag is analyst provenance
+      // and must never reach a shopper-facing keyword. The TERM is kept —
+      // endonyms are real diaspora search vocabulary.
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'test' },
+        audit: fullAudit,
+        categoryIdAudit: null,
+        intelligenceProfile: {
+          profileId: 'mip-1',
+          synonyms: [
+            'African grocery store [English]',
+            'Habesha store [endonym — Amharic/Tigrinya]',
+            'supermarché [endonym — Francophone West African]',
+          ],
+          subcategories: undefined,
+          prohibitedKeywords: undefined,
+          schemaOrgType: null,
+        },
+        goldStandard: null,
+      });
+
+      expect(packet.keywords).toContain('african grocery store');
+      expect(packet.keywords).toContain('habesha store');
+      expect(packet.keywords).toContain('supermarché');
+      expect(packet.keywords.some((k) => k.includes('['))).toBe(false);
+    });
   });
 });

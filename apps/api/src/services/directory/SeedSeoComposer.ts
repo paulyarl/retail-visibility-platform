@@ -296,6 +296,25 @@ function subcategoryLabel(sub: string): string | null {
   return label;
 }
 
+/**
+ * Intelligence profile `synonyms` are language-ANNOTATED — the analyst tags
+ * each term with the language it belongs to:
+ *
+ *   "African grocery store [English]"
+ *   "Habesha store [endonym — Amharic/Tigrinya]"
+ *   "supermarché [endonym — Francophone West African]"
+ *
+ * The tag is provenance for the analyst and must never reach a shopper-facing
+ * field. The TERM itself is kept verbatim — an endonym like "Habesha store" is
+ * genuine diaspora search vocabulary, which is exactly why the profile carries
+ * it — and only the trailing bracketed annotation is removed. (Observed
+ * 2026-10-15: the tags shipped into `directory_listings_list.keywords` on the
+ * Arsema seed, e.g. "african grocery store [english]".)
+ */
+function stripLanguageTag(term: string): string {
+  return term.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+}
+
 // ─── Field compositions ──────────────────────────────────────────────────
 
 function composeMetaTitle(campaign: CampaignSeoFields, categoryLabel: string): string {
@@ -393,7 +412,8 @@ function composeKeywords(
   // 5. intelligence profile synonyms + subcategories (plain terms, category-level)
   if (profile?.synonyms) {
     for (const syn of profile.synonyms) {
-      ordered.push(syn);
+      const term = stripLanguageTag(syn);
+      if (term) ordered.push(term);
     }
   }
   if (profile?.subcategories) {
