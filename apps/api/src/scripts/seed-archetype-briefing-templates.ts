@@ -71,11 +71,42 @@ Rules:
 `;
 }
 
+/**
+ * Shared data-quality directive — the briefing must state what it verified,
+ * what it could not check, and how the evidence was gathered.
+ *
+ * Why this exists: `website_positioning` has carried this block since its
+ * sprint, which is why the website audit is the one briefing that qualifies its
+ * own figures ("content verified from the served catalog payload, not a browser
+ * render"). `profile_repair_audit` had no slot, so the archetype briefings
+ * asserted third-party mirror data as settled fact — the Arsema A8 and A3
+ * briefings both opened on "18 of your 21 five-star reviews", sourced from
+ * mirror cards that disagreed with the live profiles (22 and 8). The block is
+ * the missing slot, and it is what lets an operator know which line to verify
+ * before saying it out loud.
+ */
+function dataQualitySection(): string {
+  return `### 7. Data Quality (REQUIRED — state your own limits)
+
+Produce \`data_quality\` — an honest account of the evidence behind this briefing. The operator reads these pitch lines to a real owner, so an unqualified figure that turns out wrong costs the call. Shape:
+
+{ "verified_fields": ["<what you actually observed, and how>", ...],
+  "unavailable_fields": ["<what you could not check>", ...],
+  "limitations": ["<how the evidence was gathered, and where it may be wrong>", ...] }
+
+Rules:
+* **Name your source for any figure you put in the pitch.** A review count, rating, photo count, shipment count, tenure or directory fact read from a third-party mirror/aggregator rather than the live platform MUST be listed in \`limitations\` as mirror-sourced and unverified — and a pitch line built on it must not be stated to the owner as a settled fact.
+* \`unavailable_fields\` records what you could not check. A platform whose render was blocked on BOTH the business and the control search is \`unable_to_verify\` — never \`absent\`, and never an asserted gap anywhere else in the briefing.
+* Client-hydrated sites: if content came from a served payload rather than a rendered page, say so — the interactive page may differ from what you observed.
+* Never leave the block empty or write "nothing unavailable" without checking. A genuinely complete evidence set is worth stating; a blank array reads as "not checked".
+* Operator-facing only — this block never appears in owner-facing copy.
+`;
+}
+
 interface ArchetypeTemplate {
   id: string;
   name: string;
-  /** The `{{archetype_extract}}` section header + per-archetype instructions. */
-  extractFocus: string;
+  /** The `{{archetype_extract}}` section header + per-archetype instructions. */  extractFocus: string;
   /** Archetype-specific scope/impact/pitch/risk guidance. */
   instructions: string;
   /** Fixed issueType the output must emit. */
@@ -374,6 +405,7 @@ Produce an operator briefing for the {{archetype_label}} archetype grounded in t
 ${t.instructions}
 
 ${outreachProblemsSection(t.archetypeBinding)}
+${dataQualitySection()}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`;
 }
 

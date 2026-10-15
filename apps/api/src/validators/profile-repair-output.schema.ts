@@ -176,6 +176,23 @@ export const profileRepairAuditSchema = z.object({
       evidence: z.string(),
       outreach_use: z.string(),
     })).min(1),
+
+    // Data quality — what this briefing verified, what it could not check, and
+    // how the evidence was gathered. Same shape as `website_positioning`, which
+    // has carried the block since its sprint — and is why the website audit is
+    // the one briefing that qualifies its own figures. The archetype briefings
+    // had no slot, so they asserted third-party mirror data (review counts,
+    // photo counts) as settled fact: the Arsema A8/A3 briefings both opened on
+    // "18 of your 21 reviews" while the live profiles read 22 and 8.
+    //
+    // Declared explicitly rather than left to `.passthrough()` — passthrough
+    // persists the key in raw audit_data but gives typed consumers no
+    // validation and no guaranteed access.
+    data_quality: z.object({
+      verified_fields: z.array(z.string()).optional(),
+      unavailable_fields: z.array(z.string()).optional(),
+      limitations: z.array(z.string()).optional(),
+    }).passthrough().optional(),
   }).passthrough(),
 });
 
@@ -213,7 +230,12 @@ Return valid JSON only matching this shape:
         "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
         "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>"
       }
-    ]
+    ],
+    "data_quality": {
+      "verified_fields": ["<what you actually observed, and how>", ...],
+      "unavailable_fields": ["<what you could not check>", ...],
+      "limitations": ["<how the evidence was gathered and where it may be wrong — name any figure sourced from a third-party mirror rather than the live platform>", ...]
+    }
   }
 }
 
