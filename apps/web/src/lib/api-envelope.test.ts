@@ -47,4 +47,14 @@ describe('unwrapApiBody', () => {
     expect(unwrapApiBody(null)).toBeNull();
     expect(unwrapApiBody(undefined)).toBeNull();
   });
+
+  it('returns null when the handler payload is explicitly null', () => {
+    // Regression: /coupons/spotlight responds { success: true, data: null } when
+    // the merchant has no featured coupon. `result.data?.data || result.data`
+    // treated the null payload as falsy and fell back to the *envelope*, which is
+    // truthy — so the storefront rendered an empty "Special Offer" panel and fired
+    // a phantom spotlight view event.
+    const result = { success: true, data: { success: true, data: null } };
+    expect(unwrapApiBody(result)).toBeNull();
+  });
 });

@@ -49,7 +49,7 @@ export default function CouponSpotlight({
     const fetchSpotlight = async () => {
       try {
         const result = await publicCouponService.getSpotlightCoupon(tenantId);
-        if (!cancelled && result) {
+        if (!cancelled && result?.code) {
           setFetchedCoupon(result);
         }
       } catch {
@@ -80,7 +80,7 @@ export default function CouponSpotlight({
 
   // Track view event on mount
   useEffect(() => {
-    if (!coupon || isExpired || isExhausted) return;
+    if (!coupon?.code || isExpired || isExhausted) return;
     publicCouponService.trackEvent(tenantId, {
       eventType: 'view',
       couponId: coupon.id,
@@ -113,10 +113,10 @@ export default function CouponSpotlight({
     });
   }, [coupon, tenantId, publicCouponService]);
 
-  // Render nothing if loading, capability disabled, no coupon, expired, or exhausted
+  // Render nothing if loading, capability disabled, no valid coupon, expired, or exhausted
   if (capLoading) return null;
   if (!capState?.enabled || !capState?.canUseSpotlight) return null;
-  if (!coupon) return null;
+  if (!coupon?.code) return null;
   if (isExpired || isExhausted) return null;
 
   const iconMap = {

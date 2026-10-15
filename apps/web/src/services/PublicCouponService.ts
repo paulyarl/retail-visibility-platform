@@ -3,6 +3,7 @@
  * Extends PublicApiSingleton for unauthenticated storefront access
  */
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { unwrapApiBody } from '@/lib/api-envelope';
 
 export class PublicCouponService extends PublicApiSingleton {
   private static instance: PublicCouponService;
@@ -38,8 +39,7 @@ export class PublicCouponService extends PublicApiSingleton {
       `public-coupons-validate-${tenantId}-${code}`,
       this.cacheTTL
     );
-    const responseData = result.data?.data || result.data;
-    return responseData;
+    return unwrapApiBody<any>(result);
   }
 
   async getSpotlightCoupon(tenantId: string): Promise<any> {
@@ -49,8 +49,7 @@ export class PublicCouponService extends PublicApiSingleton {
       `public-coupons-spotlight-${tenantId}`,
       this.cacheTTL
     );
-    const responseData = result.data?.data || result.data;
-    return responseData;
+    return unwrapApiBody<any>(result);
   }
 
   async trackEvent(tenantId: string, event: { couponId?: string; couponCode?: string; eventType: string; surface: string; source?: string; sessionId?: string }): Promise<void> {
