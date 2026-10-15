@@ -36,6 +36,18 @@ describe('deriveDiscoverySignals', () => {
     expect(contributions.find((c) => c.code === 'DS_MISSING_PROFILE')?.via).toBe('int_signal');
   });
 
+  it('maps the discovery duplicate-listing code to the audit-family pain code', () => {
+    // The scan detects duplicates by address+phone alone (the alternate-identity
+    // split). It can only emit INT_*, so the bridge to the pain layer is this
+    // mapping — DS_DUPLICATE_LISTING is what routes to PB-09 / A8 presence.
+    const { signals, contributions } = deriveDiscoverySignals({
+      discoverySignals: ['INT_POSSIBLE_DUPLICATE_LISTING'],
+    });
+    expect(signals).toContain('DS_DUPLICATE_LISTING');
+    expect(signals.every((s) => !s.startsWith('INT_'))).toBe(true);
+    expect(contributions.find((c) => c.code === 'DS_DUPLICATE_LISTING')?.via).toBe('int_signal');
+  });
+
   it('maps competitive weakness keys (the pitch wedge) into audit signals', () => {
     const { signals, contributions } = deriveDiscoverySignals({
       competitiveWeaknesses: [

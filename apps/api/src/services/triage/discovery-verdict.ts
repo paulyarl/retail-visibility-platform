@@ -82,6 +82,10 @@ const INT_SIGNAL_MAP: Record<string, SignalCode[]> = {
   INT_LOW_VISIBILITY: ['DS_MISSING_PROFILE'],
   INT_WEAK_MAINSTREAM_INDEXING: ['DS_MISSING_PROFILE'],
   INT_MISSING_WEBSITE: ['WC_MISSING_WEBSITE'],
+  // Address/phone-keyed duplicate detection — the audit-family expression of
+  // "two live listings for one business" is DS_DUPLICATE_LISTING, which routes
+  // to PB-09 / A8 presence.
+  INT_POSSIBLE_DUPLICATE_LISTING: ['DS_DUPLICATE_LISTING'],
 };
 
 /** competitive_weaknesses[].weakness_key → audit-family codes. */

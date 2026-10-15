@@ -1,7 +1,7 @@
 /**
  * Seed script: Intelligence Discovery Signals (INT_* family)
  *
- * Seeds the 11 INT_* discovery signal codes into `mkt_signal_registry` as a
+ * Seeds the 12 INT_* discovery signal codes into `mkt_signal_registry` as a
  * new `INT` family (idempotent update-in-place). The registry is the runtime
  * source of truth for signal validation — the spec explicitly forbids
  * hardcoding these as a TS-only union (§6.7, §3.4 rule 3).
@@ -27,7 +27,7 @@ import { invalidateSignalRegistryCache } from '../services/triage/signal-taxonom
  * SEED_VERSION_MARKER — bump when signal definitions change to force
  * update-in-place of label/description on already-registered rows.
  */
-const SEED_VERSION_MARKER = '2026-09-18-v2-signal-divergence';
+const SEED_VERSION_MARKER = '2026-10-15-duplicate-listing';
 
 export const INTELLIGENCE_DISCOVERY_SIGNALS = [
   {
@@ -116,6 +116,18 @@ export const INTELLIGENCE_DISCOVERY_SIGNALS = [
     label: 'Underexposed credential',
     description:
       'The business holds credentials, certifications, or affiliations that would build customer trust but are not visible on the platforms where customers discover the business.',
+    detectionSource: 'model_emitted' as const,
+  },
+  {
+    // Address/phone-keyed duplicate detection — two live listings for one
+    // business under different trading names. Diagnostic layer: the
+    // audit-family expression is DS_DUPLICATE_LISTING (discovery-verdict
+    // INT_SIGNAL_MAP), which routes to PB-09 / A8 presence.
+    code: 'INT_POSSIBLE_DUPLICATE_LISTING',
+    family: 'INT',
+    label: 'Possible duplicate listing',
+    description:
+      'Two or more live listings for the same business were observed on one platform at the same street address and phone under different trading names (or with slight name variants) — a duplicate / alternate-identity split that divides reviews, splits categories, and risks platform enforcement.',
     detectionSource: 'model_emitted' as const,
   },
   {
