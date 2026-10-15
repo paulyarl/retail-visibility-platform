@@ -883,6 +883,15 @@ export interface GbpManagementState {
   features: Record<string, boolean>;
 }
 
+/** Tier-only coupon allowance — what the plan offers, before merchant gates. */
+export interface CouponOptionsTierState {
+  enabled: boolean;
+  allowedDiscountTypes: CouponDiscountType[];
+  canTargetProducts: boolean;
+  canUseQrSharing: boolean;
+  canUseSpotlight: boolean;
+}
+
 export interface CouponOptionsState {
   enabled: boolean;
   canCreateCoupons: boolean;
@@ -898,6 +907,7 @@ export interface CouponOptionsState {
   allowedDiscountTypes: CouponDiscountType[];
   isFlexible: boolean;
   merchantPreferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null; percent_off_enabled?: boolean | null; fixed_amount_enabled?: boolean | null; free_shipping_enabled?: boolean | null; bogo_enabled?: boolean | null; target_products_enabled?: boolean | null; qr_sharing_enabled?: boolean | null } | null;
+  tier: CouponOptionsTierState;
 }
 
 // --- Funnel Options ---
@@ -2898,6 +2908,12 @@ export function resolveCouponOptionsState(
   const tierCanUseFreeShipping = tierEnabled && (flexible || !!features.coupon_free_shipping) && !discountTypesOff;
   const tierCanUseBogo = tierEnabled && (flexible || !!features.coupon_bogo) && !discountTypesOff;
 
+  const tierDiscountTypes: CouponDiscountType[] = [];
+  if (tierCanUsePercentOff) tierDiscountTypes.push('percent_off');
+  if (tierCanUseFixedAmount) tierDiscountTypes.push('fixed_amount');
+  if (tierCanUseFreeShipping) tierDiscountTypes.push('free_shipping');
+  if (tierCanUseBogo) tierDiscountTypes.push('bogo');
+
   // Merchant gate helper (default true if no prefs)
   const mGate = (val: boolean | null | undefined): boolean => val === null || val === undefined ? true : !!val;
   // Master switch is opt-in — absent prefs mean disabled, mirroring the settings DB default
@@ -2938,6 +2954,14 @@ export function resolveCouponOptionsState(
     allowedDiscountTypes,
     isFlexible: flexible,
     merchantPreferences: merchantPrefs ?? null,
+    // Tier-only allowance (pre-merchant-gate) — see EffectiveCouponOptionsTier.
+    tier: {
+      enabled: tierEnabled,
+      allowedDiscountTypes: tierDiscountTypes,
+      canTargetProducts: tierEnabled && (flexible || !!features.coupon_targeted),
+      canUseQrSharing: tierEnabled && (flexible || !!features.coupon_qr_sharing),
+      canUseSpotlight: tierEnabled && (flexible || !!features.coupon_spotlight),
+    },
   };
 }
 

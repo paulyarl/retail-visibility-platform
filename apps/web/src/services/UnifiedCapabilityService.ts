@@ -1182,6 +1182,13 @@ interface BackendEffectiveCouponOptions {
   allowed_discount_types: string[];
   is_flexible: boolean;
   merchant_preferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null; percent_off_enabled?: boolean | null; fixed_amount_enabled?: boolean | null; free_shipping_enabled?: boolean | null; bogo_enabled?: boolean | null; target_products_enabled?: boolean | null; qr_sharing_enabled?: boolean | null } | null;
+  tier?: {
+    enabled: boolean;
+    allowed_discount_types: string[];
+    can_target_products: boolean;
+    can_use_qr_sharing: boolean;
+    can_use_spotlight: boolean;
+  };
 }
 
 interface BackendEffectiveMarketingOps {
@@ -1254,6 +1261,14 @@ function mapCouponOptions(b: BackendEffectiveCouponOptions): CouponOptionsState 
     allowedDiscountTypes: (b.allowed_discount_types || []) as CouponDiscountType[],
     isFlexible: b.is_flexible,
     merchantPreferences: b.merchant_preferences ?? null,
+    // Fall back to the effective values when an older API omits the tier block.
+    tier: {
+      enabled: b.tier?.enabled ?? b.enabled,
+      allowedDiscountTypes: (b.tier?.allowed_discount_types ?? b.allowed_discount_types ?? []) as CouponDiscountType[],
+      canTargetProducts: b.tier?.can_target_products ?? b.can_target_products,
+      canUseQrSharing: b.tier?.can_use_qr_sharing ?? b.can_use_qr_sharing,
+      canUseSpotlight: b.tier?.can_use_spotlight ?? b.can_use_spotlight,
+    },
   };
 }
 

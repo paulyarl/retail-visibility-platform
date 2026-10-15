@@ -104,5 +104,16 @@ export function resolveCouponOptions(
     allowed_discount_types,
     is_flexible: flexible,
     merchant_preferences: merchantPrefs ?? null,
+    // Tier-only allowance (pre-merchant-gate). The merchant settings UI needs this to
+    // decide whether a switch is offerable at all — the effective can_use_* flags
+    // already fold in the merchant's own toggles, so using them there would make a
+    // switch that was turned off impossible to turn back on.
+    tier: {
+      enabled: tierEnabled,
+      allowed_discount_types: tierAllowedDiscountTypes,
+      can_target_products: tierEnabled && tierCanTargetProducts,
+      can_use_qr_sharing: tierEnabled && tierCanUseQrSharing,
+      can_use_spotlight: tierEnabled && tierCanUseSpotlight,
+    },
   };
 }

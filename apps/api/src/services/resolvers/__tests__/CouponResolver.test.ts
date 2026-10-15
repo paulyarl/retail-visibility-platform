@@ -42,3 +42,29 @@ describe('resolveCouponOptions master switch', () => {
     expect(caps.allowed_discount_types).toEqual(['percent_off', 'fixed_amount', 'free_shipping', 'bogo']);
   });
 });
+
+// The merchant settings page must gate its switches on the plan's allowance, not on the
+// effective can_use_* flags — those already fold in the merchant's own toggles, so a
+// switch that is off would report itself as unavailable and could never be turned back on.
+describe('resolveCouponOptions tier allowance', () => {
+  it('reports spotlight as tier-allowed while the merchant gate keeps it effective-off', () => {
+    const caps = resolveCouponOptions(tierFeatures, { coupon_enabled: true, spotlight_enabled: false });
+    expect(caps.enabled).toBe(true);
+    expect(caps.can_use_spotlight).toBe(false);
+    expect(caps.tier.enabled).toBe(true);
+    expect(caps.tier.can_use_spotlight).toBe(true);
+  });
+
+  it('still reports tier allowance when no settings row exists', () => {
+    const caps = resolveCouponOptions(tierFeatures, null);
+    expect(caps.enabled).toBe(false);
+    expect(caps.tier.enabled).toBe(true);
+    expect(caps.tier.allowed_discount_types).toEqual(['percent_off', 'fixed_amount', 'free_shipping', 'bogo']);
+  });
+
+  it('omits features the plan does not include', () => {
+    const caps = resolveCouponOptions(tierFeatures, { coupon_enabled: true });
+    expect(caps.tier.can_target_products).toBe(false);
+    expect(caps.can_target_products).toBe(false);
+  });
+});

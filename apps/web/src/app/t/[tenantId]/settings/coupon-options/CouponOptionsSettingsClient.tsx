@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { AlertCircle, Save, Tag, Percent, DollarSign, Truck, Gift, Target, QrCode, Spotlight, Settings, Plus, List, ArrowRight, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useCouponOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import type { CouponOptionsState } from '@/services/CapabilityResolutionService';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { CouponService, Coupon } from '@/services/CouponService';
 import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
@@ -38,15 +39,24 @@ interface FeatureToggle {
   tierFlag: (cap: NonNullable<ReturnType<typeof useCouponOptionsCapability>['data']>) => boolean;
 }
 
-const FEATURE_TOGGLES: FeatureToggle[] = [
-  { key: 'percentOffEnabled', label: 'Percent Off', description: 'Offer percentage-based discounts (e.g. 20% off)', icon: Percent, tierFlag: cap => cap.canUsePercentOff },
-  { key: 'fixedAmountEnabled', label: 'Fixed Amount', description: 'Offer fixed-dollar discounts (e.g. $10 off)', icon: DollarSign, tierFlag: cap => cap.canUseFixedAmount },
-  { key: 'freeShippingEnabled', label: 'Free Shipping', description: 'Offer free shipping coupons', icon: Truck, tierFlag: cap => cap.canUseFreeShipping },
-  { key: 'bogoEnabled', label: 'BOGO', description: 'Buy-one-get-one promotions', icon: Gift, tierFlag: cap => cap.canUseBogo },
-  { key: 'targetProductsEnabled', label: 'Target Products', description: 'Restrict coupons to specific products or categories', icon: Target, tierFlag: cap => cap.canTargetProducts },
-  { key: 'qrSharingEnabled', label: 'QR Sharing', description: 'Generate QR codes for coupon sharing', icon: QrCode, tierFlag: cap => cap.canUseQrSharing },
-  { key: 'spotlightEnabled', label: 'Spotlight', description: 'Highlight a featured coupon on your storefront', icon: Spotlight, tierFlag: cap => cap.canUseSpotlight },
+// The toggles must be gated on the TIER allowance, never on the effective can_use_*
+// flags: those already fold in the merchant's own switches, so a switch that is off
+// would report itself as unavailable and could never be turned back on.
+export const FEATURE_TOGGLES: FeatureToggle[] = [
+  { key: 'percentOffEnabled', label: 'Percent Off', description: 'Offer percentage-based discounts (e.g. 20% off)', icon: Percent, tierFlag: cap => cap.tier.allowedDiscountTypes.includes('percent_off') },
+  { key: 'fixedAmountEnabled', label: 'Fixed Amount', description: 'Offer fixed-dollar discounts (e.g. $10 off)', icon: DollarSign, tierFlag: cap => cap.tier.allowedDiscountTypes.includes('fixed_amount') },
+  { key: 'freeShippingEnabled', label: 'Free Shipping', description: 'Offer free shipping coupons', icon: Truck, tierFlag: cap => cap.tier.allowedDiscountTypes.includes('free_shipping') },
+  { key: 'bogoEnabled', label: 'BOGO', description: 'Buy-one-get-one promotions', icon: Gift, tierFlag: cap => cap.tier.allowedDiscountTypes.includes('bogo') },
+  { key: 'targetProductsEnabled', label: 'Target Products', description: 'Restrict coupons to specific products or categories', icon: Target, tierFlag: cap => cap.tier.canTargetProducts },
+  { key: 'qrSharingEnabled', label: 'QR Sharing', description: 'Generate QR codes for coupon sharing', icon: QrCode, tierFlag: cap => cap.tier.canUseQrSharing },
+  { key: 'spotlightEnabled', label: 'Spotlight', description: 'Highlight a featured coupon on your storefront', icon: Spotlight, tierFlag: cap => cap.tier.canUseSpotlight },
 ];
+
+/** Whether the plan offers coupons at all — the master switch's allowance. */
+export function couponTierAllowed(cap: CouponOptionsState | null): boolean {
+  if (!cap) return false;
+  return cap.tier.enabled || cap.isFlexible || cap.tier.allowedDiscountTypes.length > 0;
+}
 
 function getQuickActions(settings: CouponSettings, tenantId: string, tierAllowed: boolean): { id: string; label: string; description: string; href: string; icon: React.ComponentType<{ className?: string }>; variant: 'general' | 'product' }[] {
   const actions: { id: string; label: string; description: string; href: string; icon: React.ComponentType<{ className?: string }>; variant: 'general' | 'product' }[] = [];
@@ -87,7 +97,7 @@ export default function CouponOptionsSettingsClient({ tenantId }: CouponOptionsS
   const couponCap = useCouponOptionsCapability(tenantId);
   const allCaps = useAllCapabilities(tenantId);
   const capState = couponCap.data;
-  const tierAllowed = !!capState && (capState.enabled || capState.isFlexible || (capState.allowedDiscountTypes?.length ?? 0) > 0);
+  const tierAllowed = couponTierAllowed(capState);
 
   const [settings, setSettings] = useState<CouponSettings>({
     couponEnabled: false,

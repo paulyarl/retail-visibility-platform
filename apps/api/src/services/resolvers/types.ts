@@ -1004,6 +1004,15 @@ export interface FunnelOptionsMerchantSettings {
 
 export type CouponDiscountType = 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
 
+/** Tier-only coupon allowance — computed before merchant gates are applied. */
+export interface EffectiveCouponOptionsTier {
+  enabled: boolean;
+  allowed_discount_types: CouponDiscountType[];
+  can_target_products: boolean;
+  can_use_qr_sharing: boolean;
+  can_use_spotlight: boolean;
+}
+
 export interface EffectiveCouponOptions {
   enabled: boolean;
   can_create_coupons: boolean;
@@ -1019,6 +1028,7 @@ export interface EffectiveCouponOptions {
   allowed_discount_types: CouponDiscountType[];
   is_flexible: boolean;
   merchant_preferences: CouponOptionsMerchantSettings | null;
+  tier: EffectiveCouponOptionsTier;
 }
 
 export interface CouponOptionsMerchantSettings {
