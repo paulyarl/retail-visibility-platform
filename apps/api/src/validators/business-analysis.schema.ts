@@ -317,6 +317,20 @@ const recommendedAttributeEntrySchema = z.object({
   current_state: z.string().nullable().optional(),
 }).passthrough();
 
+const alternateProfileEntrySchema = z.object({
+  // The name the alternate listing renders.
+  name: z.string(),
+  // The live profile URL, when observed.
+  url: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  rating: coercedNumberNullable.optional(),
+  review_count: coercedNumberNullable.optional(),
+  // Free-text age signal ("2 years", "since 2023") — the audit cannot read a
+  // creation date, so this is whatever the profile evidences.
+  first_seen: z.string().nullable().optional(),
+  plus_code: z.string().nullable().optional(),
+}).passthrough();
+
 const platformSchema = z.object({
   profile_status: profileStatusEnum,
   rating: coercedNumberNullable,
@@ -338,6 +352,12 @@ const platformSchema = z.object({
   // evidence — never inferred from category labels. SNAP/EBT stays in its
   // dedicated fields (migration 207), never here.
   attributes: z.array(platformAttributeEntrySchema).nullable().optional(),
+  // Alternate listings observed for the SAME business on this platform — a
+  // duplicate/second profile under a different trading name, sharing the
+  // address and phone (DS_DUPLICATE_LISTING). Carries the structured facts the
+  // A8 presence plan and keyword surface plan need (name, review count, rating,
+  // age) that `name_variations` (bare strings) and `same_as` (bare URLs) cannot.
+  alternate_profiles: z.array(alternateProfileEntrySchema).nullable().optional(),
 }).passthrough();
 
 const googlePlatformSchema = platformSchema.extend({
@@ -1011,6 +1031,11 @@ Return your response as JSON matching this exact schema:
       "attributes": [
         { "key": "<snake_case_key>", "label": "<display label>",
           "source_url": "<url or null>", "as_of": "<ISO date or null>" }
+      ],
+      "alternate_profiles": [
+        { "name": "<other trading name for THIS business>", "url": "<profile url or null>",
+          "category": "<string|null>", "rating": <number|null>, "review_count": <number|null>,
+          "first_seen": "<string|null>", "plus_code": "<string|null>" }
       ],
       "data_status": "complete|partial|unavailable|unable_to_verify|restricted"
     },

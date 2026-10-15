@@ -344,6 +344,18 @@ export function archetypeFactSlice(
           .filter((r: any) => r?.determination === 'business_specific_failure')
           .map((r: any) => r?.platform)
           .filter(Boolean),
+        // A second live listing for the same business (DS_DUPLICATE_LISTING) —
+        // the structured facts the presence plan and keyword surface plan need:
+        // which listing is older, which carries more reviews.
+        alternate_profiles: Object.values(audit.platforms ?? {})
+          .flatMap((p: any) => (Array.isArray(p?.alternate_profiles) ? p.alternate_profiles : []))
+          .map((p: any) => ({
+            name: p?.name ?? null,
+            category: p?.category ?? null,
+            rating: p?.rating ?? null,
+            review_count: p?.review_count ?? null,
+            first_seen: p?.first_seen ?? null,
+          })),
         gap_rows: gapRows(/profile|listing|presence|claim|platform|directory|social|contact/i),
         ...internal,
       };

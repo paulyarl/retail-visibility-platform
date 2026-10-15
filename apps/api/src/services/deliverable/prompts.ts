@@ -705,6 +705,37 @@ Keep it practical — this is paperwork, not engineering. No pricing.
 
 Output as structured text.`;
 
+export const KEYWORD_SURFACE_PLAN_PROMPT = `You are preparing a keyword surface plan for {{business_name}}, a {{business_category}} (origin: {{business_origin}}) in {{business_city}}, {{business_state}}.
+
+Identity tokens observed for this business — from its real-world names, its signage, and the profiles and directories it appears on:
+{{identity_tokens}}
+
+Other names this business is known by:
+{{alternate_names}}
+
+{{duplicate_listing_note}}
+
+Where each token belongs:
+{{keyword_placements}}
+
+Task: Write the plan that puts every word this business cares about where the platform actually reads it. Cover:
+
+## The Words You're Known By
+[Name the tokens plainly and say where each was observed — the storefront sign, a trade name, a directory, a category. This is the owner's own identity reflected back, not a list of search terms. If the business is known by more than one name, say so without judgement: that is normal for a business whose community and its paperwork use different words.]
+
+## Where Each Word Belongs
+[A placement walk-through, one field at a time: primary + additional categories, services / service menu, products, business description, attributes. For each, name the tokens that go there and why that field is indexed and searchable. Be concrete — the owner should be able to open their profile and fill each field from this section.]
+
+## The One Place It Must Not Go
+[The business name. Explain plainly: a profile name is the real-world name, and adding category, specialty, or location words to it is against the platform's guidelines. Everything the name was being asked to do for search can be done in the fields above — legally, durably, and without risking the profile. Do not moralise; the instinct to be findable is correct.]
+
+## One Profile, Every Surface
+[The consolidation: one profile carrying every category, service, product, attribute, and description loses nothing. Say what the split is costing — reviews and ratings divided across two half-profiles, neither ranking as strongly as one complete profile would.]
+
+Keep it practical and specific to this business. No pricing.
+
+Output as structured text.`;
+
 export function buildPresenceMapPrompt(
   ctx: BusinessContextFields,
   platformStates: string,
@@ -748,6 +779,25 @@ export function buildOwnershipClaimGuidePrompt(
     .replace('{{business_state}}', ctx.state ?? '')
     .replace('{{claim_actions}}', claimActions || 'No unclaimed or blocked profiles detected')
     .replace('{{integrity_issues}}', integrityIssues || 'None detected');
+}
+
+export function buildKeywordSurfacePlanPrompt(
+  ctx: BusinessContextFields,
+  identityTokens: string,
+  alternateNames: string,
+  duplicateListingNote: string,
+  keywordPlacements: string,
+): string {
+  return KEYWORD_SURFACE_PLAN_PROMPT
+    .replace('{{business_name}}', ctx.businessName)
+    .replace('{{business_category}}', ctx.businessCategory)
+    .replace('{{business_origin}}', ctx.businessOrigin ?? 'unspecified')
+    .replace('{{business_city}}', ctx.city ?? '')
+    .replace('{{business_state}}', ctx.state ?? '')
+    .replace('{{identity_tokens}}', identityTokens || 'None observed')
+    .replace('{{alternate_names}}', alternateNames || 'None observed — one name only')
+    .replace('{{duplicate_listing_note}}', duplicateListingNote)
+    .replace('{{keyword_placements}}', keywordPlacements || 'None derived');
 }
 
 // ─── Execution-layer variable maps ─────────────────────────────────────────

@@ -1908,7 +1908,7 @@ function transformBusinessAuditV1(body: string): string {
 //     canonical_city/state/zip)
 // The .md asset is the source of truth — edit it and bump
 // DEFAULT_AUDIT_MARKER when the canonical body changes.
-const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-15-duplicate-listing-alternate-name-1 -->';
+const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-15-alternate-profiles-2 -->';
 
 function transformSeedBusinessAudit(): string {
   const body = readFileSync(

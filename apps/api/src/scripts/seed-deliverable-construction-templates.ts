@@ -49,6 +49,7 @@ import {
   PRESENCE_MAP_PROMPT,
   PROFILE_BUILD_PLAN_PROMPT,
   OWNERSHIP_CLAIM_GUIDE_PROMPT,
+  KEYWORD_SURFACE_PLAN_PROMPT,
 } from '../services/deliverable/prompts';
 
 const SEED_VERSION_MARKER = '<!-- DELIVERABLE_CONSTRUCTION_SEED_V1 -->';
@@ -260,6 +261,22 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     category: 'Deliverables',
     body: `${SEED_VERSION_MARKER}\n${OWNERSHIP_CLAIM_GUIDE_PROMPT}`,
     variables: [...BIZ_CTX_VARS, 'claim_actions', 'integrity_issues'],
+    outputSchema: null,
+    isDefault: false,
+  },
+  {
+    id: 'mpt-deliverable-section-keyword-surface',
+    name: 'Deliverable Section: Keyword Surface Plan',
+    promptType: 'fulfill',
+    category: 'Deliverables',
+    body: `${SEED_VERSION_MARKER}\n${KEYWORD_SURFACE_PLAN_PROMPT}`,
+    variables: [
+      ...BIZ_CTX_VARS,
+      'identity_tokens',
+      'alternate_names',
+      'duplicate_listing_note',
+      'keyword_placements',
+    ],
     outputSchema: null,
     isDefault: false,
   },

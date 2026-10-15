@@ -51,6 +51,137 @@ interface PlacesTextSearchResponse {
   }>;
 }
 
+// ─── Address-keyed alternate-listing sweep ───────────────────────────────
+//
+// `lookupBusiness` is name-keyed (`"<name>, <city>"` → places[0]) so it can
+// only ever see ONE listing. A duplicate under a different trading name is
+// therefore invisible to it — the exact blind spot behind DS_DUPLICATE_LISTING.
+// The sweep queries by ADDRESS and keeps every result that shares the
+// business's identity under a different name.
+
+const PLACES_SWEEP_FIELDS =
+  'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,'
+  + 'places.internationalPhoneNumber,places.rating,places.userRatingCount,'
+  + 'places.primaryTypeDisplayName,places.plusCode';
+
+export interface PlacesSweepPlace {
+  id: string;
+  displayName?: { text?: string; languageCode?: string };
+  formattedAddress?: string;
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  rating?: number;
+  userRatingCount?: number;
+  primaryTypeDisplayName?: { text?: string; languageCode?: string };
+  plusCode?: { globalCode?: string; compoundCode?: string };
+}
+
+export interface AlternateListing {
+  placeId: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  category: string | null;
+  rating: number | null;
+  reviewCount: number | null;
+  plusCode: string | null;
+  sharesAddress: boolean;
+  sharesPhone: boolean;
+}
+
+export type AlternateListingSweepSource = 'places_api' | 'no_match' | 'not_configured';
+
+/** Digits only, last 10 — mirrors the seed-level dedup normalizer. */
+export function normalizePhone(raw?: string | null): string {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+/** Lowercase, punctuation → space, whitespace-collapsed. */
+export function normalizeName(raw?: string | null): string {
+  return String(raw ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+const NAME_STOPWORDS = new Set([
+  'llc', 'inc', 'co', 'corp', 'ltd', 'company', 'the', 'and', 'of',
+  'store', 'shop', 'mart', 'market',
+]);
+
+/** Significant name tokens — the words that actually identify the business. */
+export function nameTokens(raw?: string | null): string[] {
+  return normalizeName(raw)
+    .split(' ')
+    .filter((t) => t.length >= 2 && !NAME_STOPWORDS.has(t));
+}
+
+/**
+ * True when two names plausibly denote the SAME listing — the shorter name's
+ * tokens are ≥80% present in the longer. So "Arsema G Food Mart LLC" and
+ * "Arsema Food Mart" match, while "Ethiopian Eritrean Store" does not.
+ */
+export function isSameListingName(a?: string | null, b?: string | null): boolean {
+  const ta = nameTokens(a);
+  const tb = nameTokens(b);
+  if (ta.length === 0 || tb.length === 0) return normalizeName(a) === normalizeName(b);
+  const [small, big] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  const bigSet = new Set(big);
+  const overlap = small.filter((t) => bigSet.has(t)).length;
+  return overlap / small.length >= 0.8;
+}
+
+/**
+ * Street-identity key: the leading number + street name + type of an address.
+ * Unit designators ("Unit A"), city, state, and postcode fall away, so
+ * "6667 W Washington St, Unit A" and "6667 W Washington St, Indianapolis, IN
+ * 46241, USA" produce the same key.
+ */
+export function streetKey(raw?: string | null): string {
+  return normalizeName(raw).split(' ').filter(Boolean).slice(0, 3).join(' ');
+}
+
+/**
+ * Pure matcher — the OTHER listings at this business's identity. A result is
+ * an alternate when its name differs from the target's AND it shares the
+ * street key or the phone. Returns [] when only the target listing exists.
+ */
+export function findAlternateListings(input: {
+  targetName?: string | null;
+  targetAddress?: string | null;
+  targetPhone?: string | null;
+  places?: PlacesSweepPlace[] | null;
+}): AlternateListing[] {
+  const targetName = input.targetName;
+  const targetStreet = streetKey(input.targetAddress);
+  const targetPhone = normalizePhone(input.targetPhone);
+
+  const out: AlternateListing[] = [];
+  for (const p of input.places ?? []) {
+    if (!p?.id) continue;
+    const name = p.displayName?.text?.trim();
+    if (!name) continue;
+    // Same listing (same or contained name) → not an alternate.
+    if (isSameListingName(name, targetName)) continue;
+    const address = p.formattedAddress ?? null;
+    const phone = p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? null;
+    const sharesAddress = Boolean(targetStreet) && streetKey(address) === targetStreet;
+    const sharesPhone = Boolean(targetPhone) && normalizePhone(phone) === targetPhone;
+    if (!sharesAddress && !sharesPhone) continue;
+    out.push({
+      placeId: p.id,
+      name,
+      address,
+      phone,
+      category: p.primaryTypeDisplayName?.text ?? null,
+      rating: typeof p.rating === 'number' ? p.rating : null,
+      reviewCount: typeof p.userRatingCount === 'number' ? p.userRatingCount : null,
+      plusCode: p.plusCode?.globalCode ?? p.plusCode?.compoundCode ?? null,
+      sharesAddress,
+      sharesPhone,
+    });
+  }
+  return out;
+}
+
 export class MarketingGbpEnhancerService extends BaseService {
   private static instance: MarketingGbpEnhancerService;
 
@@ -240,6 +371,77 @@ export class MarketingGbpEnhancerService extends BaseService {
     } catch (error) {
       logger.error('populateContactFields failed', ctx, { error: (error as Error).message, campaignId });
       return { phone: null, websiteUrl: null, source: 'audit_fallback', populated: [] };
+    }
+  }
+
+  /**
+   * Address-keyed Places sweep — the detector behind DS_DUPLICATE_LISTING.
+   *
+   * Enumerates the listings at the campaign's street address and returns any
+   * OTHER listing that shares its identity under a different name. Opt-in and
+   * billable: not auto-called and not cached — invoke it deliberately (audit
+   * supplement, operator action). Soft-fails to an empty list.
+   */
+  async sweepAlternateListings(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ source: AlternateListingSweepSource; listings: AlternateListing[] }> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: {
+          business_name: true,
+          address_line1: true,
+          address_city: true,
+          address_state: true,
+          city: true,
+          phone: true,
+        },
+      });
+      if (!campaign) throw new NotFoundError('Campaign not found');
+
+      const address = campaign.address_line1 ?? null;
+      const city = campaign.address_city ?? campaign.city ?? null;
+      if (!address) return { source: 'no_match', listings: [] };
+
+      const apiKey = unifiedConfig.googleMapsApiKey;
+      if (!apiKey) {
+        logger.warn('GOOGLE_MAPS_API_KEY not configured; skipping alternate-listing sweep', ctx, { campaignId });
+        return { source: 'not_configured', listings: [] };
+      }
+
+      const textQuery = [address, city, campaign.address_state].filter(Boolean).join(', ');
+      const response = await fetch(PLACES_TEXT_SEARCH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': PLACES_SWEEP_FIELDS,
+        },
+        body: JSON.stringify({ textQuery, languageCode: 'en' }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        logger.warn('Places alternate-listing sweep failed', ctx, { campaignId, status: response.status, errBody });
+        return { source: 'no_match', listings: [] };
+      }
+
+      const data = (await response.json()) as { places?: PlacesSweepPlace[] };
+      const listings = findAlternateListings({
+        targetName: campaign.business_name,
+        targetAddress: address,
+        targetPhone: campaign.phone,
+        places: data.places,
+      });
+
+      logger.info('Alternate-listing sweep completed', ctx, {
+        campaignId, scanned: data.places?.length ?? 0, alternates: listings.length,
+      });
+      return { source: 'places_api', listings };
+    } catch (error) {
+      logger.error('sweepAlternateListings failed', ctx, { error: (error as Error).message, campaignId });
+      return { source: 'no_match', listings: [] };
     }
   }
 }

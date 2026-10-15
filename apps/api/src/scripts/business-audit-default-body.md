@@ -653,7 +653,7 @@ Evaluate the verified audit observations and populate the top-level `detected_si
 * `DS_PHOTO_DEFICIT`: Zero business photos or no new photos added in last 6 months.
 * `DS_ZERO_INDEXED_PRESENCE`: a direct name + city search returns essentially no business-attributable indexed footprint — no directory listings, no owned site, no review presence. Emit only for near-total absence; weak rank with identifiable listings is not zero-indexed.
 * `DS_PROFILE_SUSPENDED`: the platform shows the profile as suspended, disabled, removed-for-policy, or pending verification review — or the listing is unfindable while evidence shows it recently existed (indexed references, reviews citing it). Emit only on an observed suspension state, never on ordinary absence.
-* `DS_DUPLICATE_LISTING`: two or more live listings for the same business on one platform. The tell is a shared identity, not a shared name — either a same or near-same name/address/phone with slight variants, OR a different trading name carrying the same street address AND the same phone number (an alternate-identity split, e.g. "Ethiopian Eritrean Store" and "Arsema Food Mart" at one address and phone). Emit on sight when two profiles resolve to one business — split reviews, split categories, or duplicate map pins. Do not emit for two genuinely distinct businesses sharing a building (different phone, different owners, no shared identity).
+* `DS_DUPLICATE_LISTING`: two or more live listings for the same business on one platform. The tell is a shared identity, not a shared name — either a same or near-same name/address/phone with slight variants, OR a different trading name carrying the same street address AND the same phone number (an alternate-identity split, e.g. "Ethiopian Eritrean Store" and "Arsema Food Mart" at one address and phone). Emit on sight when two profiles resolve to one business — split reviews, split categories, or duplicate map pins. Do not emit for two genuinely distinct businesses sharing a building (different phone, different owners, no shared identity). When you emit it, also record each alternate listing in `platforms.<platform>.alternate_profiles[]` — name, url, category, rating, review_count, first_seen — so the finding carries the structured facts (which listing is older, which carries more reviews) that a bare name cannot.
 * `DS_HIJACKED_LISTING`: profile content appears controlled by a third party — a planted foreign website or phone number, different branding, or an unauthorized claim. Emit when profile content conflicts with the business's verified identity; stale or drifted info alone is drift, not hijack.
 * `DS_OWNERSHIP_DISPUTE`: ownership is contested — "this listing has already been claimed" states, pending or conflicting ownership requests, or control held by a former manager/agency.
 * `DS_ADDRESS_VERIFICATION_BLOCK`: the platform refuses verification at the stated address — postcard/video verification required, PO box / virtual office / residential address flagged.
@@ -1085,6 +1085,7 @@ Omit a conditional field entirely when its governing directive says to omit it (
       "photo_types": [],
       "special_hours_present": "unable_to_verify",
       "attributes": [],
+      "alternate_profiles": [],
       "profile_url": null,
       "data_status": "unavailable"
     },
@@ -1411,4 +1412,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-15-duplicate-listing-alternate-name-1 -->
+<!-- seed-version: business-audit-default-2026-10-15-alternate-profiles-2 -->

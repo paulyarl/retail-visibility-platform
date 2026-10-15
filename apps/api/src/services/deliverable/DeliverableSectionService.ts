@@ -21,6 +21,12 @@ import BusinessContextService from './BusinessContextService';
 import { resolveCampaignArchetype } from '../OutreachOpenerService';
 import { MarketingBusinessTypeService } from '../MarketingBusinessTypeService';
 import { surfaceRef } from '../../lib/channel-surfaces';
+import {
+  buildKeywordSurfacePlan,
+  formatKeywordPlacements,
+  formatDuplicateListingNote,
+} from './keyword-surface-plan';
+import type { KeywordSurfacePlan } from './keyword-surface-plan';
 
 const DEFAULT_VOICE_FIELDS: OwnerVoiceFields = {
   person: 'first_person',
@@ -53,6 +59,7 @@ const SECTION_TEMPLATE_IDS: Record<SectionType, string> = {
   presence_map: 'mpt-deliverable-section-presence-map',
   profile_build_plan: 'mpt-deliverable-section-profile-build',
   ownership_claim_guide: 'mpt-deliverable-section-claim-guide',
+  keyword_surface_plan: 'mpt-deliverable-section-keyword-surface',
 };
 
 export interface DeliverableSection {
@@ -88,7 +95,8 @@ export type SectionType =
   // PB-09 — profile-presence sections (A8):
   | 'presence_map'
   | 'profile_build_plan'
-  | 'ownership_claim_guide';
+  | 'ownership_claim_guide'
+  | 'keyword_surface_plan';
 
 export class DeliverableSectionService extends BaseService {
   private static instance: DeliverableSectionService;
@@ -288,6 +296,7 @@ export class DeliverableSectionService extends BaseService {
           'presence_map',
           'profile_build_plan',
           'ownership_claim_guide',
+          'keyword_surface_plan',
         ];
         for (const sectionType of a8Sections) {
           try {
@@ -625,6 +634,21 @@ export class DeliverableSectionService extends BaseService {
         };
       }
 
+      case 'keyword_surface_plan': {
+        const { plan, duplicateListingNote } = this.describeKeywordSurface(auditData, businessCtx);
+        return {
+          variables: {
+            ...ctxVars,
+            identity_tokens: plan.tokens.join(', ') || 'None observed',
+            alternate_names: plan.alternateNames.join(', ') || 'None observed — one name only',
+            duplicate_listing_note: duplicateListingNote,
+            keyword_placements: formatKeywordPlacements(plan),
+          },
+          title: 'Keyword Surface Plan',
+          sectionIndex: 980,
+        };
+      }
+
       default:
         throw new Error(`Unknown section type: ${sectionType}`);
     }
@@ -691,6 +715,45 @@ export class DeliverableSectionService extends BaseService {
       claimActions,
       integrityIssues,
     };
+  }
+
+  /**
+   * Derive the keyword surface plan for the A8 section — the business's
+   * observed real-world names, category vocabulary, attributes, and product
+   * terms. Reads the same audit the presence map / build plan use, plus the
+   * audit's `alternate_profiles` (a second live listing) when present. Pure
+   * over its inputs; the analyst hop writes the prose.
+   */
+  private describeKeywordSurface(auditData: any, businessCtx: BusinessContextFields): {
+    plan: KeywordSurfacePlan;
+    duplicateListingNote: string;
+  } {
+    const detected: string[] = Array.isArray(auditData?.detected_signals) ? auditData.detected_signals : [];
+    const platforms = auditData?.platforms ?? {};
+    const google = platforms?.google ?? {};
+
+    const platformDisplayedNames = Object.values(platforms)
+      .map((p: any) => p?.displayed_name)
+      .filter((n: any): n is string => typeof n === 'string' && n.trim().length > 0);
+
+    const plan = buildKeywordSurfacePlan({
+      businessName: auditData?.matched_business?.business_name ?? businessCtx.businessName,
+      category: auditData?.matched_business?.category ?? google?.primary_category ?? businessCtx.businessCategory,
+      secondaryCategories: Array.isArray(google?.additional_categories) ? google.additional_categories : [],
+      nameVariations: Array.isArray(auditData?.nap_consistency?.name_variations)
+        ? auditData.nap_consistency.name_variations
+        : [],
+      platformDisplayedNames,
+      additionalCategories: Array.isArray(google?.additional_categories) ? google.additional_categories : [],
+      observedAttributes: Array.isArray(auditData?.observed_attributes) ? auditData.observed_attributes : [],
+      productCategories: Array.isArray(auditData?.website?.product_categories_visible)
+        ? auditData.website.product_categories_visible
+        : [],
+      alternateProfiles: Array.isArray(google?.alternate_profiles) ? google.alternate_profiles : [],
+      hasDuplicateListing: detected.includes('DS_DUPLICATE_LISTING'),
+    });
+
+    return { plan, duplicateListingNote: formatDuplicateListingNote(plan) };
   }
 
   /**
