@@ -922,7 +922,7 @@ class BotKnowledgeEmbeddingService {
     for (const coupon of coupons) {
       const parts = [
         `Coupon: ${coupon.code}`,
-        `Discount: ${coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : coupon.discount_type === 'fixed' ? `$${(coupon.discount_value / 100).toFixed(2)} off` : coupon.discount_type === 'free_shipping' ? 'Free shipping' : coupon.discount_type === 'bogo' ? 'Buy one get one' : coupon.discount_type}`,
+        `Discount: ${coupon.discount_type === 'percent_off' ? `${coupon.discount_value}% off` : coupon.discount_type === 'fixed_amount' ? `$${(coupon.discount_value / 100).toFixed(2)} off` : coupon.discount_type === 'free_shipping' ? 'Free shipping' : coupon.discount_type === 'bogo' ? 'Buy one get one' : coupon.discount_type}`,
       ];
 
       if (coupon.max_redemptions) {

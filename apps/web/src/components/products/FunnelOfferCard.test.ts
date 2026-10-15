@@ -11,7 +11,8 @@ const coupon = (discount_type: string, discount_value: number) => ({ code: 'SAVE
 describe('formatCouponDiscount', () => {
   it('labels the canonical tenant_coupons discount types', () => {
     expect(formatCouponDiscount(coupon('percent_off', 15))).toBe('15% OFF');
-    expect(formatCouponDiscount(coupon('fixed_amount', 10))).toBe('$10.00 OFF');
+    // fixed_amount is stored in cents
+    expect(formatCouponDiscount(coupon('fixed_amount', 1099))).toBe('$10.99 OFF');
     expect(formatCouponDiscount(coupon('free_shipping', 0))).toBe('FREE SHIPPING');
     expect(formatCouponDiscount(coupon('bogo', 0))).toBe('BUY ONE GET ONE');
   });

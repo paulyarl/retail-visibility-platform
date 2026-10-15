@@ -36,7 +36,8 @@ const discountIcon = (discountType: string) => {
 const discountLabel = (discountType: string, discountValue: number) => {
   switch (discountType) {
     case 'percent_off': return `${discountValue}% off`;
-    case 'fixed_amount': return `$${discountValue.toFixed(2)} off`;
+    // fixed_amount is stored in cents (tenant_coupons.discount_value is an integer)
+    case 'fixed_amount': return `$${(discountValue / 100).toFixed(2)} off`;
     case 'free_shipping': return 'Free shipping';
     case 'bogo': return 'Buy one get one';
     default: return 'Discount';

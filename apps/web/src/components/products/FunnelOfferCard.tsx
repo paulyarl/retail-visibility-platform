@@ -37,7 +37,8 @@ const STEP_BADGE_COLORS: Record<string, string> = {
 export function formatCouponDiscount(coupon: NonNullable<ProductFunnelStep['coupon']>) {
   switch (coupon.discount_type) {
     case 'percent_off': return `${coupon.discount_value}% OFF`;
-    case 'fixed_amount': return `$${(coupon.discount_value ?? 0).toFixed(2)} OFF`;
+    // fixed_amount is stored in cents (tenant_coupons.discount_value is an integer)
+    case 'fixed_amount': return `$${((coupon.discount_value ?? 0) / 100).toFixed(2)} OFF`;
     case 'free_shipping': return 'FREE SHIPPING';
     case 'bogo': return 'BUY ONE GET ONE';
     default: return 'SPECIAL OFFER';

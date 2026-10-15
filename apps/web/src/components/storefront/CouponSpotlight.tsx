@@ -131,7 +131,8 @@ export default function CouponSpotlight({
     coupon.discountType === 'percent_off'
       ? `${coupon.discountValue}% off`
       : coupon.discountType === 'fixed_amount'
-      ? `$${(coupon.discountValue ?? 0).toFixed(2)} off`
+      // fixed_amount is stored in cents (tenant_coupons.discount_value is an integer)
+      ? `$${((coupon.discountValue ?? 0) / 100).toFixed(2)} off`
       : coupon.discountType === 'free_shipping'
       ? 'Free Shipping'
       : coupon.discountType === 'bogo'

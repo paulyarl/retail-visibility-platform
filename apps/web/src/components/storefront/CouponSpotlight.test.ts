@@ -36,7 +36,8 @@ describe('CouponSpotlight', () => {
   // Nothing matched, so every real coupon fell through to the generic "Special Offer".
   it('labels the canonical API discount types', () => {
     expect(render({ id: 'c1', code: 'PCT', discountType: 'percent_off', discountValue: 15 })).toContain('15% off');
-    expect(render({ id: 'c2', code: 'AMT', discountType: 'fixed_amount', discountValue: 10 })).toContain('$10.00 off');
+    // fixed_amount is stored in cents
+    expect(render({ id: 'c2', code: 'AMT', discountType: 'fixed_amount', discountValue: 1099 })).toContain('$10.99 off');
     expect(render({ id: 'c3', code: 'SHIP', discountType: 'free_shipping', discountValue: 0 })).toContain('Free Shipping');
     expect(render({ id: 'c4', code: 'BOGO', discountType: 'bogo', discountValue: 0 })).toContain('Buy one get one');
   });

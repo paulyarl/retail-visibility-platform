@@ -35,6 +35,30 @@ const EMPTY_FORM: CouponFormData = {
   isActive: true,
 };
 
+// tenant_coupons.discount_value is an integer. For percent_off it holds a percentage;
+// for fixed_amount it holds CENTS, so the form works in dollars and cents and converts
+// at the boundary. free_shipping / bogo carry no value.
+export function toStoredDiscountValue(discountType: string, value: number): number {
+  if (discountType === 'fixed_amount') return Math.round(value * 100);
+  if (discountType === 'free_shipping' || discountType === 'bogo') return 0;
+  return value;
+}
+
+export function toFormDiscountValue(discountType: string, value: number): number {
+  return discountType === 'fixed_amount' ? value / 100 : value;
+}
+
+export function discountValueRequired(discountType: string): boolean {
+  return discountType === 'percent_off' || discountType === 'fixed_amount';
+}
+
+const DISCOUNT_ENTRY_HINTS: Record<string, string> = {
+  percent_off: 'Enter a percentage — 20 means 20% off.',
+  fixed_amount: 'Enter dollars and cents — 10.99 means $10.99 off.',
+  free_shipping: 'No value needed — this coupon waives shipping at checkout.',
+  bogo: 'No value needed — this coupon applies buy one, get one.',
+};
+
 export default function CouponManagementClient({ tenantId }: { tenantId: string }) {
   const { data: capState, loading: capLoading, error: capError } = useCouponOptionsCapability(tenantId);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -113,7 +137,7 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
     setFormData({
       code: coupon.code,
       discountType: coupon.discountType,
-      discountValue: coupon.discountValue,
+      discountValue: toFormDiscountValue(coupon.discountType, coupon.discountValue),
       maxRedemptions: null,
       expiresAt: coupon.expiresAt,
       isActive: coupon.isActive,
@@ -122,17 +146,19 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
   };
 
   const handleSave = async () => {
-    if (!formData.code.trim() || !formData.discountValue) {
-      toast({ title: 'Validation', description: 'Code and discount value are required', variant: 'destructive' });
+    const needsValue = discountValueRequired(formData.discountType);
+    if (!formData.code.trim() || (needsValue && !formData.discountValue)) {
+      toast({ title: 'Validation', description: needsValue ? 'Code and discount value are required' : 'Code is required', variant: 'destructive' });
       return;
     }
     setSaving(true);
+    const payload = { ...formData, discountValue: toStoredDiscountValue(formData.discountType, formData.discountValue) };
     try {
       if (editingId) {
-        await couponService.updateCoupon(tenantId, editingId, formData);
+        await couponService.updateCoupon(tenantId, editingId, payload);
         toast({ title: 'Coupon updated', description: `${formData.code} has been updated`, variant: 'success' });
       } else {
-        await couponService.createCoupon(tenantId, formData);
+        await couponService.createCoupon(tenantId, payload);
         toast({ title: 'Coupon created', description: `${formData.code} has been created`, variant: 'success' });
       }
       setModalOpen(false);
@@ -361,15 +387,26 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="discountValue">Discount Value</Label>
+                <Label htmlFor="discountValue">
+                  Discount Value{formData.discountType === 'percent_off' ? ' (%)' : formData.discountType === 'fixed_amount' ? ' ($)' : ''}
+                </Label>
                 <Input
                   id="discountValue"
                   type="number"
                   value={formData.discountValue}
                   onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
-                  min={0}
+                  min={formData.discountType === 'percent_off' ? 1 : 0}
+                  max={formData.discountType === 'percent_off' ? 100 : undefined}
+                  step={formData.discountType === 'fixed_amount' ? '0.01' : '1'}
+                  disabled={!discountValueRequired(formData.discountType)}
                 />
               </div>
+            </div>
+
+            {/* Entry hints — the unit depends on the discount type, which is easy to get wrong. */}
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+              <p className="font-medium">How to enter this discount</p>
+              <p className="mt-0.5">{DISCOUNT_ENTRY_HINTS[formData.discountType]}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
