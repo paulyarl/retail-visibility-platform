@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { couponTierAllowed, FEATURE_TOGGLES } from './CouponOptionsSettingsClient';
+import { couponTierAllowed, shouldShowFeaturedCouponPicker, FEATURE_TOGGLES } from './CouponOptionsSettingsClient';
 import type { CouponOptionsState } from '@/services/CapabilityResolutionService';
 
 // Regression: every switch on the coupon-options page was gated on the *effective*
@@ -54,5 +54,30 @@ describe('coupon options tier allowance', () => {
       tier: { enabled: false, allowedDiscountTypes: [], canTargetProducts: false, canUseQrSharing: false, canUseSpotlight: false },
     };
     expect(couponTierAllowed(noCoupons)).toBe(false);
+  });
+});
+
+// The picker must appear the moment the merchant flips Spotlight on, not after a save +
+// capability refetch. `canUseSpotlight` is false until spotlight_enabled is persisted,
+// so gating on it left the picker unreachable without a manual reload.
+describe('shouldShowFeaturedCouponPicker', () => {
+  const on = { couponEnabled: true, spotlightEnabled: true };
+
+  it('shows the picker while the merchant gate is still effective-off', () => {
+    const c = cap();
+    expect(c.canUseSpotlight).toBe(false);
+    expect(shouldShowFeaturedCouponPicker(c, on)).toBe(true);
+  });
+
+  it('stays hidden until the master and spotlight switches are on', () => {
+    expect(shouldShowFeaturedCouponPicker(cap(), { couponEnabled: true, spotlightEnabled: false })).toBe(false);
+    expect(shouldShowFeaturedCouponPicker(cap(), { couponEnabled: false, spotlightEnabled: true })).toBe(false);
+  });
+
+  it('stays hidden when the plan does not include spotlight', () => {
+    const noSpotlight = cap({
+      tier: { enabled: true, allowedDiscountTypes: ['percent_off'], canTargetProducts: false, canUseQrSharing: true, canUseSpotlight: false },
+    });
+    expect(shouldShowFeaturedCouponPicker(noSpotlight, on)).toBe(false);
   });
 });

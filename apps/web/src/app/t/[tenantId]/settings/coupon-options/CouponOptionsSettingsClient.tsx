@@ -58,6 +58,18 @@ export function couponTierAllowed(cap: CouponOptionsState | null): boolean {
   return cap.tier.enabled || cap.isFlexible || cap.tier.allowedDiscountTypes.length > 0;
 }
 
+/**
+ * Whether to offer the featured-coupon picker. Gated on the tier allowance, not on the
+ * effective canUseSpotlight — that flag only turns true once spotlight_enabled is saved
+ * and the capability is refetched, so the picker would stay hidden until a manual reload.
+ */
+export function shouldShowFeaturedCouponPicker(
+  cap: CouponOptionsState | null,
+  settings: Pick<CouponSettings, 'couponEnabled' | 'spotlightEnabled'>,
+): boolean {
+  return settings.couponEnabled && settings.spotlightEnabled && (cap?.tier.canUseSpotlight ?? false);
+}
+
 function getQuickActions(settings: CouponSettings, tenantId: string, tierAllowed: boolean): { id: string; label: string; description: string; href: string; icon: React.ComponentType<{ className?: string }>; variant: 'general' | 'product' }[] {
   const actions: { id: string; label: string; description: string; href: string; icon: React.ComponentType<{ className?: string }>; variant: 'general' | 'product' }[] = [];
 
@@ -282,6 +294,9 @@ export default function CouponOptionsSettingsClient({ tenantId }: CouponOptionsS
                   <Switch
                     checked={canSelect ? isSelected : false}
                     onCheckedChange={() => canSelect && handleToggle(key)}
+                    // Without this the click bubbles to the row's onClick and toggles twice,
+                    // which cancels out — the switch would appear unflippable.
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!canSelect}
                   />
                 </div>
@@ -290,7 +305,7 @@ export default function CouponOptionsSettingsClient({ tenantId }: CouponOptionsS
           </div>
 
           {/* Spotlight Featured Coupon Picker */}
-          {settings.couponEnabled && settings.spotlightEnabled && (capState?.canUseSpotlight ?? false) && (
+          {shouldShowFeaturedCouponPicker(capState, settings) && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border space-y-2">
               <p className="font-medium text-sm text-neutral-900">Featured Coupon</p>
               <Select
