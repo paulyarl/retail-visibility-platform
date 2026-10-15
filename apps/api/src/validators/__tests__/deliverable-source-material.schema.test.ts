@@ -60,6 +60,33 @@ describe('deliverableSourceMaterialSchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('accepts a profile_presence_plan block carrying a keyword surface plan', () => {
+    const result = deliverableSourceMaterialSchema.safeParse({
+      signals_consumed: ['DS_DUPLICATE_LISTING'],
+      deliverable_sources: {
+        profile_presence_plan: {
+          presence_map: [{ platform: 'google', state: 'duplicated', cost: 'split reviews' }],
+          education_note: 'Being listed is not the same as being visible.',
+          keyword_surface_plan: {
+            identity_tokens: ['ethiopian', 'eritrean', 'african', 'merkato'],
+            alternate_names: ['Ethiopian Eritrean Store'],
+            placements: [
+              { field: 'name', tokens: ['Arsema G Food Mart LLC'], guidance: 'brand only' },
+              { field: 'categories', tokens: ['African Grocery Store'], guidance: 'shelf tokens' },
+            ],
+            name_note: 'The name is the one field the tokens must not go.',
+          },
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(
+        result.data.deliverable_sources.profile_presence_plan?.keyword_surface_plan?.identity_tokens,
+      ).toEqual(['ethiopian', 'eritrean', 'african', 'merkato']);
+    }
+  });
 });
 
 describe('reviewIntakeSchema', () => {

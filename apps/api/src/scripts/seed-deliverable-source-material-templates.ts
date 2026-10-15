@@ -32,7 +32,7 @@ import {
   REVIEW_INTAKE_SCHEMA_NAME,
 } from '../validators/market-analysis.schema';
 
-const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V11 -->';
+const SEED_VERSION_MARKER = '<!-- DELIVERABLE_SOURCE_MATERIAL_SEED_V12 -->';
 
 const RAW_JSON = { name: 'raw_json' };
 
@@ -426,6 +426,18 @@ Produce the complete presence plan, grounded in the supplied material:
    customers. Plain language — most owners don't know listings are free,
    and fewer know that being listed is not the same as being visible: a
    profile the public can't see does the business no good at all.
+10. KEYWORD SURFACE PLAN — the words this business is actually known by,
+   placed where the platform reads them. Take the identity tokens and any
+   alternate trading names from the supplied material and map each to the
+   field that legitimately carries it: primary + additional categories,
+   services / service menu, products, business description, attributes.
+   State plainly that the business NAME is the one field the tokens must not
+   go — a profile name is the real-world name, and category or specialty
+   words in it are against the platform's guidelines. That is the rule a
+   second listing breaks. If the material shows a second live listing for
+   this business, name it without judgement: the instinct to be findable is
+   right, the tool was wrong, and this plan is the legal version of what
+   that listing was trying to do. Never moralise.
 
 RULES
 - Ground every row in the supplied source material. Do not invent platforms,
@@ -440,7 +452,9 @@ RULES
   "profile_specs": [{ "platform", "fields" }],
   "delivery_options": [{ "path", "what_the_owner_gets" }],
   "verification_steps": [...],
-  "education_note" }
+  "education_note",
+  "keyword_surface_plan": { "identity_tokens": [...], "alternate_names": [...],
+    "placements": [{ "field", "tokens", "guidance" }], "name_note" } }
 
 ${FULFILL_TONE}`;
 

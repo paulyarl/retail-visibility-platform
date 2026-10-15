@@ -79,6 +79,7 @@ const TYPE_LABELS: Partial<Record<DeliverableType, Record<string, string>>> = {
     delivery_options: 'Two Ways to Get There',
     verification_steps: 'Verification Steps',
     education_note: 'Why Profiles Matter',
+    keyword_surface_plan: 'Keyword Surface Plan',
   },
 };
 

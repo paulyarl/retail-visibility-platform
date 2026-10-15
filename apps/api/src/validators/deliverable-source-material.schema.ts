@@ -181,6 +181,20 @@ const profilePresencePlanSourceSchema = z.object({
   }).passthrough()).optional(),
   verification_steps: z.array(z.string()).optional(),
   education_note: z.string().nullable().optional(),
+  // Keyword surface plan — the real-world identity tokens and the profile
+  // fields that legitimately carry them. Motivated by the duplicate-listing
+  // class: a second profile under a keyword-bearing name is the owner putting
+  // tokens in the one field they must not go. This is the legal placement.
+  keyword_surface_plan: z.object({
+    identity_tokens: z.array(z.string()).optional(),
+    alternate_names: z.array(z.string()).optional(),
+    placements: z.array(z.object({
+      field: z.string(),
+      tokens: z.array(z.string()).optional(),
+      guidance: z.string().nullable().optional(),
+    }).passthrough()).optional(),
+    name_note: z.string().nullable().optional(),
+  }).passthrough().optional(),
 }).passthrough();
 
 export const deliverableSourceMaterialSchema = z.object({
