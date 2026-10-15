@@ -32,6 +32,7 @@ import { inputValidationMiddleware } from './input-validation';
 import { validateInput, securityLogger } from './security';
 import { ssrfProtection, blockIotRequests } from './ssrf-protection';
 import { performanceMonitoring } from '../services/alerting';
+import { resolveCorsOptions, platformOnlyCorsOptions } from './cors-origin';
 
 // Pre-middleware routes (mounted before JSON parsing)
 import clientErrorRoutes from '../routes/client-errors';
@@ -86,12 +87,19 @@ export function bootstrapMiddleware(app: Express): void {
   app.use(ssrfProtection);
 
   // ── 5. CORS ──────────────────────────────────────────────────────────
-  app.use(cors({
-    origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
-    credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-customer-email', 'x-correlation-id', 'cache-control', 'x-platform-cache', 'x-service-admin'],
-  }));
+  // The origin decision is per request: platform hosts are a code-owned
+  // allowlist, tenant custom domains are read from persistence (see
+  // cors-origin.ts). cors 2.8.x resolves the origin synchronously, so the
+  // async decision is handed over as an options delegate — the storefront on a
+  // tenant-owned domain would otherwise have every client fetch blocked.
+  app.use(
+    cors((req, callback) => {
+      resolveCorsOptions(req.headers.origin).then(
+        (options) => callback(null, options),
+        () => callback(null, platformOnlyCorsOptions()),
+      );
+    }),
+  );
 
   // ── 6. Pre-middleware routes (before JSON parsing) ───────────────────
   // Inventory: client-errors, webhooks (stripe/paypal), stripe-connect, meta-webhooks.
