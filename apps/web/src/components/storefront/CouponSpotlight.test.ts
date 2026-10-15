@@ -30,4 +30,14 @@ describe('CouponSpotlight', () => {
     const html = render({ id: 'cpn_1', code: 'SAVE10', discountType: 'percent_off', discountValue: 10 });
     expect(html).toContain('SAVE10');
   });
+
+  // Regression: the component typed discountType as 'percent' | 'fixed' | 'gift', but the
+  // API emits the canonical 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo'.
+  // Nothing matched, so every real coupon fell through to the generic "Special Offer".
+  it('labels the canonical API discount types', () => {
+    expect(render({ id: 'c1', code: 'PCT', discountType: 'percent_off', discountValue: 15 })).toContain('15% off');
+    expect(render({ id: 'c2', code: 'AMT', discountType: 'fixed_amount', discountValue: 10 })).toContain('$10.00 off');
+    expect(render({ id: 'c3', code: 'SHIP', discountType: 'free_shipping', discountValue: 0 })).toContain('Free Shipping');
+    expect(render({ id: 'c4', code: 'BOGO', discountType: 'bogo', discountValue: 0 })).toContain('Buy one get one');
+  });
 });

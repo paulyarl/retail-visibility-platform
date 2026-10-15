@@ -8,7 +8,7 @@ import { usePublicCouponOptionsCapability } from '@/hooks/tenant-access/usePubli
 export interface SpotlightCoupon {
   id: string;
   code: string;
-  discountType: 'percent' | 'fixed' | 'free_shipping' | 'gift';
+  discountType: 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
   discountValue: number;
   promotionalMessage?: string;
   termsSummary?: string;
@@ -120,20 +120,22 @@ export default function CouponSpotlight({
   if (isExpired || isExhausted) return null;
 
   const iconMap = {
-    percent: Percent,
-    fixed: DollarSign,
+    percent_off: Percent,
+    fixed_amount: DollarSign,
     free_shipping: Truck,
-    gift: Gift,
+    bogo: Gift,
   };
   const Icon = iconMap[coupon.discountType] || Percent;
 
   const discountText =
-    coupon.discountType === 'percent'
+    coupon.discountType === 'percent_off'
       ? `${coupon.discountValue}% off`
-      : coupon.discountType === 'fixed'
-      ? `$${(coupon.discountValue / 100).toFixed(2)} off`
+      : coupon.discountType === 'fixed_amount'
+      ? `$${(coupon.discountValue ?? 0).toFixed(2)} off`
       : coupon.discountType === 'free_shipping'
       ? 'Free Shipping'
+      : coupon.discountType === 'bogo'
+      ? 'Buy one get one'
       : 'Special Offer';
 
   const base = 'rounded-lg overflow-hidden shadow-sm';
