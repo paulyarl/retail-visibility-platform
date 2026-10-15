@@ -12,6 +12,8 @@ export interface Coupon {
   isActive: boolean;
   redemptionCount: number;
   expiresAt: string | null;
+  promotionalMessage?: string | null;
+  termsSummary?: string | null;
 }
 
 export class CouponService extends TenantApiSingleton {

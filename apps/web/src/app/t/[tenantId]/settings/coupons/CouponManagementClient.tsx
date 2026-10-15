@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
+import { Textarea } from '@/components/ui/Textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog';
 import { Plus, Pencil, Star, QrCode, Loader2, Tag, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -24,6 +25,8 @@ interface CouponFormData {
   maxRedemptions: number | null;
   expiresAt: string | null;
   isActive: boolean;
+  promotionalMessage: string | null;
+  termsSummary: string | null;
 }
 
 const EMPTY_FORM: CouponFormData = {
@@ -33,6 +36,8 @@ const EMPTY_FORM: CouponFormData = {
   maxRedemptions: null,
   expiresAt: null,
   isActive: true,
+  promotionalMessage: null,
+  termsSummary: null,
 };
 
 // tenant_coupons.discount_value is an integer. For percent_off it holds a percentage;
@@ -141,6 +146,8 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
       maxRedemptions: null,
       expiresAt: coupon.expiresAt,
       isActive: coupon.isActive,
+      promotionalMessage: coupon.promotionalMessage ?? null,
+      termsSummary: coupon.termsSummary ?? null,
     });
     setModalOpen(true);
   };
@@ -408,6 +415,30 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
               <p className="font-medium">How to enter this discount</p>
               <p className="mt-0.5">{DISCOUNT_ENTRY_HINTS[formData.discountType]}</p>
             </div>
+
+            {/* Optional promo copy — surfaced to shoppers on the storefront spotlight. */}
+            <div className="space-y-2">
+              <Label htmlFor="promotionalMessage">Promotion Message (optional)</Label>
+              <Textarea
+                id="promotionalMessage"
+                value={formData.promotionalMessage ?? ''}
+                onChange={(e) => setFormData({ ...formData, promotionalMessage: e.target.value || null })}
+                placeholder="Give shoppers a reason — e.g. Fresh produce restock, 15% off this week."
+                rows={2}
+              />
+              <p className="text-xs text-gray-500">Shown with the coupon on your storefront and directory listing.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="termsSummary">Terms (optional)</Label>
+              <Input
+                id="termsSummary"
+                value={formData.termsSummary ?? ''}
+                onChange={(e) => setFormData({ ...formData, termsSummary: e.target.value || null })}
+                placeholder="One per customer"
+                maxLength={500}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="maxRedemptions">Max Redemptions (optional)</Label>

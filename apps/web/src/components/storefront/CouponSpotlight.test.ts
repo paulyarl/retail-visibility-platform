@@ -41,4 +41,17 @@ describe('CouponSpotlight', () => {
     expect(render({ id: 'c3', code: 'SHIP', discountType: 'free_shipping', discountValue: 0 })).toContain('Free Shipping');
     expect(render({ id: 'c4', code: 'BOGO', discountType: 'bogo', discountValue: 0 })).toContain('Buy one get one');
   });
+
+  it('renders the merchant promotion message and terms', () => {
+    const html = render({
+      id: 'c1',
+      code: 'PCT',
+      discountType: 'percent_off',
+      discountValue: 15,
+      promotionalMessage: 'Fresh produce restock this week',
+      termsSummary: 'One per customer',
+    });
+    expect(html).toContain('Fresh produce restock this week');
+    expect(html).toContain('One per customer');
+  });
 });
