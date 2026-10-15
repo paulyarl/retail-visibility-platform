@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LogContactModal from './LogContactModal';
-import type { Campaign } from '@/services/MarketingOpsService';
+import type { Campaign, OutreachIntelligenceResult } from '@/services/MarketingOpsService';
 
 const campaign = (overrides: Partial<Campaign> = {}): Campaign =>
   ({
@@ -76,5 +76,83 @@ describe('LogContactModal channel targets', () => {
     expect(html).not.toContain('href="mailto:');
     // The channel select still renders with the always-available options.
     expect(html).toContain('In Person');
+  });
+});
+
+// ─── Worksheet parity ────────────────────────────────────────────────────
+//
+// The modal loads the campaign's contact channels when it opens; the
+// confirmed-fields trio (owner name / team signal / preferred channel) comes
+// from the Outreach Prep worksheet and used to open blank. Now it prefills.
+//
+// `initialTab: 'writeback'` is required to assert it: Radix TabsContent
+// unmounts inactive panels, so the write-back block is absent from a static
+// render unless it is the active tab.
+
+const worksheet = (overrides: Partial<OutreachIntelligenceResult> = {}) =>
+  ({
+    id: 'moi-test1',
+    campaign_id: 'mcamp-test1',
+    owner_name: 'Maria',
+    owner_name_confidence: 'confirmed',
+    business_email: null,
+    business_email_confidence: 'unavailable',
+    team_signal: 'family_team',
+    preferred_contact_channel: 'facebook_dm',
+    recommended_salutation: 'Hi Maria',
+    research_date: null,
+    prepared_by: null,
+    payload: {},
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+    ...overrides,
+  } as unknown as OutreachIntelligenceResult);
+
+const renderWriteBack = (
+  c: Campaign,
+  sheet: OutreachIntelligenceResult | null = worksheet(),
+) =>
+  renderToStaticMarkup(
+    createElement(LogContactModal, {
+      campaign: c,
+      onClose: () => {},
+      onLogged: () => {},
+      initialTab: 'writeback',
+      initialWorksheet: sheet,
+    }),
+  );
+
+describe('LogContactModal worksheet parity', () => {
+  it('prefills the confirmed-fields trio from the worksheet', () => {
+    const html = renderWriteBack(campaign());
+
+    expect(html).toContain('value="Maria"');
+    expect(html).toContain('value="facebook_dm"');
+    // The select marks the worksheet's team signal as the current option.
+    expect(html).toMatch(/value="family_team"[^>]*selected/);
+  });
+
+  it('treats a worksheet team_signal of "unknown" as no signal', () => {
+    const html = renderWriteBack(
+      campaign(),
+      worksheet({
+        team_signal: 'unknown',
+        owner_name: null,
+        preferred_contact_channel: null,
+      }),
+    );
+
+    expect(html).not.toContain('value="Maria"');
+    expect(html).not.toContain('value="facebook_dm"');
+    expect(html).not.toMatch(/value="family_team"[^>]*selected/);
+  });
+
+  it('renders the confirmed-fields panel even with no worksheet on file', () => {
+    const html = renderWriteBack(campaign(), null);
+
+    // The fields are present (blank) — the operator can still fill them.
+    expect(html).toContain('Owner name confirmed');
+    expect(html).toContain('Team signal');
+    expect(html).not.toContain('value="Maria"');
   });
 });

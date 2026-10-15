@@ -2914,10 +2914,21 @@ class DirectoryPresenceSeedService {
     // Build composer inputs from explicit fields only (never the raw blob)
     const platformsObj = d.platforms ?? {};
     const platformProfileUrls: Array<{ platform: string; url: string }> = [];
+    const alternateProfileUrls: Array<{ platform: string; url: string }> = [];
     for (const pkey of ['google', 'yelp', 'facebook', 'bbb']) {
       const pdata = (platformsObj as any)[pkey];
       if (pdata?.profile_url && typeof pdata.profile_url === 'string') {
         platformProfileUrls.push({ platform: pkey, url: pdata.profile_url });
+      }
+      // Alternate listings for the same business (DS_DUPLICATE_LISTING) are
+      // "same entity elsewhere" links — and the reason a resharpen must not
+      // drop a hand-added alternate URL.
+      if (Array.isArray(pdata?.alternate_profiles)) {
+        for (const alt of pdata.alternate_profiles) {
+          if (typeof alt?.url === 'string' && alt.url) {
+            alternateProfileUrls.push({ platform: pkey, url: alt.url });
+          }
+        }
       }
     }
 
@@ -2942,6 +2953,7 @@ class DirectoryPresenceSeedService {
         storeFormat: meta.matched_business?.store_format ?? null,
         googleAdditionalCategories: google.additional_categories ?? null,
         platformProfileUrls: platformProfileUrls.length > 0 ? platformProfileUrls : null,
+        alternateProfileUrls: alternateProfileUrls.length > 0 ? alternateProfileUrls : null,
         publicNarrative: d.public_narrative ?? null,
       },
       categoryIdAudit: catIdAudit

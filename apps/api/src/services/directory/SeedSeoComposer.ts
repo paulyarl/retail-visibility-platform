@@ -52,6 +52,15 @@ export interface AuditSeoFields {
   googleAdditionalCategories?: string[] | null;
   /** Profile URLs from platforms.{google,yelp,facebook,bbb}.profile_url */
   platformProfileUrls?: Array<{ platform: string; url: string }> | null;
+  /**
+   * Alternate-listing URLs from platforms.*.alternate_profiles[].url — a second
+   * live listing for the SAME business under a different trading name
+   * (DS_DUPLICATE_LISTING). These are "same entity elsewhere" links like any
+   * other profile URL, so they belong in the sameAs set — and including them
+   * means a post-audit resharpen preserves a hand-added alternate URL instead
+   * of silently dropping it.
+   */
+  alternateProfileUrls?: Array<{ platform: string; url: string }> | null;
   /** Public-safe narrative from audit_data.public_narrative (Phase 1.2) */
   publicNarrative?: string | null;
 }
@@ -479,6 +488,16 @@ function composeSameAs(
   // Audit platforms.*.profile_url
   if (audit?.platformProfileUrls) {
     for (const { url } of audit.platformProfileUrls) {
+      if (isHttpOrHttps(url)) {
+        urls.push(url);
+      }
+    }
+  }
+
+  // Audit platforms.*.alternate_profiles[].url — a second live listing for the
+  // same business is the same entity elsewhere, so it is a sameAs link.
+  if (audit?.alternateProfileUrls) {
+    for (const { url } of audit.alternateProfileUrls) {
       if (isHttpOrHttps(url)) {
         urls.push(url);
       }

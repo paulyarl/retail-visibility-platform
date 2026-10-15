@@ -1136,5 +1136,43 @@ describe('SeedSeoComposer', () => {
       ).length;
       expect(dupCount).toBe(1);
     });
+
+    it('feeds alternate-listing URLs into sameAs (a duplicate is the same entity)', () => {
+      // A second live listing for the same business is the same entity
+      // elsewhere, so it belongs in the sameAs set — including it also means a
+      // post-audit resharpen preserves a hand-added alternate URL instead of
+      // silently dropping it.
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'test' },
+        audit: {
+          ...fullAudit,
+          alternateProfileUrls: [
+            { platform: 'google', url: 'https://maps.google.com/ethiopian-eritrean-store' },
+            { platform: 'google', url: 'not-a-url' },
+          ],
+        },
+        categoryIdAudit: null,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.sameAs).toContain('https://maps.google.com/ethiopian-eritrean-store');
+      expect(packet.sameAs).not.toContain('not-a-url');
+    });
+
+    it('dedupes an alternate URL already present as the platform profile_url', () => {
+      const packet = buildSeedSeoPacket({
+        campaign: { businessName: 'Test', category: 'test' },
+        audit: {
+          ...fullAudit,
+          alternateProfileUrls: [{ platform: 'google', url: 'https://maps.google.com/example' }],
+        },
+        categoryIdAudit: null,
+        intelligenceProfile: null,
+        goldStandard: null,
+      });
+
+      expect(packet.sameAs.filter((u) => u === 'https://maps.google.com/example')).toHaveLength(1);
+    });
   });
 });

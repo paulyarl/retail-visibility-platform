@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Sparkles, RefreshCw, Link2, Phone, Mail, Globe, Share2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails, ContactResult, OtherSubtype } from '@/services/MarketingOpsService';
+import type { Campaign, ContactChannel, ContactOutcome, FreshSnapshot, CallResult, CallDetails, ContactResult, OtherSubtype, OutreachIntelligenceResult } from '@/services/MarketingOpsService';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 
 const CHANNEL_OPTIONS: { value: ContactChannel; label: string }[] = [
@@ -117,6 +117,16 @@ interface LogContactModalProps {
   // Script tab passes the operator's selected hook angle so it's recorded
   // on the outreach log without retyping.
   initialAngleUsed?: string;
+  // Optional tab to open on. Radix TabsContent unmounts inactive panels, so
+  // the write-back panel (and its prefilled fields) is not in the markup
+  // unless it is the active tab — same test hook as ResolveVerificationModal's
+  // initialTab / initialOutcome.
+  initialTab?: LogContactTab;
+  // The campaign's Outreach Prep worksheet, when the caller already has it.
+  // Prefills the confirmed-fields trio so the operator confirms/amends instead
+  // of retyping what the worksheet already holds. When omitted, the modal
+  // fetches it on open (best-effort).
+  initialWorksheet?: OutreachIntelligenceResult | null;
 }
 
 // Channel, contact date, and outcome stay pinned above the tab strip — the
@@ -124,7 +134,7 @@ interface LogContactModalProps {
 // auto-derived from the channel's result picker inside it.
 type LogContactTab = 'details' | 'writeback' | 'notes';
 
-export default function LogContactModal({ campaign, onClose, onLogged, initialAngleUsed }: LogContactModalProps) {
+export default function LogContactModal({ campaign, onClose, onLogged, initialAngleUsed, initialTab, initialWorksheet }: LogContactModalProps) {
   // Pre-fill channel selector with channels the campaign actually has.
   const availableChannels: ContactChannel[] = [];
   if (campaign.phone) availableChannels.push('phone');
@@ -206,7 +216,7 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [insertingLink, setInsertingLink] = useState(false);
-  const [tab, setTab] = useState<LogContactTab>('details');
+  const [tab, setTab] = useState<LogContactTab>(initialTab ?? 'details');
 
   // ─── Phone-mode call details state (Sprint 1 — Cold Call Channel) ────
   const [callResult, setCallResult] = useState<CallResult>('connected');
@@ -218,9 +228,20 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   const [emailObtained, setEmailObtained] = useState(false);
   const [emailValue, setEmailValue] = useState('');
   const [callbackNumberLeft, setCallbackNumberLeft] = useState(false);
-  const [ownerNameConfirmed, setOwnerNameConfirmed] = useState('');
-  const [teamSignalConfirmed, setTeamSignalConfirmed] = useState<string>('');
-  const [preferredChannelConfirmed, setPreferredChannelConfirmed] = useState('');
+  // Confirmed-fields trio — prefilled from the Outreach Prep worksheet so the
+  // operator confirms or amends rather than retyping what the worksheet
+  // already holds. Same parity the channel selector already has (the
+  // campaign's contact channels prefill it). A worksheet `team_signal` of
+  // 'unknown' is the absence of a signal, so it prefills nothing.
+  const [ownerNameConfirmed, setOwnerNameConfirmed] = useState(initialWorksheet?.owner_name ?? '');
+  const [teamSignalConfirmed, setTeamSignalConfirmed] = useState<string>(
+    initialWorksheet?.team_signal && initialWorksheet.team_signal !== 'unknown'
+      ? initialWorksheet.team_signal
+      : '',
+  );
+  const [preferredChannelConfirmed, setPreferredChannelConfirmed] = useState(
+    initialWorksheet?.preferred_contact_channel ?? '',
+  );
   const [updateWorksheet, setUpdateWorksheet] = useState(true);
 
   // ─── Non-phone-mode contact result + Other subtype state ─────────────
@@ -238,6 +259,33 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
     preferredChannelConfirmed.trim() ||
     (emailObtained && emailValue.trim())
   );
+
+  // Fetch the worksheet when the caller didn't supply one, and prefill the
+  // confirmed-fields trio. Best-effort by design: a worksheet that doesn't
+  // exist yet is normal (it's created on first save), and a failed fetch must
+  // never block logging a contact. Each field only fills while still empty, so
+  // an operator edit always wins over the late-arriving fetch.
+  // (`initialWorksheet === null` explicitly means "there is none" — skip.)
+  useEffect(() => {
+    if (initialWorksheet !== undefined) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const worksheet = await marketingOpsService.getOutreachIntelligence(campaign.id);
+        if (cancelled || !worksheet) return;
+        const teamSignal =
+          worksheet.team_signal && worksheet.team_signal !== 'unknown' ? worksheet.team_signal : '';
+        setOwnerNameConfirmed((prev) => prev || worksheet.owner_name || '');
+        setTeamSignalConfirmed((prev) => prev || teamSignal);
+        setPreferredChannelConfirmed((prev) => prev || worksheet.preferred_contact_channel || '');
+      } catch {
+        // No worksheet yet, or the fetch failed — the fields stay blank.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id, initialWorksheet]);
 
   // When the channel changes, reset the contact_result to the first option
   // of the new channel's result list (so the dropdown always shows a valid
