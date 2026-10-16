@@ -2135,7 +2135,7 @@ export const routeRegistry: RouteEntry[] = [
     router: seedReportQrRoutes,
     domain: 'directory',
     authLevel: 'public',
-    comment: 'Public report-delivery QR redirect (/r/seed/:seedId/:channel → /seed-report/:seedId)',
+    comment: 'Public report-delivery QR redirect (/r/seed/:seedId/:channel → /seed-report/:seedId) + resolve+track for the web /r/seed/:seedId/:channel and /r*/{shortCode} redirect pages',
   },
   {
     path: '/api/public',

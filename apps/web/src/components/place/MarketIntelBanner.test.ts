@@ -128,8 +128,10 @@ describe('MarketIntelBanner', () => {
     );
 
     // Tracked redirect, never the destination — and its own surface, so banner
-    // scans never land in the report_delivery_* funnel.
-    expect(html).toContain('/api/public/r/seed/seed-1/banner');
+    // scans never land in the report_delivery_* funnel. The seed-id fallback is
+    // the frontend redirect page, not the bare API path.
+    expect(html).toContain('/r/seed/seed-1/banner');
+    expect(html).not.toContain('/api/public/r/seed/');
     expect(html).toContain('See the report');
     expect(html).not.toContain('/seed-report/seed-1"');
   });

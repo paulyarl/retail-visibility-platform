@@ -36,20 +36,6 @@ import { brandingLogoDataUri, loadPlatformBranding } from '../marketing/Marketin
 import { SeedIntelligenceReportService } from './SeedIntelligenceReportService';
 import type { SeedIntelligenceReport } from '../../validators/seed-report-dto.schema';
 
-// Public-facing base URL the QR encodes. Same pattern as
-// ClaimInviteQrKitService.QR_BASE_URL.
-const QR_BASE_URL = (
-  unifiedConfig.frontendUrl ||
-  unifiedConfig.webUrl ||
-  unifiedConfig.get('API_URL') ||
-  unifiedConfig.get('API_BASE_URL') ||
-  unifiedConfig.get('NEXT_PUBLIC_API_URL') ||
-  unifiedConfig.get('NEXT_PUBLIC_API_BASE_URL') ||
-  'https://app.visibleshelf.com'
-)
-  .replace(/\/+$/, '')
-  .replace(/\/api$/i, '');
-
 // Human-facing report links live on the web app.
 const WEB_BASE_URL = (
   unifiedConfig.frontendUrl ||
@@ -211,10 +197,10 @@ export class SeedReportDeliveryService extends BaseService {
     // These pages resolve the short code, record the scan event with the
     // matching surface, then redirect to /seed-report/{seedId}.
     //
-    // Seed-id fallback (API direct): /api/public/r/seed/{seedId}/{channel}
+    // Seed-id fallback (frontend redirect page): /r/seed/{seedId}/{channel}
     const qrBase = shortCode
       ? `${WEB_BASE_URL}`
-      : `${QR_BASE_URL}/api/public/r/seed/${seedId}`;
+      : `${WEB_BASE_URL}/r/seed/${seedId}`;
 
     const qrUrlPhone = shortCode
       ? `${WEB_BASE_URL}/rp/${shortCode}`

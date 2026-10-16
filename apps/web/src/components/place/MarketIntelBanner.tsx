@@ -58,11 +58,12 @@ const SEED_PROMO = {
  *  `report_banner` scan (its own surface — never a delivery channel), then
  *  redirects to /seed-report/{seedId}. Prefers the claim-token short code
  *  (/rb/{code} — same resolve+track+redirect pattern as /r/, /rt/ & co.);
- *  falls back to the seed-id API path when no claim token is active. */
+ *  falls back to the seed-id frontend redirect page when no claim token
+ *  is active. */
 export function bannerReportTrackedPath(seedId: string, shortCode?: string | null): string {
   return shortCode
     ? `/rb/${shortCode}`
-    : `/api/public/r/seed/${seedId}/banner`;
+    : `/r/seed/${seedId}/banner`;
 }
 
 /**
@@ -259,9 +260,9 @@ export function MarketIntelBanner({
 
         <div className="mt-auto pt-3">
           {available && trackedPath ? (
-            // Plain anchor, not next/link — trackedPath is an API redirect
-            // endpoint, not an app route. Link would issue an RSC prefetch/navigation
-            // request (?_rsc) that misses the route and 404s, and prefetches could
+            // Plain anchor, not next/link — trackedPath is a tracked
+            // redirect page, not a destination route. Link would issue an
+            // RSC prefetch/navigation request (?_rsc), and prefetches could
             // record phantom report_banner scans.
             <a
               href={trackedPath}

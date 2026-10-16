@@ -17,7 +17,15 @@ import { clientLogger } from '@/lib/client-logger';
 
 // 'banner' is a report-QR surface but NOT a delivery channel — it records
 // 'report_banner' scans and never writes a delivered → viewed touch.
-export type ReportQrSurface = 'in_person' | 'text' | 'email' | 'social' | 'phone' | 'banner';
+// 'claimed' is the post-claim sibling ('report_claimed'), also non-delivery.
+export type ReportQrSurface =
+  | 'in_person'
+  | 'text'
+  | 'email'
+  | 'social'
+  | 'phone'
+  | 'banner'
+  | 'claimed';
 
 export class ReportQrScanService extends PublicApiSingleton {
   protected defaultContext: AppContext = AppContext.SHOP;
@@ -65,6 +73,42 @@ export class ReportQrScanService extends PublicApiSingleton {
       return responseData?.seedId || null;
     } catch (error) {
       clientLogger.error('[ReportQrScanService] Failed to resolve + track short code:', { detail: error });
+      return null;
+    }
+  }
+
+  /**
+   * Seed-id variant for the /r/seed/{seedId}/{channel} redirect page — the
+   * frontend mirror of the API redirect. No code resolution is needed (the
+   * seed id is already the address); the endpoint verifies the seed exists,
+   * records the qr_scan_events row under the channel's surface, and returns
+   * the seed id. Powers the tracked report links on surfaces that have no
+   * claim-token short code (uninvited seeds, claimed listings).
+   * @param seedId - The directory_presence_seeds id (e.g., "dps-329R-nf8nmoao")
+   * @param surface - Report QR surface
+   * @returns the seed_id string or null if the seed doesn't exist
+   */
+  async resolveSeedAndTrack(seedId: string, surface: ReportQrSurface): Promise<string | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/r/report-seed-scan/${encodeURIComponent(seedId)}?surface=${surface}`,
+        {},
+        `report-qr-seed-scan-${seedId}-${surface}`,
+        0,
+        {
+          context: AppContext.SHOP,
+          isolation: CacheIsolation.SHOP,
+        },
+      );
+
+      if (!result.success) {
+        return null;
+      }
+
+      const responseData = result.data?.data || result.data;
+      return responseData?.seedId || null;
+    } catch (error) {
+      clientLogger.error('[ReportQrScanService] Failed to track seed scan:', { detail: error });
       return null;
     }
   }

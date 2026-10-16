@@ -1135,6 +1135,20 @@ router.get('/presence-seeds/by-campaign/:campaignId', requirePlatformStaff, asyn
 router.get('/presence-seeds/:id', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    // Spec D5 lazy fidelity refresh. The detail page is where an operator
+    // lands when a claim surface is missing (the QR kit 404s, the claim link
+    // degrades to the inquiry path), so the stored verdict self-heals here: a
+    // NAP verification or a newer source audit invalidates it. Best-effort —
+    // a refresh failure must never fail the read.
+    try {
+      const { refreshSeedFidelityIfStale } = await import('../services/seed-fidelity');
+      await refreshSeedFidelityIfStale(id);
+    } catch (err: any) {
+      logger.warn('[GET /api/admin/directory/presence-seeds/:id] fidelity refresh failed', undefined, {
+        seedId: id,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+    }
     const detail = await DirectoryPresenceSeedService.getSeed(id);
     if (!detail) return res.status(404).json({ error: 'seed_not_found' });
     res.json({ success: true, ...detail });

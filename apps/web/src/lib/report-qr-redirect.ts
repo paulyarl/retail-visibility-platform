@@ -2,7 +2,8 @@
  * Report QR short-URL redirect helper
  *
  * Shared resolve + track + redirect logic for the /r/, /rt/, /re/, /rs/,
- * /rp/ short-URL pages. Each page is a thin wrapper that passes its delivery
+ * /rp/, /rb/ short-URL pages and the /r/seed/{seedId}/{channel} seed-id
+ * variant. Each page is a thin wrapper that passes its delivery
  * surface; the surface is a typed `ReportQrSurface` so per-surface scan
  * tracking can never drift.
  *
@@ -36,4 +37,24 @@ export async function resolveReportQrAndRedirect(
   }
 
   redirect(`${platformOrigin()}/seed-report/${seedId}`);
+}
+
+/**
+ * Seed-id variant for /r/seed/{seedId}/{channel} — the frontend mirror of
+ * the /api/public/r/seed/:seedId/:channel redirect. No code resolution is
+ * needed (the seed id is already the address); the endpoint exists to
+ * verify the seed and record the scan under the channel's surface.
+ * notFound() when the seed doesn't exist.
+ */
+export async function trackSeedReportAndRedirect(
+  seedId: string,
+  surface: ReportQrSurface,
+): Promise<never> {
+  const resolved = await reportQrScanService.resolveSeedAndTrack(seedId, surface);
+
+  if (!resolved) {
+    notFound();
+  }
+
+  redirect(`${platformOrigin()}/seed-report/${resolved}`);
 }

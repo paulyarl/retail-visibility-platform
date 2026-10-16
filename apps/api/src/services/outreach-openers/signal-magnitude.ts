@@ -178,6 +178,65 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+// Unit designators — a sub-premise label inside a building, not part of the
+// street identity. "Unit A" / "Ste 200" / "#4" name the same storefront as
+// the bare street line, so a unit carried on only ONE of two otherwise
+// identical addresses is cosmetic, never material drift. Two DIFFERENT unit
+// labels on the same street stay material — those are different premises.
+// "Building"/"Lot" are deliberately absent: they name the premises.
+const UNIT_DESIGNATORS = new Set([
+  'unit', 'units', 'suite', 'ste', 'apt', 'apartment',
+  'rm', 'room', 'fl', 'floor',
+]);
+
+/**
+ * Split an address into its street identity and its unit designator. The `#`
+ * form is rewritten to `unit` first — normalizeAddress drops `#`, and with it
+ * the label.
+ *
+ * Comma-separated segments are examined in turn so that a unit cannot swallow
+ * the rest of the address: "6667 W Washington St, Unit A, Indianapolis, IN"
+ * keeps Indianapolis in the street identity rather than in the unit. A
+ * segment is a sub-premise when it OPENS with a designator ("Unit A"); a
+ * designator later in a segment splits it in place ("123 Main St Ste 200").
+ * A leading designator is never split out of a segment, so "Building 2, 123
+ * Main St" keeps its full street identity.
+ */
+export function splitUnitDesignator(addr: string): { street: string; unit: string | null } {
+  const streetParts: string[] = [];
+  let unit: string | null = null;
+
+  for (const rawSegment of addr.split(',')) {
+    const segment = rawSegment.trim();
+    if (!segment) continue;
+    const tokens = normalizeAddress(segment.replace(/#/g, ' unit ')).split(' ').filter(Boolean);
+    if (tokens.length === 0) continue;
+
+    if (UNIT_DESIGNATORS.has(tokens[0])) {
+      if (unit === null) unit = tokens.slice(1).join(' ').trim() || null;
+      continue;
+    }
+
+    const at = tokens.findIndex((tok) => UNIT_DESIGNATORS.has(tok));
+    if (at > 0) {
+      streetParts.push(tokens.slice(0, at).join(' '));
+      if (unit === null) unit = tokens.slice(at + 1).join(' ').trim() || null;
+      continue;
+    }
+
+    streetParts.push(tokens.join(' '));
+  }
+
+  return { street: streetParts.join(' ').trim(), unit };
+}
+
+/** Material ADDRESS drift across a set of address strings. */
+export function hasMaterialAddressVariations(addresses: string[]): boolean {
+  const parts = addresses.filter(Boolean).map(splitUnitDesignator);
+  if (new Set(parts.map((p) => p.street)).size > 1) return true;
+  return new Set(parts.map((p) => p.unit).filter(Boolean)).size > 1;
+}
+
 /**
  * Returns true if any NAP variation type has more than one distinct
  * normalized value — i.e., the variations are not just formatting/cosmetic
@@ -191,10 +250,13 @@ export function hasMaterialDrift(
   const names = nap.name_variations ?? [];
 
   const distinctPhones = new Set(phones.map(normalizePhone)).size;
-  const distinctAddresses = new Set(addresses.map(normalizeAddress)).size;
   const distinctNames = new Set(names.map(normalizeName)).size;
 
-  return distinctPhones > 1 || distinctAddresses > 1 || distinctNames > 1;
+  return (
+    distinctPhones > 1 ||
+    hasMaterialAddressVariations(addresses) ||
+    distinctNames > 1
+  );
 }
 
 // ─── Field-scoped + status-aware material variance ──────────────────────
@@ -244,8 +306,7 @@ export function hasMaterialAddressDrift(nap: NapData | undefined | null): boolea
   if (issuesMentionField(nap, 'address')) return true;
   const candidates = [nap.canonical_address, ...(nap.address_variations ?? [])]
     .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
-  const distinct = new Set(candidates.map(normalizeAddress).filter(Boolean));
-  return distinct.size > 1;
+  return hasMaterialAddressVariations(candidates);
 }
 
 /** Material PHONE drift: distinct normalized phones, or analyst-flagged. */

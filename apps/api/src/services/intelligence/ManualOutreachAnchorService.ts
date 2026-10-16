@@ -1109,8 +1109,25 @@ export class ManualOutreachAnchorService extends BaseService {
       }
     }
 
-    // §23.4 auditability — contact verification write-back
+    // Wedge fidelity (project-phase spec §4/§6): a fact confirmation or
+    // correction is a verdict input — it stamps nap_verified_at /
+    // nap_owner_corrected, which make the listing NAP authoritative over the
+    // audit canonical (see evaluateSeedFidelity). Recompute so a seed verified
+    // after its publish-time verdict leaves 'misaligned' and its claim
+    // surfaces come back. Non-fatal, after the loop so the recompute reads the
+    // final listing state.
     if (writebacks.length > 0) {
+      try {
+        const { computeAndStoreSeedFidelity } = await import('../seed-fidelity');
+        await computeAndStoreSeedFidelity(seedId);
+      } catch (err: any) {
+        logger.warn('ManualOutreachAnchorService: fidelity recompute failed (non-fatal)', ctx, {
+          seedId,
+          error: err?.message,
+        });
+      }
+
+      // §23.4 auditability — contact verification write-back
       await audit({
         actorType: 'user',
         actor: userId,

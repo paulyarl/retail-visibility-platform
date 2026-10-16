@@ -21,10 +21,10 @@ export interface ClaimedReportCtaProps {
  *
  * The prospect's second report (the claimed/published seed report) stays
  * reachable through the same tracked redirect family: the CTA + QR encode
- * /api/public/r/seed/{seedId}/claimed, which records a `report_claimed`
- * scan — its own surface, outside both the pre-claim `report_banner`
- * surface and the operator `report_delivery_*` funnel — then 302s to the
- * report.
+ * /r/seed/{seedId}/claimed — the frontend redirect page that records a
+ * `report_claimed` scan (its own surface, outside both the pre-claim
+ * `report_banner` surface and the operator `report_delivery_*` funnel)
+ * then redirects to the report.
  *
  * The QR renders through TenantQRCode so the claimed tenant's storefront_qr
  * merchant preferences apply — including any design the operator persisted
@@ -39,7 +39,7 @@ export function ClaimedReportCta({
   dark = false,
   className = '',
 }: ClaimedReportCtaProps) {
-  const trackedPath = `/api/public/r/seed/${seedId}/claimed`;
+  const trackedPath = `/r/seed/${seedId}/claimed`;
 
   return (
     <div className={`flex flex-col items-center ${className}`}>
@@ -59,8 +59,9 @@ export function ClaimedReportCta({
         pageType="directory"
         isPublic
       />
-      {/* Plain anchor — the tracked path is an API redirect, not an app route
-          (next/link would issue RSC navigation + prefetch phantom scans). */}
+      {/* Plain anchor — the tracked path is a redirect page, not a
+          destination route (next/link would issue RSC navigation +
+          prefetch phantom scans). */}
       <a
         href={trackedPath}
         className={`mt-3 text-sm font-medium hover:underline ${dark ? 'text-sky-400' : 'text-blue-600'}`}

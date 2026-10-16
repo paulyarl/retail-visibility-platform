@@ -30,7 +30,7 @@ import { logger } from '../logger';
 import { resolveCampaignNap, type ResolvedNap } from '../lib/canonical-nap';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import {
-  normalizeAddress,
+  hasMaterialAddressVariations,
   normalizeName,
   normalizePhone,
 } from './outreach-openers/signal-magnitude';
@@ -84,10 +84,13 @@ export function evaluateSeedFidelity(input: SeedFidelityInput): SeedFidelity {
       !!canonical.name &&
       !!listing.business_name &&
       normalizeName(canonical.name) !== normalizeName(listing.business_name);
+    // Unit designators are cosmetic too: a campaign's street line rarely
+    // carries the unit the listing records ("6667 W Washington St" vs
+    // "6667 W Washington St, Unit A"), and that is not a wrong address.
     const addressMismatch =
       !!canonical.address &&
       !!listing.address &&
-      normalizeAddress(canonical.address) !== normalizeAddress(listing.address);
+      hasMaterialAddressVariations([canonical.address, listing.address]);
     const phoneMismatch =
       !!canonical.phone &&
       !!listing.phone &&
@@ -235,17 +238,44 @@ export async function computeAndStoreSeedFidelity(seedId: string): Promise<SeedF
 }
 
 /**
- * Lazy refresh (spec D5): recompute only when the campaign's latest
- * business_analysis audit is newer than the one the stored verdict was
- * computed against. Public surfaces keep consulting the stored verdict.
+ * Lazy refresh (spec D5): recompute only when a verdict input has moved on
+ * since the stored verdict was written — the campaign's latest
+ * business_analysis audit is newer than the one the verdict was computed
+ * against, the stored audit id no longer resolves, or a NAP verification
+ * postdates the verdict. Public surfaces keep consulting the stored verdict.
  */
 export async function refreshSeedFidelityIfStale(seedId: string): Promise<void> {
   try {
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT seed_fidelity_audit_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      SELECT seed_fidelity_audit_id, seed_fidelity_checked_at
+      FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
     if (!rows[0]) return;
     const storedAuditId: string | null = rows[0].seed_fidelity_audit_id;
+    // Coerce explicitly — a raw read can hand back a string, and a
+    // string-vs-Date comparison would silently never report staleness.
+    const checkedAt = rows[0].seed_fidelity_checked_at
+      ? new Date(rows[0].seed_fidelity_checked_at)
+      : null;
+
+    // A NAP verification/correction is a verdict input as well: it stamps
+    // nap_verified_at / nap_owner_corrected, which make the listing NAP
+    // authoritative over the audit canonical (see evaluateSeedFidelity). A
+    // verdict older than the latest verification event is stale no matter
+    // which write site produced it — including rows written before the
+    // verification paths learned to recompute.
+    const verificationRows = await prisma.$queryRaw<Array<{ latest: Date | null }>>`
+      SELECT max(created_at) AS latest
+      FROM directory_seed_nap_verifications
+      WHERE seed_id = ${seedId}
+    `;
+    const latestVerification = verificationRows[0]?.latest
+      ? new Date(verificationRows[0].latest)
+      : null;
+    if (latestVerification && (!checkedAt || latestVerification > checkedAt)) {
+      await computeAndStoreSeedFidelity(seedId);
+      return;
+    }
 
     const linkRows = await prisma.$queryRaw<any[]>`
       SELECT campaign_id FROM directory_seed_campaign_links

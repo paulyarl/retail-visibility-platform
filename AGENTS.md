@@ -1915,3 +1915,21 @@ The Outreach Kit tab's Diagnostic Screenshots panel now has a per-row **Delete**
 - `DirectoryStore` gained `listingOrigin?: string | null` — the MV search route already returns it (`apps/api/src/routes/directory-mv.ts`), so the seed signal is now typed instead of runtime-only.
 - **The per-listing `canUseExternalLink` capability now has no consumer on the web.** It came from `mec.is_enabled` (`directory-mv.ts` / `directory.ts` / `directory-consolidated.ts`); the tier-capability UI (`canShowExternalLink`/`externalLinkEnabled` in `CapabilityResolutionService` → `DirectorySettingsPanel`, `PlanSummaryPanel`, `CapabilityShowcase`) still advertises it, and the entry-page layouts never rendered a website link — so if the entitlement should still do something, it has to be re-homed (e.g. a "Visit Website" link *inside* the entry page), not the card destination.
 - Test: `apps/web/src/components/directory/redesign/StoreCardV2.test.ts` (seed→`/place`, claimed→`/directory`, website ignored even with the capability on, `?shelf=` preserved).
+
+### Wedge fidelity (`directory_presence_seeds.seed_fidelity`) — every claim surface is gated (added 2026-10-16)
+
+`misaligned` suppresses **every** claim-token surface — QR kits, claim links, merge vars, report CTAs, and the `/place` claim banner all add `AND dps.seed_fidelity IS DISTINCT FROM 'misaligned'` and degrade to the inquiry path (`ClaimInviteQrKitService.resolveClaimInviteKit`, `outreach-openers/outreach-link-vars.ts`, `seed-report-public.ts`, `directory-consolidated.ts`, `DirectoryClaimService`). The verdict is one persisted value per seed, consulted by reads — so **every writer that changes a verdict input must recompute it**, or a stale verdict silently 404s the claim surfaces (`{"error":"no_active_claim_token"}`).
+
+Verdict inputs (`services/seed-fidelity.ts` → `evaluateSeedFidelity`, pure):
+
+- the audit canonical (campaign columns → latest non-stub `business_analysis` audit → `resolveCampaignNap`)
+- the listing NAP + sparsity (`product_count`, `directory_photos` count, `business_hours`)
+- **`nap_verified_at` / `nap_owner_corrected`** — an attested NAP makes the *listing* authoritative over the audit canonical, short-circuiting the mismatch branch entirely
+
+Recompute sites (`computeAndStoreSeedFidelity`): `publishSeed`, `updateFields` (when NAP fields or hours change), `MarketingCampaignService.resolveCampaignVerification`, and `ManualOutreachAnchorService.processVerificationResults` (the last two added 2026-10-16 — a seed verified *after* its publish-time verdict used to keep that verdict forever; repro `dps-329R-nf8nmoao`: verdict 10-13 `misaligned`, campaign verification confirmed the NAP 10-15, QR kit 404'd until the verdict was recomputed → `thin`). Any **new** NAP-verification writer must recompute too.
+
+`refreshSeedFidelityIfStale` (spec D5 lazy refresh) is the belt-and-braces: it now recomputes when the latest `directory_seed_nap_verifications.created_at` postdates `seed_fidelity_checked_at`, as well as when the source audit id changed or the stored audit id no longer resolves to a live campaign. Called from `resolvePlanSeedClaim` (plan cockpit) and `GET /api/admin/directory/presence-seeds/:id` (seed detail) — the detail route is what makes a stale row self-heal for the operator.
+
+`hasMaterialAddressVariations` / `splitUnitDesignator` (`outreach-openers/signal-magnitude.ts`) own the "a unit designator is not drift" rule for `evaluateSeedFidelity`, `hasMaterialDrift`, and `hasMaterialAddressDrift`: a unit on only one side (`"6667 W Washington St"` vs `"6667 W Washington St, Unit A"`) is cosmetic, two *different* units on the same street stay material. Addresses are segmented on commas first so a mid-address unit cannot swallow the city into the unit bucket.
+
+Tests: `services/__tests__/seed-fidelity.test.ts` (comparator), `seed-fidelity-refresh.test.ts` (staleness), `ManualOutreachAnchorService.processVerificationResults.test.ts` + `MarketingCampaignService.resolveCampaignVerification.test.ts` (write sites), `outreach-openers/__tests__/signal-magnitude.test.ts` (normalizer).

@@ -18,6 +18,9 @@
  * The short-code variant (/r/{shortCode}/{channel}) is handled by a
  * Next.js redirect page on the web app that calls this endpoint's
  * resolve+track logic, then redirects to /seed-report/{seedId}.
+ * The seed-id variant (/r/seed/{seedId}/{channel}) is the same — a
+ * Next.js redirect page calling /r/report-seed-scan/:seedId — so public
+ * surfaces never emit bare /api/public/* URLs.
  *
  * Mirrors the directory-claim-qr.ts pattern but with report-delivery
  * surfaces and a different redirect destination.
@@ -180,16 +183,7 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
   // Validate surface — fall back to in_person for unrecognized values.
   // 'banner' maps to the standalone report_banner surface (not report_delivery_*)
   // so banner scans never inflate the delivered → viewed funnel.
-  const validSurfaces: Record<string, QrSurfaceType> = {
-    in_person: 'report_delivery_in_person',
-    text: 'report_delivery_text',
-    email: 'report_delivery_email',
-    social: 'report_delivery_social',
-    phone: 'report_delivery_phone',
-    banner: 'report_banner',
-    claimed: 'report_claimed',
-  };
-  const resolvedSurface = validSurfaces[surface as string] || 'report_delivery_in_person';
+  const resolvedSurface = SURFACE_MAP[surface as ReportChannel] || 'report_delivery_in_person';
 
   let seedId: string | null = null;
   let tenantId = 'platform';
@@ -234,8 +228,79 @@ router.get('/r/report-scan/:shortCode', async (req: Request, res: Response) => {
   // §5.3.2 lifecycle: write the view side of the delivery (best-effort).
   // Delivery channels only — a banner scan has no delivery to mark as viewed.
   try {
-    const channel = (Object.keys(validSurfaces) as ReportChannel[]).find(
-      (c) => validSurfaces[c] === resolvedSurface,
+    const channel = (Object.keys(SURFACE_MAP) as ReportChannel[]).find(
+      (c) => SURFACE_MAP[c] === resolvedSurface,
+    );
+    if (channel && DELIVERY_CHANNELS.has(channel)) {
+      const { default: reportDelivery } = await import(
+        '../services/intelligence/SeedReportDeliveryService'
+      );
+      await reportDelivery.recordViewFromScan(seedId, channel as ReportDeliveryChannel);
+    }
+  } catch {
+    // View write-back failure — the scan row is still recorded
+  }
+
+  res.json({ success: true, seedId });
+});
+
+/**
+ * GET /api/public/r/report-seed-scan/:seedId?surface=banner|claimed|...
+ *
+ * Seed-id sibling of /r/report-scan/:shortCode — the resolve+track backend
+ * for the web app's /r/seed/{seedId}/{channel} redirect page. No code
+ * resolution is needed (the seed id is already the address); the endpoint
+ * verifies the seed exists, records the qr_scan_events row under the
+ * channel's surface, and returns { seedId } so the page can redirect to
+ * /seed-report/{seedId}. The scan is recorded even for an unknown seed
+ * (warm-lead analytics), then 404s so the page can notFound().
+ */
+router.get('/r/report-seed-scan/:seedId', async (req: Request, res: Response) => {
+  const { seedId } = req.params;
+  const { surface } = req.query;
+
+  const resolvedSurface = SURFACE_MAP[surface as ReportChannel] || 'report_delivery_in_person';
+
+  let tenantId = 'platform';
+  let seedExists = false;
+
+  try {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT tenant_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    if (rows[0]) {
+      seedExists = true;
+      tenantId = rows[0].tenant_id || 'platform';
+    }
+  } catch {
+    // Resolution failure — still record the scan
+  }
+
+  try {
+    await trackQrScanEvent({
+      tenantId,
+      surface: resolvedSurface,
+      consumer: 'merchant',
+      productId: seedId, // §5.4 — seed attribution for report viewed/unviewed tracking
+      source: `qr_code_${surface || 'unknown'}`,
+      referrer: req.get('referer') ?? undefined,
+      userAgent: req.get('user-agent') ?? undefined,
+      geoCountry: (req as any).geoCountry ?? undefined,
+      geoCity: (req as any).geoCity ?? undefined,
+    });
+  } catch {
+    // Scan tracking failure — don't block the response
+  }
+
+  if (!seedExists) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+
+  // §5.3.2 lifecycle: write the view side of the delivery (best-effort).
+  // Delivery channels only — a banner/claimed scan has no delivery to mark.
+  try {
+    const channel = (Object.keys(SURFACE_MAP) as ReportChannel[]).find(
+      (c) => SURFACE_MAP[c] === resolvedSurface,
     );
     if (channel && DELIVERY_CHANNELS.has(channel)) {
       const { default: reportDelivery } = await import(

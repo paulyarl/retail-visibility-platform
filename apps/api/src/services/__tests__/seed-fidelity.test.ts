@@ -68,6 +68,31 @@ describe('evaluateSeedFidelity', () => {
     ).toBe('aligned');
   });
 
+  it('a one-sided unit designator is cosmetic, not misaligned', () => {
+    // The campaign's street line rarely carries the unit the listing records
+    // ("6667 W Washington St" vs "6667 W Washington St, Unit A") — a unit is a
+    // sub-premise label, not a wrong address.
+    expect(
+      evaluateSeedFidelity(
+        base({
+          canonical: { ...CANONICAL, address: '412 Meridian St' },
+          listing: { ...RICH_LISTING, address: '412 Meridian St, Unit A' },
+        }),
+      ),
+    ).toBe('aligned');
+  });
+
+  it('conflicting units on the same street stay misaligned', () => {
+    expect(
+      evaluateSeedFidelity(
+        base({
+          canonical: { ...CANONICAL, address: '412 Meridian St Ste 200' },
+          listing: { ...RICH_LISTING, address: '412 Meridian St Ste 300' },
+        }),
+      ),
+    ).toBe('misaligned');
+  });
+
   it('misaligned on material name / address / phone differences', () => {
     expect(
       evaluateSeedFidelity(base({ listing: { ...RICH_LISTING, business_name: 'Harbor Grocery' } })),

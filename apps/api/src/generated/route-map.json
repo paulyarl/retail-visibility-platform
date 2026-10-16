@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-16T13:57:48.749Z",
+  "generatedAt": "2026-10-16T19:29:08.814Z",
   "totalMounts": 243,
-  "totalRoutes": 2889,
+  "totalRoutes": 2894,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -25635,6 +25635,42 @@
           ]
         },
         {
+          "method": "GET",
+          "path": "/presence-seeds/:id/report-qr-style",
+          "fullPath": "/api/admin/directory-presence/presence-seeds/:id/report-qr-style",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/presence-seeds/:id/report-qr-style",
+          "fullPath": "/api/admin/directory-presence/presence-seeds/:id/report-qr-style",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/presence-seeds/:id/claim-qr-style",
+          "fullPath": "/api/admin/directory-presence/presence-seeds/:id/claim-qr-style",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/presence-seeds/:id/claim-qr-style",
+          "fullPath": "/api/admin/directory-presence/presence-seeds/:id/claim-qr-style",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
           "method": "PATCH",
           "path": "/presence-seeds/:id/fields",
           "fullPath": "/api/admin/directory-presence/presence-seeds/:id/fields",
@@ -26652,7 +26688,7 @@
       "mountPath": "/api/public",
       "domain": "directory",
       "authLevel": "public",
-      "comment": "Public report-delivery QR redirect (/r/seed/:seedId/:channel → /seed-report/:seedId)",
+      "comment": "Public report-delivery QR redirect (/r/seed/:seedId/:channel → /seed-report/:seedId) + resolve+track for the web /r/seed/:seedId/:channel and /r*/{shortCode} redirect pages",
       "routes": [
         {
           "method": "GET",
@@ -26666,6 +26702,14 @@
           "method": "GET",
           "path": "/r/report-scan/:shortCode",
           "fullPath": "/api/public/r/report-scan/:shortCode",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/r/report-seed-scan/:seedId",
+          "fullPath": "/api/public/r/report-seed-scan/:seedId",
           "middleware": [
             "AsyncFunction"
           ]

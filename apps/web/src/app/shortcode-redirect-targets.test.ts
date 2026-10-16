@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
 const mocks = vi.hoisted(() => ({
   claimScan: vi.fn(),
   reportScan: vi.fn(),
+  reportSeedScan: vi.fn(),
   intakeScan: vi.fn(),
   claimCode: vi.fn(),
   galleryCode: vi.fn(),
@@ -41,7 +42,10 @@ vi.mock('@/services/ClaimQrScanService', () => ({
   claimQrScanService: { resolveAndTrack: mocks.claimScan },
 }));
 vi.mock('@/services/ReportQrScanService', () => ({
-  reportQrScanService: { resolveAndTrack: mocks.reportScan },
+  reportQrScanService: {
+    resolveAndTrack: mocks.reportScan,
+    resolveSeedAndTrack: mocks.reportSeedScan,
+  },
 }));
 vi.mock('@/services/IntakeShortCodeService', () => ({
   intakeShortCodeService: { resolveAndTrack: mocks.intakeScan },
@@ -68,6 +72,7 @@ import { resolveIntakeAndRedirect } from '@/lib/intake-scan-redirect';
 import ClaimShortCodePage from './c/[shortCode]/page';
 import GalleryShortCodePage from './g/[shortCode]/page';
 import CouponShortCodePage from './s/[autoId]/page';
+import ReportQrSeedPage from './r/seed/[seedId]/[channel]/page';
 
 const PLATFORM = platformOrigin();
 
@@ -117,6 +122,34 @@ describe('short-code targets resolve on the platform origin', () => {
     await expect(resolveReportQrAndRedirect('AB12CD', 'in_person')).rejects.toThrow(
       `NEXT_REDIRECT:${PLATFORM}/seed-report/seed-1`,
     );
+  });
+
+  it('seed-id report redirect → platform /seed-report/{seedId}', async () => {
+    mocks.reportSeedScan.mockResolvedValue('dps-329R-nf8nmoao');
+    await expect(
+      ReportQrSeedPage({
+        params: Promise.resolve({ seedId: 'dps-329R-nf8nmoao', channel: 'banner' }),
+      }),
+    ).rejects.toThrow(`NEXT_REDIRECT:${PLATFORM}/seed-report/dps-329R-nf8nmoao`);
+    expect(mocks.reportSeedScan).toHaveBeenCalledWith('dps-329R-nf8nmoao', 'banner');
+  });
+
+  it('seed-id report redirect 404s an unknown channel without tracking', async () => {
+    await expect(
+      ReportQrSeedPage({
+        params: Promise.resolve({ seedId: 'dps-329R-nf8nmoao', channel: 'bogus' }),
+      }),
+    ).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(mocks.reportSeedScan).not.toHaveBeenCalled();
+  });
+
+  it('seed-id report redirect 404s an unknown seed', async () => {
+    mocks.reportSeedScan.mockResolvedValue(null);
+    await expect(
+      ReportQrSeedPage({
+        params: Promise.resolve({ seedId: 'dps-missing', channel: 'claimed' }),
+      }),
+    ).rejects.toThrow('NEXT_NOT_FOUND');
   });
 
   // The reported bug: a host-relative /recovery/intake 404s on a tenant host

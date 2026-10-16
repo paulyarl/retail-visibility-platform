@@ -1121,7 +1121,7 @@ function PresenceSeedDetailClient() {
           url: typeof window !== 'undefined'
             ? (bannerShortCode
                 ? `${window.location.origin}/rb/${bannerShortCode}`
-                : `${window.location.origin}/api/public/r/seed/${seedId}/banner`)
+                : `${window.location.origin}/r/seed/${seedId}/banner`)
             : (bannerShortCode ? `/rb/${bannerShortCode}` : ''),
           postcard: false,
           defaultTemplate: 'report-audit' as QrTemplateName,

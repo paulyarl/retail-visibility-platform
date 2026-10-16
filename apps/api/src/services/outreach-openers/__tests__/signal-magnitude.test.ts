@@ -24,6 +24,8 @@ import {
   signalsStrongerThan,
   getStrongestCoOccurringSignal,
   hasMaterialDrift,
+  hasMaterialAddressVariations,
+  splitUnitDesignator,
   severityRank,
   isStronger,
   SEVERITY_RANK,
@@ -125,6 +127,107 @@ describe('hasMaterialDrift', () => {
       overall_status: 'inconsistent',
       address_variations: ['123 Main St, Indy, IN', '456 Oak Ave, Indy, IN'],
     })).toBe(true);
+  });
+
+  it('returns false when a unit designator appears on only one variation', () => {
+    expect(hasMaterialDrift({
+      overall_status: 'minor_variations',
+      address_variations: ['6667 W Washington St, Indy, IN', '6667 W Washington St, Unit A, Indy, IN'],
+    })).toBe(false);
+  });
+
+  it('returns true when the variations name conflicting units', () => {
+    expect(hasMaterialDrift({
+      overall_status: 'inconsistent',
+      address_variations: ['123 Main St Ste 200', '123 Main St Ste 300'],
+    })).toBe(true);
+  });
+});
+
+// ─── unit designators ────────────────────────────────────────────────────
+
+describe('splitUnitDesignator', () => {
+  it('separates the street identity from a trailing unit label', () => {
+    expect(splitUnitDesignator('6667 W Washington St, Unit A')).toEqual({
+      street: '6667 west washington street',
+      unit: 'a',
+    });
+    expect(splitUnitDesignator('123 Main St Ste 200')).toEqual({
+      street: '123 main street',
+      unit: '200',
+    });
+    expect(splitUnitDesignator('123 Main St #4')).toEqual({
+      street: '123 main street',
+      unit: '4',
+    });
+  });
+
+  it('leaves an address with no unit intact and unchanged from normalizeAddress', () => {
+    expect(splitUnitDesignator('4271 Lafayette Rd, Indy, IN')).toEqual({
+      street: '4271 lafayette road indy in',
+      unit: null,
+    });
+  });
+
+  it('keeps the city in the street identity when a unit sits mid-address', () => {
+    // The unit must not swallow everything after it — a full address with the
+    // unit removed has to yield the same street identity.
+    expect(splitUnitDesignator('6667 W Washington St, Unit A, Indianapolis, IN 46241')).toEqual({
+      street: '6667 west washington street indianapolis in 46241',
+      unit: 'a',
+    });
+    expect(splitUnitDesignator('6667 W Washington St, Indianapolis, IN 46241').street).toBe(
+      '6667 west washington street indianapolis in 46241',
+    );
+  });
+
+  it('does not split a leading designator — "Building 2" names the street', () => {
+    // An empty street identity would compare against nothing, so a designator
+    // in first position stays part of the street.
+    expect(splitUnitDesignator('Building 2, 123 Main St')).toEqual({
+      street: 'building 2 123 main street',
+      unit: null,
+    });
+  });
+});
+
+describe('hasMaterialAddressVariations', () => {
+  it('treats a one-sided unit suffix as cosmetic', () => {
+    expect(
+      hasMaterialAddressVariations(['6667 W Washington St', '6667 W Washington St, Unit A']),
+    ).toBe(false);
+    expect(
+      hasMaterialAddressVariations(['6667 W Washington St', '6667 W Washington St #12']),
+    ).toBe(false);
+  });
+
+  it('treats a one-sided unit suffix as cosmetic on a full address too', () => {
+    expect(
+      hasMaterialAddressVariations([
+        '6667 W Washington St, Indianapolis, IN 46241',
+        '6667 W Washington St, Unit A, Indianapolis, IN 46241',
+      ]),
+    ).toBe(false);
+  });
+
+  it('keeps conflicting units on the same street material', () => {
+    expect(hasMaterialAddressVariations(['123 Main St Ste 200', '123 Main St Ste 300'])).toBe(true);
+  });
+
+  it('keeps a different street number, street, or city material', () => {
+    expect(hasMaterialAddressVariations(['123 Main St', '456 Main St'])).toBe(true);
+    expect(hasMaterialAddressVariations(['123 Main St', '123 Oak Ave'])).toBe(true);
+    expect(hasMaterialAddressVariations(['123 Main St, Indy, IN', '123 Main St, Carmel, IN'])).toBe(true);
+  });
+
+  it('collapses formatting-only differences', () => {
+    expect(
+      hasMaterialAddressVariations(['12 Main Rd, Indy, IN', '12 Main Road, Indy, IN']),
+    ).toBe(false);
+  });
+
+  it('ignores empty entries', () => {
+    expect(hasMaterialAddressVariations(['', '   '])).toBe(false);
   });
 });
 

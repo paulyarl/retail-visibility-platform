@@ -17,6 +17,7 @@ const {
   mockExecuteRaw,
   mockExecuteRawUnsafe,
   mockRefreshReport,
+  mockComputeFidelity,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findUnique: vi.fn(), update: vi.fn() },
   mockEvidenceCreate: vi.fn(),
@@ -24,6 +25,7 @@ const {
   mockExecuteRaw: vi.fn(),
   mockExecuteRawUnsafe: vi.fn(),
   mockRefreshReport: vi.fn(),
+  mockComputeFidelity: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -64,6 +66,11 @@ vi.mock('../MarketingServiceCategoryService', () => ({
   default: { getLabel: vi.fn().mockResolvedValue(null) },
 }));
 
+vi.mock('../seed-fidelity', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../seed-fidelity')>()),
+  computeAndStoreSeedFidelity: mockComputeFidelity,
+}));
+
 import MarketingCampaignService from '../MarketingCampaignService';
 
 describe('resolveCampaignVerification', () => {
@@ -77,6 +84,7 @@ describe('resolveCampaignVerification', () => {
     mockExecuteRaw.mockResolvedValue(1);
     mockExecuteRawUnsafe.mockResolvedValue(1);
     mockRefreshReport.mockResolvedValue(undefined);
+    mockComputeFidelity.mockResolvedValue(null);
   });
 
   it('writes the verified NAP to the campaign and records attributed owner evidence', async () => {
@@ -208,6 +216,10 @@ describe('resolveCampaignVerification', () => {
     expect(prov[0].some((a: any) => a === 'owner_confirmed')).toBe(true);
     expect(mockExecuteRawUnsafe).not.toHaveBeenCalled(); // no correction → listing untouched
     expect(mockRefreshReport).toHaveBeenCalledWith('seed-1');
+    // The verification stamped nap_verified_at, which is a wedge-fidelity
+    // verdict input — the stored verdict is now stale and must be recomputed
+    // or the seed keeps suppressing its claim surfaces.
+    expect(mockComputeFidelity).toHaveBeenCalledWith('seed-1');
   });
 
   it('back-fills an owner_corrected row and syncs the public listing when the value differs', async () => {
@@ -232,6 +244,9 @@ describe('resolveCampaignVerification', () => {
     expect(mockExecuteRawUnsafe.mock.calls[0][0]).toContain('directory_listings_list');
     expect(mockExecuteRawUnsafe.mock.calls[0][0]).toContain('phone');
     expect(mockRefreshReport).toHaveBeenCalledWith('seed-1');
+    // nap_owner_corrected is a verdict input too — the corrected listing NAP
+    // is authoritative, so the verdict must be recomputed against it.
+    expect(mockComputeFidelity).toHaveBeenCalledWith('seed-1');
   });
 
   it('writes no seed verification when the call did not connect', async () => {
@@ -266,6 +281,7 @@ describe('resolveCampaignVerification', () => {
     // which is about the queue row, not the seed link, and is expected to run.
     expect(mockExecuteRawUnsafe).not.toHaveBeenCalled();
     expect(mockRefreshReport).not.toHaveBeenCalled();
+    expect(mockComputeFidelity).not.toHaveBeenCalled();
   });
 
   it('keeps the campaign update and owner evidence when the back-fill fails', async () => {

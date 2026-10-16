@@ -2995,6 +2995,24 @@ export class MarketingCampaignService extends BaseService {
                 error: (refreshErr as Error).message,
               });
             }
+
+            // Wedge fidelity (project-phase spec §4/§6): the verification just
+            // stamped nap_verified_at / nap_owner_corrected, and those are
+            // verdict inputs — evaluateSeedFidelity treats the listing NAP as
+            // authoritative once the owner attested it. The stored verdict is
+            // therefore stale, and a seed verified AFTER its publish-time
+            // verdict would stay 'misaligned' forever, degrading every claim
+            // surface (QR kits, claim links, report CTAs) to the inquiry path.
+            // Non-fatal — same precedent as publish/updateFields.
+            try {
+              const { computeAndStoreSeedFidelity } = await import('./seed-fidelity');
+              await computeAndStoreSeedFidelity(seedId);
+            } catch (fidelityErr) {
+              logger.warn('resolveCampaignVerification: fidelity recompute failed (non-fatal)', ctx, {
+                seedId,
+                error: (fidelityErr as Error).message,
+              });
+            }
           }
         }
       } catch (error) {
