@@ -95,6 +95,12 @@ export const TIER_FEATURES = {
     'propagation_profile',
     'propagation_flags',
     'propagation_roles',
+    // Added 2026-10-16 (1.5c). These three were mapped to `organization` in
+    // FEATURE_TIER_MAP but granted by no bag — advertised features with nothing
+    // behind them. Ruled: grant them rather than drop the map entries.
+    'propagation_selective',
+    'propagation_scheduling',
+    'propagation_rollback',
     'propagation_brand',
     'organization_dashboard',
     'hero_location',
