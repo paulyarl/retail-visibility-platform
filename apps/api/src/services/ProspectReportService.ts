@@ -39,6 +39,8 @@ import {
 } from '../lib/id-generator';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { surfaceNoun, surfaceRef } from '../lib/channel-surfaces';
+import { PRESENT_STATUSES, platformLabel } from '../lib/platform-presence';
+import { archetypeFacts, sharedCoreKeys } from '../lib/archetype-facts';
 import {
   websitePositioningAuditSchema,
   type WebsitePositioningAudit,
@@ -211,6 +213,21 @@ export const ARCHETYPE_BRIEFING_TEMPLATES: Record<
  * schema validation happens in the builders.
  */
 export function archetypeFactSlice(
+  archetype: string,
+  auditData: unknown,
+): Record<string, unknown> {
+  return {
+    ...archetypeFactSliceBase(archetype, auditData),
+    // The shared audit core (platform presence + normalized review counts),
+    // spread into every archetype's slice. The briefing's `{{archetype_extract}}`
+    // therefore carries the SAME presence map and counts the outreach opener
+    // reads — `lib/archetype-facts` is the single source for both, so a
+    // briefing-vs-opener disagreement is a test failure rather than a drift.
+    ...sharedCoreKeys(archetypeFacts(archetype, auditData)),
+  };
+}
+
+function archetypeFactSliceBase(
   archetype: string,
   auditData: unknown,
 ): Record<string, unknown> {
@@ -496,23 +513,12 @@ function humanizeField(field: string): string {
 // The BA audit is one document read five ways — the archetype extractors
 // below all pull from these shared helpers so the owner-facing vocabulary
 // stays consistent across chapters.
-
-const PRESENT_STATUSES = new Set([
-  'claimed',
-  'likely_claimed',
-  'unclaimed',
-  'likely_unclaimed',
-]);
-
-function platformLabel(key: string): string {
-  return key === 'google'
-    ? 'Google Business Profile'
-    : key === 'yelp'
-      ? 'Yelp'
-      : key === 'facebook'
-        ? 'Facebook'
-        : humanizeField(key);
-}
+//
+// Platform presence + labels come from `lib/platform-presence` (the shared
+// delegate) rather than local copies: the local `platformLabel` title-cased
+// unknown keys, rendering `bbb` as "Bbb" and `apple_maps` as "Apple maps" in
+// owner-facing PDFs, and the outreach layer had grown its own divergent copies
+// of both the label map and the present-status set.
 
 function platformEntriesOf(audit: {
   platforms?: Record<string, unknown> | null;

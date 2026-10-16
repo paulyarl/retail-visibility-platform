@@ -27,6 +27,7 @@ import type { BusinessAnalysisAuditData } from './archetype-selection';
 import type { ArchetypeCode } from './archetype-selection';
 import { signalLabel, type SignalCode } from '../triage/signal-taxonomy';
 import { isSocialPlatformHost, isBuilderSubdomainHost } from '../triage/website-host-classification';
+import { platformPresence } from '../../lib/platform-presence';
 
 // ─── Severity tiers ──────────────────────────────────────────────────────
 
@@ -277,14 +278,11 @@ export function hasMaterialNapVariance(nap: NapData | undefined | null): boolean
 // ─── Per-signal severity ─────────────────────────────────────────────────
 
 /**
- * Platform keys the audit verified ABSENT — `data_status: 'unavailable'` on
- * the platform block. Restricted profiles are deliberately excluded: they
- * exist, they are simply not publicly visible (a different finding with a
- * different fix).
+ * Platform keys the audit verified ABSENT — delegated to the shared presence
+ * module so severity cannot disagree with the A8 presence map or the report.
  */
 function absentPlatformKeys(auditData: BusinessAnalysisAuditData): string[] {
-  const platforms = (auditData.platforms ?? {}) as Record<string, any>;
-  return Object.keys(platforms).filter((k) => platforms[k]?.data_status === 'unavailable');
+  return platformPresence(auditData).missingKeys;
 }
 
 /**
@@ -533,22 +531,23 @@ export function computePrimarySignalSeverity(
         (r) => r.platform === 'google' && r.determination === 'business_specific_failure',
       );
       if (googleConfirmedAbsent) return 'crisis';
-      const platforms = Object.values(auditData.platforms ?? {});
-      const anyPresent = platforms.some(
-        (p: any) => p && ['claimed', 'likely_claimed', 'unclaimed', 'likely_unclaimed'].includes(p.profile_status),
-      );
-      const anyRestricted = platforms.some(
-        (p: any) => p && p.data_status === 'restricted',
-      );
-      if (!anyPresent && !anyRestricted) return 'crisis';
+      const presence = platformPresence(auditData);
+      if (presence.presentKeys.length === 0 && presence.restrictedKeys.length === 0) {
+        return 'crisis';
+      }
       if (
         detected.includes('DS_CLAIMED_STATUS') ||
+        // A missing profile is a MATERIAL presence gap — crisis only when
+        // Google is the absent platform (handled above). Without this the
+        // signal fell through to borderline, which reads as a healthy
+        // presence and understates a platform the business is absent from.
+        detected.includes('DS_MISSING_PROFILE') ||
         detected.includes('DS_DUPLICATE_LISTING') ||
         detected.includes('DS_HIJACKED_LISTING') ||
         detected.includes('DS_OWNERSHIP_DISPUTE') ||
         detected.includes('DS_ADDRESS_VERIFICATION_BLOCK') ||
         detected.includes('DS_PROFILE_NOT_PUBLIC') ||
-        anyRestricted
+        presence.restrictedKeys.length > 0
       ) {
         return 'material';
       }

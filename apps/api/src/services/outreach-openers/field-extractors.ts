@@ -24,6 +24,13 @@ import {
 } from './signal-magnitude';
 import type { SignalCode } from '../triage/signal-taxonomy';
 import { isSocialPlatformHost, isBuilderSubdomainHost, thirdPartyPlatformLabel } from '../triage/website-host-classification';
+import {
+  platformPresence,
+  platformLabel,
+  platformLabels as toPlatformLabels,
+  platformShortLabels,
+} from '../../lib/platform-presence';
+import { archetypeFacts } from '../../lib/archetype-facts';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -90,9 +97,12 @@ export interface CommonFields {
 }
 
 export interface A1Fields extends CommonFields {
-  unanswered_total: number;
-  unanswered_negatives: number;
-  unanswered_rate_percent: number;
+  // Nullable: `combined_review_metrics.observable_*` is `coercedNumberNullable`
+  // in the audit schema, and "unavailable" is not "zero" — a null count means
+  // the analyst could not observe it. Consumers must not coerce to 0.
+  unanswered_total: number | null;
+  unanswered_negatives: number | null;
+  unanswered_rate_percent: number | null;
   platforms: string[];
   newest_unanswered_date: string | null;
 }
@@ -103,7 +113,7 @@ export interface A2Fields extends CommonFields {
   theme_review_count: number;
   secondary_theme: string | null;
   secondary_theme_review_count: number | null;
-  unanswered_negatives: number;
+  unanswered_negatives: number | null;
   example_complaint: string | null;
   example_platform: string | null;
   example_date: string | null;
@@ -164,7 +174,7 @@ export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fiel
 export interface A5Fields extends CommonFields {
   repair_signals: string[];              // ['nap_inconsistent', 'dead_url', 'url_mismatch']
   days_since_last_review: number;
-  unaddressed_review_count: number;
+  unaddressed_review_count: number | null;
   platforms_with_listings: string[];
 }
 
@@ -258,41 +268,29 @@ export interface A8Fields extends CommonFields {
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
-/** Map internal platform keys to human-readable names for the prompt. */
-const PLATFORM_LABELS: Record<string, string> = {
-  google: 'Google',
-  yelp: 'Yelp',
-  facebook: 'Facebook',
-};
-
 /**
  * Platforms the business actually HAS a listing on, for the "shows up
  * differently across …" clause in the A3 and A5 openers.
  *
- * Keyed on the block's `data_status`, NOT on key-presence. The audit always
- * emits all four platform blocks (google, yelp, facebook, bbb are required in
- * the schema), so `Object.keys(auditData.platforms)` is effectively constant —
- * keying on it made this list the same for every business and told owners they
- * "show up differently across Yelp, Google and Facebook" when no Yelp listing
- * existed. `PLATFORM_LABELS` has no `bbb` entry, so BBB was the only block the
- * old filter ever dropped.
+ * Presence comes from the shared delegate (`lib/platform-presence`), so this
+ * cannot disagree with the archetype fact slice or the owner report. Keyed on
+ * `data_status` rather than key-presence: the audit always emits all four
+ * platform blocks (schema-required), so a key-presence read is effectively a
+ * constant and told owners they "show up differently across Yelp, Google and
+ * Facebook" when no Yelp listing existed.
  *
- * Included: `complete` (content rendered) and `partial` (rendered via a
- * syndication path). Excluded: `unavailable` (verified absent) and
- * `restricted` (exists, but the public cannot see it — nothing to compare
- * against a customer's view).
- *
- * Falls back to key-presence when NO block carries a positive status, so an
- * all-unknown payload (older audits, or a model that left `data_status` unset)
- * keeps the legacy list rather than rendering an empty one.
+ * Falls back to key-presence when NO block positively evidences a listing, so
+ * an all-unknown payload (older audits, or a model that left `data_status`
+ * unset) keeps the legacy list rather than rendering an empty one.
  */
 function platformLabels(auditData: BusinessAnalysisAuditData): string[] {
-  const platforms = (auditData.platforms ?? {}) as Record<string, any>;
-  const keys = Object.keys(platforms).filter((k) => PLATFORM_LABELS[k]);
-  const evidenced = keys.filter((k) =>
-    ['complete', 'partial'].includes(String(platforms[k]?.data_status ?? '')),
-  );
-  return (evidenced.length > 0 ? evidenced : keys).map((k) => PLATFORM_LABELS[k]);
+  const evidenced = platformPresence(auditData).evidencedKeys;
+  const keys = evidenced.length > 0
+    ? evidenced
+    : Object.keys((auditData.platforms ?? {}) as Record<string, unknown>);
+  // Conversational labels: this list lands inside a spoken sentence
+  // ("shows up differently across Google, Facebook"), not a field list.
+  return platformShortLabels(keys);
 }
 
 /** Pick the highest-impact missing CTA from the website audit. */
@@ -330,14 +328,16 @@ export function extractA1Fields(
   auditData: BusinessAnalysisAuditData,
   common: CommonFields,
 ): A1Fields {
-  const m = auditData.combined_review_metrics;
+  // Counts come from the shared core (`lib/archetype-facts`) so the opener and
+  // the archetype briefing cite identical figures.
+  const { counts } = archetypeFacts('A1', auditData);
   return {
     ...common,
-    unanswered_total: m.observable_unanswered_reviews,
-    unanswered_negatives: m.observable_unanswered_negative_reviews,
-    unanswered_rate_percent: m.observable_unanswered_rate_percent,
+    unanswered_total: counts.unanswered,
+    unanswered_negatives: counts.unansweredNegative,
+    unanswered_rate_percent: counts.unansweredRate,
     platforms: platformLabels(auditData),
-    newest_unanswered_date: m.newest_observable_unanswered_review ?? null,
+    newest_unanswered_date: counts.newestUnanswered,
   };
 }
 
@@ -346,11 +346,11 @@ export function extractA2Fields(
   common: CommonFields,
   theme: NegativeReviewTheme,
 ): A2Fields {
-  const m = auditData.combined_review_metrics;
   const themes = auditData.negative_review_themes ?? [];
   const secondary = themes[1];
   const examples = auditData.unanswered_negative_review_examples ?? [];
   const firstExample = examples[0];
+  const { counts } = archetypeFacts('A2', auditData);
 
   return {
     ...common,
@@ -363,7 +363,7 @@ export function extractA2Fields(
       secondary && secondary.supporting_review_count >= 3
         ? secondary.supporting_review_count
         : null,
-    unanswered_negatives: m.observable_unanswered_negative_reviews,
+    unanswered_negatives: counts.unansweredNegative,
     example_complaint: firstExample?.complaint_summary ?? null,
     example_platform: firstExample?.platform ?? null,
     example_date: firstExample?.date ?? null,
@@ -424,7 +424,7 @@ export function extractA5Fields(
 ): A5Fields {
   const nap = auditData.nap_consistency;
   const website = auditData.website;
-  const m = auditData.combined_review_metrics;
+  const { counts } = archetypeFacts('A5', auditData);
 
   const repairSignals: string[] = [];
   if (nap && nap.overall_status !== 'consistent') repairSignals.push('nap_inconsistent');
@@ -436,7 +436,7 @@ export function extractA5Fields(
     ...common,
     repair_signals: repairSignals,
     days_since_last_review: -1, // filled by the caller from campaign.last_review_date
-    unaddressed_review_count: m.observable_unanswered_reviews,
+    unaddressed_review_count: counts.unanswered,
     platforms_with_listings: platformLabels(auditData),
   };
 }
@@ -557,69 +557,30 @@ export function extractA8Fields(
     ? auditData.detected_signals
     : [];
 
-  // Owner-facing platform names. The old fallback title-cased the raw key, so
-  // `bbb` rendered as "Bbb" and `apple_maps` as "Apple_maps" — straight into
-  // the prompt, where the writer could echo them back to the owner.
-  const PLATFORM_DISPLAY: Record<string, string> = {
-    google: 'Google Business Profile',
-    yelp: 'Yelp',
-    facebook: 'Facebook',
-    bbb: 'BBB',
-    apple_maps: 'Apple Maps',
-    bing: 'Bing',
-  };
-  const label = (key: string) =>
-    PLATFORM_DISPLAY[key]
-    ?? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  // Presence comes from the shared delegate (`lib/platform-presence`), so A8's
+  // map cannot disagree with the archetype fact slice or the owner report.
+  // `unable_to_verify` attributes nothing: presence needs a claim verdict, and
+  // absence is carried by `data_status: 'unavailable'` or a render-control
+  // `business_specific_failure`. Verified-present platforms are already
+  // subtracted from `missingKeys` inside the delegate.
+  const presence = platformPresence(auditData);
+  const present = toPlatformLabels(presence.claimedKeys);
+  const unclaimed = toPlatformLabels(presence.unclaimedKeys);
+  const restricted = toPlatformLabels(presence.restrictedKeys);
+  const confirmedAbsent = new Set(toPlatformLabels(presence.missingKeys));
 
-  // Present: the audit has a platform entry whose status isn't absent-ish.
-  // Restricted is tracked separately — the profile exists but the public
-  // cannot see it, so it belongs in neither the present nor absent list.
-  const present: string[] = [];
-  const unclaimed: string[] = [];
-  const restricted: string[] = [];
-  for (const [key, p] of Object.entries(platforms)) {
-    if (!p || typeof p !== 'object' || !p.profile_status) continue;
-    // A block the audit verified ABSENT is not a presence — its absence is
-    // carried by render_controls below. The old `else` put every
-    // non-unclaimed status (including `unable_to_verify`) into `present`, and
-    // the delete below then erased render-control-confirmed absences — so a
-    // business verified missing from Yelp and BBB read as being ON Yelp and
-    // BBB, inverting A8's entire presence map.
-    if (p.data_status === 'unavailable') continue;
-    if (p.data_status === 'restricted') {
-      restricted.push(label(key));
-      continue;
-    }
-    if (p.profile_status === 'unclaimed' || p.profile_status === 'likely_unclaimed') {
-      unclaimed.push(label(key));
-    } else if (p.profile_status === 'claimed' || p.profile_status === 'likely_claimed') {
-      present.push(label(key));
-    }
-    // Anything else (`unable_to_verify`, or no data_status at all) attributes
-    // nothing: presence needs a claim verdict, and absence comes from
-    // render_controls. `unable_to_verify` is the absence of a finding.
-  }
-
-  // Confirmed absent: render-control business_specific_failure entries, plus
-  // key platforms with no audit entry at all when a missing-profile signal
-  // fired (the model saw absence but left no row to attribute it to).
-  const confirmedAbsent = new Set<string>();
-  for (const r of auditData.render_controls ?? []) {
-    if (r.determination === 'business_specific_failure' && r.platform) {
-      confirmedAbsent.add(label(r.platform.toLowerCase()));
-    }
-  }
+  // A8's own seam — signal-driven: when a missing-profile signal fired but the
+  // model left no platform row to attribute it to, the key platforms with no
+  // entry at all are treated as absent.
   const missingSignal =
     detected.includes('DS_MISSING_PROFILE') || triggeredCodes.has('DS_MISSING_PROFILE');
   if (missingSignal) {
     for (const key of ['google', 'yelp', 'facebook']) {
-      if (!platforms[key]?.profile_status) confirmedAbsent.add(label(key));
+      if (!(platforms as Record<string, any>)[key]?.profile_status) {
+        confirmedAbsent.add(platformLabel(key));
+      }
     }
   }
-  // Platforms the audit actually verified present are never "missing" — a
-  // broad DS_MISSING_PROFILE for Yelp shouldn't tar a confirmed Google claim.
-  for (const name of [...present, ...unclaimed]) confirmedAbsent.delete(name);
 
   const INTEGRITY_LABELS: Record<string, string> = {
     DS_PROFILE_SUSPENDED: 'a suspended profile',

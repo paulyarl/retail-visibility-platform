@@ -18,6 +18,7 @@
  */
 
 import type { ArchetypeCode } from './archetype-selection';
+import { coOccurringLeadAllowed } from './archetype-contract';
 
 // ─── Close variants (split-testable) ────────────────────────────────────
 //
@@ -77,7 +78,7 @@ export function buildArchetypePrompt(
   } catch {
     // Malformed JSON — skip the co-occurring signal instruction
   }
-  const coOccurringInstruction = buildCoOccurringSignalInstruction(fields);
+  const coOccurringInstruction = buildCoOccurringSignalInstruction(fields, archetype);
   const platformPremiseInstruction = buildPlatformPremiseInstruction(fields);
   const platformPriorityInstruction = buildPlatformPriorityInstruction(fields);
   const tailInstructions = coOccurringInstruction + platformPremiseInstruction + platformPriorityInstruction;
@@ -298,10 +299,31 @@ reference only — do NOT dump these into the opener body verbatim):
  * signal. Injected into the prompt when strongest_co_occurring is non-null.
  * Returns empty string when no stronger signal exists (the archetype's
  * primary is already the strongest).
+ *
+ * SCOPED BY THE ARCHETYPE'S OWN FORBIDDEN VOCABULARY. A lane forbids a
+ * subject's vocabulary because that subject belongs to a different lane — the
+ * presence lane (A8) forbids "reviews"/"website", the website lane (A7)
+ * forbids "reviews". Telling such a lane to LEAD with a signal from a subject
+ * it forbids is unsatisfiable: the writer must either break the lead or break
+ * the forbidden list. When that happens this emits a scoped acknowledgement
+ * instead, so the instruction is always obeyable.
  */
-function buildCoOccurringSignalInstruction(fields: any): string {
+function buildCoOccurringSignalInstruction(fields: any, archetype: ArchetypeCode): string {
   if (!fields?.strongest_co_occurring) return '';
   const sig = fields.strongest_co_occurring;
+
+  if (!coOccurringLeadAllowed(archetype, sig.code)) {
+    return `
+
+IMPORTANT — A STRONGER SIGNAL EXISTS OUTSIDE THIS OPENER'S SCOPE:
+The strongest signal for this business is "${sig.label}" (severity: ${sig.severity}),
+which is more severe than this archetype's primary signal (severity: ${fields.primary_signal_severity}).
+That signal belongs to a DIFFERENT outreach lane — this archetype's prompt forbids
+its vocabulary, so you must NOT lead with it and must NOT name it here. Lead with
+this archetype's own primary signal and keep the opener entirely inside its scope.
+A separate lane covers the stronger finding; this opener is not the place to raise it.`;
+  }
+
   return `
 
 IMPORTANT — STRONGER CO-OCCURRING SIGNAL DETECTED:

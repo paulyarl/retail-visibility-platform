@@ -19,12 +19,17 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  extractA1Fields,
+  extractA2Fields,
   extractA3Fields,
   extractA5Fields,
   extractA8Fields,
   type CommonFields,
 } from '../field-extractors';
 import { computeSignalSeverity, computePrimarySignalSeverity } from '../signal-magnitude';
+import { platformPresence, platformLabels, platformShortLabels } from '../../../lib/platform-presence';
+import { archetypeFacts } from '../../../lib/archetype-facts';
+import { archetypeFactSlice } from '../../ProspectReportService';
 import type { BusinessAnalysisAuditData } from '../archetype-selection';
 
 const common: CommonFields = {
@@ -289,5 +294,113 @@ describe('remaining archetype severities read the audit, not a placeholder', () 
 
     const noSite = baseAudit({ website: { url: null, status: 'none_found' } } as any);
     expect(computePrimarySignalSeverity('A6', noSite)).toBe('crisis');
+  });
+});
+
+// ─── Contract guard ──────────────────────────────────────────────────────
+//
+// The anti-drift test. Platform presence was derived independently in four
+// places and they disagreed about the same audit; these assertions make
+// disagreement a test failure instead of a shipped defect. If a future change
+// teaches a consumer its own presence rule, this breaks.
+
+describe('contract — every consumer agrees with the shared delegate', () => {
+  const audit = baseAudit({
+    detected_signals: ['DS_MISSING_PROFILE'],
+    render_controls: [
+      { platform: 'google', determination: 'platform_available' },
+      { platform: 'facebook', determination: 'platform_available' },
+      { platform: 'yelp', determination: 'business_specific_failure' },
+      { platform: 'bbb', determination: 'business_specific_failure' },
+    ],
+  } as any);
+
+  it('A8 presence equals the delegate, label for label', () => {
+    const fields = extractA8Fields(audit, common);
+    const presence = platformPresence(audit);
+
+    expect(fields.present_platforms).toEqual(platformLabels(presence.claimedKeys));
+    expect(fields.unclaimed_platforms).toEqual(platformLabels(presence.unclaimedKeys));
+    expect(fields.restricted_platforms).toEqual(platformLabels(presence.restrictedKeys));
+    // A8 layers its own signal-driven seam on top, so missing is a superset.
+    for (const label of platformLabels(presence.missingKeys)) {
+      expect(fields.missing_platforms).toContain(label);
+    }
+  });
+
+  it('A3/A5 platforms_with_listings equals the delegate evidenced set (short labels)', () => {
+    // The drift clause lands inside a spoken sentence, so it uses the
+    // conversational register — "across Google, Facebook", not
+    // "across Google Business Profile, Facebook".
+    const expected = platformShortLabels(platformPresence(audit).evidencedKeys);
+    expect(expected).toEqual(['Google', 'Facebook']);
+    expect(extractA3Fields(audit, common).platforms_with_listings).toEqual(expected);
+    expect(extractA5Fields(audit, common).platforms_with_listings).toEqual(expected);
+  });
+
+  it('DS_MISSING_PROFILE severity reads the delegate absence set', () => {
+    // Only non-Google platforms are absent here.
+    expect(platformPresence(audit).missingKeys).not.toContain('google');
+    expect(computeSignalSeverity('DS_MISSING_PROFILE', audit)).toBe('material');
+    expect(computePrimarySignalSeverity('A8', audit)).toBe('material');
+  });
+});
+
+// ─── Cross-layer contract (Phase 2) ──────────────────────────────────────
+//
+// The archetype briefing reads `archetypeFactSlice`; the opener reads
+// `extractFields`. They are different audiences and legitimately carry
+// different keys — but they must never disagree about the SHARED CORE: which
+// platforms the business is on, and how many reviews are unanswered. These
+// assertions make that disagreement a test failure.
+
+describe('contract — the briefing slice and the opener fields share one core', () => {
+  const ARCHETYPES = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'] as const;
+
+  const audit = baseAudit({
+    detected_signals: ['DS_MISSING_PROFILE', 'DS_DUPLICATE_LISTING'],
+    render_controls: [
+      { platform: 'google', determination: 'platform_available' },
+      { platform: 'facebook', determination: 'platform_available' },
+      { platform: 'yelp', determination: 'business_specific_failure' },
+      { platform: 'bbb', determination: 'business_specific_failure' },
+    ],
+  } as any);
+
+  it('every archetype slice carries the shared core', () => {
+    for (const arch of ARCHETYPES) {
+      const slice = archetypeFactSlice(arch, audit) as any;
+      const facts = archetypeFacts(arch, audit);
+
+      expect(slice.platform_presence).toEqual({
+        present: facts.presence.presentKeys,
+        claimed: facts.presence.claimedKeys,
+        unclaimed: facts.presence.unclaimedKeys,
+        missing: facts.presence.missingKeys,
+        restricted: facts.presence.restrictedKeys,
+        evidenced: facts.presence.evidencedKeys,
+      });
+      expect(slice.review_counts).toEqual(facts.counts);
+    }
+  });
+
+  it('the opener and the briefing cite identical review counts', () => {
+    const slice = archetypeFactSlice('A1', audit) as any;
+
+    expect(extractA1Fields(audit, common).unanswered_total).toBe(slice.review_counts.unanswered);
+    expect(extractA2Fields(audit, common, { theme: 'x', summary: 'y', supporting_review_count: 1 } as any).unanswered_negatives)
+      .toBe(slice.review_counts.unansweredNegative);
+    expect(extractA5Fields(audit, common).unaddressed_review_count).toBe(slice.review_counts.unanswered);
+  });
+
+  it('the opener and the briefing cite identical platform presence', () => {
+    const slice = archetypeFactSlice('A8', audit) as any;
+    const fields = extractA8Fields(audit, common);
+
+    expect(fields.present_platforms).toEqual(platformLabels(slice.platform_presence.claimed));
+    expect(fields.unclaimed_platforms).toEqual(platformLabels(slice.platform_presence.unclaimed));
+    // A3/A5 use the conversational register of the same evidenced set.
+    expect(extractA5Fields(audit, common).platforms_with_listings)
+      .toEqual(platformShortLabels(slice.platform_presence.evidenced));
   });
 });
