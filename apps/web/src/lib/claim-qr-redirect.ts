@@ -11,13 +11,21 @@
  *      /api/public/qr/claim-scan endpoint (records the qr_scan_events row
  *      with the correct surface in the same request).
  *   2. notFound() if the code is invalid / expired / consumed.
- *   3. redirect() to /place/claim/{token}.
+ *   3. redirect() to /place/claim/{token} — ABSOLUTE on the platform origin.
+ *
+ * The claim flow is a `public` surface (surface-class table,
+ * `lib/storefront-routing.ts`): it lives on the platform host only, so the
+ * target is emitted absolute. A host-relative redirect would keep the visitor
+ * on whatever host the short link was opened on — serving the platform's claim
+ * page under a tenant's custom domain, and 404ing outright on any host whose
+ * allowlist refuses the target.
  *
  * `redirect()` and `notFound()` throw Next.js control-flow errors, so they
  * propagate up from this helper to the calling page component.
  */
 
 import { redirect, notFound } from 'next/navigation';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { claimQrScanService, type ClaimQrSurface } from '@/services/ClaimQrScanService';
 
 export async function resolveClaimQrAndRedirect(
@@ -30,5 +38,5 @@ export async function resolveClaimQrAndRedirect(
     notFound();
   }
 
-  redirect(`/place/claim/${token}`);
+  redirect(`${platformOrigin()}/place/claim/${token}`);
 }

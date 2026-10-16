@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import ProspectReportShortPage from './[code]/page';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 describe('/r/pr/[code] redirect page', () => {
   beforeEach(() => {
@@ -37,12 +38,22 @@ describe('/r/pr/[code] redirect page', () => {
     expect(existsSync(path.join(appDir, 'r', '[shortCode]'))).toBe(true);
   });
 
-  it('redirects to the signed-token report URL for a valid code', async () => {
+  // The report is a `public` surface — platform host only, so the target is
+  // emitted absolute. A host-relative target would render the report under a
+  // tenant's custom domain.
+  it('redirects to the signed-token report URL on the platform origin for a valid code', async () => {
     resolveCode.mockResolvedValue('/prospect-report/abc.def');
     await expect(
       ProspectReportShortPage({ params: Promise.resolve({ code: 'K7M2XN' }) }),
-    ).rejects.toThrow('NEXT_REDIRECT:/prospect-report/abc.def');
+    ).rejects.toThrow(`NEXT_REDIRECT:${platformOrigin()}/prospect-report/abc.def`);
     expect(resolveCode).toHaveBeenCalledWith('K7M2XN');
+  });
+
+  it('leaves an already-absolute report URL untouched', async () => {
+    resolveCode.mockResolvedValue('https://reports.example.com/abc.def');
+    await expect(
+      ProspectReportShortPage({ params: Promise.resolve({ code: 'K7M2XN' }) }),
+    ).rejects.toThrow('NEXT_REDIRECT:https://reports.example.com/abc.def');
   });
 
   it('notFounds on an unknown/revoked code', async () => {

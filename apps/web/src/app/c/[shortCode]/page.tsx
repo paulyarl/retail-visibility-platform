@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { claimShortCodeService } from '@/services/ClaimShortCodeService';
 
 export const dynamic = 'force-dynamic';
@@ -17,5 +18,7 @@ export default async function ClaimShortCodePage({
     notFound();
   }
 
-  redirect(`/place/claim/${token}`);
+  // The claim flow is a `public` surface — platform host only, so the target
+  // is absolute and never renders under a tenant's custom domain.
+  redirect(`${platformOrigin()}/place/claim/${token}`);
 }

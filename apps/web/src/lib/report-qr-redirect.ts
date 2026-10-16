@@ -11,13 +11,18 @@
  *      /api/public/r/report-scan endpoint (records the qr_scan_events row
  *      with the correct surface in the same request).
  *   2. notFound() if the code is invalid / expired / consumed.
- *   3. redirect() to /seed-report/{seedId}.
+ *   3. redirect() to /seed-report/{seedId} — ABSOLUTE on the platform origin.
+ *
+ * The seed report is a `public` surface (surface-class table,
+ * `lib/storefront-routing.ts`) — platform host only, so the target is emitted
+ * absolute and never renders under a tenant's custom domain.
  *
  * `redirect()` and `notFound()` throw Next.js control-flow errors, so they
  * propagate up from this helper to the calling page component.
  */
 
 import { redirect, notFound } from 'next/navigation';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { reportQrScanService, type ReportQrSurface } from '@/services/ReportQrScanService';
 
 export async function resolveReportQrAndRedirect(
@@ -30,5 +35,5 @@ export async function resolveReportQrAndRedirect(
     notFound();
   }
 
-  redirect(`/seed-report/${seedId}`);
+  redirect(`${platformOrigin()}/seed-report/${seedId}`);
 }

@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
+import { platformOrigin } from '@/lib/storefront-routing';
 import prospectReportPublicService from '@/services/ProspectReportPublicService';
 
 export const dynamic = 'force-dynamic';
@@ -24,5 +25,8 @@ export default async function ProspectReportShortPage({
   if (!url) {
     notFound();
   }
-  redirect(url);
+  // The prospect report is a `public` surface — platform host only. resolveCode
+  // returns a platform-relative path; emit it absolute so it never renders
+  // under a tenant's custom domain.
+  redirect(url.startsWith('/') ? `${platformOrigin()}${url}` : url);
 }

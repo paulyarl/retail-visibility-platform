@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, tenantHostCanonicalPath, isTenantHostName, storefrontPath } from './storefront-routing';
+import {
+  isPlatformSubdomain,
+  isStorefrontPath,
+  isCandidateCustomHost,
+  managePathSuffix,
+  tenantHostCanonicalPath,
+  isTenantHostName,
+  storefrontPath,
+  surfaceClassForPath,
+  SURFACE_RULES,
+  STOREFRONT_PASSTHROUGH_ROOTS,
+  canonicalStorefrontOrigin,
+  canonicalStorefrontHome,
+  platformOrigin,
+  platformApexHost,
+} from './storefront-routing';
 
 describe('isPlatformSubdomain', () => {
   it('detects tenant subdomains on platform domains', () => {
@@ -188,5 +203,74 @@ describe('storefrontPath (URL delegate mapping)', () => {
 
   it('accepts a slug as the tenant key for platform paths', () => {
     expect(storefrontPath(false, 'ivoire-market', '/')).toBe('/tenant/ivoire-market');
+  });
+});
+
+describe('surface classes (the shared inventory)', () => {
+  it('classifies the roots the delegate and the proxy ask about', () => {
+    expect(surfaceClassForPath('/')).toBeNull();
+    expect(surfaceClassForPath('/products/p1')).toBe('product');
+    expect(surfaceClassForPath('/directory/acme')).toBe('directory');
+    expect(surfaceClassForPath('/place/acme')).toBe('directory');
+    expect(surfaceClassForPath('/shops/acme')).toBe('directory');
+    expect(surfaceClassForPath('/tenant/abc/policies/x')).toBe('storefront');
+    expect(surfaceClassForPath('/services')).toBe('storefront');
+    expect(surfaceClassForPath('/cart')).toBe('storefront');
+    expect(surfaceClassForPath('/preview/tok')).toBe('public');
+    expect(surfaceClassForPath('/seed-report/seed-1')).toBe('public');
+    expect(surfaceClassForPath('/place/claim/tok')).toBe('directory');
+  });
+
+  it('derives the B1 allowlist from the class rules', () => {
+    for (const root of STOREFRONT_PASSTHROUGH_ROOTS) {
+      expect(isStorefrontPath(root), `${root} should be reachable`).toBe(true);
+    }
+    // Classified, but never served under tenant DNS.
+    for (const root of ['/admin', '/settings', '/t', '/recovery', '/marketing', '/api']) {
+      expect(surfaceClassForPath(root), root).toBe('tenant-scope');
+      expect(SURFACE_RULES['tenant-scope'].reachableOnTenantHost).toBe(false);
+      expect(isStorefrontPath(root), root).toBe(false);
+    }
+  });
+
+  // Every short-code redirector root is a platform-hosted public surface — the
+  // proxy must let it through, and its TARGET is resolved by the redirector
+  // (see shortcode-redirect-targets.test.ts).
+  it('every short-code redirector root is a reachable public surface', () => {
+    const roots = [
+      '/s', '/c', '/g', '/i', '/q', '/qr', '/qe', '/qs', '/qw',
+      '/r', '/re', '/rb', '/rp', '/rs', '/rt',
+    ];
+    for (const root of roots) {
+      expect(surfaceClassForPath(root), root).toBe('public');
+      expect(isStorefrontPath(root), root).toBe(true);
+    }
+  });
+});
+
+describe('canonical ladder helpers', () => {
+  const ORIGIN = platformOrigin();
+  const APEX = platformApexHost();
+
+  it('maps an active custom domain to its own origin', () => {
+    expect(canonicalStorefrontOrigin({ kind: 'custom', host: 'mybrand.com' })).toBe('https://mybrand.com');
+    expect(canonicalStorefrontHome({ kind: 'custom', host: 'mybrand.com' }, 'tid-1')).toBe('https://mybrand.com/');
+  });
+
+  it('maps a platform subdomain to {host}.{apex}', () => {
+    expect(canonicalStorefrontOrigin({ kind: 'subdomain', host: 'baraka' })).toBe(`https://baraka.${APEX}`);
+    expect(canonicalStorefrontHome({ kind: 'subdomain', host: 'baraka' }, 'tid-1')).toBe(`https://baraka.${APEX}/`);
+  });
+
+  it('maps a path tenant to the platform app', () => {
+    expect(canonicalStorefrontOrigin({ kind: 'path', tenantId: 'tid-1' })).toBe(ORIGIN);
+    expect(canonicalStorefrontHome({ kind: 'path', tenantId: 'tid-1' }, 'tid-1')).toBe(`${ORIGIN}/tenant/tid-1`);
+  });
+
+  it('falls back to the platform path when the lookup failed or is incomplete', () => {
+    expect(canonicalStorefrontOrigin(null)).toBe(ORIGIN);
+    expect(canonicalStorefrontHome(null, 'tid-1')).toBe(`${ORIGIN}/tenant/tid-1`);
+    expect(canonicalStorefrontOrigin({ kind: 'custom', host: null })).toBe(ORIGIN);
+    expect(canonicalStorefrontHome({ kind: 'subdomain', host: null }, 'tid-1')).toBe(`${ORIGIN}/tenant/tid-1`);
   });
 });

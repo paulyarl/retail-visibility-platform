@@ -1,4 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
+import { canonicalStorefrontHome } from '@/lib/storefront-routing';
+import { tenantPublicService } from '@/services/TenantPublicService';
 import { shortCodeService } from '@/services/ShortCodeService';
 import { PublicCouponService } from '@/services/PublicCouponService';
 
@@ -30,5 +32,12 @@ export default async function ShortCodePage({
     source: 'short_code_redirect',
   }).catch(() => {});
 
-  redirect(`/tenant/${tenantId}?coupon=${encodeURIComponent(couponCode)}`);
+  // A coupon lands on the tenant's STOREFRONT surface, so the destination is
+  // the canonical ladder (active custom domain → platform subdomain → platform
+  // path), emitted absolute. A host-relative /tenant/{id} would depend on the
+  // proxy to canonicalize it (an extra 301) and would pin the coupon to
+  // whatever host the QR was opened on. Best-effort: a failed lookup falls
+  // through to the platform path, which the proxy still canonicalizes.
+  const canon = await tenantPublicService.getStorefrontCanonical(tenantId).catch(() => null);
+  redirect(`${canonicalStorefrontHome(canon, tenantId)}?coupon=${encodeURIComponent(couponCode)}`);
 }

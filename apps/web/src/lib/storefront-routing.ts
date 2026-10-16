@@ -6,20 +6,130 @@
 // Platform domains that support subdomains
 const PLATFORM_DOMAINS = ['visibleshelf.com', 'visibleshelf.store'];
 
-// Paths a tenant storefront host is allowed to serve. The subdomain rewrite
-// in the proxy returns before the /admin and /settings auth gates run, so
-// every path not on this list must be refused — otherwise protected routes
-// render on a tenant subdomain with no session check. Prefix roots get the
-// /tenant/{id} prefix; pass-through roots serve as-is on the tenant host.
+/**
+ * Surface classes — the shared vocabulary for "what is this path, and where
+ * must a link to it point". One table, two consumers: the proxy's B1 allowlist
+ * (reachability) and the URL delegate (origin). The class names the surface;
+ * the rule is the behaviour, and there are only two origins:
+ *
+ *   platform   — host-independent. Emitted absolute to `platformOrigin()` so a
+ *                link never renders the platform under a tenant's domain.
+ *   canonical  — host-scoped. On a tenant host the storefront IS the origin
+ *                (host-relative); a cross-tenant link resolves the TARGET
+ *                tenant's canonical ladder (custom → subdomain → /tenant/{id}).
+ */
+export type SurfaceClass = 'public' | 'directory' | 'tenant-scope' | 'storefront' | 'product';
+
+export interface SurfaceRule {
+  /** Served when the request host is a tenant storefront host. */
+  reachableOnTenantHost: boolean;
+  /** Where links to this surface must point. */
+  origin: 'platform' | 'canonical';
+}
+
+export const SURFACE_RULES: Record<SurfaceClass, SurfaceRule> = {
+  // Platform-owned public pages (marketing, legal, report/gallery/preview,
+  // claim + the short-code redirectors). Reachable on a tenant host, but links
+  // are always emitted platform-absolute.
+  public: { reachableOnTenantHost: true, origin: 'platform' },
+  // Directory entries — per-listing pages that live on the platform host and
+  // may describe any business. Same rule as public; named because the
+  // directory→storefront hop is its own delegate concern.
+  directory: { reachableOnTenantHost: true, origin: 'platform' },
+  // Platform-scoped surfaces that are NEVER addressable under tenant DNS: the
+  // workspace, auth, app-internal paths, and platform-only token forms. The
+  // rewrite returns before the /admin and /settings auth gates, so anything
+  // off the reachable set must 404.
+  'tenant-scope': { reachableOnTenantHost: false, origin: 'platform' },
+  // The tenant's own storefront: the origin IS the storefront on a tenant
+  // host, /tenant/{id} on the platform app.
+  storefront: { reachableOnTenantHost: true, origin: 'canonical' },
+  // Product pages — storefront-shaped, but the owning tenant is the product's,
+  // not the host's (cross-tenant resolution).
+  product: { reachableOnTenantHost: true, origin: 'canonical' },
+};
+
+/**
+ * Root segment → surface class. THE inventory: the proxy allowlist and the
+ * URL delegate both derive from it. Adding a public route means adding it here.
+ */
+const SURFACE_ROOTS: Record<string, SurfaceClass> = {
+  // storefront (host-scoped)
+  '/tenant': 'storefront',
+  '/cart': 'storefront',
+  '/carts': 'storefront',
+  '/checkout': 'storefront',
+  '/orders': 'storefront',
+  '/my-orders': 'storefront',
+  '/compare': 'storefront',
+  '/customerlogin': 'storefront',
+  '/services': 'storefront',
+  '/policies': 'storefront',
+  // product (host-scoped, cross-tenant)
+  '/products': 'product',
+  // directory (platform host)
+  '/shops': 'directory',
+  '/directory': 'directory',
+  '/place': 'directory',
+  // public (platform host)
+  '/privacy': 'public',
+  '/terms': 'public',
+  '/legal': 'public',
+  '/contact': 'public',
+  '/faq': 'public',
+  '/support': 'public',
+  '/guides': 'public',
+  '/features': 'public',
+  '/solutions': 'public',
+  '/retail': 'public',
+  '/prospect-report': 'public',
+  '/seed-report': 'public',
+  '/preview': 'public',
+  // Short-code redirectors — platform-hosted; each bounces to its target's own
+  // surface class (see the resolve*AndRedirect helpers).
+  '/s': 'public',
+  '/c': 'public',
+  '/g': 'public',
+  '/i': 'public',
+  '/q': 'public',
+  '/qr': 'public',
+  '/qe': 'public',
+  '/qs': 'public',
+  '/qw': 'public',
+  '/r': 'public',
+  '/re': 'public',
+  '/rb': 'public',
+  '/rp': 'public',
+  '/rs': 'public',
+  '/rt': 'public',
+  // tenant-scope (never served on a tenant host)
+  '/t': 'tenant-scope',
+  '/settings': 'tenant-scope',
+  '/admin': 'tenant-scope',
+  '/dashboard': 'tenant-scope',
+  '/account': 'tenant-scope',
+  '/debug': 'tenant-scope',
+  '/items': 'tenant-scope',
+  '/register': 'tenant-scope',
+  '/login': 'tenant-scope',
+  '/api': 'tenant-scope',
+  // Platform-only token forms — reached via a platform-absolute short link,
+  // never served under tenant DNS.
+  '/recovery': 'tenant-scope',
+  '/marketing': 'tenant-scope',
+};
+
+// Prefix roots get the /tenant/{id} prefix on a tenant host; pass-through
+// roots serve as-is. Kept explicit — this is a rewrite mechanic, not a class.
 export const STOREFRONT_PREFIX_ROOTS = ['/services', '/policies'];
-export const STOREFRONT_PASSTHROUGH_ROOTS = [
-  '/tenant', '/products', '/cart', '/carts', '/checkout', '/orders', '/my-orders', '/compare',
-  '/shops', '/directory', '/place', '/s', '/c', '/customerlogin',
-  '/privacy', '/terms', '/legal', '/contact', '/faq', '/support', '/guides',
-  '/features', '/solutions', '/retail', '/prospect-report', '/seed-report', '/preview',
-  // Short-code redirectors — safe to pass: they bounce to their canonical target.
-  '/g', '/i', '/q', '/qr', '/qe', '/qs', '/qw', '/r', '/re', '/rb', '/rp', '/rs', '/rt',
-];
+
+/** Roots a tenant storefront host is allowed to serve (the B1 allowlist). */
+export const STOREFRONT_PASSTHROUGH_ROOTS: readonly string[] = Object.entries(SURFACE_ROOTS)
+  .filter(
+    ([root, cls]) =>
+      SURFACE_RULES[cls].reachableOnTenantHost && !STOREFRONT_PREFIX_ROOTS.includes(root),
+  )
+  .map(([root]) => root);
 
 export function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; subdomain: string; domain: string } | null {
   // Check production domains
@@ -44,10 +154,15 @@ export function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; s
   return null;
 }
 
+/** Surface class of a path's root segment, or null when it isn't a known root. */
+export function surfaceClassForPath(pathname: string): SurfaceClass | null {
+  return SURFACE_ROOTS[`/${pathname.split('/')[1]}`] ?? null;
+}
+
 export function isStorefrontPath(pathname: string): boolean {
   if (pathname === '/') return true;
-  const root = `/${pathname.split('/')[1]}`;
-  return STOREFRONT_PREFIX_ROOTS.includes(root) || STOREFRONT_PASSTHROUGH_ROOTS.includes(root);
+  const cls = surfaceClassForPath(pathname);
+  return cls !== null && SURFACE_RULES[cls].reachableOnTenantHost;
 }
 
 // Platform apexes — the app itself. A host matching one of these is never a
@@ -177,4 +292,50 @@ export function tenantHostCanonicalPath(pathname: string, tenantId: string): Ten
     return { kind: 'self', path: rest };
   }
   return null;
+}
+
+/**
+ * Canonical ladder result — mirrors `GET /api/tenants/storefront-canonical/:id`.
+ * The API resolves tenant STATE; this module maps it to a URL.
+ */
+export interface StorefrontCanonical {
+  kind: 'custom' | 'subdomain' | 'path';
+  host?: string | null;
+  tenantId?: string | null;
+}
+
+/**
+ * Origin of a tenant's canonical surface — for PASSTHROUGH paths that are valid
+ * verbatim on every surface (`/products/{id}`, `/directory/{slug}`):
+ *   custom    → https://{host}
+ *   subdomain → https://{host}.{platformApexHost()}
+ *   path      → {platformOrigin()}  (the platform app)
+ *
+ * The single ladder implementation — it used to be copy-pasted at every
+ * consumer (cross-tenant links, Visit-Store, storefront metadata, the /s
+ * coupon redirect).
+ */
+export function canonicalStorefrontOrigin(canon: StorefrontCanonical | null | undefined): string {
+  if (canon?.kind === 'custom' && canon.host) return `https://${canon.host}`;
+  if (canon?.kind === 'subdomain' && canon.host) return `https://${canon.host}.${platformApexHost()}`;
+  return platformOrigin();
+}
+
+/**
+ * Absolute URL of a tenant's canonical storefront HOME:
+ *   custom    → https://{host}/
+ *   subdomain → https://{host}.{platformApexHost()}/
+ *   path      → {platformOrigin()}/tenant/{idOrSlug}
+ *
+ * Never host-relative: a share/QR/short-link target must be absolute so it
+ * survives being emitted from any surface (platform apex, subdomain, or a
+ * different tenant's custom domain).
+ */
+export function canonicalStorefrontHome(
+  canon: StorefrontCanonical | null | undefined,
+  idOrSlug: string,
+): string {
+  if (canon?.kind === 'custom' && canon.host) return `https://${canon.host}/`;
+  if (canon?.kind === 'subdomain' && canon.host) return `https://${canon.host}.${platformApexHost()}/`;
+  return `${platformOrigin()}/tenant/${idOrSlug}`;
 }

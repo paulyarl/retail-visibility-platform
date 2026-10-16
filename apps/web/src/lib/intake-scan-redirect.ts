@@ -11,13 +11,21 @@
  *      with the correct surface in the same request).
  *   2. Unresolved code → /recovery/intake root, which renders its existing
  *      invalid-token state.
- *   3. Resolved → redirect() to /recovery/intake?token={token}.
+ *   3. Resolved → redirect() to /recovery/intake?token={token} — ABSOLUTE on
+ *      the platform origin.
+ *
+ * The intake form is a `tenant-scope` (platform-only) surface — the proxy's
+ * allowlist deliberately refuses /recovery on a tenant host, because the
+ * rewrite returns before the auth gates. A host-relative redirect therefore
+ * 404s after the scan is recorded; the absolute target keeps the B1 boundary
+ * intact instead of widening it.
  *
  * `redirect()` throws a Next.js control-flow error, so it propagates up from
  * this helper to the calling page component.
  */
 
 import { redirect } from 'next/navigation';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { intakeShortCodeService, type IntakeScanSurface } from '@/services/IntakeShortCodeService';
 
 export async function resolveIntakeAndRedirect(
@@ -27,8 +35,8 @@ export async function resolveIntakeAndRedirect(
   const resolved = await intakeShortCodeService.resolveAndTrack(shortCode, surface);
 
   if (!resolved?.token) {
-    redirect('/recovery/intake');
+    redirect(`${platformOrigin()}/recovery/intake`);
   }
 
-  redirect(`/recovery/intake?token=${encodeURIComponent(resolved.token)}`);
+  redirect(`${platformOrigin()}/recovery/intake?token=${encodeURIComponent(resolved.token)}`);
 }

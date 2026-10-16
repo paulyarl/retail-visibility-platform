@@ -52,7 +52,7 @@ import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerCon
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 import { clientLogger } from '@/lib/client-logger';
-import { platformOrigin, platformApexHost } from '@/lib/storefront-routing';
+import { canonicalStorefrontHome } from '@/lib/storefront-routing';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -538,12 +538,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // canonical emits on all three surfaces so equity consolidates to the
   // tenant-owned domain while platform URLs stay reachable (D3).
   const canonicalLookup = await tenantPublicService.getStorefrontCanonical(id).catch(() => null);
-  const canonicalUrl =
-    canonicalLookup?.kind === 'custom' && canonicalLookup.host
-      ? `https://${canonicalLookup.host}/`
-      : canonicalLookup?.kind === 'subdomain' && canonicalLookup.host
-        ? `https://${canonicalLookup.host}.${platformApexHost()}/`
-        : `${platformOrigin()}/tenant/${data.resolvedTenantId}`;
+  const canonicalUrl = canonicalStorefrontHome(canonicalLookup, data.resolvedTenantId);
 
   // Basic metadata — always emitted
   const basicMetadata: Metadata = {

@@ -21,7 +21,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import Link, { type LinkProps } from 'next/link';
-import { storefrontPath, platformOrigin, platformApexHost, isTenantHostName } from '@/lib/storefront-routing';
+import { storefrontPath, platformOrigin, canonicalStorefrontOrigin, canonicalStorefrontHome, isTenantHostName } from '@/lib/storefront-routing';
 import { tenantPublicService } from '@/services/TenantPublicService';
 
 export interface StorefrontUrlValue {
@@ -123,12 +123,7 @@ export function useCrossTenantUrl(targetTenantId: string | undefined, path: stri
       .getStorefrontCanonical(targetTenantId)
       .then((canon) => {
         if (cancelled) return;
-        const resolved =
-          canon?.kind === 'custom' && canon.host
-            ? `https://${canon.host}`
-            : canon?.kind === 'subdomain' && canon.host
-              ? `https://${canon.host}.${platformApexHost()}`
-              : platformOrigin();
+        const resolved = canonicalStorefrontOrigin(canon);
         // Canonical may land back on this host (same tenant, unknown to the
         // provider) — keep the href relative so client nav stays intact.
         const sameHost =
@@ -172,18 +167,13 @@ export function useTenantStorefrontUrl(idOrSlug: string | undefined): string {
       .getStorefrontCanonical(idOrSlug)
       .then((canon) => {
         if (cancelled) return;
-        const url =
-          canon?.kind === 'custom' && canon.host
-            ? `https://${canon.host}/`
-            : canon?.kind === 'subdomain' && canon.host
-              ? `https://${canon.host}.${platformApexHost()}/`
-              : `${platformOrigin()}${pathHref}`;
+        const url = canonicalStorefrontHome(canon, idOrSlug);
         // Canonical landed back on this host → the storefront IS the host root.
         setResolved(
           new URL(url).host.toLowerCase() === window.location.host.toLowerCase() ? '/' : url
         );
       })
-      .catch(() => setResolved(`${platformOrigin()}${pathHref}`));
+      .catch(() => setResolved(canonicalStorefrontHome(null, idOrSlug)));
 
     return () => { cancelled = true; };
   }, [ctx?.tenantHost, ctx?.tenantId, idOrSlug, pathHref]);

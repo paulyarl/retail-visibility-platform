@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Store,
@@ -11,6 +11,8 @@ import {
   Clock,
   AlertTriangle,
 } from 'lucide-react';
+import { platformOrigin } from '@/lib/storefront-routing';
+import { useTenantStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
 import { qrScanService } from '@/services/QrScanService';
 
 interface QRTenantInfo {
@@ -23,12 +25,17 @@ interface QRTenantInfo {
 
 export default function QRLandingPage() {
   const params = useParams();
-  const router = useRouter();
   const tenantId = params?.tenantId as string;
 
   const [tenantInfo, setTenantInfo] = useState<QRTenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Visit-Store destination goes through the URL delegate: the canonical
+  // ladder (custom domain → subdomain → /tenant/{id}) instead of a hardcoded
+  // `{subdomain}.visibleshelf.com`, which ignored custom domains and 404'd for
+  // a tenant that had a domain but no subdomain.
+  const visitStoreHref = useTenantStorefrontUrl(tenantId);
 
   useEffect(() => {
     async function trackAndFetch() {
@@ -54,17 +61,13 @@ export default function QRLandingPage() {
   }, [tenantId]);
 
   function handleVisitStore() {
-    if (tenantInfo?.subdomain) {
-      window.location.href = `https://${tenantInfo.subdomain}.visibleshelf.com`;
-    } else if (tenantInfo?.slug) {
-      router.push(`/tenant/${tenantInfo.slug}`);
-    } else {
-      router.push(`/tenant/${tenantId}`);
-    }
+    window.location.href = visitStoreHref;
   }
 
+  // Signup is a platform (`tenant-scope`) surface — never served on a tenant
+  // host, so it must be emitted absolute.
   function handleSignup() {
-    router.push(`/signup?demo=${tenantId}`);
+    window.location.href = `${platformOrigin()}/signup?demo=${tenantId}`;
   }
 
   if (loading) {
@@ -90,7 +93,7 @@ export default function QRLandingPage() {
             This QR code may be expired or invalid. Please contact the person who shared it with you.
           </p>
           <button
-            onClick={() => router.push('/')}
+            onClick={() => { window.location.href = platformOrigin(); }}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
           >
             Go to VisibleShelf

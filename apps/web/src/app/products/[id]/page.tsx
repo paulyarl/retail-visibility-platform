@@ -558,7 +558,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     // keywords: tenantProfile?.seo_tags?.join(", ") || "",
     offers: {
       '@type': 'Offer',
-      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'}/products/${product.id}`,
+      // Host-aware product URL (same value as the share/QR URL above) — was a
+      // hardcoded `NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'`, which
+      // shipped a stale non-platform origin to Google on every surface.
+      url: currentUrl,
       priceCurrency: product.currency,
       price: product.price,
       availability: `https://schema.org/${product.availability === 'in_stock' ? 'InStock' : 'OutOfStock'}`,
