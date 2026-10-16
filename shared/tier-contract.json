@@ -1,0 +1,98 @@
+{
+  "$comment": "Tier contract fixture — the SINGLE source every consumer asserts against. See docs/LocalBiz/TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md (D2: the fixture is canonical, the DB is one of its witnesses; D6: repo-root shared/ so both apps/api and apps/web import it by relative path). Hand-authored, NOT generated — a DB dump leg CHECKS it (Phase 0.2/4.1), it does not produce it.",
+  "version": 1,
+  "decided": "2026-10-16",
+
+  "tier_order": [
+    "directory_presence",
+    "google_only",
+    "presence",
+    "starter",
+    "discovery",
+    "storefront",
+    "commitment",
+    "ecommerce",
+    "omnichannel",
+    "professional",
+    "organization",
+    "enterprise",
+    "chain_starter",
+    "chain_professional",
+    "chain_enterprise",
+    "custom"
+  ],
+
+  "$tier_order_note": "D9 (decided 2026-10-16): `starter` is pinned at index 3, NOT the documented index 11. All four code copies already agreed at 3; moving it to 11 would change `tierIndex('starter')` for existing legacy tenants and rank them near `enterprise` in the tip/quick-link surfaces. The doc bends to the code. Phase 5 corrects tier-hierarchy.md.",
+
+  "tier_classes": {
+    "$comment": "D8. Phase 1.3's bidirectional check reads these: `active` needs order membership + display name + price; `inactive_legacy` needs order membership only; `pseudo_tiers` are exempt by rule (never in a purchasable path, zero keys).",
+    "active": [
+      "directory_presence",
+      "presence",
+      "discovery",
+      "storefront",
+      "commitment",
+      "ecommerce",
+      "omnichannel",
+      "professional",
+      "organization",
+      "enterprise"
+    ],
+    "inactive_legacy": [
+      "google_only",
+      "starter",
+      "chain_starter",
+      "chain_professional",
+      "chain_enterprise",
+      "custom"
+    ],
+    "pseudo_tiers": [
+      "seed_preview",
+      "expired_trial",
+      "trial_google_only",
+      "trial_directory_presence",
+      "trial_presence",
+      "trial_discovery",
+      "trial_starter",
+      "trial_storefront",
+      "trial_commitment",
+      "trial_ecommerce",
+      "trial_omnichannel",
+      "trial_professional",
+      "trial_organization",
+      "trial_enterprise",
+      "trial_chain_starter",
+      "trial_chain_professional",
+      "trial_chain_enterprise"
+    ]
+  },
+
+  "$pseudo_tiers_note": "Deliberately NOT in tier_order — a trial wrapper is a state, not a rung. `expired_trial` is deprecated (presentation returns it unmapped; limits proxy it to `presence`). See H2 in the sprint plan.",
+
+  "pricing": {
+    "$comment": "0.4 is unresolved: the doc table lacks the `chain_*` / `google_only` / `trial` / `starter` rows that exist in code, and Phase 5.1's doc generation is gated on that decision. Only the documented active-tier prices are pinned here; the dormant rows are deliberately absent until 0.4 rules.",
+    "directory_presence": 0,
+    "presence": 19,
+    "discovery": 29,
+    "storefront": 59,
+    "commitment": 79,
+    "ecommerce": 99,
+    "omnichannel": 149,
+    "professional": 199,
+    "organization": 499,
+    "enterprise": 499
+  },
+
+  "critical_order_invariants": {
+    "$comment": "Phase 1.2. Asserted by INDEX POSITION, not membership — the failure mode is mis-ordering, not absence. The doc's own warning: 'missing either collapses index fallbacks and mis-gates capabilities.'",
+    "ecommerce_between": ["commitment", "omnichannel"],
+    "organization_between": ["professional", "enterprise"],
+    "directory_presence_before": "presence"
+  },
+
+  "index_fallback": {
+    "$comment": "Every copy's tierIndex returns 0 for an unknown key (`idx >= 0 ? idx : 0`), so a missing tier compares as `directory_presence` — the LOWEST rung. This is why omissions are silent under-gates rather than crashes. Pinned so a future refactor to -1 (which would flip every unknown tier to 'above everything') fails a test.",
+    "unknown_key_index": 0,
+    "unknown_key_equivalent_to": "directory_presence"
+  }
+}

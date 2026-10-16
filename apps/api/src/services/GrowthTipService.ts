@@ -138,7 +138,9 @@ function hasIntegrations(ctx: TipContext): boolean {
 // TIER HELPERS
 // ====================
 
-const TIER_ORDER: string[] = [
+// Exported for the tier contract test (see shared/tier-contract.json and
+// docs/LocalBiz/TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md, D1: assert first).
+export const TIER_ORDER: string[] = [
   'directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront', 'commitment',
   'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',

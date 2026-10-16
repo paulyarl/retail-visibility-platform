@@ -219,13 +219,40 @@ Asserts the model's internal consistency. Pure, no DB, no mocks. **Every red ass
 | 1.2 | `ecommerce` sits between `commitment` and `omnichannel`; `organization` between `professional` and `enterprise`. | Asserted by index position, not membership — the failure mode is mis-ordering, not absence. |
 | 1.3 | Every key in the fixture's tier universe resolves in `TIER_DISPLAY_NAMES` and `TIER_PRICING` per its D8 class: active tiers need both; `inactive_legacy` need order-membership only; `pseudo_tiers` (`seed_preview`, `expired_trial`, `trial_*`, `custom`) are explicitly exempt by rule. | Bidirectional within each class — a display name with no tier is as wrong as a tier with no price. Today `custom` violates this on both sides. |
 | 1.4 | `presence`'s display name is `"Starter"` and `starter` is inactive legacy — present in order arrays, absent from primary GTM paths. | The doc's bug #1. Partially covered by `entry-presence-tier.test.ts` — fold it in, don't duplicate. |
-| 1.5 | `TIER_FEATURES` and `FEATURE_TIER_MAP` agree in both directions for every tier they share. | **Known red on day one:** `propagation_products: 'starter'` in the map vs. organization-only in the feature bag; `propagation_user_roles`, `propagation_feature_flags`, `propagation_brand_assets`, `propagation_selective`, `propagation_scheduling`, `propagation_rollback` are mapped to tiers but absent from every `TIER_FEATURES` entry. Route each to the remediation gate. |
+| 1.5 | `TIER_FEATURES` and `FEATURE_TIER_MAP` agree in both directions for every tier they share. | **⚠️ PREMISE CORRECTED — see "1.5 is unwritable as specified" below.** The two structures are **not inverses**, so a naive bidirectional check cannot be written. |
 | 1.6 | **The trial map is one map with four copies** — fixture pins `trial_*` → base for all of: the MV `trial_map` CTE (migration 332), `TierService.getBaseTierForTrial`, `tier-limits.getBaseTierForTrial`, `trial-tier-transparency.getBaseTierForTrial`. | Already diverged: `trial_chain_starter` → `starter` in tier-limits vs `chain_starter` elsewhere; `trial_presence`/`trial_directory_presence`/`trial_organization` exist only in the transparency util (the MV resolves them to literal `trial_*` keys with likely no `subscription_tiers_list` row → zero features); `expired_trial` → `presence` only in tier-limits while `getEffectiveTier` returns it unmapped. |
 | 1.7 | **Pin the silent defaults.** `mapTierLevel` default → `'discovery'`; `hasFeature` fallback tier → `'starter'` (the inactive legacy!); `getRequiredTier` unknown feature → `'professional'`; `getSKULimit(null)` → `starter`; `getEffectiveTier(null)` → `'discovery'`. | Five different opinions on "tenant with no tier" — the fixture names the intended default per call site or a shared one. |
 
 ### Remediation gate (between Phase 1–3 and Phase 4)
 
 Every red assertion gets a written disposition: **fix code / fix fixture / fix doc / exempt-with-reason**. Dispositions are recorded in this plan or the fixture. The phases are allowed to land red only if each failure carries its disposition — the suite may not go green by silently weakening assertions to match whatever the code happens to do today.
+
+### 1.5 is unwritable as specified — premise corrected 2026-10-16
+
+The plan predicted *"`propagation_products: 'starter'` vs organization-only; six `propagation_*` keys mapped but absent from every bag."* A diagnostic run against the real data shows the mismatch is **an order of magnitude larger and of a different kind**:
+
+| Direction | Count | Meaning |
+|---|---|---|
+| **A** — mapped to a tier whose bag omits it | **22** | Includes the whole `integration_*` family (14 keys) mapped to tiers whose `TIER_FEATURES` entries do not list them |
+| **B** — in a bag with no map entry | **56** | Mostly `directory_entry_*` chrome plus `professional.*` / `enterprise.*` extras |
+| **C** — in **multiple** bags while the map names one (or null) | **27** | `storefront` in `[starter, chain_starter]`; `custom_domain` in `[enterprise, chain_enterprise]`; `api_access` in **three** |
+
+**Two structural reasons the check cannot be written as stated:**
+
+1. **`FEATURE_TIER_MAP` is single-valued; the bags are multi-valued.** A feature granted at N tiers cannot be expressed by a `feature → one tier` map — and the chain tiers (`chain_starter`/`chain_professional`/`chain_enterprise`) mirror their base tiers, so **27 features are legitimately multi-tier**. This is not drift; it is the map's shape.
+2. **The two structures carry different namespaces.** The map has `integration_*`; the bags have `directory_entry_*`. Neither is the other's inverse.
+
+**What the check should assert instead** (and it is *stronger* than the original, because it tests a real invariant rather than a false one):
+
+| # | Assertion | Status |
+|---|---|---|
+| 1.5a | **Chain-mirror invariant:** for every `chain_X`, `TIER_FEATURES['chain_X'] ⊇ TIER_FEATURES['X']` | The diagnostic suggests it **holds** — worth pinning |
+| 1.5b | **Single-valued consistency, scoped:** for a feature in the map whose named tier's bag *does* list it, no *other* non-chain bag lists it | The 22 in (A) are the honest exception list — each needs a disposition |
+| 1.5c | **The `propagation_*` family:** the 11 keys in (A) are the real finding — `propagation_products → starter` where the bag says organization-only | **Real, and it is the plan's original claim, confirmed at 11 keys not 6** |
+| 1.5d | **The `integration_*` family (14 keys)** is a capability-module namespace, not a `TIER_FEATURES` namespace | Disposition: **exempt-with-reason**, documented — not a defect |
+
+**The gate applied to itself:** 1.5 as written would have failed on 105 rows, 27 of which are *correct by construction*. A test that demands 27 legitimate facts be "fixed" is the failure mode the gate exists to prevent — so the assertion changes, not the code. **1.5c is the one genuine red and gets a code fix; 1.5a is the invariant worth pinning; 1.5d is exempt with the reason above.**
+
 
 ---
 
