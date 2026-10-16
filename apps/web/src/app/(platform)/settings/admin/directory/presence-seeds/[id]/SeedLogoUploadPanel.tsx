@@ -8,7 +8,7 @@ import { getAcceptString, ImageUploadPresets, uploadImage } from '@/lib/image-up
 
 interface SeedLogoUploadPanelProps {
   seedId: string;
-  listing: { logoUrl?: string | null; business_name?: string | null } | null;
+  listing: { logo_url?: string | null; business_name?: string | null } | null;
   canEdit?: boolean;
 }
 
@@ -35,7 +35,7 @@ export default function SeedLogoUploadPanel({
   listing,
   canEdit = true,
 }: SeedLogoUploadPanelProps) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(listing?.logoUrl ?? null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(listing?.logo_url ?? null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
