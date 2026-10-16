@@ -186,17 +186,22 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   
   // Starter tier propagation (limited)
   propagation_products: 'starter',
-  propagation_user_roles: 'starter',
+  // Renamed 2026-10-16 to match the bag's live keys (`TIER_FEATURES`) and
+  // `TIER_DISPLAY_NAMES`. These three were dead aliases — `propagation_roles`,
+  // `propagation_flags` and `propagation_brand` are the names the bag and the
+  // display map actually use, so nothing ever resolved the old ones. See
+  // docs/LocalBiz/TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md, 1.5c.
+  propagation_roles: 'starter',
   
   // Professional tier propagation (full operational suite)
   propagation_hours: 'professional',
   propagation_profile: 'professional',
   propagation_categories: 'professional',
   propagation_gbp_sync: 'professional',
-  propagation_feature_flags: 'professional',
+  propagation_flags: 'professional',
   
   // Organization tier features
-  propagation_brand_assets: 'organization',
+  propagation_brand: 'organization',
   propagation_selective: 'organization',
   propagation_scheduling: 'organization',
   propagation_rollback: 'organization',

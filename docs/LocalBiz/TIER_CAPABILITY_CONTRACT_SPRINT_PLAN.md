@@ -70,17 +70,37 @@
 | **1.5a — chain mirror** | **Per-key: decide deliberate-vs-omission by family.** | The 14 splits: **deliberate** — `clover_pos`, `square_pos`, `payment_client_credentials` (POS/payment integration keys a chain tier plausibly excludes); **likely omission** — `basic_categories`, `business_logo`, `interactive_maps`, `privacy_mode`, `custom_marketing_copy`, `priority_support`, `advanced_analytics`, `sla_guarantee`, `custom_integrations`, `customDomains`, `category_quick_start`, `image_finder`. The `it.fails` assertion stays until each is dispositioned; promoting it means all 14 are resolved one way or the other. |
 | **Next work** | **1.5c — the `propagation_*` fix.** | The one genuine defect found. 11 keys mapped to a tier whose bag contradicts them. |
 
-### 1.5c — the work, specified
+### 1.5c — DIAGNOSED 2026-10-16: it is naming drift, not missing grants
 
-From the 1.5 diagnostic, all 11 in direction (A) are `propagation_*`:
+Reading the bag against the map settles the direction question — and it was the wrong question.
 
-| Mapped to | Keys | Bag says |
+**The bag lists 8 propagation keys** (`tier-features.ts:91-98`):
+
+```
+propagation_products · propagation_categories · propagation_gbp_sync · propagation_hours
+propagation_profile · propagation_flags · propagation_roles · propagation_brand
+```
+
+**The map names 11** (`:188-202`), and **three are stale renames of bag keys**:
+
+| Map key (stale) | Bag key (live) | Also in `TIER_DISPLAY_NAMES`? |
 |---|---|---|
-| `starter` | `propagation_products`, `propagation_user_roles` | organization-only |
-| `professional` | `propagation_hours`, `propagation_profile`, `propagation_categories`, `propagation_gbp_sync`, `propagation_feature_flags` | absent from every bag |
-| `organization` | `propagation_brand_assets`, `propagation_selective`, `propagation_scheduling`, `propagation_rollback` | absent from every bag |
+| `propagation_user_roles` | **`propagation_roles`** | `propagation_roles` only (`:315`) |
+| `propagation_feature_flags` | **`propagation_flags`** | `propagation_flags` only (`:314`) |
+| `propagation_brand_assets` | **`propagation_brand`** | `propagation_brand` only (`:316`) |
 
-**The direction of the fix is a product question, not a test question:** the map reads *"this feature requires at least tier X"*, while the bags read *"tier X grants this."* For `propagation_products → starter` the two contradict each other directly — `starter` tenants are the *minimum* for a feature their bag does not grant. Either the bags are missing 11 entries, or the map's tiers are wrong. **Read `tier-features.ts`'s `propagation_*` bag entries and the map together before changing either** — a fix that adds the keys to the bags grants chain-propagation features to `starter`, which is a commercial decision as much as a technical one.
+**The display-name map sides with the bag**, and the three stale names appear in no other structure — so the map carries three dead aliases that nothing resolves.
+
+**And three map keys are genuinely absent from every bag:** `propagation_selective`, `propagation_scheduling`, `propagation_rollback` (`:200-202`). These are the only real "mapped but never granted" cases.
+
+**So the fix is three renames, not eleven bag additions** — and the commercial question I flagged (granting chain-propagation to `starter`) **does not arise**. It never was a product decision; it is a key-naming cleanup. Corrected disposition:
+
+| Sub-item | Disposition |
+|---|---|
+| 3 stale aliases (`propagation_user_roles`, `propagation_feature_flags`, `propagation_brand_assets`) | **Fix code** — rename in `FEATURE_TIER_MAP` to the bag's live names |
+| 3 orphans (`propagation_selective`, `propagation_scheduling`, `propagation_rollback`) | **Needs a call** — either add to the `organization` bag or remove from the map. They are advertised as org-tier features with no grant behind them |
+| `propagation_products → starter` (the plan's original claim) | **Confirmed, and it is the bag's tier that needs checking** — not the map's key |
+
 
 
 ---

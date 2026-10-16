@@ -87,7 +87,8 @@ describe('tier contract (web) — 1.5a, the chain-mirror invariant', () => {
    * demanding 27 correct rows be "fixed". See the plan, "1.5 is unwritable as
    * specified".
    */
-  const bag = TIER_FEATURES as Record<string, string[]>;
+  // `TIER_FEATURES` is declared `as const`, so the bags are readonly.
+  const bag = TIER_FEATURES as unknown as Record<string, readonly string[]>;
 
   /**
    * `it.fails` — a DOCUMENTED KNOWN-RED, not a deleted assertion.
