@@ -62,6 +62,27 @@
 
 **All decisions settled: D1–D9 + 0.6.** No blockers remain.
 
+### Decided — round 2, 2026-10-16
+
+| # | Ruling | Consequence |
+|---|---|---|
+| **P1 — the private-map pattern** | **Export the maps.** Same treatment the four `TIER_ORDER`s already got. | Applies to 1.1's remaining arrays and **1.6's five trial maps**. Rejected: static file read (tests text, not value — a computed map evades it, which is the "goes green while the bug ships" failure mode this sprint exists to prevent) and behaviour-only (can't distinguish "map wrong" from "consumer wrong"). |
+| **1.5a — chain mirror** | **Per-key: decide deliberate-vs-omission by family.** | The 14 splits: **deliberate** — `clover_pos`, `square_pos`, `payment_client_credentials` (POS/payment integration keys a chain tier plausibly excludes); **likely omission** — `basic_categories`, `business_logo`, `interactive_maps`, `privacy_mode`, `custom_marketing_copy`, `priority_support`, `advanced_analytics`, `sla_guarantee`, `custom_integrations`, `customDomains`, `category_quick_start`, `image_finder`. The `it.fails` assertion stays until each is dispositioned; promoting it means all 14 are resolved one way or the other. |
+| **Next work** | **1.5c — the `propagation_*` fix.** | The one genuine defect found. 11 keys mapped to a tier whose bag contradicts them. |
+
+### 1.5c — the work, specified
+
+From the 1.5 diagnostic, all 11 in direction (A) are `propagation_*`:
+
+| Mapped to | Keys | Bag says |
+|---|---|---|
+| `starter` | `propagation_products`, `propagation_user_roles` | organization-only |
+| `professional` | `propagation_hours`, `propagation_profile`, `propagation_categories`, `propagation_gbp_sync`, `propagation_feature_flags` | absent from every bag |
+| `organization` | `propagation_brand_assets`, `propagation_selective`, `propagation_scheduling`, `propagation_rollback` | absent from every bag |
+
+**The direction of the fix is a product question, not a test question:** the map reads *"this feature requires at least tier X"*, while the bags read *"tier X grants this."* For `propagation_products → starter` the two contradict each other directly — `starter` tenants are the *minimum* for a feature their bag does not grant. Either the bags are missing 11 entries, or the map's tiers are wrong. **Read `tier-features.ts`'s `propagation_*` bag entries and the map together before changing either** — a fix that adds the keys to the bags grants chain-propagation features to `starter`, which is a commercial decision as much as a technical one.
+
+
 ---
 
 ## Green baseline — establish before Phase 0
@@ -220,7 +241,7 @@ Asserts the model's internal consistency. Pure, no DB, no mocks. **Every red ass
 | 1.3 | Every key in the fixture's tier universe resolves in `TIER_DISPLAY_NAMES` and `TIER_PRICING` per its D8 class: active tiers need both; `inactive_legacy` need order-membership only; `pseudo_tiers` (`seed_preview`, `expired_trial`, `trial_*`, `custom`) are explicitly exempt by rule. | Bidirectional within each class — a display name with no tier is as wrong as a tier with no price. Today `custom` violates this on both sides. |
 | 1.4 | `presence`'s display name is `"Starter"` and `starter` is inactive legacy — present in order arrays, absent from primary GTM paths. | The doc's bug #1. Partially covered by `entry-presence-tier.test.ts` — fold it in, don't duplicate. |
 | 1.5 | `TIER_FEATURES` and `FEATURE_TIER_MAP` agree in both directions for every tier they share. | **⚠️ PREMISE CORRECTED — see "1.5 is unwritable as specified" below.** The two structures are **not inverses**, so a naive bidirectional check cannot be written. |
-| 1.6 | **The trial map is one map with four copies** — fixture pins `trial_*` → base for all of: the MV `trial_map` CTE (migration 332), `TierService.getBaseTierForTrial`, `tier-limits.getBaseTierForTrial`, `trial-tier-transparency.getBaseTierForTrial`. | Already diverged: `trial_chain_starter` → `starter` in tier-limits vs `chain_starter` elsewhere; `trial_presence`/`trial_directory_presence`/`trial_organization` exist only in the transparency util (the MV resolves them to literal `trial_*` keys with likely no `subscription_tiers_list` row → zero features); `expired_trial` → `presence` only in tier-limits while `getEffectiveTier` returns it unmapped. |
+| 1.6 | **The trial map is one map with five copies** — fixture pins `trial_*` → base for all of: the MV `trial_map` CTE (migration 332), `TierService.getBaseTierForTrial`, `tier-limits.getBaseTierForTrial`, `trial-tier-transparency.getBaseTierForTrial`. | **⚠️ PREREQUISITE (same as 1.1): every copy is a private `const trialToBaseMap` inside its function — none is exported.** Pick the 1.1 pattern (export vs static read) before writing the assertion; it applies five times here. Confirmed copies from the 0.1 sweep: `trial-tier-transparency.ts:28`, `tier-limits.ts:29`, `TierService.ts:18`, **`commerce-capabilities.ts:71` and `:193` (two in one file)**, plus the MV's `trial_map` CTE in migration 332 (SQL — needs the 3.7 mechanism, not a unit test). **Already divergent:** `trial_chain_starter` → `starter` in `tier-limits` vs `chain_starter` in `trial-tier-transparency`; `trial_presence` / `trial_directory_presence` / `trial_organization` exist only in the transparency util; `expired_trial` is absent from the transparency map **by design** (see H2) but present in `tier-limits` as `→ presence`. **That last one is NOT a defect** — the two maps answer different questions (presentation vs limits), which is why they were renamed in the hotfix. |
 | 1.7 | **Pin the silent defaults.** `mapTierLevel` default → `'discovery'`; `hasFeature` fallback tier → `'starter'` (the inactive legacy!); `getRequiredTier` unknown feature → `'professional'`; `getSKULimit(null)` → `starter`; `getEffectiveTier(null)` → `'discovery'`. | Five different opinions on "tenant with no tier" — the fixture names the intended default per call site or a shared one. |
 
 ### Remediation gate (between Phase 1–3 and Phase 4)
