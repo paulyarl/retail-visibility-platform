@@ -8,7 +8,11 @@
  * component variants:
  *   - Opener (selected from existing variants)
  *   - Header (subject line) — dual AI/Import path, split-testable
- *   - 3-slot Preview (review paste + AI/Import owner response, negative-first)
+ *   - 3-slot Preview (archetype-aware) — evidence + briefing regular/hook
+ *     spoken lines + fix. Structured footprint slots (A5/A3/A8) capture
+ *     platform + profile URL + an archetype-aware focus attribute; the
+ *     "Sync from briefing" hand-off fills the slots from the campaign's
+ *     outreach_problems (regular → hook → fix).
  *   - Closer — dual AI/Import path, pre-filled editable template
  *   - Contact (optional) — simple CRUD
  *   - Assemble → rendered output + Copy/Download + pitch history
@@ -53,6 +57,7 @@ import ConstructionVariablesPanel, {
   type ConstructionVariable,
 } from './ConstructionVariablesPanel';
 import { useConstructionVariables, resolveVar } from './constructionVariables';
+import { focusLabelFor, focusOptionsFor } from './footprintFocus';
 
 interface PitchConstructionPanelProps {
   campaignId: string;
@@ -322,76 +327,9 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
 // the persisted pitch and are queryable via the footprint-diff endpoint for
 // before/after reporting on completed work.
 //
-// The focus vocabulary has two families:
-//   - identity — the canonical NAP+W attributes + Claim Status
-//   - problem  — the other briefing-shaped focuses the analyst raises
-//     (category mislabeling, review gap, missing presence, …). These are
-//     surfaced archetype-aware so an A5 multi-signal problem like "filed as
-//     a convenience store" is captured as a `category` focus instead of
-//     being forced into the NAP+W/Claim list.
-interface FootprintFocusOption {
-  value: FootprintFocusAttribute;
-  label: string;
-  group: 'identity' | 'problem';
-  /** Archetypes this option is offered for. Omitted = every structured archetype. */
-  archetypes?: OpenerArchetype[];
-}
-
-const FOOTPRINT_FOCUS_CATALOG: FootprintFocusOption[] = [
-  // Identity — canonical listing attributes (always available).
-  { value: 'name', label: 'Name', group: 'identity' },
-  { value: 'address', label: 'Address', group: 'identity' },
-  { value: 'phone', label: 'Phone', group: 'identity' },
-  { value: 'website', label: 'Website', group: 'identity' },
-  { value: 'claim_status', label: 'Claim Status', group: 'identity' },
-  // Problem — the other briefing-shaped focuses the analyst raises.
-  { value: 'category', label: 'Category', group: 'problem' },
-  { value: 'description', label: 'Business description', group: 'problem' },
-  { value: 'hours', label: 'Hours', group: 'problem' },
-  { value: 'reviews', label: 'Reviews', group: 'problem', archetypes: ['A5'] },
-  { value: 'photos', label: 'Photos', group: 'problem', archetypes: ['A5', 'A8'] },
-  { value: 'products', label: 'Products / catalog', group: 'problem', archetypes: ['A5'] },
-  { value: 'cta', label: 'Booking / CTA', group: 'problem', archetypes: ['A5'] },
-  { value: 'presence', label: 'Profile presence', group: 'problem', archetypes: ['A3', 'A8'] },
-  { value: 'suspended', label: 'Suspended / duplicate', group: 'problem', archetypes: ['A8'] },
-  { value: 'other', label: 'Other problem', group: 'problem' },
-];
-
-const FOOTPRINT_FOCUS_LABELS: Record<FootprintFocusAttribute, string> = {
-  name: 'Name',
-  address: 'Address',
-  phone: 'Phone',
-  website: 'Website',
-  claim_status: 'Claim Status',
-  category: 'Category',
-  reviews: 'Reviews',
-  hours: 'Hours',
-  photos: 'Photos',
-  description: 'Business description',
-  products: 'Products / catalog',
-  cta: 'Booking / CTA',
-  presence: 'Profile presence',
-  suspended: 'Suspended / duplicate',
-  other: 'Other problem',
-};
-
-function focusLabelFor(value: FootprintFocusAttribute | undefined): string {
-  return value ? FOOTPRINT_FOCUS_LABELS[value] ?? 'focus' : 'focus';
-}
-
-/** The focus options offered for a structured archetype, grouped for the dropdown. */
-function focusOptionsFor(archetype: OpenerArchetype): {
-  identity: FootprintFocusOption[];
-  problem: FootprintFocusOption[];
-} {
-  const applicable = FOOTPRINT_FOCUS_CATALOG.filter(
-    (o) => !o.archetypes || o.archetypes.includes(archetype),
-  );
-  return {
-    identity: applicable.filter((o) => o.group === 'identity'),
-    problem: applicable.filter((o) => o.group === 'problem'),
-  };
-}
+// The focus vocabulary (identity NAP+W/Claim + archetype-aware problem
+// focuses) lives in `footprintFocus.ts` so it can be unit-tested without
+// rendering the panel.
 
 // Archetypes that render the structured footprint slot UI instead of the
 // generic two-textarea layout. A5 is the multi-signal footprint pitch;
@@ -655,6 +593,14 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   const contactStarters = CONTACT_STARTERS[effectiveArchetype] ?? CONTACT_STARTERS.A1;
   const slotConfig = PREVIEW_SLOT_CONFIGS[effectiveArchetype] ?? PREVIEW_SLOT_CONFIGS.A1;
 
+  // Archetype-aware focus options for the structured slot dropdown
+  // (A5/A3/A8). Identity options are always offered; the problem-family
+  // options are filtered to the ones the archetype's briefing raises.
+  const focusGroups = useMemo(
+    () => focusOptionsFor(effectiveArchetype),
+    [effectiveArchetype],
+  );
+
   // ─── Construction Variables (shared store with the Manual tab) ──────
   // Values live in a per-campaign localStorage store shared with tab 1, so a
   // value entered on either tab resolves on both. `mergeDefaults` holds the
@@ -748,6 +694,15 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
   );
   const [pairLoading, setPairLoading] = useState<number | null>(null);
   const [pairError, setPairError] = useState<string | null>(null);
+
+  // ─── Briefing sync (manual hand-off) ────────────────────────────────
+  // Pulls the campaign's outreach_problems (AI Triage Briefing / audit)
+  // and maps the first three problems into the 3 preview slots — regular,
+  // hook, and the fix — saving the operator the copy/paste from the
+  // briefing. Manual only (never fires on load).
+  const [syncingBriefing, setSyncingBriefing] = useState(false);
+  const [briefingSyncError, setBriefingSyncError] = useState<string | null>(null);
+  const [briefingSyncNote, setBriefingSyncNote] = useState<string | null>(null);
 
   // ─── Header AI/Import ───────────────────────────────────────────────
   const [headerImportText, setHeaderImportText] = useState('');
@@ -1044,6 +999,48 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
     );
   };
   const canAssemble = !!selectedOpenerId && reviewPairs.every(pairIsComplete);
+
+  // ─── Sync the 3 preview slots from the briefing ─────────────────────
+  // Maps the campaign's outreach_problems (regular → hook → fix) into the
+  // slots. Structured archetypes (A5/A3/A8) land the fix in the summary
+  // line (the discrete correct value stays operator-authored); free-text
+  // archetypes land it in the fix field. Manual only.
+  const handleSyncFromBriefing = async () => {
+    setSyncingBriefing(true);
+    setBriefingSyncError(null);
+    setBriefingSyncNote(null);
+    try {
+      const problems = await marketingOpsService.getCampaignOutreachProblems(campaignId);
+      if (!problems || problems.length === 0) {
+        setBriefingSyncNote('No briefing problems found for this campaign.');
+        return;
+      }
+      const take = problems.slice(0, reviewPairs.length);
+      setReviewPairs((prev) =>
+        prev.map((p, i) => {
+          const problem: OutreachProblem | undefined = take[i];
+          if (!problem) return p;
+          const next: ReviewPair = {
+            ...p,
+            regular: problem.regular || undefined,
+            hook: problem.hook || undefined,
+          };
+          if (problem.solution) {
+            if (structured) next.summary = problem.solution;
+            else next.response_text = problem.solution;
+          }
+          return next;
+        }),
+      );
+      setBriefingSyncNote(
+        `Synced ${take.length} problem${take.length === 1 ? '' : 's'} from the briefing.`,
+      );
+    } catch (err: any) {
+      setBriefingSyncError(err.message || 'Failed to load briefing problems');
+    } finally {
+      setSyncingBriefing(false);
+    }
+  };
 
   const handleAssemble = async () => {
     if (!canAssemble) return;
@@ -1349,18 +1346,40 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
 
           {/* ─── 3-Slot Preview (archetype-aware) ─────────────────────── */}
           <section className="border-t border-gray-100 dark:border-neutral-700 pt-4">
-            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-              {slotConfig.sectionTitle.replace(/:$/, '')}
-              <span
-                title={`Aligned to the detected campaign archetype (${effectiveArchetype} — ${ARCHETYPE_LABELS[effectiveArchetype]})`}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide flex items-center gap-2">
+                {slotConfig.sectionTitle.replace(/:$/, '')}
+                <span
+                  title={`Aligned to the detected campaign archetype (${effectiveArchetype} — ${ARCHETYPE_LABELS[effectiveArchetype]})`}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                >
+                  {effectiveArchetype}
+                </span>
+              </h3>
+              <button
+                type="button"
+                onClick={handleSyncFromBriefing}
+                disabled={syncingBriefing}
+                title="Fill the 3 slots from this campaign's outreach problems (AI Triage Briefing / audit) — regular, hook, and fix."
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50"
               >
-                {effectiveArchetype}
-              </span>
-            </h3>
+                {syncingBriefing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                Sync from briefing
+              </button>
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
               {slotConfig.sectionBlurb}
             </p>
+            {briefingSyncError && (
+              <div className="mb-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-2">
+                <p className="text-xs text-red-700 dark:text-red-400">{briefingSyncError}</p>
+              </div>
+            )}
+            {briefingSyncNote && (
+              <div className="mb-2 rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-2">
+                <p className="text-xs text-emerald-700 dark:text-emerald-400">{briefingSyncNote}</p>
+              </div>
+            )}
             {pairError && (
               <div className="mb-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-2">
                 <p className="text-xs text-red-700 dark:text-red-400">{pairError}</p>
@@ -1449,13 +1468,29 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                               className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             >
                               <option value="">— select —</option>
-                              {FOOTPRINT_FOCUS_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
+                              {/* Orphan guard — a focus carried over from
+                                  another archetype (or a legacy pitch) stays
+                                  selectable so the value never silently drops. */}
+                              {pair.focus_attribute &&
+                                ![...focusGroups.identity, ...focusGroups.problem].some((o) => o.value === pair.focus_attribute) && (
+                                  <option value={pair.focus_attribute}>
+                                    {focusLabelFor(pair.focus_attribute)}
+                                  </option>
+                                )}
+                              <optgroup label="Identity (NAP + claim)">
+                                {focusGroups.identity.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label={`Problem focus (${effectiveArchetype})`}>
+                                {focusGroups.problem.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                              </optgroup>
                             </select>
                           </label>
                           <label className="block">
-                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Inconsistent Info ({FOOTPRINT_FOCUS_OPTIONS.find((o) => o.value === pair.focus_attribute)?.label ?? 'focus'})</span>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Inconsistent Info ({focusLabelFor(pair.focus_attribute)})</span>
                             <input
                               type="text"
                               value={pair.current_value ?? ''}
@@ -1466,6 +1501,13 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                           </label>
                         </div>
                       </div>
+                      {/* Spoken lines (briefing regular/hook) — problem → how
+                          to say it → fix. Optional; filled by the briefing
+                          sync or typed. */}
+                      <SpokenLineFields
+                        pair={pair}
+                        onChange={(field, value) => updatePair(idx, field, value)}
+                      />
                       {/* Proposed fix box */}
                       <div className="rounded-md border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-900/10 p-3">
                         <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">
@@ -1493,7 +1535,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                             />
                           </label>
                           <label className="block">
-                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Correct Info ({FOOTPRINT_FOCUS_OPTIONS.find((o) => o.value === pair.focus_attribute)?.label ?? 'focus'})</span>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Correct Info ({focusLabelFor(pair.focus_attribute)})</span>
                             <input
                               type="text"
                               value={pair.correct_value ?? ''}
@@ -1516,7 +1558,7 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                       </div>
                     </div>
                   ) : (
-                    // ── Free-text slot (A1/A2/A4/A6) ──
+                    // ── Free-text slot (A1/A2/A4/A6/A7) ──
                     <>
                       <textarea
                         value={pair.review_text ?? ''}
@@ -1525,6 +1567,15 @@ export default function PitchConstructionPanel({ campaignId, openers, archetype 
                         rows={3}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
                       />
+                      {/* Spoken lines (briefing regular/hook) — evidence →
+                          how to say it → fix. Optional; filled by the
+                          briefing sync or typed. */}
+                      <div className="mb-2">
+                        <SpokenLineFields
+                          pair={pair}
+                          onChange={(field, value) => updatePair(idx, field, value)}
+                        />
+                      </div>
                       <textarea
                         value={pair.response_text ?? ''}
                         onChange={(e) => updatePair(idx, 'response_text', e.target.value)}
