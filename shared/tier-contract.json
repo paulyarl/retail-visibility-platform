@@ -94,5 +94,29 @@
     "$comment": "Every copy's tierIndex returns 0 for an unknown key (`idx >= 0 ? idx : 0`), so a missing tier compares as `directory_presence` — the LOWEST rung. This is why omissions are silent under-gates rather than crashes. Pinned so a future refactor to -1 (which would flip every unknown tier to 'above everything') fails a test.",
     "unknown_key_index": 0,
     "unknown_key_equivalent_to": "directory_presence"
+  },
+
+  "chain_mirrors": [
+    { "chain": "chain_starter", "base": "starter" },
+    { "chain": "chain_professional", "base": "professional" },
+    { "chain": "chain_enterprise", "base": "enterprise" }
+  ],
+
+  "$chain_mirrors_note": "Phase 1.5a. A chain tier mirrors its base tier's grants. This is the invariant the failed bidirectional check was reaching for — the 1.5 diagnostic found it, and most of that check's 27 'multi-bag' rows are these mirrors behaving correctly.",
+
+  "feature_namespaces": {
+    "$comment": "Phase 1.5d — exempt-with-reason. `TIER_FEATURES` (the bags) and `FEATURE_TIER_MAP` are NOT inverses: they carry overlapping but different namespaces. Recorded so a future contributor does not 'reconcile' them and break a working model.",
+    "bag_only": {
+      "prefixes": ["directory_entry_"],
+      "$reason": "Directory/presence chrome. Granted by the bags; absent from the map, which covers purchasable feature keys."
+    },
+    "map_only": {
+      "prefixes": ["integration_"],
+      "$reason": "Capability-module namespace, not a TIER_FEATURES namespace. 14 keys mapped to tiers whose bags do not list them — by design, not drift."
+    },
+    "known_genuine_red": {
+      "prefixes": ["propagation_"],
+      "$reason": "Phase 1.5c — the ONE real defect. 11 keys mapped to a tier whose bag contradicts them, including `propagation_products -> starter` where the bag says organization-only. Needs a code fix, not an exemption."
+    }
   }
 }

@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import contract from '../../../../../shared/tier-contract.json';
 import { TIER_ORDER } from '../growth-tips/tipEngine';
-import { TIER_DISPLAY_NAMES, TIER_PRICING } from './tier-features';
+import { TIER_DISPLAY_NAMES, TIER_PRICING, TIER_FEATURES } from './tier-features';
 
 describe('tier contract (web) — order matches the fixture', () => {
   it('tipEngine declares the fixture order exactly', () => {
@@ -72,4 +72,49 @@ describe('tier contract (web) — Phase 1.3, per D8 class', () => {
       expect(TIER_ORDER as readonly string[]).not.toContain(t);
     }
   });
+});
+
+describe('tier contract (web) — 1.5a, the chain-mirror invariant', () => {
+  /**
+   * A chain tier mirrors its base tier: whatever `starter` grants, `chain_starter`
+   * grants too. This is the REAL invariant the failed 1.5 was reaching for — and
+   * the 1.5 diagnostic is what found it.
+   *
+   * The naive bidirectional check (TIER_FEATURES ↔ FEATURE_TIER_MAP) was
+   * unwritable: the map is single-valued while the bags are multi-valued, so 27
+   * features appear in two bags legitimately — and most of those pairs ARE the
+   * chain mirror. Asserting the mirror directly tests the fact instead of
+   * demanding 27 correct rows be "fixed". See the plan, "1.5 is unwritable as
+   * specified".
+   */
+  const bag = TIER_FEATURES as Record<string, string[]>;
+
+  /**
+   * `it.fails` — a DOCUMENTED KNOWN-RED, not a deleted assertion.
+   *
+   * The invariant does not hold today: 14 features are granted at the base tier
+   * and absent from the chain tier.
+   *
+   *   chain_starter     ← basic_categories, category_quick_start, image_finder, clover_pos
+   *   chain_professional ← business_logo, interactive_maps, privacy_mode,
+   *                        custom_marketing_copy, priority_support, square_pos,
+   *                        payment_client_credentials
+   *   chain_enterprise  ← advanced_analytics, sla_guarantee, custom_integrations, customDomains
+   *
+   * `tier-hierarchy.md` says `chain_professional` is "professional level", which
+   * implies the mirror. Either the chain bags are incomplete (a real bug) or a
+   * chain tier is a genuinely different bundle and the doc is loose — undecided.
+   *
+   * `it.fails` is the honest instrument: the suite stays green, the gap stays
+   * visible in the source, and **fixing the code makes this test fail** — forcing
+   * whoever fixes it to promote the assertion rather than leave it buried.
+   */
+  it.fails.each(contract.chain_mirrors.map((m) => [m.chain, m.base] as const))(
+    'KNOWN-RED: %s grants everything %s grants',
+    (chain, base) => {
+      const chainBag = new Set(bag[chain] ?? []);
+      const missing = (bag[base] ?? []).filter((f) => !chainBag.has(f));
+      expect(missing, `${chain} is missing from ${base}: ${missing.join(', ')}`).toEqual([]);
+    },
+  );
 });
