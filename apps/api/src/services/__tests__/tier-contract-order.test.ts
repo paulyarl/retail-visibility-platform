@@ -19,11 +19,13 @@ import contract from '../../../../../shared/tier-contract.json';
 import { TIER_ORDER as QUICK_LINKS_ORDER } from '../QuickLinksService';
 import { TIER_ORDER as NEXT_STEPS_ORDER } from '../NextStepsService';
 import { TIER_ORDER as GROWTH_TIP_ORDER } from '../GrowthTipService';
+import { FALLBACK_TIER_ORDER as TIER_ACCESS_ORDER } from '../../middleware/tier-access';
 
 const COPIES: Array<[string, readonly string[]]> = [
   ['QuickLinksService', QUICK_LINKS_ORDER],
   ['NextStepsService', NEXT_STEPS_ORDER],
   ['GrowthTipService', GROWTH_TIP_ORDER],
+  ['tier-access.ts (fallback)', TIER_ACCESS_ORDER],
 ];
 
 describe('tier contract — order arrays match the fixture', () => {

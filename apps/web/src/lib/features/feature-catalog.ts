@@ -423,12 +423,17 @@ export const FEATURE_CATALOG: PlatformFeature[] = [
   }
 ];
 
+// Legacy 4-rung catalog vocabulary — an INTENDED SUBSET of the contract order,
+// not a copy of it (requiredTier on PlatformFeature only admits these keys).
+// Exported for the tier contract test: asserted as relative-order-consistent
+// with shared/tier-contract.json, not for membership (Phase 1.1, subset role).
+export const CATALOG_TIER_ORDER: readonly string[] = ['google_only', 'starter', 'professional', 'enterprise'];
+
 /**
  * Get features available for a specific tier
  */
 export function getFeaturesForTier(tierLevel: string): PlatformFeature[] {
-  const tierHierarchy = ['google_only', 'starter', 'professional', 'enterprise'];
-  const tierIndex = tierHierarchy.indexOf(tierLevel);
+  const tierIndex = CATALOG_TIER_ORDER.indexOf(tierLevel);
   
   if (tierIndex === -1) {
     return [];
@@ -436,7 +441,7 @@ export function getFeaturesForTier(tierLevel: string): PlatformFeature[] {
   
   // Return all features up to and including this tier
   return FEATURE_CATALOG.filter(feature => {
-    const featureIndex = tierHierarchy.indexOf(feature.requiredTier);
+    const featureIndex = CATALOG_TIER_ORDER.indexOf(feature.requiredTier);
     return featureIndex !== -1 && featureIndex <= tierIndex;
   });
 }

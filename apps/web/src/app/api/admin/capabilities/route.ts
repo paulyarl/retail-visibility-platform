@@ -85,7 +85,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Sparse sort map for the admin capability listing — an INTENDED SUBSET: only
+// the four tiers this route iterates carry explicit positions; everything else
+// sorts to the end (999). Exported for the tier contract test: asserted as
+// relative-order-consistent with shared/tier-contract.json (Phase 1.1 subset).
+export const CAPABILITY_TIER_SORT_ORDER = { 'discovery': 1, 'storefront': 2, 'professional': 3, 'enterprise': 4 } as const;
+
 function getTierSortOrder(tierKey: string): number {
-  const tierOrder = { 'discovery': 1, 'storefront': 2, 'professional': 3, 'enterprise': 4 };
-  return tierOrder[tierKey as keyof typeof tierOrder] || 999;
+  return CAPABILITY_TIER_SORT_ORDER[tierKey as keyof typeof CAPABILITY_TIER_SORT_ORDER] || 999;
 }

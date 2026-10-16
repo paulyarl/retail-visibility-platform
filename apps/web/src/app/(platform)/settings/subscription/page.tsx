@@ -1060,8 +1060,12 @@ export default function SubscriptionPage({ embedded = false, tenantId: propTenan
                       const isApproved = request.status === 'complete';
                       const isDenied = request.status === 'denied';
                       
-                      // Determine if upgrade or downgrade
-                      const tierOrder = ['starter', 'discovery', 'commitment', 'storefront', 'professional', 'enterprise'];
+                      // Determine if upgrade or downgrade.
+                      // Order must match shared/tier-contract.json `tier_order` —
+                      // a stale 6-key subset here mis-badged direction for any
+                      // transition touching presence/ecommerce/omnichannel/
+                      // organization/directory_presence (indexOf → -1).
+                      const tierOrder = ['directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise', 'custom'];
                       const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
                       const isChain = (request.currentTier as string).startsWith('chain_');
                       const order = isChain ? chainTierOrder : tierOrder;

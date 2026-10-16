@@ -191,6 +191,17 @@ const FEATURE_TIER_MAP: Record<string, string> = {
   integration_propagation_gbp: 'organization',
 };
 
+// Order used by the FEATURE_TIER_MAP fallback compare below. Was a private
+// 11-key array missing `omnichannel` (and chain_* / custom) with `ecommerce`
+// after `professional` — indexOf(-1) meant an omnichannel tenant silently
+// failed any ecommerce+ gated check on this path. Aligned to
+// shared/tier-contract.json and exported for the contract test (D1).
+export const FALLBACK_TIER_ORDER: string[] = [
+  'directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront',
+  'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
+  'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
+];
+
 // Legacy feature key aliases → canonical integration_* keys
 const INTEGRATION_LEGACY_ALIASES: Record<string, string> = {
   clover_sync: 'integration_clover',
@@ -239,9 +250,8 @@ export async function checkTierAccess(tier: string, feature: string): Promise<bo
     // Check FEATURE_TIER_MAP as last fallback
     const requiredTier = FEATURE_TIER_MAP[resolvedFeature] || FEATURE_TIER_MAP[feature];
     if (requiredTier) {
-      const tierOrder = ['directory_presence', 'google_only', 'presence', 'discovery', 'starter', 'storefront', 'commitment', 'professional', 'ecommerce', 'enterprise', 'organization'];
-      const tierIndex = tierOrder.indexOf(tier);
-      const requiredIndex = tierOrder.indexOf(requiredTier);
+      const tierIndex = FALLBACK_TIER_ORDER.indexOf(tier);
+      const requiredIndex = FALLBACK_TIER_ORDER.indexOf(requiredTier);
       return tierIndex >= requiredIndex;
     }
     
@@ -297,7 +307,7 @@ export function getTierPricing(tier: string): number {
     omnichannel: 149, // V2 new tier
     professional: 199,
     enterprise: 499,  // V2 pricing
-    organization: 399, // V2 pricing
+    organization: 499, // was 399 — stale price, contradicted tier-features.ts / subscription_tiers_list / tier-contract.json
     chain_starter: 199,
     chain_professional: 1999,
     chain_enterprise: 4999,

@@ -16,6 +16,8 @@ import { describe, it, expect } from 'vitest';
 import contract from '../../../../../shared/tier-contract.json';
 import { TIER_ORDER } from '../growth-tips/tipEngine';
 import { TIER_DISPLAY_NAMES, TIER_PRICING, TIER_FEATURES } from './tier-features';
+import { CATALOG_TIER_ORDER } from '../features/feature-catalog';
+import { CAPABILITY_TIER_SORT_ORDER } from '../../app/api/admin/capabilities/route';
 
 describe('tier contract (web) — order matches the fixture', () => {
   it('tipEngine declares the fixture order exactly', () => {
@@ -39,6 +41,33 @@ describe('tier contract (web) — order matches the fixture', () => {
 
     expect(order.indexOf('directory_presence'))
       .toBeLessThan(order.indexOf(contract.critical_order_invariants.directory_presence_before));
+  });
+});
+
+describe('tier contract (web) — Phase 1.1, intended-subset arrays', () => {
+  /**
+   * Not every order-shaped structure is a copy of the canonical 16. Subsets are
+   * legitimate when the consumer's vocabulary is deliberately narrower — the
+   * contract for them is RELATIVE ORDER: filtering the fixture order down to the
+   * subset's keys must reproduce the subset exactly.
+   */
+  const SUBSETS: Array<[string, readonly string[]]> = [
+    // Legacy 4-rung catalog vocabulary (PlatformFeature.requiredTier admits
+    // only these keys).
+    ['feature-catalog CATALOG_TIER_ORDER', CATALOG_TIER_ORDER],
+    // Sparse sort map for the four tiers the admin capabilities route iterates.
+    ['admin/capabilities CAPABILITY_TIER_SORT_ORDER', Object.keys(CAPABILITY_TIER_SORT_ORDER)],
+  ];
+
+  it.each(SUBSETS)('%s keeps the fixture relative order', (_name, subset) => {
+    const inFixture = contract.tier_order.filter((k) => subset.includes(k));
+    expect([...subset], `${_name} keys must appear in fixture order`).toEqual(inFixture);
+  });
+
+  it.each(SUBSETS)('%s keys are all real tier keys', (_name, subset) => {
+    for (const k of subset) {
+      expect(contract.tier_order, `${k} is not a contract tier`).toContain(k);
+    }
   });
 });
 
