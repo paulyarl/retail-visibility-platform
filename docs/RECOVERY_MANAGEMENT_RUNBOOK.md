@@ -91,8 +91,9 @@ The campaign detail page and recovery detail page both show a
 - 4 channel badges (Email, Phone, Social, Website) — green if present, gray if missing
 - Cascade readiness indicator:
   - **Green "Cascade Ready"** — email + at least one secondary channel (phone or social)
-  - **Amber "Partial"** — email only (SMS/DM steps will fall back to email)
-  - **Red "Blocked"** — no email (cascade cannot fire)
+  - **Amber "Partial"** — email only (SMS/DM steps will fall back to email), or secondary-only with no email (Day 1 skipped; SMS/DM still fire)
+  - **Red "Blocked"** — no contact channels at all (cascade cannot fire)
+- Status CTAs: on 'ready' — **Go to Cascade** (Cascade tab jump, review-pipeline campaigns) and **Log contact** (LogContactModal, same manual-outreach entry as the communications page); degraded states offer **Enrich from GBP** (re-fetches readiness on success) and **Edit contact info** (campaign edit page)
 - For recovery campaigns: intake email status (captured vs. not yet submitted)
 
 After Day 4 with no response, the cascade is exhausted. The intake

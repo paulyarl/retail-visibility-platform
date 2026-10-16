@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-10T13:54:32.029Z",
-  "totalMounts": 242,
-  "totalRoutes": 2870,
+  "generatedAt": "2026-10-16T13:57:48.749Z",
+  "totalMounts": 243,
+  "totalRoutes": 2889,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -5492,6 +5492,7 @@
           "middleware": [
             "Function",
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -5502,6 +5503,7 @@
           "middleware": [
             "Function",
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -5552,6 +5554,7 @@
           "middleware": [
             "Function",
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -5562,6 +5565,7 @@
           "middleware": [
             "Function",
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -5931,6 +5935,7 @@
           "fullPath": "/api/admin/enrichment/cache-stats",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -5940,6 +5945,7 @@
           "fullPath": "/api/admin/enrichment/rate-limits",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -5949,6 +5955,7 @@
           "fullPath": "/api/admin/enrichment/clear-cache",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -5958,6 +5965,7 @@
           "fullPath": "/api/admin/enrichment/analytics",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -5967,6 +5975,7 @@
           "fullPath": "/api/admin/enrichment/search",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -5976,6 +5985,7 @@
           "fullPath": "/api/admin/enrichment/:barcode",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -5985,6 +5995,7 @@
           "fullPath": "/api/scan/tenant/:tenantId/analytics",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -6348,6 +6359,7 @@
           "fullPath": "/api/admin/active-featured/invalidate-cache",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         }
@@ -6631,6 +6643,7 @@
           "fullPath": "/api/admin/products/featured",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -6640,6 +6653,7 @@
           "fullPath": "/api/admin/products/featuring/stats",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -6669,6 +6683,7 @@
           "fullPath": "/api/admin/products/featured/:id",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         }
@@ -7441,6 +7456,7 @@
           "fullPath": "/api/tenants/:tenantId/abandoned-carts",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -7450,6 +7466,7 @@
           "fullPath": "/api/tenants/:tenantId/abandoned-carts/summary",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -7459,6 +7476,7 @@
           "fullPath": "/api/tenants/:tenantId/abandoned-carts/:cartId/resend",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -7948,6 +7966,7 @@
           "fullPath": "/api/tenants/:tenantId/tax-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -7957,6 +7976,7 @@
           "fullPath": "/api/tenants/:tenantId/tax-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8170,6 +8190,7 @@
           "fullPath": "/api/tenants/:tenantId/directory-entry-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8179,6 +8200,7 @@
           "fullPath": "/api/tenants/:tenantId/directory-entry-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8313,6 +8335,7 @@
           "fullPath": "/api/tenants/:tenantId/faq-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8322,6 +8345,7 @@
           "fullPath": "/api/tenants/:tenantId/faq-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8339,6 +8363,7 @@
           "fullPath": "/api/tenants/:tenantId/faq-options/capability",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8348,6 +8373,7 @@
           "fullPath": "/api/tenants/:tenantId/crm-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8357,6 +8383,7 @@
           "fullPath": "/api/tenants/:tenantId/crm-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8374,6 +8401,7 @@
           "fullPath": "/api/tenants/:tenantId/crm-options/capability",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8411,6 +8439,7 @@
           "fullPath": "/api/tenants/:tenantId/chatbot-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8420,6 +8449,7 @@
           "fullPath": "/api/tenants/:tenantId/chatbot-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8437,6 +8467,7 @@
           "fullPath": "/api/tenants/:tenantId/chatbot-options/capability",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8493,6 +8524,7 @@
           "fullPath": "/api/tenants/:tenantId/payment-gateway-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8502,6 +8534,7 @@
           "fullPath": "/api/tenants/:tenantId/payment-gateway-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8519,6 +8552,7 @@
           "fullPath": "/api/tenants/:tenantId/wholesale/check",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8528,6 +8562,7 @@
           "fullPath": "/api/tenants/:tenantId/wholesale/search",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8537,6 +8572,7 @@
           "fullPath": "/api/tenants/:tenantId/wholesale/suppliers",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8546,6 +8582,7 @@
           "fullPath": "/api/tenants/:tenantId/wholesale/dashboard",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8555,6 +8592,7 @@
           "fullPath": "/api/tenants/:tenantId/wholesale/affiliate-link",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8600,6 +8638,7 @@
           "fullPath": "/api/tenants/:tenantId/notifications",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8609,6 +8648,7 @@
           "fullPath": "/api/tenants/:tenantId/notifications/:notificationId/read",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8618,6 +8658,7 @@
           "fullPath": "/api/tenants/:tenantId/notifications/mark-all-read",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8627,6 +8668,7 @@
           "fullPath": "/api/tenants/:tenantId/notifications/:notificationId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8636,6 +8678,7 @@
           "fullPath": "/api/tenants/:tenantId/notifications/stats",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8645,6 +8688,7 @@
           "fullPath": "/api/tenants/:tenantId/notifications/unread-count",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -8653,6 +8697,7 @@
           "path": "/:tenantId/users",
           "fullPath": "/api/tenants/:tenantId/users",
           "middleware": [
+            "authenticateToken",
             "checkTenantAccess",
             "AsyncFunction"
           ]
@@ -8662,6 +8707,7 @@
           "path": "/:tenantId/users",
           "fullPath": "/api/tenants/:tenantId/users",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8671,6 +8717,7 @@
           "path": "/:tenantId/users/:userId",
           "fullPath": "/api/tenants/:tenantId/users/:userId",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8680,6 +8727,7 @@
           "path": "/:tenantId/users/:userId",
           "fullPath": "/api/tenants/:tenantId/users/:userId",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8689,6 +8737,7 @@
           "path": "/:tenantId/users/:userId",
           "fullPath": "/api/tenants/:tenantId/users/:userId",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8698,6 +8747,7 @@
           "path": "/:tenantId/users/invite",
           "fullPath": "/api/tenants/:tenantId/users/invite",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8707,6 +8757,7 @@
           "path": "/:tenantId/invitations",
           "fullPath": "/api/tenants/:tenantId/invitations",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8716,6 +8767,7 @@
           "path": "/:tenantId/invitations/:id",
           "fullPath": "/api/tenants/:tenantId/invitations/:id",
           "middleware": [
+            "authenticateToken",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -8772,6 +8824,62 @@
           "method": "GET",
           "path": "/resolve-subdomain/:subdomain",
           "fullPath": "/api/tenants/resolve-subdomain/:subdomain",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/resolve-custom-domain/:host",
+          "fullPath": "/api/tenants/resolve-custom-domain/:host",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:id/custom-domains",
+          "fullPath": "/api/tenants/:id/custom-domains",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:id/custom-domains",
+          "fullPath": "/api/tenants/:id/custom-domains",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:id/custom-domains/:domainId/check",
+          "fullPath": "/api/tenants/:id/custom-domains/:domainId/check",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/:id/custom-domains/:domainId",
+          "fullPath": "/api/tenants/:id/custom-domains/:domainId",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/storefront-canonical/:id",
+          "fullPath": "/api/tenants/storefront-canonical/:id",
           "middleware": [
             "AsyncFunction"
           ]
@@ -9005,6 +9113,7 @@
           "fullPath": "/api/tax/:tenantId/tax-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9014,6 +9123,7 @@
           "fullPath": "/api/tax/:tenantId/tax-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -9362,6 +9472,7 @@
           "fullPath": "/api/:tenantId/faq-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9371,6 +9482,7 @@
           "fullPath": "/api/:tenantId/faq-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9388,6 +9500,7 @@
           "fullPath": "/api/:tenantId/faq-options/capability",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -9405,6 +9518,7 @@
           "fullPath": "/api/:tenantId/crm-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9414,6 +9528,7 @@
           "fullPath": "/api/:tenantId/crm-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9431,6 +9546,7 @@
           "fullPath": "/api/:tenantId/crm-options/capability",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -9484,6 +9600,7 @@
           "fullPath": "/api/:tenantId/chatbot-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9493,6 +9610,7 @@
           "fullPath": "/api/:tenantId/chatbot-options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9510,6 +9628,7 @@
           "fullPath": "/api/:tenantId/chatbot-options/capability",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -9623,6 +9742,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/config",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9642,6 +9762,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/conversations",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9651,6 +9772,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/conversations/:id",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9660,6 +9782,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/conversations/:id/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9669,6 +9792,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/conversations/:id/escalate",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9678,6 +9802,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/skills",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9687,6 +9812,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/skills/:skillId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9696,6 +9822,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/dashboard",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9705,6 +9832,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/analytics",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9714,6 +9842,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/gdpr-erase",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9723,6 +9852,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/retention",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9732,6 +9862,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/faq-webhook",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9741,6 +9872,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/embeddings/refresh",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9750,6 +9882,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/embeddings/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9759,6 +9892,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/product-embeddings/refresh",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9768,6 +9902,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/embeddings/knowledge/refresh",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9777,6 +9912,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/product-embeddings/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9786,6 +9922,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/dashboard-chat/start",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9795,6 +9932,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/dashboard-chat/message",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9804,6 +9942,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/platform-guide",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9813,6 +9952,7 @@
           "fullPath": "/api/tenants/:tenantId/bot/avatar",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -9830,6 +9970,7 @@
           "fullPath": "/api/:tenantId/payment-gateway-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -9839,6 +9980,7 @@
           "fullPath": "/api/:tenantId/payment-gateway-settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10011,6 +10153,7 @@
           "fullPath": "/api/tenants/:tenantId/orders",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10020,6 +10163,7 @@
           "fullPath": "/api/tenants/:tenantId/orders/:orderId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10029,6 +10173,7 @@
           "fullPath": "/api/tenants/:tenantId/orders/:orderId/fulfillment",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10038,6 +10183,7 @@
           "fullPath": "/api/tenants/:tenantId/orders/:orderId/archive",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10047,6 +10193,7 @@
           "fullPath": "/api/tenants/:tenantId/orders/:orderId/service-bookings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10056,6 +10203,7 @@
           "fullPath": "/api/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -10065,6 +10213,7 @@
           "fullPath": "/api/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assign-provider",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -12236,6 +12385,7 @@
           "fullPath": "/api/fulfillment/time-slots/:tenantId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -12245,6 +12395,7 @@
           "fullPath": "/api/fulfillment/time-slots/:tenantId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -12263,6 +12414,7 @@
           "fullPath": "/api/fulfillment/schedules/:tenantId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -12281,6 +12433,7 @@
           "fullPath": "/api/fulfillment/stats/:tenantId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13318,6 +13471,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/enable",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -13328,6 +13482,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/disable",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -13338,6 +13493,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13347,6 +13503,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/oauth/authorize",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -13365,6 +13522,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/scenarios",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13374,6 +13532,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13383,6 +13542,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate/:eventId/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13392,6 +13552,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate/:eventId/execute",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13401,6 +13562,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate/:eventId/cancel",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13410,6 +13572,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/mappings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13419,6 +13582,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/mappings/:mappingId/resolve",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13428,6 +13592,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/sync-history",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13437,6 +13602,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/sync",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -13447,6 +13613,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/disconnect",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -13457,6 +13624,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/mappings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13466,6 +13634,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/mappings/:mappingId/resolve",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13475,6 +13644,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/category-mappings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -13484,6 +13654,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/sync-history",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -14666,6 +14837,7 @@
           "fullPath": "/api/stores/:tenantId/reviews/pending",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14675,6 +14847,7 @@
           "fullPath": "/api/stores/:tenantId/reviews/:reviewId/approve",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14684,6 +14857,7 @@
           "fullPath": "/api/stores/:tenantId/reviews/:reviewId/reject",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14753,6 +14927,7 @@
           "fullPath": "/api/stores/:tenantId/reviews/approved",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14874,6 +15049,7 @@
           "fullPath": "/api/:tenantId/reviews/pending",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14883,6 +15059,7 @@
           "fullPath": "/api/:tenantId/reviews/:reviewId/approve",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14892,6 +15069,7 @@
           "fullPath": "/api/:tenantId/reviews/:reviewId/reject",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -14961,6 +15139,7 @@
           "fullPath": "/api/:tenantId/reviews/approved",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15359,6 +15538,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15368,6 +15548,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry/rules",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15377,6 +15558,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry/validation",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15386,6 +15568,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry/custom",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15395,6 +15578,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry/custom",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15404,6 +15588,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry/custom/:badgeId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15413,6 +15598,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-registry/custom/:badgeId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15422,6 +15608,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-suggestions",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15431,6 +15618,7 @@
           "fullPath": "/api/admin/badge-registry/invalidate-cache",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         }
@@ -15448,6 +15636,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-analytics",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15457,6 +15646,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-analytics/timeseries",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15466,6 +15656,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-analytics/roi",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15475,6 +15666,7 @@
           "fullPath": "/api/tenants/:tenantId/badge-analytics/aggregate",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15508,6 +15700,7 @@
           "fullPath": "/api/tenants/:tenantId/qr-analytics",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15517,6 +15710,7 @@
           "fullPath": "/api/tenants/:tenantId/qr-analytics/timeseries",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15526,6 +15720,7 @@
           "fullPath": "/api/tenants/:tenantId/qr-analytics/aggregate",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15551,6 +15746,7 @@
           "fullPath": "/api/admin/qr-analytics",
           "middleware": [
             "authenticateToken",
+            "requireAdmin",
             "AsyncFunction"
           ]
         }
@@ -15568,6 +15764,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels/settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15577,6 +15774,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels/settings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -15653,6 +15851,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15662,6 +15861,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15691,6 +15891,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels/:funnelId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15700,6 +15901,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels/:funnelId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15709,6 +15911,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels/:funnelId",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -15718,6 +15921,7 @@
           "fullPath": "/api/tenants/:tenantId/funnels/:funnelId/analytics",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -16342,6 +16546,22 @@
           ]
         },
         {
+          "method": "PATCH",
+          "path": "/:id/review-delivery-mode",
+          "fullPath": "/api/admin/marketing-ops/:id/review-delivery-mode",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/:id/recovery-delivery-mode",
+          "fullPath": "/api/admin/marketing-ops/:id/recovery-delivery-mode",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
           "method": "GET",
           "path": "/:id/website-build-execution",
           "fullPath": "/api/admin/marketing-ops/:id/website-build-execution",
@@ -16353,6 +16573,22 @@
           "method": "GET",
           "path": "/campaigns/:id/prospect-report",
           "fullPath": "/api/admin/marketing-ops/campaigns/:id/prospect-report",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/prospects/:prospectId/project-plan",
+          "fullPath": "/api/admin/marketing-ops/prospects/:prospectId/project-plan",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/prospects/:prospectId/controlling-audit",
+          "fullPath": "/api/admin/marketing-ops/prospects/:prospectId/controlling-audit",
           "middleware": [
             "AsyncFunction"
           ]
@@ -17050,6 +17286,14 @@
           "method": "GET",
           "path": "/:id/revenue",
           "fullPath": "/api/admin/marketing-ops/:id/revenue",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:id/outreach-problems",
+          "fullPath": "/api/admin/marketing-ops/:id/outreach-problems",
           "middleware": [
             "AsyncFunction"
           ]
@@ -18256,6 +18500,14 @@
         },
         {
           "method": "POST",
+          "path": "/campaigns/:id/mailer/qr-target",
+          "fullPath": "/api/admin/marketing-ops/campaigns/:id/mailer/qr-target",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
           "path": "/campaigns/:id/mailer",
           "fullPath": "/api/admin/marketing-ops/campaigns/:id/mailer",
           "middleware": [
@@ -18625,6 +18877,15 @@
           ]
         },
         {
+          "method": "GET",
+          "path": "/rate-limits",
+          "fullPath": "/api/admin/subdomains/rate-limits",
+          "middleware": [
+            "requirePlatformAdmin",
+            "Function"
+          ]
+        },
+        {
           "method": "PUT",
           "path": "/:tenantId",
           "fullPath": "/api/admin/subdomains/:tenantId",
@@ -18637,6 +18898,59 @@
           "method": "DELETE",
           "path": "/:tenantId",
           "fullPath": "/api/admin/subdomains/:tenantId",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        }
+      ]
+    },
+    {
+      "mountPath": "/api/admin/custom-domains",
+      "domain": "admin",
+      "authLevel": "admin",
+      "comment": "Admin custom-domain management — list, per-tenant entitlement detail, attach (DFY), check, remove (platform admin only)",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/",
+          "fullPath": "/api/admin/custom-domains",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId",
+          "fullPath": "/api/admin/custom-domains/:tenantId",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId",
+          "fullPath": "/api/admin/custom-domains/:tenantId",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/:domainId/check",
+          "fullPath": "/api/admin/custom-domains/:tenantId/:domainId/check",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/:tenantId/:domainId",
+          "fullPath": "/api/admin/custom-domains/:tenantId/:domainId",
           "middleware": [
             "requirePlatformAdmin",
             "AsyncFunction"
@@ -20231,6 +20545,7 @@
           "fullPath": "/api/tenant/profile",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -20240,6 +20555,7 @@
           "fullPath": "/api/tenant/profile",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -20249,6 +20565,7 @@
           "fullPath": "/api/tenant/gbp-category",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -20643,6 +20960,8 @@
           "path": "/api/tenants/:id/logo",
           "fullPath": "/api/tenants/:id/logo",
           "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
             "multerMiddleware",
             "AsyncFunction"
           ]
@@ -20652,6 +20971,8 @@
           "path": "/api/tenant/:id/banner",
           "fullPath": "/api/tenant/:id/banner",
           "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
             "multerMiddleware",
             "AsyncFunction"
           ]
@@ -22000,6 +22321,14 @@
           "method": "GET",
           "path": "/subdomain-stats",
           "fullPath": "/api/analytics/subdomain-stats",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/custom-domain-stats",
+          "fullPath": "/api/analytics/custom-domain-stats",
           "middleware": [
             "AsyncFunction"
           ]
@@ -23693,6 +24022,7 @@
           "fullPath": "/api/v1/tenants/:tenantId/quick-start",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "requireWritableSubscription",
             "AsyncFunction",
             "validateSKULimits",
@@ -23705,6 +24035,7 @@
           "fullPath": "/api/v1/tenants/:tenantId/quick-start/eligibility",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -23714,6 +24045,7 @@
           "fullPath": "/api/v1/tenants/:tenantId/categories/quick-start",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "requireWritableSubscription",
             "AsyncFunction"
           ]
@@ -23789,7 +24121,7 @@
           "fullPath": "/api/platform/categories/quick-start",
           "middleware": [
             "authenticateToken",
-            "checkTenantAccess",
+            "requireAdmin",
             "AsyncFunction"
           ]
         },
@@ -24255,6 +24587,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/enable",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -24265,6 +24598,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/disable",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -24275,6 +24609,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24284,6 +24619,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/oauth/authorize",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -24302,6 +24638,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/scenarios",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24311,6 +24648,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24320,6 +24658,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate/:eventId/status",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24329,6 +24668,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate/:eventId/execute",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24338,6 +24678,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/simulate/:eventId/cancel",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24347,6 +24688,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/mappings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24356,6 +24698,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/mappings/:mappingId/resolve",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24365,6 +24708,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/demo/sync-history",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24374,6 +24718,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/sync",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -24384,6 +24729,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/disconnect",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction",
             "AsyncFunction"
           ]
@@ -24394,6 +24740,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/mappings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24403,6 +24750,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/mappings/:mappingId/resolve",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24412,6 +24760,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/category-mappings",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -24421,6 +24770,7 @@
           "fullPath": "/api/integrations/:tenantId/clover/sync-history",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }
@@ -26438,6 +26788,7 @@
           "fullPath": "/api/tenant/:tenantId/upgrade/options",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         },
@@ -26447,6 +26798,7 @@
           "fullPath": "/api/tenant/:tenantId/upgrade",
           "middleware": [
             "authenticateToken",
+            "checkTenantAccess",
             "AsyncFunction"
           ]
         }

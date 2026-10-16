@@ -812,7 +812,7 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 ### Use Case: Multi-Channel Cascade — Re-engaging a Silent Prospect
 
 1. **Identify** — a review campaign in `preview_built` or `shown` hasn't responded to the initial email.
-2. **Check readiness** — verify the **Channel Readiness** widget shows "Cascade Ready" (email + phone/social). If "Partial" (email only), SMS/DM steps will fall back to email. If "Blocked", add contact info first.
+2. **Check readiness** — verify the **Channel Readiness** widget shows "Cascade Ready" (email + phone/social). If "Partial" (email only), SMS/DM steps will fall back to email. If "Blocked" (no contact channels), use the widget's **Enrich from GBP** or **Edit contact info** buttons first.
 3. **Enable** — open the campaign → **Cascade** tab → click **Enable Cascade**.
 4. **Day 1** — the cascade fires the primary email (frame preview + grade impact + CTA).
 5. **Day 2** — if unopened, the cascade fires an SMS pointer referencing the email. Falls back to email if no phone.
@@ -998,9 +998,11 @@ Recovery campaigns in `awaiting_owner_intake` receive an automated outreach sequ
 **Channel availability + fallback:** If a step's primary channel is unavailable (no phone for SMS, no social for DM), the cascade falls back to email. If email is also missing, the step is skipped. If the campaign has no contact channels at all, the cascade is blocked until contact info is added.
 
 **Channel Readiness widget:** Both the campaign detail and recovery detail pages show a Channel Readiness widget with 4 badges (Email, Phone, Social, Website) and a cascade readiness indicator:
-- **Green "Cascade Ready"** — email + at least one secondary channel
-- **Amber "Partial"** — email only (SMS/DM steps will fall back to email)
-- **Red "Blocked"** — no email (cascade cannot fire)
+- **Green "Cascade Ready"** — email + at least one secondary channel; shows **Go to Cascade** (review-pipeline campaigns) and **Log contact** (LogContactModal, same manual-outreach entry as the communications page) CTAs
+- **Amber "Partial"** — email only (SMS/DM steps will fall back to email), or secondary-only with no email (Day 1 skipped; SMS/DM still fire)
+- **Red "Blocked"** — no contact channels at all (cascade cannot fire)
+
+Degraded states carry inline actions: **Enrich from GBP** (re-fetches readiness on success) and **Edit contact info** (opens the campaign edit page).
 
 After Day 4 with no response, the cascade is exhausted. The intake timeout sweep transitions the campaign to `dead` 4 days after the intake token expires.
 

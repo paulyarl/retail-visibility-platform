@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import {
   Container,
@@ -36,10 +36,12 @@ import diagnosticGalleryPublicService, {
   type GalleryData,
 } from '@/services/DiagnosticGalleryPublicService';
 import { useGalleryTracking } from './useGalleryTracking';
+import { resolveGalleryToken } from './galleryToken';
 
 export default function GalleryClient() {
+  const params = useParams();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token') || '';
+  const token = resolveGalleryToken(params?.token, searchParams.get('token'));
 
   const [data, setData] = useState<GalleryData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -20,6 +20,38 @@ import { OutreachOpenerService } from '../OutreachOpenerService';
 import aiProviderFactory from '../ai-providers';
 import MarketingCustomerService from '../MarketingCustomerService';
 import MarketingDeliverableService from '../MarketingDeliverableService';
+import GalleryEligibilityService from './GalleryEligibilityService';
+import { resolveGalleryArchetypeDefaults } from './GalleryArchetypeDefaults';
+import { resolveGalleryTheme } from './gallery-theme';
+import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
+
+/**
+ * Operator-picked QR destination for the mailer composer (Outreach Kit tab).
+ * 'auto' preserves the original precedence (claim → portal → gallery → site).
+ * 'site' is the explicit homepage pick; 'none' is the auto fallback result —
+ * both land on the site root but stay distinct for logging.
+ */
+export type MailerQrDestination =
+  | 'auto'
+  | 'diagnostic_gallery'
+  | 'claim'
+  | 'portal'
+  | 'site'
+  | 'custom';
+
+export interface MailerQrOptions {
+  destination?: MailerQrDestination;
+  customUrl?: string;
+}
+
+export interface PostalMailerQrTarget {
+  qrUrl: string;
+  qrDestination: Exclude<MailerQrDestination, 'auto'> | 'none';
+  ctaLabel: string;
+  token: string | null;
+  /** Expiry of the token encoded in the QR (gallery/claim destinations). */
+  tokenExpiresAt: Date | null;
+}
 
 export interface PostalMailerPayload {
   campaignId: string;
@@ -29,9 +61,12 @@ export interface PostalMailerPayload {
   body: string;
   ctaLabel: string;
   qrUrl: string;
-  qrDestination: 'diagnostic_gallery' | 'claim' | 'portal' | 'none';
+  qrDestination: 'diagnostic_gallery' | 'claim' | 'portal' | 'site' | 'custom' | 'none';
   archetype: string;
   token: string | null;
+  /** Styled QR PNG data URL from the admin QR designer — when present the
+   *  postcard embeds it verbatim instead of rendering a classic B/W code. */
+  qrImageDataUrl?: string;
   filename: string;
 }
 
@@ -48,40 +83,39 @@ class PostalMailerService {
   }
 
   /**
+   * Resolve the QR landing URL for a mailer without generating the PDF.
+   * Backs the composer's "Design QR" step — the styled QR is rendered
+   * client-side, so the URL must be settled before the operator styles it.
+   * Applies the same scope/stage gate as generate() (minus the address
+   * requirement — a URL needs no mailing address).
+   */
+  async resolveQrTarget(
+    campaignId: string,
+    qrOptions?: MailerQrOptions,
+    ctx?: RequestCtx,
+  ): Promise<PostalMailerQrTarget> {
+    const campaign = await this.loadCampaign(campaignId);
+    this.assertMailerAllowed(campaign);
+
+    const resolved = await this.resolveQrDestination(campaign, ctx, qrOptions);
+    return {
+      ...resolved,
+      ctaLabel: this.ctaLabelForDestination(resolved.qrDestination),
+    };
+  }
+
+  /**
    * Build a signal-aware postcard payload for a campaign.
    */
   async generate(
     campaignId: string,
     ctx?: RequestCtx,
     importCopy?: { headline: string; body: string },
+    qrOptions?: MailerQrOptions,
+    qrImageDataUrl?: string,
   ): Promise<PostalMailerPayload> {
-    const campaign = await prisma.mkt_campaigns_list.findUnique({
-      where: { id: campaignId },
-      select: {
-        id: true,
-        business_name: true,
-        address_line1: true,
-        address_line2: true,
-        address_city: true,
-        address_state: true,
-        address_zip: true,
-        address_country: true,
-        email: true,
-        scope: true,
-        stage: true,
-        date_paid: true,
-        customer_id: true,
-      },
-    });
-
-    if (!campaign) {
-      throw new NotFoundError('Campaign not found');
-    }
-
-    const allowedStages = ['seek', 'seed', 'preview_built'];
-    if (campaign.scope !== 'business' || !allowedStages.includes(campaign.stage)) {
-      throw new ValidationError('Mailer is only available for business-scope campaigns in seek, seed, or preview_built stage');
-    }
+    const campaign = await this.loadCampaign(campaignId);
+    this.assertMailerAllowed(campaign);
 
     if (!this.hasMailingAddress(campaign)) {
       throw new ValidationError('Campaign has no mailing address');
@@ -98,7 +132,7 @@ class PostalMailerService {
     const { headline, body } = await this.generateCopy(resolvedPrompt, importCopy, ctx);
 
     // Pick the QR destination and mint the right token.
-    const { qrUrl, qrDestination, token } = await this.resolveQrDestination(campaign, ctx);
+    const { qrUrl, qrDestination, token } = await this.resolveQrDestination(campaign, ctx, qrOptions);
 
     const addressLines = this.formatAddressLines(campaign);
 
@@ -119,8 +153,43 @@ class PostalMailerService {
       qrDestination,
       archetype: selection.archetype,
       token,
+      qrImageDataUrl,
       filename: `postcard-${campaign.id}-${selection.archetype.toLowerCase()}.pdf`,
     };
+  }
+
+  private async loadCampaign(campaignId: string) {
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: {
+        id: true,
+        business_name: true,
+        address_line1: true,
+        address_line2: true,
+        address_city: true,
+        address_state: true,
+        address_zip: true,
+        address_country: true,
+        email: true,
+        scope: true,
+        stage: true,
+        date_paid: true,
+        customer_id: true,
+        package_price_cents: true,
+      },
+    });
+
+    if (!campaign) {
+      throw new NotFoundError('Campaign not found');
+    }
+    return campaign;
+  }
+
+  private assertMailerAllowed(campaign: { scope: string | null; stage: string | null }) {
+    const allowedStages = ['seek', 'seed', 'preview_built'];
+    if (campaign.scope !== 'business' || !allowedStages.includes(campaign.stage ?? '')) {
+      throw new ValidationError('Mailer is only available for business-scope campaigns in seek, seed, or preview_built stage');
+    }
   }
 
   private hasMailingAddress(campaign: any): boolean {
@@ -206,56 +275,230 @@ class PostalMailerService {
   }
 
   /**
-   * Pick the QR destination based on campaign stage and mint a token when needed.
+   * Pick the QR destination and mint a token when needed.
+   *
+   * `destination: 'auto'` (or omitted) keeps the original precedence:
+   * claim → portal → diagnostic gallery (when eligible) → site root.
+   * Any explicit destination is operator-chosen and validated hard — a
+   * forced pick that cannot resolve is a 400, never a silent fallback.
    */
   private async resolveQrDestination(
     campaign: any,
     ctx?: RequestCtx,
-  ): Promise<{ qrUrl: string; qrDestination: PostalMailerPayload['qrDestination']; token: string | null }> {
+    qrOptions?: MailerQrOptions,
+  ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'>> {
     const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || 'https://app.visibleshelf.com';
+    const destination = qrOptions?.destination ?? 'auto';
 
-    // Claim path: paid but not yet linked to a customer.
-    if (campaign.date_paid && !campaign.customer_id && campaign.email) {
-      const issued = await MarketingCustomerService.issueClaimToken(campaign.email);
-      if (issued) {
-        return {
-          qrUrl: `${baseUrl}/marketing/claim/${issued.token}`,
-          qrDestination: 'claim',
-          token: issued.token,
-        };
+    if (destination !== 'auto') {
+      switch (destination) {
+        case 'diagnostic_gallery': {
+          const eligibility = await GalleryEligibilityService.resolveEligibility(campaign.id, ctx);
+          if (!eligibility.eligible || !eligibility.archetype) {
+            throw new ValidationError(
+              `Diagnostic gallery is not available: ${eligibility.reason}. ${eligibility.action ?? ''}`.trim(),
+            );
+          }
+          return this.galleryQrTarget(campaign, eligibility.archetype, baseUrl, ctx);
+        }
+        case 'claim': {
+          if (campaign.customer_id) {
+            throw new ValidationError('Campaign already has a claimed customer — use the portal destination.');
+          }
+          if (!campaign.email) {
+            throw new ValidationError('Claim link requires a campaign email.');
+          }
+          const target = await this.claimQrTarget(campaign, baseUrl);
+          if (!target) {
+            throw new ValidationError('Claim link could not be issued — no paid, unclaimed campaigns for this email.');
+          }
+          return target;
+        }
+        case 'portal': {
+          if (!campaign.customer_id) {
+            throw new ValidationError('Campaign has no claimed customer — a portal QR would dead-end.');
+          }
+          return {
+            qrUrl: `${baseUrl}/account/marketing`,
+            qrDestination: 'portal',
+            token: null,
+            tokenExpiresAt: null,
+          };
+        }
+        case 'site':
+          return { qrUrl: `${baseUrl}/`, qrDestination: 'site', token: null, tokenExpiresAt: null };
+        case 'custom': {
+          const raw = qrOptions?.customUrl?.trim();
+          if (!raw) {
+            throw new ValidationError('A custom QR destination requires a URL.');
+          }
+          let parsed: URL;
+          try {
+            parsed = new URL(raw);
+          } catch {
+            throw new ValidationError('Custom QR destination must be a valid URL.');
+          }
+          if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            throw new ValidationError('Custom QR destination must be an http(s) URL.');
+          }
+          return { qrUrl: raw, qrDestination: 'custom', token: null, tokenExpiresAt: null };
+        }
       }
     }
 
-    // Portal path: already claimed.
+    // Auto precedence — claim → portal → gallery → site.
+    if (campaign.date_paid && !campaign.customer_id && campaign.email) {
+      const target = await this.claimQrTarget(campaign, baseUrl);
+      if (target) {
+        return target;
+      }
+    }
+
     if (campaign.customer_id) {
       return {
         qrUrl: `${baseUrl}/account/marketing`,
         qrDestination: 'portal',
         token: null,
+        tokenExpiresAt: null,
       };
     }
 
-    // Diagnostic gallery: the cold-outreach default.
-    const galleryStages = ['seek', 'seed', 'preview_built', 'shown'];
-    if (galleryStages.includes(campaign.stage)) {
-      const tokenRow = await MarketingDeliverableService.generateCampaignToken(
-        campaign.id,
-        'diagnostic_gallery',
-        undefined,
-        30,
-        ctx,
-      );
-      return {
-        qrUrl: `${baseUrl}/preview/${tokenRow.token}`,
-        qrDestination: 'diagnostic_gallery',
-        token: tokenRow.token,
-      };
+    // Diagnostic gallery — only when the gallery actually exists. Eligibility
+    // requires preview_built|shown + at least one diagnostic screenshot + a
+    // resolved archetype, so a seek/seed campaign (the mailer's cold-outreach
+    // default) has nothing to show: minting a bare token there printed a card
+    // promising a diagnostic the prospect could not open.
+    const eligibility = await GalleryEligibilityService.resolveEligibility(campaign.id, ctx);
+    if (eligibility.eligible && eligibility.archetype) {
+      return this.galleryQrTarget(campaign, eligibility.archetype, baseUrl, ctx);
     }
+
+    logger.info('PostalMailerService: QR falls back to the site root — no eligible diagnostic gallery', ctx, {
+      campaignId: campaign.id,
+      stage: campaign.stage,
+      reason: eligibility.reason,
+      screenshotCount: eligibility.screenshotCount,
+    });
 
     return {
       qrUrl: `${baseUrl}/`,
       qrDestination: 'none',
       token: null,
+      tokenExpiresAt: null,
+    };
+  }
+
+  /**
+   * Claim-link QR target. Reuses a live claim token for the campaign email
+   * when one exists — issueClaimToken voids prior unclaimed tokens, and the
+   * composer's Design-QR step must encode the same URL the PDF ends up with.
+   */
+  private async claimQrTarget(
+    campaign: { id: string; email: string | null },
+    baseUrl: string,
+  ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'> | null> {
+    const email = campaign.email?.toLowerCase().trim();
+    if (!email) return null;
+
+    const existing = await prisma.mkt_customer_claim_tokens.findFirst({
+      where: { email, claimed_at: null, expires_at: { gt: new Date() } },
+      orderBy: { created_at: 'desc' },
+      select: { token: true, expires_at: true },
+    });
+
+    if (existing) {
+      return {
+        qrUrl: `${baseUrl}/marketing/claim/${existing.token}`,
+        qrDestination: 'claim',
+        token: existing.token,
+        tokenExpiresAt: existing.expires_at,
+      };
+    }
+
+    const issued = await MarketingCustomerService.issueClaimToken(email);
+    if (!issued) return null;
+    return {
+      qrUrl: `${baseUrl}/marketing/claim/${issued.token}`,
+      qrDestination: 'claim',
+      token: issued.token,
+      tokenExpiresAt: null,
+    };
+  }
+
+  /**
+   * Gallery QR target. Reuses the campaign's live diagnostic_gallery token
+   * when one exists — the resolve (QR design) and generate (PDF) steps must
+   * encode the same URL, and superseding on every print would churn tokens.
+   * The /g/ short code resolves through the campaign anyway, so even a dead
+   * encoded code routes to the live token — but keeping them identical avoids
+   * relying on the fallback for the common print case.
+   */
+  private async galleryQrTarget(
+    campaign: any,
+    archetype: ArchetypeCode,
+    baseUrl: string,
+    ctx?: RequestCtx,
+  ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'>> {
+    const live = await prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: {
+        campaign_id: campaign.id,
+        token_type: 'diagnostic_gallery',
+        converted_at: null,
+        paid_at: null,
+        expires_at: { gt: new Date() },
+      },
+      orderBy: { created_at: 'desc' },
+      select: { token: true, short_code: true, expires_at: true },
+    });
+
+    if (live) {
+      return {
+        qrUrl: live.short_code
+          ? `${baseUrl}/g/${live.short_code}`
+          : `${baseUrl}/preview/${live.token}`,
+        qrDestination: 'diagnostic_gallery',
+        token: live.token,
+        tokenExpiresAt: live.expires_at,
+      };
+    }
+
+    // No live token — supersede any unconverted stragglers (same contract as
+    // the gallery-token route) and mint a fresh 30-day token for print.
+    await prisma.mkt_deliverable_preview_tokens.updateMany({
+      where: {
+        campaign_id: campaign.id,
+        token_type: 'diagnostic_gallery',
+        converted_at: null,
+        paid_at: null,
+      },
+      data: { converted_at: new Date() },
+    });
+
+    const theme = await resolveGalleryTheme(campaign.id, archetype, ctx);
+    const defaults = resolveGalleryArchetypeDefaults(archetype, theme);
+    const tokenRow = await MarketingDeliverableService.generateCampaignToken(
+      campaign.id,
+      'diagnostic_gallery',
+      undefined,
+      30,
+      ctx,
+      {
+        galleryTitle: defaults.galleryTitle,
+        gallerySubtitle: defaults.gallerySubtitle,
+        frictionSummary: defaults.frictionSummary,
+        ctaLabel: defaults.ctaLabel,
+        ctaAmountCents: campaign.package_price_cents ?? undefined,
+        galleryArchetype: archetype,
+      },
+    );
+
+    return {
+      qrUrl: tokenRow.short_code
+        ? `${baseUrl}/g/${tokenRow.short_code}`
+        : `${baseUrl}/preview/${tokenRow.token}`,
+      qrDestination: 'diagnostic_gallery',
+      token: tokenRow.token,
+      tokenExpiresAt: tokenRow.expires_at ?? null,
     };
   }
 

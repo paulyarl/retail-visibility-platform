@@ -1728,6 +1728,12 @@ export interface ProspectSummary {
   business_prospect_id: string | null;
   last_contact_at: string | null;
   contact_count: number;
+  /** Direct proving-ground stamp on the queue row (migration 282). */
+  proving_ground_id?: string | null;
+  /** Resolved PG badge — the PG this prospect belongs to via either linkage
+   *  (direct stamp, or a source campaign that is a PG / discovery child of
+   *  one). Null when ungrouped. */
+  proving_ground?: { id: string; title: string | null; category: string | null; city: string | null } | null;
   /** Timeline payload only — raw queue snapshot + verification, used by the
    *  shared resolve-verification modal. */
   business_snapshot?: Record<string, any> | null;
@@ -6407,19 +6413,51 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /**
+   * Resolve the QR landing URL for a mailer — backs the composer's
+   * "Design QR" step. Resolving mints/reuses the destination token exactly
+   * like generate() does, so the URL returned here is what the PDF encodes.
+   */
+  async resolveMailerQrTarget(
+    campaignId: string,
+    qrDestination: MailerQrDestination,
+    customUrl?: string,
+  ): Promise<MailerQrTarget> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/marketing-ops/campaigns/${campaignId}/mailer/qr-target`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrDestination, ...(customUrl ? { customUrl } : {}) }),
+      },
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to resolve QR target');
+    }
+    return result.data?.data ?? result.data;
+  }
+
   async generateMailer(
     campaignId: string,
-    importCopy?: { headline: string; body: string },
+    options?: {
+      headline?: string;
+      body?: string;
+      qrDestination?: MailerQrDestination;
+      customUrl?: string;
+      /** Styled QR PNG data URL from the QR designer — embedded verbatim. */
+      qrDataUrl?: string;
+    },
   ): Promise<{ success: boolean; pdfUrl?: string; error?: string }> {
     try {
-      const options: RequestInit = { method: 'POST' };
-      if (importCopy) {
-        options.headers = { 'Content-Type': 'application/json' };
-        options.body = JSON.stringify(importCopy);
-      }
+      const requestOptions: RequestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options ?? {}),
+      };
       const result = await this.makeDefaultRequest<Blob>(
         `/api/admin/marketing-ops/campaigns/${campaignId}/mailer`,
-        options,
+        requestOptions,
         `mkt-ops-mailer-${campaignId}`,
         0,
         { responseType: ResponseType.BLOB },
@@ -7037,6 +7075,27 @@ export interface GalleryToken {
   created_at: string;
   short_code?: string | null;
   shortUrl?: string | null;
+}
+
+/**
+ * Operator-picked QR landing for the postcard composer (Outreach Kit tab).
+ * 'auto' keeps the stage-based precedence (claim → portal → gallery → site).
+ */
+export type MailerQrDestination =
+  | 'auto'
+  | 'diagnostic_gallery'
+  | 'claim'
+  | 'portal'
+  | 'site'
+  | 'custom';
+
+/** Resolved QR landing for a mailer — the URL the styled QR encodes. */
+export interface MailerQrTarget {
+  qrUrl: string;
+  qrDestination: Exclude<MailerQrDestination, 'auto'> | 'none';
+  ctaLabel: string;
+  token: string | null;
+  tokenExpiresAt: string | null;
 }
 
 /**

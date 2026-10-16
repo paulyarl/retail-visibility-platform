@@ -16,9 +16,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  RefreshCw, Search, Phone, Mail, MessageSquare, MapPin, Globe, Share2,
+  RefreshCw, Phone, Mail, MessageSquare, MapPin, Globe, Share2,
   Calendar, CheckCircle2, ChevronDown, ChevronRight, Clock, AlertTriangle,
-  PlayCircle, Loader2, ShieldCheck, ClipboardList, PhoneCall, X,
+  PlayCircle, Loader2, ShieldCheck, ClipboardList, PhoneCall, X, Filter,
 } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, {
@@ -32,6 +32,18 @@ import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import LogContactModal from '@/components/marketing-ops/LogContactModal';
 import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
 import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
+import SelectorToolbar from '@/components/marketing-ops/SelectorToolbar';
+import {
+  sortProspects,
+  PROSPECT_SORT_OPTIONS,
+  type ProspectSortKey,
+} from '@/lib/prospect-sort';
+import {
+  filterProspects,
+  statusRank,
+  type CampaignLinkage,
+  type PgLens,
+} from '@/lib/prospect-filters';
 import {
   DAYS,
   type DayHours,
@@ -70,6 +82,7 @@ const CHANNEL_CHIP: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  intake: 'Intake',
   queued: 'Queued',
   verify_then_outreach: 'Verify',
   campaign_created: 'Campaign',
@@ -146,6 +159,12 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<ProspectSortKey>('name');
+  // Segment filters — narrow the loaded list to the slice the operator wants
+  // to work (a batch of prospects to read, and pick from, together).
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [campaignFilter, setCampaignFilter] = useState<CampaignLinkage>('all');
+  const [pgFilter, setPgFilter] = useState<PgLens>('');
   const [selectedId, setSelectedId] = useState('');
 
   const [timeline, setTimeline] = useState<ProspectTimeline | null>(null);
@@ -294,15 +313,49 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
     }
   };
 
-  const filteredProspects = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return prospects;
-    return prospects.filter((p) =>
-      [p.business_name, p.title, p.city, p.state, p.category]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
-    );
-  }, [prospects, search]);
+  // Status filter options — only the statuses actually present, funnel-ordered.
+  const statusOptions = useMemo(
+    () => Array.from(new Set(prospects.map((p) => p.status))).sort((a, b) => statusRank(a) - statusRank(b)),
+    [prospects],
+  );
+
+  // Proving-ground filter options — the PGs present in the loaded list.
+  const pgOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const p of prospects) {
+      if (!p.proving_ground) continue;
+      const label =
+        p.proving_ground.title ||
+        [p.proving_ground.category, p.proving_ground.city].filter(Boolean).join(' · ') ||
+        'Proving ground';
+      byId.set(p.proving_ground.id, label);
+    }
+    return [...byId.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [prospects]);
+
+  const filtersActive =
+    statusFilter !== 'all' || campaignFilter !== 'all' || pgFilter !== '' || search.trim() !== '';
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setCampaignFilter('all');
+    setPgFilter('');
+    setSearch('');
+  };
+
+  const filteredProspects = useMemo(
+    () =>
+      sortProspects(
+        filterProspects(prospects, {
+          status: statusFilter,
+          campaignLinkage: campaignFilter,
+          pgLens: pgFilter,
+          search,
+        }),
+        sortBy,
+      ),
+    [prospects, search, sortBy, statusFilter, campaignFilter, pgFilter],
+  );
 
   const selected = prospects.find((p) => p.id === selectedId) ?? null;
 
@@ -338,21 +391,20 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Prospect</h2>
           <span className="text-xs text-gray-400 dark:text-gray-500">
-            {prospects.length} prospect{prospects.length !== 1 ? 's' : ''}
+            {filtersActive
+              ? `${filteredProspects.length} of ${prospects.length} prospect${prospects.length !== 1 ? 's' : ''}`
+              : `${prospects.length} prospect${prospects.length !== 1 ? 's' : ''}`}
           </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative sm:w-72">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, city, category…"
-              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-            />
-          </div>
+        <SelectorToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search name, city, category…"
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          sortOptions={PROSPECT_SORT_OPTIONS}
+        >
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
@@ -366,9 +418,62 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
               </option>
             ))}
           </select>
+        </SelectorToolbar>
+
+        {/* Segment filters — narrow the list to the slice of the registry to
+            work together (status, campaign linkage, proving ground). */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+            <Filter className="h-3.5 w-3.5" />
+            Filters
+          </span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 text-gray-900 dark:text-white"
+            title="Scope to a queue status"
+          >
+            <option value="all">All statuses</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+            ))}
+          </select>
+          <select
+            value={campaignFilter}
+            onChange={(e) => setCampaignFilter(e.target.value as CampaignLinkage)}
+            className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 text-gray-900 dark:text-white"
+            title="Scope by campaign linkage — graduated prospects vs those still in the queue"
+          >
+            <option value="all">Any campaign state</option>
+            <option value="with_campaign">With campaign</option>
+            <option value="queue_only">Queue only (no campaign)</option>
+          </select>
+          <select
+            value={pgFilter}
+            onChange={(e) => setPgFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 text-gray-900 dark:text-white"
+            title="Scope to a proving ground's whole tree, to every PG, or to ungrouped prospects"
+          >
+            <option value="">All proving grounds</option>
+            <option value="any">In any proving ground</option>
+            <option value="none">No proving ground</option>
+            {pgOptions.map((pg) => (
+              <option key={pg.id} value={pg.id}>{pg.label}</option>
+            ))}
+          </select>
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          )}
         </div>
         {filteredProspects.length === 0 && (
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No prospects match that search.</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No prospects match the current filters.</p>
         )}
       </div>
 

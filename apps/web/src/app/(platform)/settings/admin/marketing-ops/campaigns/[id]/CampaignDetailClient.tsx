@@ -47,6 +47,7 @@ import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageC
 import CampaignChecklistTab from './CampaignChecklistTab';
 import GalleryPanel from './GalleryPanel';
 import GalleryAnalyticsTab from './GalleryAnalyticsTab';
+import MailerPanel from './MailerPanel';
 import SiblingsTab from './SiblingsTab';
 import ProjectPlanTab from '@/components/marketing-ops/ProjectPlanTab';
 import OutreachIntelligenceTab from './OutreachIntelligenceTab';
@@ -316,12 +317,6 @@ export default function CampaignDetailClient({
   const [verifyNotes, setVerifyNotes] = useState('');
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  // Postal mailer dual-mode: AI execute vs import (headline/body).
-  const [mailerMode, setMailerMode] = useState<'ai' | 'import'>('ai');
-  const [importHeadline, setImportHeadline] = useState('');
-  const [importBody, setImportBody] = useState('');
-  const [mailerLoading, setMailerLoading] = useState(false);
-  const [mailerError, setMailerError] = useState<string | null>(null);
   // Soft gate for incomplete required checklist steps — operator may acknowledge and proceed.
   const [checklistIncompleteDialog, setChecklistIncompleteDialog] = useState<{
     toStage: PipelineStage;
@@ -891,32 +886,6 @@ export default function CampaignDetailClient({
     }
   };
 
-  const handleGenerateMailer = async (importCopy?: { headline: string; body: string }) => {
-    setMailerLoading(true);
-    setMailerError(null);
-    const tab = window.open('', '_blank');
-    try {
-      const result = await marketingOpsService.generateMailer(campaignId, importCopy);
-      if (!result.success || !result.pdfUrl) {
-        throw new Error(result.error || 'Failed to generate mailer');
-      }
-      if (tab) {
-        tab.location.href = result.pdfUrl;
-      } else {
-        const link = document.createElement('a');
-        link.href = result.pdfUrl;
-        link.download = `postcard-${campaignId}.pdf`;
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(result.pdfUrl!), 60_000);
-    } catch (err) {
-      tab?.close();
-      setMailerError(err instanceof Error ? err.message : 'Failed to generate mailer');
-    } finally {
-      setMailerLoading(false);
-    }
-  };
-
   const handleEnrichFromDialog = async () => {
     setReadinessEnriching(true);
     try {
@@ -1039,9 +1008,10 @@ export default function CampaignDetailClient({
     { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
     // Outreach Prep — business-scope campaigns only (Sprint 1).
     ...((campaign?.scope === 'business') ? [{ key: 'outreach-prep' as Tab, label: 'Outreach Prep' }] : []),
-    // Gallery tab — diagnostic gallery (screenshots + token + analytics).
+    // Outreach Kit tab — diagnostic gallery (screenshots + token + analytics)
+    // plus the postal mailer composer (the gallery's print front-end).
     // Visible for all campaigns (operator can upload screenshots at preview_built+).
-    { key: 'gallery', label: 'Diagnostic Gallery' },
+    { key: 'gallery', label: 'Outreach Kit' },
     // Cascade tab is review-pipeline only (Track A yes, Track B no).
     // Recovery-pipeline campaigns use RecoveryCascadeService instead.
     ...((campaign as any)?.pipeline === 'review' ? [{ key: 'cascade' as Tab, label: 'Cascade' }] : []),
@@ -1693,8 +1663,19 @@ export default function CampaignDetailClient({
                   </div>
                 )}
                 {/* Channel Readiness — shows email/phone/social/website availability
-                    + cascade readiness indicator. */}
-                <ChannelReadinessWidget campaignId={campaign.id} />
+                    + cascade readiness indicator with status CTAs (Cascade tab
+                    jump for review pipeline; enrich/edit actions when degraded). */}
+                <ChannelReadinessWidget
+                  campaignId={campaign.id}
+                  campaign={campaign}
+                  onOpenCascade={
+                    (campaign as any)?.pipeline === 'review'
+                      ? () => setActiveTab('cascade')
+                      : undefined
+                  }
+                  onEnriched={fetchCampaign}
+                  onContactLogged={fetchCampaign}
+                />
                 {/* Repair Track Panel — only for profile_repair campaigns.
                     Shows triage status + Switch Track action. */}
                 <RepairTrackPanel campaign={campaign} onRefresh={fetchCampaign} />
@@ -1954,97 +1935,6 @@ export default function CampaignDetailClient({
                     </div>
                   )}
                 </div>
-
-                {/* Postal Mailer — business-scope seek/seed/preview_built only */}
-                {campaign.scope === 'business' && ['seek', 'seed', 'preview_built'].includes(campaign.stage) && (
-                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Postal Mailer</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setMailerMode('ai'); setMailerError(null); }}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
-                            mailerMode === 'ai'
-                              ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300'
-                              : 'border-gray-300 text-gray-600 dark:border-neutral-600 dark:text-gray-400'
-                          }`}
-                        >
-                          Generate with AI
-                        </button>
-                        <button
-                          onClick={() => { setMailerMode('import'); setMailerError(null); }}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
-                            mailerMode === 'import'
-                              ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300'
-                              : 'border-gray-300 text-gray-600 dark:border-neutral-600 dark:text-gray-400'
-                          }`}
-                        >
-                          Import copy
-                        </button>
-                      </div>
-
-                      {mailerMode === 'ai' ? (
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                            Runs triage archetype resolution + AI copy generation.
-                          </p>
-                          <button
-                            onClick={() => handleGenerateMailer()}
-                            disabled={mailerLoading}
-                            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-                          >
-                            <Download className="w-3 h-3" />
-                            {mailerLoading ? 'Generating...' : 'Generate Postcard PDF'}
-                          </button>
-                          {mailerError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{mailerError}</p>}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Paste a headline and body. To resolve the prompt for an external AI, use the{' '}
-                            <Link
-                              href={`/settings/admin/marketing-ops/openers?campaign=${campaignId}`}
-                              target="_blank"
-                              className="text-blue-600 dark:text-blue-400 hover:underline"
-                            >
-                              Openers workspace
-                            </Link>
-                            .
-                          </p>
-                          <input
-                            value={importHeadline}
-                            onChange={(e) => setImportHeadline(e.target.value)}
-                            placeholder="Headline (5-10 words)"
-                            maxLength={120}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
-                          />
-                          <textarea
-                            value={importBody}
-                            onChange={(e) => setImportBody(e.target.value)}
-                            placeholder="Body (25-45 words)"
-                            rows={3}
-                            maxLength={400}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
-                          />
-                          <button
-                            onClick={() =>
-                              handleGenerateMailer({
-                                headline: importHeadline.trim(),
-                                body: importBody.trim(),
-                              })
-                            }
-                            disabled={mailerLoading || !importHeadline.trim() || !importBody.trim()}
-                            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-                          >
-                            <Download className="w-3 h-3" />
-                            {mailerLoading ? 'Generating...' : 'Generate PDF from imported copy'}
-                          </button>
-                          {mailerError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{mailerError}</p>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* Conversion (Tenant Prospecting Channel) */}
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
@@ -2880,6 +2770,10 @@ export default function CampaignDetailClient({
 
             {activeTab === 'gallery' && campaign && (
               <GalleryPanel campaignId={campaign.id} campaign={campaign} onRefresh={fetchCampaign} />
+            )}
+
+            {activeTab === 'gallery' && campaign && (
+              <MailerPanel campaignId={campaign.id} campaign={campaign} />
             )}
 
             {activeTab === 'gallery' && campaign && (

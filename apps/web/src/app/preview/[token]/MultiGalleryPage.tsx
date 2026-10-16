@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import {
   Container,
@@ -39,6 +39,7 @@ import diagnosticGalleryPublicService, {
   type CompletedSiblingSection,
   type MultiGalleryProjectPlan,
 } from '@/services/DiagnosticGalleryPublicService';
+import { resolveGalleryToken } from './galleryToken';
 
 const ARCHETYPE_COLORS: Record<string, string> = {
   A1: 'blue',
@@ -52,8 +53,9 @@ const ARCHETYPE_COLORS: Record<string, string> = {
 };
 
 export default function MultiGalleryPage() {
+  const params = useParams();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token') || '';
+  const token = resolveGalleryToken(params?.token, searchParams.get('token'));
 
   const [data, setData] = useState<MultiGalleryData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -40,6 +40,7 @@ import {
   normalizeReferenceCity,
   normalizeReferenceState,
 } from './intelligence/IntelligenceProfileService';
+import { resolveProvingGroundBadges } from './provingGroundBadge';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -649,51 +650,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
       const intakeCount = statusCounts['intake'] ?? 0;
 
       // Proving-ground badge decoration — resolves each row's PG from either
-      // linkage: the direct proving_ground_id column, the source campaign
-      // itself being a PG, or the source campaign's parent being one (the
-      // discovery-child path). Two batched lookups for the whole page so
-      // every queue surface can show "which PG owns this prospect" without
-      // per-row campaign fetches. Non-fatal: degrades to no badges.
-      const pgByEntry = new Map<string, { id: string; title: string | null; category: string | null; city: string | null }>();
-      try {
-        const linkedIds = new Set<string>();
-        for (const e of entries as any[]) {
-          if (e.proving_ground_id) linkedIds.add(e.proving_ground_id);
-          if (e.source_campaign_id) linkedIds.add(e.source_campaign_id);
-        }
-        if (linkedIds.size > 0) {
-          const linked = await this.prisma.mkt_campaigns_list.findMany({
-            where: { id: { in: [...linkedIds] } },
-            select: { id: true, title: true, category: true, city: true, campaign_category: true, parent_campaign_id: true },
-          });
-          const parentIds = [...new Set(
-            linked.map((c) => c.parent_campaign_id).filter((id): id is string => !!id),
-          )];
-          const parents = parentIds.length > 0
-            ? await this.prisma.mkt_campaigns_list.findMany({
-                where: { id: { in: parentIds }, campaign_category: 'proving_ground' },
-                select: { id: true, title: true, category: true, city: true, campaign_category: true },
-              })
-            : [];
-          const byId = new Map<string, any>([...linked, ...parents].map((c) => [c.id, c]));
-          const asPg = (c: any) =>
-            c?.campaign_category === 'proving_ground'
-              ? { id: c.id as string, title: c.title as string | null, category: c.category as string | null, city: c.city as string | null }
-              : null;
-          for (const e of entries as any[]) {
-            const source = e.source_campaign_id ? byId.get(e.source_campaign_id) : undefined;
-            const pg =
-              asPg(e.proving_ground_id ? byId.get(e.proving_ground_id) : undefined) ??
-              asPg(source) ??
-              asPg(source?.parent_campaign_id ? byId.get(source.parent_campaign_id) : undefined);
-            if (pg) pgByEntry.set(e.id, pg);
-          }
-        }
-      } catch (e) {
-        logger.warn('list: proving-ground badge lookup failed (non-fatal)', ctx, {
-          error: (e as Error).message,
-        });
-      }
+      // linkage (direct proving_ground_id, or a source campaign that is a PG
+      // / a discovery child of one). Shared with the communications picker.
+      const pgByEntry = await resolveProvingGroundBadges(entries as any[], ctx);
 
       // Audit coverage (pre-push tracking): when decorating with campaigns,
       // also flag which processed campaigns already have a business_analysis

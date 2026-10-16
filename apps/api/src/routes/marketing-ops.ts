@@ -166,7 +166,8 @@ import MarketingServiceCategoryService from '../services/MarketingServiceCategor
 import CategoryVocabularyService from '../services/CategoryVocabularyService';
 import { ReviewResponseService } from '../services/ReviewResponseService';
 import { OutreachOpenerService } from '../services/OutreachOpenerService';
-import { selectArchetype, type BusinessAnalysisAuditData } from '../services/outreach-openers/archetype-selection';
+import type { ArchetypeCode } from '../services/outreach-openers/archetype-selection';
+import { resolveGalleryTheme } from '../services/marketing/gallery-theme';
 import { resolveGalleryArchetypeDefaults } from '../services/marketing/GalleryArchetypeDefaults';
 import galleryAnalyticsService from '../services/GalleryAnalyticsService';
 import { GalleryMultiService } from '../services/marketing/GalleryMultiService';
@@ -7789,16 +7790,7 @@ router.post('/campaigns/:id/gallery-token', async (req: any, res: Response) => {
 
     // For A2, re-run selectArchetype to get the theme (HeaderService pattern).
     // resolveCampaignArchetype does not return the theme field.
-    let theme: any = null;
-    if (archetype === 'A2') {
-      // Need the audit data to re-run selectArchetype — fetch via BusinessContextService
-      const BusinessContextService = (await import('../services/deliverable/BusinessContextService')).default;
-      const auditResult = await BusinessContextService.getLatestAuditData(id, ctx);
-      if (auditResult) {
-        const autoSel = selectArchetype(auditResult.auditData as BusinessAnalysisAuditData);
-        theme = autoSel.theme ?? null;
-      }
-    }
+    const theme = await resolveGalleryTheme(id, archetype as ArchetypeCode, ctx);
 
     // 4. Build archetype-aware defaults
     const defaults = resolveGalleryArchetypeDefaults(archetype as any, theme);
@@ -8134,13 +8126,53 @@ router.post('/campaigns/:id/send-claim-invite', async (req: any, res: Response) 
   }
 });
 
+const MAILER_QR_DESTINATIONS = ['auto', 'diagnostic_gallery', 'claim', 'portal', 'site', 'custom'] as const;
+
+/**
+ * POST /campaigns/:id/mailer/qr-target
+ *
+ * Resolve the QR landing URL for a mailer without generating the PDF.
+ * Backs the composer's "Design QR" step — the styled QR is rendered
+ * client-side, so the destination URL must be settled first. Resolving
+ * mints/reuses the token just like generate() does, so the URL returned
+ * here is the same one the PDF encodes.
+ *
+ * Body: { qrDestination?: 'auto'|'diagnostic_gallery'|'claim'|'portal'|'site'|'custom', customUrl? }
+ */
+router.post('/campaigns/:id/mailer/qr-target', async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const ctx = getCtx(req);
+    const qrDestination = req.body?.qrDestination as string | undefined;
+    const customUrl = req.body?.customUrl as string | undefined;
+    if (qrDestination && !MAILER_QR_DESTINATIONS.includes(qrDestination as any)) {
+      return res.status(400).json({ success: false, error: 'invalid_qr_destination' });
+    }
+
+    const target = await PostalMailerService.getInstance().resolveQrTarget(
+      id,
+      { destination: qrDestination as any, customUrl },
+      ctx,
+    );
+    res.json({ success: true, data: target });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 /**
  * POST /campaigns/:id/mailer
  *
  * Generate a 4x6" triage-aware postcard PDF for a campaign.
  * Dual path (mirrors opener execute/import):
- *   - Path 1 (execute): no body → platform AI generates headline + body.
+ *   - Path 1 (execute): no headline/body → platform AI generates copy.
  *   - Path 2 (import): body { headline, body } → uses operator-provided copy.
+ * QR bundle options:
+ *   - qrDestination: operator-picked landing (auto = stage-based precedence)
+ *   - customUrl: required when qrDestination === 'custom'
+ *   - qrDataUrl: styled QR PNG data URL from the QR designer — embedded
+ *     verbatim instead of a classic B/W code (same contract as the seed
+ *     QR-kit postcards).
  * If platform AI is unavailable, Path 1 returns 503 with code `ai_unavailable`.
  */
 router.post('/campaigns/:id/mailer', async (req: any, res: Response) => {
@@ -8150,8 +8182,23 @@ router.post('/campaigns/:id/mailer', async (req: any, res: Response) => {
     const headline = req.body?.headline as string | undefined;
     const body = req.body?.body as string | undefined;
     const importCopy = headline && body ? { headline, body } : undefined;
+    const qrDestination = req.body?.qrDestination as string | undefined;
+    const customUrl = req.body?.customUrl as string | undefined;
+    if (qrDestination && !MAILER_QR_DESTINATIONS.includes(qrDestination as any)) {
+      return res.status(400).json({ success: false, error: 'invalid_qr_destination' });
+    }
+    const qrDataUrl = typeof req.body?.qrDataUrl === 'string' ? req.body.qrDataUrl : undefined;
+    if (qrDataUrl && (!qrDataUrl.startsWith('data:image/png;base64,') || qrDataUrl.length > 8_000_000)) {
+      return res.status(400).json({ success: false, error: 'invalid_qr_data_url' });
+    }
 
-    const payload = await PostalMailerService.getInstance().generate(id, ctx, importCopy);
+    const payload = await PostalMailerService.getInstance().generate(
+      id,
+      ctx,
+      importCopy,
+      { destination: qrDestination as any, customUrl },
+      qrDataUrl,
+    );
     const { pdfBuffer, filename } = await generatePostcardPdf(payload);
 
     res.setHeader('Content-Type', 'application/pdf');

@@ -849,6 +849,14 @@ export class MarketingDeliverableService extends BaseService {
    * Returns the token + token_type so the redirect page knows whether to
    * append ?prospect=true (multi_diagnostic_gallery) or not.
    *
+   * Token-aware redirect (same pattern as directory claim short codes and
+   * intake /i/ codes): the code→campaign mapping is permanent, so when the
+   * encoded token is expired / superseded / paid the code resolves to the
+   * campaign's CURRENT live token of the same type — printed QR cards keep
+   * working after a re-issue. When no live successor exists the dead token
+   * is still returned so /preview/[token] renders its expired re-activation
+   * hook rather than a bare 404.
+   *
    * Lazily backfills a short_code on legacy tokens that don't have one yet,
    * so old tokens picked up from the long URL eventually gain a short URL.
    */
@@ -856,14 +864,29 @@ export class MarketingDeliverableService extends BaseService {
     const normalized = shortCode.toUpperCase();
     const row = await this.prisma.mkt_deliverable_preview_tokens.findFirst({
       where: { short_code: normalized },
-      select: { id: true, token: true, token_type: true, short_code: true, expires_at: true, converted_at: true },
+      select: { id: true, token: true, token_type: true, campaign_id: true, expires_at: true, converted_at: true, paid_at: true },
     });
     if (!row) {
       return null;
     }
-    // Expired or converted tokens are not resolvable via short code.
-    if (row.expires_at && new Date(row.expires_at) < new Date()) {
-      return null;
+    const now = new Date();
+    const live = row.expires_at > now && !row.converted_at && !row.paid_at;
+    if (live) {
+      return { token: row.token, tokenType: row.token_type };
+    }
+    const successor = await this.prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: {
+        campaign_id: row.campaign_id,
+        token_type: row.token_type,
+        converted_at: null,
+        paid_at: null,
+        expires_at: { gt: now },
+      },
+      orderBy: { created_at: 'desc' },
+      select: { token: true, token_type: true },
+    });
+    if (successor) {
+      return { token: successor.token, tokenType: successor.token_type };
     }
     return { token: row.token, tokenType: row.token_type };
   }

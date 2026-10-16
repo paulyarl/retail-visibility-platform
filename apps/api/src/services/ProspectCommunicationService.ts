@@ -30,6 +30,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError } from '../middleware/errorHandler';
 import DirectoryPresenceSeedService from './DirectoryPresenceSeedService';
+import { resolveProvingGroundBadges, type ProvingGroundBadge } from './provingGroundBadge';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -95,6 +96,12 @@ export interface ProspectSummary {
   business_prospect_id: string | null;
   last_contact_at: string | null;
   contact_count: number;
+  /** Direct proving-ground stamp on the queue row (migration 282). */
+  proving_ground_id: string | null;
+  /** Resolved PG badge — the PG this prospect belongs to via either linkage
+   *  (direct stamp, or a source campaign that is a PG / discovery child of
+   *  one). Null when ungrouped. Populated on the list read (picker filters). */
+  proving_ground: ProvingGroundBadge | null;
   /** Populated on the timeline payload only — the raw queue row's snapshot,
    *  needed by the shared resolve-verification modal to pre-fill verified NAP. */
   business_snapshot?: Record<string, any> | null;
@@ -292,6 +299,8 @@ class ProspectCommunicationServiceClass extends BaseService {
         }
       }
 
+      const pgByEntry = await resolveProvingGroundBadges(entries as any[], ctx);
+
       return entries.map((e) => {
         const campaign = (e as any)
           .mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list;
@@ -318,6 +327,8 @@ class ProspectCommunicationServiceClass extends BaseService {
           business_prospect_id: campaign?.business_prospect_id ?? null,
           last_contact_at: last ? last.toISOString() : null,
           contact_count: (seed?.count ?? 0) + (camp?.count ?? 0),
+          proving_ground_id: (e as any).proving_ground_id ?? null,
+          proving_ground: pgByEntry.get(e.id) ?? null,
         };
       });
     } catch (error) {
@@ -394,6 +405,8 @@ class ProspectCommunicationServiceClass extends BaseService {
         ? campaignById.get(entry.processed_campaign_id)
         : undefined;
 
+      const pgBadges = await resolveProvingGroundBadges([entry as any], ctx);
+
       const prospect: ProspectSummary = {
         id: entry.id,
         business_name: entry.business_name ?? null,
@@ -411,6 +424,8 @@ class ProspectCommunicationServiceClass extends BaseService {
         business_prospect_id: businessProspectId,
         last_contact_at: summary.last_contact_at,
         contact_count: summary.total_events,
+        proving_ground_id: (entry as any).proving_ground_id ?? null,
+        proving_ground: pgBadges.get(entry.id) ?? null,
         business_snapshot: (entry.business_snapshot ?? null) as Record<string, any> | null,
         verification: (entry.verification ?? null) as Record<string, any> | null,
       };

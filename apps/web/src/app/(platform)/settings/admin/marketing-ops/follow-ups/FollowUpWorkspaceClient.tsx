@@ -31,6 +31,9 @@ import marketingOpsService, {
   FollowUpType,
   CloseVariant,
 } from '@/services/MarketingOpsService';
+import SelectorToolbar from '@/components/marketing-ops/SelectorToolbar';
+import { sortCampaigns, CAMPAIGN_SORT_OPTIONS, type CampaignSortKey } from '@/lib/campaign-sort';
+import { searchCampaigns } from '@/lib/campaign-filters';
 
 const CLOSE_VARIANT_LABELS: Record<CloseVariant, { label: string; hint: string }> = {
   soft: {
@@ -71,6 +74,8 @@ export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [campaignSortBy, setCampaignSortBy] = useState<CampaignSortKey>('name');
 
   const [resolution, setResolution] = useState<FollowUpResolution | null>(null);
   const [resolving, setResolving] = useState(false);
@@ -101,6 +106,13 @@ export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
       (c) => (c as any).pipeline === 'review',
     ),
     [campaigns],
+  );
+
+  // Search + sort over the review campaigns — the dropdown is otherwise in
+  // workflow order, which reads as arbitrary when scanning by name or market.
+  const displayCampaigns = useMemo(
+    () => sortCampaigns(searchCampaigns(reviewCampaigns, campaignSearch), campaignSortBy),
+    [reviewCampaigns, campaignSearch, campaignSortBy],
   );
 
   // ─── Data fetching ─────────────────────────────────────────────────────
@@ -279,25 +291,39 @@ export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Campaign — Review Management</h2>
-          <span className="text-xs text-gray-400 dark:text-gray-500">Recovery campaigns excluded</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            {displayCampaigns.length} campaign{displayCampaigns.length !== 1 ? 's' : ''}
+          </span>
         </div>
-        <select
-          value={selectedCampaignId}
-          onChange={(e) => setSelectedCampaignId(e.target.value)}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <SelectorToolbar
+          search={campaignSearch}
+          onSearchChange={setCampaignSearch}
+          searchPlaceholder="Search name, city, category…"
+          sortBy={campaignSortBy}
+          onSortChange={setCampaignSortBy}
+          sortOptions={CAMPAIGN_SORT_OPTIONS}
         >
-          <option value="">— Select a campaign —</option>
-          {reviewCampaigns.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.title || c.business_name || `${c.category} · ${c.city}`}
-              {c.archetype ? ` [${c.archetype}]` : ''} ({c.stage})
-            </option>
-          ))}
-        </select>
+          <select
+            value={selectedCampaignId}
+            onChange={(e) => setSelectedCampaignId(e.target.value)}
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">— Select a campaign —</option>
+            {displayCampaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title || c.business_name || `${c.category} · ${c.city}`}
+                {c.archetype ? ` [${c.archetype}]` : ''} ({c.stage})
+              </option>
+            ))}
+          </select>
+        </SelectorToolbar>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Follow-ups require an opener to exist for the selected campaign. The opener&apos;s archetype and close variant are inherited.
           Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
         </p>
+        {reviewCampaigns.length > 0 && displayCampaigns.length === 0 && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">No campaigns match your search.</p>
+        )}
         {reviewCampaigns.length === 0 && campaigns.length > 0 && (
           <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
             No review-management campaigns found. All current campaigns are recovery-management campaigns, which use the Day 1/2/4 cascade instead.

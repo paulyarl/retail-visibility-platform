@@ -625,10 +625,15 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
           )}
 
           {/* Channel Readiness — shows email/phone/social availability +
-              cascade readiness + intake email status. */}
+              cascade readiness + intake email status. Degraded states carry
+              enrich/edit CTAs; the recovery cascade is automatic so no
+              cascade-tab jump is offered here. */}
           <ChannelReadinessWidget
             campaignId={campaignId}
+            campaign={campaign}
             intakeEmail={intake?.owner_email ?? null}
+            onEnriched={fetchData}
+            onContactLogged={fetchData}
           />
         </div>
 

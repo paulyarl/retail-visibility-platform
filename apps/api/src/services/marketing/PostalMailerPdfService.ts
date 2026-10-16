@@ -63,9 +63,12 @@ export async function generatePostcardPdf(payload: PostalMailerPayload): Promise
   yPos += bodyLines.length * 0.16 + 0.3;
 
   // ── QR code ───────────────────────────────────────────────────────────
+  // qrImageDataUrl carries the admin QR designer's styled render (logo +
+  // colors) — same override contract as the seed QR-kit postcards. Omitting
+  // it yields the classic B/W code.
   const qrSize = 1.4;
   const qrX = (pageWidth - qrSize) / 2;
-  const qrDataUrl = await QRCode.toDataURL(payload.qrUrl, {
+  const qrDataUrl = payload.qrImageDataUrl ?? await QRCode.toDataURL(payload.qrUrl, {
     width: 400,
     margin: 1,
     errorCorrectionLevel: 'M',

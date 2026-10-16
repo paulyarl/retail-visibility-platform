@@ -23,7 +23,11 @@ const router = Router();
  *   - 'diagnostic_gallery'        → /preview/{token}
  *   - 'multi_diagnostic_gallery'  → /preview/{token}?prospect=true
  *
- * Expired tokens return 404 (do not leak existence vs. expiry).
+ * Dead tokens (expired / superseded / paid) resolve to the campaign's
+ * current live token of the same type when one exists — the code→campaign
+ * mapping is permanent so printed QRs survive reissue. When no live
+ * successor exists the dead token is returned so /preview renders its
+ * expired re-activation hook. Only unknown codes 404.
  */
 router.get('/:shortCode', async (req, res) => {
   try {

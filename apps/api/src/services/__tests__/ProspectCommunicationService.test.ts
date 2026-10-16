@@ -306,4 +306,37 @@ describe('ProspectCommunicationService.listProspects', () => {
     expect(mockSeedTouches.groupBy).not.toHaveBeenCalled();
     expect(mockOutreachLog.groupBy).not.toHaveBeenCalled();
   });
+
+  it('decorates prospects with their proving-ground badge', async () => {
+    mockQueue.findMany.mockResolvedValue([{ ...queueEntry(), proving_ground_id: 'pg-1' }]);
+    mockCampaigns.findMany.mockResolvedValue([
+      {
+        id: 'pg-1',
+        title: 'Milwaukee Grocers',
+        category: 'grocery',
+        city: 'Milwaukee',
+        campaign_category: 'proving_ground',
+        parent_campaign_id: null,
+      },
+    ]);
+
+    const [prospect] = await ProspectCommunicationService.listProspects({});
+
+    expect(prospect.proving_ground_id).toBe('pg-1');
+    expect(prospect.proving_ground).toEqual({
+      id: 'pg-1',
+      title: 'Milwaukee Grocers',
+      category: 'grocery',
+      city: 'Milwaukee',
+    });
+  });
+
+  it('leaves proving_ground null for an ungrouped prospect', async () => {
+    mockQueue.findMany.mockResolvedValue([queueEntry()]);
+
+    const [prospect] = await ProspectCommunicationService.listProspects({});
+
+    expect(prospect.proving_ground_id).toBeNull();
+    expect(prospect.proving_ground).toBeNull();
+  });
 });

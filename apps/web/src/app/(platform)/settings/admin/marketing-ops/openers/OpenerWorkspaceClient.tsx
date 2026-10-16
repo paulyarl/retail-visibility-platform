@@ -13,6 +13,9 @@ import marketingOpsService, {
 } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import LogContactModal from '@/components/marketing-ops/LogContactModal';
+import SelectorToolbar from '@/components/marketing-ops/SelectorToolbar';
+import { sortCampaigns, CAMPAIGN_SORT_OPTIONS, type CampaignSortKey } from '@/lib/campaign-sort';
+import { searchCampaigns } from '@/lib/campaign-filters';
 import PitchConstructionPanel from './PitchConstructionPanel';
 import PreviewDeliverablePanel from './PreviewDeliverablePanel';
 import CallScriptPanel from './CallScriptPanel';
@@ -51,6 +54,8 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [campaignSortBy, setCampaignSortBy] = useState<CampaignSortKey>('name');
 
   // Active workspace tab. "opener" is the legacy generate/import workspace;
   // "pitch" is the pitch construction assembly UI (header + opener + 3-slot
@@ -154,6 +159,13 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
       (c) => c.scope === 'business' && (c as any).pipeline === 'review',
     ),
     [campaigns],
+  );
+
+  // Search + sort over the eligible campaigns — the dropdown is otherwise in
+  // workflow order, which reads as arbitrary when scanning by name or market.
+  const displayCampaigns = useMemo(
+    () => sortCampaigns(searchCampaigns(businessCampaigns, campaignSearch), campaignSortBy),
+    [businessCampaigns, campaignSearch, campaignSortBy],
   );
 
   const fetchData = useCallback(async () => {
@@ -439,26 +451,43 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
         <div className="space-y-4">
           {/* Campaign Selector */}
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Campaign</h2>
-            <select
-              value={selectedCampaignId}
-              onChange={(e) => setSelectedCampaignId(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Campaign</h2>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {displayCampaigns.length} campaign{displayCampaigns.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <SelectorToolbar
+              search={campaignSearch}
+              onSearchChange={setCampaignSearch}
+              searchPlaceholder="Search name, city, category…"
+              sortBy={campaignSortBy}
+              onSortChange={setCampaignSortBy}
+              sortOptions={CAMPAIGN_SORT_OPTIONS}
             >
-              <option value="">— Select a business campaign —</option>
-              {businessCampaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title || c.business_name || `${c.category} · ${c.city}`}
-                  {c.archetype ? ` [${c.archetype}]` : ''} ({c.stage})
-                </option>
-              ))}
-            </select>
+              <select
+                value={selectedCampaignId}
+                onChange={(e) => setSelectedCampaignId(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— Select a business campaign —</option>
+                {displayCampaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title || c.business_name || `${c.category} · ${c.city}`}
+                    {c.archetype ? ` [${c.archetype}]` : ''} ({c.stage})
+                  </option>
+                ))}
+              </select>
+            </SelectorToolbar>
             {businessCampaigns.length === 0 && (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                 No eligible campaigns. Openers only apply to review-management campaigns that have a
                 business_analysis audit (run a seek-stage business analysis first). Recovery campaigns
                 use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
               </p>
+            )}
+            {businessCampaigns.length > 0 && displayCampaigns.length === 0 && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No campaigns match your search.</p>
             )}
             {checklistBadge && (
               <a
