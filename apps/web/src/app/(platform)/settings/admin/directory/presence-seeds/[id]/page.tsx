@@ -255,12 +255,15 @@ function PresenceSeedDetailClient() {
   const [qrDesignerVariant, setQrDesignerVariant] = useState<
     'mail' | 'walkin' | 'social' | 'email' | null
   >(null);
+  // The seed's shared claim-invite QR design — one design for all claim variant
+  // cards (preview + QR PNG + Postcard PDF). Null = none saved (classic B/W).
+  const [claimQrStyle, setClaimQrStyle] = useState<PersistedQrStyle | null>(null);
   const [reportQrKit, setReportQrKit] = useState<ReportDeliveryQrKitMeta | null>(null);
   // The seed's shared report-delivery QR design — one design for all delivery
   // cards (preview + QR PNG + Postcard PDF). Null = none saved (classic B/W).
   const [reportQrStyle, setReportQrStyle] = useState<PersistedQrStyle | null>(null);
   // Platform logo — the design's center logo (the modal's default for delivery).
-  const [reportLogoUrl, setReportLogoUrl] = useState<string | null>(null);
+  const [qrPlatformLogoUrl, setQrPlatformLogoUrl] = useState<string | null>(null);
   const [reportVersions, setReportVersions] = useState<Array<{
     version: number;
     status: string;
@@ -416,17 +419,26 @@ function PresenceSeedDetailClient() {
     }
   }, [seedId]);
 
+  const loadClaimQrStyle = useCallback(async () => {
+    try {
+      const style = await directoryPresenceAdminService.getClaimQrStyle(seedId);
+      setClaimQrStyle(style);
+    } catch (err) {
+      clientLogger.error('Failed to load claim QR style:', { detail: err });
+    }
+  }, [seedId]);
+
   // The design's center logo resolves like the designer modal's default — the
-  // platform logo (delivery channels don't use a per-seed business logo).
+  // platform logo (neither kit uses a per-seed business logo for these cards).
   useEffect(() => {
     let cancelled = false;
     platformSettingsService
       .getPlatformSettings()
       .then((s) => {
-        if (!cancelled) setReportLogoUrl(s?.logoUrl ?? null);
+        if (!cancelled) setQrPlatformLogoUrl(s?.logoUrl ?? null);
       })
       .catch(() => {
-        if (!cancelled) setReportLogoUrl(null);
+        if (!cancelled) setQrPlatformLogoUrl(null);
       });
     return () => {
       cancelled = true;
@@ -609,6 +621,7 @@ function PresenceSeedDetailClient() {
   useEffect(() => {
     fetchDetail();
     loadQrKit();
+    loadClaimQrStyle();
     loadReportQrKit();
     loadReportQrStyle();
     loadAnchors();
@@ -616,7 +629,7 @@ function PresenceSeedDetailClient() {
     loadReportVersions();
     loadReengagement();
     loadPreviewStatus();
-  }, [fetchDetail, loadQrKit, loadReportQrKit, loadReportQrStyle, loadAnchors, loadTouches, loadReportVersions, loadReengagement, loadPreviewStatus]);
+  }, [fetchDetail, loadQrKit, loadClaimQrStyle, loadReportQrKit, loadReportQrStyle, loadAnchors, loadTouches, loadReportVersions, loadReengagement, loadPreviewStatus]);
 
   // Load the verification call script — refetches when the anchor selection
   // changes so the script reflects the anchor's questions + transition.
@@ -689,7 +702,7 @@ function PresenceSeedDetailClient() {
         // A design is saved — render it client-side so the download matches the
         // card preview and the Design modal (the classic server render can't).
         const dataUrl = await generateQrDataUrl({
-          ...bannerQrOptions(url, reportQrStyle, reportLogoUrl),
+          ...bannerQrOptions(url, reportQrStyle, qrPlatformLogoUrl),
           exportSize: kind === 'png' ? 512 : 1024,
         });
         if (kind === 'png') {
@@ -726,25 +739,41 @@ function PresenceSeedDetailClient() {
   const handleQrDownload = async (
     variant: 'mail' | 'walkin' | 'social' | 'email',
     kind: 'png' | 'postcard',
+    url: string,
   ) => {
     const key = `${variant}-${kind}`;
     setActionError(null);
     try {
       setQrDownloading(key);
+      if (claimQrStyle) {
+        // A design is saved — render it client-side so the download matches the
+        // card preview and the Design modal (the classic server render can't).
+        const dataUrl = await generateQrDataUrl({
+          ...bannerQrOptions(url, claimQrStyle, qrPlatformLogoUrl),
+          exportSize: kind === 'png' ? 512 : 1024,
+        });
+        if (kind === 'png') {
+          triggerDataUrlDownload(dataUrl, `claim-qr-${variant}-512px.png`);
+        } else {
+          const blob = await directoryPresenceAdminService.downloadClaimInvitePostcardStyled(
+            seedId,
+            variant,
+            dataUrl,
+          );
+          if (!blob) throw new Error('Download failed');
+          triggerBlobDownload(blob, `claim-postcard-${variant}.pdf`);
+        }
+        return;
+      }
       const blob =
         kind === 'png'
           ? await directoryPresenceAdminService.downloadClaimInvitePng(seedId, variant)
           : await directoryPresenceAdminService.downloadClaimInvitePostcard(seedId, variant);
       if (!blob) throw new Error('Download failed');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download =
-        kind === 'png'
-          ? `claim-qr-${variant}.png`
-          : `claim-postcard-${variant}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(
+        blob,
+        kind === 'png' ? `claim-qr-${variant}.png` : `claim-postcard-${variant}.pdf`,
+      );
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : 'Failed to download QR artifact',
@@ -2380,7 +2409,11 @@ function PresenceSeedDetailClient() {
                   <p className="text-xs text-gray-500 mt-0.5">{v.desc}</p>
                 </div>
                 <div className="flex justify-center">
-                  <ClaimQrPreview url={v.url} />
+                  <ClaimQrPreview
+                    url={v.url}
+                    qrStyle={claimQrStyle}
+                    logoUrl={qrPlatformLogoUrl}
+                  />
                 </div>
                 <p className="text-xs font-mono text-gray-600 break-all bg-gray-50 rounded px-2 py-1.5">
                   {v.url}
@@ -2409,7 +2442,7 @@ function PresenceSeedDetailClient() {
                     Design
                   </button>
                   <button
-                    onClick={() => handleQrDownload(v.variant, 'png')}
+                    onClick={() => handleQrDownload(v.variant, 'png', v.url)}
                     disabled={qrDownloading !== null}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
                   >
@@ -2418,7 +2451,7 @@ function PresenceSeedDetailClient() {
                   </button>
                   {v.postcard && (
                     <button
-                      onClick={() => handleQrDownload(v.variant, 'postcard')}
+                      onClick={() => handleQrDownload(v.variant, 'postcard', v.url)}
                       disabled={qrDownloading !== null}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
                     >
@@ -2446,6 +2479,8 @@ function PresenceSeedDetailClient() {
           allowPostcard={qrDesignerConfig.postcard}
           templates={CLAIM_QR_TEMPLATES}
           defaultTemplate={qrDesignerConfig.defaultTemplate}
+          initialStyle={claimQrStyle}
+          onSaved={setClaimQrStyle}
         />
       )}
 
@@ -2567,7 +2602,7 @@ function PresenceSeedDetailClient() {
                   <ClaimQrPreview
                     url={c.url}
                     qrStyle={c.channel === 'banner' ? null : reportQrStyle}
-                    logoUrl={reportLogoUrl}
+                    logoUrl={qrPlatformLogoUrl}
                   />
                 </div>
                 <p className="text-xs font-mono text-gray-600 break-all bg-gray-50 rounded px-2 py-1.5">

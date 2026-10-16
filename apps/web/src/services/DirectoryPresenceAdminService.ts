@@ -1826,6 +1826,32 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return !!result.success;
   }
 
+  /** GET /api/admin/directory-presence/presence-seeds/:id/claim-qr-style
+   *  The shared claim-invite QR design (camelCase PersistedQrStyle) — the Claim
+   *  QR Kit card previews and each variant card's PNG/postcard downloads render
+   *  it. Null = no design saved (cards fall back to classic B/W). */
+  async getClaimQrStyle(seedId: string): Promise<PersistedQrStyle | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/claim-qr-style`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.style ?? null) as PersistedQrStyle | null;
+  }
+
+  /** PUT /api/admin/directory-presence/presence-seeds/:id/claim-qr-style */
+  async updateClaimQrStyle(seedId: string, style: PersistedQrStyle): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/claim-qr-style`,
+      { method: 'PUT', body: JSON.stringify(style) },
+      undefined,
+      0,
+    );
+    return !!result.success;
+  }
+
   /** POST /api/admin/directory-presence/presence-seeds/:id/logo — upload the
    *  seed tenant's logo (same tenant_business_profiles_list.logo_url write a
    *  tenant's own logo upload performs). Returns the stored public URL — QR

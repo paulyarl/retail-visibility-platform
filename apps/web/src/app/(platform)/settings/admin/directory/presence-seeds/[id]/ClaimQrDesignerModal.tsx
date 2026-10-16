@@ -13,16 +13,22 @@
  *
  * The QR always encodes the variant's tracked redirect URL — scans still
  * record as claim_invite / _walkin / _social / _email regardless of styling.
+ *
+ * "Save design" PERSISTS one shared design for the seed's claim variants
+ * (directory_presence_seeds.claim_qr_style), so every claim card's preview,
+ * QR PNG, and Postcard PDF render it. The designer prefills from that saved
+ * design when one exists.
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Download, QrCode, FileText, Image as ImageIcon } from 'lucide-react';
+import { X, Download, QrCode, FileText, Image as ImageIcon, Save } from 'lucide-react';
 import {
   QR_TEMPLATE_LIST,
   generateQrInstance,
   generateQrDataUrl,
   type QrTemplateName,
   type QrEngineOptions,
+  type PersistedQrStyle,
 } from '@/lib/qr-engine';
 import {
   DOT_STYLES,
@@ -48,6 +54,12 @@ export interface ClaimQrDesignerModalProps {
   templates?: QrTemplateName[];
   /** Template applied on open. Defaults to 'default'. */
   defaultTemplate?: QrTemplateName;
+  /** The seed's saved shared claim design — used to prefill the designer so the
+   *  operator edits the live card design. Null/absent → the default template. */
+  initialStyle?: PersistedQrStyle | null;
+  /** Called after a successful save so the page can re-render the claim cards
+   *  with the new design. */
+  onSaved?: (style: PersistedQrStyle) => void;
 }
 
 export default function ClaimQrDesignerModal({
@@ -60,6 +72,8 @@ export default function ClaimQrDesignerModal({
   allowPostcard = false,
   templates,
   defaultTemplate = 'default',
+  initialStyle = null,
+  onSaved,
 }: ClaimQrDesignerModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>(defaultTemplate);
   const [dotType, setDotType] = useState('rounded');
@@ -86,6 +100,8 @@ export default function ClaimQrDesignerModal({
   const [size, setSize] = useState(512);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const qrInstanceRef = useRef<any>(null);
 
@@ -173,13 +189,36 @@ export default function ClaimQrDesignerModal({
     };
   }, [open]);
 
-  // Apply the surface's default template on open so its concrete values land
-  // in state (resolveOptions alone never overrides always-defined fields).
+  // Prefill from the seed's saved shared claim design so the operator edits the
+  // live card design; with no design saved, apply the surface's default template
+  // (resolveOptions alone never overrides the always-defined option fields).
   useEffect(() => {
     if (!open) return;
-    applyTemplate(defaultTemplate);
+    if (!initialStyle) {
+      applyTemplate(defaultTemplate);
+      return;
+    }
+    if (initialStyle.dotType) setDotType(initialStyle.dotType);
+    if (initialStyle.cornerType) setCornerType(initialStyle.cornerType);
+    if (initialStyle.cornerDotType) setCornerDotType(initialStyle.cornerDotType);
+    if (initialStyle.customColorsEnabled !== undefined) setCustomColorsEnabled(initialStyle.customColorsEnabled);
+    if (initialStyle.dotColor) setDotColor(initialStyle.dotColor);
+    if (initialStyle.cornerColor) setCornerColor(initialStyle.cornerColor);
+    if (initialStyle.cornerDotColor) setCornerDotColor(initialStyle.cornerDotColor);
+    if (initialStyle.bgColor) setBgColor(initialStyle.bgColor);
+    if (initialStyle.gradientEnabled !== undefined) setGradientEnabled(initialStyle.gradientEnabled);
+    if (initialStyle.gradientStart) setGradientStart(initialStyle.gradientStart);
+    if (initialStyle.gradientEnd) setGradientEnd(initialStyle.gradientEnd);
+    if (initialStyle.gradientOnDots !== undefined) setGradientOnDots(initialStyle.gradientOnDots);
+    if (initialStyle.gradientOnCorners !== undefined) setGradientOnCorners(initialStyle.gradientOnCorners);
+    if (initialStyle.gradientOnCornerDots !== undefined) setGradientOnCornerDots(initialStyle.gradientOnCornerDots);
+    if (initialStyle.logo !== undefined) setLogoEnabled(initialStyle.logo);
+    if (initialStyle.logoShape) setLogoShape(initialStyle.logoShape);
+    // Persisted designs are concrete — no template identity survives the save,
+    // so keep the surface default selected as a display label only.
+    setSelectedTemplate(defaultTemplate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, defaultTemplate]);
+  }, [open, initialStyle, defaultTemplate]);
 
   // Live preview — always via generateQrDataUrl so the logo overlay shows.
   useEffect(() => {
@@ -276,6 +315,44 @@ export default function ClaimQrDesignerModal({
       setError('Failed to generate styled postcard');
     } finally {
       setDownloading(null);
+    }
+  };
+
+  // Persist the shared claim design on the seed so every variant card's preview,
+  // QR PNG, and Postcard PDF render it.
+  const buildPersistedStyle = (): PersistedQrStyle => ({
+    dotType,
+    cornerType,
+    cornerDotType,
+    dotColor,
+    cornerColor,
+    cornerDotColor,
+    bgColor,
+    customColorsEnabled,
+    gradientEnabled,
+    gradientStart,
+    gradientEnd,
+    gradientOnDots,
+    gradientOnCorners,
+    gradientOnCornerDots,
+    logo: logoEnabled,
+    logoShape,
+  });
+
+  const handleSaveDesign = async () => {
+    try {
+      setSaving(true);
+      setSaved(false);
+      const style = buildPersistedStyle();
+      const ok = await directoryPresenceAdminService.updateClaimQrStyle(seedId, style);
+      if (!ok) throw new Error('Save failed');
+      setSaved(true);
+      setError(null);
+      onSaved?.(style);
+    } catch {
+      setError('Failed to save the QR design');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -593,7 +670,21 @@ export default function ClaimQrDesignerModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex flex-wrap gap-2 justify-end">
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-wrap gap-2 justify-end items-center">
+          {saved && (
+            <span className="mr-auto text-xs text-emerald-600">
+              Saved — the cards render this design
+            </span>
+          )}
+          <button
+            onClick={handleSaveDesign}
+            disabled={saving}
+            title="Save this design — every claim card's preview, QR PNG, and Postcard PDF renders it"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving…' : 'Save design'}
+          </button>
           <button
             onClick={handleDownloadPng}
             disabled={downloading !== null}

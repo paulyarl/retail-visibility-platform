@@ -1331,11 +1331,12 @@ const bannerQrStyleSchema = z.object({
   qr_logo_shape: z.string().max(20).optional(),
 });
 
-// Report-delivery QR design — ONE shared design for the seed's delivery
-// channels, persisted on the seed (directory_presence_seeds.report_qr_style).
-// Stored as the camelCase PersistedQrStyle projection the card preview + the
-// card's PNG/postcard downloads consume (@/lib/qr-engine).
-const reportQrStyleSchema = z.object({
+// Seed QR designs — ONE shared design per kit, persisted on the seed
+// (directory_presence_seeds.report_qr_style / .claim_qr_style). Stored as the
+// camelCase PersistedQrStyle projection the card previews + the cards'
+// PNG/postcard downloads consume (@/lib/qr-engine). The report and claim kits
+// are independent artifacts, so each has its own row/column.
+const seedQrStyleSchema = z.object({
   dotType: z.string().max(30).optional(),
   cornerType: z.string().max(30).optional(),
   cornerDotType: z.string().max(30).optional(),
@@ -1448,7 +1449,7 @@ router.get('/presence-seeds/:id/report-qr-style', requirePlatformAdmin, async (r
  *  Postcard PDF. */
 router.put('/presence-seeds/:id/report-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
-    const validation = reportQrStyleSchema.safeParse(req.body);
+    const validation = seedQrStyleSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
     }
@@ -1462,6 +1463,45 @@ router.put('/presence-seeds/:id/report-qr-style', requirePlatformAdmin, async (r
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     logger.error('[PUT /api/admin/directory/presence-seeds/:id/report-qr-style] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/claim-qr-style — designer prefill
+ *  for the shared claim-invite QR design (claim kit card preview + downloads). */
+router.get('/presence-seeds/:id/claim-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const style = await DirectoryPresenceSeedService.getClaimQrStyle(req.params.id);
+    res.json({ success: true, style });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/claim-qr-style] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** PUT /api/admin/directory/presence-seeds/:id/claim-qr-style — save the shared
+ *  claim-invite QR design. Drives every claim variant card's preview, QR PNG,
+ *  and Postcard PDF. */
+router.put('/presence-seeds/:id/claim-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = seedQrStyleSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    await DirectoryPresenceSeedService.updateClaimQrStyle(req.params.id, validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    logger.error('[PUT /api/admin/directory/presence-seeds/:id/claim-qr-style] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

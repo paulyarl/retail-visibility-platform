@@ -1881,6 +1881,7 @@ model directory_presence_seeds {
   seed_fidelity_checked_at          DateTime?                           @db.Timestamptz(6)
   observed_assets                   Json?
   report_qr_style                   Json?
+  claim_qr_style                    Json?
   directory_claim_requests          directory_claim_requests[]
   directory_claim_tokens            directory_claim_tokens[]
   directory_enrichment_tokens       directory_enrichment_tokens[]
