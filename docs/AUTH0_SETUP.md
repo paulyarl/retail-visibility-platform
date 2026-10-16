@@ -1,5 +1,17 @@
 # Auth0 Next.js SDK Setup
 
+> ⚠️ **This is a migration-era SDK setup guide and parts of it have drifted from the
+> deployed configuration.** For the authoritative record of the Auth0 tenant, its
+> applications, allowlist rules, the Google OAuth relationships, and host/domain config,
+> see **[AUTH_CONFIG_SECURITY.md](./AUTH_CONFIG_SECURITY.md)** — including how to verify a
+> change actually took effect. In particular, the `AUTH0_CLIENT_ID` below is the **staging**
+> application and must not be used for local development.
+>
+> Known drift in this file: paths (`apps/web/lib/…` vs actual `apps/web/src/lib/…`),
+> `APP_BASE_URL` (the SDK infers the base URL from the request host; it is not set), the
+> "HttpOnly cookies" claim (the identity cookies `auth0_email` / `auth0_id` are set with
+> `httpOnly: false`), and the absence of any mention of allowlist wildcards.
+
 This guide walks you through setting up secure OAuth 2.0 authentication using the official Auth0 Next.js SDK.
 
 ## 🚀 Quick Setup
@@ -26,7 +38,12 @@ Fill in your values from the Auth0 dashboard:
 # From your Auth0 dashboard
 APP_BASE_URL=http://localhost:3000
 AUTH0_DOMAIN=dev-jaiggvvi3zsttaoo.us.auth0.com
-AUTH0_CLIENT_ID=qa3lsBavdX2uIZ5lSElylPvwF58Dzs8C
+# Local dev needs its OWN Auth0 application — never the staging one.
+# (The staging app is `Visible Shelf`.) Pointing local dev at staging means
+# local logins use staging's allowlist and user pool. Create e.g.
+# `visible-shelf-local-dev` with only http://localhost:3000/auth/callback
+# allowlisted. See AUTH_CONFIG_SECURITY.md §2.
+AUTH0_CLIENT_ID=your_local_dev_client_id_here
 AUTH0_CLIENT_SECRET=your_auth0_client_secret_here
 AUTH0_SECRET=your_auth0_secret_here
 
