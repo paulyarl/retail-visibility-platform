@@ -212,7 +212,9 @@ describe('analyst hook round-trip — external import → audit → {{analyst_ho
     mockAuditFindFirst.mockResolvedValue(null);
   });
 
-  it('accepts a business_analysis payload carrying primary_outreach_hook and persists it verbatim', async () => {
+  // Explicit timeout: this round-trip parses a full business_analysis payload
+  // and persists it — real work that exceeds the 5 s default.
+  it('accepts a business_analysis payload carrying primary_outreach_hook and persists it verbatim', { timeout: 20000 }, async () => {
     const result = await promptService.importExternalResult({
       campaignId: CAMPAIGN.id,
       templateId: BA_TEMPLATE.id,

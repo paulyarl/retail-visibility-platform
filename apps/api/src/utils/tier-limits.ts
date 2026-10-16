@@ -10,9 +10,22 @@
 export type SubscriptionTier = 'directory_presence'|'google_only'|'presence'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization' | 'seed_preview';
 
 /**
- * Map trial tiers to their base tiers for limit proxying
+ * Map trial tiers to their base tiers **for limit proxying**.
+ *
+ * Renamed from `getBaseTierForTrial` (2026-10-16): `trial-tier-transparency.ts`
+ * has a same-named private function with a DIFFERENT map, and the two answer
+ * different questions —
+ *
+ *   - here:  what SKU/location LIMIT does this trial tier proxy to?
+ *   - there: how should this trial tier PRESENT to the frontend?
+ *
+ * They diverge on `expired_trial` on purpose. Here it proxies to `presence`
+ * (whose `maxSkus` is legitimately 0 — directory mode, no catalog). There it is
+ * deliberately absent, so an expired trial presents as ITSELF rather than as a
+ * free tier. Neither is stale; treating either as a copy of the other would
+ * "fix" a deliberate design. See `TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md` H2.
  */
-function getBaseTierForTrial(tier: string): SubscriptionTier {
+function resolveLimitBaseTier(tier: string): SubscriptionTier {
   const trialToBaseMap: Record<string, SubscriptionTier> = {
     'trial_google_only': 'google_only',
     'trial_discovery': 'discovery',
@@ -106,7 +119,7 @@ export function getSKULimit(tier: string | null | undefined): number {
   if (!tier) return TIER_LIMITS.starter.maxSkus;
   
   // Handle trial tiers as wrappers - proxy to base tier
-  const baseTier = getBaseTierForTrial(tier.toLowerCase());
+  const baseTier = resolveLimitBaseTier(tier.toLowerCase());
   // ?? not || — presence.maxSkus is legitimately 0 (directory-mode, no catalog)
   return TIER_LIMITS[baseTier]?.maxSkus ?? TIER_LIMITS.starter.maxSkus;
 }
@@ -127,6 +140,6 @@ export function getTierInfo(tier: string | null | undefined): TierLimits {
   if (!tier) return TIER_LIMITS.starter;
   
   // Handle trial tiers as wrappers - proxy to base tier
-  const baseTier = getBaseTierForTrial(tier.toLowerCase());
+  const baseTier = resolveLimitBaseTier(tier.toLowerCase());
   return TIER_LIMITS[baseTier] || TIER_LIMITS.starter;
 }

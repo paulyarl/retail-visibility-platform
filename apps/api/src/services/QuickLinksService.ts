@@ -141,9 +141,21 @@ function needsFulfillmentMethodSelection(ctx: LinkContext): boolean {
 // TIER HELPERS
 // ====================
 
+// Canonical tier order (see `.devin/skills/tier-hierarchy.md` §Tier order).
+//
+// This array was missing `presence`, `ecommerce` and `organization`, so
+// `tierIndex` returned -1 for each and `tierIndex(tier) >= requiredIndex` read
+// as "below every tier" — e.g. an `ecommerce` tenant compared BELOW
+// `commitment`. Live mis-gating, not a hypothetical: the doc's own warning is
+// that a missing entry "collapses index fallbacks and mis-gates capabilities".
+//
+// `starter` is left at its current position deliberately. It is inactive
+// legacy, and moving it to the documented slot (after `enterprise`) changes
+// `tierIndex('starter')` for existing legacy tenants — a behaviour change that
+// belongs with the D9 decision and its test, not with this fix.
 const TIER_ORDER: string[] = [
-  'directory_presence', 'google_only', 'starter', 'discovery', 'storefront', 'commitment',
-  'omnichannel', 'professional', 'enterprise',
+  'directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront',
+  'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];
 

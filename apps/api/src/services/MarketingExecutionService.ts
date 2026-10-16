@@ -42,10 +42,11 @@ import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 // ─── INT signal labels (Migration 253 — GAP-E3, spec §8.4) ───────────────
 // Hardcoded label map for the INT_* discovery signal family. The intelligence
 // sprint's proposed registry seed (migration 199, GAP-S1) was never delivered:
-// no INT_* rows exist in mkt_signal_registry. INT_* is a closed, spec-defined
-// 11-code family, so a static map avoids a DB dependency in the prompt-render
-// path. If the INT family is ever registered in mkt_signal_registry, this map
-// can be retired in favor of registry lookup.
+// no INT_* rows exist in mkt_signal_registry. The INT family is closed and
+// defined by the SEED (`seed-intelligence-discovery-signals.ts`) — do not
+// restate its size here; it drifted once already (the comment said "11-code"
+// while the seed carried 13, and the missing label shipped).
+// `int-discovery-signals-parity.test.ts` enforces this map against the seed.
 const INT_SIGNAL_LABELS: Record<string, string> = {
   INT_LOW_VISIBILITY: 'Low Visibility',
   INT_WEAK_MAINSTREAM_INDEXING: 'Weak Mainstream Indexing',
@@ -58,6 +59,7 @@ const INT_SIGNAL_LABELS: Record<string, string> = {
   INT_ACTIVE_OPERATIONAL_EVIDENCE: 'Active Operational Evidence',
   INT_CATEGORY_SPECIALIZATION: 'Category Specialization',
   INT_UNDEREXPOSED_CREDENTIAL: 'Underexposed Credential',
+  INT_POSSIBLE_DUPLICATE_LISTING: 'Possible Duplicate Listing',
   INT_PLATFORM_SIGNAL_DIVERGENCE: 'Platform Signal Divergence',
 };
 

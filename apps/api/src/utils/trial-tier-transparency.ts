@@ -8,9 +8,23 @@
  */
 
 /**
- * Map trial tiers to their base tiers for frontend presentation
+ * Map trial tiers to their base tiers **for frontend presentation**.
+ *
+ * Renamed from `getBaseTierForTrial` (2026-10-16): `tier-limits.ts` has a
+ * same-named private function with a DIFFERENT map, and the two answer
+ * different questions —
+ *
+ *   - here:  how should this trial tier PRESENT to the frontend?
+ *   - there: what SKU/location LIMIT does it proxy to?
+ *
+ * `expired_trial` is deliberately ABSENT here (returns null → `getEffectiveTier`
+ * returns it unmapped). An expired trial is an expired STATE, not a free tier —
+ * presenting it as `presence` would make it look claimable. It proxies to
+ * `presence` in `tier-limits` for limits only. Neither is stale; treating
+ * either as a copy of the other would "fix" a deliberate design. See
+ * `TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md` H2.
  */
-function getBaseTierForTrial(tierKey: string): string | null {
+function resolvePresentationBaseTier(tierKey: string): string | null {
   const trialToBaseMap: Record<string, string> = {
     'trial_google_only': 'google_only',
     'trial_directory_presence': 'directory_presence',
@@ -49,7 +63,7 @@ export function getEffectiveTier(tierKey: string | null | undefined): string {
   if (!tierKey) return 'discovery';
   
   // If it's a trial tier, return the base tier for frontend
-  const baseTier = getBaseTierForTrial(tierKey);
+  const baseTier = resolvePresentationBaseTier(tierKey);
   return baseTier || tierKey;
 }
 

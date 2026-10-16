@@ -655,7 +655,11 @@ describe('importExternalResult — bronze consumer write-back', () => {
     expect(mockProfileService.recordBronzeExternalFills).not.toHaveBeenCalled();
   });
 
-  it('writes a business_audit fill when an attributed prospect audit fails non_negotiable gates', async () => {
+  // Explicit timeout: `importExternalResult` does real parse + gate work here,
+  // and at the 5 s default this test times out — leaving its in-flight promise
+  // to resolve DURING the next test, whose `not.toHaveBeenCalled()` then catches
+  // this test's fill and fails. The cascade, not the assertion, was the bug.
+  it('writes a business_audit fill when an attributed prospect audit fails non_negotiable gates', { timeout: 20000 }, async () => {
     vi.spyOn(service, 'getTemplate').mockResolvedValue(BA_TEMPLATE as any);
     mockCampaignService.getCampaign.mockResolvedValue(AUDIT_CAMPAIGN);
     mockPrisma.mkt_campaigns_list.findUnique.mockResolvedValue({

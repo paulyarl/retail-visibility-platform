@@ -352,4 +352,71 @@ Every figure spoken to the owner must come from the **operator's verified record
 
 ---
 
+## 11. The founding-tenant cohort
+
+Everything above is the **per-prospect** motion. This is the **cohort** motion — how the first tenants arrive, and what they are for.
+
+The platform is deployed and functioning; what it has not yet been tested against is an owner who did not build it. A founding cohort is the instrument for that, and it compounds: twenty real storefronts owned by real businesses become the proof the claim motion needs, which is an asset that cannot be bought later.
+
+### 11.1 Two roles, not one
+
+A founding cohort is often asked to do two jobs. They are different experiments and should stay separate:
+
+| Role | Tests | Interface |
+|---|---|---|
+| **Beta tenant** | the product — claim flow, catalog enrichment, hours, whether an owner understands a page they didn't build | owner-facing |
+| **Second operator** | the operator system — audit, triage, campaigns, capability resolution | the docs + admin surfaces |
+
+**A tenant never touches triage or the campaign system.** So a tenant cohort does **not** substitute for the docs-only operator run (§8.3): that instrument is still needed, and it needs a different incentive — a contractor or a partner, not a free storefront.
+
+The tenant cohort is nonetheless the **better beta of the two**, because it tests the one thing that cannot be simulated: what an owner does when handed a page they did not build.
+
+### 11.2 Trade, not discount
+
+*"Free storefront"* reads as a discount, and does two unwanted things: it selects for owners who want free things, and it anchors a price that tenant #21 will then argue with.
+
+The same economics, framed as a trade:
+
+> *"Founding tenant — we build your storefront, you tell us what's wrong with it."*
+
+This selects for owners who **engage**, creates a feedback obligation both sides can hold to, and leaves the price intact. It is also structurally identical to the FitD (§3) — the platform does the work, the owner participates — so it reinforces the motion rather than contradicting it.
+
+### 11.3 Sequence: reconcile, then invite
+
+**The cohort raises the cost of the exact class of defect this playbook keeps finding.** Six owner-facing false claims were found on 2026-10-15 alone — a business told it shows up differently on Yelp when it has no Yelp listing; a presence map reporting the two platforms a business is *missing from* as platforms it is *on*; a storefront link described as "not looking like yours" when the URL says `arsemamart`.
+
+Those go to **owners**, and a founding cohort is a group of owners who will check. So the contract tests and the doc sync are **not parallel workstreams — they are the precondition** for inviting real businesses. Invite after the claims on the page are true, not before.
+
+### 11.4 Cohort size
+
+**Five to ten, not fifty.** Each tenant costs a domain decision, a catalog enrichment and claim support; the enrichment chain is designed for it but unproven at volume. At fifty the operation becomes a support desk, which teaches nothing about the product.
+
+The consent mechanism already exists, which is what makes this safe to run: an unclaimed page carries *"this business has not claimed this page yet"* and *"ask us to take it down."* Publishing a page about a real business before they arrive is already handled honestly — the cohort is viable once the claims **on** that page are true.
+
+### 11.5 The pitch
+
+**The ladder still applies (§3): finding → corrected record → the ask.** The offer is the **close**, not the open.
+
+The failure mode to avoid is a founding-tenant pitch that could be sent unchanged to any business in any category — which violates the platform's own opener rule (*"a hook that could be sent unchanged to any business in any category is a failure"*). The owner's first question is **"why me?"**, and *"we build this for businesses like yours"* answers it categorically rather than personally. Lead with the finding, and the storefront offer lands as the answer to something the owner can verify in thirty seconds.
+
+Three rules for the copy:
+
+1. **One feedback line.** "Tell us what's wrong and what's working" is the trade — don't restate it as "tell us what's wrong" and drop half of it.
+2. **Separate the two clocks.** The **feedback window** (three months, when you check in) and the **commitment** (none) are different things. Saying them together makes the owner wonder what happens at month three.
+3. **Name the exit.** *"You are free to leave at any time"* leaves the real question unanswered — **what happens to my page?** Say it: *"if it isn't for you, we take the page down."* That is more reassuring than "free to leave", because it answers what they are actually thinking.
+
+**The copy:**
+
+> [The finding, specific to this business — §3. For Arsema: *"Google lists your store twice at your Washington Street address, and most of your reviews sit on the one that doesn't say Arsema."*]
+>
+> We build this platform for businesses like yours — to make your shelves visible to the customers who already trust you. Your storefront is already built, and as a founding tenant it's yours to claim.
+>
+> In exchange, tell us what's wrong and what's working. We'll check in at three months — no contract either way. If it isn't for you, we take the page down.
+
+*"Trusted customers"* is the load-bearing phrase: it says **your regulars**, not strangers — true to the walk-in mission and disarming to an owner who has been pitched "get more customers" before.
+
+**Optional, if it is true:** name the cohort size — *"one of the first ten."* Real scarcity does more for the pioneer feeling than the word "founding" does.
+
+---
+
 *Playbook derived from the Arsema G Food Mart case. Mechanisms referenced are platform capabilities as of 2026-10-15; recommendations are marked.*

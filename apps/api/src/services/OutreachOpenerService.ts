@@ -105,19 +105,24 @@ export interface ResolvedArchetype {
 }
 
 /**
- * Resolve the effective archetype for a campaign.
+ * Resolve the archetype from the campaign's own DECLARATIONS only — the
+ * operator-accepted triage, then the declared playbook lane. Returns `null`
+ * when neither declares one, so the caller supplies its own fallback.
  *
- * Precedence:
- *   1. Operator-accepted triage result's playbook archetype (honors overrides)
- *   2. The campaign's own declared `archetype` (a sibling's lane)
- *   3. selectArchetype(latestAuditData) fallback
+ * Split out of `resolveCampaignArchetype` (2026-10-16) for callers that
+ * already hold the audit: `resolveOpener` fetches the audit itself, and
+ * routing it through the composed function would fetch the same audit a second
+ * time and pull in `BusinessContextService` — which its test mocks do not
+ * provide, and which it has no other reason to depend on.
  *
- * Returns { archetype, source, reason }. Throws if no audit exists.
+ * The precedence lives here ONCE. `resolveCampaignArchetype` adds the
+ * audit-derived fallback; `resolveOpener` supplies its own because it already
+ * has the audit in hand.
  */
-export async function resolveCampaignArchetype(
+export async function resolveDeclaredArchetype(
   campaignId: string,
   ctx?: RequestCtx,
-): Promise<ResolvedArchetype> {
+): Promise<ResolvedArchetype | null> {
   // 1. Check for an operator-accepted triage result
   let triageArchetype: string | null = null;
   try {
@@ -130,7 +135,7 @@ export async function resolveCampaignArchetype(
       }
     }
   } catch {
-    // Triage not found or not accepted — fall through to selectArchetype
+    // Triage not found or not accepted — fall through
   }
 
   if (triageArchetype && VALID_ARCHETYPES.has(triageArchetype)) {
@@ -148,9 +153,9 @@ export async function resolveCampaignArchetype(
   // reliably holds it: the `archetype` column is not stamped by acceptTriage,
   // and re-evaluating a sibling's triage CLEARS `overridden_playbook_id` — so
   // between a re-evaluate and a re-accept the triage no longer declares the
-  // lane, and the deterministic selector below knows nothing about it. That is
-  // how an A7 (website) sibling resolved as A8 (presence): right prompt
-  // family, wrong lane.
+  // lane, and the deterministic selector knows nothing about it. That is how
+  // an A7 (website) sibling resolved as A8 (presence): right prompt family,
+  // wrong lane.
   try {
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const declaredCode =
@@ -169,8 +174,28 @@ export async function resolveCampaignArchetype(
       }
     }
   } catch {
-    // Campaign or playbook unreadable — fall through to the audit-derived selector.
+    // Campaign or playbook unreadable — no declaration available.
   }
+
+  return null;
+}
+
+/**
+ * Resolve the effective archetype for a campaign.
+ *
+ * Precedence:
+ *   1. Operator-accepted triage result's playbook archetype (honors overrides)
+ *   2. The campaign's own declared `playbook_code` (a sibling's lane)
+ *   3. selectArchetype(latestAuditData) fallback
+ *
+ * Returns { archetype, source, reason }. Throws if no audit exists.
+ */
+export async function resolveCampaignArchetype(
+  campaignId: string,
+  ctx?: RequestCtx,
+): Promise<ResolvedArchetype> {
+  const declared = await resolveDeclaredArchetype(campaignId, ctx);
+  if (declared) return declared;
 
   // 3. Fallback: recompute from latest audit data
   const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
@@ -349,9 +374,11 @@ export class OutreachOpenerService extends BaseService {
       common.triggered_signals = [];
     }
 
-    // Archetype resolution is SHARED with every other consumer
-    // (`resolveCampaignArchetype`) rather than re-implemented here. The inline
-    // copy this replaces had drifted twice:
+    // Archetype resolution is SHARED with every other consumer rather than
+    // re-implemented here — via `resolveDeclaredArchetype`, not
+    // `resolveCampaignArchetype`, because this method already holds the audit
+    // and supplies its own fallback. The inline copy this replaces had drifted
+    // twice:
     //   1. it read `triage.recommendedPlaybook` and ignored `overriddenPlaybook`
     //      — so an OVERRIDDEN sibling generated the recommended playbook's
     //      archetype, not the lane the operator chose;
@@ -359,20 +386,24 @@ export class OutreachOpenerService extends BaseService {
     //      its re-accept it fell to the audit-derived selector and resolved as a
     //      DIFFERENT lane (an A7 website sibling became an A8 presence opener).
     let selection: ArchetypeSelection;
-    const resolved = await resolveCampaignArchetype(campaignId, ctx);
-    if (resolved.archetype === 'A2') {
+    const declared = await resolveDeclaredArchetype(campaignId, ctx);
+
+    if (declared && declared.archetype === 'A2') {
       // A2 is theme-driven — the theme still comes from the audit selector.
       const autoSel = selectArchetype(auditResult.auditData);
       selection = {
         archetype: 'A2',
-        reason: `${resolved.reason}. Theme: ${autoSel.theme?.theme ?? 'recurring negatives'}`,
+        reason: `${declared.reason}. Theme: ${autoSel.theme?.theme ?? 'recurring negatives'}`,
         theme: autoSel.theme,
       };
-    } else {
+    } else if (declared) {
       selection = {
-        archetype: resolved.archetype,
-        reason: resolved.reason,
+        archetype: declared.archetype,
+        reason: declared.reason,
       };
+    } else {
+      // Nothing declared it — the audit-derived selector is the last resort.
+      selection = selectArchetype(auditResult.auditData);
     }
 
     const extractedFields = extractFields(

@@ -7,13 +7,14 @@
  * - Merge resolution: {{salutation}}, {{city}}, {{category}}, {{sender_name}}
  *   resolved; unresolvable placeholders render visibly (never fabricated)
  * - Salutation from worksheet (with sibling inheritance) vs inline fallback
- * - All 12 hooks returned, ranked
+ * - All hooks in HOOK_LIBRARY returned, ranked (count derived, not hardcoded)
  * - Empty triage signals → archetype-only ranking
  *
  * Spec: docs/LocalBiz/marketing_ops_outreach_intelligence_prep_sprint_plan.md §13
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { HOOK_LIBRARY } from '../outreach-openers/hook-library';
 
 // ─── Mocks (hoisted) ─────────────────────────────────────────────────────
 
@@ -152,12 +153,12 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('HookSuggestionService.suggestForCampaign', () => {
-  it('returns all 23 hooks ranked', async () => {
+  it('returns every hook in the library, ranked', async () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(23);
-    // Ranks are 1–20, sequential
-    for (let i = 0; i < 23; i++) {
+    expect(result.suggestions).toHaveLength(HOOK_LIBRARY.length);
+    // Ranks are 1..N, sequential
+    for (let i = 0; i < HOOK_LIBRARY.length; i++) {
       expect(result.suggestions[i].rank).toBe(i + 1);
     }
   });
@@ -319,7 +320,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(23);
+    expect(result.suggestions).toHaveLength(HOOK_LIBRARY.length);
     // All matchedSignals should be empty
     for (const s of result.suggestions) {
       expect(s.matchedSignals).toEqual([]);
@@ -331,7 +332,7 @@ describe('HookSuggestionService.suggestForCampaign', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(23);
+    expect(result.suggestions).toHaveLength(HOOK_LIBRARY.length);
   });
 });
 
@@ -524,7 +525,7 @@ describe('Emerging-archetype rank boost', () => {
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
     // Without boost, the ranking should match the Sprint 1 logic
-    expect(result.suggestions).toHaveLength(23);
+    expect(result.suggestions).toHaveLength(HOOK_LIBRARY.length);
     // gbp_verification has A3 archetype affinity — should be #1
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
@@ -534,7 +535,7 @@ describe('Emerging-archetype rank boost', () => {
 
     const result = await HookSuggestionService.suggestForCampaign('camp-001');
 
-    expect(result.suggestions).toHaveLength(23);
+    expect(result.suggestions).toHaveLength(HOOK_LIBRARY.length);
     expect(result.suggestions[0].angle).toBe('gbp_verification');
   });
 });

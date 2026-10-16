@@ -252,13 +252,19 @@ describe('resolveCampaignVerification', () => {
     expect(mockExecuteRaw).not.toHaveBeenCalled();
   });
 
-  it('skips the back-fill when the campaign has no primary seed link', async () => {
+  it('skips the seed back-fill when the campaign has no primary seed link', async () => {
     await MarketingCampaignService.resolveCampaignVerification('camp-1', {
       outcome: 'operational',
       verifiedPhone: '608-555-0100',
     });
     expect(mockQueryRaw).toHaveBeenCalledTimes(1); // link lookup only
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
+    // Assert on the method the SEED back-fill actually uses. `executeRawUnsafe`
+    // carries the dynamic `directory_listings_list` identifiers; the earlier
+    // `expect(mockExecuteRaw).not.toHaveBeenCalled()` was a proxy for "no seed
+    // back-fill" that a later, INDEPENDENT caller invalidated — the
+    // prospect-queue back-fill (`business_snapshot.campaign_verified_at`),
+    // which is about the queue row, not the seed link, and is expected to run.
+    expect(mockExecuteRawUnsafe).not.toHaveBeenCalled();
     expect(mockRefreshReport).not.toHaveBeenCalled();
   });
 
