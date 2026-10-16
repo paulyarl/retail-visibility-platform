@@ -70,6 +70,17 @@
 | **1.5a — chain mirror** | **Per-key: decide deliberate-vs-omission by family.** | The 14 splits: **deliberate** — `clover_pos`, `square_pos`, `payment_client_credentials` (POS/payment integration keys a chain tier plausibly excludes); **likely omission** — `basic_categories`, `business_logo`, `interactive_maps`, `privacy_mode`, `custom_marketing_copy`, `priority_support`, `advanced_analytics`, `sla_guarantee`, `custom_integrations`, `customDomains`, `category_quick_start`, `image_finder`. The `it.fails` assertion stays until each is dispositioned; promoting it means all 14 are resolved one way or the other. |
 | **Next work** | **1.5c — the `propagation_*` fix.** | The one genuine defect found. 11 keys mapped to a tier whose bag contradicts them. |
 
+### Decided — round 3, 2026-10-16
+
+| # | Ruling | Implementation |
+|---|---|---|
+| **1.5c orphans** | **Add to the `organization` bag.** `propagation_selective`, `propagation_scheduling`, `propagation_rollback` become real org-tier grants. | Add the three keys to `TIER_FEATURES.organization` in `tier-features.ts`. The bag is at ~`:85-98` (the one already listing `propagation_products` … `propagation_brand`); the `organization` key is below the first six tier keys. Once added, direction (A) of the 1.5 diagnostic drops by three and 1.5c is closed. |
+| **1.7 default** | **One shared default: `directory_presence`** — the free gateway, least privilege. | Export a single constant (e.g. `DEFAULT_TIER = 'directory_presence'`) and use it at all five sites: `mapTierLevel`, `hasFeature` (**currently `starter` — the INACTIVE legacy tier**, the most suspicious of the five), `getRequiredTier` (currently `professional`), `getSKULimit(null)` (currently `starter`), `getEffectiveTier(null)` (currently `discovery`). Then assert it once. |
+
+**Note on 1.7's blast radius:** `getRequiredTier` currently answers `professional` — a *high* default for an unknown feature. Moving it to `directory_presence` **loosens** that gate, so a tenant with no tier gains access where it previously had none. That is the correct direction (least privilege for the *tenant*, and `professional` was never a defensible answer for "unknown"), but it is a behaviour change on an access path and deserves its own test, not a drive-by edit.
+
+
+
 ### 1.5c — DIAGNOSED 2026-10-16: it is naming drift, not missing grants
 
 Reading the bag against the map settles the direction question — and it was the wrong question.
