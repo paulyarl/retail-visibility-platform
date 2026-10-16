@@ -15,13 +15,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Download, QrCode, AlertCircle, ExternalLink } from 'lucide-react';
+import { Download, QrCode, AlertCircle, ExternalLink, Palette } from 'lucide-react';
 import marketingOpsService, {
   CampaignDetail,
   GalleryEligibility,
   MailerQrDestination,
   MailerQrTarget,
 } from '@/services/MarketingOpsService';
+import { generateQrDataUrl } from '@/lib/qr-engine';
 import MailerQrDesignerModal from './MailerQrDesignerModal';
 
 const MAILER_STAGES = ['seek', 'seed', 'preview_built'];
@@ -53,6 +54,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
   const [resolvedTarget, setResolvedTarget] = useState<MailerQrTarget | null>(null);
   const [designerOpen, setDesignerOpen] = useState(false);
   const [resolvingQr, setResolvingQr] = useState(false);
+  const [plainPreviewUrl, setPlainPreviewUrl] = useState<string | null>(null);
   const [eligibility, setEligibility] = useState<GalleryEligibility | null>(null);
   const [mailerLoading, setMailerLoading] = useState(false);
   const [mailerError, setMailerError] = useState<string | null>(null);
@@ -67,16 +69,17 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
       .catch(() => setEligibility(null));
   }, [campaignId, mailerAllowed]);
 
-  // A destination change invalidates a previously designed QR — it encodes
-  // the old target's URL.
+  // A destination change invalidates a previously resolved/designed QR — it
+  // encodes the old target's URL.
   const changeDestination = (value: MailerQrDestination) => {
     setQrDestination(value);
     setStyledQrDataUrl(null);
     setResolvedTarget(null);
+    setPlainPreviewUrl(null);
     setMailerError(null);
   };
 
-  const handleDesignQr = useCallback(async () => {
+  const resolveQrTarget = useCallback(async () => {
     setResolvingQr(true);
     setMailerError(null);
     try {
@@ -86,13 +89,44 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
         qrDestination === 'custom' ? customUrl.trim() : undefined,
       );
       setResolvedTarget(target);
-      setDesignerOpen(true);
+      return target;
     } catch (err) {
       setMailerError(err instanceof Error ? err.message : 'Failed to resolve QR target');
+      return null;
     } finally {
       setResolvingQr(false);
     }
   }, [campaignId, qrDestination, customUrl]);
+
+  const handlePreviewQr = useCallback(() => {
+    void resolveQrTarget();
+  }, [resolveQrTarget]);
+
+  const handleDesignQr = useCallback(async () => {
+    const target = resolvedTarget ?? (await resolveQrTarget());
+    if (target) setDesignerOpen(true);
+  }, [resolvedTarget, resolveQrTarget]);
+
+  // Plain-QR preview for the artifact card once the target resolves — same
+  // unstyled preview the seed QR kits render (styled:false, errorCorrection H).
+  useEffect(() => {
+    const url = resolvedTarget?.qrUrl;
+    if (!url) {
+      setPlainPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    generateQrDataUrl({ data: url, exportSize: 256, styled: false, errorCorrection: 'H' })
+      .then((d) => {
+        if (!cancelled) setPlainPreviewUrl(d);
+      })
+      .catch(() => {
+        if (!cancelled) setPlainPreviewUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedTarget?.qrUrl]);
 
   const handleGenerateMailer = async (importCopy?: { headline: string; body: string }) => {
     setMailerLoading(true);
@@ -234,40 +268,75 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
             )}
           </div>
 
-          {/* QR design */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleDesignQr}
-              disabled={
-                resolvingQr ||
-                (qrDestination === 'custom' && !customUrl.trim())
-              }
-              className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-            >
-              <QrCode className="w-3 h-3" />
-              {resolvingQr ? 'Resolving…' : styledQrDataUrl ? 'Redesign QR' : 'Design QR (optional)'}
-            </button>
-            {styledQrDataUrl && (
-              <div className="flex items-center gap-2">
+          {/* QR artifact — same card pattern as the seed QR kits: preview +
+              encoded URL + peer actions. Resolution stays lazy (it
+              mints/reuses the destination token), so the preview appears
+              after "Preview QR" or "Design". */}
+          <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
+            <div className="flex justify-center">
+              {styledQrDataUrl ? (
                 <img
                   src={styledQrDataUrl}
-                  alt="Styled QR"
-                  className="h-8 w-8 rounded border border-gray-200 dark:border-neutral-600 bg-white"
+                  alt="Styled QR preview"
+                  className="w-28 h-28 rounded border border-gray-200 dark:border-neutral-600 bg-white"
                 />
+              ) : plainPreviewUrl ? (
+                <img
+                  src={plainPreviewUrl}
+                  alt="QR preview"
+                  className="w-28 h-28 rounded border border-gray-200 dark:border-neutral-600"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded border border-dashed border-gray-300 bg-gray-50 dark:bg-neutral-900 dark:border-neutral-600 flex items-center justify-center">
+                  <QrCode className="w-6 h-6 text-gray-300" />
+                </div>
+              )}
+            </div>
+            <p className="text-xs font-mono text-gray-600 dark:text-gray-400 break-all bg-gray-50 dark:bg-neutral-900 rounded px-2 py-1.5">
+              {resolvedTarget?.qrUrl ??
+                'Resolve the QR target to see what the code will encode.'}
+            </p>
+            <div className="flex flex-wrap gap-2 items-center">
+              {!resolvedTarget && (
+                <button
+                  onClick={handlePreviewQr}
+                  disabled={
+                    resolvingQr ||
+                    (qrDestination === 'custom' && !customUrl.trim())
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
+                  title="Resolve the QR landing URL and show a preview"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  {resolvingQr ? 'Resolving…' : 'Preview QR'}
+                </button>
+              )}
+              <button
+                onClick={handleDesignQr}
+                disabled={
+                  resolvingQr ||
+                  (qrDestination === 'custom' && !customUrl.trim())
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
+                title="Open the styled QR designer — templates, colors, platform or custom logo"
+              >
+                <Palette className="w-3.5 h-3.5" />
+                {resolvingQr ? 'Resolving…' : styledQrDataUrl ? 'Redesign' : 'Design'}
+              </button>
+              {styledQrDataUrl ? (
                 <button
                   onClick={() => setStyledQrDataUrl(null)}
                   className="text-[11px] text-red-600 hover:underline"
                 >
                   Reset to plain QR
                 </button>
-              </div>
-            )}
+              ) : (
+                <span className="text-[11px] text-gray-400">
+                  Optional — a plain QR is used if skipped
+                </span>
+              )}
+            </div>
           </div>
-          {resolvedTarget && styledQrDataUrl && (
-            <p className="text-[11px] font-mono text-gray-400 break-all">
-              Encodes: {resolvedTarget.qrUrl}
-            </p>
-          )}
           {tokenExpiryWarning && (
             <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-2.5 flex items-start gap-2">
               <AlertCircle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -307,9 +376,9 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
               <button
                 onClick={() => handleGenerateMailer()}
                 disabled={mailerLoading}
-                className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
               >
-                <Download className="w-3 h-3" />
+                <Download className="w-3.5 h-3.5" />
                 {mailerLoading ? 'Generating...' : 'Generate Postcard PDF'}
               </button>
             </div>
@@ -350,9 +419,9 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
                   })
                 }
                 disabled={mailerLoading || !importHeadline.trim() || !importBody.trim()}
-                className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
               >
-                <Download className="w-3 h-3" />
+                <Download className="w-3.5 h-3.5" />
                 {mailerLoading ? 'Generating...' : 'Generate PDF from imported copy'}
               </button>
             </div>
