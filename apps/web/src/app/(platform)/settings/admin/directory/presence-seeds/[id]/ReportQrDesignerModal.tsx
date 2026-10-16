@@ -41,7 +41,9 @@ import {
   CORNER_DOT_STYLES,
   SIZE_OPTIONS,
 } from '@/lib/qr-style-constants';
-import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
+import directoryPresenceAdminService, {
+  type BannerQrStyleUpdate,
+} from '@/services/DirectoryPresenceAdminService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 
 export interface ReportQrDesignerModalProps {
@@ -70,6 +72,9 @@ export interface ReportQrDesignerModalProps {
   /** Delivery channels only — called after a successful save so the page can
    *  re-render the card previews with the new design. */
   onSaved?: (style: PersistedQrStyle) => void;
+  /** Banner mode only — called after a successful "Apply to on-page banner" so
+   *  the page can re-render the banner card preview with the new design. */
+  onBannerSaved?: (style: BannerQrStyleUpdate) => void;
 }
 
 export default function ReportQrDesignerModal({
@@ -85,6 +90,7 @@ export default function ReportQrDesignerModal({
   defaultTemplate = 'default',
   initialStyle = null,
   onSaved,
+  onBannerSaved,
 }: ReportQrDesignerModalProps) {
   const isBanner = channel === 'banner';
   const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>(defaultTemplate);
@@ -377,7 +383,7 @@ export default function ReportQrDesignerModal({
     try {
       setSaving(true);
       setSaved(false);
-      const ok = await directoryPresenceAdminService.updateBannerQrStyle(seedId, {
+      const style: BannerQrStyleUpdate = {
         // Activating a banner design also flips the module's enable flags so
         // the style survives claim — post-claim the claimed tenant's tier
         // capability resolution still governs what actually renders.
@@ -400,10 +406,12 @@ export default function ReportQrDesignerModal({
         qr_gradient_on_corner_dots: gradientOnCornerDots,
         qr_logo: logoEnabled,
         qr_logo_shape: logoShape,
-      });
+      };
+      const ok = await directoryPresenceAdminService.updateBannerQrStyle(seedId, style);
       if (!ok) throw new Error('Save failed');
       setSaved(true);
       setError(null);
+      onBannerSaved?.(style);
     } catch {
       setError('Failed to save the banner design');
     } finally {

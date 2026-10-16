@@ -9,6 +9,7 @@ import directoryPresenceAdminService, {
   AnchorVerificationResult,
   AnchorVerificationResultType,
   AssembledSeedCallScript,
+  BannerQrStyleUpdate,
   ClaimInviteQrKitMeta,
   DirectoryAttributeDefinition,
   DirectoryAttributeRecommendation,
@@ -176,6 +177,34 @@ function triggerBlobDownload(blob: Blob, filename: string) {
 }
 
 /**
+ * Project the on-page banner design (a snake_case tenant_storefront_qr_settings
+ * row) onto the camelCase PersistedQrStyle the qr-engine consumes. Mirrors the
+ * server-side projection the public /place page uses (directory-consolidated.ts)
+ * so the banner card preview matches what the public listing actually renders.
+ */
+function bannerStyleToPersisted(style: BannerQrStyleUpdate | null): PersistedQrStyle | null {
+  if (!style) return null;
+  return {
+    dotType: style.qr_dot_type,
+    cornerType: style.qr_corner_type,
+    cornerDotType: style.qr_corner_dot_type,
+    dotColor: style.qr_dot_color,
+    cornerColor: style.qr_corner_color,
+    cornerDotColor: style.qr_corner_dot_color,
+    bgColor: style.qr_bg_color,
+    customColorsEnabled: !!style.qr_custom_colors_enabled,
+    gradientEnabled: !!style.qr_gradient_enabled,
+    gradientStart: style.qr_gradient_start,
+    gradientEnd: style.qr_gradient_end,
+    gradientOnDots: style.qr_gradient_on_dots !== false,
+    gradientOnCorners: style.qr_gradient_on_corners !== false,
+    gradientOnCornerDots: style.qr_gradient_on_corner_dots !== false,
+    logo: !!style.qr_logo,
+    logoShape: style.qr_logo_shape || 'square',
+  };
+}
+
+/**
  * Live preview of the exact URL the downloaded PNG/postcard encodes —
  * rendered via the shared qr-engine (classic B/W path, same `qrcode` lib and
  * error-correction level as ClaimInviteQrKitService) so what the operator
@@ -189,17 +218,23 @@ function ClaimQrPreview({
   url,
   qrStyle = null,
   logoUrl = null,
+  styledFallback = false,
 }: {
   url: string;
   qrStyle?: PersistedQrStyle | null;
   logoUrl?: string | null;
+  /** Render a styled QR even with no saved design (the default template) — used
+   *  by the on-page banner card, whose public render always styles the code. */
+  styledFallback?: boolean;
 }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const opts = qrStyle
       ? { ...bannerQrOptions(url, qrStyle, logoUrl), exportSize: 512 }
-      : { data: url, exportSize: 512, styled: false as const, errorCorrection: 'H' as const };
+      : styledFallback
+        ? { ...bannerQrOptions(url, null, logoUrl), exportSize: 512 }
+        : { data: url, exportSize: 512, styled: false as const, errorCorrection: 'H' as const };
     generateQrDataUrl(opts)
       .then((d) => {
         if (!cancelled) setDataUrl(d);
@@ -210,7 +245,7 @@ function ClaimQrPreview({
     return () => {
       cancelled = true;
     };
-  }, [url, qrStyle, logoUrl]);
+  }, [url, qrStyle, logoUrl, styledFallback]);
   if (!dataUrl) {
     return (
       <div className="w-28 h-28 rounded border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
@@ -258,6 +293,9 @@ function PresenceSeedDetailClient() {
   // The seed's shared claim-invite QR design — one design for all claim variant
   // cards (preview + QR PNG + Postcard PDF). Null = none saved (classic B/W).
   const [claimQrStyle, setClaimQrStyle] = useState<PersistedQrStyle | null>(null);
+  // The on-page banner's persisted design (tenant_storefront_qr_settings) — the
+  // banner card preview renders it so it matches the public listing's render.
+  const [bannerQrStyle, setBannerQrStyle] = useState<PersistedQrStyle | null>(null);
   const [reportQrKit, setReportQrKit] = useState<ReportDeliveryQrKitMeta | null>(null);
   // The seed's shared report-delivery QR design — one design for all delivery
   // cards (preview + QR PNG + Postcard PDF). Null = none saved (classic B/W).
@@ -425,6 +463,15 @@ function PresenceSeedDetailClient() {
       setClaimQrStyle(style);
     } catch (err) {
       clientLogger.error('Failed to load claim QR style:', { detail: err });
+    }
+  }, [seedId]);
+
+  const loadBannerQrStyle = useCallback(async () => {
+    try {
+      const style = await directoryPresenceAdminService.getBannerQrStyle(seedId);
+      setBannerQrStyle(bannerStyleToPersisted(style));
+    } catch (err) {
+      clientLogger.error('Failed to load banner QR style:', { detail: err });
     }
   }, [seedId]);
 
@@ -624,12 +671,13 @@ function PresenceSeedDetailClient() {
     loadClaimQrStyle();
     loadReportQrKit();
     loadReportQrStyle();
+    loadBannerQrStyle();
     loadAnchors();
     loadTouches();
     loadReportVersions();
     loadReengagement();
     loadPreviewStatus();
-  }, [fetchDetail, loadQrKit, loadClaimQrStyle, loadReportQrKit, loadReportQrStyle, loadAnchors, loadTouches, loadReportVersions, loadReengagement, loadPreviewStatus]);
+  }, [fetchDetail, loadQrKit, loadClaimQrStyle, loadReportQrKit, loadReportQrStyle, loadBannerQrStyle, loadAnchors, loadTouches, loadReportVersions, loadReengagement, loadPreviewStatus]);
 
   // Load the verification call script — refetches when the anchor selection
   // changes so the script reflects the anchor's questions + transition.
@@ -2598,11 +2646,16 @@ function PresenceSeedDetailClient() {
                 </div>
                 <div className="flex justify-center">
                   {/* The shared report design drives the delivery cards; the
-                      on-page banner keeps its own persisted design. */}
+                      on-page banner renders its own persisted design (and the
+                      default template when none is saved) — matching the public
+                      listing's banner render. */}
                   <ClaimQrPreview
                     url={c.url}
-                    qrStyle={c.channel === 'banner' ? null : reportQrStyle}
-                    logoUrl={qrPlatformLogoUrl}
+                    qrStyle={c.channel === 'banner' ? bannerQrStyle : reportQrStyle}
+                    logoUrl={c.channel === 'banner'
+                      ? (listing?.logo_url ?? qrPlatformLogoUrl)
+                      : qrPlatformLogoUrl}
+                    styledFallback={c.channel === 'banner'}
                   />
                 </div>
                 <p className="text-xs font-mono text-gray-600 break-all bg-gray-50 rounded px-2 py-1.5">
@@ -2736,6 +2789,7 @@ function PresenceSeedDetailClient() {
           defaultTemplate={reportQrDesignerConfig.defaultTemplate}
           initialStyle={reportQrStyle}
           onSaved={setReportQrStyle}
+          onBannerSaved={(style) => setBannerQrStyle(bannerStyleToPersisted(style))}
         />
       )}
 
