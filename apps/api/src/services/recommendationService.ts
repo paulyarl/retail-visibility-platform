@@ -20,6 +20,12 @@ export interface Recommendation {
   state?: string;
   distance?: number;
 
+  // Seed/tier signal for store entries — lets consumers route unclaimed
+  // directory_presence seeds to /place/{slug} vs claimed tenants' /directory/{slug}
+  // (see apps/web utils/slug getDirectoryListingUrl).
+  listingOrigin?: string;
+  subscriptionTier?: string;
+
   // Rich product data from mv_storefront_discovery
   productId?: string;
   productName?: string;
@@ -1047,7 +1053,9 @@ export async function getLastViewedItems(
                   AND ii.item_status = 'active'
                   AND ii.visibility = 'public'
               ), 0),
-              'isFeatured', dcl.is_featured
+              'isFeatured', dcl.is_featured,
+              'listingOrigin', dcl.listing_origin,
+              'subscriptionTier', dcl.subscription_tier
             )
             FROM directory_listings_list dcl
             WHERE dcl.tenant_id = rv.dedup_key
@@ -1128,7 +1136,9 @@ export async function getLastViewedItems(
             ratingAvg: data.ratingAvg,
             ratingCount: data.ratingCount,
             productCount: data.productCount,
-            isFeatured: data.isFeatured
+            isFeatured: data.isFeatured,
+            listingOrigin: data.listingOrigin,
+            subscriptionTier: data.subscriptionTier
           } as Recommendation;
         } else if (row.entity_type === 'product') {
           // Calculate price range from variants if available

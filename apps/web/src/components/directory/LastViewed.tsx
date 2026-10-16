@@ -8,6 +8,7 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
+import { buildLastViewedStoreListing } from '@/lib/last-viewed-listing';
 import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 // Types for last viewed items
@@ -27,6 +28,9 @@ interface LastViewedStore {
   isFeatured?: boolean;
   primaryCategory?: string;
   gbpPrimaryCategoryName?: string;
+  /** Seed/tier signal — routes unclaimed seeds to /place/{slug}. */
+  listingOrigin?: string | null;
+  subscriptionTier?: string | null;
   lastViewedAt?: string;
 }
 
@@ -272,6 +276,8 @@ export default function LastViewed({
                 primaryCategory: item.primaryCategory || item.tenantCategory,
                 tenantCategory: item.primaryCategory || item.tenantCategory,
                 gbpPrimaryCategoryName: item.gbpPrimaryCategoryName||item.primaryCategory,
+                listingOrigin: item.listingOrigin,
+                subscriptionTier: item.subscriptionTier,
                 lastViewedAt: item.lastViewedAt || new Date().toISOString()
                 
               }
@@ -588,24 +594,7 @@ export default function LastViewed({
                         <UnifiedStoreCard
                           key={`store-${storeData.tenantId}-${index}`}
                           sourceRef="recent"
-                          listing={{
-                            id: storeData.tenantId,
-                            tenantId: storeData.tenantId,
-                            businessName: storeData.businessName,
-                            slug: storeData.slug,
-                            address: storeData.address,
-                            city: storeData.city,
-                            state: storeData.state,
-                            logoUrl: storeData.logoUrl,
-                            ratingAvg: storeData.ratingAvg,
-                            ratingCount: storeData.ratingCount,
-                            productCount: storeData.productCount,
-                            isFeatured: storeData.isFeatured,
-                            reason: storeData.reason,
-                            directoryPublished: true,
-                            primaryCategory: storeData.primaryCategory,
-                            gbpPrimaryCategoryName: (storeData as any).gbpPrimaryCategoryName
-                          }}
+                          listing={buildLastViewedStoreListing(storeData)}
                           viewMode="grid"
                           linkType="directory"
                           className="h-full"

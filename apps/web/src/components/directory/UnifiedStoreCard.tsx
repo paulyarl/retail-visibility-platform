@@ -42,6 +42,9 @@ export interface DirectoryListing {
   isPromoted?: boolean;
   promotionTier?: string;
   subscriptionTier?: string;
+  /** `directory_seed` marks an unclaimed directory-presence seed — routed to
+   *  /place/{slug} rather than /directory/{slug} by getDirectoryListingUrl. */
+  listingOrigin?: string | null;
   directoryPublished?: boolean;
   businessHours?: any; // Business hours object for status indicator
   reason?: string; // Recommendation reason (e.g., "Same category in Indianapolis")
