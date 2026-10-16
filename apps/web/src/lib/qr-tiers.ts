@@ -4,6 +4,7 @@
  */
 
 import type { SubscriptionTier } from '@/lib/tiers';
+import { DEFAULT_TIER } from '@/lib/tiers/tier-defaults';
 
 export interface QRCodeFeatures {
   enabled: boolean;
@@ -165,8 +166,8 @@ export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
 };
 
 export function getQRFeatures(tier_key: SubscriptionTier | string | null | undefined): QRCodeFeatures {
-  const normalizedTier = (tier_key?.toLowerCase() || 'starter') as SubscriptionTier;
-  return QR_TIER_FEATURES[normalizedTier] || QR_TIER_FEATURES.starter;
+  const normalizedTier = (tier_key?.toLowerCase() || DEFAULT_TIER) as SubscriptionTier;
+  return QR_TIER_FEATURES[normalizedTier] || QR_TIER_FEATURES[DEFAULT_TIER];
 }
 
 export function canUseQRFeature(tier: SubscriptionTier | string | null | undefined): boolean {

@@ -4,12 +4,16 @@
  * Calculates trash bin capacity as 5% of tier SKU limit
  * Prevents trash from growing indefinitely
  */
+import { DEFAULT_TIER } from './tier-defaults';
 
 interface TierLimits {
   maxSkus: number;
 }
 
-const TIER_LIMITS: Record<string, TierLimits> = {
+// Exported for the tier-contract guard (sprint plan 4.4): subset limit map —
+// keys must stay ⊆ the contract tier universe.
+export const TRASH_TIER_LIMITS: Record<string, TierLimits> = {
+  directory_presence: { maxSkus: 5 },
   google_only: { maxSkus: 250 },
   discovery: { maxSkus: 1000 },
   storefront: { maxSkus: 5000 },
@@ -21,7 +25,12 @@ const TIER_LIMITS: Record<string, TierLimits> = {
 };
 
 const TRASH_CAPACITY_PERCENT = 0.05; // 5% of SKU limit
-const DEFAULT_TRASH_CAPACITY = 25; // Default for unknown tiers or unlimited
+// 1.7: "no/unknown tier" resolves through DEFAULT_TIER's limits row
+// (directory_presence → 5 SKUs → 5% → min-10 floor), not a hardcoded 25.
+const DEFAULT_TRASH_CAPACITY = Math.max(
+  10,
+  Math.ceil((TRASH_TIER_LIMITS[DEFAULT_TIER]?.maxSkus ?? 5) * TRASH_CAPACITY_PERCENT),
+);
 
 /**
  * Calculate trash capacity for a given tier
@@ -29,7 +38,7 @@ const DEFAULT_TRASH_CAPACITY = 25; // Default for unknown tiers or unlimited
  * @returns Maximum number of items allowed in trash
  */
 export function getTrashCapacity(tier: string): number {
-  const tierConfig = TIER_LIMITS[tier];
+  const tierConfig = TRASH_TIER_LIMITS[tier];
   
   if (!tierConfig) {
     return DEFAULT_TRASH_CAPACITY;

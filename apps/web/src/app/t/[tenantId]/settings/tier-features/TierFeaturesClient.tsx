@@ -11,7 +11,10 @@ import { summarizeResolvedCapabilities } from '@/lib/tiers/capability-display';
 import CapabilityComparisonMatrix from '@/components/subscription/CapabilityComparisonMatrix';
 import CapabilityFeatureList from '@/components/subscription/CapabilityFeatureList';
 
-const TIER_UPGRADE_PATHS: string[][] = [
+// Exported for the tier-contract guard (sprint plan 4.4): intended-subset —
+// the upgrade path deliberately excludes the gateway/entry tiers, organization,
+// chain_*, and custom. Relative order must match the fixture order.
+export const TIER_UPGRADE_PATHS: string[][] = [
   ['google_only', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'],
   ['chain_starter', 'chain_professional', 'chain_enterprise'],
   ['organization'],

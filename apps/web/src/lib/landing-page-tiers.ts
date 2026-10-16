@@ -4,6 +4,7 @@
  */
 
 import type { SubscriptionTier } from '@/lib/tiers';
+import { DEFAULT_TIER } from '@/lib/tiers/tier-defaults';
 
 export interface LandingPageFeatures {
   // Content features
@@ -437,8 +438,8 @@ export const LANDING_PAGE_TIER_FEATURES: Record<SubscriptionTier, LandingPageFea
 };
 
 export function getLandingPageFeatures(tier: SubscriptionTier | string | null | undefined): LandingPageFeatures {
-  const normalizedTier = (tier?.toLowerCase() || 'starter') as SubscriptionTier;
-  return LANDING_PAGE_TIER_FEATURES[normalizedTier] || LANDING_PAGE_TIER_FEATURES.starter;
+  const normalizedTier = (tier?.toLowerCase() || DEFAULT_TIER) as SubscriptionTier;
+  return LANDING_PAGE_TIER_FEATURES[normalizedTier] || LANDING_PAGE_TIER_FEATURES[DEFAULT_TIER];
 }
 
 export function canUseFeature(tier: SubscriptionTier | string | null | undefined, feature: keyof LandingPageFeatures): boolean {

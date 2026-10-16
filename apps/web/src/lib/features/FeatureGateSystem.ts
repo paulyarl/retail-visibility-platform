@@ -7,6 +7,32 @@
 
 import { featureResolver } from './FeatureResolver';
 
+/**
+ * Feature-gate level bands — NOT tier rank. Level answers "which gated
+ * features may this tier reach": entry tiers sit at 0, then the ladder
+ * follows the contract order's commerce bands. Exported for the tier
+ * contract guard (sprint plan 4.4). History: the original map ranked
+ * `discovery` below `starter` and omitted `organization` entirely — an org
+ * tenant fell to level 0 and was denied its own propagation features.
+ */
+export const FEATURE_GATE_TIER_LEVELS = {
+  directory_presence: 0,
+  presence: 0,
+  google_only: 1,
+  starter: 2,
+  discovery: 2,
+  storefront: 3,
+  commitment: 4,
+  ecommerce: 4,
+  omnichannel: 5,
+  professional: 5,
+  organization: 7,
+  enterprise: 7,
+  chain_starter: 2,
+  chain_professional: 5,
+  chain_enterprise: 7,
+} as const;
+
 // ==================== FEATURE OPERATIONS REGISTRY ====================
 
 export interface FeatureOperation {
@@ -392,17 +418,17 @@ export class FeatureGateEngine {
     if (!tierKey) return false;
     
     // This would integrate with your tier system
-    // For now, use a simple mapping based on tier hierarchy
-    const tierHierarchy = {
-      'discovery': 1,
-      'starter': 2,
-      'storefront': 3,
-      'commitment': 4,
-      'ecommerce': 4,
-      'professional': 5,
-      'omnichannel': 5,
-      'enterprise': 6
-    };
+    // For now, use a simple mapping based on tier hierarchy.
+    // Exported + aligned to the tier contract order (sprint plan 4.4):
+    //   FIXED: discovery ranked BELOW starter (inverted vs contract) —
+    //     a discovery tenant was denied level-2 'discovery+' features.
+    //   FIXED: organization was ABSENT — fell to 0, denying org tenants the
+    //     level-7 propagation features that are their own tier's grants.
+    //   directory_presence/presence sit at 0 by design: entry tiers carry no
+    //     gated catalog features; trial_*/custom fall to 0 (fail-closed).
+    //   Band semantics are feature-gate levels, not tier rank — google_only=1
+    //     outranks presence=0 here because level 1 IS the Google surface.
+    const tierHierarchy = FEATURE_GATE_TIER_LEVELS;
     
     const featureTiers: Record<string, number> = {
       'product_management': 2, // discovery+

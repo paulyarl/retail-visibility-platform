@@ -70,7 +70,9 @@ interface OrgTipDefinition {
 // TIER HELPERS
 // ====================
 
-const ORG_TIER_ORDER = ['chain_starter', 'chain_professional', 'chain_enterprise', 'custom'];
+// Exported for the tier-contract guard (sprint plan 4.4): intended-subset —
+// the org/chain rungs only. Relative order must match the fixture order.
+export const ORG_TIER_ORDER = ['chain_starter', 'chain_professional', 'chain_enterprise', 'custom'];
 
 function orgTierIndex(tier: string): number {
   const idx = ORG_TIER_ORDER.indexOf(tier);

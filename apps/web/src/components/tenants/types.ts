@@ -101,7 +101,12 @@ export const TIER_BADGE_CLASSES: Record<string, string> = {
     'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400',
 };
 
-const TIER_DISPLAY_NAMES: Record<string, string> = {
+// Exported for the tier-contract guard (sprint plan 4.4): intended-subset of
+// the canonical TIER_DISPLAY_NAMES — where a key is present its value MUST
+// agree with the fixture's display_names. Missing keys fall back to a
+// title-cased key in formatTierDisplay (known gap: directory_presence,
+// presence, starter, google_only, chain_enterprise render as raw keys).
+export const TENANT_TIER_DISPLAY_NAMES: Record<string, string> = {
   discovery: 'Discovery',
   storefront: 'Storefront',
   commitment: 'Commitment',
@@ -122,7 +127,7 @@ export function getTierBadgeClass(tierKey?: string): string {
 export function formatTierDisplay(tierKey?: string): string {
   if (!tierKey) return '';
   return (
-    TIER_DISPLAY_NAMES[tierKey] ??
+    TENANT_TIER_DISPLAY_NAMES[tierKey] ??
     tierKey.charAt(0).toUpperCase() + tierKey.slice(1)
   );
 }

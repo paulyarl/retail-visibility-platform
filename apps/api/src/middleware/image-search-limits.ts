@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { DEFAULT_TIER } from '../utils/tier-defaults';
 
 /**
  * Rate limiting for image search API
@@ -16,7 +17,10 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Tier-based limits per hour
-const TIER_LIMITS = {
+// Exported for the tier-contract guard (sprint plan 4.4): subset limit map —
+// keys must stay ⊆ the contract tier universe.
+export const IMAGE_SEARCH_TIER_LIMITS = {
+  directory_presence: 10, // floor — also the DEFAULT_TIER fallback value
   google_only: 10,      // 10 searches/hour
   discovery: 10,
   storefront: 20,
@@ -25,7 +29,7 @@ const TIER_LIMITS = {
   professional: 50,     // 50 searches/hour (matches Unsplash free tier)
   enterprise: 100,      // 100 searches/hour
   organization: 100,    // 100 searches/hour
-};
+} as const;
 
 /**
  * Check and enforce rate limits for image search
@@ -46,18 +50,20 @@ export async function checkImageSearchLimit(
       });
     }
 
-    // Get tenant to check tier
-    let tier = 'starter'; // Default
+    // Get tenant to check tier — DEFAULT_TIER (directory_presence) per 1.7:
+    // the shared "no/unknown tier" answer, least privilege.
+    let tier: string = DEFAULT_TIER;
     if (tenantId) {
       const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
         select: { subscription_tier: true },
       });
-      tier = tenant?.subscription_tier || 'starter';
+      tier = tenant?.subscription_tier || DEFAULT_TIER;
     }
 
     // Get rate limit for this tier
-    const limit = TIER_LIMITS[tier as keyof typeof TIER_LIMITS] || TIER_LIMITS.starter;
+    const limit = IMAGE_SEARCH_TIER_LIMITS[tier as keyof typeof IMAGE_SEARCH_TIER_LIMITS]
+      ?? IMAGE_SEARCH_TIER_LIMITS[DEFAULT_TIER];
 
     // Check rate limit
     const now = Date.now();
