@@ -82,6 +82,32 @@ const requirePlatformAdmin = (req: Request, res: Response, next: any) => {
   next();
 };
 
+/**
+ * Spec D5 lazy wedge-fidelity refresh on a claim read.
+ *
+ * A stored `seed_fidelity` verdict invalidated by a NAP verification or a
+ * newer source audit suppresses every claim-token surface, so a stale
+ * 'misaligned' 404s the QR kit and degrades the claim link to the inquiry
+ * path. The seed detail and the QR-kit meta route are fetched IN PARALLEL by
+ * the admin page, so both call this — whichever lands first has to be able to
+ * correct the verdict, otherwise the kit answers from the stale row and the
+ * page contradicts itself (Active token in one panel, "no active claim token"
+ * in the other).
+ *
+ * Best-effort: the stored verdict is still served if the refresh fails.
+ */
+async function refreshSeedFidelityQuietly(seedId: string, context: string): Promise<void> {
+  try {
+    const { refreshSeedFidelityIfStale } = await import('../services/seed-fidelity');
+    await refreshSeedFidelityIfStale(seedId);
+  } catch (err: any) {
+    logger.warn(`[${context}] fidelity refresh failed`, undefined, {
+      seedId,
+      error: { name: err?.name || 'Error', message: err?.message || String(err) },
+    });
+  }
+}
+
 const createSeedSchema = z.object({
   businessName: z.string().min(1).max(200),
   address: z.string().min(1).max(300),
@@ -1135,20 +1161,7 @@ router.get('/presence-seeds/by-campaign/:campaignId', requirePlatformStaff, asyn
 router.get('/presence-seeds/:id', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    // Spec D5 lazy fidelity refresh. The detail page is where an operator
-    // lands when a claim surface is missing (the QR kit 404s, the claim link
-    // degrades to the inquiry path), so the stored verdict self-heals here: a
-    // NAP verification or a newer source audit invalidates it. Best-effort —
-    // a refresh failure must never fail the read.
-    try {
-      const { refreshSeedFidelityIfStale } = await import('../services/seed-fidelity');
-      await refreshSeedFidelityIfStale(id);
-    } catch (err: any) {
-      logger.warn('[GET /api/admin/directory/presence-seeds/:id] fidelity refresh failed', undefined, {
-        seedId: id,
-        error: { name: err?.name || 'Error', message: err?.message || String(err) },
-      });
-    }
+    await refreshSeedFidelityQuietly(id, 'GET /api/admin/directory/presence-seeds/:id');
     const detail = await DirectoryPresenceSeedService.getSeed(id);
     if (!detail) return res.status(404).json({ error: 'seed_not_found' });
     res.json({ success: true, ...detail });
@@ -2683,6 +2696,7 @@ router.post('/suggestions/:id/status', requirePlatformStaff, async (req: Request
 router.get('/presence-seeds/:id/qr-kit', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    await refreshSeedFidelityQuietly(id, 'GET /api/admin/directory/presence-seeds/:id/qr-kit');
     const kit = await getClaimInviteKitMeta(id);
     if (!kit) return res.status(404).json({ error: 'no_active_claim_token' });
     res.json({
