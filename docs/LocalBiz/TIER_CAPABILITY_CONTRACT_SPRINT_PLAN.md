@@ -44,6 +44,24 @@
 | D8 | **What is the tier-key universe?** `seed_preview`, `expired_trial`, `trial_*`, and `custom` are tier-shaped strings that appear in some maps and not others — `seed_preview` is in `SubscriptionTier` and `TIER_LIMITS` but in no order/display/pricing map; `custom` is in the canonical order but has no display name or price. | **Classify, don't flatten.** The fixture needs a `pseudo_tiers` class (never in `TIER_ORDER`, never purchasable, zero keys) distinct from `inactive_legacy` (present in order arrays, absent from GTM paths) — otherwise Phase 1.3's bidirectional check is unwritable. |
 | D9 | **Where does inactive `starter` sit in `TIER_ORDER`?** Doc canonical: index 11 (after `enterprise`). `tipEngine.ts` and `GrowthTipService.ts`: index 3 (between `presence` and `discovery`). Code agrees with code; the doc disagrees — and the position is load-bearing for legacy tenants (`tierIndex('starter')` gates `isDiscoveryOrBelow`). | **Decide in Phase 0, pin in Phase 1.** Recommend pinning the doc order and fixing the two code copies — it keeps all active GTM tiers contiguous and makes position bugs impossible to hide behind inactivity. |
 
+### Decided — 2026-10-16
+
+| # | Ruling | Consequence |
+|---|---|---|
+| **D2** | **Fixture is canonical; the DB is one of its witnesses.** A committed JSON model is the contract; a dump script (`subscription_tiers_list` + `tier_features_list` → JSON) lets a check compare fixture to live DB. `tier-features.ts` is **not** canonical — it cannot see admin-UI writes. | The fixture is authored, not generated; the dump leg is a *check*, not the source. A code-only green cannot hide a DB drift. |
+| **D7** | **`_disabled` is an absolute veto** — over `_enabled`, `_flexible`, purchases and admin grants. Post-332 resolver behaviour is the intent; the stale *"purchases bypass — intentional"* note in `capability-resolution-mv.md` gets corrected (Phase 5.4). | **The store must not sell a module whose tier carries the veto.** A sale-eligibility check against the merged map is now part of the work, recorded in `store-purchases-capability-checklist.md`. Without it the store sells what the veto kills. |
+| **D8** | **Three classes:** `active` / `inactive_legacy` / `pseudo_tiers` (`seed_preview`, `expired_trial`, `trial_*`, `custom`). | Phase 1.3's bidirectional check becomes writable: active tiers need display name + price; `inactive_legacy` need order membership only; `pseudo_tiers` are exempt by rule. |
+| **D1** | **Assert first.** Tests pin the ~23 existing files to each other; unification is a follow-up justified by what the assertions reveal. | Zero refactor risk up front. The full second model inside `middleware/tier-access.ts` gets *pinned*, not moved. |
+| **D3** | **Generated block + diff.** The doc's tier-order and pricing tables are generated between markers; a test regenerates and fails on a non-empty diff. | The doc becomes a build artefact. Gated on 0.4's dormant-price decision (today the doc table lacks the `chain_*` / `google_only` / `trial` / `starter` rows that exist in code). |
+| **D4** | **The three money rules:** the key contract, the veto precedence (per D7), and `granted=false` ignored rather than a deny. | R1–R37's remaining rules stay documented conventions, not invariants. The three chosen are the ones whose failure charges the wrong amount or blocks an operator. |
+| **D9** | **Pin the CODE order — `starter` stays at index 3** (between `presence` and `discovery`); `tier-hierarchy.md` is corrected to match. **This reverses the plan's original recommendation** (doc order, index 11) on behaviour grounds. | No change for existing legacy `starter` tenants. Had the doc order been pinned, `tierIndex('starter')` would move 3 → 11 and legacy tenants would start ranking near `enterprise` in the tip and quick-link surfaces — a live behaviour change bought for tidiness. **The doc bends to the code here.** |
+
+| **D5** | **Accept the bounded window; make it visible.** Single-tenant reads are already real-time via the resolver — the ≤10 min applies only to bulk listing routes and public surfaces. The purchase confirmation states when the capability activates. | Phase 6 owns the residual: whether a buyer's *own* directory card shows the unlock before the next refresh. Silence during the window is what reads as failure. |
+| **D6** | **Repo-root `shared/` fixture.** One JSON file both suites import by relative path (`resolveJsonModule` is set on both tsconfigs). | One file, one truth, no alias tricks. Rejected: a `packages/` workspace (real setup for one JSON) and per-app copies (recreates the two-places problem). |
+| **0.6** | **Delete the tier-relevant `.bak`s — narrowest defensible reading: the ones that DECLARE a tier map.** Deleted 2026-10-16: `middleware/tier-access.ts.bak`, `middleware/image-search-limits.ts.bak`, `services/TierService.ts.bak`. | **Scope caveat, recorded:** the boundary is not crisply definable. Three candidate sets exist — **3** by map *declaration* (deleted), **18** by name match, **23** by tier/capability identifier presence. `-name "*tier*"` is also case-sensitive and misses `TierService.ts.bak`. The stated purpose was *"kill the copies that can be mistaken for the model"*, which is the declaration set; widening to the other 20 is available but needs an explicit call. **The 493 remaining `.bak` files stay**, and the Phase 4.4 guard must still exclude `*.bak` by pattern — the deletion does not make the exclusion unnecessary. |
+
+**All decisions settled: D1–D9 + 0.6.** No blockers remain.
+
 ---
 
 ## Green baseline — establish before Phase 0
@@ -151,6 +169,22 @@ They are **not compiled** (TypeScript ignores `.bak`, which is why `checkapi` pa
 2. **Delete the shadow tree** as its own change, with its own justification — the `.bak` convention is not documented anywhere, and 496 unreviewed copies of routing/middleware/services is a standing hazard independent of this sprint.
 
 **Recommendation: (1) now, (2) as a separate decision.** The contract must not depend on the `.bak` question, and 496 deletions should not ride along inside a test sprint.
+
+### 0.3 — verified: the four order arrays are now identical
+
+All four `TIER_ORDER` declarations carry the **same 16 keys in the same order**:
+
+```
+'directory_presence', 'google_only', 'presence', 'starter', 'discovery', 'storefront',
+'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
+'chain_starter', 'chain_professional', 'chain_enterprise', 'custom'
+```
+
+`tipEngine.ts:88` and `GrowthTipService.ts:141` **already had `presence` / `ecommerce` / `organization`** — only `QuickLinksService` and `NextStepsService` were missing them, which the hotfix corrected. **The code agrees with itself 4/4; the doc disagrees** — `starter` sits at **index 3** in all four and at **index 11** in the documented order. That is precisely D9, and it is uniform, so it is one decision rather than four.
+
+**One mechanic worth recording:** every copy's `tierIndex` returns **0** for an unknown key (`idx >= 0 ? idx : 0`). A missing tier therefore compares as `directory_presence` — the *lowest* rung — so an omission is a **silent under-gate**, never a crash. That is why this survived: the symptom was a tenant quietly comparing below where it belonged, not an error.
+
+**One more order array found (0.1 addendum):** `apps/web/src/lib/features/feature-catalog.ts:431` uses its own `tierHierarchy.indexOf(tierLevel)` — a fifth order source the declaration-anchored sweep did not name. Include it in the fixture's per-array role map.
 
 **Separate namespace — out of scope pending 0.6**
 
