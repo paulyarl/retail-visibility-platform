@@ -23,6 +23,7 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
   const [eligibility, setEligibility] = useState<GalleryEligibility | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [useShortUrl, setUseShortUrl] = useState(true);
@@ -98,6 +99,22 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Permanent — the row and its stored object both go. Refreshes eligibility
+  // too, since the screenshot count is part of the gallery gate.
+  const handleDelete = async (shot: DiagnosticScreenshot) => {
+    if (!window.confirm(`Delete ${shot.file_name}? The screenshot is removed permanently.`)) return;
+    setDeletingId(shot.id);
+    setError(null);
+    try {
+      await marketingOpsService.deleteFile(shot.id);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -288,6 +305,18 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
                   >
                     <Download className="h-4 w-4 text-gray-500" />
                   </a>
+                  <button
+                    onClick={() => handleDelete(s)}
+                    disabled={deletingId === s.id}
+                    className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
+                    title="Delete screenshot"
+                  >
+                    {deletingId === s.id ? (
+                      <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    )}
+                  </button>
                 </div>
               </div>
             ))}

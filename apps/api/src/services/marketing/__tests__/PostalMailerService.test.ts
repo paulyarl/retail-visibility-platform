@@ -205,6 +205,79 @@ describe('PostalMailerService QR destination', () => {
   });
 });
 
+describe('PostalMailerService auto destination with existing gallery links', () => {
+  it('reuses a live gallery link when the campaign can no longer mint one', async () => {
+    mockCampaignsFindUnique.mockResolvedValue({ ...campaign, stage: 'seek' });
+    mockResolveEligibility.mockResolvedValue(
+      eligible({
+        eligible: false,
+        stage: 'seek',
+        stageOk: false,
+        screenshotCount: 2,
+        archetype: null,
+        reason: 'invalid_stage',
+      }),
+    );
+    mockTokensFindFirst.mockResolvedValue({
+      token: 'LIVE1',
+      short_code: 'LIVECD',
+      expires_at: new Date('2026-11-15'),
+    });
+
+    const payload = await PostalMailerService.getInstance().generate(CAMPAIGN_ID, undefined, importCopy);
+
+    expect(payload.qrDestination).toBe('diagnostic_gallery');
+    expect(payload.qrUrl).toBe('https://app.example.com/g/LIVECD');
+    expect(payload.token).toBe('LIVE1');
+    expect(payload.ctaLabel).toBe('Scan to see your free diagnostic');
+    expect(mockGenerateCampaignToken).not.toHaveBeenCalled();
+    expect(mockTokensUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('encodes an operator-pinned gallery link without consulting eligibility', async () => {
+    mockCampaignsFindUnique.mockResolvedValue({ ...campaign, stage: 'seek' });
+    mockTokensFindFirst.mockResolvedValue({
+      token: 'LIVE1',
+      short_code: 'LIVECD',
+      expires_at: new Date('2026-11-15'),
+    });
+
+    const target = await PostalMailerService.getInstance().resolveQrTarget(CAMPAIGN_ID, {
+      destination: 'diagnostic_gallery',
+      galleryTokenId: 'mdpt-943y2up0',
+    });
+
+    expect(target.qrDestination).toBe('diagnostic_gallery');
+    expect(target.qrUrl).toBe('https://app.example.com/g/LIVECD');
+    expect(mockResolveEligibility).not.toHaveBeenCalled();
+    expect(mockTokensFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          campaign_id: CAMPAIGN_ID,
+          OR: [{ id: 'mdpt-943y2up0' }, { token: 'mdpt-943y2up0' }],
+        }),
+      }),
+    );
+  });
+
+  it('normalizes a trailing slash on the configured frontend URL', async () => {
+    const { unifiedConfig } = await import('../../../config/unifiedConfig');
+    (unifiedConfig as any).frontendUrl = 'https://app.example.com/';
+    try {
+      const payload = await PostalMailerService.getInstance().generate(
+        CAMPAIGN_ID,
+        undefined,
+        importCopy,
+        { destination: 'site' },
+      );
+
+      expect(payload.qrUrl).toBe('https://app.example.com/');
+    } finally {
+      (unifiedConfig as any).frontendUrl = 'https://app.example.com';
+    }
+  });
+});
+
 describe('PostalMailerService explicit QR destinations', () => {
   it('reuses the live gallery token instead of minting when one exists', async () => {
     mockResolveEligibility.mockResolvedValue(eligible());

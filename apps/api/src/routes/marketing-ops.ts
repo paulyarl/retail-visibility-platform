@@ -3670,9 +3670,44 @@ router.get('/:campaignId/files/:fileId/render', async (req: any, res: Response) 
   }
 });
 
+/**
+ * DELETE /files/:id
+ *
+ * Removes an mkt_files_list row — backs the Outreach Kit tab's screenshot
+ * delete. The stored object goes first: a row without its object is a broken
+ * thumbnail, an object without its row is unreachable garbage. Storage cleanup
+ * is best-effort — an unreachable storage backend must not leave the operator
+ * stuck with a screenshot they can't remove.
+ */
 router.delete('/files/:id', async (req: any, res: Response) => {
   try {
-    await MarketingFileService.deleteFile(req.params.id, getCtx(req));
+    const { id } = req.params;
+    const file = await prisma.mkt_files_list.findUnique({
+      where: { id },
+      select: { storage_path: true },
+    });
+
+    if (file?.storage_path) {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const { StorageBuckets } = await import('../storage-config');
+        const supabaseUrl = unifiedConfig.supabaseUrl;
+        const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const { error: removeError } = await supabase.storage
+            .from(StorageBuckets.DISPUTES.name)
+            .remove([file.storage_path]);
+          if (removeError) {
+            logger.warn('Marketing file storage cleanup failed', getCtx(req), { fileId: id, error: removeError.message });
+          }
+        }
+      } catch (storageError) {
+        logger.warn('Marketing file storage cleanup threw', getCtx(req), { fileId: id, error: (storageError as Error).message });
+      }
+    }
+
+    await MarketingFileService.deleteFile(id, getCtx(req));
     res.json({ success: true });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

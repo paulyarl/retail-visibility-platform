@@ -6,9 +6,10 @@
  *   - OutreachOpenerService.resolveOpener (signal extraction + prompt)
  *   - aiProviderFactory (AI-generated, credible copy)
  *
- * Generates a 4x6" postcard payload with a scannable QR destination chosen
- * by campaign stage: diagnostic gallery for seek/preview/shown, claim link
- * for paid/unclaimed, customer portal for claimed.
+ * Generates a 4x6" postcard payload with a scannable QR destination — the
+ * operator's pick, or the auto precedence (claim → portal → diagnostic
+ * gallery → site root). The gallery step mints when the campaign is eligible
+ * and otherwise reuses an existing live link.
  */
 
 import { prisma } from '../../prisma';
@@ -282,7 +283,10 @@ class PostalMailerService {
    * Pick the QR destination and mint a token when needed.
    *
    * `destination: 'auto'` (or omitted) keeps the original precedence:
-   * claim → portal → diagnostic gallery (when eligible) → site root.
+   * claim → portal → diagnostic gallery → site root. The gallery step mints
+   * when the campaign is eligible and otherwise reuses an existing live link —
+   * a seek/seed campaign that minted at preview_built still has a real gallery
+   * to send people to, so the postcard shouldn't dead-end on the site root.
    * Any explicit destination is operator-chosen and validated hard — a
    * forced pick that cannot resolve is a 400, never a silent fallback.
    */
@@ -291,7 +295,9 @@ class PostalMailerService {
     ctx?: RequestCtx,
     qrOptions?: MailerQrOptions,
   ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'>> {
-    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl || 'https://app.visibleshelf.com';
+    // WEB_URL carries a trailing slash in prod ('https://visibleshelf.com/'),
+    // which would otherwise produce '//' paths in every encoded QR.
+    const baseUrl = (unifiedConfig.frontendUrl || unifiedConfig.webUrl || 'https://app.visibleshelf.com').replace(/\/+$/, '');
     const destination = qrOptions?.destination ?? 'auto';
 
     if (destination !== 'auto') {
@@ -370,14 +376,26 @@ class PostalMailerService {
       };
     }
 
-    // Diagnostic gallery — only when the gallery actually exists. Eligibility
-    // requires preview_built|shown + at least one diagnostic screenshot + a
-    // resolved archetype, so a seek/seed campaign (the mailer's cold-outreach
-    // default) has nothing to show: minting a bare token there printed a card
-    // promising a diagnostic the prospect could not open.
+    // Diagnostic gallery — mint when the gallery is eligible; otherwise reuse
+    // the campaign's existing live link. Eligibility requires
+    // preview_built|shown + at least one diagnostic screenshot + a resolved
+    // archetype, so a seek/seed campaign (the mailer's cold-outreach default)
+    // cannot mint — minting a bare token there printed a card promising a
+    // diagnostic the prospect could not open. A live link already minted at
+    // preview_built is a different story: the gallery exists, so print it.
     const eligibility = await GalleryEligibilityService.resolveEligibility(campaign.id, ctx);
     if (eligibility.eligible && eligibility.archetype) {
       return this.galleryQrTarget(campaign, eligibility.archetype, baseUrl, ctx);
+    }
+
+    const live = await this.liveGalleryQrTarget(campaign.id, baseUrl);
+    if (live) {
+      logger.info('PostalMailerService: QR reuses an existing gallery link — not mint-eligible', ctx, {
+        campaignId: campaign.id,
+        stage: campaign.stage,
+        reason: eligibility.reason,
+      });
+      return live;
     }
 
     logger.info('PostalMailerService: QR falls back to the site root — no eligible diagnostic gallery', ctx, {
@@ -433,6 +451,40 @@ class PostalMailerService {
   }
 
   /**
+   * The campaign's live diagnostic gallery link, if it has one — newest
+   * unconverted, unexpired token. Encodable by a postcard even when the
+   * campaign can no longer mint: a seek/seed campaign that minted at
+   * preview_built still has a gallery worth sending people to.
+   */
+  private async liveGalleryQrTarget(
+    campaignId: string,
+    baseUrl: string,
+  ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'> | null> {
+    const live = await prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: {
+        campaign_id: campaignId,
+        token_type: 'diagnostic_gallery',
+        converted_at: null,
+        paid_at: null,
+        expires_at: { gt: new Date() },
+      },
+      orderBy: { created_at: 'desc' },
+      select: { token: true, short_code: true, expires_at: true },
+    });
+
+    if (!live) return null;
+
+    return {
+      qrUrl: live.short_code
+        ? `${baseUrl}/g/${live.short_code}`
+        : `${baseUrl}/preview/${live.token}`,
+      qrDestination: 'diagnostic_gallery',
+      token: live.token,
+      tokenExpiresAt: live.expires_at,
+    };
+  }
+
+  /**
    * Gallery QR target. Reuses the campaign's live diagnostic_gallery token
    * when one exists — the resolve (QR design) and generate (PDF) steps must
    * encode the same URL, and superseding on every print would churn tokens.
@@ -446,28 +498,8 @@ class PostalMailerService {
     baseUrl: string,
     ctx?: RequestCtx,
   ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'>> {
-    const live = await prisma.mkt_deliverable_preview_tokens.findFirst({
-      where: {
-        campaign_id: campaign.id,
-        token_type: 'diagnostic_gallery',
-        converted_at: null,
-        paid_at: null,
-        expires_at: { gt: new Date() },
-      },
-      orderBy: { created_at: 'desc' },
-      select: { token: true, short_code: true, expires_at: true },
-    });
-
-    if (live) {
-      return {
-        qrUrl: live.short_code
-          ? `${baseUrl}/g/${live.short_code}`
-          : `${baseUrl}/preview/${live.token}`,
-        qrDestination: 'diagnostic_gallery',
-        token: live.token,
-        tokenExpiresAt: live.expires_at,
-      };
-    }
+    const live = await this.liveGalleryQrTarget(campaign.id, baseUrl);
+    if (live) return live;
 
     // No live token — supersede any unconverted stragglers (same contract as
     // the gallery-token route) and mint a fresh 30-day token for print.

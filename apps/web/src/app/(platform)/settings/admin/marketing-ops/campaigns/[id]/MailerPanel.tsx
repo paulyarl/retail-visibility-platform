@@ -11,6 +11,10 @@
  * resolveQrTarget, since resolving mints/reuses the destination token. The
  * resolved URL is re-resolved server-side at generate time with reuse-or-mint
  * semantics, so the styled QR and the PDF always encode the same landing.
+ *
+ * The gallery destination is token-aware: minting a fresh link needs gallery
+ * eligibility, but encoding an existing one doesn't, so a seek/seed campaign
+ * that minted at preview_built can still print that link.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,18 +28,16 @@ import marketingOpsService, {
   MailerQrTarget,
 } from '@/services/MarketingOpsService';
 import { generateQrDataUrl } from '@/lib/qr-engine';
+import {
+  canMintGalleryLink,
+  defaultGalleryTokenId,
+  filterLiveGalleryTokens,
+  galleryTokenLabel,
+  resolveMailerDestinations,
+} from '@/lib/mailer-qr-destinations';
 import MailerQrDesignerModal from './MailerQrDesignerModal';
 
 const MAILER_STAGES = ['seek', 'seed', 'preview_built'];
-
-const DESTINATION_OPTIONS: { value: MailerQrDestination; label: string }[] = [
-  { value: 'auto', label: 'Auto (best available)' },
-  { value: 'diagnostic_gallery', label: 'Diagnostic gallery' },
-  { value: 'claim', label: 'Claim link' },
-  { value: 'portal', label: 'Customer portal' },
-  { value: 'site', label: 'Website homepage' },
-  { value: 'custom', label: 'Custom URL' },
-];
 
 interface MailerPanelProps {
   campaignId: string;
@@ -76,11 +78,25 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
       .catch(() => setGalleryTokens([]));
   }, [campaignId, mailerAllowed]);
 
+  const galleryMintEligible = canMintGalleryLink(eligibility);
+  const liveGalleryTokens = useMemo(() => filterLiveGalleryTokens(galleryTokens), [galleryTokens]);
+
+  // Live links first; a pinned link that has since expired stays selectable so
+  // the picker never renders blank on a value the operator already chose.
+  const galleryTokenChoices = useMemo(() => {
+    const pinned = galleryTokens.find((t) => t.id === galleryTokenId);
+    return pinned && !liveGalleryTokens.some((t) => t.id === pinned.id)
+      ? [pinned, ...liveGalleryTokens]
+      : liveGalleryTokens;
+  }, [galleryTokens, galleryTokenId, liveGalleryTokens]);
+
   // A destination change invalidates a previously resolved/designed QR — it
   // encodes the old target's URL.
   const changeDestination = (value: MailerQrDestination) => {
     setQrDestination(value);
-    setGalleryTokenId('');
+    // Reuse-or-mint needs eligibility; encoding an existing link doesn't, so
+    // default to the newest live link when a fresh one can't be minted.
+    setGalleryTokenId(defaultGalleryTokenId(eligibility, liveGalleryTokens));
     setStyledQrDataUrl(null);
     setResolvedTarget(null);
     setPlainPreviewUrl(null);
@@ -182,32 +198,31 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
   // the operator can't pick a target that would 400 at resolve/generate.
   // Server still validates hard; the omission is advisory.
   const availableDestinations = useMemo(
-    () =>
-      DESTINATION_OPTIONS.filter((opt) => {
-        switch (opt.value) {
-          case 'diagnostic_gallery':
-            return eligibility?.eligible === true;
-          case 'claim':
-            // Mirrors the auto-path precondition — issueClaimToken only mints
-            // for a paid, unclaimed campaign email.
-            return !!campaign.email && !campaign.customer_id && !!campaign.date_paid;
-          case 'portal':
-            return !!campaign.customer_id;
-          default:
-            return true;
-        }
-      }),
-    [eligibility, campaign.email, campaign.customer_id, campaign.date_paid],
+    () => resolveMailerDestinations({ eligibility, liveGalleryTokens, campaign }),
+    [eligibility, liveGalleryTokens, campaign.email, campaign.customer_id, campaign.date_paid],
   );
 
+  const galleryOptionAvailable = availableDestinations.some((o) => o.value === 'diagnostic_gallery');
+  // Gallery picked on a campaign that can't mint and with nothing pinned —
+  // resolve would 400, so the resolve/generate buttons stay disabled.
+  const galleryNeedsToken = qrDestination === 'diagnostic_gallery' && !galleryMintEligible && !galleryTokenId;
+  const qrActionDisabled =
+    resolvingQr || (qrDestination === 'custom' && !customUrl.trim()) || galleryNeedsToken;
+
   // If the selected destination dropped out of the available set (e.g. the
-  // eligibility fetch came back ineligible), fall back to auto.
+  // eligibility fetch came back ineligible), fall back to auto. A gallery
+  // selection that survives a losing-eligibility refetch re-pins to a live
+  // link, since the reuse-or-mint sentinel would 400 on an ineligible campaign.
   useEffect(() => {
     if (!availableDestinations.some((o) => o.value === qrDestination)) {
       changeDestination('auto');
+      return;
+    }
+    if (qrDestination === 'diagnostic_gallery' && !galleryMintEligible && !galleryTokenId) {
+      setGalleryTokenId(defaultGalleryTokenId(eligibility, liveGalleryTokens));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableDestinations, qrDestination]);
+  }, [availableDestinations, qrDestination, galleryMintEligible, galleryTokenId, liveGalleryTokens]);
 
   // Short print-runway warning — a QR that expires before the card lands is
   // dead on arrival. The /g/ short code still re-resolves to a live token,
@@ -255,12 +270,18 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
                 </option>
               ))}
             </select>
-            {qrDestination === 'diagnostic_gallery' && galleryOptionHint && (
+            {qrDestination === 'diagnostic_gallery' && galleryMintEligible && galleryOptionHint && (
               <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                 {galleryOptionHint}
               </p>
             )}
-            {qrDestination === 'diagnostic_gallery' && galleryTokens.length > 0 && (
+            {qrDestination === 'diagnostic_gallery' && !galleryMintEligible && (
+              <p className="mt-1 text-[11px] text-amber-600">
+                A new gallery link can't be minted for this campaign — the postcard will encode the
+                existing link you pick.
+              </p>
+            )}
+            {qrDestination === 'diagnostic_gallery' && galleryTokenChoices.length > 0 && (
               <select
                 value={galleryTokenId}
                 onChange={(e) => {
@@ -270,19 +291,15 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
                 }}
                 className="mt-1.5 w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
               >
-                <option value="">Latest live link (reuse or mint)</option>
-                {galleryTokens.map((t) => (
+                {galleryMintEligible && <option value="">Latest live link (reuse or mint)</option>}
+                {galleryTokenChoices.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.short_code ? `/g/${t.short_code}` : `…${t.token.slice(-8)}`}
-                    {t.viewed_at ? ' · viewed' : ''}
-                    {t.expires_at
-                      ? ` · exp ${new Date(t.expires_at).toLocaleDateString()}`
-                      : ''}
+                    {galleryTokenLabel(t)}
                   </option>
                 ))}
               </select>
             )}
-            {eligibility && !eligibility.eligible && eligibility.stageOk && (
+            {eligibility && !galleryOptionAvailable && (
               <p className="mt-1 text-[11px] text-amber-600">
                 Diagnostic gallery isn't an option yet — {eligibility.action ?? eligibility.reason}
               </p>
@@ -329,14 +346,17 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
               {resolvedTarget?.qrUrl ??
                 'Resolve the QR target to see what the code will encode.'}
             </p>
+            {resolvedTarget?.qrDestination === 'none' && (
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Auto found no claim, portal, or gallery link for this campaign, so the code encodes
+                the platform home page. Pick a destination above to override it.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2 items-center">
               {!resolvedTarget && (
                 <button
                   onClick={handlePreviewQr}
-                  disabled={
-                    resolvingQr ||
-                    (qrDestination === 'custom' && !customUrl.trim())
-                  }
+                  disabled={qrActionDisabled}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
                   title="Resolve the QR landing URL and show a preview"
                 >
@@ -346,10 +366,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
               )}
               <button
                 onClick={handleDesignQr}
-                disabled={
-                  resolvingQr ||
-                  (qrDestination === 'custom' && !customUrl.trim())
-                }
+                disabled={qrActionDisabled}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
                 title="Open the styled QR designer — templates, colors, platform or custom logo"
               >
@@ -408,7 +425,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
               </p>
               <button
                 onClick={() => handleGenerateMailer()}
-                disabled={mailerLoading}
+                disabled={mailerLoading || galleryNeedsToken}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -451,7 +468,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
                     body: importBody.trim(),
                   })
                 }
-                disabled={mailerLoading || !importHeadline.trim() || !importBody.trim()}
+                disabled={mailerLoading || galleryNeedsToken || !importHeadline.trim() || !importBody.trim()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 dark:border-neutral-600 dark:text-gray-300 dark:hover:bg-neutral-700 disabled:opacity-50"
               >
                 <Download className="w-3.5 h-3.5" />
