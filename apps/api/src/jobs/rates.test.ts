@@ -24,7 +24,7 @@ describe("Currency Rate Job Stub (REQ-2025-905)", () => {
 
     expect(res.status).toBe(503);
     expect(res.body.error).toBe("rate_job_disabled");
-  });
+  }, 60_000); // first request pays the full app cold-boot (~17s)
 
   it("should return 401 when service token is missing", async () => {
     const res = await request(app).post("/jobs/rates/daily");

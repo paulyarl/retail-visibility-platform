@@ -160,7 +160,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
       );
 
       if (result.success) {
-        setSuccess(`Successfully purchased "${purchaseTarget.name}"! The feature is now active.`);
+        setSuccess(`Successfully purchased "${purchaseTarget.name}"! The feature is now active in your account. Public directory surfaces refresh within ~10 minutes.`);
         setShowConfirm(false);
         setPurchaseTarget(null);
         await loadData();
@@ -232,7 +232,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
 
       if (result.success) {
         const statusLabel = result.data?.status === 'trial' ? ` (trial — ${bundleTarget.trialDays} days)` : '';
-        setSuccess(`Successfully purchased "${bundleTarget.name}"${statusLabel}! All components are now active.`);
+        setSuccess(`Successfully purchased "${bundleTarget.name}"${statusLabel}! All components are now active in your account. Public directory surfaces refresh within ~10 minutes.`);
         setShowBundleConfirm(false);
         setBundleTarget(null);
         await loadData();

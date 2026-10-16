@@ -8,6 +8,17 @@
 - `doppler run --config local -- pnpm prisma db pull` — Pull DB schema into `prisma/schema.prisma` (run from `apps/api`)
 - `doppler run --config local -- pnpm prisma generate` — Regenerate client with Doppler secrets
 - `cd apps/web && npx vitest run` — web unit tests (vitest, node environment, `src/**/*.test.ts`). Run a single file by path.
+- `pnpm test` — both app vitest suites (`pnpm -r test`); `pnpm test:watch` for watch mode
+
+### Tier/capability contract (`shared/tier-contract.json`)
+
+**The fixture is the source of truth for tier order, pricing, display names, inheritance edges, trial maps, tier classes, capability modules, and the surface inventory.** The DB is a witness, not the generator. Rules:
+
+- Adding a tier or capability key means **editing the fixture first**, then the code — contract suites in `apps/api/src/services/__tests__/` (`tier-*`, `mv-shape-lint`, `tier-doc-generation`) fail on drift.
+- `surface_files` in the fixture is the contract-surface manifest: any file under `apps/api/src`/`apps/web/src` declaring a `TIER_*` map / `DEFAULT_TIER` / `*_TRIAL_BASE_TIERS` / tier enum must be listed (`asserted`/`covered`/`derived`/`documented`/`exempt`) or the guard fails.
+- `capability_modules` is generated — regenerate via `node apps/api/scripts/sync-fixture-modules.cjs` after re-dumping the DB witness (`cd apps/api && doppler run --config prd -- node scripts/dump-tier-contract.cjs` → `shared/tier-contract-db-witness.json`).
+- Doc blocks between `<!-- BEGIN/END tier-contract:* -->` markers are generated — regenerate via `node apps/api/scripts/gen-tier-doc-blocks.cjs --write` (`--check` diffs without writing).
+- Sprint plan + decision log: `docs/LocalBiz/TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md`.
 
 ### DB rescue utility (`apps/api/scripts/db-rescue.cjs`)
 

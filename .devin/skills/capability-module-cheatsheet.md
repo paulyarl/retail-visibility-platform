@@ -34,21 +34,21 @@ never put recurring infrastructure entitlements in it.
 
 ## The key contract (per module)
 
+<!-- BEGIN tier-contract:key-contract -->
 ```
-<module>_enabled    → module ON explicitly (grants nothing alone)
-<module>_disabled   → module OFF — absolute veto, wins over everything
-<module>_flexible   → module ON + every feature key in the module
-<any other active key> → implicit _enabled (R17 §4)
-no keys at all      → module OFF
+<module>_enabled         → module ON explicitly (grants nothing alone)
+<module>_disabled        → module OFF — absolute veto, wins over every other source (resolved in merge, post-332)
+<module>_flexible        → module ON + every active feature key linked to the module (expansion excludes *_disabled and *_off)
+<any other active key>   → implicit _enabled (R17 §4)
+no keys at all           → module OFF
 ```
 
-- `_disabled` is a **veto, not a grant** — never counts as engagement.
-- Never fabricate `_enabled` just to host a grant — if a key needs a home the
-  veto can't reach, it's in the wrong module (the Discovery bug).
-- Group gates in options modules use `_on`/`_off` (legacy `_enabled`/`_disabled`
-  group keys remain as OR-aliases during migration).
-- Resolver fields: `allowed_*` = tier hard gate; `can_use_*`/`effective_*` =
-  tier AND merchant soft gate (R33 — merchant prefs never touch tier fields).
+- _disabled is a veto, not a grant — never counts as engagement, and a module whose enabled tier rows are all veto is not purchase-eligible (capabilitySaleAllowed, D7).
+- Never fabricate _enabled just to host a grant — if a key needs a home the veto can't reach, it's in the wrong module (the Discovery bug).
+- Group gates in options modules use _on/_off (legacy _enabled/_disabled group keys remain as OR-aliases during migration).
+- granted=false purchase/override rows are ignored, not denies; granted=true rows force-enable and can expand _flexible.
+- Resolver fields: allowed_* = tier hard gate; can_use_*/effective_* = tier AND merchant soft gate (R33 — merchant prefs never touch tier fields).
+<!-- END tier-contract:key-contract -->
 
 ## Module-responsibility test (R37) — where does a new key live?
 

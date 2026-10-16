@@ -23,10 +23,12 @@ describe('getSKULimit', () => {
     expect(getSKULimit('expired_trial')).toBe(0); // deprecated → presence
   });
 
-  it('falls back to discovery only for genuinely unknown tiers', () => {
-    expect(getSKULimit('not_a_tier')).toBe(75);
-    expect(getSKULimit('')).toBe(TIER_LIMITS.starter.maxSkus); // nullish → starter
-    expect(getSKULimit(null)).toBe(TIER_LIMITS.starter.maxSkus);
+  it('falls back to directory_presence for genuinely unknown or absent tiers', () => {
+    // Sprint plan 1.7: the shared DEFAULT_TIER — not a silent 'discovery'
+    // 75-SKU answer, and not 'starter' (an inactive legacy key).
+    expect(getSKULimit('not_a_tier')).toBe(TIER_LIMITS.directory_presence.maxSkus);
+    expect(getSKULimit('')).toBe(TIER_LIMITS.directory_presence.maxSkus);
+    expect(getSKULimit(null)).toBe(TIER_LIMITS.directory_presence.maxSkus);
   });
 
   it('is case-insensitive', () => {

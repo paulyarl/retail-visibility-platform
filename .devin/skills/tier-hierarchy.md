@@ -34,18 +34,28 @@ Scale            professional | organization | enterprise
 
 ## Tier order (low → high for sort / compare)
 
-| # | Key | Display | Price/mo | Layer | Notes |
+<!-- BEGIN tier-contract:tier-order-table -->
+| # | Key | Display | Price/mo | Layer | Class |
 |---|-----|---------|----------|-------|-------|
-| 0 | `directory_presence` | Directory Presence | $0 | Gateway | Free; never paid acquisition SKU |
-| 1 | `presence` | Starter | $19 | Entry Presence | **Directory mode only** (new key; old `starter` stays inactive) |
-| 2 | `discovery` | Discovery | $29 | Entry Presence | Google third-party |
-| 3 | `storefront` | Storefront | $59 | Entry Presence | Platform in-house (+ Google inherit) |
-| 4 | `commitment` | Commitment | $79 | Commerce | Deposit |
-| 5 | `ecommerce` | E-commerce | $99 | Commerce | Full pay |
-| 6 | `omnichannel` | Omnichannel | $149 | Commerce | Both |
-| 7 | `professional` | Professional | $199 | Scale | Advanced single-loc |
-| 8 | `organization` | Organization | $499 | Scale | Org type |
-| 9 | `enterprise` | Enterprise | $499 | Scale | Multi-loc |
+| 0 | `directory_presence` | Directory Presence | $0 | Gateway | active |
+| 1 | `google_only` | Google-Only | — | — | inactive legacy |
+| 2 | `presence` | Starter | $19 | Entry Presence | active |
+| 3 | `starter` | Starter | — | — | inactive legacy |
+| 4 | `discovery` | Discovery | $29 | Entry Presence | active |
+| 5 | `storefront` | Storefront | $59 | Entry Presence | active |
+| 6 | `commitment` | Commitment | $79 | Commerce | active |
+| 7 | `ecommerce` | E-commerce | $99 | Commerce | active |
+| 8 | `omnichannel` | Omnichannel | $149 | Commerce | active |
+| 9 | `professional` | Professional | $199 | Scale | active |
+| 10 | `organization` | Organization | $499 | Scale | active |
+| 11 | `enterprise` | Enterprise | $499 | Scale | active |
+| 12 | `chain_starter` | Chain Starter | — | — | inactive legacy |
+| 13 | `chain_professional` | Chain Professional | — | — | inactive legacy |
+| 14 | `chain_enterprise` | Chain Enterprise | — | — | inactive legacy |
+| 15 | `custom` | — | — | — | inactive legacy |
+
+_Price `—` = unpinned (0.4 dormant-price decision pending) or never-priced. Display `—` = no catalog-facing name by rule._
+<!-- END tier-contract:tier-order-table -->
 
 **Aliases / maintenance (not primary GTM):**
 - `google_only` → treat as discovery-class Google maintenance (inactive)
@@ -63,11 +73,15 @@ Scale            professional | organization | enterprise
 
 Prefer this ordering for `tierIndex()`-style compares:
 
+<!-- BEGIN tier-contract:tier-order-array -->
 ```
-['directory_presence', 'google_only', 'presence', 'discovery', 'storefront',
- 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization',
- 'enterprise', 'starter', 'chain_starter', 'chain_professional', 'chain_enterprise', 'custom']
+['directory_presence', 'google_only', 'presence', 'starter', 'discovery',
+ 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional',
+ 'organization', 'enterprise', 'chain_starter', 'chain_professional', 'chain_enterprise',
+ 'custom'
+]
 ```
+<!-- END tier-contract:tier-order-array -->
 
 **Critical:** Include `ecommerce` between `commitment` and `omnichannel`, and `organization` between `professional` and `enterprise`. Missing either collapses index fallbacks and mis-gates capabilities.
 
@@ -168,24 +182,20 @@ Companion: `docs/LocalBiz/directory_presence_progressive_upgrade_spec.md`
 
 ## Files that MUST stay in sync
 
-### Frontend (`apps/web/src/lib/`)
-- `tiers/tier-resolver.ts` — levels, mapTierLevel, getHigherTierLevel, getUpgradeOptions
-- `tiers/tier-features.ts` — TIER_HIERARCHY, DISPLAY_NAMES, PRICING, FEATURES, FEATURE_TIER_MAP
-- `tiers/content-consistency.ts` — progressions
-- `tiers/chain-pricing.ts`
-- `growth-tips/tipEngine.ts` — TIER_ORDER, helpers, tips
+**Retired as a hand-maintained list** — this section historically drifted
+(it missed `tier-access.ts`, `QuickLinksService`, `NextStepsService`, and a
+dozen others). The authoritative inventory now lives in
+`shared/tier-contract.json → surface_files`, enforced by
+`apps/api/src/services/__tests__/tier-surface-guard.test.ts`: any file under
+`apps/api/src` or `apps/web/src` that declares a contract structure
+(`TIER_*` map, `*_TRIAL_BASE_TIERS`, `DEFAULT_TIER`, `TIER_HIERARCHY`, tier
+zod enum, …) and is absent from the manifest fails the suite — and every
+manifested `asserted` file that stops declaring one fails it too.
 
-### Backend (`apps/api/src/`)
-- `services/GrowthTipService.ts`
-- `utils/tier-limits.ts`
-- `utils/trial-tier-transparency.ts`
-- `services/TierService.ts`
-- `routes/admin/tier-management.ts`
-- `utils/featured-product-scoring.ts`
-- `services/IntegrationOptionsService.ts`
-- `routes/directory-presence-upgrade.ts` — gateway mode options
+To add or reclassify a surface, edit `surface_files` in the fixture
+(`asserted` / `covered` / `derived` / `documented` / `exempt`).
 
-### Docs
+Strategy docs that still matter by hand:
 - `docs/PLATFORM_STRATEGY_V3.md` — strategy SoT
 - `docs/LocalBiz/directory_presence_progressive_upgrade_spec.md` — ladder/impl
 - `docs/DIRECTORY_PRESENCE_LIGHT_TIER_SPRINT_PLAN.md` — free gateway

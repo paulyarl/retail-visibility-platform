@@ -6,6 +6,13 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // These files are named *.test.ts but contain script-style functions, not
+    // vitest suites — they fail "No test suite found". Excluded until converted.
+    exclude: [
+      'src/tests/FlexibleApiSingletonV2.test.ts',
+      'src/tests/TenantPublicServiceMigration.test.ts',
+      'src/lib/sku-generator.test.ts',
+    ],
   },
   resolve: {
     alias: {

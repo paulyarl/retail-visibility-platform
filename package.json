@@ -33,8 +33,9 @@
     "prisma:generate": "npm run -w @rvp/api prisma:generate",
     "typecheck": "pnpm -r typecheck || exit 0",
     "lint": "pnpm -r lint || exit 0",
-    "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test": "doppler run --config local -- pnpm -r test",
+    "test:noci": "pnpm -r test",
+    "test:watch": "pnpm -r --parallel test:watch"
   },
   "license": "ISC",
   "packageManager": "pnpm@12.8.1",

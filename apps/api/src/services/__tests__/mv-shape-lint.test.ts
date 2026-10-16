@@ -109,3 +109,44 @@ describe(`MV shape lint — ${MV_FILE}`, () => {
     expect(count(sql, /gate_status = 'disabled'/g)).toBe(3);
   });
 });
+
+/**
+ * Phase 6.2 — D5's testable half: the MV staleness window is BOUNDED by a
+ * committed schedule, not an operator ritual. The refresh job lived for
+ * months as a comment-only snippet in migration 089 — a fresh env built
+ * from migrations would serve a permanently stale view. 339 commits it.
+ */
+describe('MV refresh schedule is committed and guarded (D5)', () => {
+  const JOB = 'refresh-mv_tenant_effective_capabilities';
+  const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+  const cronMigrations = files
+    .map((f) => ({ file: f, sql: readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8') }))
+    .filter(({ sql }) => sql.includes(JOB) && sql.includes('cron.schedule'));
+
+  it('a migration schedules the refresh job via cron.schedule', () => {
+    expect(
+      cronMigrations.length,
+      `no migration schedules '${JOB}' — the MV never refreshes on a fresh env`,
+    ).toBeGreaterThan(0);
+  });
+
+  it('the committed schedule bounds the staleness window at ≤10 minutes', () => {
+    const all = cronMigrations.map((m) => m.sql).join('\n');
+    expect(all).toMatch(/'\*\/10 \* \* \* \*'/);
+  });
+
+  it('the schedule is guarded — pg_cron existence + NOT EXISTS jobname (re-runnable)', () => {
+    const all = cronMigrations.map((m) => m.sql).join('\n');
+    expect(all, 'unscheduled write must check pg_cron is installed').toMatch(
+      /pg_extension WHERE extname = 'pg_cron'/,
+    );
+    expect(all, 'must not duplicate an operator-scheduled job').toMatch(
+      new RegExp(`NOT EXISTS[^;]*cron\\.job WHERE jobname = '${JOB}'`),
+    );
+  });
+
+  it('the refresh runs CONCURRENTLY — readers are never blocked', () => {
+    const all = cronMigrations.map((m) => m.sql).join('\n');
+    expect(all).toContain('REFRESH MATERIALIZED VIEW CONCURRENTLY');
+  });
+});
