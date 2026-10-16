@@ -7,6 +7,8 @@
  * Frontend should always see the "effective" tier, not the trial wrapper.
  */
 
+import { DEFAULT_TIER } from './tier-defaults';
+
 /**
  * Map trial tiers to their base tiers **for frontend presentation**.
  *
@@ -23,29 +25,32 @@
  * `presence` in `tier-limits` for limits only. Neither is stale; treating
  * either as a copy of the other would "fix" a deliberate design. See
  * `TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md` H2.
+ *
+ * Exported for the Phase 1.6 contract test: asserted against
+ * `shared/tier-contract.json` → `trial_map`.
  */
+export const PRESENTATION_TRIAL_BASE_TIERS: Record<string, string> = {
+  'trial_google_only': 'google_only',
+  'trial_directory_presence': 'directory_presence',
+  'trial_presence': 'presence',
+  'trial_discovery': 'discovery',
+  'trial_starter': 'starter',
+  'trial_storefront': 'storefront',
+  'trial_commitment': 'commitment',
+  'trial_professional': 'professional',
+  'trial_ecommerce': 'ecommerce',
+  'trial_omnichannel': 'omnichannel',
+  'trial_enterprise': 'enterprise',
+  'trial_organization': 'organization',
+  'trial_chain_starter': 'chain_starter',
+  'trial_chain_professional': 'chain_professional',
+  'trial_chain_enterprise': 'chain_enterprise',
+  // expired_trial is deprecated — new downgrades go to 'presence' (free baseline).
+  // Kept for backward compatibility with existing expired_trial tenants.
+};
+
 function resolvePresentationBaseTier(tierKey: string): string | null {
-  const trialToBaseMap: Record<string, string> = {
-    'trial_google_only': 'google_only',
-    'trial_directory_presence': 'directory_presence',
-    'trial_presence': 'presence',
-    'trial_discovery': 'discovery',
-    'trial_starter': 'starter',
-    'trial_storefront': 'storefront',
-    'trial_commitment': 'commitment',
-    'trial_professional': 'professional',
-    'trial_ecommerce': 'ecommerce',
-    'trial_omnichannel': 'omnichannel',
-    'trial_enterprise': 'enterprise',
-    'trial_organization': 'organization',
-    'trial_chain_starter': 'chain_starter',
-    'trial_chain_professional': 'chain_professional',
-    'trial_chain_enterprise': 'chain_enterprise',
-    // expired_trial is deprecated — new downgrades go to 'presence' (free baseline).
-    // Kept for backward compatibility with existing expired_trial tenants.
-  };
-  
-  return trialToBaseMap[tierKey] || null;
+  return PRESENTATION_TRIAL_BASE_TIERS[tierKey] || null;
 }
 
 /**
@@ -60,7 +65,7 @@ export function isTrialTier(tierKey: string): boolean {
  * Trial tiers are transparent and show as their base tiers
  */
 export function getEffectiveTier(tierKey: string | null | undefined): string {
-  if (!tierKey) return 'discovery';
+  if (!tierKey) return DEFAULT_TIER; // was 'discovery' — shared default, sprint plan 1.7
   
   // If it's a trial tier, return the base tier for frontend
   const baseTier = resolvePresentationBaseTier(tierKey);
@@ -78,7 +83,7 @@ export function getEffectiveTierWithTrialInfo(tierKey: string | null | undefined
   trialEndsAt?: Date | null;
 } {
   if (!tierKey) {
-    return { effectiveTier: 'discovery', isTrial: false };
+    return { effectiveTier: DEFAULT_TIER, isTrial: false };
   }
   
   const isTrial = isTrialTier(tierKey);

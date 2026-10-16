@@ -96,6 +96,10 @@
     "unknown_key_equivalent_to": "directory_presence"
   },
 
+  "default_tier": "directory_presence",
+
+  "$default_tier_note": "Phase 1.7 (decided): ONE shared answer for 'tenant with no/unknown tier' — the free gateway, least privilege. Replaces five divergent silent defaults (starter/discovery/professional across mapTierLevel, hasFeature, getRequiredTier, getSKULimit, getEffectiveTier). BLAST RADIUS per the plan: `getRequiredTier` moving professional → directory_presence LOOSENS the unknown-feature gate (unlisted feature keys now pass for every tier instead of requiring professional+) — accepted because 'premium by omission' was never defensible, but it is a live-gate change and this key ships as its own commit.",
+
   "chain_mirrors": [
     { "chain": "chain_starter", "base": "starter" },
     { "chain": "chain_professional", "base": "professional" },
@@ -103,6 +107,52 @@
   ],
 
   "$chain_mirrors_note": "Phase 1.5a. A chain tier mirrors its base tier's grants. This is the invariant the failed bidirectional check was reaching for — the 1.5 diagnostic found it, and most of that check's 27 'multi-bag' rows are these mirrors behaving correctly.",
+
+  "trial_map": {
+    "$comment": "Phase 1.6. Canonical convention: `trial_<base>` → `<base>` for every base tier key. Each site map answers a different question (presentation / limits / feature-proxy / commerce / MV), but where a site maps a key it MUST agree with `canonical` unless listed in `site_exceptions`. Coverage is required for every canonical key — an unmapped trial_* key falls through to a literal lookup or a wrong-tier default (e.g. tier-limits missing `trial_enterprise` silently proxied to discovery's 75 SKUs). The MV's trial_map CTE (migration 332) is a SQL copy — checked by the Phase 3.7/DB leg, not unit tests.",
+    "canonical": {
+      "trial_google_only": "google_only",
+      "trial_directory_presence": "directory_presence",
+      "trial_presence": "presence",
+      "trial_discovery": "discovery",
+      "trial_starter": "starter",
+      "trial_storefront": "storefront",
+      "trial_commitment": "commitment",
+      "trial_professional": "professional",
+      "trial_ecommerce": "ecommerce",
+      "trial_omnichannel": "omnichannel",
+      "trial_enterprise": "enterprise",
+      "trial_organization": "organization",
+      "trial_chain_starter": "chain_starter",
+      "trial_chain_professional": "chain_professional",
+      "trial_chain_enterprise": "chain_enterprise"
+    },
+    "site_exceptions": {
+      "$comment": "Deliberate per-site overrides — a map that answers a different question, documented in H2 of the sprint plan. Absence of a site means it has none.",
+      "tier-limits": {
+        "trial_chain_starter": "starter",
+        "trial_chain_professional": "professional",
+        "trial_chain_enterprise": "enterprise",
+        "expired_trial": "presence",
+        "$reason": "TIER_LIMITS has no chain_* rows — resolving a chain trial to its chain_* key would fall through to the 'discovery' 75-SKU default, so chain trials proxy to the display-twin's limits row. `expired_trial` proxies to `presence` for LIMITS only (maxSkus 0); presentation sites deliberately leave it unmapped so an expired trial presents as itself, not a claimable free tier."
+      }
+    },
+    "not_mapped": {
+      "expired_trial": "An expired trial is an expired STATE, not a tier to resolve. Only the limits site maps it (see site_exceptions). Every other site returns it as itself/null by design (H2)."
+    }
+  },
+
+  "trial_eligible": {
+    "$comment": "OPEN QUESTION — parked like `pricing`'s dormant rows (0.4-style). Which base tiers may be wrapped as `trial_*` at creation time is a PRODUCT decision; the four live/dead lists disagree and none is clearly authoritative. Recorded so the divergence is visible, not pinned until ruled on.",
+    "observed_lists": {
+      "api TrialManagementService.TRIAL_ELIGIBLE_TIERS": ["google_only", "discovery", "storefront", "commitment", "professional", "chain_starter"],
+      "api trial-setup.ts zod enum (both router bodies)": ["google_only", "discovery", "starter", "storefront", "commitment", "professional", "chain_starter"],
+      "web TrialService trialTier union": ["google_only", "discovery", "starter", "storefront", "commitment", "professional", "chain_starter"],
+      "web lib/tiers TRIAL_ELIGIBLE_TIERS (dead — zero importers)": ["google_only", "starter", "discovery", "commitment", "storefront", "chain_starter"],
+      "packages/shared lib/tiers TRIAL_ELIGIBLE_TIERS (dead — zero importers)": ["google_only", "starter", "professional", "chain_starter"]
+    },
+    "divergence": "The zod route + web TrialService accept `starter` trials; TrialManagementService's gate excludes them (defensible — `starter` is inactive_legacy — or stale). Web's list omits `professional` while its own TrialService type includes it. Both dead lists are stale and should be deleted or generated, not trusted."
+  },
 
   "feature_namespaces": {
     "$comment": "Phase 1.5d — exempt-with-reason. `TIER_FEATURES` (the bags) and `FEATURE_TIER_MAP` are NOT inverses: they carry overlapping but different namespaces. Recorded so a future contributor does not 'reconcile' them and break a working model.",

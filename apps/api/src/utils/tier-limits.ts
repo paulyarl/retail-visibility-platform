@@ -7,6 +7,8 @@
  * NOTE: Trial tiers are wrappers that proxy to their base tiers for limits.
  */
 
+import { DEFAULT_TIER } from './tier-defaults';
+
 export type SubscriptionTier = 'directory_presence'|'google_only'|'presence'| 'discovery'|'storefront'|'commitment' | 'ecommerce' | 'omnichannel' | 'starter' | 'professional' | 'enterprise' | 'organization' | 'seed_preview';
 
 /**
@@ -24,29 +26,40 @@ export type SubscriptionTier = 'directory_presence'|'google_only'|'presence'| 'd
  * deliberately absent, so an expired trial presents as ITSELF rather than as a
  * free tier. Neither is stale; treating either as a copy of the other would
  * "fix" a deliberate design. See `TIER_CAPABILITY_CONTRACT_SPRINT_PLAN.md` H2.
+ *
+ * Exported for the Phase 1.6 contract test: asserted against
+ * `shared/tier-contract.json` → `trial_map`. The chain_* → display-twin
+ * entries and `expired_trial` are the fixture's `site_exceptions.tier-limits`:
+ * `TIER_LIMITS` has no chain_* rows, so a chain trial resolving to its chain
+ * key would fall through to the 'discovery' 75-SKU default.
  */
+export const LIMIT_TRIAL_BASE_TIERS: Record<string, SubscriptionTier> = {
+  'trial_google_only': 'google_only',
+  'trial_directory_presence': 'directory_presence',
+  'trial_presence': 'presence',
+  'trial_discovery': 'discovery',
+  'trial_storefront': 'storefront',
+  'trial_commitment': 'commitment',
+  'trial_ecommerce': 'ecommerce',
+  'trial_omnichannel': 'omnichannel',
+  'trial_organization': 'organization',
+  'trial_starter': 'starter',
+  'trial_professional': 'professional',
+  'trial_enterprise': 'enterprise',
+  'trial_chain_starter': 'starter', // Use starter as base for chain trial
+  'trial_chain_professional': 'professional',
+  'trial_chain_enterprise': 'enterprise',
+  'expired_trial': 'presence', // Deprecated — expired_trial now maps to presence (free baseline)
+};
+
 function resolveLimitBaseTier(tier: string): SubscriptionTier {
-  const trialToBaseMap: Record<string, SubscriptionTier> = {
-    'trial_google_only': 'google_only',
-    'trial_discovery': 'discovery',
-    'trial_storefront': 'storefront',
-    'trial_commitment': 'commitment',
-    'trial_ecommerce': 'ecommerce',
-    'trial_omnichannel': 'omnichannel',
-    'trial_organization': 'organization',
-    'trial_starter': 'starter',
-    'trial_professional': 'professional',
-    'trial_chain_starter': 'starter', // Use starter as base for chain trial
-    'trial_chain_professional': 'professional',
-    'trial_chain_enterprise': 'enterprise',
-    'expired_trial': 'presence', // Deprecated — expired_trial now maps to presence (free baseline)
-  };
-  
-  if (trialToBaseMap[tier]) return trialToBaseMap[tier];
+  if (LIMIT_TRIAL_BASE_TIERS[tier]) return LIMIT_TRIAL_BASE_TIERS[tier];
   // Non-trial tiers resolve to themselves — previously every real tier fell
   // through to 'discovery' here (e.g. omnichannel resolved to 75 SKUs).
   if (tier in TIER_LIMITS) return tier as SubscriptionTier;
-  return 'discovery';
+  // Unknown/unlisted key (incl. chain_*, custom, junk): the shared default,
+  // not a silent 'discovery' 75-SKU answer (sprint plan 1.7).
+  return DEFAULT_TIER;
 }
 
 export interface TierLimits {
@@ -116,12 +129,12 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
  * Handles trial tiers as wrappers that proxy to their base tiers
  */
 export function getSKULimit(tier: string | null | undefined): number {
-  if (!tier) return TIER_LIMITS.starter.maxSkus;
+  if (!tier) return TIER_LIMITS[DEFAULT_TIER].maxSkus;
   
   // Handle trial tiers as wrappers - proxy to base tier
   const baseTier = resolveLimitBaseTier(tier.toLowerCase());
   // ?? not || — presence.maxSkus is legitimately 0 (directory-mode, no catalog)
-  return TIER_LIMITS[baseTier]?.maxSkus ?? TIER_LIMITS.starter.maxSkus;
+  return TIER_LIMITS[baseTier]?.maxSkus ?? TIER_LIMITS[DEFAULT_TIER].maxSkus;
 }
 
 /**
@@ -137,9 +150,9 @@ export function canAddSKUs(tier: string | null | undefined, currentCount: number
  * Handles trial tiers as wrappers that proxy to their base tiers
  */
 export function getTierInfo(tier: string | null | undefined): TierLimits {
-  if (!tier) return TIER_LIMITS.starter;
+  if (!tier) return TIER_LIMITS[DEFAULT_TIER];
   
   // Handle trial tiers as wrappers - proxy to base tier
   const baseTier = resolveLimitBaseTier(tier.toLowerCase());
-  return TIER_LIMITS[baseTier] || TIER_LIMITS.starter;
+  return TIER_LIMITS[baseTier] || TIER_LIMITS[DEFAULT_TIER];
 }

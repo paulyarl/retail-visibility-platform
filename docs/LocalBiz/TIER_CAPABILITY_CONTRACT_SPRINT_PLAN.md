@@ -287,6 +287,38 @@ Asserts the model's internal consistency. Pure, no DB, no mocks. **Every red ass
 
 **Found while pinning:** `getTierPricing` in `tier-access.ts` priced `organization` at **$399** vs $499 everywhere else (web `TIER_PRICING`, fixture, doc). Fixed → 499. The api-side pricing map still isn't asserted — it belongs in the 1.3/pricing leg when that extends past the web copy (`trial: 0`, `starter: 49` dormant rows stay parked under 0.4's undecided policy).
 
+### 1.6 progress — 2026-10-16 (trial maps exported, completed, pinned)
+
+Fixture gained `trial_map` (`canonical` 15-key convention + `site_exceptions` + `not_mapped`) and a `trial_eligible` block recorded as an **open question** (see below). Four api maps exported per P1 and completed to full canonical coverage; the MV `trial_map` CTE stays with the 3.7 SQL leg.
+
+| Copy | Exported as | Coverage gaps fixed (were live silent defaults) |
+|---|---|---|
+| `trial-tier-transparency.ts` | `PRESENTATION_TRIAL_BASE_TIERS` | none — already the full 15 |
+| `tier-limits.ts` | `LIMIT_TRIAL_BASE_TIERS` | +`trial_presence`→presence (was falling through to discovery's 75 SKUs vs presence's 0), +`trial_directory_presence`→directory_presence (75 vs 5), +`trial_enterprise`→enterprise (75 vs 10000) |
+| `TierService.ts` | `FEATURE_TRIAL_BASE_TIERS` | +`trial_presence`, `trial_directory_presence`, `trial_organization` — unmapped keys looked up literal `trial_*` rows → zero features |
+| `commerce-capabilities.ts` (was 2 identical copies) | `COMMERCE_TRIAL_BASE_TIERS` | +6 keys incl. `trial_ecommerce`/`trial_omnichannel` — a `trial_ecommerce` tenant's commerce resolved off a nonexistent tier row → `commerce_enabled` silently false |
+
+`tier-limits`' chain-trial → display-twin entries and `expired_trial`→presence are the fixture's `site_exceptions` (TIER_LIMITS has no chain_* rows; the split is H2-deliberate). `expired_trial` stays unmapped everywhere else, pinned by a dedicated test. Suites: api `tier-trial-map.test.ts` 14/14, web `tier-trial-map.test.ts` (pins `TIER_LIMITS[*].trialTarget`) 3/3, both typechecks clean.
+
+**Found while pinning — trial eligibility is a fifth, undecided list.** `TrialManagementService.TRIAL_ELIGIBLE_TIERS` (6, no `starter`) vs the `trial-setup.ts` zod enum + web `TrialService` union (7, incl. `starter`) vs two **dead** lists (`web/lib/tiers.ts` and `packages/shared/lib/tiers.ts` — zero importers, both stale and mutually disagreeing). Whether `starter` trials are sellable is a product decision; recorded in the fixture's `trial_eligible` block rather than guessed. Dead lists are delete-candidates under Phase 4's guard leg.
+
+### 1.7 progress — 2026-10-16 (shared default landed — OWN-COMMIT item, loosens a live gate)
+
+`DEFAULT_TIER = 'directory_presence'` exported once per app (`apps/api/src/utils/tier-defaults.ts`, `apps/web/src/lib/tiers/tier-defaults.ts`); fixture `default_tier` pins it. Seven silent defaults changed — the plan's five plus two found while sweeping:
+
+| Site | Was → now | Direction |
+|---|---|---|
+| `tier-access.ts getRequiredTier` | professional → `DEFAULT_TIER` | **LOOSER — the decided blast radius.** Unknown feature keys now pass for every tier instead of requiring professional+. 'Premium by omission' was never defensible; unmapped = not gated until cataloged. |
+| `tier-access.ts requireWritableSubscription` | starter → `DEFAULT_TIER` | tighter — a null-tier tenant's write gate no longer gets inactive-legacy-starter treatment |
+| `tier-limits` `getSKULimit`/`getTierInfo` (4 spots) + `resolveLimitBaseTier` tail | starter / discovery → `DEFAULT_TIER` | tighter — null tier 500→5 SKUs; unlisted keys (incl. `chain_*`, `custom`) 75→5 |
+| `trial-tier-transparency` `getEffectiveTier(WithTrialInfo)` | discovery → `DEFAULT_TIER` | tighter |
+| `tier-resolver` `mapTierLevel` + `hasFeature` (×2) + `getDefaultTier` | discovery / starter / **fabricated storefront** → `DEFAULT_TIER` | tighter — and `getDefaultTier` now returns an honest floor TierInfo instead of fabricating `basic_inventory`/`single_location` grants (feature claims now fall through to the static bag check on the id anyway). Stale `['storefront','commitment']` upgrade list → `getUpgradeOptions(DEFAULT_TIER)`. |
+| `useTenantComplete` | `starter` fallbacks (×5) + divergent `mapTierLevel` → `DEFAULT_TIER` + aligned cases | tighter — and this second `mapTierLevel` copy had **`organization → enterprise`** (over-map) and was missing `presence`/`ecommerce`/`directory_presence`/`chain_professional`/`chain_enterprise`; rewritten to match `tier-resolver`'s cases |
+
+Exempt: `useTierAccess.ts` — `@deprecated` hook pending removal; its `'starter'` fallback dies with it.
+
+Tests: api `tier-defaults.test.ts` 5/5, web `tier-defaults.test.ts` 4/4 (proves the `hasFeature` fallback no longer reaches the starter bag), full `lib/tiers/` re-run green, both typechecks clean.
+
 ### Remediation gate (between Phase 1–3 and Phase 4)
 
 Every red assertion gets a written disposition: **fix code / fix fixture / fix doc / exempt-with-reason**. Dispositions are recorded in this plan or the fixture. The phases are allowed to land red only if each failure carries its disposition — the suite may not go green by silently weakening assertions to match whatever the code happens to do today.

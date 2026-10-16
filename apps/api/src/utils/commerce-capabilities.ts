@@ -47,6 +47,33 @@ export interface CheckoutMode {
 }
 
 /**
+ * Proxy trial tiers to their base tiers for commerce feature resolution.
+ *
+ * Exported for the Phase 1.6 contract test: asserted against
+ * `shared/tier-contract.json` → `trial_map`. Previously two identical private
+ * copies (one per function) missing 6 trial keys — e.g. a `trial_ecommerce`
+ * tenant resolved commerce features off a literal `trial_ecommerce` tier row
+ * that doesn't exist → commerce silently disabled.
+ */
+export const COMMERCE_TRIAL_BASE_TIERS: Record<string, string> = {
+  'trial_google_only': 'google_only',
+  'trial_directory_presence': 'directory_presence',
+  'trial_presence': 'presence',
+  'trial_discovery': 'discovery',
+  'trial_starter': 'starter',
+  'trial_storefront': 'storefront',
+  'trial_commitment': 'commitment',
+  'trial_professional': 'professional',
+  'trial_ecommerce': 'ecommerce',
+  'trial_omnichannel': 'omnichannel',
+  'trial_enterprise': 'enterprise',
+  'trial_organization': 'organization',
+  'trial_chain_starter': 'chain_starter',
+  'trial_chain_professional': 'chain_professional',
+  'trial_chain_enterprise': 'chain_enterprise',
+};
+
+/**
  * Get comprehensive commerce capabilities for an organization
  * Combines tier-based features from organization's tenants with organization commerce settings
  * 
@@ -68,18 +95,7 @@ export async function getOrganizationCommerceCapabilities(
   const rawTierKeys = [...new Set(tenants.map((t: { subscription_tier: any; }) => t.subscription_tier).filter(Boolean))] as string[];
 
   // Proxy trial tiers to their base tiers for feature resolution
-  const trialToBaseMap: Record<string, string> = {
-    'trial_google_only': 'google_only',
-    'trial_discovery': 'discovery',
-    'trial_starter': 'starter',
-    'trial_storefront': 'storefront',
-    'trial_commitment': 'commitment',
-    'trial_professional': 'professional',
-    'trial_chain_starter': 'chain_starter',
-    'trial_chain_professional': 'chain_professional',
-    'trial_chain_enterprise': 'chain_enterprise',
-  };
-  const tierKeys = rawTierKeys.map(k => trialToBaseMap[k] || k);
+  const tierKeys = rawTierKeys.map(k => COMMERCE_TRIAL_BASE_TIERS[k] || k);
 
   // Fetch tier features for all unique tiers
   const tierFeatures = await prismaClient.subscription_tiers_list.findMany({
@@ -190,18 +206,7 @@ export async function getTenantCommerceCapabilities(
   const organizationId = tenant?.organization_id;
 
   // Proxy trial tiers to their base tiers for feature resolution
-  const trialToBaseMap: Record<string, string> = {
-    'trial_google_only': 'google_only',
-    'trial_discovery': 'discovery',
-    'trial_starter': 'starter',
-    'trial_storefront': 'storefront',
-    'trial_commitment': 'commitment',
-    'trial_professional': 'professional',
-    'trial_chain_starter': 'chain_starter',
-    'trial_chain_professional': 'chain_professional',
-    'trial_chain_enterprise': 'chain_enterprise',
-  };
-  const resolveTier = (k: string) => trialToBaseMap[k] || k;
+  const resolveTier = (k: string) => COMMERCE_TRIAL_BASE_TIERS[k] || k;
 
   // Fetch features from both org and tenant tiers, then merge (most-permissive-wins)
   const tierKeys = [orgTierKey, tenantTierKey]

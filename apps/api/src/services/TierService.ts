@@ -12,27 +12,35 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 
 /**
- * Map trial tiers to their base tiers for feature/limit proxying
+ * Map trial tiers to their base tiers for feature/limit proxying.
+ *
+ * Exported for the Phase 1.6 contract test: asserted against
+ * `shared/tier-contract.json` → `trial_map`. An unmapped `trial_*` key falls
+ * through to a literal `subscription_tiers_list` lookup, which has no trial
+ * rows — silently zero features — so coverage is the contract.
  */
+export const FEATURE_TRIAL_BASE_TIERS: Record<string, string> = {
+  'trial_google_only': 'google_only',
+  'trial_directory_presence': 'directory_presence',
+  'trial_presence': 'presence',
+  'trial_discovery': 'discovery',
+  'trial_starter': 'starter',
+  'trial_storefront': 'storefront',
+  'trial_commitment': 'commitment',
+  'trial_professional': 'professional',
+  'trial_ecommerce': 'ecommerce',
+  'trial_omnichannel': 'omnichannel',
+  'trial_enterprise': 'enterprise',
+  'trial_organization': 'organization',
+  'trial_chain_starter': 'chain_starter',
+  'trial_chain_professional': 'chain_professional',
+  'trial_chain_enterprise': 'chain_enterprise',
+  // expired_trial is deprecated — new downgrades go to 'presence' (free baseline).
+  // Kept for backward compatibility with existing expired_trial tenants.
+};
+
 function getBaseTierForTrial(tierKey: string): string | null {
-  const trialToBaseMap: Record<string, string> = {
-    'trial_google_only': 'google_only',
-    'trial_discovery': 'discovery',
-    'trial_starter': 'starter',
-    'trial_storefront': 'storefront',
-    'trial_commitment': 'commitment',
-    'trial_professional': 'professional',
-    'trial_ecommerce': 'ecommerce',
-    'trial_omnichannel': 'omnichannel',
-    'trial_enterprise': 'enterprise',
-    'trial_chain_starter': 'chain_starter',
-    'trial_chain_professional': 'chain_professional',
-    'trial_chain_enterprise': 'chain_enterprise',
-    // expired_trial is deprecated — new downgrades go to 'presence' (free baseline).
-    // Kept for backward compatibility with existing expired_trial tenants.
-  };
-  
-  return trialToBaseMap[tierKey] || null;
+  return FEATURE_TRIAL_BASE_TIERS[tierKey] || null;
 }
 
 interface TierFeature {

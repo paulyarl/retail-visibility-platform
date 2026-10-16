@@ -5,6 +5,7 @@
  */
 
 import { checkTierFeature } from './tier-features';
+import { DEFAULT_TIER } from './tier-defaults';
 import { getCapabilityTypeForFeature } from '@/services/CapabilityResolutionService';
 
 export interface TierFeature {
@@ -84,7 +85,7 @@ export function resolveTier(
       case 'chain_starter': return 'chain_starter';
       case 'chain_professional': return 'chain_professional';
       case 'chain_enterprise': return 'chain_enterprise';
-      default: return 'discovery';
+      default: return DEFAULT_TIER; // was 'discovery' — shared default, sprint plan 1.7
     }
   };
 
@@ -126,12 +127,12 @@ export function resolveTier(
     };
   }
 
-  // Default to starter tier
+  // No tier resolved at all — the shared default (sprint plan 1.7)
   return {
     effective: getDefaultTier(),
     isChain: false,
     canUpgrade: true,
-    upgradeOptions: ['storefront', 'commitment']
+    upgradeOptions: getUpgradeOptions(DEFAULT_TIER)
   };
 }
 
@@ -228,36 +229,23 @@ function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
 }
 
 /**
- * Returns default starter tier
+ * Returns the shared default tier for a tenant with no resolvable tier.
+ * Was 'storefront' (with fabricated inventory features) despite the comment
+ * claiming 'starter' — sprint plan 1.7 pins directory_presence, and the
+ * feature/limits fields no longer fabricate grants: `hasFeature` falls back
+ * to the static bag check on this id anyway.
  */
 function getDefaultTier(): TierInfo {
   return {
-    id: 'storefront',
-    name: 'Storefront',
-    level: 'storefront',
+    id: DEFAULT_TIER,
+    name: 'Directory Presence',
+    level: DEFAULT_TIER,
     source: 'tenant',
-    features: [
-      {
-        id: 'basic_inventory',
-        name: 'Basic Inventory',
-        description: 'Manage your product catalog',
-        category: 'inventory',
-        enabled: true,
-        source: 'tenant'
-      },
-      {
-        id: 'single_location',
-        name: 'Single Location',
-        description: 'Manage one store location',
-        category: 'inventory',
-        enabled: true,
-        source: 'tenant'
-      }
-    ],
+    features: [],
     limits: {
-      maxProducts: 100,
+      maxProducts: 5,
       maxLocations: 1,
-      maxUsers: 2
+      maxUsers: 1
     }
   };
 }
@@ -276,7 +264,7 @@ export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boole
   // Safety check for undefined features
   if (!resolvedTier?.effective?.features) {
     // Fallback to static tier features if API doesn't provide features
-    const tierKey = resolvedTier?.effective?.id || 'starter';
+    const tierKey = resolvedTier?.effective?.id || DEFAULT_TIER;
     return checkTierFeature(tierKey, featureId);
   }
 
@@ -293,7 +281,7 @@ export function hasFeature(resolvedTier: ResolvedTier, featureId: string): boole
 
   // API features exist but don't include this feature - check static tier features
   // This handles cases where API doesn't include inherited features
-  const tierKey = resolvedTier?.effective?.id || 'starter';
+  const tierKey = resolvedTier?.effective?.id || DEFAULT_TIER;
   return checkTierFeature(tierKey, featureId);
 }
 

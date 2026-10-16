@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import TierService from '../services/TierService';
 import { getMaintenanceState } from '../utils/subscription-status';
+import { DEFAULT_TIER } from '../utils/tier-defaults';
 import { logger } from '../logger';
 
 /**
@@ -264,7 +265,7 @@ export async function checkTierAccess(tier: string, feature: string): Promise<bo
  */
 export function getRequiredTier(feature: string): string {
   const canonical = INTEGRATION_LEGACY_ALIASES[feature] || feature;
-  return FEATURE_TIER_MAP[canonical] || FEATURE_TIER_MAP[feature] || 'professional';
+  return FEATURE_TIER_MAP[canonical] || FEATURE_TIER_MAP[feature] || DEFAULT_TIER;
 }
 
 /**
@@ -527,7 +528,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
       });
     }
 
-    const tier = tenant.subscription_tier || 'starter';
+    const tier = tenant.subscription_tier || DEFAULT_TIER;
     const status = tenant.subscription_status || 'active';
     const maintenanceState = getMaintenanceState({
       tier,

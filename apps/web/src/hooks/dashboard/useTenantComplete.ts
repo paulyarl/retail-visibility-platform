@@ -16,6 +16,7 @@ import {
   getUsagePercentage,
   TierFeature
 } from '@/lib/tiers/tier-resolver';
+import { DEFAULT_TIER } from '@/lib/tiers/tier-defaults';
 import { canBypassTierRestrictions, canBypassRoleRestrictions, forceAdminBypass } from '@/lib/auth/platform-admin';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -352,9 +353,9 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
       
       // Build tenant tier from raw data
       const tenantTier: TierInfo = {
-        id: rawTierData.tenantTier?.tier_key || rawTierData.tier || 'starter',
-        name: rawTierData.tenantTier?.display_name || rawTierData.name || rawTierData.tier || 'Starter',
-        level: mapTierLevel(rawTierData.tenantTier?.tier_key || rawTierData.tier || 'starter'),
+        id: rawTierData.tenantTier?.tier_key || rawTierData.tier || DEFAULT_TIER,
+        name: rawTierData.tenantTier?.display_name || rawTierData.name || rawTierData.tier || 'Directory Presence',
+        level: mapTierLevel(rawTierData.tenantTier?.tier_key || rawTierData.tier || DEFAULT_TIER),
         source: 'tenant',
         features: rawTierData.tenantTier?.features?.map((f: any) => ({
           id: f.feature_key,
@@ -363,9 +364,9 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
           category: 'general' as const,
         })) || [],
         limits: {
-          maxProducts: rawTierData.tenantTier?.max_skus || getTierLimit(rawTierData.tier || 'starter', 'products'),
-          maxLocations: rawTierData.tenantTier?.max_locations || getTierLimit(rawTierData.tier || 'starter', 'locations'),
-          maxUsers: getTierLimit(rawTierData.tier || 'starter', 'users'),
+          maxProducts: rawTierData.tenantTier?.max_skus || getTierLimit(rawTierData.tier || DEFAULT_TIER, 'products'),
+          maxLocations: rawTierData.tenantTier?.max_locations || getTierLimit(rawTierData.tier || DEFAULT_TIER, 'locations'),
+          maxUsers: getTierLimit(rawTierData.tier || DEFAULT_TIER, 'users'),
         },
         price: rawTierData.tenantTier?.price_monthly ?? rawTierData.tenantTier?.price,
       };
@@ -509,25 +510,32 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
 }
 
 // Helper functions (simplified versions for this consolidated hook)
+// Aligned to tier-resolver.mapTierLevel 2026-10-16 (sprint plan 1.7): this copy
+// was missing half the tiers and mapped organization → enterprise.
 function mapTierLevel(tierId: string): TierInfo['level'] {
   switch (tierId) {
+    case 'directory_presence': return 'directory_presence';
     case 'google_only': return 'discovery';
+    case 'presence': return 'presence';
     case 'discovery': return 'discovery';
     case 'storefront': return 'storefront';
     case 'commitment': return 'commitment';
+    case 'ecommerce': return 'ecommerce';
     case 'omnichannel': return 'omnichannel';
-    case 'starter': return 'discovery';
     case 'professional': return 'professional';
     case 'enterprise': return 'enterprise';
-    case 'organization': return 'enterprise';
+    case 'organization': return 'organization';
     case 'chain_starter': return 'chain_starter';
-    default: return 'discovery';
+    case 'chain_professional': return 'chain_professional';
+    case 'chain_enterprise': return 'chain_enterprise';
+    default: return DEFAULT_TIER;
   }
 }
 
 function getTierLimit(tierId: string, type: 'products' | 'locations' | 'users'): number {
   // Simplified tier limits - in production you'd have a proper tier configuration
   const limits: Record<string, Record<string, number>> = {
+    'directory_presence': { products: 5, locations: 1, users: 1 },
     'free': { products: 50, locations: 1, users: 2 },
     'starter': { products: 100, locations: 1, users: 5 },
     'discovery': { products: 100, locations: 1, users: 5 },
