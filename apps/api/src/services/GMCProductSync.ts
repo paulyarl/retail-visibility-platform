@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
+import { canonicalStorefrontBaseUrl, resolveStorefrontCanonical } from '../lib/storefront-url';
 import { validateProductForGMC } from './GMCValidationService';
 import { logger } from '../logger';
 
@@ -365,28 +366,29 @@ export async function syncProduct(
       };
     }
 
-    // Get tenant business profile for website and subdomain
+    // Get tenant business profile for the external-website fallback
     const businessProfile = await prisma.tenant_business_profiles_list.findFirst({
       where: { tenant_id: tenantId },
       select: { website: true }
     });
 
-    // Get tenant subdomain for custom URL generation
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: { subdomain: true }
-    });
-
-    // Build website URL with subdomain support
-    // GMC requires product links to point to a domain the merchant controls.
-    // The fallback visibleshelf.com/store/{tenantId} URL causes mismatched domain errors.
+    // Build website URL from the tenant's canonical ladder.
+    // GMC requires product links to point to a domain the merchant controls —
+    // the platform /store/{tenantId} path causes mismatched-domain errors.
+    // Prefer the tenant's ACTIVE CUSTOM DOMAIN (their own domain, and the
+    // canonical storefront surface once live), then the platform subdomain;
+    // the tenant's external website stays the last resort (its products may
+    // not live there at all).
+    const canonicalBase = canonicalStorefrontBaseUrl(
+      await resolveStorefrontCanonical(tenantId)
+    );
     let websiteUrl: string;
-    if (tenant?.subdomain) {
-      websiteUrl = `https://${tenant.subdomain}.visibleshelf.com`;
+    if (canonicalBase) {
+      websiteUrl = canonicalBase;
     } else if (businessProfile?.website) {
       websiteUrl = businessProfile.website;
     } else {
-      return { success: false, productId: itemId, offerId: item.sku || '', error: 'Storefront not published: tenant must have a subdomain or website configured before GMC sync (fallback URL causes mismatched domain errors)' };
+      return { success: false, productId: itemId, offerId: item.sku || '', error: 'Storefront not published: tenant must have an active custom domain, a subdomain, or a website configured before GMC sync (fallback URL causes mismatched domain errors)' };
     }
 
     // Get merchant link settings (pickup-only, etc.)
@@ -598,23 +600,19 @@ export async function batchSyncProducts(
       }
     }
 
-    // Get tenant business profile for website and subdomain
+    // Get tenant business profile for the external-website fallback
     const businessProfile = await prisma.tenant_business_profiles_list.findFirst({
       where: { tenant_id: tenantId },
       select: { website: true }
     });
 
-    // Get tenant subdomain for custom URL generation
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: { subdomain: true }
-    });
-
-    // Build website URL with subdomain support
-    // GMC requires product links to point to a domain the merchant controls.
+    // Build website URL from the tenant's canonical ladder — see syncProduct.
+    const canonicalBase = canonicalStorefrontBaseUrl(
+      await resolveStorefrontCanonical(tenantId)
+    );
     let websiteUrl: string;
-    if (tenant?.subdomain) {
-      websiteUrl = `https://${tenant.subdomain}.visibleshelf.com`;
+    if (canonicalBase) {
+      websiteUrl = canonicalBase;
     } else if (businessProfile?.website) {
       websiteUrl = businessProfile.website;
     } else {
@@ -623,7 +621,7 @@ export async function batchSyncProducts(
         total: 0,
         synced: 0,
         failed: 0,
-        results: [{ success: false, productId: '', offerId: '', error: 'Storefront not published: tenant must have a subdomain or website configured before GMC sync' }]
+        results: [{ success: false, productId: '', offerId: '', error: 'Storefront not published: tenant must have an active custom domain, a subdomain, or a website configured before GMC sync' }]
       };
     }
 
@@ -1050,11 +1048,9 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
 
     const merchantLink = account?.google_merchant_links_list[0];
 
-    // Get tenant subdomain for GMC compliance check
-    const tenant = await prisma.tenants.findUnique({
-      where: { id: tenantId },
-      select: { subdomain: true }
-    });
+    // Canonical ladder — the same resolution syncProduct uses for the product
+    // link, so "storefront ready" can't disagree with what the sync accepts.
+    const canon = await resolveStorefrontCanonical(tenantId);
 
     // Get product sync stats using existing fields
     const [total, synced, pending, errors] = await Promise.all([
@@ -1075,8 +1071,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     return {
       hasGMCConnection: !!account?.google_oauth_tokens_list,
       hasMerchantLink: !!merchantLink,
-      hasSubdomain: !!tenant?.subdomain,
-      subdomain: tenant?.subdomain || null,
+      hasSubdomain: !!canon?.subdomain,
+      subdomain: canon?.subdomain ?? null,
       merchantId: merchantLink?.merchant_id || null,
       merchantName: merchantLink?.merchant_name || null,
       fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
@@ -1088,7 +1084,7 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       pendingProducts: pending,
       errorProducts: errors,
       lastSyncAt: merchantLink?.last_sync_at || null,
-      storefrontReady: !!tenant?.subdomain,
+      storefrontReady: !!canonicalStorefrontBaseUrl(canon),
       syncableProducts: await prisma.inventory_items.count({
         where: {
           tenant_id: tenantId,

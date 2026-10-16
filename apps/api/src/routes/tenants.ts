@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { assignSubdomain, checkSubdomainAvailability, clearSubdomain, type SubdomainFailureCode } from '../lib/subdomain';
+import { resolveStorefrontCanonical } from '../lib/storefront-url';
 import { customDomainService } from '../services/CustomDomainService';
 import { RATE_LIMITS, type RateLimitOperation } from '../config/rate-limits';
 
@@ -879,26 +880,17 @@ router.get('/storefront-canonical/:id', async (req: Request, res: Response) => {
       });
     }
 
-    const tenant = await prisma.tenants.findFirst({
-      where: { OR: [{ id }, { slug: id }] },
-      select: { id: true, subdomain: true },
-    });
+    const tenant = await resolveStorefrontCanonical(id);
     if (!tenant) {
       return res.status(404).json({ success: false, error: 'tenant_not_found', message: 'Tenant not found' });
     }
 
-    const domain = await prisma.custom_domains.findFirst({
-      where: { tenant_id: tenant.id, status: 'active' },
-      orderBy: { is_primary: 'desc' },
-      select: { domain: true },
-    });
-    if (domain) {
-      return res.json({ success: true, kind: 'custom', host: domain.domain });
+    // Response shape is the web delegate's contract: `host` for a DNS-shaped
+    // level (custom/subdomain), `tenantId` for the platform path.
+    if (tenant.kind === 'path') {
+      return res.json({ success: true, kind: 'path', tenantId: tenant.tenantId });
     }
-    if (tenant.subdomain) {
-      return res.json({ success: true, kind: 'subdomain', host: tenant.subdomain });
-    }
-    return res.json({ success: true, kind: 'path', tenantId: tenant.id });
+    return res.json({ success: true, kind: tenant.kind, host: tenant.host });
   } catch (error: any) {
     logger.error('[TENANTS] Error resolving storefront canonical:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to resolve canonical' });
