@@ -19,6 +19,7 @@ import { Download, QrCode, AlertCircle, ExternalLink, Palette } from 'lucide-rea
 import marketingOpsService, {
   CampaignDetail,
   GalleryEligibility,
+  GalleryToken,
   MailerQrDestination,
   MailerQrTarget,
 } from '@/services/MarketingOpsService';
@@ -56,23 +57,30 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
   const [resolvingQr, setResolvingQr] = useState(false);
   const [plainPreviewUrl, setPlainPreviewUrl] = useState<string | null>(null);
   const [eligibility, setEligibility] = useState<GalleryEligibility | null>(null);
+  const [galleryTokens, setGalleryTokens] = useState<GalleryToken[]>([]);
+  const [galleryTokenId, setGalleryTokenId] = useState('');
   const [mailerLoading, setMailerLoading] = useState(false);
   const [mailerError, setMailerError] = useState<string | null>(null);
 
-  // Gallery eligibility hint for the destination picker (degrade silently —
-  // the server validates hard at resolve/generate time anyway).
+  // Gallery eligibility + existing links for the destination picker (degrade
+  // silently — the server validates hard at resolve/generate time anyway).
   useEffect(() => {
     if (!mailerAllowed) return;
     marketingOpsService
       .getGalleryEligibility(campaignId)
       .then(setEligibility)
       .catch(() => setEligibility(null));
+    marketingOpsService
+      .listGalleryTokens(campaignId)
+      .then(setGalleryTokens)
+      .catch(() => setGalleryTokens([]));
   }, [campaignId, mailerAllowed]);
 
   // A destination change invalidates a previously resolved/designed QR — it
   // encodes the old target's URL.
   const changeDestination = (value: MailerQrDestination) => {
     setQrDestination(value);
+    setGalleryTokenId('');
     setStyledQrDataUrl(null);
     setResolvedTarget(null);
     setPlainPreviewUrl(null);
@@ -87,6 +95,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
         campaignId,
         qrDestination,
         qrDestination === 'custom' ? customUrl.trim() : undefined,
+        qrDestination === 'diagnostic_gallery' && galleryTokenId ? galleryTokenId : undefined,
       );
       setResolvedTarget(target);
       return target;
@@ -96,7 +105,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
     } finally {
       setResolvingQr(false);
     }
-  }, [campaignId, qrDestination, customUrl]);
+  }, [campaignId, qrDestination, customUrl, galleryTokenId]);
 
   const handlePreviewQr = useCallback(() => {
     void resolveQrTarget();
@@ -141,6 +150,8 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
         body: importCopy?.body,
         qrDestination,
         customUrl: qrDestination === 'custom' ? customUrl.trim() : undefined,
+        galleryTokenId:
+          qrDestination === 'diagnostic_gallery' && galleryTokenId ? galleryTokenId : undefined,
         qrDataUrl: styledQrDataUrl ?? undefined,
       });
       if (!result.success || !result.pdfUrl) {
@@ -248,6 +259,28 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
               <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                 {galleryOptionHint}
               </p>
+            )}
+            {qrDestination === 'diagnostic_gallery' && galleryTokens.length > 0 && (
+              <select
+                value={galleryTokenId}
+                onChange={(e) => {
+                  setGalleryTokenId(e.target.value);
+                  setStyledQrDataUrl(null);
+                  setResolvedTarget(null);
+                }}
+                className="mt-1.5 w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
+              >
+                <option value="">Latest live link (reuse or mint)</option>
+                {galleryTokens.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.short_code ? `/g/${t.short_code}` : `…${t.token.slice(-8)}`}
+                    {t.viewed_at ? ' · viewed' : ''}
+                    {t.expires_at
+                      ? ` · exp ${new Date(t.expires_at).toLocaleDateString()}`
+                      : ''}
+                  </option>
+                ))}
+              </select>
             )}
             {eligibility && !eligibility.eligible && eligibility.stageOk && (
               <p className="mt-1 text-[11px] text-amber-600">

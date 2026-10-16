@@ -12,6 +12,11 @@
  * The QR always encodes the channel's tracked redirect URL — scans still
  * record as report_delivery_{channel} regardless of styling.
  *
+ * Delivery mode (channel !== 'banner'): "Save design" PERSISTS one shared
+ * design for the seed's delivery channels (directory_presence_seeds
+ * .report_qr_style), so every card's preview, QR PNG, and Postcard PDF render
+ * it. The designer prefills from that saved design when one exists.
+ *
  * Banner mode (channel === 'banner'): the design is PERSISTED — "Apply to
  * on-page banner" writes the style to the seed tenant's
  * tenant_storefront_qr_settings row (the storefront_qr capability module's
@@ -28,6 +33,7 @@ import {
   generateQrDataUrl,
   type QrTemplateName,
   type QrEngineOptions,
+  type PersistedQrStyle,
 } from '@/lib/qr-engine';
 import {
   DOT_STYLES,
@@ -57,6 +63,13 @@ export interface ReportQrDesignerModalProps {
   /** Template applied on open when no persisted design exists (banner mode)
    *  or always (delivery channels). Defaults to 'default'. */
   defaultTemplate?: QrTemplateName;
+  /** Delivery channels only — the seed's saved shared design, used to prefill
+   *  the designer so the operator edits the live card design. Null/absent →
+   *  the surface default template. */
+  initialStyle?: PersistedQrStyle | null;
+  /** Delivery channels only — called after a successful save so the page can
+   *  re-render the card previews with the new design. */
+  onSaved?: (style: PersistedQrStyle) => void;
 }
 
 export default function ReportQrDesignerModal({
@@ -70,6 +83,8 @@ export default function ReportQrDesignerModal({
   businessLogoUrl = null,
   templates,
   defaultTemplate = 'default',
+  initialStyle = null,
+  onSaved,
 }: ReportQrDesignerModalProps) {
   const isBanner = channel === 'banner';
   const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>(defaultTemplate);
@@ -151,14 +166,37 @@ export default function ReportQrDesignerModal({
     logoShape,
   });
 
-  // Delivery channels: apply the surface's default template on open so its
-  // concrete values land in state (resolveOptions alone never overrides the
+  // Delivery channels: prefill from the seed's saved shared design so the
+  // operator edits the live card design; with no design saved, apply the
+  // surface's default template (resolveOptions alone never overrides the
   // always-defined option fields).
   useEffect(() => {
     if (!open || isBanner) return;
-    applyTemplate(defaultTemplate);
+    if (!initialStyle) {
+      applyTemplate(defaultTemplate);
+      return;
+    }
+    if (initialStyle.dotType) setDotType(initialStyle.dotType);
+    if (initialStyle.cornerType) setCornerType(initialStyle.cornerType);
+    if (initialStyle.cornerDotType) setCornerDotType(initialStyle.cornerDotType);
+    if (initialStyle.customColorsEnabled !== undefined) setCustomColorsEnabled(initialStyle.customColorsEnabled);
+    if (initialStyle.dotColor) setDotColor(initialStyle.dotColor);
+    if (initialStyle.cornerColor) setCornerColor(initialStyle.cornerColor);
+    if (initialStyle.cornerDotColor) setCornerDotColor(initialStyle.cornerDotColor);
+    if (initialStyle.bgColor) setBgColor(initialStyle.bgColor);
+    if (initialStyle.gradientEnabled !== undefined) setGradientEnabled(initialStyle.gradientEnabled);
+    if (initialStyle.gradientStart) setGradientStart(initialStyle.gradientStart);
+    if (initialStyle.gradientEnd) setGradientEnd(initialStyle.gradientEnd);
+    if (initialStyle.gradientOnDots !== undefined) setGradientOnDots(initialStyle.gradientOnDots);
+    if (initialStyle.gradientOnCorners !== undefined) setGradientOnCorners(initialStyle.gradientOnCorners);
+    if (initialStyle.gradientOnCornerDots !== undefined) setGradientOnCornerDots(initialStyle.gradientOnCornerDots);
+    if (initialStyle.logo !== undefined) setLogoEnabled(initialStyle.logo);
+    if (initialStyle.logoShape) setLogoShape(initialStyle.logoShape);
+    // Persisted designs are concrete — no template identity survives the
+    // save, so keep the surface default selected as a display label only.
+    setSelectedTemplate(defaultTemplate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isBanner, defaultTemplate]);
+  }, [open, isBanner, initialStyle, defaultTemplate]);
 
   // Banner mode: prefill the designer from the persisted tenant_storefront_qr_settings
   // row so the operator edits the live on-page design rather than starting over.
@@ -368,6 +406,44 @@ export default function ReportQrDesignerModal({
       setError(null);
     } catch {
       setError('Failed to save the banner design');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delivery channels only: persist the shared design on the seed so every
+  // delivery card's preview, QR PNG, and Postcard PDF render it.
+  const buildPersistedStyle = (): PersistedQrStyle => ({
+    dotType,
+    cornerType,
+    cornerDotType,
+    dotColor,
+    cornerColor,
+    cornerDotColor,
+    bgColor,
+    customColorsEnabled,
+    gradientEnabled,
+    gradientStart,
+    gradientEnd,
+    gradientOnDots,
+    gradientOnCorners,
+    gradientOnCornerDots,
+    logo: logoEnabled,
+    logoShape,
+  });
+
+  const handleSaveDesign = async () => {
+    try {
+      setSaving(true);
+      setSaved(false);
+      const style = buildPersistedStyle();
+      const ok = await directoryPresenceAdminService.updateReportQrStyle(seedId, style);
+      if (!ok) throw new Error('Save failed');
+      setSaved(true);
+      setError(null);
+      onSaved?.(style);
+    } catch {
+      setError('Failed to save the QR design');
     } finally {
       setSaving(false);
     }
@@ -732,6 +808,24 @@ export default function ReportQrDesignerModal({
               </button>
               {saved && (
                 <span className="text-xs text-emerald-600">Saved — the page renders this design</span>
+              )}
+            </>
+          )}
+          {!isBanner && (
+            <>
+              <button
+                onClick={handleSaveDesign}
+                disabled={saving}
+                className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+                title="Save this design — every delivery card's preview, QR PNG, and Postcard PDF renders it"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saving ? 'Saving…' : 'Save design'}
+              </button>
+              {saved && (
+                <span className="text-xs text-emerald-600">
+                  Saved — the cards render this design
+                </span>
               )}
             </>
           )}

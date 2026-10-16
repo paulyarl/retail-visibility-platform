@@ -33,8 +33,21 @@ export async function GET(
     );
 
     if (!upstream.ok || !upstream.body) {
+      // Surface the upstream error instead of a generic render_failed — a
+      // missing storage object vs an auth/storage misconfiguration read
+      // identically otherwise.
+      let upstreamError: { error?: string; message?: string } | null = null;
+      try {
+        upstreamError = await upstream.json();
+      } catch {
+        upstreamError = null;
+      }
       return NextResponse.json(
-        { success: false, error: upstream.status === 404 ? 'not_found' : 'render_failed' },
+        {
+          success: false,
+          error: upstream.status === 404 ? 'not_found' : upstreamError?.error ?? 'render_failed',
+          ...(upstreamError?.message ? { message: upstreamError.message } : {}),
+        },
         { status: upstream.status === 404 ? 404 : 502 }
       );
     }

@@ -42,6 +42,10 @@ export type MailerQrDestination =
 export interface MailerQrOptions {
   destination?: MailerQrDestination;
   customUrl?: string;
+  /** Pin the QR to a specific existing gallery link (mkt_deliverable_preview_tokens
+   *  id or token string) instead of reuse-or-mint. Only meaningful with
+   *  destination === 'diagnostic_gallery'. */
+  galleryTokenId?: string;
 }
 
 export interface PostalMailerQrTarget {
@@ -293,6 +297,9 @@ class PostalMailerService {
     if (destination !== 'auto') {
       switch (destination) {
         case 'diagnostic_gallery': {
+          if (qrOptions?.galleryTokenId) {
+            return this.explicitGalleryQrTarget(campaign, qrOptions.galleryTokenId, baseUrl);
+          }
           const eligibility = await GalleryEligibilityService.resolveEligibility(campaign.id, ctx);
           if (!eligibility.eligible || !eligibility.archetype) {
             throw new ValidationError(
@@ -499,6 +506,38 @@ class PostalMailerService {
       qrDestination: 'diagnostic_gallery',
       token: tokenRow.token,
       tokenExpiresAt: tokenRow.expires_at ?? null,
+    };
+  }
+
+  /**
+   * Operator-pinned gallery link — encodes the specific token's URL rather
+   * than reuse-or-mint. Dead links still encode (the /g/ short code
+   * resolves campaign-aware to the live successor); tokenExpiresAt lets
+   * the composer warn about print runway.
+   */
+  private async explicitGalleryQrTarget(
+    campaign: any,
+    galleryTokenId: string,
+    baseUrl: string,
+  ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'>> {
+    const row = await prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: {
+        campaign_id: campaign.id,
+        token_type: 'diagnostic_gallery',
+        OR: [{ id: galleryTokenId }, { token: galleryTokenId }],
+      },
+      select: { token: true, short_code: true, expires_at: true },
+    });
+    if (!row) {
+      throw new ValidationError('Gallery link not found on this campaign.');
+    }
+    return {
+      qrUrl: row.short_code
+        ? `${baseUrl}/g/${row.short_code}`
+        : `${baseUrl}/preview/${row.token}`,
+      qrDestination: 'diagnostic_gallery',
+      token: row.token,
+      tokenExpiresAt: row.expires_at ?? null,
     };
   }
 

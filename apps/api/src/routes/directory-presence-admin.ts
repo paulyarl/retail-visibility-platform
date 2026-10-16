@@ -1331,6 +1331,29 @@ const bannerQrStyleSchema = z.object({
   qr_logo_shape: z.string().max(20).optional(),
 });
 
+// Report-delivery QR design — ONE shared design for the seed's delivery
+// channels, persisted on the seed (directory_presence_seeds.report_qr_style).
+// Stored as the camelCase PersistedQrStyle projection the card preview + the
+// card's PNG/postcard downloads consume (@/lib/qr-engine).
+const reportQrStyleSchema = z.object({
+  dotType: z.string().max(30).optional(),
+  cornerType: z.string().max(30).optional(),
+  cornerDotType: z.string().max(30).optional(),
+  dotColor: z.string().max(20).optional(),
+  cornerColor: z.string().max(20).optional(),
+  cornerDotColor: z.string().max(20).optional(),
+  bgColor: z.string().max(20).optional(),
+  customColorsEnabled: z.boolean().optional(),
+  gradientEnabled: z.boolean().optional(),
+  gradientStart: z.string().max(20).optional(),
+  gradientEnd: z.string().max(20).optional(),
+  gradientOnDots: z.boolean().optional(),
+  gradientOnCorners: z.boolean().optional(),
+  gradientOnCornerDots: z.boolean().optional(),
+  logo: z.boolean().optional(),
+  logoShape: z.string().max(20).optional(),
+});
+
 const seedLogoSchema = z.object({
   dataUrl: z.string().min(1),
   contentType: z.string().min(1),
@@ -1400,6 +1423,45 @@ router.put('/presence-seeds/:id/banner-qr-style', requirePlatformAdmin, async (r
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     logger.error('[PUT /api/admin/directory/presence-seeds/:id/banner-qr-style] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/:id/report-qr-style — designer prefill
+ *  for the shared report-delivery QR design (card preview + downloads read it). */
+router.get('/presence-seeds/:id/report-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const style = await DirectoryPresenceSeedService.getReportQrStyle(req.params.id);
+    res.json({ success: true, style });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/report-qr-style] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** PUT /api/admin/directory/presence-seeds/:id/report-qr-style — save the shared
+ *  report-delivery QR design. Drives every delivery card's preview, QR PNG, and
+ *  Postcard PDF. */
+router.put('/presence-seeds/:id/report-qr-style', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = reportQrStyleSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    await DirectoryPresenceSeedService.updateReportQrStyle(req.params.id, validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    logger.error('[PUT /api/admin/directory/presence-seeds/:id/report-qr-style] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

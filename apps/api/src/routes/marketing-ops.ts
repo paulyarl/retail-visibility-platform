@@ -3446,6 +3446,25 @@ const diagnosticScreenshotUpload = multer({
 });
 
 /**
+ * Magic-byte MIME sniff — the browser declares file.type from the extension,
+ * so a JPEG renamed .png arrives as "image/png" with JPEG bytes. Sniff the
+ * actual content so storage contentType + mkt_files_list.mime_type (and the
+ * render route's Content-Type) reflect what's really in the object.
+ */
+function sniffImageMimeType(buf: Buffer): string | null {
+  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return 'image/png';
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+    return 'image/webp';
+  }
+  return null;
+}
+
+/**
  * POST /:campaignId/files/upload
  *
  * One-step multipart upload for diagnostic screenshots. Accepts a single
@@ -3493,10 +3512,21 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
     const supabase = createClient(supabaseUrl, supabaseKey);
     const pathKey = `diagnostic-${campaignId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
+    const sniffedMime = sniffImageMimeType(file.buffer);
+    if (sniffedMime && sniffedMime !== file.mimetype) {
+      logger.warn('Diagnostic screenshot declared MIME differs from content', getCtx(req), {
+        campaignId,
+        declared: file.mimetype,
+        detected: sniffedMime,
+        fileName: file.originalname,
+      });
+    }
+    const effectiveMime = sniffedMime ?? file.mimetype;
+
     const { error: uploadError } = await supabase.storage
       .from(StorageBuckets.DISPUTES.name)
       .upload(pathKey, file.buffer, {
-        contentType: file.mimetype,
+        contentType: effectiveMime,
         upsert: false,
       });
 
@@ -3512,7 +3542,7 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
       fileName: file.originalname,
       storagePath: pathKey,
       fileSize: file.size,
-      mimeType: file.mimetype,
+      mimeType: effectiveMime,
       uploadedBy: req.user?.id,
     }, getCtx(req));
 
@@ -8145,13 +8175,14 @@ router.post('/campaigns/:id/mailer/qr-target', async (req: any, res: Response) =
     const ctx = getCtx(req);
     const qrDestination = req.body?.qrDestination as string | undefined;
     const customUrl = req.body?.customUrl as string | undefined;
+    const galleryTokenId = req.body?.galleryTokenId as string | undefined;
     if (qrDestination && !MAILER_QR_DESTINATIONS.includes(qrDestination as any)) {
       return res.status(400).json({ success: false, error: 'invalid_qr_destination' });
     }
 
     const target = await PostalMailerService.getInstance().resolveQrTarget(
       id,
-      { destination: qrDestination as any, customUrl },
+      { destination: qrDestination as any, customUrl, galleryTokenId },
       ctx,
     );
     res.json({ success: true, data: target });
@@ -8192,11 +8223,12 @@ router.post('/campaigns/:id/mailer', async (req: any, res: Response) => {
       return res.status(400).json({ success: false, error: 'invalid_qr_data_url' });
     }
 
+    const galleryTokenId = req.body?.galleryTokenId as string | undefined;
     const payload = await PostalMailerService.getInstance().generate(
       id,
       ctx,
       importCopy,
-      { destination: qrDestination as any, customUrl },
+      { destination: qrDestination as any, customUrl, galleryTokenId },
       qrDataUrl,
     );
     const { pdfBuffer, filename } = await generatePostcardPdf(payload);

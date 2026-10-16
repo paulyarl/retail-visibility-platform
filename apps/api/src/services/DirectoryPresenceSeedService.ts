@@ -935,6 +935,45 @@ class DirectoryPresenceSeedService {
     return { tenantId };
   }
 
+  // ─── Report QR design (delivery channels) ────────────────────────────────
+  //
+  // The Report QR Kit's delivery cards (in_person / text / email / social /
+  // phone) share ONE operator-authored design, persisted on the seed so the
+  // card preview, the card's QR PNG, and the card's Postcard PDF all render it.
+  // Stored as the camelCase PersistedQrStyle projection (@/lib/qr-engine) — the
+  // shape the public banner QR consumes. The on-page banner keeps its own
+  // persistence (tenant_storefront_qr_settings) because it renders publicly.
+
+  async getReportQrStyle(seedId: string): Promise<Record<string, unknown> | null> {
+    const rows = await prisma.$queryRaw<Array<{ report_qr_style: unknown }>>`
+      SELECT report_qr_style FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+    `;
+    const style = rows[0]?.report_qr_style;
+    return style && typeof style === 'object' ? (style as Record<string, unknown>) : null;
+  }
+
+  async updateReportQrStyle(
+    seedId: string,
+    style: Record<string, unknown>,
+    ctx?: SeedAuditCtx,
+  ): Promise<void> {
+    const updated = await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET report_qr_style = ${JSON.stringify(style)}::jsonb, updated_at = now()
+      WHERE id = ${seedId}
+    `;
+    if (updated === 0) throw new Error('seed_not_found');
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.report_qr_style_update',
+      payload: { seedId, fields: Object.keys(style) },
+    });
+
+    logger.info('DirectoryPresenceSeedService.updateReportQrStyle', undefined, { seedId });
+  }
+
   /**
    * Upload a logo for a seed tenant — the same write a tenant's own logo
    * upload performs (tenant_business_profiles_list.logo_url), so every QR

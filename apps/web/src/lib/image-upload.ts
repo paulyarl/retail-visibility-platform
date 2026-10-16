@@ -486,7 +486,27 @@ export const ImageUploadPresets = {
     maxSizeMB: 8,
     allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
   },
+
+  /** Diagnostic screenshots - LOW compression (evidence must stay legible at full width) */
+  diagnostic: {
+    compressionLevel: 'low' as CompressionLevel,
+    maxSizeMB: 10,
+    allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
+  },
 } as const;
+
+/**
+ * Convert a data URL back into a Blob — for callers that normalize via
+ * uploadImage() but still post through a multipart endpoint.
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const [head, b64] = dataUrl.split(',');
+  const mime = head.match(/^data:([^;]+)/)?.[1] || 'application/octet-stream';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
 
 /**
  * Helper function to get accepted file types string for input element

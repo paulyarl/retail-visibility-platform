@@ -11,6 +11,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { ResponseType } from '../providers/base/FlexibleApiSingleton';
 import { clientLogger } from '../lib/client-logger';
+import { uploadImage, dataUrlToBlob, ImageUploadPresets } from '../lib/image-upload';
 
 // ====================
 // TYPES
@@ -6422,13 +6423,18 @@ class MarketingOpsService extends AdminApiSingleton {
     campaignId: string,
     qrDestination: MailerQrDestination,
     customUrl?: string,
+    galleryTokenId?: string,
   ): Promise<MailerQrTarget> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/marketing-ops/campaigns/${campaignId}/mailer/qr-target`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrDestination, ...(customUrl ? { customUrl } : {}) }),
+        body: JSON.stringify({
+          qrDestination,
+          ...(customUrl ? { customUrl } : {}),
+          ...(galleryTokenId ? { galleryTokenId } : {}),
+        }),
       },
     );
     if (!result.success) {
@@ -6445,6 +6451,8 @@ class MarketingOpsService extends AdminApiSingleton {
       body?: string;
       qrDestination?: MailerQrDestination;
       customUrl?: string;
+      /** Pin the QR to a specific existing gallery link (token row id). */
+      galleryTokenId?: string;
       /** Styled QR PNG data URL from the QR designer — embedded verbatim. */
       qrDataUrl?: string;
     },
@@ -7575,13 +7583,35 @@ MarketingOpsService.prototype.getGalleryDashboard = async function (
   return result.data?.data ?? result.data;
 };
 
+/**
+ * Normalize a picked screenshot through the shared image pipeline — the same
+ * canvas re-encode the seed-page/directory photo flow uses. The browser
+ * declares file.type from the extension, so a JPEG renamed .png arrives
+ * mislabeled; the canvas pass produces honest bytes, strips EXIF, and caps
+ * dimensions. On any processing failure we fall back to the raw file and let
+ * the API's magic-byte sniff keep the stored metadata honest.
+ */
+async function normalizeScreenshot(file: File): Promise<File> {
+  if (typeof document === 'undefined') return file;
+  try {
+    const result = await uploadImage(file, ImageUploadPresets.diagnostic);
+    if (result.error || !result.dataUrl) return file;
+    const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[result.contentType] || '';
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'screenshot';
+    return new File([dataUrlToBlob(result.dataUrl)], `${baseName}${ext}`, { type: result.contentType });
+  } catch {
+    return file;
+  }
+}
+
 MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
   this: MarketingOpsService,
   campaignId: string,
   file: File,
 ): Promise<MarketingFile> {
+  const upload = await normalizeScreenshot(file);
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', upload);
 
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/${campaignId}/files/upload`,

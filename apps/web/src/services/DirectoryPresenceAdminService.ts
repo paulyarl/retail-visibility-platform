@@ -16,6 +16,7 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 import type { OutreachProblem } from '@/services/MarketingOpsService';
+import type { PersistedQrStyle } from '@/lib/qr-engine';
 
 /** A row from directory_photos, as served by /api/directory/:id/photos. */
 export interface DirectoryListingPhoto {
@@ -1792,6 +1793,32 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   async updateBannerQrStyle(seedId: string, style: BannerQrStyleUpdate): Promise<boolean> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/banner-qr-style`,
+      { method: 'PUT', body: JSON.stringify(style) },
+      undefined,
+      0,
+    );
+    return !!result.success;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/report-qr-style
+   *  The shared report-delivery QR design (camelCase PersistedQrStyle) — the
+   *  Report QR Kit card previews and each card's PNG/postcard downloads render
+   *  it. Null = no design saved (cards fall back to classic B/W). */
+  async getReportQrStyle(seedId: string): Promise<PersistedQrStyle | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-qr-style`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.style ?? null) as PersistedQrStyle | null;
+  }
+
+  /** PUT /api/admin/directory-presence/presence-seeds/:id/report-qr-style */
+  async updateReportQrStyle(seedId: string, style: PersistedQrStyle): Promise<boolean> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/report-qr-style`,
       { method: 'PUT', body: JSON.stringify(style) },
       undefined,
       0,
