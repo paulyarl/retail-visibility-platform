@@ -6425,10 +6425,8 @@ class MarketingOpsService extends AdminApiSingleton {
         { responseType: ResponseType.BLOB },
       );
       if (!result.success) {
-        return {
-          success: false,
-          error: typeof result.error === 'string' ? result.error : 'Failed to generate mailer PDF',
-        };
+        const message = typeof result.error === 'string' ? result.error : result.error?.message;
+        return { success: false, error: message || 'Failed to generate mailer PDF' };
       }
       const pdfUrl = URL.createObjectURL(result.data!);
       return { success: true, pdfUrl };

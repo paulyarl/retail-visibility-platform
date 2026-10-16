@@ -37,6 +37,7 @@ vi.mock('../marketing/MarketingReceiptPdfService', () => ({
     platformName: 'VisibleShelf',
     primaryColor: '#000000',
   }),
+  brandingLogoDataUri: vi.fn(async () => null),
 }));
 
 vi.mock('qrcode', () => ({

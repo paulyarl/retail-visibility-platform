@@ -13,7 +13,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateBrandingConfigId } from '../lib/id-generator';
-import { loadPlatformBranding } from './marketing/MarketingReceiptPdfService';
+import { brandingLogoDataUri, loadPlatformBranding } from './marketing/MarketingReceiptPdfService';
 import { jsPDF } from 'jspdf';
 
 /**
@@ -221,20 +221,11 @@ export class MarketingBrandingService extends BaseService {
     height: number,
   ): Promise<boolean> {
     try {
-      let dataUri: string;
-      if (logoUrl.startsWith('data:')) {
-        dataUri = logoUrl;
-      } else {
-        const res = await fetch(logoUrl);
-        if (!res.ok) return false;
-        const contentType = res.headers.get('content-type') || 'image/png';
-        const base64 = Buffer.from(await res.arrayBuffer()).toString('base64');
-        dataUri = `data:${contentType};base64,${base64}`;
-      }
-      const props = doc.getImageProperties(dataUri);
+      const logo = await brandingLogoDataUri(logoUrl);
+      if (!logo) return false;
+      const props = doc.getImageProperties(logo.dataUri);
       const width = height * (props.width / props.height);
-      const format = /jpe?g/i.test(dataUri.slice(0, 30)) ? 'JPEG' : 'PNG';
-      doc.addImage(dataUri, format, x, y, width, height);
+      doc.addImage(logo.dataUri, logo.format, x, y, width, height, undefined, 'SLOW');
       return true;
     } catch {
       return false;

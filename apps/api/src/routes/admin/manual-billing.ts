@@ -15,6 +15,7 @@ import { getServiceChargeService } from '../../services/subscription/ServiceChar
 import { audit } from '../../audit';
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { brandingLogoDataUri } from '../../services/marketing/MarketingReceiptPdfService';
 
 const router = Router();
 
@@ -971,20 +972,15 @@ router.post('/generate-invoice-pdf', async (req, res) => {
     if (branding.logoUrl) {
       try {
         // Fetch the logo image
-        const logoResponse = await fetch(branding.logoUrl);
-        if (logoResponse.ok) {
-          const logoBuffer = await logoResponse.arrayBuffer();
-          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-          const contentType = logoResponse.headers.get('content-type') || 'image/png';
-          const logoDataUri = `data:${contentType};base64,${logoBase64}`;
-
+        const logo = await brandingLogoDataUri(branding.logoUrl);
+        if (logo) {
           // Add logo to PDF with fixed height, auto-calculate width to maintain aspect ratio
           // For square logos, this will result in 15x15
-          const imgProps = doc.getImageProperties(logoDataUri);
+          const imgProps = doc.getImageProperties(logo.dataUri);
           const aspectRatio = imgProps.width / imgProps.height;
           logoWidth = logoHeight * aspectRatio;
 
-          doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
+          doc.addImage(logo.dataUri, logo.format, margin, yPos - 5, logoWidth, logoHeight, undefined, 'SLOW');
           yPos += 12; // Adjust for logo
         }
       } catch (logoError) {
@@ -1315,20 +1311,15 @@ router.get('/invoices/:invoiceId/pdf', async (req, res) => {
     if (branding.logoUrl) {
       try {
         // Fetch the logo image
-        const logoResponse = await fetch(branding.logoUrl);
-        if (logoResponse.ok) {
-          const logoBuffer = await logoResponse.arrayBuffer();
-          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-          const contentType = logoResponse.headers.get('content-type') || 'image/png';
-          const logoDataUri = `data:${contentType};base64,${logoBase64}`;
-
+        const logo = await brandingLogoDataUri(branding.logoUrl);
+        if (logo) {
           // Add logo to PDF with fixed height, auto-calculate width to maintain aspect ratio
           // For square logos, this will result in 15x15
-          const imgProps = doc.getImageProperties(logoDataUri);
+          const imgProps = doc.getImageProperties(logo.dataUri);
           const aspectRatio = imgProps.width / imgProps.height;
           logoWidth = logoHeight * aspectRatio;
 
-          doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
+          doc.addImage(logo.dataUri, logo.format, margin, yPos - 5, logoWidth, logoHeight, undefined, 'SLOW');
           yPos += 12; // Adjust for logo
         }
       } catch (logoError) {

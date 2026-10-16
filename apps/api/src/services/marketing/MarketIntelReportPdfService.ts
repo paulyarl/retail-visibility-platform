@@ -20,7 +20,7 @@
 import { prisma } from '../../prisma';
 import type { MarketIntelFullContent } from '../MarketIntelService';
 import type { CategoryMarketIntelFull, CityMarketIntelFull } from '../MarketIntelService';
-import { loadPlatformBranding, type ReceiptBranding } from './MarketingReceiptPdfService';
+import { brandingLogoDataUri, loadPlatformBranding, type ReceiptBranding } from './MarketingReceiptPdfService';
 
 export interface ReportPdfInput {
   businessSlug: string;
@@ -105,16 +105,12 @@ export async function generateReportPdf(input: ReportPdfInput): Promise<Generate
   const logoHeight = 15;
   if (branding.logoUrl) {
     try {
-      const logoResponse = await fetch(branding.logoUrl);
-      if (logoResponse.ok) {
-        const logoBuffer = await logoResponse.arrayBuffer();
-        const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-        const contentType = logoResponse.headers.get('content-type') || 'image/png';
-        const logoDataUri = `data:${contentType};base64,${logoBase64}`;
-        const imgProps = doc.getImageProperties(logoDataUri);
+      const logo = await brandingLogoDataUri(branding.logoUrl);
+      if (logo) {
+        const imgProps = doc.getImageProperties(logo.dataUri);
         const aspectRatio = imgProps.width / imgProps.height;
         logoWidth = logoHeight * aspectRatio;
-        doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
+        doc.addImage(logo.dataUri, logo.format, margin, yPos - 5, logoWidth, logoHeight, undefined, 'SLOW');
         yPos += 12;
       }
     } catch {

@@ -891,6 +891,32 @@ export default function CampaignDetailClient({
     }
   };
 
+  const handleGenerateMailer = async (importCopy?: { headline: string; body: string }) => {
+    setMailerLoading(true);
+    setMailerError(null);
+    const tab = window.open('', '_blank');
+    try {
+      const result = await marketingOpsService.generateMailer(campaignId, importCopy);
+      if (!result.success || !result.pdfUrl) {
+        throw new Error(result.error || 'Failed to generate mailer');
+      }
+      if (tab) {
+        tab.location.href = result.pdfUrl;
+      } else {
+        const link = document.createElement('a');
+        link.href = result.pdfUrl;
+        link.download = `postcard-${campaignId}.pdf`;
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(result.pdfUrl!), 60_000);
+    } catch (err) {
+      tab?.close();
+      setMailerError(err instanceof Error ? err.message : 'Failed to generate mailer');
+    } finally {
+      setMailerLoading(false);
+    }
+  };
+
   const handleEnrichFromDialog = async () => {
     setReadinessEnriching(true);
     try {
@@ -1963,21 +1989,7 @@ export default function CampaignDetailClient({
                             Runs triage archetype resolution + AI copy generation.
                           </p>
                           <button
-                            onClick={async () => {
-                              setMailerLoading(true);
-                              setMailerError(null);
-                              try {
-                                const result = await marketingOpsService.generateMailer(campaignId);
-                                if (!result.success || !result.pdfUrl) {
-                                  throw new Error(result.error || 'Failed to generate mailer');
-                                }
-                                window.open(result.pdfUrl, '_blank');
-                              } catch (err) {
-                                setMailerError(err instanceof Error ? err.message : 'Failed to generate mailer');
-                              } finally {
-                                setMailerLoading(false);
-                              }
-                            }}
+                            onClick={() => handleGenerateMailer()}
                             disabled={mailerLoading}
                             className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
                           >
@@ -2015,24 +2027,12 @@ export default function CampaignDetailClient({
                             className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white"
                           />
                           <button
-                            onClick={async () => {
-                              setMailerLoading(true);
-                              setMailerError(null);
-                              try {
-                                const result = await marketingOpsService.generateMailer(campaignId, {
-                                  headline: importHeadline.trim(),
-                                  body: importBody.trim(),
-                                });
-                                if (!result.success || !result.pdfUrl) {
-                                  throw new Error(result.error || 'Failed to generate mailer');
-                                }
-                                window.open(result.pdfUrl, '_blank');
-                              } catch (err) {
-                                setMailerError(err instanceof Error ? err.message : 'Failed to generate mailer');
-                              } finally {
-                                setMailerLoading(false);
-                              }
-                            }}
+                            onClick={() =>
+                              handleGenerateMailer({
+                                headline: importHeadline.trim(),
+                                body: importBody.trim(),
+                              })
+                            }
                             disabled={mailerLoading || !importHeadline.trim() || !importBody.trim()}
                             className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
                           >

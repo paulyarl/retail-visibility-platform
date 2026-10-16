@@ -11,6 +11,7 @@
  * QR embedding with customer branding is Phase 2 §6.5 steps 2-5).
  */
 
+import sharp from 'sharp';
 import { prisma } from '../../prisma';
 import MarketingServiceCategoryService from '../MarketingServiceCategoryService';
 import type { RequestCtx } from '../../context';
@@ -54,6 +55,47 @@ export async function loadPlatformBranding(): Promise<ReceiptBranding> {
   };
 }
 
+export interface BrandingLogo {
+  dataUri: string;
+  format: 'PNG' | 'JPEG';
+}
+
+/**
+ * Resolve a branding logo (remote URL or data URI) into a downscaled data URI
+ * for jsPDF embedding. jsPDF stores whatever resolution it is handed, so the
+ * 1200x1200 platform logo drawn a fraction of an inch tall dominated the size
+ * of every generated PDF.
+ */
+export async function brandingLogoDataUri(
+  source: string | null | undefined,
+  maxEdge = 400,
+): Promise<BrandingLogo | null> {
+  if (!source) return null;
+
+  let bytes: Buffer;
+  let isJpeg: boolean;
+  if (source.startsWith('data:')) {
+    const [meta, payload] = source.split(',', 2);
+    isJpeg = /jpe?g/i.test(meta);
+    bytes = Buffer.from(payload ?? '', 'base64');
+  } else {
+    const response = await fetch(source);
+    if (!response.ok) return null;
+    isJpeg = /jpe?g/i.test(response.headers.get('content-type') || '');
+    bytes = Buffer.from(await response.arrayBuffer());
+  }
+
+  const resize = { width: maxEdge, height: maxEdge, fit: 'inside' as const, withoutEnlargement: true };
+  const resized = isJpeg
+    ? await sharp(bytes).resize(resize).jpeg({ quality: 90 }).toBuffer()
+    : await sharp(bytes).resize(resize).png({ compressionLevel: 9 }).toBuffer();
+
+  return {
+    dataUri: `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${resized.toString('base64')}`,
+    format: isJpeg ? 'JPEG' : 'PNG',
+  };
+}
+
 /**
  * Generate a receipt PDF for a campaign's most recent revenue record.
  *
@@ -93,16 +135,12 @@ export async function generateReceiptPdf(input: ReceiptPdfInput): Promise<Genera
   const logoHeight = 15;
   if (branding.logoUrl) {
     try {
-      const logoResponse = await fetch(branding.logoUrl);
-      if (logoResponse.ok) {
-        const logoBuffer = await logoResponse.arrayBuffer();
-        const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-        const contentType = logoResponse.headers.get('content-type') || 'image/png';
-        const logoDataUri = `data:${contentType};base64,${logoBase64}`;
-        const imgProps = doc.getImageProperties(logoDataUri);
+      const logo = await brandingLogoDataUri(branding.logoUrl);
+      if (logo) {
+        const imgProps = doc.getImageProperties(logo.dataUri);
         const aspectRatio = imgProps.width / imgProps.height;
         logoWidth = logoHeight * aspectRatio;
-        doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
+        doc.addImage(logo.dataUri, logo.format, margin, yPos - 5, logoWidth, logoHeight, undefined, 'SLOW');
         yPos += 12;
       }
     } catch {

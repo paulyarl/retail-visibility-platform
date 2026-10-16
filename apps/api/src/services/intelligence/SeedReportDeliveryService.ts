@@ -32,7 +32,7 @@ import { BaseService } from '../BaseService';
 import { logger } from '../../logger';
 import type { RequestCtx } from '../../context';
 import { unifiedConfig } from '../../config/unifiedConfig';
-import { loadPlatformBranding } from '../marketing/MarketingReceiptPdfService';
+import { brandingLogoDataUri, loadPlatformBranding } from '../marketing/MarketingReceiptPdfService';
 import { SeedIntelligenceReportService } from './SeedIntelligenceReportService';
 import type { SeedIntelligenceReport } from '../../validators/seed-report-dto.schema';
 
@@ -522,16 +522,12 @@ export class SeedReportDeliveryService extends BaseService {
     const logoHeight = 0.3;
     if (branding.logoUrl) {
       try {
-        const logoResponse = await fetch(branding.logoUrl);
-        if (logoResponse.ok) {
-          const logoBuffer = await logoResponse.arrayBuffer();
-          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-          const contentType = logoResponse.headers.get('content-type') || 'image/png';
-          const logoDataUri = `data:${contentType};base64,${logoBase64}`;
-          const imgProps = doc.getImageProperties(logoDataUri);
+        const logo = await brandingLogoDataUri(branding.logoUrl);
+        if (logo) {
+          const imgProps = doc.getImageProperties(logo.dataUri);
           const aspectRatio = imgProps.width / imgProps.height;
           logoWidth = logoHeight * aspectRatio;
-          doc.addImage(logoDataUri, 'PNG', margin, margin, logoWidth, logoHeight);
+          doc.addImage(logo.dataUri, logo.format, margin, margin, logoWidth, logoHeight, undefined, 'SLOW');
         }
       } catch {
         // Continue without logo
@@ -571,7 +567,7 @@ export class SeedReportDeliveryService extends BaseService {
       margin: 1,
       errorCorrectionLevel: 'H',
     });
-    doc.addImage(qrDataUrl, 'PNG', qrX, yPos, qrSize, qrSize);
+    doc.addImage(qrDataUrl, 'PNG', qrX, yPos, qrSize, qrSize, undefined, 'SLOW');
     yPos += qrSize + 0.08;
 
     // ── CTA label ─────────────────────────────────────────────────────────

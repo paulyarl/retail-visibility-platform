@@ -6,6 +6,7 @@ vi.mock('../../marketing/MarketingReceiptPdfService', () => ({
     primaryColor: '#0284c7',
     logoUrl: null,
   })),
+  brandingLogoDataUri: vi.fn(async () => null),
 }));
 
 vi.mock('../../../prisma', () => ({ prisma: {} }));

@@ -10,6 +10,7 @@ import { prisma } from '../prisma';
 import { requireAuth } from '../middleware/auth';
 import { jsPDF } from 'jspdf';
 import { logger } from '../logger';
+import { brandingLogoDataUri } from '../services/marketing/MarketingReceiptPdfService';
 
 const router = Router({ mergeParams: true });
 
@@ -1036,18 +1037,14 @@ router.get('/statements/:statementId/download', requireAuth, async (req: Request
     let hasLogo = false;
     if (branding.logoUrl) {
       try {
-        const logoResponse = await fetch(branding.logoUrl);
-        if (logoResponse.ok) {
-          const logoBuffer = await logoResponse.arrayBuffer();
-          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-          const logoDataUri = `data:image/png;base64,${logoBase64}`;
-
-          const imgProps = doc.getImageProperties(logoDataUri);
+        const logo = await brandingLogoDataUri(branding.logoUrl);
+        if (logo) {
+          const imgProps = doc.getImageProperties(logo.dataUri);
           const aspectRatio = imgProps.width / imgProps.height;
           const logoWidth = 20;
           const logoHeight = logoWidth / aspectRatio;
 
-          doc.addImage(logoDataUri, 'PNG', margin, yPos, logoWidth, logoHeight);
+          doc.addImage(logo.dataUri, logo.format, margin, yPos, logoWidth, logoHeight, undefined, 'SLOW');
           yPos += logoHeight + 5;
           hasLogo = true;
         }
