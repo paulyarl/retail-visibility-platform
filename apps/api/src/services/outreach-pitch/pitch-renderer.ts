@@ -42,18 +42,36 @@
 
 // ── Structured footprint fields (A5 Multi-Signal Footprint, A3 Listing) ──
 // When present, the slot carries a structured "current state → proposed fix"
-// pair keyed by platform + profile URL + a single focus attribute (one of
-// NAP+W or Claim Status). The renderer formats these into a readable
-// before/after block instead of the free-text evidence/fix lines. Stored
-// in the review_pairs JSON column on mkt_outreach_pitches_list — queryable
-// via GET /openers/pitches/:id/footprint-diff for completed-work reporting.
-// Optional on every archetype; only A5/A3 surface them in the UI today.
+// pair keyed by platform + profile URL + a single focus attribute. The
+// renderer formats these into a readable before/after block instead of the
+// free-text evidence/fix lines. Stored in the review_pairs JSON column on
+// mkt_outreach_pitches_list — queryable via
+// GET /openers/pitches/:id/footprint-diff for completed-work reporting.
+// Optional on every archetype; only A5/A3/A8 surface them in the UI today.
+//
+// The vocabulary has two families:
+//   - identity (NAP+W + Claim Status) — the canonical listing attributes
+//   - problem  — the other briefing-shaped focuses the analyst raises
+//     (category mislabeling, review gap, missing presence, …). The intake
+//     dropdown surfaces these archetype-aware so an A5 multi-signal problem
+//     like "filed as a convenience store" can be captured as a `category`
+//     focus instead of being forced into the NAP+W/Claim list.
 export type FootprintFocusAttribute =
   | 'name'
   | 'address'
   | 'phone'
   | 'website'
-  | 'claim_status';
+  | 'claim_status'
+  | 'category'
+  | 'reviews'
+  | 'hours'
+  | 'photos'
+  | 'description'
+  | 'products'
+  | 'cta'
+  | 'presence'
+  | 'suspended'
+  | 'other';
 
 export interface FootprintFields {
   platform_name?: string;        // e.g. "Google", "Yelp", "Facebook"
@@ -72,6 +90,16 @@ export interface ReviewPair extends FootprintFields {
   // shapes is filled per pair.
   review_text?: string;
   response_text?: string;
+  // ── Briefing regular/hook lines (additive, optional) ──
+  // The two spoken lines the analyst emits per outreach problem
+  // (outreach_problems contract): `regular` is the plain professional
+  // way to raise the problem, `hook` is the attention-earning alternative.
+  // Captured verbatim from the AI Triage Briefing / audit so the preview
+  // slot is architecture-aware of the regular → hook → fix pattern. When
+  // present they render as labelled lines above the fix; omitted on
+  // legacy pitches so existing renders are unchanged.
+  regular?: string;
+  hook?: string;
   response_source: 'ai' | 'external';
   response_ai_provider?: string | null;
   response_ai_model?: string | null;
@@ -129,6 +157,16 @@ export const FOOTPRINT_FOCUS_LABELS: Record<FootprintFocusAttribute, string> = {
   phone: 'Phone',
   website: 'Website',
   claim_status: 'Claim Status',
+  category: 'Category',
+  reviews: 'Reviews',
+  hours: 'Hours',
+  photos: 'Photos',
+  description: 'Business description',
+  products: 'Products / catalog',
+  cta: 'Booking / CTA',
+  presence: 'Profile presence',
+  suspended: 'Suspended / duplicate',
+  other: 'Other problem',
 };
 
 /**
@@ -145,6 +183,8 @@ function isStructuredFootprint(pair: ReviewPair): boolean {
  * Render a single structured footprint slot as a Current State → Proposed
  * Fix block with platform name, profile URL, the focus attribute, the
  * inconsistent value, the corrected value, and an optional summary line.
+ * The briefing regular/hook lines, when captured, render between the two
+ * boxes (problem → how to say it → fix).
  */
 function renderStructuredFootprintSlot(pair: ReviewPair, slotName: string, evidenceLabel: string, fixLabel: string): string[] {
   const focusLabel = FOOTPRINT_FOCUS_LABELS[pair.focus_attribute!] ?? pair.focus_attribute;
@@ -155,6 +195,8 @@ function renderStructuredFootprintSlot(pair: ReviewPair, slotName: string, evide
   out.push(`Platform name: ${pair.platform_name}`);
   if (pair.profile_url) out.push(`Profile URL: ${pair.profile_url}`);
   out.push(`Inconsistent Info (${focusLabel}): ${pair.current_value ?? '(not specified)'}`);
+  // ── Spoken lines (briefing regular/hook) ──
+  out.push(...spokenLineLines(pair));
   // ── Proposed fix box ──
   out.push(`${fixLabel}:`);
   out.push(`Platform name: ${pair.platform_name}`);
@@ -163,6 +205,18 @@ function renderStructuredFootprintSlot(pair: ReviewPair, slotName: string, evide
   if (pair.summary && pair.summary.trim()) {
     out.push(`Summary: ${pair.summary.trim()}`);
   }
+  return out;
+}
+
+/**
+ * The briefing regular/hook spoken lines for a slot, as renderer lines.
+ * Both are optional and additive — an empty line is omitted entirely so
+ * legacy pitches (and slots the operator left blank) render unchanged.
+ */
+function spokenLineLines(pair: ReviewPair): string[] {
+  const out: string[] = [];
+  if (pair.regular && pair.regular.trim()) out.push(`Regular: "${pair.regular.trim()}"`);
+  if (pair.hook && pair.hook.trim()) out.push(`Hook: "${pair.hook.trim()}"`);
   return out;
 }
 
@@ -215,6 +269,7 @@ export function renderPitchText(input: PitchRenderInput): string {
     } else {
       lines.push(slotName);
       lines.push(`${evidenceLabel}: "${(pair.review_text ?? '').trim()}"`);
+      lines.push(...spokenLineLines(pair));
       lines.push(`${fixLabel}: "${(pair.response_text ?? '').trim()}"`);
     }
     if (idx < ordered.length - 1) {

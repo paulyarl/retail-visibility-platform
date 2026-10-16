@@ -167,7 +167,7 @@ Tests       4095 passed | 1 skipped (4096)
 | 0.4 | Confirm the pricing table in code against the doc — **including dormant rows**: `directory_presence` 0, `presence` 19, `discovery` 29, `storefront` 59, `commitment` 79, `ecommerce` 99, `omnichannel` 149, `professional` 199, `organization` 499, `enterprise` 499; plus code-only rows `google_only` 29, `chain_starter` 199, `chain_professional` 1999, `chain_enterprise` 4999, and `tier-access.ts`'s `trial` 0 / `starter` 49. | `tier-features.ts` (`TIER_PRICING`), `tier-access.ts`, `subscription_tiers_list` | Decide whether dormant/chain prices enter the fixture before Phase 5 generates the doc table — a naive bidirectional check fails on these rows either way. |
 | 0.5 | Harness facts (verified, D6): both suites include `src/**/*.test.ts` only; fixture imports by relative path work; `checkweb` typechecks tests, `checkapi` does not. Decide fixture location (e.g., `shared/tier-contract.json` at repo root, or `packages/`). | `vitest.config.ts` ×2, `tsconfig.json` ×2 | Remaining question is where the fixture lives so both suites import it without alias tricks. |
 | 0.6 | Delete `apps/api/src/middleware/tier-access.ts.bak`; rule on whether `ShopTierMiddleware`'s `basic/premium/enterprise` shop-tier model is inside the contract's scope. | — | The `.bak` is a stale full copy of the maps sitting in `src/` — a drift trap whether or not anything imports it. |
-| 0.7 | **Answered 2026-10-15 — scheduled and healthy, but it needs committing, not verifying.** prd: `cron.job` **jobid 120**, `refresh-mv_tenant_effective_capabilities`, `*/10 * * * *`, `active: true`; `cron.job_run_details` shows `succeeded` at 03:00 / 03:10 / 03:20 / 03:30 — a clean cadence. **So D5's premise holds.** But the schedule is still **not reproducible from the repo** (only the commented snippet in `089`). The idiom already exists: `315_scheduled_job_runs_retention.sql` guards `cron.schedule` on `IF EXISTS (… extname = 'pg_cron') AND NOT EXISTS (… cron.job WHERE jobname = …)`. | `database/migrations/316_*.sql` | **Deliverable: `316_*.sql` scheduling the MV refresh the same way** — a no-op on prd (job 120 exists), correct on a fresh env. Second reason: 315's header says *"Every **migrated** job now records a run row"* — job 120 is not a migrated job, so the one job whose silent failure would leave the public directory serving stale capability state may be the one not instrumented in `scheduled_job_runs`. *(Inferred from 315's wording — `cron.job_run_details` does have it.)* Committing it brings it into that mechanism. |
+| 0.7 | **Answered 2026-10-15 — scheduled and healthy, but it needs committing, not verifying.** prd: `cron.job` **jobid 120**, `refresh-mv_tenant_effective_capabilities`, `*/10 * * * *`, `active: true`; `cron.job_run_details` shows `succeeded` at 03:00 / 03:10 / 03:20 / 03:30 — a clean cadence. **So D5's premise holds.** But the schedule is still **not reproducible from the repo** (only the commented snippet in `089`). The idiom already exists: `315_scheduled_job_runs_retention.sql` guards `cron.schedule` on `IF EXISTS (… extname = 'pg_cron') AND NOT EXISTS (… cron.job WHERE jobname = …)`. | `database/migrations/339_mv_refresh_cron.sql` | **DONE 2026-10-16 — landed as `339`** (316 was taken). Schedules `refresh-mv_tenant_effective_capabilities` at `*/10 * * * *` via 315's guarded `pg_cron` idiom: no-op on prd (job 120 exists), installs on a fresh env, skips where pg_cron is absent. Second reason it matters: 315's header says *"Every **migrated** job now records a run row"* — job 120 was not a migrated job. *(Inferred from 315's wording — `cron.job_run_details` does have it.)* Committing brings it into that mechanism. |
 | 0.8 | Settle D1–D9. | — | D5/D6/D7/D8/D9 all change the shape of the work; D1 decides whether this sprint ends with a test or a refactor. |
 
 ### 0.1 — the actual inventory (sweep run 2026-10-16)
@@ -245,6 +245,18 @@ All four `TIER_ORDER` declarations carry the **same 16 keys in the same order**:
 **Revised count: ~23 files, 3 `.bak` copies, 6 divergent order arrays, 5 trial maps, 4 `TIER_LIMITS` copies, 3 `TIER_DISPLAY_NAMES` copies.** The plan's "twenty-plus" was right; its *list* was not — which is why 0.1 is a sweep.
 
 **New scope question for 0.6:** do the three `.bak` files get deleted, and is the shop-tier namespace in or out? Both are cheap now and expensive once the fixture exists.
+
+### 0.2 progress — 2026-10-16 (witness leg landed; prd dump committed)
+
+`apps/api/scripts/dump-tier-contract.cjs` (read-only, plain `pg`, doppler per env like db-rescue) → `shared/tier-contract-db-witness.json` (26 tiers, 30 capability types). `tier-db-witness.test.ts` (9/9) pins DB↔contract parity: every DB tier classified, every `active` tier `is_active` in DB, critical order invariants on `sort_order`, active-tier prices vs fixture, veto-linkage completeness. **prd findings, all recorded as explicit baselines/divergence entries rather than silently asserted:**
+
+- **`organization` is priced $399 in the DB itself** — the same row that made `tier-access.ts` quote $399 (fixed in 1.1); fixture/doc/web all say $499. The DB row is a live divergence needing a ruling (which price is true?), recorded in `KNOWN_PRICE_DIVERGENCES` alongside `enterprise`'s $499.99 rounding.
+- **3.6's premise is falsified.** The doc said `presence`/`seed_preview`/`chain_*`/`trial_*` "carry zero keys — never `_disabled`." Reality: `seed_preview` vetoes `payment_gateway`, `chain_*`/`enterprise`/`organization` veto `wholesale_matching`, `commitment`+`chain_starter` veto `coupon`, `discovery` carries 14 vetoes, `storefront` 4, `directory_presence` 1. And every `trial_*` row carries `coupon_disabled`/`funnel_options_disabled`. The current veto set is pinned as a drift guard (`TIER_VETO_BASELINE`); whether each veto is *intended* is a ruling the fixture can't make.
+- **Dormant vetoes exist:** `presence` holds 9 `*_disabled` rows with `is_enabled=false` — inert today, one UPDATE from live. Worth knowing they exist.
+- **The `trial_*` tier rows' feature bags are dead data.** Both the MV and the resolver proxy `trial_*` → base BEFORE reading `tier_features_list` — the bags (some large: `trial_omnichannel` 123 keys, `trial_professional` 117) are never consulted on resolve paths, and several carry keys their base lacks (so they'd *mis*lead any raw-key read path, e.g. admin "what's in this tier" views). Ruling pending: prune, or keep for a path that reads them.
+- **MV trial coverage gap confirmed:** DB has 9 `trial_*` rows; the MV maps 12 keys (incl. `trial_enterprise`, `trial_chain_professional`, `trial_chain_enterprise` — no DB rows) and canonical has 15. `trial_presence`/`trial_directory_presence`/`trial_organization` are fixture-mapped but have neither a DB row nor an MV entry.
+- **`custom` has no DB row** — consistent with its pseudo/assigned nature; the witness treats "fixture order key without a DB row" as allowed only for `custom`.
+- **DB `sort_order` is a different axis than `tier_order`** (chain tiers at 7–9 before `presence` at 10, trials at 101+). Only the critical invariants are pinned on it; full-order parity is deliberately not asserted.
 
 ---
 
@@ -363,7 +375,25 @@ The four hard rules from `tier-hierarchy.md` §Inheritance, each a named asserti
 | 2.3 | `storefront` does **not** grant checkout — commerce starts at `commitment` / `ecommerce`. | A storefront tier that accepts payment is a revenue bug. |
 | 2.4 | `directory_presence` grants **free gateway features only** — asserted against an explicit gateway-safe allowlist in the fixture, not by inspection. | Today its bag includes `storefront_enabled`, `storefront_retail`, `directory_visibility_snap_ebt` — presumed base chrome, but the fixture must say so, or the assertion has no criterion. |
 | 2.5 | The inheritance graph is **acyclic *and* transitively closed**, and `omnichannel` inherits both money modes. | `checkTierFeature`, `getTierFeatures`, and the `tier-access` fallback each resolve exactly **one hop** — `TIER_HIERARCHY` entries *are* the closure. A tidy refactor listing only direct parents passes "acyclic" while silently stripping every inherited feature. |
-| 2.6 | Rule on the empty tiers: `discovery`, `storefront`, `commitment`, `ecommerce`, `omnichannel` have **no own entries** in `TIER_FEATURES` — their web-side grants are pure inheritance, and everything else lives only in `tier_features_list`. | Either the fixture blesses this as "grants are DB-only for these tiers" (and 1.5 scopes accordingly) or it's a hole. Undecided today. |
+| 2.6 | Rule on the empty tiers: `discovery`, `storefront`, `commitment`, `ecommerce`, `omnichannel` have **no own entries** in `TIER_FEATURES` — their web-side grants are pure inheritance, and everything else lives only in `tier_features_list`. | **RULED 2026-10-16: blessed as `db_only_grant_tiers`**, not a hole — the bags' absence is now asserted (a new static bag for one of these tiers fails the test and needs a documented reason). |
+
+### Phase 2 progress — 2026-10-16
+
+Fixture gained `inheritance` (`edges` = the canonical parent **closure**, `omnichannel_money_modes`, `negative_rules`, `gateway_allowlist`, `db_only_grant_tiers`). Reference = web `tier-features.ts`, verified against the doc rules.
+
+**The api `TIER_HIERARCHY` was badly diverged** — fixed and exported:
+
+| api copy was | vs canonical |
+|---|---|
+| `discovery: [directory_presence]` | missing `google_only` — the Google surface lost its own Google features on the fallback path |
+| `ecommerce`, `omnichannel` | **no edges at all** — zero inherited features in `checkTierAccess`/`getTierFeatures` fallback |
+| `professional: [starter, google_only, dp]` | missing the entire commerce chain (`omnichannel→…→discovery`) — inherited the legacy starter lineage instead |
+| `enterprise`/`organization` | missing `omnichannel`/`ecommerce`/`storefront`/`discovery`; carried `starter` instead |
+| `chain_*` | wrongly carried `commitment` (commerce!) + same missing commerce chain |
+
+Closure properties are now asserted on both maps themselves: transitively closed (a direct-parents refactor fails), acyclic, `omnichannel` inherits both `commitment` and `ecommerce`, `presence` inherits neither `google_only` nor `starter`. Bag-level rules are web-side only (the api `TIER_FEATURES` is the fully-commented fallback set): `discovery` resolves no `storefront`/`product_search`; nothing below commitment carries `commerce_*`/`checkout_*`; `directory_presence` ⊆ the 10-key gateway allowlist; `presence` resolves none of google_only's distinct features.
+
+Suites: api `tier-inheritance.test.ts` 20/20, web `tier-inheritance.test.ts` 33/33. Full `src/services/__tests__` run: 2309/2310 pass — one unrelated flake (`DirectoryClaimService.napStamp` 5s timeout under 129-worker load; passes solo in 373ms). Both typechecks clean.
 
 ---
 
@@ -380,6 +410,23 @@ The rules from D4/D7. **Where they run matters:** the per-domain resolvers are p
 | 3.5 | `tenant_feature_overrides_list` with `granted=false` is **ignored, not a deny**. | Lives in the prisma-bound merge (`granted: true` filter) and the MV — needs 3.7's mechanism, not a pure unit test. |
 | 3.6 | Tier policy holds: `seed_preview` / `presence` / `chain_*` / `trial_*` carry **zero keys** — never `_disabled`. | The doc's *"deliberate — do not fix"*: the veto would also block admin grants. Asserted against `tier_features_list` via the DB leg — the keys live in data, not code. |
 | 3.7 | **Choose the merge/MV parity mechanism.** Options: (a) extract `EffectiveCapabilityResolver`'s merge into a pure function so 3.1–3.5 stay DB-free; (b) a migration-lint asserting the MV definition's shape (gate-key flow, `flexible_key_map`, post-332 negative-key exclusion); (c) a DB integration test — the jest e2e suite already exists and runs against a real DB (excluded from vitest for exactly that reason). | Pick at least one for the merge and one for the MV. The repo's own incident history — 14/18 flexible keys guessed wrong (090), dead vetoes and phantom vetoes (332) — says the SQL copy is where drift breeds. Skipping it leaves the highest-stakes reimplementation untested. |
+
+### Phase 3 progress — 2026-10-16
+
+**3.7 mechanism: (a) + (b) both landed** — extraction for the merge, lint for the SQL. Option (c) stays available for the 0.2 DB leg but isn't needed for the contract rows.
+
+- **(a) Pure merge:** `fetchRawCapabilities`'s merge (~230 lines) extracted to `apps/api/src/services/effectiveCapabilityMerge.ts` (`mergeCapabilitySources`). Prisma fetches stay in the resolver; semantics — most-permissive tier merge, veto-key carry-through, purchase/override force-enable, flexible expansion, `granted===true` filter (moved OUT of the prisma where-clause so it's testable) — live in the pure module.
+- **(b) MV lint:** `mv-shape-lint.test.ts` reads the NEWEST migration that recreates `mv_tenant_effective_capabilities` (today 332) and pins: `trial_map` pairs ⊆ fixture canonical, `flexible_key_map` lookup-not-guess, each flexible CTE excluding `%_disabled`/`%_off`, NO gate-key filter on output (exactly 3 negative-key exclusions — one per CTE), `granted = true` on overrides, purchase status set `('active','past_due','trial')`, and `tenant_type_gates` suppression on all 3 flexible sources. 7/7 pass on 332.
+- **3.1–3.5 pinned on the pure merge:** `tier-merge-contract.test.ts` 13/13 — veto survives the merge beside a purchase; a `_disabled`-only module grants nothing; `*_flexible` expands via purchase AND override; implicit engagement; uncategorized bucketing; `granted=false` ignored (no deny).
+
+**Two live bugs found and fixed during extraction:**
+
+1. **Resolver-side phantom-veto risk.** The original flexible-*purchase* expansion filtered `capLinks` — which only cover PURCHASED feature ids — so a `*_flexible` purchase expanded to ~itself (near no-op). Fixed to fetch the full active feature set per cap type like the override path — and since working expansion must not emit `_disabled`/`_off` (the MV's BUG-2 rule, previously unenforced resolver-side), the negative-key exclusion was added INSIDE the pure merge where the contract test can see it. Without this, the newly-functional expansion would have created the same phantom vetoes 332 fixed in the MV.
+2. **D7 store eligibility (the "don't sell a vetoed module" consequence).** `checkCapabilityEngagement` in `bsaas-purchases.ts` only refused when EVERY enabled tier feature in the cap type was `*_disabled` — a tier carrying `{cap}_disabled` plus any positive key still sold into a module the veto then kills. Replaced with `capabilitySaleAllowed` (pure, pinned): the exact `{cap}_disabled` veto key enabled → unsellable. Covers catalog listing, single purchase, and bundle purchase paths. **Also fixed:** both `checkCapabilityEngagement` and `checkTierFeatureStatus` looked up tiers by RAW `subscription_tier` — a `trial_*` key resolves to no tier row (no engagement → can't buy; no "included in plan" → could re-buy a granted feature). Both now apply `getEffectiveTier` (the canonical trial map).
+
+**5.4 pulled forward:** `capability-resolution-mv.md` corrected — the stale "purchases/overrides bypass type gates — intentional" note is replaced with the D7 semantics, the gate-key filter doc updated to 332's post-fix reality (keys flow to resolvers; expansion emits non-negative keys only).
+
+**Remaining in Phase 3:** 3.6 (zero-key tiers — `seed_preview`/`presence`/`chain_*`/`trial_*` carry no `_disabled`) is DB-leg work (0.2) — the keys live in `tier_features_list` data, not code.
 
 ---
 

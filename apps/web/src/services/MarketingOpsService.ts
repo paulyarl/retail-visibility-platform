@@ -1173,12 +1173,27 @@ export interface ReviewResponseDraft {
 // a single focus attribute. The renderer formats these into a readable
 // before/after block; the footprint-diff endpoint exposes them for
 // completed-work reporting.
+//
+// Two families: identity (NAP+W + Claim Status) and problem (the other
+// briefing-shaped focuses — category mislabeling, review gap, missing
+// presence, …). The intake dropdown surfaces the problem focuses
+// archetype-aware.
 export type FootprintFocusAttribute =
   | 'name'
   | 'address'
   | 'phone'
   | 'website'
-  | 'claim_status';
+  | 'claim_status'
+  | 'category'
+  | 'reviews'
+  | 'hours'
+  | 'photos'
+  | 'description'
+  | 'products'
+  | 'cta'
+  | 'presence'
+  | 'suspended'
+  | 'other';
 
 export interface FootprintFields {
   platform_name?: string;
@@ -1209,6 +1224,12 @@ export interface ReviewPair extends FootprintFields {
   slot_label_prefix?: string;
   section_title?: string;
   first_slot_label?: string;
+  // ── Briefing regular/hook spoken lines (additive, optional) ──
+  // Captured verbatim from the campaign's outreach_problems briefing so the
+  // slot is architecture-aware of the regular → hook → fix pattern. Rendered
+  // as labelled lines above the fix; omitted when blank.
+  regular?: string;
+  hook?: string;
 }
 
 // ── Footprint before/after diff (completed-work reporting) ──
@@ -1222,6 +1243,9 @@ export interface FootprintDiffEntry {
   current_value: string;
   correct_value: string;
   summary: string | null;
+  /** Briefing spoken lines captured on the slot (regular/hook). */
+  regular: string | null;
+  hook: string | null;
 }
 
 export interface FootprintDiff {
@@ -4807,6 +4831,23 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get footprint diff');
     }
     return result.data?.data ?? result.data;
+  }
+
+  // Outreach problems — the verbatim problem → solution pairs the analyst
+  // emitted on the campaign's triage briefing (the "AI Triage Briefing"
+  // panel) and its per-platform audits. Feeds the Pitch Construction
+  // "Sync from briefing" hand-off into the 3 preview slots.
+  async getCampaignOutreachProblems(campaignId: string): Promise<OutreachProblem[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${encodeURIComponent(campaignId)}/outreach-problems`,
+      { method: 'GET' },
+      `mkt-ops-outreach-problems-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load outreach problems');
+    }
+    return (result.data?.data ?? result.data ?? []) as OutreachProblem[];
   }
 
   // ─── Deliverable Construction ──────────────────────────────────────────

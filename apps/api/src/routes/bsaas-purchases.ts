@@ -22,12 +22,14 @@ import { requirePermission } from '../middleware/role-validation';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { capabilitySaleAllowed } from '../services/effectiveCapabilityMerge';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 import CrmAlertService from '../services/CrmAlertService';
 import CouponTargetService, { CouponTargets, CouponTargetContext } from '../services/CouponTargetService';
 import { audit } from '../audit';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { verifyGrantToken, isGrantTokenExpired } from '../services/GrantTokenService';
+import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { generateGrantClaimId } from '../lib/id-generator';
 
 const router = Router();
@@ -349,8 +351,11 @@ async function checkCapabilityEngagement(
     return { eligible: false, reason: 'Tenant not found', capabilityKey };
   }
 
+  // Trial keys proxy to their base tier (the trial_map contract) — a raw
+  // `trial_*` key matches no subscription_tiers_list row.
   const tierKeys = [tenant.subscription_tier, tenant.organizations_list?.subscription_tier]
-    .filter((k): k is string => !!k);
+    .filter((k): k is string => !!k)
+    .map(getEffectiveTier);
   if (tierKeys.length === 0) {
     return { eligible: false, reason: 'No subscription tier assigned', capabilityKey };
   }
@@ -379,11 +384,12 @@ async function checkCapabilityEngagement(
     };
   }
 
-  // 4. Check if the capability type is explicitly disabled (all enabled features are _disabled keys)
-  const hasNonDisabledFeature = tierFeaturesInCapType.some(
-    tf => !tf.feature_key.endsWith('_disabled')
-  );
-  if (!hasNonDisabledFeature) {
+  // 4. D7 veto — `{capability_key}_disabled` is an ABSOLUTE veto: it wins even
+  //    when other keys in the capability type are enabled, and it overrides
+  //    purchases at resolve time. Selling a feature into a vetoed module is
+  //    dead money, so the store must refuse it here (`capabilitySaleAllowed`
+  //    is the pure contract fn — pinned in tier-merge-contract.test.ts).
+  if (!capabilitySaleAllowed(capabilityKey, tierFeaturesInCapType.map(tf => tf.feature_key))) {
     return {
       eligible: false,
       reason: `The ${capabilityKey.replace(/_options$/, '').replace(/_/g, ' ')} capability is explicitly disabled for your plan.`,
@@ -457,8 +463,11 @@ async function checkTierFeatureStatus(
   });
   if (!tenant) return { inTier: false, merchantGateOn: null, capabilityKey: null };
 
+  // Trial keys proxy to their base tier (the trial_map contract) — a raw
+  // `trial_*` key matches no subscription_tiers_list row.
   const tierKeys = [tenant.subscription_tier, tenant.organizations_list?.subscription_tier]
-    .filter((k): k is string => !!k);
+    .filter((k): k is string => !!k)
+    .map(getEffectiveTier);
   if (tierKeys.length === 0) return { inTier: false, merchantGateOn: null, capabilityKey: null };
 
   const tiers = await prisma.subscription_tiers_list.findMany({

@@ -264,6 +264,9 @@ export class PitchService extends BaseService {
       current_value: string;
       correct_value: string;
       summary: string | null;
+      /** Briefing spoken lines captured on the slot (regular/hook). */
+      regular: string | null;
+      hook: string | null;
     }>;
   } | null> {
     const pitch = await this.getPitch(pitchId, ctx);
@@ -280,6 +283,8 @@ export class PitchService extends BaseService {
       current_value: string;
       correct_value: string;
       summary: string | null;
+      regular: string | null;
+      hook: string | null;
     }> = [];
 
     // Preserve the negative-first ordering the renderer uses so the
@@ -300,6 +305,8 @@ export class PitchService extends BaseService {
         current_value: pair.current_value ?? '',
         correct_value: pair.correct_value ?? '',
         summary: pair.summary ?? null,
+        regular: pair.regular ?? null,
+        hook: pair.hook ?? null,
       });
     });
 

@@ -11,6 +11,8 @@
 
 import { prisma } from '../prisma';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
+import { DEFAULT_TIER } from '../utils/tier-defaults';
+import { mergeCapabilitySources } from './effectiveCapabilityMerge';
 import { deriveInternalStatus, getMaintenanceState } from '../utils/subscription-status';
 import { logger } from '../logger';
 import { generateCorrelationId, generateTenantKey } from '../lib/id-generator';
@@ -1001,23 +1003,6 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     });
   }
 
-  // Merge features: most-permissive-wins (org-tier + tenant-tier)
-  const mergedFeatures = new Map<string, { feature_key: string; is_enabled: boolean; is_highlighted: boolean; capability_type_list: any }>();
-  for (const tf of tierFeatures) {
-    const existing = mergedFeatures.get(tf.feature_key);
-    if (existing) {
-      existing.is_enabled = existing.is_enabled || tf.is_enabled;
-      existing.is_highlighted = existing.is_highlighted || (tf.is_highlighted ?? false);
-    } else {
-      mergedFeatures.set(tf.feature_key, {
-        feature_key: tf.feature_key,
-        is_enabled: tf.is_enabled,
-        is_highlighted: tf.is_highlighted ?? false,
-        capability_type_list: tf.capability_type_list,
-      });
-    }
-  }
-
   // Merge purchased features (BSaaS — à la carte feature purchases)
   // Active and past_due (grace period) purchases override tier gates with most-permissive-wins
   const purchases = await prisma.tenant_feature_purchases.findMany({
@@ -1029,6 +1014,8 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     select: { feature_key: true },
   });
 
+  const purchaseCapTypeByFeature = new Map<string, any>();
+  const purchaseFlexibleExpansion = new Map<string, string[]>();
   if (purchases.length > 0) {
     // Resolve capability_type for purchased features that may not be in any tier
     const purchaseFeatureKeys = purchases.map(p => p.feature_key);
@@ -1043,67 +1030,52 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
       include: { capability_type_list: { select: { key: true, name: true, category: true } } },
     });
 
-    const featureKeyToCapType = new Map<string, any>();
     for (const link of capLinks) {
       const fKey = featureIdToKey.get(link.feature_id);
-      if (fKey) featureKeyToCapType.set(fKey, link.capability_type_list);
+      if (fKey) purchaseCapTypeByFeature.set(fKey, link.capability_type_list);
     }
 
-    for (const purchase of purchases) {
-      const existing = mergedFeatures.get(purchase.feature_key);
-      if (existing) {
-        existing.is_enabled = true; // purchased = always enabled
-      } else {
-        const capType = featureKeyToCapType.get(purchase.feature_key) || null;
-        mergedFeatures.set(purchase.feature_key, {
-          feature_key: purchase.feature_key,
-          is_enabled: true,
-          is_highlighted: false,
-          capability_type_list: capType,
-        });
-      }
-    }
-
-    // Flexible purchase expansion: if a tenant purchases {capability_key}_flexible,
-    // expand to ALL features in that capability type (mirrors MV flexible_purchase_features CTE)
+    // Flexible purchase expansion: a `*_flexible` purchase expands to ALL
+    // features in its capability type (mirrors MV flexible_purchase_features
+    // CTE). Fixed 2026-10-16: this previously filtered `capLinks`, which only
+    // cover the PURCHASED feature ids — a _flexible purchase expanded to
+    // itself unless another purchase shared the cap type. Fetch the full
+    // active feature set per cap, same as the override path.
+    const flexiblePurchaseCapIds = new Map<string, string>(); // capKey → capability_type_id
     for (const purchase of purchases) {
       if (!purchase.feature_key.endsWith('_flexible')) continue;
-      const capType = featureKeyToCapType.get(purchase.feature_key);
+      const capType = purchaseCapTypeByFeature.get(purchase.feature_key);
       if (!capType) continue;
-
-      const flexibleCapLinks = capLinks.filter(l => l.capability_type_list?.key === capType.key);
-      for (const cfl of flexibleCapLinks) {
-        const expandedFeature = featureIdToKey.get(cfl.feature_id);
-        if (!expandedFeature) continue;
-        const existing = mergedFeatures.get(expandedFeature);
-        if (existing) {
-          existing.is_enabled = true;
-        } else {
-          mergedFeatures.set(expandedFeature, {
-            feature_key: expandedFeature,
-            is_enabled: true,
-            is_highlighted: false,
-            capability_type_list: capType,
-          });
-        }
-      }
+      const capId = capLinks.find(l => l.capability_type_list?.key === capType.key)?.capability_type_id;
+      if (capId) flexiblePurchaseCapIds.set(capType.key, capId);
+    }
+    for (const [capKey, capId] of flexiblePurchaseCapIds) {
+      const rows = await prisma.capability_features_list.findMany({
+        where: { capability_type_id: capId, is_active: true },
+        include: { features_list: { select: { key: true, is_active: true } } },
+      });
+      purchaseFlexibleExpansion.set(
+        capKey,
+        rows.filter(r => r.features_list?.is_active).map(r => r.features_list!.key),
+      );
     }
   }
 
-  // Merge admin overrides (tenant_feature_overrides_list)
-  // Admin can grant any feature to a tenant, including _flexible keys that expand
-  // to all features in a capability type. This mirrors the MV's override + flexible_override CTEs.
+  // Admin overrides (tenant_feature_overrides_list). `granted` is selected
+  // rather than filtered here so the "granted=false is ignored, not a deny"
+  // rule lives in the testable merge (sprint plan 3.5).
   const overrides = await prisma.tenant_feature_overrides_list.findMany({
     where: {
       tenant_id: tenantId,
-      granted: true,
       OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
     },
-    select: { feature: true },
+    select: { feature: true, granted: true },
   });
 
-  const overrideFeatureKeys = overrides.map(o => o.feature);
+  const overrideFeatureKeys = overrides.filter(o => o.granted).map(o => o.feature);
 
+  const overrideCapTypeByFeature = new Map<string, any>();
+  const overrideFlexibleExpansion = new Map<string, string[]>();
   if (overrideFeatureKeys.length > 0) {
     // Resolve capability_type for override features (same pattern as purchases)
     const overrideFeatures = await prisma.features_list.findMany({
@@ -1118,77 +1090,46 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
       include: { capability_type_list: { select: { key: true, name: true, category: true } } },
     });
 
-    const overrideFeatureKeyToCapType = new Map<string, any>();
     for (const link of overrideCapLinks) {
       const fKey = overrideFeatureIdToKey.get(link.feature_id);
-      if (fKey) overrideFeatureKeyToCapType.set(fKey, link.capability_type_list);
+      if (fKey) overrideCapTypeByFeature.set(fKey, link.capability_type_list);
     }
 
-    // Add override features to merged map
-    for (const fk of overrideFeatureKeys) {
-      const existing = mergedFeatures.get(fk);
-      if (existing) {
-        existing.is_enabled = true;
-      } else {
-        const capType = overrideFeatureKeyToCapType.get(fk) || null;
-        mergedFeatures.set(fk, {
-          feature_key: fk,
-          is_enabled: true,
-          is_highlighted: false,
-          capability_type_list: capType,
-        });
-      }
-    }
-
-    // Flexible override expansion: if an override grants {capability_key}_flexible,
-    // expand to ALL features in that capability type (mirrors MV flexible_override_features CTE)
+    // Flexible override expansion: a `*_flexible` override expands to ALL
+    // features in that capability type (mirrors MV flexible_override_features CTE)
+    const flexibleOverrideCapIds = new Map<string, string>(); // capKey → capability_type_id
     for (const fk of overrideFeatureKeys) {
       if (!fk.endsWith('_flexible')) continue;
-      const capType = overrideFeatureKeyToCapType.get(fk);
+      const capType = overrideCapTypeByFeature.get(fk);
       if (!capType) continue;
-
-      // Fetch all features linked to this capability type
-      const allCapFeatures = await prisma.capability_features_list.findMany({
-        where: { capability_type_id: overrideCapLinks.find(l => l.capability_type_list?.key === capType.key)?.capability_type_id, is_active: true },
+      const capId = overrideCapLinks.find(l => l.capability_type_list?.key === capType.key)?.capability_type_id;
+      if (capId) flexibleOverrideCapIds.set(capType.key, capId);
+    }
+    for (const [capKey, capId] of flexibleOverrideCapIds) {
+      const rows = await prisma.capability_features_list.findMany({
+        where: { capability_type_id: capId, is_active: true },
         include: { features_list: { select: { key: true, is_active: true } } },
       });
-
-      for (const cfl of allCapFeatures) {
-        if (!cfl.features_list?.is_active) continue;
-        const expandedKey = cfl.features_list.key;
-        const existing = mergedFeatures.get(expandedKey);
-        if (existing) {
-          existing.is_enabled = true;
-        } else {
-          mergedFeatures.set(expandedKey, {
-            feature_key: expandedKey,
-            is_enabled: true,
-            is_highlighted: false,
-            capability_type_list: capType,
-          });
-        }
-      }
+      overrideFlexibleExpansion.set(
+        capKey,
+        rows.filter(r => r.features_list?.is_active).map(r => r.features_list!.key),
+      );
     }
   }
 
-  // Group by capability type
-  const capabilities: Record<string, { capability_enabled: boolean; is_highlighted: boolean; features: Record<string, boolean> }> = {};
-  const uncategorizedFeatures: string[] = [];
+  // The merge itself is pure — extracted for the Phase 3 contract tests
+  // (3.7 option (a)): veto-carrying, flexible expansion, granted=false.
+  const { mergedFeatures, capabilities, uncategorizedFeatures } = mergeCapabilitySources({
+    tierFeatures,
+    purchases,
+    purchaseCapTypeByFeature,
+    purchaseFlexibleExpansion,
+    overrides,
+    overrideCapTypeByFeature,
+    overrideFlexibleExpansion,
+  });
 
-  for (const tf of mergedFeatures.values()) {
-    const capKey = tf.capability_type_list?.key;
-    if (capKey) {
-      if (!capabilities[capKey]) {
-        capabilities[capKey] = { capability_enabled: true, is_highlighted: false, features: {} };
-      }
-      capabilities[capKey].features[tf.feature_key] = tf.is_enabled;
-      if (tf.is_highlighted) capabilities[capKey].is_highlighted = true;
-    } else {
-      uncategorizedFeatures.push(tf.feature_key);
-    }
-  }
-
-  const effectiveTierKey = resolvedOrgTierKey || resolvedTenantTierKey || 'starter';
+  const effectiveTierKey = resolvedOrgTierKey || resolvedTenantTierKey || DEFAULT_TIER;
   const effectiveTier = tierMap.get(effectiveTierKey);
 
   return {

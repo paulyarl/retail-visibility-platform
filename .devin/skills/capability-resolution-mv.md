@@ -120,12 +120,13 @@ WHERE tfl.feature_key = fkm.flexible_feature_key
 4. Individual features → **ON** (implicit enable — capability is available if any individual feature is enabled)
 5. Else → **OFF** (default disabled — nothing enabled at all)
 
-**Implementation in MV** (migration 090):
+**Implementation in MV** (migration 332 — the current definition):
 - The `type_gate_map` CTE looks up the actual `_disabled` and `_enabled` keys for each capability type from `capability_features_list`
 - The `tenant_type_gates` CTE determines the gate status per tenant from tier sources only
 - All flexible expansion CTEs (`flexible_tier_features`, `flexible_purchase_features`, `flexible_override_features`) exclude features when the capability type has `gate_status = 'disabled'`
 - This ensures that even if a tenant has `_flexible` or individual feature assignments, a `_disabled` type gate blocks all features in that capability type
-- Type gate keys are excluded from the MV's final output via WHERE clause — they are control keys, not features
+- Flexible expansion emits only NON-NEGATIVE keys (`NOT LIKE '%_disabled'`, `NOT LIKE '%_off'`) — a `*_flexible` grant never synthesizes its own veto (332 BUG-2 fix)
+- Type gate keys are NOT excluded from the MV's final output — assigned `_disabled`/`_enabled` rows flow to the resolvers, which apply the veto (332 BUG-1 fix: the old output filter made vetoes on canonical-named modules silently dead)
 
 **Implementation in `checkTierFeatureStatus`** (apps/api/src/routes/bsaas-purchases.ts):
 - Looks up type gate keys (`_disabled`, `_enabled`) from `capability_features_list` for the feature's capability type
@@ -142,7 +143,7 @@ WHERE tfl.feature_key = fkm.flexible_feature_key
 | product_options | product_options_disabled | product_options_enabled |
 | product_types | product_types_disabled | product_types_enabled |
 
-**Note**: Type gate keys are tier-level controls only. They are NOT checked for purchases or overrides — only tier sources are considered for type gate precedence. This is intentional: a merchant can purchase a flexible feature even if their tier has the capability type disabled, giving them the ability to opt-in to capabilities their tier doesn't grant by default.
+**Note** (updated 2026-10-16 for D7 — an earlier version of this paragraph documented an "intentional bypass" that migration 332 reversed): `_disabled` is an ABSOLUTE veto. Tier sources determine gate status, but the veto wins over purchases and admin overrides — a purchase cannot revive a vetoed module. Both implementations enforce this: the MV suppresses flexible expansion when `gate_status = 'disabled'` (all three sources) AND emits the veto key itself so resolvers apply it over the merged map; the resolver merge (`effectiveCapabilityMerge.ts`) carries `_disabled` rows through unconditionally. Consequence for the store: `capabilitySaleAllowed` / `checkCapabilityEngagement` refuse to sell a feature into a vetoed capability — a sale that can never resolve is dead money.
 
 ### Schema
 

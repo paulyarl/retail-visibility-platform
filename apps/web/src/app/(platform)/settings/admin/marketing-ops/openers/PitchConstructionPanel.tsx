@@ -47,6 +47,7 @@ import marketingOpsService, {
   HookSuggestionResult,
   FootprintFocusAttribute,
   CampaignOutreachAnchor,
+  OutreachProblem,
 } from '@/services/MarketingOpsService';
 import ConstructionVariablesPanel, {
   type ConstructionVariable,
@@ -313,20 +314,84 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A8: 'Profile Presence',
 };
 
-// ─── Structured footprint config (A5 + A3) ───────────────────────────
-// A5 (Multi-Signal Footprint) and A3 (Listing Inconsistency) present
-// each preview slot as a structured Current State → Proposed Fix pair
-// keyed by platform + profile URL + a single focus attribute (one of
-// NAP+W or Claim Status). The structured fields flow through to the
-// review_pairs JSON on the persisted pitch and are queryable via the
-// footprint-diff endpoint for before/after reporting on completed work.
-const FOOTPRINT_FOCUS_OPTIONS: { value: FootprintFocusAttribute; label: string }[] = [
-  { value: 'name', label: 'Name' },
-  { value: 'address', label: 'Address' },
-  { value: 'phone', label: 'Phone' },
-  { value: 'website', label: 'Website' },
-  { value: 'claim_status', label: 'Claim Status' },
+// ─── Structured footprint config (A5 + A3 + A8) ──────────────────────
+// A5 (Multi-Signal Footprint), A3 (Listing Inconsistency) and A8 (Profile
+// Presence) present each preview slot as a structured Current State →
+// Proposed Fix pair keyed by platform + profile URL + a single focus
+// attribute. The structured fields flow through to the review_pairs JSON on
+// the persisted pitch and are queryable via the footprint-diff endpoint for
+// before/after reporting on completed work.
+//
+// The focus vocabulary has two families:
+//   - identity — the canonical NAP+W attributes + Claim Status
+//   - problem  — the other briefing-shaped focuses the analyst raises
+//     (category mislabeling, review gap, missing presence, …). These are
+//     surfaced archetype-aware so an A5 multi-signal problem like "filed as
+//     a convenience store" is captured as a `category` focus instead of
+//     being forced into the NAP+W/Claim list.
+interface FootprintFocusOption {
+  value: FootprintFocusAttribute;
+  label: string;
+  group: 'identity' | 'problem';
+  /** Archetypes this option is offered for. Omitted = every structured archetype. */
+  archetypes?: OpenerArchetype[];
+}
+
+const FOOTPRINT_FOCUS_CATALOG: FootprintFocusOption[] = [
+  // Identity — canonical listing attributes (always available).
+  { value: 'name', label: 'Name', group: 'identity' },
+  { value: 'address', label: 'Address', group: 'identity' },
+  { value: 'phone', label: 'Phone', group: 'identity' },
+  { value: 'website', label: 'Website', group: 'identity' },
+  { value: 'claim_status', label: 'Claim Status', group: 'identity' },
+  // Problem — the other briefing-shaped focuses the analyst raises.
+  { value: 'category', label: 'Category', group: 'problem' },
+  { value: 'description', label: 'Business description', group: 'problem' },
+  { value: 'hours', label: 'Hours', group: 'problem' },
+  { value: 'reviews', label: 'Reviews', group: 'problem', archetypes: ['A5'] },
+  { value: 'photos', label: 'Photos', group: 'problem', archetypes: ['A5', 'A8'] },
+  { value: 'products', label: 'Products / catalog', group: 'problem', archetypes: ['A5'] },
+  { value: 'cta', label: 'Booking / CTA', group: 'problem', archetypes: ['A5'] },
+  { value: 'presence', label: 'Profile presence', group: 'problem', archetypes: ['A3', 'A8'] },
+  { value: 'suspended', label: 'Suspended / duplicate', group: 'problem', archetypes: ['A8'] },
+  { value: 'other', label: 'Other problem', group: 'problem' },
 ];
+
+const FOOTPRINT_FOCUS_LABELS: Record<FootprintFocusAttribute, string> = {
+  name: 'Name',
+  address: 'Address',
+  phone: 'Phone',
+  website: 'Website',
+  claim_status: 'Claim Status',
+  category: 'Category',
+  reviews: 'Reviews',
+  hours: 'Hours',
+  photos: 'Photos',
+  description: 'Business description',
+  products: 'Products / catalog',
+  cta: 'Booking / CTA',
+  presence: 'Profile presence',
+  suspended: 'Suspended / duplicate',
+  other: 'Other problem',
+};
+
+function focusLabelFor(value: FootprintFocusAttribute | undefined): string {
+  return value ? FOOTPRINT_FOCUS_LABELS[value] ?? 'focus' : 'focus';
+}
+
+/** The focus options offered for a structured archetype, grouped for the dropdown. */
+function focusOptionsFor(archetype: OpenerArchetype): {
+  identity: FootprintFocusOption[];
+  problem: FootprintFocusOption[];
+} {
+  const applicable = FOOTPRINT_FOCUS_CATALOG.filter(
+    (o) => !o.archetypes || o.archetypes.includes(archetype),
+  );
+  return {
+    identity: applicable.filter((o) => o.group === 'identity'),
+    problem: applicable.filter((o) => o.group === 'problem'),
+  };
+}
 
 // Archetypes that render the structured footprint slot UI instead of the
 // generic two-textarea layout. A5 is the multi-signal footprint pitch;
@@ -379,6 +444,51 @@ function StarterExamples({ examples, onPick, archetype }: StarterExamplesProps) 
         ))}
       </div>
     </details>
+  );
+}
+
+// ─── Spoken lines (briefing regular/hook) ─────────────────────────────
+// The two spoken lines the analyst emits per outreach problem
+// (outreach_problems contract): `regular` is the plain professional way to
+// raise the problem, `hook` is the attention-earning alternative. Captured
+// verbatim from the AI Triage Briefing / audit — or typed — and rendered
+// above the fix in the assembled pitch. Optional on every archetype; the
+// "Sync from briefing" hand-off fills them from the campaign's briefing.
+interface SpokenLineFieldsProps {
+  pair: ReviewPair;
+  onChange: (field: 'regular' | 'hook', value: string | undefined) => void;
+}
+
+function SpokenLineFields({ pair, onChange }: SpokenLineFieldsProps) {
+  const field = (
+    key: 'regular' | 'hook',
+    label: string,
+    hint: string,
+    placeholder: string,
+  ) => (
+    <label className="block">
+      <span className="text-[11px] text-gray-500 dark:text-gray-400">
+        {label} <span className="text-gray-400 dark:text-gray-500">— {hint}</span>
+      </span>
+      <textarea
+        value={pair[key] ?? ''}
+        onChange={(e) => onChange(key, e.target.value || undefined)}
+        placeholder={placeholder}
+        rows={2}
+        className="mt-0.5 w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+      />
+    </label>
+  );
+  return (
+    <div className="rounded-md border border-purple-200 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-900/10 p-3">
+      <p className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide mb-2">
+        Spoken lines <span className="font-normal normal-case tracking-normal text-gray-500 dark:text-gray-400">— from the briefing (optional)</span>
+      </p>
+      <div className="space-y-2">
+        {field('regular', 'Regular', 'the plain professional line', 'The plain line that raises this problem...')}
+        {field('hook', 'Hook', 'the attention-earning alternative', 'Same fact, pattern-interrupt delivery...')}
+      </div>
+    </div>
   );
 }
 

@@ -131,21 +131,30 @@ export const TIER_FEATURES = {
 
 // Tier hierarchy for inheritance (lower tiers inherit from higher)
 // NOTE: 'trial' is not a tier - it's a subscription status that can apply to any tier
-const TIER_HIERARCHY: Record<string, string[]> = {
+// NOTE: entries are the TRANSITIVE CLOSURE — checkTierAccess resolves exactly
+// one hop, so a refactor to direct-parents-only silently strips inherited
+// features. Pinned by shared/tier-contract.json → inheritance (Phase 2).
+// Was badly diverged from the web copy: discovery lost google_only,
+// professional/enterprise/organization lost the whole commerce chain,
+// ecommerce/omnichannel had no edges, chain_* wrongly carried commitment.
+// Aligned 2026-10-16 and exported for the contract test (P1).
+export const TIER_HIERARCHY: Record<string, string[]> = {
   directory_presence: [],
   google_only: ['directory_presence'],
   // V3.1: presence inherits directory_presence ONLY (no google_only)
   presence: ['directory_presence'],
-  discovery: ['directory_presence'],
   starter: ['google_only', 'directory_presence'],
+  discovery: ['google_only', 'directory_presence'],
   storefront: ['discovery', 'google_only', 'directory_presence'],
   commitment: ['storefront', 'discovery', 'google_only', 'directory_presence'],
-  professional: ['starter', 'google_only', 'directory_presence'],
-  enterprise: ['professional','commitment', 'starter', 'google_only', 'directory_presence'],
-  organization: ['professional','commitment', 'starter', 'google_only', 'directory_presence'],
-  chain_starter: ['starter','commitment', 'google_only', 'directory_presence'],
-  chain_professional: ['professional','commitment', 'starter', 'google_only', 'directory_presence'],
-  chain_enterprise: ['enterprise','commitment', 'professional', 'starter', 'google_only', 'directory_presence'],
+  ecommerce: ['storefront', 'discovery', 'google_only', 'directory_presence'],
+  omnichannel: ['commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  professional: ['omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  enterprise: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  organization: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  chain_starter: ['starter', 'google_only', 'directory_presence'],
+  chain_professional: ['professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
+  chain_enterprise: ['enterprise', 'professional', 'omnichannel', 'commitment', 'ecommerce', 'storefront', 'discovery', 'google_only', 'directory_presence'],
 };
 
 // Feature to minimum required tier mapping

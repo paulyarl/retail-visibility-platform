@@ -108,6 +108,68 @@
 
   "$chain_mirrors_note": "Phase 1.5a. A chain tier mirrors its base tier's grants. This is the invariant the failed bidirectional check was reaching for — the 1.5 diagnostic found it, and most of that check's 27 'multi-bag' rows are these mirrors behaving correctly.",
 
+  "inheritance": {
+    "$comment": "Phase 2 — canonical parent CLOSURE, not just direct parents. The resolvers do exactly ONE hop (web checkTierFeature/getTierFeatures, api checkTierAccess fallback), so each array IS the transitive closure by contract: a refactor that stores only direct parents passes 'acyclic' while silently stripping every inherited feature — the closure assertion exists to fail on that. Reference copy: web tier-features.ts. The api tier-access.ts copy had silently diverged (discovery lost google_only; professional/enterprise/organization lost the entire commerce chain; ecommerce/omnichannel had NO edges; chain_* wrongly carried commitment) — aligned to this 2026-10-16.",
+    "edges": {
+      "directory_presence": [],
+      "google_only": ["directory_presence"],
+      "presence": ["directory_presence"],
+      "starter": ["google_only", "directory_presence"],
+      "discovery": ["google_only", "directory_presence"],
+      "storefront": ["discovery", "google_only", "directory_presence"],
+      "commitment": ["storefront", "discovery", "google_only", "directory_presence"],
+      "ecommerce": ["storefront", "discovery", "google_only", "directory_presence"],
+      "omnichannel": ["commitment", "ecommerce", "storefront", "discovery", "google_only", "directory_presence"],
+      "professional": ["omnichannel", "commitment", "ecommerce", "storefront", "discovery", "google_only", "directory_presence"],
+      "enterprise": ["professional", "omnichannel", "commitment", "ecommerce", "storefront", "discovery", "google_only", "directory_presence"],
+      "organization": ["professional", "omnichannel", "commitment", "ecommerce", "storefront", "discovery", "google_only", "directory_presence"],
+      "chain_starter": ["starter", "google_only", "directory_presence"],
+      "chain_professional": ["professional", "omnichannel", "commitment", "ecommerce", "storefront", "discovery", "google_only", "directory_presence"],
+      "chain_enterprise": ["enterprise", "professional", "omnichannel", "commitment", "ecommerce", "storefront", "discovery", "google_only", "directory_presence"]
+    },
+    "omnichannel_money_modes": {
+      "$comment": "2.5 — omnichannel combines the deposit and full-payment paths; it must inherit BOTH money-mode tiers.",
+      "tier": "omnichannel",
+      "must_inherit": ["commitment", "ecommerce"]
+    },
+    "negative_rules": {
+      "presence_must_not_inherit": {
+        "$comment": "2.1 — inheriting google_only smears the Entry Presence modes (V3.1 rule).",
+        "tier": "presence",
+        "forbidden_parents": ["google_only", "starter"]
+      },
+      "discovery_no_platform_storefront": {
+        "$comment": "2.2 — discovery is the Google surface; the platform catalog keys 'storefront'/'product_search' belong to the starter lineage. (Not prefixes — 'storefront_enabled'/'storefront_retail' are gateway chrome every tier carries via directory_presence.)",
+        "tier": "discovery",
+        "resolved_bag_must_not_contain": ["storefront", "product_search"]
+      },
+      "no_checkout_below_commitment": {
+        "$comment": "2.3 — commerce starts at commitment/ecommerce. Prefix-level ban since commerce grants live in tier_features_list, not the static bags: nobody below commitment may carry commerce_*/checkout_* keys.",
+        "tiers": ["directory_presence", "presence", "google_only", "discovery", "storefront"],
+        "resolved_bag_must_not_have_prefix": ["commerce_", "checkout_"]
+      }
+    },
+    "gateway_allowlist": {
+      "$comment": "2.4 — directory_presence grants gateway chrome ONLY. The fixture says so; a new key in the bag is a contract change, not a drive-by.",
+      "keys": [
+        "directory_entry_enabled",
+        "directory_entry_layout_classic",
+        "directory_entry_hours_on",
+        "directory_entry_map_on",
+        "directory_entry_contact_on",
+        "directory_entry_qr_on",
+        "directory_entry_whatsapp_on",
+        "storefront_enabled",
+        "storefront_retail",
+        "directory_visibility_snap_ebt"
+      ]
+    },
+    "db_only_grant_tiers": {
+      "$comment": "2.6 — RULED: blessed, not a hole. These five tiers have no own TIER_FEATURES entries; their web-side grants are pure inheritance and their real feature rows live in tier_features_list (owned by the 0.2/DB leg). If a bag appears for one of these keys it needs a documented reason.",
+      "tiers": ["discovery", "storefront", "commitment", "ecommerce", "omnichannel"]
+    }
+  },
+
   "trial_map": {
     "$comment": "Phase 1.6. Canonical convention: `trial_<base>` → `<base>` for every base tier key. Each site map answers a different question (presentation / limits / feature-proxy / commerce / MV), but where a site maps a key it MUST agree with `canonical` unless listed in `site_exceptions`. Coverage is required for every canonical key — an unmapped trial_* key falls through to a literal lookup or a wrong-tier default (e.g. tier-limits missing `trial_enterprise` silently proxied to discovery's 75 SKUs). The MV's trial_map CTE (migration 332) is a SQL copy — checked by the Phase 3.7/DB leg, not unit tests.",
     "canonical": {

@@ -4480,6 +4480,78 @@ router.get('/:id/revenue', async (req: any, res: Response) => {
   }
 });
 
+// GET /:id/outreach-problems — verbatim problem → solution pairs for the
+// pitch-construction preview slots. The analyst emits these on the campaign's
+// triage briefing (the "AI Triage Briefing" panel source) and on its
+// per-platform audits (outreach_problems contract, Triage & Repair Outreach
+// Problems spec §5). Aggregated + deduped by problem text: the triage variant
+// first, then the latest audit per platform. Empty when no briefing or audit
+// carries the contract.
+router.get('/:id/outreach-problems', async (req: any, res: Response) => {
+  try {
+    const ctx = getCtx(req);
+    const campaignId = req.params.id;
+
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { repair_triage_briefing: true },
+    });
+
+    const problems: Array<{
+      problem: string;
+      regular: string;
+      hook: string;
+      solution: string;
+      evidence: string;
+      outreach_use: string;
+    }> = [];
+    const seen = new Set<string>();
+    const norm = (v: unknown) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+    const asString = (v: unknown) => (typeof v === 'string' ? v : '');
+    const push = (p: any) => {
+      if (!p || typeof p !== 'object' || !norm(p.problem)) return;
+      const key = norm(p.problem);
+      if (seen.has(key)) return;
+      seen.add(key);
+      problems.push({
+        problem: asString(p.problem),
+        regular: asString(p.regular),
+        hook: asString(p.hook),
+        solution: asString(p.solution),
+        evidence: asString(p.evidence),
+        outreach_use: asString(p.outreach_use),
+      });
+    };
+
+    // 1. Triage briefing variant (persisted by the triage/repair seek runs).
+    const brief = (campaign?.repair_triage_briefing as any) ?? null;
+    for (const p of Array.isArray(brief?.outreach_problems) ? brief.outreach_problems : []) push(p);
+
+    // 2. Latest audit per platform. A non-primary sibling inherits the
+    //    primary's business_analysis audit, so fall back to that when the
+    //    sibling has no business_analysis audit of its own.
+    const audits = (await prisma.mkt_audits_list.findMany({
+      where: { campaign_id: campaignId },
+      orderBy: { created_at: 'desc' },
+      select: { platform: true, audit_data: true },
+    })) as any[];
+    const latest = new Map<string, any>();
+    for (const a of audits) if (!latest.has(a.platform)) latest.set(a.platform, a);
+    if (!latest.has('business_analysis')) {
+      const BusinessContextService = (await import('../services/deliverable/BusinessContextService')).default;
+      const inherited = await BusinessContextService.getLatestAuditData(campaignId, ctx).catch(() => null);
+      if (inherited?.auditData) latest.set('business_analysis', { audit_data: inherited.auditData });
+    }
+    for (const a of latest.values()) {
+      for (const p of Array.isArray(a.audit_data?.outreach_problems) ? a.audit_data.outreach_problems : []) push(p);
+    }
+
+    res.json({ success: true, data: problems });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ─── Outreach Openers ───────────────────────────────────────────────────
 // IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
 // otherwise Express matches /openers as a campaign ID param and returns 404.
@@ -5136,7 +5208,12 @@ const pitchAssembleSchema = z.object({
       slot_label_prefix: z.string().optional(),
       section_title: z.string().optional(),
       first_slot_label: z.string().optional(),
-      // ── Structured footprint fields (A5 Multi-Signal, A3 Listing) ──
+      // Briefing regular/hook spoken lines (additive, optional). Captured
+      // verbatim from the campaign's outreach_problems briefing so the slot
+      // is architecture-aware of the regular → hook → fix pattern.
+      regular: z.string().optional(),
+      hook: z.string().optional(),
+      // ── Structured footprint fields (A5 Multi-Signal, A3 Listing, A8 Presence) ──
       // When platform_name + focus_attribute are present, the renderer
       // emits a structured Current State → Proposed Fix block and the
       // free-text review_text/response_text are ignored. Stored in the
@@ -5144,7 +5221,11 @@ const pitchAssembleSchema = z.object({
       // endpoint for before/after reporting on completed work.
       platform_name: z.string().optional(),
       profile_url: z.string().optional(),
-      focus_attribute: z.enum(['name', 'address', 'phone', 'website', 'claim_status']).optional(),
+      focus_attribute: z.enum([
+        'name', 'address', 'phone', 'website', 'claim_status',
+        'category', 'reviews', 'hours', 'photos', 'description',
+        'products', 'cta', 'presence', 'suspended', 'other',
+      ]).optional(),
       current_value: z.string().optional(),
       correct_value: z.string().optional(),
       summary: z.string().optional(),
