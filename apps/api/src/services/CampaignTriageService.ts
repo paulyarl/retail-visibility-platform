@@ -119,6 +119,31 @@ export interface StoredTriageResult {
 
 // ─── Service ─────────────────────────────────────────────────────────────
 
+/**
+ * Drop playbooks another campaign in the prospect already holds.
+ *
+ * The sibling-uniqueness guard (migration 184) keys on `playbook_code` over
+ * `business_prospect_id` + `scope: 'business'` — so a second campaign on the
+ * same playbook is refused. A recommendation the guard will reject is not a
+ * recommendation: without this filter every sibling's card recommended the
+ * prospect's rank-winner (which the primary owns), so Accept, Override and
+ * Create Sibling all 409'd and the sibling had no reachable lane.
+ *
+ * Degenerate case: when EVERY matching playbook is taken, the unfiltered list
+ * is returned so the card still renders a verdict (and the operator can see
+ * the conflict) rather than nothing.
+ *
+ * Pure — exported for direct testing.
+ */
+export function filterAvailablePlaybooks<T extends { code: string }>(
+  playbooks: T[],
+  usedElsewhere: ReadonlySet<string>,
+): T[] {
+  if (usedElsewhere.size === 0) return playbooks;
+  const available = playbooks.filter((p) => !usedElsewhere.has(p.code));
+  return available.length > 0 ? available : playbooks;
+}
+
 export class CampaignTriageService extends BaseService {
   private static instance: CampaignTriageService;
 
@@ -368,7 +393,52 @@ export class CampaignTriageService extends BaseService {
       signals,
       signalPrefs,
     );
-    return { signals, playbooks, sourceAuditId, sourceAuditSource, signalPrefs, wiredPrefs: wired };
+
+    // One playbook per prospect (migration 184). The sibling-uniqueness guard
+    // refuses a second campaign on the same playbook — so a recommendation the
+    // guard will reject is not a recommendation. Without this filter every
+    // sibling's card recommended the prospect's RANK-WINNER (PB-05), which the
+    // primary owns, so Accept, Override and Create Sibling all 409'd and the
+    // sibling had no reachable lane.
+    //
+    // Self-exclusion is implicit: the used set comes from the OTHER campaigns,
+    // so a campaign's own playbook stays in its own pool — and the primary is
+    // unaffected, because no sibling can hold the primary's playbook.
+    const usedElsewhere = await this.playbookCodesUsedElsewhere(prospectId, campaignId);
+    const rankedPlaybooks = filterAvailablePlaybooks(playbooks, usedElsewhere);
+
+    return {
+      signals,
+      playbooks: rankedPlaybooks,
+      sourceAuditId,
+      sourceAuditSource,
+      signalPrefs,
+      wiredPrefs: wired,
+    };
+  }
+
+  /**
+   * Playbook codes held by ANOTHER campaign in the same prospect group.
+   *
+   * Mirrors the sibling-uniqueness guard's key exactly — `playbook_code` over
+   * `business_prospect_id` + `scope: 'business'` — minus the current campaign,
+   * so a campaign's own playbook is never excluded from its own ranking.
+   */
+  private async playbookCodesUsedElsewhere(
+    prospectId: string | null,
+    campaignId: string,
+  ): Promise<Set<string>> {
+    if (!prospectId) return new Set();
+    const rows = (await this.prisma.mkt_campaigns_list.findMany({
+      where: {
+        business_prospect_id: prospectId,
+        scope: 'business',
+        id: { not: campaignId },
+        playbook_code: { not: null },
+      } as any,
+      select: { playbook_code: true },
+    })) as any[];
+    return new Set(rows.map((r) => r.playbook_code).filter(Boolean) as string[]);
   }
 
   /**

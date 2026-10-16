@@ -46,7 +46,7 @@ export interface RankedHook extends HookTemplate {
 
 export interface HookSuggestionResult {
   archetype: ArchetypeCode;
-  archetypeSource: 'triage' | 'fallback';
+  archetypeSource: 'triage' | 'campaign' | 'fallback';
   /**
    * The merge values used to resolve the hooks (business, city, category,
    * salutation, sender_name, claim_url, lead_platform …), nulls omitted.

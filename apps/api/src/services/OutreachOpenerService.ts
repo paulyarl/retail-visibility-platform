@@ -100,7 +100,7 @@ export interface OpenerResult {
 
 export interface ResolvedArchetype {
   archetype: ArchetypeSelection['archetype'];
-  source: 'triage' | 'fallback';
+  source: 'triage' | 'campaign' | 'fallback';
   reason: string;
 }
 
@@ -109,7 +109,8 @@ export interface ResolvedArchetype {
  *
  * Precedence:
  *   1. Operator-accepted triage result's playbook archetype (honors overrides)
- *   2. selectArchetype(latestAuditData) fallback
+ *   2. The campaign's own declared `archetype` (a sibling's lane)
+ *   3. selectArchetype(latestAuditData) fallback
  *
  * Returns { archetype, source, reason }. Throws if no audit exists.
  */
@@ -140,7 +141,38 @@ export async function resolveCampaignArchetype(
     };
   }
 
-  // 2. Fallback: recompute from latest audit data
+  // 2. The campaign's own declared LANE — its `playbook_code`.
+  //
+  // A sibling campaign is created FOR a playbook, and
+  // `mkt_campaigns_list.playbook_code` is that declaration. Nothing else
+  // reliably holds it: the `archetype` column is not stamped by acceptTriage,
+  // and re-evaluating a sibling's triage CLEARS `overridden_playbook_id` — so
+  // between a re-evaluate and a re-accept the triage no longer declares the
+  // lane, and the deterministic selector below knows nothing about it. That is
+  // how an A7 (website) sibling resolved as A8 (presence): right prompt
+  // family, wrong lane.
+  try {
+    const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
+    const declaredCode =
+      (campaign as any)?.playbook_code ?? (campaign as any)?.playbookCode ?? null;
+    if (declaredCode) {
+      const { MarketingPlaybookCatalogService } = await import('./MarketingPlaybookCatalogService');
+      const pb = await MarketingPlaybookCatalogService.getInstance()
+        .getPlaybookByCode(declaredCode, ctx);
+      const declared = (pb as any)?.archetype;
+      if (declared && VALID_ARCHETYPES.has(declared)) {
+        return {
+          archetype: declared as ArchetypeSelection['archetype'],
+          source: 'campaign',
+          reason: `campaign-declared: ${declared} (playbook ${declaredCode})`,
+        };
+      }
+    }
+  } catch {
+    // Campaign or playbook unreadable — fall through to the audit-derived selector.
+  }
+
+  // 3. Fallback: recompute from latest audit data
   const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
   if (!auditResult) {
     throw new Error(
@@ -317,45 +349,30 @@ export class OutreachOpenerService extends BaseService {
       common.triggered_signals = [];
     }
 
-    // Sprint 6: If the campaign has an accepted triage result, use the
-    // triage-derived archetype (which may be A5 — the only archetype
-    // selectArchetype never returns). This is the "triage → opener" flow:
-    // the operator accepts a playbook recommendation, and the opener
-    // generation respects that decision instead of re-running the
-    // deterministic selector.
+    // Archetype resolution is SHARED with every other consumer
+    // (`resolveCampaignArchetype`) rather than re-implemented here. The inline
+    // copy this replaces had drifted twice:
+    //   1. it read `triage.recommendedPlaybook` and ignored `overriddenPlaybook`
+    //      — so an OVERRIDDEN sibling generated the recommended playbook's
+    //      archetype, not the lane the operator chose;
+    //   2. it had no declared-lane step — so between a sibling's re-evaluate and
+    //      its re-accept it fell to the audit-derived selector and resolved as a
+    //      DIFFERENT lane (an A7 website sibling became an A8 presence opener).
     let selection: ArchetypeSelection;
-    let triageArchetype: string | null = null;
-    try {
-      const triage = await CampaignTriageService.getTriageResult(campaignId, ctx);
-      if (triage?.isOperatorAccepted === true) {
-        const pb = triage.recommendedPlaybook;
-        if (pb?.archetype) {
-          triageArchetype = pb.archetype;
-        }
-      }
-    } catch {
-      // Triage not found or not accepted — fall through to selectArchetype
-    }
-
-    if (triageArchetype && VALID_ARCHETYPES.has(triageArchetype)) {
-      // Use the triage-derived archetype. For A2, we still need a theme —
-      // re-run selectArchetype to get the theme if the triage archetype is A2.
-      // For A5, there is no theme (it's dual-signal, not theme-driven).
-      if (triageArchetype === 'A2') {
-        const autoSel = selectArchetype(auditResult.auditData);
-        selection = {
-          archetype: 'A2',
-          reason: `triage-accepted: A2 (PB recommendation). Theme: ${autoSel.theme?.theme ?? 'recurring negatives'}`,
-          theme: autoSel.theme,
-        };
-      } else {
-        selection = {
-          archetype: triageArchetype as ArchetypeSelection['archetype'],
-          reason: `triage-accepted: ${triageArchetype} (playbook recommendation)`,
-        };
-      }
+    const resolved = await resolveCampaignArchetype(campaignId, ctx);
+    if (resolved.archetype === 'A2') {
+      // A2 is theme-driven — the theme still comes from the audit selector.
+      const autoSel = selectArchetype(auditResult.auditData);
+      selection = {
+        archetype: 'A2',
+        reason: `${resolved.reason}. Theme: ${autoSel.theme?.theme ?? 'recurring negatives'}`,
+        theme: autoSel.theme,
+      };
     } else {
-      selection = selectArchetype(auditResult.auditData);
+      selection = {
+        archetype: resolved.archetype,
+        reason: resolved.reason,
+      };
     }
 
     const extractedFields = extractFields(
