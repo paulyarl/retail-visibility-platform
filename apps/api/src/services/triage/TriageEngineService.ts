@@ -121,6 +121,24 @@ export function ruleMatches(
 // ─── Reasoning builder ───────────────────────────────────────────────────
 
 /**
+ * The signals that actually SATISFIED the winning rule's clauses — the `any`
+ * hits, the `all` set, and both dual groups when the rule is dual.
+ */
+function matchedSignals(
+  rules: MatchingRules,
+  signals: ReadonlySet<SignalCode>,
+): SignalCode[] {
+  const out = new Set<SignalCode>();
+  for (const code of rules.any ?? []) if (signals.has(code)) out.add(code);
+  for (const code of rules.all ?? []) if (signals.has(code)) out.add(code);
+  if (rules.dual) {
+    for (const code of rules.dual.groupA ?? []) if (signals.has(code)) out.add(code);
+    for (const code of rules.dual.groupB ?? []) if (signals.has(code)) out.add(code);
+  }
+  return Array.from(out);
+}
+
+/**
  * Build a human-readable reasoning string for the winning playbook, naming
  * the triggered signals and which clause matched. Uses the family predicates
  * for natural-language grouping (e.g., "repair + review signals present").
@@ -140,6 +158,20 @@ function buildReasoning(
 
   // Name the winning playbook + its primary trigger
   parts.push(`${playbook.code} (${playbook.name})`);
+
+  // Name the signals that ACTUALLY matched — derived from the rule clauses,
+  // not from the family buckets below.
+  //
+  // Those buckets cover repair / review / crisis / visual but NOT the website
+  // family, so everything `WC_*` fell through to "other signals". A website
+  // playbook (PB-08, whose entire `any` clause is `WC_*`) therefore rendered a
+  // rationale that filed its own winning signal under "other" while listing
+  // the duplicate and NAP-drift signals that did not contribute — the card
+  // read as if listing drift had driven a website recommendation.
+  const matched = matchedSignals(rules, signals);
+  if (matched.length > 0) {
+    parts.push(`matched on: ${matched.join(', ')}`);
+  }
 
   if (rules.dual) {
     parts.push(
@@ -167,6 +199,7 @@ function buildReasoning(
     ...review,
     ...crisis,
     ...visual,
+    ...matched,
   ]);
   const other = detected.filter((s) => !mentioned.has(s));
   if (other.length > 0) {
