@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
 import DemoBadge from '@/components/shared/DemoBadge';
+import { getDirectoryListingUrl } from '@/utils/slug';
 
 interface StoreCardProps {
   listing: {
@@ -64,12 +65,10 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
     }
   }, [listing.isPromoted, listing.tenantId]);
 
-  // Use external link only when capability flag is set and website exists
-  const canUseExternal = listing.canUseExternalLink && !!listing.website;
-  const destinationUrl = canUseExternal
-    ? (listing.website as string)
-    : `/directory/${listing.slug || listing.tenantId}`;
-  const isExternalLink = canUseExternal;
+  // Directory cards always land on the entry page (directory for claimed
+  // tenants, place for unclaimed seeds) — never the store's external website,
+  // so a listing with a website can't leak shoppers off-platform.
+  const entryUrl = getDirectoryListingUrl(listing);
 
   // Format rating
   const formatRating = (rating: number) => {
@@ -80,7 +79,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
   const handleDirectoryPageClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/directory/${listing.slug || listing.tenantId}`);
+    router.push(entryUrl);
   };
 
   // Handle publish to directory action (placeholder for future implementation)
@@ -99,7 +98,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
       className="group cursor-pointer"
     >
       <Link
-        href={destinationUrl}
+        href={entryUrl}
         className="block"
         onClick={() => { if (listing.isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}
       >
@@ -244,7 +243,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
 
               {/* Main CTA Button */}
               <div className="w-full text-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors cursor-pointer">
-                {isExternalLink ? 'Visit Website' : 'View Storefront'} →
+                View Storefront →
               </div>
             </div>
           </div>

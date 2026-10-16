@@ -11,7 +11,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MapPin, Package, Star, ExternalLink, Navigation } from 'lucide-react';
+import { MapPin, Package, Star, ChevronRight, Navigation } from 'lucide-react';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
@@ -40,14 +40,13 @@ export default function StoreCardV2({
   const isImmersive = appearance === 'immersive';
   const isEditorial = appearance === 'editorial';
 
-  // Use external link only when capability flag is set and website exists
-  const canUseExternal = store.canUseExternalLink && !!store.website;
+  // Directory cards always land on the entry page (directory for claimed
+  // tenants, place for unclaimed seeds) — never the store's external website,
+  // so a listing with a website can't leak shoppers off-platform.
   const baseEntryUrl = getDirectoryListingUrl(store);
   const entryUrl = shelfRef
     ? `${baseEntryUrl}${baseEntryUrl.includes('?') ? '&' : '?'}shelf=${encodeURIComponent(shelfRef)}`
     : baseEntryUrl;
-  const destinationUrl = canUseExternal ? (store.website as string) : entryUrl;
-  const isExternalLink = canUseExternal;
 
   // Shelf → entry click-through — self-reported from the ref this card carries.
   const handleEntryClick = () => reportShelfListingClick(shelfRef);
@@ -128,10 +127,8 @@ export default function StoreCardV2({
 
   return (
     <Link
-      href={destinationUrl}
+      href={entryUrl}
       onClick={handleEntryClick}
-      target={isExternalLink ? '_blank' : undefined}
-      rel={isExternalLink ? 'noopener noreferrer' : undefined}
       className={`block group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 rounded-2xl ${cardSize}`}
     >
       <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
@@ -253,7 +250,7 @@ export default function StoreCardV2({
               className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             >
               Visit Store
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

@@ -58,6 +58,8 @@ export interface DirectoryStore {
   businessHours?: any;
   distance?: number;
   canUseExternalLink?: boolean;
+  /** `directory_seed` marks an unclaimed seed — routed to /place/{slug}. */
+  listingOrigin?: string | null;
   isDemo?: boolean;
   demoExpiresAt?: string | null;
 }

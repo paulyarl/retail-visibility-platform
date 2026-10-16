@@ -3465,29 +3465,84 @@ function sniffImageMimeType(buf: Buffer): string | null {
 }
 
 /**
+ * Decode a base64 image data URL into bytes — the server half of the
+ * canvas-encoded upload contract the seed/directory photo flows use (the client
+ * re-encodes through a canvas so EXIF is stripped before the bytes leave the
+ * browser). Same shape as DirectoryPresenceSeedService.uploadSeedLogo.
+ */
+function decodeImageDataUrl(dataUrl: string): { buffer: Buffer; mime: string } | null {
+  const match = /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/.exec(dataUrl.trim());
+  if (!match) return null;
+  try {
+    return { mime: match[1], buffer: Buffer.from(match[2], 'base64') };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /:campaignId/files/upload
  *
- * One-step multipart upload for diagnostic screenshots. Accepts a single
- * file field named "file", uploads to the Supabase disputes bucket, and
- * creates an mkt_files_list record with file_type='diagnostic_screenshot'.
+ * One-step upload for diagnostic screenshots. Accepts either shape:
+ *   - multipart/form-data with a single "file" field (curl / legacy callers)
+ *   - application/json { dataUrl, contentType?, fileName? } — the canvas-encoded
+ *     path the seed/directory photo flows use, so the client can strip EXIF
+ *     before the bytes leave the browser
+ * Uploads to the Supabase disputes bucket and creates an mkt_files_list record
+ * with file_type='diagnostic_screenshot'.
  *
  * Mirrors the DisputeIntakeService upload pattern (line 588).
  */
 router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file'), async (req: any, res: Response) => {
   try {
     const { campaignId } = req.params;
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ success: false, error: 'no_file', message: 'A file named "file" is required.' });
+
+    // Normalize both payload shapes down to bytes + declared metadata.
+    let buffer: Buffer;
+    let declaredMime: string;
+    let fileName: string;
+
+    if (req.file) {
+      buffer = req.file.buffer;
+      declaredMime = req.file.mimetype;
+      fileName = req.file.originalname;
+    } else if (typeof req.body?.dataUrl === 'string') {
+      const decoded = decodeImageDataUrl(req.body.dataUrl);
+      if (!decoded) {
+        return res.status(400).json({
+          success: false,
+          error: 'invalid_payload',
+          message: 'dataUrl must be a base64 image data URL (data:<mime>;base64,<bytes>).',
+        });
+      }
+      buffer = decoded.buffer;
+      declaredMime = typeof req.body.contentType === 'string' && req.body.contentType ? req.body.contentType : decoded.mime;
+      fileName = typeof req.body.fileName === 'string' && req.body.fileName.trim() ? req.body.fileName : 'screenshot';
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'no_file',
+        message: 'A multipart "file" field or a JSON dataUrl is required.',
+      });
+    }
+
+    // multer caps the multipart body; the JSON path is bounded only by the body
+    // parser, so enforce the same ceiling for both.
+    if (buffer.length > unifiedConfig.recoveryMaxAttachmentBytes) {
+      return res.status(413).json({
+        success: false,
+        error: 'file_too_large',
+        message: `Screenshots are capped at ${Math.round(unifiedConfig.recoveryMaxAttachmentBytes / (1024 * 1024))}MB.`,
+      });
     }
 
     // Validate MIME type — screenshots only (PNG, JPEG, WebP)
     const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'];
-    if (!ALLOWED_MIME.includes(file.mimetype)) {
+    if (!ALLOWED_MIME.includes(declaredMime)) {
       return res.status(400).json({
         success: false,
         error: 'invalid_file_type',
-        message: `Only PNG, JPEG, and WebP screenshots are accepted (got: ${file.mimetype}).`,
+        message: `Only PNG, JPEG, and WebP screenshots are accepted (got: ${declaredMime}).`,
       });
     }
 
@@ -3510,22 +3565,22 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const pathKey = `diagnostic-${campaignId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const pathKey = `diagnostic-${campaignId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-    const sniffedMime = sniffImageMimeType(file.buffer);
-    if (sniffedMime && sniffedMime !== file.mimetype) {
+    const sniffedMime = sniffImageMimeType(buffer);
+    if (sniffedMime && sniffedMime !== declaredMime) {
       logger.warn('Diagnostic screenshot declared MIME differs from content', getCtx(req), {
         campaignId,
-        declared: file.mimetype,
+        declared: declaredMime,
         detected: sniffedMime,
-        fileName: file.originalname,
+        fileName,
       });
     }
-    const effectiveMime = sniffedMime ?? file.mimetype;
+    const effectiveMime = sniffedMime ?? declaredMime;
 
     const { error: uploadError } = await supabase.storage
       .from(StorageBuckets.DISPUTES.name)
-      .upload(pathKey, file.buffer, {
+      .upload(pathKey, buffer, {
         contentType: effectiveMime,
         upsert: false,
       });
@@ -3539,14 +3594,14 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
     const fileRecord = await MarketingFileService.createFile({
       campaignId,
       fileType: 'diagnostic_screenshot',
-      fileName: file.originalname,
+      fileName,
       storagePath: pathKey,
-      fileSize: file.size,
+      fileSize: buffer.length,
       mimeType: effectiveMime,
       uploadedBy: req.user?.id,
     }, getCtx(req));
 
-    logger.info('Diagnostic screenshot uploaded', getCtx(req), { campaignId, fileId: fileRecord.id, fileName: file.originalname });
+    logger.info('Diagnostic screenshot uploaded', getCtx(req), { campaignId, fileId: fileRecord.id, fileName });
 
     return res.status(201).json({ success: true, data: fileRecord });
   } catch (error) {

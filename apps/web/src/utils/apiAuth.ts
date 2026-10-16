@@ -101,16 +101,51 @@ export async function requirePlatformAdmin(req: NextRequest): Promise<{
  * Create authenticated fetch headers for backend API calls
  * Uses Auth0 access token if available, falls back to session-based auth
  */
-export function createAuthHeaders(accessToken: string | null): HeadersInit {
+export function createAuthHeaders(
+  accessToken: string | null,
+  identity?: { auth0Id?: string | null; auth0Email?: string | null }
+): HeadersInit {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  
+
   if (accessToken) {
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
-  
+
+  // The API's authenticateToken has read x-auth0-id / x-auth0-email (or the
+  // auth0_email cookie) since the Auth0 migration removed the legacy Bearer
+  // path (docs/auth0-migration-plan.md Phase 2). These are the same headers
+  // AdminApiSingleton installs client-side from the marker cookies.
+  if (identity?.auth0Id) {
+    headers['x-auth0-id'] = identity.auth0Id;
+  }
+  if (identity?.auth0Email) {
+    headers['x-auth0-email'] = identity.auth0Email;
+  }
+
   return headers;
+}
+
+/**
+ * Resolve the Auth0 identity the API authenticates with.
+ *
+ * `auth0.getSession()` reads the request context directly (that is why
+ * `getAuth0Session(req)` above can ignore its `req` argument), so resolving it
+ * here keeps every existing `authenticatedFetch` caller working without having
+ * to thread the session through ~45 call sites.
+ */
+async function resolveAuth0Identity(): Promise<{ auth0Id: string | null; auth0Email: string | null }> {
+  try {
+    const session = await auth0.getSession();
+    return {
+      auth0Id: (session?.user?.sub as string) || null,
+      auth0Email: (session?.user?.email as string) || null,
+    };
+  } catch (error) {
+    clientLogger.error('[API Auth] Failed to resolve Auth0 identity for upstream headers:', { detail: error });
+    return { auth0Id: null, auth0Email: null };
+  }
 }
 
 /**
@@ -124,12 +159,13 @@ export async function authenticatedFetch(
 ): Promise<Response> {
   const apiBaseUrl = process.env.API_BASE_URL || process.env.API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || '';
   const url = `${apiBaseUrl}${endpoint}`;
-  
+
+  const identity = await resolveAuth0Identity();
   const headers = {
-    ...createAuthHeaders(accessToken),
+    ...createAuthHeaders(accessToken, identity),
     ...options.headers,
   };
-  
+
   return fetch(url, {
     ...options,
     headers,

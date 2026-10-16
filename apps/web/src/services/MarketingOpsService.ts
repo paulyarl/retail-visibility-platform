@@ -11,7 +11,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { ResponseType } from '../providers/base/FlexibleApiSingleton';
 import { clientLogger } from '../lib/client-logger';
-import { uploadImage, dataUrlToBlob, ImageUploadPresets } from '../lib/image-upload';
+import { uploadImage, ImageUploadPresets } from '../lib/image-upload';
 
 // ====================
 // TYPES
@@ -5321,77 +5321,71 @@ class MarketingOpsService extends AdminApiSingleton {
   // ─── Cascade methods ───────────────────────────────────────────
 
   async enableCascade(campaignId: string, config?: any): Promise<any> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/enable`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ cascade_config: config }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to enable cascade (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/cascade/enable`,
+      { method: 'POST', body: JSON.stringify({ cascade_config: config }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to enable cascade');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async disableCascade(campaignId: string): Promise<any> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/disable`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to disable cascade (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/cascade/disable`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to disable cascade');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async getCascadeStatus(campaignId: string): Promise<CascadeStatus> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/status`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to get cascade status (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/cascade/status`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to get cascade status');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Signal registry + triage methods (Sprint 3.5) ──────────────────
 
   async listSignals(): Promise<SignalRegistryEntry[]> {
-    const res = await fetch(`${BASE_URL}/signals`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to list signals (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/signals`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to list signals');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async getTriage(campaignId: string): Promise<TriageResult | null> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/triage`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to get triage (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/triage`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      if (result.status === 404 || (typeof result.error === 'object' && result.error?.status === 404)) return null;
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to get triage');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async evaluateTriage(
@@ -5402,64 +5396,58 @@ class MarketingOpsService extends AdminApiSingleton {
       operator_removed_signals?: string[];
     },
   ): Promise<TriageResult> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/triage/evaluate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to evaluate triage (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/triage/evaluate`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to evaluate triage');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async acceptTriage(campaignId: string): Promise<TriageResult> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/triage/accept`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to accept triage (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/triage/accept`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to accept triage');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async overrideTriage(campaignId: string, playbookCode: string, reason?: string): Promise<TriageResult> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/triage/override`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ playbook_code: playbookCode, reason }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to override triage (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/triage/override`,
+      { method: 'POST', body: JSON.stringify({ playbook_code: playbookCode, reason }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to override triage');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Multi-archetype: triage alternatives + siblings + cycling (Sprint 1/3) ──
 
   async getTriageAlternatives(campaignId: string): Promise<any> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/triage/alternatives`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to get triage alternatives (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/triage/alternatives`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      if (result.status === 404 || (typeof result.error === 'object' && result.error?.status === 404)) return null;
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to get triage alternatives');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async createSiblingCampaign(campaignId: string, input: {
@@ -5471,58 +5459,56 @@ class MarketingOpsService extends AdminApiSingleton {
     assignedTo?: string;
     notes?: string;
   }): Promise<any> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/siblings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        archetype: input.archetype,
-        playbook_code: input.playbookCode,
-        campaign_category: input.campaignCategory,
-        repair_track: input.repairTrack,
-        repair_issue_type: input.repairIssueType,
-        assigned_to: input.assignedTo,
-        notes: input.notes,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to create sibling campaign (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/siblings`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          archetype: input.archetype,
+          playbook_code: input.playbookCode,
+          campaign_category: input.campaignCategory,
+          repair_track: input.repairTrack,
+          repair_issue_type: input.repairIssueType,
+          assigned_to: input.assignedTo,
+          notes: input.notes,
+        }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to create sibling campaign');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async listSiblings(campaignId: string): Promise<any[]> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/siblings`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to list siblings (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/siblings`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to list siblings');
     }
-    const json = await res.json();
-    return json.data ?? [];
+    return result.data?.data ?? result.data ?? [];
   }
 
   async cycleToNextEngagement(campaignId: string, input?: {
     resetToStage?: string;
     notes?: string;
   }): Promise<any> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/cycle`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input ?? {}),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to cycle to next engagement (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/cycle`,
+      { method: 'POST', body: JSON.stringify(input ?? {}) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to cycle to next engagement');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Project plan (spec §13 — computed-on-read, internal view) ─────────
@@ -5533,16 +5519,16 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async getProjectPlan(prospectIdOrCampaignId: string, campaignId?: string): Promise<ProjectPhasePlanResponse> {
     const qs = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
-    const res = await fetch(
+    const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/prospects/${encodeURIComponent(prospectIdOrCampaignId)}/project-plan${qs}`,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' }, credentials: 'include' },
+      { method: 'GET' },
+      undefined,
+      0,
     );
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to get project plan (${res.status})`);
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to get project plan');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   /**
@@ -5556,25 +5542,20 @@ class MarketingOpsService extends AdminApiSingleton {
     campaignId?: string,
   ): Promise<{ controlling_audit_id: string | null }> {
     const qs = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
-    const res = await fetch(
+    const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/prospects/${encodeURIComponent(prospectIdOrCampaignId)}/controlling-audit${qs}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ auditId }),
-      },
+      { method: 'PUT', body: JSON.stringify({ auditId }) },
+      undefined,
+      0,
     );
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to set controlling audit (${res.status})`);
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to set controlling audit');
     }
     // Pinned audit rows are embedded in every sibling's cached campaign
     // detail (inherited audits) — drop the whole campaign cache prefix.
     await this.invalidateCachePattern('mkt-ops-campaign');
     await this.invalidateCachePattern('mkt-ops-audits');
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Playbook catalog CRUD (Sprint 4) ────────────────────────────────
@@ -5584,65 +5565,67 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.category) params.set('category', filters.category);
     if (filters?.isActive !== undefined) params.set('is_active', String(filters.isActive));
     const qs = params.toString();
-    const res = await fetch(`${BASE_URL}/playbooks${qs ? `?${qs}` : ''}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to list playbooks (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to list playbooks');
+    }
+    return result.data?.data ?? result.data;
   }
 
   async createPlaybook(input: PlaybookCreateInput): Promise<PlaybookCatalogEntry> {
-    const res = await fetch(`${BASE_URL}/playbooks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to create playbook (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to create playbook');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async updatePlaybook(id: string, input: Partial<PlaybookCreateInput>): Promise<PlaybookCatalogEntry> {
-    const res = await fetch(`${BASE_URL}/playbooks/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to update playbook (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/${id}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to update playbook');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async deletePlaybook(id: string): Promise<void> {
-    const res = await fetch(`${BASE_URL}/playbooks/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to delete playbook (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/${id}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to delete playbook');
+    }
   }
 
   async reorderPlaybooks(rankings: { id: string; priority_rank: number }[]): Promise<PlaybookCatalogEntry[]> {
-    const res = await fetch(`${BASE_URL}/playbooks/reorder`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ rankings }),
-    });
-    if (!res.ok) throw new Error(`Failed to reorder playbooks (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/reorder`,
+      { method: 'PUT', body: JSON.stringify({ rankings }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to reorder playbooks');
+    }
+    return result.data?.data ?? result.data;
   }
 
   // ─── Signal registry CRUD (Sprint 4) ─────────────────────────────────
@@ -5657,18 +5640,16 @@ class MarketingOpsService extends AdminApiSingleton {
     secondary_playbook?: string | null;
     is_active?: boolean;
   }): Promise<SignalRegistryEntry> {
-    const res = await fetch(`${BASE_URL}/signals`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to create signal (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/signals`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to create signal');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateSignal(id: string, input: Partial<{
@@ -5680,219 +5661,243 @@ class MarketingOpsService extends AdminApiSingleton {
     secondary_playbook: string | null;
     is_active: boolean;
   }>): Promise<SignalRegistryEntry> {
-    const res = await fetch(`${BASE_URL}/signals/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to update signal (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/signals/${id}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to update signal');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteSignal(id: string): Promise<void> {
-    const res = await fetch(`${BASE_URL}/signals/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to delete signal (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/signals/${id}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to delete signal');
+    }
   }
 
   // ─── Playbook checklist CRUD (Operator Checklist Sprint) ──────────────
 
   async listChecklistSteps(playbookId: string, includeInactive = false): Promise<PlaybookChecklistStep[]> {
     const qs = includeInactive ? '?include_inactive=true' : '';
-    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist${qs}`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to list checklist steps (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/${playbookId}/checklist${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to list checklist steps');
+    }
+    return result.data?.data ?? result.data;
   }
 
   async createChecklistStep(playbookId: string, input: ChecklistStepInput): Promise<PlaybookChecklistStep> {
-    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        title: input.title,
-        instructions: input.instructions,
-        step_type: input.stepType,
-        action_config: input.actionConfig,
-        is_required: input.isRequired,
-        is_active: input.isActive,
-        stage_tag: input.stageTag,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to create checklist step (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/${playbookId}/checklist`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title: input.title,
+          instructions: input.instructions,
+          step_type: input.stepType,
+          action_config: input.actionConfig,
+          is_required: input.isRequired,
+          is_active: input.isActive,
+          stage_tag: input.stageTag,
+        }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to create checklist step');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateChecklistStep(id: string, input: Partial<ChecklistStepInput> & { stepOrder?: number }): Promise<PlaybookChecklistStep> {
-    const res = await fetch(`${BASE_URL}/checklist-steps/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        title: input.title,
-        instructions: input.instructions,
-        step_type: input.stepType,
-        action_config: input.actionConfig,
-        is_required: input.isRequired,
-        is_active: input.isActive,
-        step_order: input.stepOrder,
-        stage_tag: input.stageTag,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || `Failed to update checklist step (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/checklist-steps/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: input.title,
+          instructions: input.instructions,
+          step_type: input.stepType,
+          action_config: input.actionConfig,
+          is_required: input.isRequired,
+          is_active: input.isActive,
+          step_order: input.stepOrder,
+          stage_tag: input.stageTag,
+        }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to update checklist step');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteChecklistStep(id: string): Promise<void> {
-    const res = await fetch(`${BASE_URL}/checklist-steps/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.message || body?.error || `Failed to delete checklist step (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/checklist-steps/${id}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to delete checklist step');
     }
   }
 
   async reorderChecklistSteps(playbookId: string, rankings: { id: string; step_order: number }[]): Promise<PlaybookChecklistStep[]> {
-    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist/reorder`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ rankings }),
-    });
-    if (!res.ok) throw new Error(`Failed to reorder checklist steps (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/${playbookId}/checklist/reorder`,
+      { method: 'PUT', body: JSON.stringify({ rankings }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to reorder checklist steps');
+    }
+    return result.data?.data ?? result.data;
   }
 
   // ─── Campaign checklist (resolved view + progress toggle) ────────────
 
   async getCampaignChecklist(campaignId: string): Promise<CampaignChecklistView> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/checklist`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to get campaign checklist (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/checklist`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to get campaign checklist');
+    }
+    return result.data?.data ?? result.data;
   }
 
   async setChecklistStepProgress(campaignId: string, stepId: string, input: { completed: boolean; note?: string | null }): Promise<CampaignChecklistView> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/checklist/${stepId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.message || body?.error || `Failed to toggle checklist step (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/checklist/${stepId}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to toggle checklist step');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Outreach state (bridge sprint) ───────────────────────────────────
 
   async getOutreachState(campaignId: string): Promise<OutreachState> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/outreach-state`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to get outreach state (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach-state`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to get outreach state');
+    }
+    return result.data?.data ?? result.data;
   }
 
   // ─── Checklist suggestions (operator feedback loop) ───────────────────
 
   async submitChecklistSuggestion(campaignId: string, input: ChecklistSuggestionInput): Promise<PlaybookChecklistSuggestion> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/checklist/suggestions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        step_id: input.stepId,
-        suggestion_kind: input.suggestionKind,
-        position: input.position,
-        proposed_step: input.proposedStep,
-        rationale: input.rationale,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.message || body?.error || `Failed to submit suggestion (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/checklist/suggestions`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          step_id: input.stepId,
+          suggestion_kind: input.suggestionKind,
+          position: input.position,
+          proposed_step: input.proposedStep,
+          rationale: input.rationale,
+        }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to submit suggestion');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async listCampaignChecklistSuggestions(campaignId: string): Promise<PlaybookChecklistSuggestion[]> {
-    const res = await fetch(`${BASE_URL}/${campaignId}/checklist/suggestions`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to list campaign suggestions (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/checklist/suggestions`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to list campaign suggestions');
+    }
+    return result.data?.data ?? result.data;
   }
 
   async listPlaybookChecklistSuggestions(playbookId: string, status?: 'pending' | 'accepted' | 'rejected'): Promise<PlaybookChecklistSuggestion[]> {
     const qs = status ? `?status=${status}` : '';
-    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist/suggestions${qs}`, {
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Failed to list playbook suggestions (${res.status})`);
-    const json = await res.json();
-    return json.data;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/playbooks/${playbookId}/checklist/suggestions${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to list playbook suggestions');
+    }
+    return result.data?.data ?? result.data;
   }
 
   async acceptChecklistSuggestion(id: string, amendedStep?: Record<string, any>): Promise<PlaybookChecklistSuggestion> {
-    const res = await fetch(`${BASE_URL}/checklist-suggestions/${id}/accept`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ proposed_step: amendedStep }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.message || body?.error || `Failed to accept suggestion (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/checklist-suggestions/${id}/accept`,
+      { method: 'POST', body: JSON.stringify({ proposed_step: amendedStep }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to accept suggestion');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   async rejectChecklistSuggestion(id: string, reviewNote?: string): Promise<PlaybookChecklistSuggestion> {
-    const res = await fetch(`${BASE_URL}/checklist-suggestions/${id}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ review_note: reviewNote }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.message || body?.error || `Failed to reject suggestion (${res.status})`);
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/checklist-suggestions/${id}/reject`,
+      { method: 'POST', body: JSON.stringify({ review_note: reviewNote }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to reject suggestion');
     }
-    const json = await res.json();
-    return json.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Prospect Queue (Add to Queue sprint) ──────────────────────────────
@@ -7583,25 +7588,46 @@ MarketingOpsService.prototype.getGalleryDashboard = async function (
   return result.data?.data ?? result.data;
 };
 
+/** Read a File into a base64 data URL — the fallback when the canvas pass fails. */
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
- * Normalize a picked screenshot through the shared image pipeline — the same
- * canvas re-encode the seed-page/directory photo flow uses. The browser
- * declares file.type from the extension, so a JPEG renamed .png arrives
- * mislabeled; the canvas pass produces honest bytes, strips EXIF, and caps
- * dimensions. On any processing failure we fall back to the raw file and let
- * the API's magic-byte sniff keep the stored metadata honest.
+ * Encode a picked screenshot for upload — the same shape the seed-page /
+ * directory photo flows send: a canvas re-encode carried as a base64 dataUrl
+ * in a JSON body rather than a multipart file part.
+ *
+ * The browser declares file.type from the extension, so a JPEG renamed .png
+ * arrives mislabeled; the canvas pass produces honest bytes, strips EXIF, and
+ * caps dimensions. On any processing failure we fall back to the raw bytes as
+ * a dataUrl and let the API's magic-byte sniff keep the stored metadata honest.
  */
-async function normalizeScreenshot(file: File): Promise<File> {
-  if (typeof document === 'undefined') return file;
-  try {
-    const result = await uploadImage(file, ImageUploadPresets.diagnostic);
-    if (result.error || !result.dataUrl) return file;
-    const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[result.contentType] || '';
-    const baseName = file.name.replace(/\.[^.]+$/, '') || 'screenshot';
-    return new File([dataUrlToBlob(result.dataUrl)], `${baseName}${ext}`, { type: result.contentType });
-  } catch {
-    return file;
+async function encodeScreenshotPayload(
+  file: File,
+): Promise<{ dataUrl: string; contentType: string; fileName: string }> {
+  if (typeof document !== 'undefined') {
+    try {
+      const result = await uploadImage(file, ImageUploadPresets.diagnostic);
+      if (!result.error && result.dataUrl) {
+        const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[result.contentType] || '';
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'screenshot';
+        return { dataUrl: result.dataUrl, contentType: result.contentType, fileName: `${baseName}${ext}` };
+      }
+    } catch {
+      // fall through to the raw read
+    }
   }
+  return {
+    dataUrl: await readFileAsDataUrl(file),
+    contentType: file.type || 'application/octet-stream',
+    fileName: file.name || 'screenshot',
+  };
 }
 
 MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
@@ -7609,15 +7635,13 @@ MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
   campaignId: string,
   file: File,
 ): Promise<MarketingFile> {
-  const upload = await normalizeScreenshot(file);
-  const formData = new FormData();
-  formData.append('file', upload);
+  const payload = await encodeScreenshotPayload(file);
 
   const result = await this.makeDefaultRequest<any>(
     `${BASE_URL}/${campaignId}/files/upload`,
     {
       method: 'POST',
-      body: formData,
+      body: JSON.stringify(payload),
     },
     undefined,
     0,
@@ -8095,7 +8119,7 @@ const marketingOpsService = MarketingOpsService.getInstance();
 export { marketingOpsService, MarketingOpsService };
 export default marketingOpsService;
 
-// ─── Cascade methods (added to the prototype for use by CascadePanel) ──────
+// ─── Cascade status (consumed by CascadePanel) ────────────────────────────
 
 export interface CascadeStatus {
   campaignId: string;
@@ -8112,49 +8136,6 @@ export interface CascadeStatus {
     notes: string;
   }>;
 }
-
-MarketingOpsService.prototype.enableCascade = async function (campaignId: string, config?: any): Promise<any> {
-  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/enable`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ cascade_config: config }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to enable cascade (${res.status})`);
-  }
-  const json = await res.json();
-  return json.data;
-};
-
-MarketingOpsService.prototype.disableCascade = async function (campaignId: string): Promise<any> {
-  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/disable`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to disable cascade (${res.status})`);
-  }
-  const json = await res.json();
-  return json.data;
-};
-
-MarketingOpsService.prototype.getCascadeStatus = async function (campaignId: string): Promise<CascadeStatus> {
-  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/status`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to get cascade status (${res.status})`);
-  }
-  const json = await res.json();
-  return json.data;
-};
 
 // ─── Signal registry + triage methods (Sprint 3.5) ───────────────────────
 
