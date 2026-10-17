@@ -115,7 +115,7 @@ export default function GBPAdvancedFeaturesPage() {
   async function fetchMedia() {
     try {
       const data = await platformHomeService.getGoogleBusinessMedia(tenantId);
-      setMedia(data.data || []);
+      setMedia(data || []);
     } catch (error) {
       clientLogger.error('Failed to fetch media:', { detail: error });
     }
@@ -124,7 +124,7 @@ export default function GBPAdvancedFeaturesPage() {
   async function fetchPosts() {
     try {
       const data = await platformHomeService.getGoogleBusinessPosts(tenantId);
-      setPosts(data.data || []);
+      setPosts(data || []);
     } catch (error) {
       clientLogger.error('Failed to fetch posts:', { detail: error });
     }
@@ -133,10 +133,10 @@ export default function GBPAdvancedFeaturesPage() {
   async function fetchReviews() {
     try {
       const data = await platformHomeService.getGoogleBusinessReviews(tenantId);
-      setReviews(data.data?.reviews || []);
+      setReviews(data?.reviews || []);
       setReviewStats({
-        averageRating: data.data?.averageRating,
-        totalReviewCount: data.data?.totalReviewCount,
+        averageRating: data?.averageRating,
+        totalReviewCount: data?.totalReviewCount,
       });
     } catch (error) {
       clientLogger.error('Failed to fetch reviews:', { detail: error });
@@ -146,7 +146,7 @@ export default function GBPAdvancedFeaturesPage() {
   async function fetchAttributes() {
     try {
       const data = await platformHomeService.getGoogleBusinessAttributes(tenantId);
-      setAttributes(data.data || []);
+      setAttributes(data || []);
     } catch (error) {
       clientLogger.error('Failed to fetch attributes:', { detail: error });
     }

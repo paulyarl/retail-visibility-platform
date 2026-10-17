@@ -49,8 +49,8 @@ export default function BusinessProfileTab({
           platformHomeService.getGoogleBusinessLinkedLocation(tenantId),
           platformHomeService.getGoogleBusinessSyncTracking(tenantId).catch(() => null),
         ]);
-        setLinkedLocation(locData?.data?.location || null);
-        setSyncSummary(summaryData?.data || null);
+        setLinkedLocation(locData?.location || null);
+        setSyncSummary(summaryData || null);
       } catch (err) {
         clientLogger.error('Failed to fetch GBP data:', { detail: err });
       } finally {
@@ -70,8 +70,8 @@ export default function BusinessProfileTab({
         platformHomeService.getGoogleBusinessLinkedLocation(tenantId),
         platformHomeService.getGoogleBusinessSyncTracking(tenantId).catch(() => null),
       ]);
-      setLinkedLocation(locData?.data?.location || null);
-      setSyncSummary(summaryData?.data || null);
+      setLinkedLocation(locData?.location || null);
+      setSyncSummary(summaryData || null);
     } catch (err) {
       clientLogger.error('Failed to sync business info:', { detail: err });
       setSyncResult({ success: false, message: 'Failed to sync business info' });

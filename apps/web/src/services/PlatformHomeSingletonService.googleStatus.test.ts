@@ -82,9 +82,28 @@ describe('Google status reads return the payload, not the envelope', () => {
   it('never returns the envelope itself', async () => {
     stubTransport({ success: true, data: { success: true, data: { isConnected: true } } });
 
-    const status = (await platformHomeService.getGoogleGBPStatus('tid-1')) as Record<string, unknown>;
+    const status = (await platformHomeService.getGoogleGBPStatus('tid-1')) as unknown as Record<
+      string,
+      unknown
+    >;
     expect(status).not.toHaveProperty('success');
     expect(status).not.toHaveProperty('data');
+  });
+
+  it('mutation methods return the response body, so success/message/data all resolve', async () => {
+    // Mutation consumers read `res.success`, `res.message` AND `res.data.*`
+    // (e.g. `syncResult.data.syncedFields`), so these must return the body —
+    // not the ApiResult, and not the payload.
+    stubTransport({
+      success: true,
+      data: { success: true, message: 'Synced 2 fields', data: { syncedFields: ['name', 'hours'] } },
+    });
+
+    const res = await platformHomeService.syncGoogleBusiness('tid-1');
+
+    expect(res.success).toBe(true);
+    expect(res.message).toBe('Synced 2 fields');
+    expect(res.data.syncedFields).toEqual(['name', 'hours']);
   });
 
   it('returns null when the transport failed', async () => {

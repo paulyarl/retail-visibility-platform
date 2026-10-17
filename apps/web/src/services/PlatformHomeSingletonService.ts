@@ -2693,7 +2693,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       );
       
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google OAuth merchants:', { detail: error });
       throw error;
@@ -2718,7 +2718,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-link-merchant-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to link Google merchant:', { detail: error });
       throw error;
@@ -2743,7 +2743,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-oauth-disconnect-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to disconnect Google OAuth:', { detail: error });
       throw error;
@@ -2768,7 +2768,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-gbp-disconnect-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to disconnect Google GBP:', { detail: error });
       throw error;
@@ -2791,7 +2791,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business media:', { detail: error });
       throw error;
@@ -2814,7 +2814,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business posts:', { detail: error });
       throw error;
@@ -2837,7 +2837,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business reviews:', { detail: error });
       throw error;
@@ -2860,7 +2860,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business attributes:', { detail: error });
       throw error;
@@ -2885,7 +2885,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-business-upload-media-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to upload Google Business media:', { detail: error });
       throw error;
@@ -2910,7 +2910,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-business-create-post-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to create Google Business post:', { detail: error });
       throw error;
@@ -2935,7 +2935,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-business-reply-review-${tenantId}-${reviewName}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to reply to Google Business review:', { detail: error });
       throw error;
@@ -2960,7 +2960,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-business-save-attributes-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to save Google Business attributes:', { detail: error });
       throw error;
@@ -2983,7 +2983,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business linked location:', { detail: error });
       throw error;
@@ -3006,7 +3006,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business locations:', { detail: error });
       throw error;
@@ -3031,7 +3031,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-business-link-location-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to link Google Business location:', { detail: error });
       throw error;
@@ -3056,7 +3056,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-business-sync-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to sync Google Business:', { detail: error });
       throw error;
@@ -3079,7 +3079,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business sync tracking:', { detail: error });
       throw error;
@@ -3102,7 +3102,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business comparison:', { detail: error });
       throw error;
@@ -3150,7 +3150,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-merchant-settings-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to update Google Merchant settings:', { detail: error });
       throw error;
@@ -3175,7 +3175,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-merchant-sync-${tenantId}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to sync Google Merchant:', { detail: error });
       throw error;
@@ -3206,7 +3206,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-gmc-product-sync-status-${tenantId}-${params.toString()}`
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get GMC product sync status:', { detail: error });
       throw error;

@@ -102,7 +102,7 @@ export default function GBPSyncStatusPage() {
 
         // Fetch linked GBP location
         const linkedLocData = await platformHomeService.getGoogleBusinessLinkedLocation(tenantId);
-        setLinkedLocation(linkedLocData?.data?.location || null);
+        setLinkedLocation(linkedLocData?.location || null);
 
         // Fetch tenant for location status
         const tenant = await platformHomeService.getTenant(tenantId);
@@ -192,7 +192,7 @@ export default function GBPSyncStatusPage() {
     try {
       setLoadingLocations(true);
       const data = await platformHomeService.getGoogleBusinessLocations(tenantId);
-      setGbpLocations(data.data?.locations || []);
+      setGbpLocations(data?.locations || []);
       setShowLocationSelector(true);
     } catch (error) {
       clientLogger.error('Failed to fetch GBP locations:', { detail: error });
@@ -251,7 +251,7 @@ export default function GBPSyncStatusPage() {
     try {
       setLoadingComparison(true);
       const data = await platformHomeService.getGoogleBusinessComparison(tenantId);
-      setComparison(data.data);
+      setComparison(data);
     } catch (error) {
       clientLogger.error('Failed to fetch comparison:', { detail: error });
     } finally {
