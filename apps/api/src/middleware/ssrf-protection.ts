@@ -22,12 +22,22 @@ const DANGEROUS_DOMAINS = [
   'host.docker.internal', // Docker host
 ];
 
-const ALLOWED_DOMAINS = [
-  // Add your allowed external domains here
-  'api.example.com',
-  'cdn.example.com',
-  // Add more as needed
-];
+/**
+ * Strict allowlist of external domains permitted inside request parameters.
+ *
+ * **Leave this empty** unless you deliberately want the guard to become a strict
+ * allowlist. While it is non-empty, `validateUrlForSSRF` rejects *every*
+ * URL-valued parameter that isn't on it — which is how the scaffold placeholders
+ * (`api.example.com`, `cdn.example.com`) silently 403'd the Google OAuth
+ * callbacks: `iss` and `scope` are themselves https URLs, so every callback
+ * carrying them was answered with "Access denied - SSRF protection".
+ *
+ * The guard's job is to reject internal/metadata hosts, non-HTTPS schemes, and
+ * odd ports — not to restrict which external domains a client may *name* in a
+ * parameter. Anything that genuinely needs a domain allowlist should enforce it
+ * at its own call site, where the destination is actually fetched.
+ */
+const ALLOWED_DOMAINS: string[] = [];
 
 const ALLOWED_PORTS = [
   80,  // HTTP
