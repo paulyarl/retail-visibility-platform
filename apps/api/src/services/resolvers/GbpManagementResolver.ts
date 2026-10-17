@@ -24,6 +24,8 @@ export interface EffectiveGbpManagement {
   can_show_content: boolean;
   can_use_ai_response: boolean;
   can_use_posts_scheduler: boolean;
+  can_use_media_upload: boolean;
+  can_use_attributes: boolean;
   // Effective state (hard gate AND soft gate)
   reviews_enabled: boolean;
   content_enabled: boolean;
@@ -46,6 +48,8 @@ export function resolveGbpManagement(
   const canShowContent = flexible || !!features.gbp_directory_content;
   const canUseAiResponse = flexible || !!features.gbp_ai_response;
   const canUsePostsScheduler = flexible || !!features.gbp_posts_scheduler;
+  const canUseMediaUpload = flexible || !!features.gbp_media_upload;
+  const canUseAttributes = flexible || !!features.gbp_attributes;
 
   // Soft gate (merchant-gated fields: tier AND merchant)
   const reviewsDisplayEnabled = merchantPrefs?.gbp_reviews_display !== false;
@@ -56,12 +60,20 @@ export function resolveGbpManagement(
   const contentEnabled = canShowContent && contentDisplayEnabled;
 
   return {
-    enabled: canShowReviews || canShowContent || canUseAiResponse || canUsePostsScheduler,
+    enabled:
+      canShowReviews ||
+      canShowContent ||
+      canUseAiResponse ||
+      canUsePostsScheduler ||
+      canUseMediaUpload ||
+      canUseAttributes,
     is_flexible: flexible,
     can_show_reviews: canShowReviews,
     can_show_content: canShowContent,
     can_use_ai_response: canUseAiResponse,
     can_use_posts_scheduler: canUsePostsScheduler,
+    can_use_media_upload: canUseMediaUpload,
+    can_use_attributes: canUseAttributes,
     reviews_enabled: reviewsEnabled,
     content_enabled: contentEnabled,
     merchant_preferences: {

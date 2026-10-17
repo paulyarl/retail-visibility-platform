@@ -10,6 +10,8 @@ describe('resolveGbpManagement', () => {
     expect(result.can_show_content).toBe(false);
     expect(result.can_use_ai_response).toBe(false);
     expect(result.can_use_posts_scheduler).toBe(false);
+    expect(result.can_use_media_upload).toBe(false);
+    expect(result.can_use_attributes).toBe(false);
     expect(result.reviews_enabled).toBe(false);
     expect(result.content_enabled).toBe(false);
   });
@@ -22,6 +24,8 @@ describe('resolveGbpManagement', () => {
     expect(result.can_show_content).toBe(true);
     expect(result.can_use_ai_response).toBe(true);
     expect(result.can_use_posts_scheduler).toBe(true);
+    expect(result.can_use_media_upload).toBe(true);
+    expect(result.can_use_attributes).toBe(true);
     expect(result.reviews_enabled).toBe(true);
     expect(result.content_enabled).toBe(true);
   });
@@ -32,6 +36,8 @@ describe('resolveGbpManagement', () => {
       gbp_directory_content: true,
       gbp_ai_response: true,
       gbp_posts_scheduler: true,
+      gbp_media_upload: true,
+      gbp_attributes: true,
     };
     const result = resolveGbpManagement(features, null);
     expect(result.enabled).toBe(true);
@@ -40,6 +46,15 @@ describe('resolveGbpManagement', () => {
     expect(result.can_show_content).toBe(true);
     expect(result.can_use_ai_response).toBe(true);
     expect(result.can_use_posts_scheduler).toBe(true);
+    expect(result.can_use_media_upload).toBe(true);
+    expect(result.can_use_attributes).toBe(true);
+  });
+
+  it('media upload / attributes are tier-level and never gated by merchant display prefs', () => {
+    const features = { gbp_media_upload: true, gbp_attributes: true };
+    const result = resolveGbpManagement(features, { gbp_reviews_display: false, gbp_content_display: false });
+    expect(result.can_use_media_upload).toBe(true);
+    expect(result.can_use_attributes).toBe(true);
   });
 
   it('respects merchant gate — reviews off hides reviews_enabled but not can_show_reviews', () => {

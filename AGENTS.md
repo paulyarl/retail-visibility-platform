@@ -1382,6 +1382,36 @@ A capability module (`gbp_management`) that converts Marketing Ops prospects int
 - `apps/web/src/services/MarketingCustomerService.ts` — frontend service for all customer GBP endpoints
 - `apps/web/src/components/customer/CustomerSidebar.tsx` — GBP nav items in customer sidebar
 
+## Advanced GBP Features page + GBP module capability awareness (2026-10-17)
+
+The tenant-side Advanced GBP Features page (`apps/web/src/app/t/[tenantId]/settings/integrations/google/advanced/`) is now capability-aware and grew a real photo picker, review tooling, and a retailer attribute editor.
+
+### New capability keys (Migration 342)
+`gbp_management` gains two keys, both ordinary module features (flexible key auto-unlocks; individually purchasable via BSaaS):
+- `gbp_media_upload` — upload/manage GBP photos (gates the Photos tab + `POST /google/business/media`)
+- `gbp_attributes` — read/write GBP business attributes (gates the Attributes tab + `PATCH|POST /google/business/attributes*`)
+
+Wiring: `GbpManagementResolver` adds `can_use_media_upload` / `can_use_attributes` (tier-level, R33 — never merchant-gated); mirrored in `resolvers/types.ts`, `UnifiedCapabilityService.ts` (`BackendEffectiveGbpManagement` + `mapGbpManagement`) and `CapabilityResolutionService.ts` (`GbpManagementState`). `shared/tier-contract.json` `capability_modules.gbp_management` was updated by hand to match — **after migration 342 lands in prd, re-dump the witness and re-run `sync-fixture-modules.cjs` so the generated block matches the DB** (no test compares them today; the fixture is authoritative).
+
+### Backend gate helper
+`apps/api/src/lib/google/capability-gate.ts` → `isGbpManagementFeatureAllowed(tenantId, 'ai_response'|'posts_scheduler'|'media_upload'|'attributes')`. Reads the resolved `effective.gbp_management` fields; fails closed. Unit-tested in `apps/api/src/lib/google/__tests__/capability-gate.test.ts`.
+
+### New/changed routes (`apps/api/src/routes/google-business-oauth.ts`)
+- `POST /google/business/media` — now accepts **multipart** (`file` field, memory storage, 10MB) via `uploadPhotoBinary`, or the legacy JSON `photoUrl` via `uploadPhoto`; gated by `gbp_media_upload`.
+- `POST /google/business/reviews/:reviewName/ai-draft` — resolves the local review id from the Google resource name (`gbp_reviews.google_review_id`) and calls `GBPReviewReplyService.generateDrafts` (which self-gates on `gbp_ai_response` → preview draft when unentitled).
+- `POST /google/business/reviews/:reviewName/dispute` — registry-driven intake (`intake_kind='review_dispute'`) via `DisputeIntakeService`; marks the review `DISPUTED`. Not capability-gated (dispute is free per spec §6.5).
+- `PATCH|POST /google/business/attributes*` — gated by `gbp_attributes`.
+- `apps/api/src/routes/gbp-options-settings.ts` — added the documented-but-missing `GET /:tenantId/gbp-options/capability`.
+
+`GBPAdvancedSync` fixes: `getAvailableAttributes` now calls `GET /v1/attributes?parent=locations/{id}&regionCode=US` (was `parent=<category resource>`); `updateAttributes` sends the required `attributeMask`; `setCommonAttributes` adds the storefront-retail fulfillment set (`has_delivery`, `has_curbside_pickup`, `has_in_store_pickup`, `has_takeout`, `has_in_store_shopping` — ids verified against `attributes.list` metadata) and writes `pay_credit_card_types_accepted` as REPEATED_ENUM.
+
+### Frontend
+- `advanced/GbpPhotoUploadPicker.tsx` — file (drag/drop + browse) **and** URL modes; upsell branch when `!canUseMediaUpload`. Render test: `GbpPhotoUploadPicker.test.ts`.
+- `advanced/GbpReviewsTab.tsx` — rating filter, unreplied-only, sort, reply char budget + delete reply, AI drafts (gated → `gbp_ai_response`, upsell link otherwise), dispute intake.
+- `advanced/GbpAttributesTab.tsx` — retailer fulfillment/payment quick toggles (→ `attributes/common`), Google's dynamic category-driven list (→ `PATCH attributes`), and an editable **storefront** group (SNAP/EBT display via `tenant_directory_entry_settings`, delivery/pickup via `tenant_fulfillment_settings`) — the last is platform-only, never sent to Google. There is no confirmed GBP EBT attribute, so SNAP/EBT lives in the storefront group.
+- `gbp-options/page.tsx` — merchant-facing **GBP Display Settings** page for the soft gates (`gbp_reviews_display` / `gbp_content_display`), reading `GbpManagementState.canShowReviews/canShowContent` to label features not in plan. Linked from the advanced page ("Display settings →").
+- `PlatformHomeSingletonService` gained `getGoogleBusinessAvailableAttributes`, `updateGoogleBusinessAttributes`, `deleteGoogleBusinessReviewReply`, `generateGoogleBusinessReviewDrafts`, `submitGoogleBusinessReviewDispute`, `uploadGoogleBusinessMediaFile` (FormData), `getGbpOptionsSettings`, `updateGbpOptionsSettings`.
+
 ## Directory Claim Operator Approval Flow (Migration 246)
 
 Closes the gap where `DirectoryClaimService.initiateClaim` returned `operatorApprovalRequired: true` but persisted nothing — the request was lost and operators had no review queue. Also fixes `computeContexts` so directory-claim owners get platform context (and thus see Marketing/GBP nav).

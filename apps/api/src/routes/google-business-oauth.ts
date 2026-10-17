@@ -1,13 +1,21 @@
 import { Router } from 'express';
 import { google } from 'googleapis';
+import multer from 'multer';
+import { z } from 'zod';
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
-import { isGBPSyncAllowed } from '../lib/google/capability-gate';
+import { isGBPSyncAllowed, isGbpManagementFeatureAllowed } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
 import { requestContextStorage } from '../context';
 
 const router = Router();
+
+// Binary photo uploads — memory storage, 10MB limit (matches gbp-customer).
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 /**
  * Get a valid GBP access token from the unified OAuth token store.
@@ -27,9 +35,12 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
       const now = new Date();
 
       if (tokenRecord.expires_at <= now) {
-        // Token expired — refresh using shared OAuth credentials
+        // Token expired — refresh with the GBP client that minted it
         const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
+        const newTokens = await refreshAccessToken(refreshToken, {
+          clientId: unifiedConfig.googleBusinessClientId,
+          clientSecret: unifiedConfig.googleBusinessClientSecret,
+        });
 
         if (!newTokens) {
           logger.error(`[GBP] Token refresh failed for tenant ${tenantId}`, undefined);
@@ -1055,18 +1066,46 @@ router.get('/google/business/media', async (req, res) => {
 /**
  * Upload a photo to GBP
  * POST /google/business/media
+ *
+ * Accepts either a JSON body ({ tenantId, photoUrl, category, description })
+ * or a multipart/form-data body (fields + `file`) for direct device uploads.
+ * Gated by the `gbp_media_upload` capability.
  */
-router.post('/google/business/media', async (req, res) => {
+router.post('/google/business/media', mediaUpload.single('file'), async (req, res) => {
   try {
-    const { tenantId, photoUrl, category, description } = req.body;
-    if (!tenantId || !photoUrl) {
-      return res.status(400).json({ success: false, error: 'missing_required_fields' });
+    const { tenantId } = req.body;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenantId' });
     }
 
-    const { uploadPhoto } = await import('../services/GBPAdvancedSync');
-    const result = await uploadPhoto(tenantId, photoUrl, category || 'ADDITIONAL', description);
-    res.json({ success: result.success, data: { mediaItemId: result.mediaItemId }, error: result.error });
+    if (!(await isGbpManagementFeatureAllowed(tenantId, 'media_upload'))) {
+      return res.status(403).json({
+        success: false,
+        error: 'capability_required',
+        message: 'GBP photo upload requires the gbp_media_upload capability.',
+      });
+    }
+
+    const { uploadPhoto, uploadPhotoBinary } = await import('../services/GBPAdvancedSync');
+    const category = req.body.category || 'ADDITIONAL';
+    const description = req.body.description || undefined;
+
+    const isMultipart = req.headers['content-type']?.startsWith('multipart/form-data');
+    const file = (req as any).file as { buffer: Buffer; mimetype: string } | undefined;
+
+    const result = isMultipart && file
+      ? await uploadPhotoBinary(tenantId, file.buffer, file.mimetype, category, description)
+      : await uploadPhoto(tenantId, req.body.photoUrl, category, description);
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, error: 'upload_photo_failed', message: result.error });
+    }
+
+    res.json({ success: true, data: { mediaItemId: result.mediaItemId } });
   } catch (error) {
+    logger.error('[GBP Advanced] upload media failed', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
     res.status(500).json({ success: false, error: 'upload_photo_failed' });
   }
 });
@@ -1218,6 +1257,134 @@ router.delete('/google/business/reviews/:reviewName/reply', async (req, res) => 
 });
 
 /**
+ * Resolve a gbp_reviews row from a Google review resource name.
+ * The advanced page lists reviews via the Google API (name = accounts/…/reviews/…),
+ * but the AI-draft / dispute services key off the local review id.
+ */
+async function resolveLocalReviewId(tenantId: string, googleReviewName: string): Promise<string | null> {
+  const row = await prisma.gbp_reviews.findFirst({
+    where: { tenant_id: tenantId, google_review_id: decodeURIComponent(googleReviewName) },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
+/**
+ * Generate AI draft replies for a review
+ * POST /google/business/reviews/:reviewName/ai-draft
+ *
+ * Gated by the `gbp_ai_response` capability. Unentitled tenants get a single
+ * preview draft (draft-preview mode) from the service — never a hard failure.
+ */
+router.post('/google/business/reviews/:reviewName/ai-draft', async (req, res) => {
+  try {
+    const { reviewName } = req.params;
+    const { tenantId } = req.body;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenantId' });
+    }
+
+    const reviewId = await resolveLocalReviewId(tenantId, reviewName);
+    if (!reviewId) {
+      return res.status(404).json({ success: false, error: 'review_not_found' });
+    }
+
+    const { GBPReviewReplyService } = await import('../services/GBPReviewReplyService');
+    const result = await GBPReviewReplyService.getInstance().generateDrafts(tenantId, reviewId);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('[GBP Advanced] ai-draft failed', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'ai_draft_failed' });
+  }
+});
+
+const disputeSchema = z.object({
+  tenantId: z.string().min(1),
+  ownerEmail: z.string().email(),
+  ownerPhone: z.string().optional(),
+  ownerStatement: z.string().optional(),
+  evidencePayload: z.record(z.string(), z.any()).optional(),
+  attachmentIds: z.array(z.string()).optional(),
+});
+
+/**
+ * Submit a review dispute (registry-driven intake, intake_kind = 'review_dispute')
+ * POST /google/business/reviews/:reviewName/dispute
+ */
+router.post('/google/business/reviews/:reviewName/dispute', async (req, res) => {
+  try {
+    const { reviewName } = req.params;
+    const parsed = disputeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_request',
+        message: 'tenantId + ownerEmail are required',
+        details: parsed.error.flatten(),
+      });
+    }
+    const { tenantId, ownerEmail, ownerPhone, ownerStatement, evidencePayload, attachmentIds } = parsed.data;
+
+    const review = await prisma.gbp_reviews.findFirst({
+      where: { tenant_id: tenantId, google_review_id: decodeURIComponent(reviewName) },
+    });
+    if (!review) {
+      return res.status(404).json({ success: false, error: 'review_not_found' });
+    }
+
+    const campaign = await prisma.mkt_campaigns_list.findFirst({
+      where: { tenant_id: tenantId, category: { in: ['gbp_optimization', 'review_management'] } },
+      orderBy: { created_at: 'desc' },
+      select: { id: true },
+    });
+    if (!campaign) {
+      return res.status(400).json({ success: false, error: 'no_campaign', message: 'No GBP campaign found for this tenant' });
+    }
+
+    const { DisputeIntakeService } = await import('../services/DisputeIntakeService');
+    const disputeIntakeService = DisputeIntakeService.getInstance();
+
+    const intakeLink = await disputeIntakeService.generateIntakeLink(campaign.id, undefined, 'review_dispute');
+
+    const submitResult = await disputeIntakeService.submitRegistryIntake({
+      token: intakeLink.token,
+      ownerEmail,
+      ownerPhone: ownerPhone || null,
+      ownerStatement,
+      evidencePayload: {
+        ...(evidencePayload || {}),
+        review_id: review.id,
+        google_review_id: review.google_review_id,
+        reviewer_name: review.reviewer_name,
+        star_rating: review.star_rating,
+        comment: review.comment,
+      },
+      attachmentIds,
+    });
+
+    await prisma.gbp_reviews.update({
+      where: { id: review.id },
+      data: { reply_status: 'DISPUTED', updated_at: new Date() },
+    });
+
+    res.json({ success: true, data: submitResult });
+  } catch (error: any) {
+    if (error.message?.includes('No active intake definition')) {
+      return res.status(400).json({ success: false, error: 'no_intake_definition', message: 'Review dispute intake kind is not configured' });
+    }
+    if (error.message?.includes('Validation failed')) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', message: error.message });
+    }
+    logger.error('[GBP Advanced] dispute failed', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'dispute_failed' });
+  }
+});
+
+/**
  * Get available attributes for location category
  * GET /google/business/attributes/available
  */
@@ -1266,6 +1433,14 @@ router.patch('/google/business/attributes', async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_required_fields' });
     }
 
+    if (!(await isGbpManagementFeatureAllowed(tenantId, 'attributes'))) {
+      return res.status(403).json({
+        success: false,
+        error: 'capability_required',
+        message: 'Managing GBP attributes requires the gbp_attributes capability.',
+      });
+    }
+
     const { updateAttributes } = await import('../services/GBPAdvancedSync');
     const result = await updateAttributes(tenantId, attributes);
     res.json(result);
@@ -1275,7 +1450,7 @@ router.patch('/google/business/attributes', async (req, res) => {
 });
 
 /**
- * Set common attributes (WiFi, wheelchair, etc.)
+ * Set common attributes (fulfillment, payments, accessibility, amenities)
  * POST /google/business/attributes/common
  */
 router.post('/google/business/attributes/common', async (req, res) => {
@@ -1283,6 +1458,14 @@ router.post('/google/business/attributes/common', async (req, res) => {
     const { tenantId, ...options } = req.body;
     if (!tenantId) {
       return res.status(400).json({ success: false, error: 'missing_tenantId' });
+    }
+
+    if (!(await isGbpManagementFeatureAllowed(tenantId, 'attributes'))) {
+      return res.status(403).json({
+        success: false,
+        error: 'capability_required',
+        message: 'Managing GBP attributes requires the gbp_attributes capability.',
+      });
     }
 
     const { setCommonAttributes } = await import('../services/GBPAdvancedSync');

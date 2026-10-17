@@ -2968,6 +2968,175 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Update GBP business attributes (raw Attribute payloads)
+   */
+  async updateGoogleBusinessAttributes(tenantId: string, attributes: any[]): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/attributes`,
+        { method: 'PATCH', body: JSON.stringify({ tenantId, attributes }) },
+        `platform-google-business-update-attributes-${tenantId}`
+      );
+      return result.data;
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to update GBP attributes:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get attributes available for the linked location (category/country-driven)
+   */
+  async getGoogleBusinessAvailableAttributes(tenantId: string): Promise<any[]> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/attributes/available?tenantId=${tenantId}`,
+        {},
+        `platform-google-business-available-attributes-${tenantId}`,
+        this.cacheTTL
+      );
+      return unwrapApiBody<any[]>(result) || [];
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get available GBP attributes:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a Google Business review reply
+   */
+  async deleteGoogleBusinessReviewReply(tenantId: string, reviewName: string): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/reviews/${encodeURIComponent(reviewName)}/reply`,
+        { method: 'DELETE', body: JSON.stringify({ tenantId }) },
+        `platform-google-business-delete-reply-${tenantId}-${reviewName}`
+      );
+      return result.data;
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to delete GBP review reply:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Generate AI draft replies for a review (gated by gbp_ai_response)
+   */
+  async generateGoogleBusinessReviewDrafts(tenantId: string, reviewName: string): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/reviews/${encodeURIComponent(reviewName)}/ai-draft`,
+        { method: 'POST', body: JSON.stringify({ tenantId }) },
+        `platform-google-business-ai-draft-${tenantId}-${reviewName}`
+      );
+      return unwrapApiBody<any>(result);
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to generate GBP review drafts:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Submit a review dispute (registry intake, intake_kind = 'review_dispute')
+   */
+  async submitGoogleBusinessReviewDispute(
+    tenantId: string,
+    reviewName: string,
+    payload: { ownerEmail: string; ownerPhone?: string; ownerStatement?: string; evidencePayload?: Record<string, any> }
+  ): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/reviews/${encodeURIComponent(reviewName)}/dispute`,
+        { method: 'POST', body: JSON.stringify({ tenantId, ...payload }) },
+        `platform-google-business-review-dispute-${tenantId}-${reviewName}`
+      );
+      return unwrapApiBody<any>(result);
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to submit GBP review dispute:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Upload a photo file to GBP (multipart, gated by gbp_media_upload)
+   */
+  async uploadGoogleBusinessMediaFile(
+    tenantId: string,
+    file: File,
+    category: string = 'ADDITIONAL',
+    description?: string
+  ): Promise<any> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const formData = new FormData();
+      formData.append('tenantId', tenantId);
+      formData.append('file', file);
+      formData.append('category', category);
+      if (description) formData.append('description', description);
+
+      const result = await this.makeDefaultRequest<any>(
+        `/api/google/business/media`,
+        { method: 'POST', body: formData },
+        `platform-google-business-upload-media-file-${tenantId}`,
+        0
+      );
+      if (!result.success) {
+        throw new Error((result as any).error || 'Failed to upload photo');
+      }
+      return unwrapApiBody<any>(result);
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to upload GBP media file:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get GBP options (merchant soft-gate toggles)
+   */
+  async getGbpOptionsSettings(tenantId: string): Promise<{ gbp_reviews_display: boolean; gbp_content_display: boolean } | null> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(
+        `/api/tenants/${tenantId}/gbp-options`,
+        {},
+        `platform-tenant-gbp-options-${tenantId}`,
+        this.cacheTTL
+      );
+      return unwrapApiBody<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(result)?.settings ?? null;
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to get GBP options settings:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
+   * Update GBP options (merchant soft-gate toggles)
+   */
+  async updateGbpOptionsSettings(
+    tenantId: string,
+    settings: { gbp_reviews_display?: boolean; gbp_content_display?: boolean }
+  ): Promise<{ gbp_reviews_display: boolean; gbp_content_display: boolean } | null> {
+    try {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const result = await this.makeDefaultRequest<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(
+        `/api/tenants/${tenantId}/gbp-options`,
+        { method: 'PUT', body: JSON.stringify(settings) },
+        `platform-tenant-gbp-options-update-${tenantId}`
+      );
+      await this.invalidateCachePattern(`platform-tenant-gbp-options-${tenantId}*`);
+      return unwrapApiBody<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(result)?.settings ?? null;
+    } catch (error) {
+      clientLogger.error('[PlatformHomeSingleton] Failed to update GBP options settings:', { detail: error });
+      throw error;
+    }
+  }
+
+  /**
    * Get Google Business linked location
    */
   async getGoogleBusinessLinkedLocation(tenantId: string): Promise<any> {

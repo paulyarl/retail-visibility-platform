@@ -1207,6 +1207,8 @@ interface BackendEffectiveGbpManagement {
   can_show_content: boolean;
   can_use_ai_response: boolean;
   can_use_posts_scheduler: boolean;
+  can_use_media_upload: boolean;
+  can_use_attributes: boolean;
   reviews_enabled: boolean;
   content_enabled: boolean;
   merchant_preferences: { gbp_reviews_display: boolean; gbp_content_display: boolean };
@@ -1221,6 +1223,8 @@ function mapGbpManagement(b: BackendEffectiveGbpManagement): GbpManagementState 
     canShowContent: b.can_show_content,
     canUseAiResponse: b.can_use_ai_response,
     canUsePostsScheduler: b.can_use_posts_scheduler,
+    canUseMediaUpload: b.can_use_media_upload,
+    canUseAttributes: b.can_use_attributes,
     reviewsEnabled: b.reviews_enabled,
     contentEnabled: b.content_enabled,
     merchantPreferences: b.merchant_preferences

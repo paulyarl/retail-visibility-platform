@@ -53,6 +53,20 @@ router.get('/:tenantId/gbp-options', authenticateToken, async (req, res) => {
   }
 });
 
+// Get resolved GBP capability state for a tenant
+router.get('/:tenantId/gbp-options/capability', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { resolveEffectiveCapabilities } = await import('../services/EffectiveCapabilityResolver');
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    const gbp = (caps?.effective as any)?.gbp_management ?? null;
+    res.json({ success: true, capability: gbp });
+  } catch (error) {
+    logger.error('Error fetching GBP capability state:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) } });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch GBP capability state' });
+  }
+});
+
 // Update GBP options settings for a tenant
 router.put('/:tenantId/gbp-options', authenticateToken, requireTenantAdmin, async (req, res) => {
   try {

@@ -12,6 +12,7 @@ import {
   Link as LinkIcon,
   Unlink,
 } from 'lucide-react';
+import GmcSyncAvailabilityNotice from '@/components/google/GmcSyncAvailabilityNotice';
 
 interface SetupStep {
   id: string;
@@ -53,6 +54,13 @@ interface GMCStatus {
   lastSyncAt: string | null;
   storefrontReady: boolean;
   syncableProducts: number;
+  gmcSyncAllowed: boolean;
+  gmcSyncGateReason: string;
+}
+
+interface MerchantAccount {
+  id: string;
+  name: string;
 }
 
 interface OverviewTabProps {
@@ -68,6 +76,14 @@ interface OverviewTabProps {
   onRefresh: () => void;
   connecting: boolean;
   connectingGBP: boolean;
+  merchants: MerchantAccount[];
+  showMerchantSelector: boolean;
+  loadingMerchants: boolean;
+  linkingMerchantId: string | null;
+  merchantLinkError: string | null;
+  onLoadMerchants: () => void;
+  onLinkMerchant: (merchant: MerchantAccount) => void;
+  onCancelMerchantSelector: () => void;
 }
 
 export default function OverviewTab({
@@ -83,6 +99,14 @@ export default function OverviewTab({
   onRefresh,
   connecting,
   connectingGBP,
+  merchants,
+  showMerchantSelector,
+  loadingMerchants,
+  linkingMerchantId,
+  merchantLinkError,
+  onLoadMerchants,
+  onLinkMerchant,
+  onCancelMerchantSelector,
 }: OverviewTabProps) {
   const productCoverage = gmcStatus && gmcStatus.totalProducts > 0
     ? Math.round((gmcStatus.syncedProducts / gmcStatus.totalProducts) * 100)
@@ -114,7 +138,12 @@ export default function OverviewTab({
           </div>
           <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Merchant Center</h3>
           <p className="text-sm text-neutral-500 mb-3">{setupStatus?.message || 'Not configured'}</p>
-          {gmcStatus && gmcStatus.hasGMCConnection && (
+          {setupStatus?.hasMerchantLink && gmcStatus?.merchantName && (
+            <p className="text-xs text-neutral-500 mb-3">
+              Linked account: <span className="font-medium text-neutral-700 dark:text-neutral-300">{gmcStatus.merchantName}</span>
+            </p>
+          )}
+          {gmcStatus && gmcStatus.hasGMCConnection && gmcStatus.gmcSyncAllowed !== false && (
             <div className="text-xs text-neutral-500 space-y-1">
               <div className="flex justify-between">
                 <span>Products synced:</span>
@@ -197,6 +226,11 @@ export default function OverviewTab({
         </div>
       </div>
 
+      {/* Sync availability */}
+      {gmcStatus && gmcStatus.gmcSyncAllowed === false && (
+        <GmcSyncAvailabilityNotice tenantId={tenantId} reason={gmcStatus.gmcSyncGateReason} />
+      )}
+
       {/* Setup Steps */}
       {setupStatus && !setupStatus.isReady && Array.isArray(setupStatus.setupSteps) && (
         <div className="bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-6">
@@ -240,12 +274,115 @@ export default function OverviewTab({
                     {step.description}
                   </p>
                 </div>
-                {step.completed && (
+                {step.completed ? (
                   <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+                ) : (
+                  <div className="shrink-0">
+                    {step.id === 'google_account' && (
+                      <Button
+                        onClick={onConnectGoogle}
+                        loading={connecting}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                      >
+                        <LinkIcon className="w-4 h-4" />
+                        Connect
+                      </Button>
+                    )}
+                    {step.id === 'merchant_center' && setupStatus?.hasGoogleAccount && (
+                      <Button
+                        onClick={onLoadMerchants}
+                        loading={loadingMerchants}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                      >
+                        <LinkIcon className="w-4 h-4" />
+                        Link Merchant Center
+                      </Button>
+                    )}
+                    {step.id === 'subdomain' && (
+                      <Link
+                        href={`/t/${tenantId}/settings/subdomain`}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-300 font-medium rounded-lg transition-colors text-sm"
+                      >
+                        Configure
+                      </Link>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Merchant Center account picker */}
+      {showMerchantSelector && (
+        <div className="bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-6">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">
+            Select Merchant Center Account
+          </h3>
+          <p className="text-sm text-neutral-500 mb-4">
+            Choose the Merchant Center account this store's products should sync to.
+          </p>
+
+          {merchantLinkError && (
+            <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <p className="text-sm text-red-700 dark:text-red-300">{merchantLinkError}</p>
+            </div>
+          )}
+
+          {loadingMerchants ? (
+            <div className="flex items-center gap-2 text-sm text-neutral-500">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Loading Merchant Center accounts...
+            </div>
+          ) : merchants.length === 0 ? (
+            <div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
+                No Merchant Center accounts were found for the connected Google account.
+              </p>
+              <a
+                href="https://merchants.google.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Create a Merchant Center account →
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {merchants.map((merchant) => (
+                <button
+                  key={merchant.id}
+                  onClick={() => onLinkMerchant(merchant)}
+                  disabled={linkingMerchantId !== null}
+                  className="w-full flex items-center justify-between p-3 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-orange-500 dark:hover:border-orange-400 transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShoppingBag className="w-5 h-5 text-orange-600" />
+                    <div className="text-left">
+                      <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                        {merchant.name}
+                      </p>
+                      <p className="text-xs text-neutral-500">Account ID: {merchant.id}</p>
+                    </div>
+                  </div>
+                  {linkingMerchantId === merchant.id ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-orange-600" />
+                  ) : (
+                    <LinkIcon className="w-4 h-4 text-orange-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={onCancelMerchantSelector}
+            className="mt-3 text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
@@ -270,6 +407,16 @@ export default function OverviewTab({
             >
               <LinkIcon className="w-4 h-4" />
               Connect Google Account
+            </Button>
+          )}
+          {setupStatus?.hasGoogleAccount && !setupStatus?.hasMerchantLink && (
+            <Button
+              onClick={onLoadMerchants}
+              loading={loadingMerchants}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Link Merchant Center
             </Button>
           )}
           {setupStatus?.isReady && (

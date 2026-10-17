@@ -1,48 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { 
+import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import {
   ArrowLeft,
   ChevronRight,
-  Image,
+  Image as ImageIcon,
   MessageSquare,
   Star,
   Settings2,
-  Upload,
-  Trash2,
-  Send,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
   Plus,
-  Wifi,
-  Accessibility,
-  CreditCard,
-  Car,
-  Heart,
-  PawPrint
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
+import { GbpReviewsTab, type GbpReview } from './GbpReviewsTab';
+import { GbpPhotoUploadPicker } from './GbpPhotoUploadPicker';
+import { GbpAttributesTab } from './GbpAttributesTab';
 
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '';
-
-interface Review {
-  name: string;
-  reviewId: string;
-  reviewer: { displayName: string; profilePhotoUrl?: string };
-  starRating: string;
-  comment?: string;
-  createTime: string;
-  reviewReply?: { comment: string; updateTime: string };
-}
-
-
-
+type TabId = 'reviews' | 'posts' | 'photos' | 'attributes';
 
 export default function GBPAdvancedFeaturesPage() {
   const params = useParams();
@@ -53,15 +33,19 @@ export default function GBPAdvancedFeaturesPage() {
     AccessPresets.SUPPORT_OR_TENANT_ADMIN
   );
 
-  const [activeTab, setActiveTab] = useState<'photos' | 'posts' | 'reviews' | 'attributes'>('reviews');
+  const { data: capabilities } = useAllCapabilities(tenantId || null);
+  const gbp = capabilities?.gbpManagement;
+  const canUseAiResponse = !!gbp?.canUseAiResponse;
+  const canUsePostsScheduler = !!gbp?.canUsePostsScheduler;
+  const canUseMediaUpload = !!gbp?.canUseMediaUpload;
+  const canUseAttributes = !!gbp?.canUseAttributes;
+
+  const [activeTab, setActiveTab] = useState<TabId>('reviews');
   const [loading, setLoading] = useState(true);
   const [gbpConnected, setGbpConnected] = useState(false);
 
   // Photos state
   const [media, setMedia] = useState<any[]>([]);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [photoCategory, setPhotoCategory] = useState('ADDITIONAL');
 
   // Posts state
   const [posts, setPosts] = useState<any[]>([]);
@@ -69,35 +53,47 @@ export default function GBPAdvancedFeaturesPage() {
   const [newPostSummary, setNewPostSummary] = useState('');
 
   // Reviews state
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<GbpReview[]>([]);
   const [reviewStats, setReviewStats] = useState<{ averageRating?: number; totalReviewCount?: number }>({});
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
 
-  // Attributes state
-  const [attributes, setAttributes] = useState<any[]>([]);
-  const [savingAttributes, setSavingAttributes] = useState(false);
-  const [commonAttrs, setCommonAttrs] = useState({
-    hasWifi: false,
-    wheelchairAccessible: false,
-    acceptsCreditCards: false,
-    hasParking: false,
-    lgbtqFriendly: false,
-    petFriendly: false,
-  });
+  const fetchMedia = useCallback(async () => {
+    try {
+      const data = await platformHomeService.getGoogleBusinessMedia(tenantId);
+      setMedia(data || []);
+    } catch (error) {
+      clientLogger.error('Failed to fetch media:', { detail: error });
+    }
+  }, [tenantId]);
+
+  const fetchPosts = useCallback(async () => {
+    try {
+      const data = await platformHomeService.getGoogleBusinessPosts(tenantId);
+      setPosts(data || []);
+    } catch (error) {
+      clientLogger.error('Failed to fetch posts:', { detail: error });
+    }
+  }, [tenantId]);
+
+  const fetchReviews = useCallback(async () => {
+    try {
+      const data = await platformHomeService.getGoogleBusinessReviews(tenantId);
+      setReviews(data?.reviews || []);
+      setReviewStats({
+        averageRating: data?.averageRating,
+        totalReviewCount: data?.totalReviewCount,
+      });
+    } catch (error) {
+      clientLogger.error('Failed to fetch reviews:', { detail: error });
+    }
+  }, [tenantId]);
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
-
-        // Check GBP connection
         const gbpData = await platformHomeService.getGoogleGBPStatus(tenantId);
         setGbpConnected(gbpData?.isConnected || false);
-
         if (gbpData?.isConnected) {
-          // Fetch reviews by default
           await fetchReviews();
         }
       } catch (error) {
@@ -110,61 +106,7 @@ export default function GBPAdvancedFeaturesPage() {
     if (tenantId) {
       fetchData();
     }
-  }, [tenantId]);
-
-  async function fetchMedia() {
-    try {
-      const data = await platformHomeService.getGoogleBusinessMedia(tenantId);
-      setMedia(data || []);
-    } catch (error) {
-      clientLogger.error('Failed to fetch media:', { detail: error });
-    }
-  }
-
-  async function fetchPosts() {
-    try {
-      const data = await platformHomeService.getGoogleBusinessPosts(tenantId);
-      setPosts(data || []);
-    } catch (error) {
-      clientLogger.error('Failed to fetch posts:', { detail: error });
-    }
-  }
-
-  async function fetchReviews() {
-    try {
-      const data = await platformHomeService.getGoogleBusinessReviews(tenantId);
-      setReviews(data?.reviews || []);
-      setReviewStats({
-        averageRating: data?.averageRating,
-        totalReviewCount: data?.totalReviewCount,
-      });
-    } catch (error) {
-      clientLogger.error('Failed to fetch reviews:', { detail: error });
-    }
-  }
-
-  async function fetchAttributes() {
-    try {
-      const data = await platformHomeService.getGoogleBusinessAttributes(tenantId);
-      setAttributes(data || []);
-    } catch (error) {
-      clientLogger.error('Failed to fetch attributes:', { detail: error });
-    }
-  }
-
-  async function handleUploadPhoto() {
-    if (!photoUrl) return;
-    try {
-      setUploadingPhoto(true);
-      await platformHomeService.uploadGoogleBusinessMedia(tenantId, photoUrl, photoCategory);
-      setPhotoUrl('');
-      await fetchMedia();
-    } catch (error) {
-      clientLogger.error('Failed to upload photo:', { detail: error });
-    } finally {
-      setUploadingPhoto(false);
-    }
-  }
+  }, [tenantId, fetchReviews]);
 
   async function handleCreatePost() {
     if (!newPostSummary) return;
@@ -180,36 +122,11 @@ export default function GBPAdvancedFeaturesPage() {
     }
   }
 
-  async function handleReplyToReview(reviewName: string) {
-    if (!replyText) return;
-    try {
-      setSendingReply(true);
-      await platformHomeService.replyGoogleBusinessReview(tenantId, reviewName, replyText);
-      setReplyText('');
-      setReplyingTo(null);
-      await fetchReviews();
-    } catch (error) {
-      clientLogger.error('Failed to reply to review:', { detail: error });
-    } finally {
-      setSendingReply(false);
-    }
-  }
-
-  async function handleSaveCommonAttributes() {
-    try {
-      setSavingAttributes(true);
-      await platformHomeService.saveGoogleBusinessCommonAttributes(tenantId, commonAttrs);
-      await fetchAttributes();
-    } catch (error) {
-      clientLogger.error('Failed to save attributes:', { detail: error });
-    } finally {
-      setSavingAttributes(false);
-    }
-  }
-
-  function getStarRating(rating: string): number {
-    const map: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
-    return map[rating] || 0;
+  function selectTab(id: TabId) {
+    setActiveTab(id);
+    if (id === 'photos') fetchMedia();
+    if (id === 'posts') fetchPosts();
+    if (id === 'reviews') fetchReviews();
   }
 
   if (accessLoading || loading) {
@@ -227,7 +144,7 @@ export default function GBPAdvancedFeaturesPage() {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-200">You don't have access to this page.</p>
+          <p className="text-red-800 dark:text-red-200">You don&apos;t have access to this page.</p>
         </div>
       </div>
     );
@@ -250,7 +167,7 @@ export default function GBPAdvancedFeaturesPage() {
 
       {/* Header */}
       <div className="mb-6">
-        <Link 
+        <Link
           href={`/t/${tenantId}/settings/integrations/google`}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 mb-4"
         >
@@ -263,6 +180,12 @@ export default function GBPAdvancedFeaturesPage() {
         <p className="text-neutral-600 dark:text-neutral-400">
           Manage photos, posts, reviews, and business attributes on Google Business Profile
         </p>
+        <Link
+          href={`/t/${tenantId}/settings/integrations/google/gbp-options`}
+          className="inline-block mt-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+        >
+          Display settings →
+        </Link>
       </div>
 
       {!gbpConnected && (
@@ -279,20 +202,14 @@ export default function GBPAdvancedFeaturesPage() {
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-neutral-200 dark:border-neutral-700">
         {[
-          { id: 'reviews', label: 'Reviews', icon: Star },
-          { id: 'posts', label: 'Posts', icon: MessageSquare },
-          { id: 'photos', label: 'Photos', icon: Image },
-          { id: 'attributes', label: 'Attributes', icon: Settings2 },
+          { id: 'reviews' as const, label: 'Reviews', icon: Star },
+          { id: 'posts' as const, label: 'Posts', icon: MessageSquare },
+          { id: 'photos' as const, label: 'Photos', icon: ImageIcon },
+          { id: 'attributes' as const, label: 'Attributes', icon: Settings2 },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id as any);
-              if (tab.id === 'photos') fetchMedia();
-              if (tab.id === 'posts') fetchPosts();
-              if (tab.id === 'reviews') fetchReviews();
-              if (tab.id === 'attributes') fetchAttributes();
-            }}
+            onClick={() => selectTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab.id
                 ? 'border-blue-600 text-blue-600'
@@ -307,150 +224,18 @@ export default function GBPAdvancedFeaturesPage() {
 
       {/* Reviews Tab */}
       {activeTab === 'reviews' && (
-        <div className="space-y-4">
-          {/* Stats */}
-          {reviewStats.totalReviewCount !== undefined && (
-            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
-              <div className="flex items-center gap-6">
-                <div>
-                  <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
-                    {reviewStats.averageRating?.toFixed(1) || '—'}
-                  </p>
-                  <div className="flex items-center gap-1 mt-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-4 h-4 ${
-                          star <= (reviewStats.averageRating || 0)
-                            ? 'text-yellow-400 fill-yellow-400'
-                            : 'text-neutral-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="text-neutral-600 dark:text-neutral-400">
-                  <p className="text-lg font-semibold">{reviewStats.totalReviewCount} reviews</p>
-                  <p className="text-sm">on Google</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Reviews List */}
-          <div className="space-y-3">
-            {reviews.map((review) => (
-              <div
-                key={review.name}
-                className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    {review.reviewer.profilePhotoUrl ? (
-                      <img
-                        src={review.reviewer.profilePhotoUrl}
-                        alt={review.reviewer.displayName}
-                        className="w-10 h-10 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center">
-                        <span className="text-neutral-500 font-medium">
-                          {review.reviewer.displayName.charAt(0)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                        {review.reviewer.displayName}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-3 h-3 ${
-                                star <= getStarRating(review.starRating)
-                                  ? 'text-yellow-400 fill-yellow-400'
-                                  : 'text-neutral-300'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs text-neutral-500">
-                          {new Date(review.createTime).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {review.comment && (
-                  <p className="mt-3 text-neutral-700 dark:text-neutral-300">{review.comment}</p>
-                )}
-
-                {/* Existing Reply */}
-                {review.reviewReply && (
-                  <div className="mt-3 pl-4 border-l-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-r">
-                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Your Reply:</p>
-                    <p className="text-sm text-blue-700 dark:text-blue-300">{review.reviewReply.comment}</p>
-                  </div>
-                )}
-
-                {/* Reply Form */}
-                {!review.reviewReply && (
-                  <div className="mt-3">
-                    {replyingTo === review.name ? (
-                      <div className="space-y-2">
-                        <textarea
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="Write your reply..."
-                          className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 text-sm"
-                          rows={3}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleReplyToReview(review.name)}
-                            disabled={sendingReply || !replyText}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
-                          >
-                            {sendingReply ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                            Send Reply
-                          </button>
-                          <button
-                            onClick={() => { setReplyingTo(null); setReplyText(''); }}
-                            className="px-3 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 text-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setReplyingTo(review.name)}
-                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                      >
-                        Reply to this review
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {reviews.length === 0 && (
-              <div className="text-center py-8 text-neutral-500">
-                No reviews found. Reviews will appear here once customers leave them on Google.
-              </div>
-            )}
-          </div>
-        </div>
+        <GbpReviewsTab
+          tenantId={tenantId}
+          reviews={reviews}
+          stats={reviewStats}
+          canUseAiResponse={canUseAiResponse}
+          onRefresh={fetchReviews}
+        />
       )}
 
       {/* Posts Tab */}
       {activeTab === 'posts' && (
         <div className="space-y-4">
-          {/* Create Post */}
           <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Create New Post</h3>
             <textarea
@@ -460,7 +245,15 @@ export default function GBPAdvancedFeaturesPage() {
               className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
               rows={3}
             />
-            <div className="flex justify-end mt-3">
+            <div className="flex items-center justify-end gap-3 mt-3">
+              {!canUsePostsScheduler && (
+                <Link
+                  href={`/t/${tenantId}/settings/feature-store?feature=gbp_posts_scheduler`}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                >
+                  Scheduling is part of GBP Pro
+                </Link>
+              )}
               <button
                 onClick={handleCreatePost}
                 disabled={creatingPost || !newPostSummary}
@@ -472,7 +265,6 @@ export default function GBPAdvancedFeaturesPage() {
             </div>
           </div>
 
-          {/* Posts List */}
           <div className="space-y-3">
             {posts.map((post, idx) => (
               <div
@@ -498,51 +290,15 @@ export default function GBPAdvancedFeaturesPage() {
       {/* Photos Tab */}
       {activeTab === 'photos' && (
         <div className="space-y-4">
-          {/* Upload Photo */}
-          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
-            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Upload Photo</h3>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="Enter photo URL (must be publicly accessible)"
-                className="flex-1 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
-              />
-              <select
-                value={photoCategory}
-                onChange={(e) => setPhotoCategory(e.target.value)}
-                className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
-              >
-                <option value="ADDITIONAL">Additional</option>
-                <option value="COVER">Cover</option>
-                <option value="PROFILE">Profile</option>
-                <option value="LOGO">Logo</option>
-                <option value="EXTERIOR">Exterior</option>
-                <option value="INTERIOR">Interior</option>
-                <option value="PRODUCT">Product</option>
-              </select>
-              <button
-                onClick={handleUploadPhoto}
-                disabled={uploadingPhoto || !photoUrl}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50"
-              >
-                {uploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                Upload
-              </button>
-            </div>
-          </div>
+          <GbpPhotoUploadPicker tenantId={tenantId} onUploaded={fetchMedia} canUpload={canUseMediaUpload} />
 
-          {/* Media Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {media.map((item, idx) => (
               <div
                 key={item.name || idx}
                 className="aspect-square bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden relative group"
               >
-                {item.googleUrl && (
-                  <img src={item.googleUrl} alt="" className="w-full h-full object-cover" />
-                )}
+                {item.googleUrl && <img src={item.googleUrl} alt="" className="w-full h-full object-cover" />}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <span className="text-white text-xs px-2 py-1 bg-black/50 rounded">
                     {item.locationAssociation?.category || 'Photo'}
@@ -562,67 +318,7 @@ export default function GBPAdvancedFeaturesPage() {
 
       {/* Attributes Tab */}
       {activeTab === 'attributes' && (
-        <div className="space-y-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
-            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Business Attributes</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-              Set common attributes that appear on your Google Business Profile
-            </p>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { key: 'hasWifi', label: 'Free WiFi', icon: Wifi },
-                { key: 'wheelchairAccessible', label: 'Wheelchair Accessible', icon: Accessibility },
-                { key: 'acceptsCreditCards', label: 'Accepts Credit Cards', icon: CreditCard },
-                { key: 'hasParking', label: 'Parking Available', icon: Car },
-                { key: 'lgbtqFriendly', label: 'LGBTQ+ Friendly', icon: Heart },
-                { key: 'petFriendly', label: 'Pet Friendly', icon: PawPrint },
-              ].map((attr) => (
-                <label
-                  key={attr.key}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    commonAttrs[attr.key as keyof typeof commonAttrs]
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={commonAttrs[attr.key as keyof typeof commonAttrs]}
-                    onChange={(e) => setCommonAttrs({ ...commonAttrs, [attr.key]: e.target.checked })}
-                    className="sr-only"
-                  />
-                  <attr.icon className={`w-5 h-5 ${
-                    commonAttrs[attr.key as keyof typeof commonAttrs]
-                      ? 'text-blue-600'
-                      : 'text-neutral-400'
-                  }`} />
-                  <span className={`text-sm font-medium ${
-                    commonAttrs[attr.key as keyof typeof commonAttrs]
-                      ? 'text-blue-700 dark:text-blue-300'
-                      : 'text-neutral-700 dark:text-neutral-300'
-                  }`}>
-                    {attr.label}
-                  </span>
-                  {commonAttrs[attr.key as keyof typeof commonAttrs] && (
-                    <CheckCircle className="w-4 h-4 text-blue-600 ml-auto" />
-                  )}
-                </label>
-              ))}
-            </div>
-
-            <div className="flex justify-end mt-6">
-              <button
-                onClick={handleSaveCommonAttributes}
-                disabled={savingAttributes}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50"
-              >
-                {savingAttributes ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                Save to Google
-              </button>
-            </div>
-          </div>
-        </div>
+        <GbpAttributesTab tenantId={tenantId} canUseAttributes={canUseAttributes} />
       )}
     </div>
   );

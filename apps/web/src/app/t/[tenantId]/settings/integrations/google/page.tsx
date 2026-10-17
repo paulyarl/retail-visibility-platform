@@ -79,6 +79,11 @@ export default function GoogleIntegrationsPage() {
   const [savingGmcSettings, setSavingGmcSettings] = useState(false);
   const [gmcSettingsResult, setGmcSettingsResult] = useState<any>(null);
   const [validationIssuesCount, setValidationIssuesCount] = useState(0);
+  const [merchants, setMerchants] = useState<Array<{ id: string; name: string }>>([]);
+  const [showMerchantSelector, setShowMerchantSelector] = useState(false);
+  const [loadingMerchants, setLoadingMerchants] = useState(false);
+  const [linkingMerchantId, setLinkingMerchantId] = useState<string | null>(null);
+  const [merchantLinkError, setMerchantLinkError] = useState<string | null>(null);
 
   async function fetchSetupStatus() {
     try {
@@ -205,6 +210,35 @@ export default function GoogleIntegrationsPage() {
       setGmcSettingsResult({ success: false, message: 'Failed to save settings' });
     } finally {
       setSavingGmcSettings(false);
+    }
+  }
+
+  async function handleLoadMerchants() {
+    setMerchantLinkError(null);
+    setShowMerchantSelector(true);
+    setLoadingMerchants(true);
+    try {
+      const data = await platformHomeService.getGoogleOAuthMerchants(tenantId);
+      setMerchants(data?.merchants || []);
+    } catch (err) {
+      setMerchantLinkError(err instanceof Error ? err.message : 'Failed to load Merchant Center accounts');
+    } finally {
+      setLoadingMerchants(false);
+    }
+  }
+
+  async function handleLinkMerchant(merchant: { id: string; name: string }) {
+    setLinkingMerchantId(merchant.id);
+    setMerchantLinkError(null);
+    try {
+      await platformHomeService.linkGoogleMerchant(tenantId, merchant.id, merchant.name);
+      setShowMerchantSelector(false);
+      await fetchSetupStatus();
+      await fetchGMCStatus();
+    } catch (err) {
+      setMerchantLinkError(err instanceof Error ? err.message : 'Failed to link Merchant Center account');
+    } finally {
+      setLinkingMerchantId(null);
     }
   }
 
@@ -364,6 +398,14 @@ export default function GoogleIntegrationsPage() {
           }}
           connecting={connecting}
           connectingGBP={connectingGBP}
+          merchants={merchants}
+          showMerchantSelector={showMerchantSelector}
+          loadingMerchants={loadingMerchants}
+          linkingMerchantId={linkingMerchantId}
+          merchantLinkError={merchantLinkError}
+          onLoadMerchants={handleLoadMerchants}
+          onLinkMerchant={handleLinkMerchant}
+          onCancelMerchantSelector={() => setShowMerchantSelector(false)}
         />
       )}
 
@@ -372,6 +414,8 @@ export default function GoogleIntegrationsPage() {
           tenantId={tenantId}
           gmcConnected={setupStatus?.isReady || false}
           hasMerchantLink={gmcStatus?.hasMerchantLink || false}
+          gmcSyncAllowed={gmcStatus?.gmcSyncAllowed !== false}
+          gmcSyncGateReason={gmcStatus?.gmcSyncGateReason ?? null}
           onSyncAll={handleSyncAllProducts}
           syncing={syncingProducts}
           syncResult={gmcSyncResult}

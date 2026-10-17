@@ -177,7 +177,8 @@ export default function GoogleMerchantGuide() {
           </div>
           <div className="ml-11 space-y-3">
             <p className="text-neutral-600 dark:text-neutral-400">
-              After connecting your Google account, click <strong>"Link Merchant Center"</strong>.
+              After connecting your Google account, click <strong>"Link Merchant Center"</strong> — it appears on the
+              Overview tab, both in the <strong>Setup Progress</strong> card and under <strong>Quick Actions</strong>.
             </p>
             <ol className="list-decimal list-inside space-y-2 text-neutral-600 dark:text-neutral-400">
               <li>A list of your Merchant Center accounts will appear</li>
@@ -196,6 +197,15 @@ export default function GoogleMerchantGuide() {
                   merchants.google.com
                 </a>
                 {' '}using the same Google account.
+              </p>
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Product sync also needs a physical storefront.</strong> Google Merchant Center sync requires a
+                retail or service storefront type and physical, hybrid, or service products. If sync isn't available,
+                the Overview tab links you to the setting that needs attention — or tells you if it isn't included in
+                your plan.
               </p>
             </div>
           </div>

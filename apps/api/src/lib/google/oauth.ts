@@ -126,9 +126,17 @@ export async function exchangeCodeForTokens(code: string): Promise<{
 }
 
 /**
- * Refresh access token using refresh token
+ * Refresh access token using refresh token.
+ *
+ * Google refresh tokens are bound to the OAuth client that issued them, so
+ * callers refreshing a token minted by a different client (e.g. the Google
+ * Business Profile client) must pass that client's credentials — otherwise
+ * Google rejects the grant and the call silently fails.
  */
-export async function refreshAccessToken(refreshToken: string): Promise<{
+export async function refreshAccessToken(
+  refreshToken: string,
+  creds?: { clientId?: string; clientSecret?: string },
+): Promise<{
   access_token: string;
   expires_in: number;
   scope: string;
@@ -142,8 +150,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
       },
       body: new URLSearchParams({
         refresh_token: refreshToken,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
+        client_id: creds?.clientId || GOOGLE_CLIENT_ID,
+        client_secret: creds?.clientSecret || GOOGLE_CLIENT_SECRET,
         grant_type: 'refresh_token',
       }),
     });

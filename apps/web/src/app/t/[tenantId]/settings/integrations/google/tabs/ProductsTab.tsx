@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@mantine/core';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { gmcValidationService, BulkValidationReport } from '@/services/GMCValidationService';
+import GmcSyncAvailabilityNotice from '@/components/google/GmcSyncAvailabilityNotice';
 import {
   CheckCircle,
   XCircle,
@@ -32,6 +33,8 @@ interface ProductsTabProps {
   tenantId: string;
   gmcConnected: boolean;
   hasMerchantLink: boolean;
+  gmcSyncAllowed: boolean;
+  gmcSyncGateReason?: string | null;
   onSyncAll: () => void;
   syncing: boolean;
   syncResult: any;
@@ -43,6 +46,8 @@ export default function ProductsTab({
   tenantId,
   gmcConnected,
   hasMerchantLink,
+  gmcSyncAllowed,
+  gmcSyncGateReason,
   onSyncAll,
   syncing,
   syncResult,
@@ -164,6 +169,10 @@ export default function ProductsTab({
           </span>
         );
     }
+  }
+
+  if (!gmcSyncAllowed) {
+    return <GmcSyncAvailabilityNotice tenantId={tenantId} reason={gmcSyncGateReason} />;
   }
 
   if (!gmcConnected) {

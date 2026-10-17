@@ -877,6 +877,8 @@ export interface GbpManagementState {
   canShowContent: boolean;
   canUseAiResponse: boolean;
   canUsePostsScheduler: boolean;
+  canUseMediaUpload: boolean;
+  canUseAttributes: boolean;
   reviewsEnabled: boolean;
   contentEnabled: boolean;
   merchantPreferences: { gbpReviewsDisplay: boolean; gbpContentDisplay: boolean } | null;

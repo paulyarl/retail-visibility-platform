@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
+import { evaluateGMCSyncGate } from '../lib/google/capability-gate';
 import { canonicalStorefrontBaseUrl, platformApex, resolveStorefrontCanonical } from '../lib/storefront-url';
 import { validateProductForGMC } from './GMCValidationService';
 import { logger } from '../logger';
@@ -1014,6 +1015,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
   lastSyncAt: Date | null;
   storefrontReady: boolean;
   syncableProducts: number;
+  gmcSyncAllowed: boolean;
+  gmcSyncGateReason: string;
 }> {
   try {
     const account = await prisma.google_oauth_accounts_list.findFirst({
@@ -1032,6 +1035,10 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     // Canonical ladder — the same resolution syncProduct uses for the product
     // link, so "storefront ready" can't disagree with what the sync accepts.
     const canon = await resolveStorefrontCanonical(tenantId);
+
+    // Entitlement gate — surfaced so the client can hide sync actions instead of
+    // letting the merchant click into a 403.
+    const gate = await evaluateGMCSyncGate(tenantId);
     const canonicalBase = canonicalStorefrontBaseUrl(canon);
     // Absolute platform address, apex derived from config (staging serves on
     // visibleshelf.store) — never a hardcoded literal.
@@ -1085,6 +1092,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
           product_type: { in: [...GMC_SYNCABLE_PRODUCT_TYPES] },
         },
       }),
+      gmcSyncAllowed: gate.allowed,
+      gmcSyncGateReason: gate.reason,
     };
   } catch (error) {
     logger.error(`[GMCProductSync] Error getting sync status:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
@@ -1111,6 +1120,8 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       lastSyncAt: null,
       storefrontReady: false,
       syncableProducts: 0,
+      gmcSyncAllowed: false,
+      gmcSyncGateReason: 'error',
     };
   }
 }

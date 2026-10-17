@@ -37,7 +37,10 @@ export async function getValidAccessToken(tenantId: string): Promise<string | nu
 
       if (tokenRecord.expires_at <= now) {
         const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
+        const newTokens = await refreshAccessToken(refreshToken, {
+          clientId: process.env.GOOGLE_BUSINESS_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_BUSINESS_CLIENT_SECRET,
+        });
 
         if (!newTokens) {
           logger.error(`[GBPAdvanced] Token refresh failed for tenant ${tenantId}`, undefined);
@@ -755,7 +758,11 @@ export interface BusinessAttribute {
 }
 
 /**
- * Get available attributes for a location's category
+ * Get attributes available for a location (category- and country-driven).
+ *
+ * Uses `parent=locations/{id}` so Google resolves the location's primary
+ * category + region itself and returns the attribute metadata (displayName,
+ * valueType, valueMetadata, groupDisplayName) the UI renders.
  */
 export async function getAvailableAttributes(tenantId: string): Promise<{
   success: boolean;
@@ -773,33 +780,8 @@ export async function getAvailableAttributes(tenantId: string): Promise<{
       return { success: false, attributes: [], error: 'No GBP location linked' };
     }
 
-    // First get the location to find its category
-    const locationResponse = await fetch(
-      `${GBP_API_BASE}/locations/${location.locationId}?readMask=categories`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!locationResponse.ok) {
-      return { success: false, attributes: [], error: 'Failed to get location category' };
-    }
-
-    const locationData = await locationResponse.json() as {
-      categories?: { primaryCategory?: { name?: string } };
-    };
-    const primaryCategory = locationData.categories?.primaryCategory?.name;
-
-    if (!primaryCategory) {
-      return { success: false, attributes: [], error: 'No primary category set' };
-    }
-
-    // Get attributes for this category
     const response = await fetch(
-      `${GBP_API_BASE}/attributes?parent=${primaryCategory}`,
+      `${GBP_API_BASE}/attributes?parent=locations/${location.locationId}&regionCode=US&languageCode=en&pageSize=200`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -809,11 +791,13 @@ export async function getAvailableAttributes(tenantId: string): Promise<{
     );
 
     if (!response.ok) {
+      const error = await response.text();
+      logger.error('[GBPAdvanced] Failed to list available attributes:', undefined, { status: response.status, error });
       return { success: false, attributes: [], error: `API error: ${response.status}` };
     }
 
-    const data = await response.json() as { attributes?: any[] };
-    return { success: true, attributes: data.attributes || [] };
+    const data = await response.json() as { attributeMetadata?: any[] };
+    return { success: true, attributes: data.attributeMetadata || [] };
   } catch (error: any) {
     return { success: false, attributes: [], error: error.message };
   }
@@ -860,11 +844,16 @@ export async function getLocationAttributes(tenantId: string): Promise<{
 }
 
 /**
- * Update business attributes
+ * Update business attributes.
+ *
+ * Google's `locations.updateAttributes` requires an `attributeMask` naming the
+ * attributes being written (comma-separated `attributes/{id}`). When the caller
+ * doesn't supply one it is derived from the attribute ids in the payload.
  */
 export async function updateAttributes(
   tenantId: string,
-  attributes: BusinessAttribute[]
+  attributes: BusinessAttribute[],
+  attributeMask?: string[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const accessToken = await getValidAccessToken(tenantId);
@@ -877,8 +866,15 @@ export async function updateAttributes(
       return { success: false, error: 'No GBP location linked' };
     }
 
+    const mask = (attributeMask && attributeMask.length > 0
+      ? attributeMask
+      : attributes.map((a) => a.attributeId)
+    )
+      .map((id) => (id.startsWith('attributes/') ? id : `attributes/${id}`))
+      .join(',');
+
     const response = await fetch(
-      `${GBP_API_BASE}/locations/${location.locationId}/attributes`,
+      `${GBP_API_BASE}/locations/${location.locationId}/attributes?attributeMask=${encodeURIComponent(mask)}`,
       {
         method: 'PATCH',
         headers: {
@@ -886,6 +882,7 @@ export async function updateAttributes(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          name: `locations/${location.locationId}/attributes`,
           attributes: attributes,
         }),
       }
@@ -1002,6 +999,11 @@ async function storeReviews(tenantId: string, reviews: Review[]): Promise<void> 
 
 /**
  * Set common boolean attributes like WiFi, wheelchair accessible, etc.
+ *
+ * `offers*` options are the storefront-retail fulfillment set
+ * (delivery / curbside / in-store pickup / takeout / in-store shopping) —
+ * Google's Service options group. Attribute ids verified against
+ * attributes.list metadata (BOOL).
  */
 export async function setCommonAttributes(
   tenantId: string,
@@ -1013,63 +1015,44 @@ export async function setCommonAttributes(
     hasRestroom?: boolean;
     lgbtqFriendly?: boolean;
     petFriendly?: boolean;
+    // Storefront-retail fulfillment options (Service options)
+    offersDelivery?: boolean;
+    offersCurbsidePickup?: boolean;
+    offersInStorePickup?: boolean;
+    offersTakeout?: boolean;
+    offersInStoreShopping?: boolean;
   }
 ): Promise<{ success: boolean; error?: string }> {
   const attributes: BusinessAttribute[] = [];
 
-  if (options.hasWifi !== undefined) {
-    attributes.push({
-      attributeId: 'has_wifi',
-      valueType: 'BOOL',
-      values: [options.hasWifi],
-    });
-  }
+  const pushBool = (id: string, value: boolean | undefined) => {
+    if (value !== undefined) {
+      attributes.push({ attributeId: id, valueType: 'BOOL', values: [value] });
+    }
+  };
 
-  if (options.wheelchairAccessible !== undefined) {
-    attributes.push({
-      attributeId: 'wheelchair_accessible_entrance',
-      valueType: 'BOOL',
-      values: [options.wheelchairAccessible],
-    });
-  }
+  pushBool('has_wifi', options.hasWifi);
+  pushBool('has_wheelchair_accessible_entrance', options.wheelchairAccessible);
+  pushBool('has_parking', options.hasParking);
+  pushBool('restroom', options.hasRestroom);
+  pushBool('lgbtq_friendly', options.lgbtqFriendly);
+  pushBool('dogs_allowed', options.petFriendly);
+  pushBool('has_delivery', options.offersDelivery);
+  pushBool('has_curbside_pickup', options.offersCurbsidePickup);
+  pushBool('has_in_store_pickup', options.offersInStorePickup);
+  pushBool('has_takeout', options.offersTakeout);
+  pushBool('has_in_store_shopping', options.offersInStoreShopping);
 
   if (options.acceptsCreditCards !== undefined) {
+    // pay_credit_card_types_accepted is REPEATED_ENUM — set/unset the common
+    // card values rather than writing a boolean.
+    const cardValues = ['visa', 'mastercard', 'amex', 'discover'];
     attributes.push({
       attributeId: 'pay_credit_card_types_accepted',
-      valueType: 'BOOL',
-      values: [options.acceptsCreditCards],
-    });
-  }
-
-  if (options.hasParking !== undefined) {
-    attributes.push({
-      attributeId: 'has_parking',
-      valueType: 'BOOL',
-      values: [options.hasParking],
-    });
-  }
-
-  if (options.hasRestroom !== undefined) {
-    attributes.push({
-      attributeId: 'restroom',
-      valueType: 'BOOL',
-      values: [options.hasRestroom],
-    });
-  }
-
-  if (options.lgbtqFriendly !== undefined) {
-    attributes.push({
-      attributeId: 'lgbtq_friendly',
-      valueType: 'BOOL',
-      values: [options.lgbtqFriendly],
-    });
-  }
-
-  if (options.petFriendly !== undefined) {
-    attributes.push({
-      attributeId: 'dogs_allowed',
-      valueType: 'BOOL',
-      values: [options.petFriendly],
+      valueType: 'REPEATED_ENUM',
+      repeatedEnumValue: options.acceptsCreditCards
+        ? { setValues: cardValues, unsetValues: [] }
+        : { setValues: [], unsetValues: cardValues },
     });
   }
 

@@ -1058,6 +1058,8 @@ export interface EffectiveGbpManagement {
   can_show_content: boolean;
   can_use_ai_response: boolean;
   can_use_posts_scheduler: boolean;
+  can_use_media_upload: boolean;
+  can_use_attributes: boolean;
   reviews_enabled: boolean;
   content_enabled: boolean;
   merchant_preferences: {

@@ -9,7 +9,7 @@ import {
 } from '../lib/google/oauth';
 import { listMerchantAccounts } from '../lib/google/gmc';
 import { generateQuickStart } from '../lib/id-generator';
-import { isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { evaluateGMCSyncGate, gmcSyncGateError } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
 
@@ -618,13 +618,10 @@ router.post('/google/merchant/sync', async (req, res) => {
     const { batchSyncProducts, getGMCSyncStatus } = await import('../services/GMCProductSync');
 
     // Check if tenant's tier allows GMC sync
-    const gmcAllowed = await isGMCSyncAllowed(tenantId);
-    if (!gmcAllowed) {
-      return res.status(403).json({
-        success: false,
-        error: 'tier_restricted',
-        message: 'Google Merchant Center sync is not available on your current plan. Please upgrade to use this feature.'
-      });
+    const gate = await evaluateGMCSyncGate(tenantId);
+    if (!gate.allowed) {
+      const { status, ...body } = gmcSyncGateError(gate.reason, tenantId);
+      return res.status(status).json({ success: false, ...body });
     }
 
     // Check if tenant can sync
@@ -689,13 +686,10 @@ router.post('/google/merchant/sync/:itemId', async (req, res) => {
     }
 
     // Check if tenant's tier allows GMC sync
-    const gmcAllowed = await isGMCSyncAllowed(tenantId);
-    if (!gmcAllowed) {
-      return res.status(403).json({
-        success: false,
-        error: 'tier_restricted',
-        message: 'Google Merchant Center sync is not available on your current plan. Please upgrade to use this feature.'
-      });
+    const gate = await evaluateGMCSyncGate(tenantId);
+    if (!gate.allowed) {
+      const { status, ...body } = gmcSyncGateError(gate.reason, tenantId);
+      return res.status(status).json({ success: false, ...body });
     }
 
     const { syncProduct } = await import('../services/GMCProductSync');

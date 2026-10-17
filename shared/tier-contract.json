@@ -701,9 +701,11 @@
     ],
     "gbp_management": [
       "gbp_ai_response",
+      "gbp_attributes",
       "gbp_directory_content",
       "gbp_directory_reviews",
       "gbp_management_flexible",
+      "gbp_media_upload",
       "gbp_posts_scheduler"
     ],
     "integration_options": [

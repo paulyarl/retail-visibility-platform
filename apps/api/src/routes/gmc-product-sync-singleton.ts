@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { evaluateGMCSyncGate, gmcSyncGateError } from '../lib/google/capability-gate';
 import { logger } from '../logger';
 
 const router = Router();
@@ -39,13 +39,10 @@ router.post('/sync-single', async (req, res) => {
     
     const { syncProduct } = await import('../services/GMCProductSync');
 
-    const gmcAllowed = await isGMCSyncAllowed(tenantId);
-    if (!gmcAllowed) {
-      return res.status(403).json({
-        success: false,
-        error: 'tier_restricted',
-        message: 'Google Merchant Center sync is not available on your current plan.'
-      });
+    const gate = await evaluateGMCSyncGate(tenantId);
+    if (!gate.allowed) {
+      const { status, ...body } = gmcSyncGateError(gate.reason, tenantId);
+      return res.status(status).json({ success: false, ...body });
     }
 
     const result = await syncProduct(tenantId, product.id);
@@ -94,13 +91,10 @@ router.post('/sync-batch', async (req, res) => {
     
     const { batchSyncProducts } = await import('../services/GMCProductSync');
 
-    const gmcAllowed = await isGMCSyncAllowed(tenantId);
-    if (!gmcAllowed) {
-      return res.status(403).json({
-        success: false,
-        error: 'tier_restricted',
-        message: 'Google Merchant Center sync is not available on your current plan.'
-      });
+    const gate = await evaluateGMCSyncGate(tenantId);
+    if (!gate.allowed) {
+      const { status, ...body } = gmcSyncGateError(gate.reason, tenantId);
+      return res.status(status).json({ success: false, ...body });
     }
 
     const itemIds = products.map((p: any) => p.id);
@@ -150,13 +144,10 @@ router.post('/update-inventory', async (req, res) => {
     
     const { updateInventory } = await import('../services/GMCProductSync');
 
-    const gmcAllowed = await isGMCSyncAllowed(tenantId);
-    if (!gmcAllowed) {
-      return res.status(403).json({
-        success: false,
-        error: 'tier_restricted',
-        message: 'Google Merchant Center sync is not available on your current plan.'
-      });
+    const gate = await evaluateGMCSyncGate(tenantId);
+    if (!gate.allowed) {
+      const { status, ...body } = gmcSyncGateError(gate.reason, tenantId);
+      return res.status(status).json({ success: false, ...body });
     }
 
     const qty = quantity != null ? Number(quantity) : 0;

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { gmcValidationService, BulkValidationReport } from '@/services/GMCValidationService';
 import { StorefrontDomainSummary } from '@/components/google/StorefrontDomainSummary';
+import GmcSyncAvailabilityNotice from '@/components/google/GmcSyncAvailabilityNotice';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { 
   ArrowLeft,
@@ -752,23 +753,27 @@ export default function GBPSyncStatusPage() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleSyncProductsToGMC}
-              disabled={syncingProducts}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
-            >
-              {syncingProducts ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <ShoppingBag className="w-4 h-4" />
-              )}
-              {syncingProducts ? 'Syncing...' : 'Sync Products'}
-            </button>
+            {gmcStatus?.gmcSyncAllowed !== false && (
+              <button
+                onClick={handleSyncProductsToGMC}
+                disabled={syncingProducts}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {syncingProducts ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShoppingBag className="w-4 h-4" />
+                )}
+                {syncingProducts ? 'Syncing...' : 'Sync Products'}
+              </button>
+            )}
           </div>
         </div>
 
         <div className="p-4">
-          {gmcStatus ? (
+          {gmcStatus?.gmcSyncAllowed === false ? (
+            <GmcSyncAvailabilityNotice tenantId={tenantId} reason={gmcStatus.gmcSyncGateReason} />
+          ) : gmcStatus ? (
             <div className="space-y-4">
               {/* GMC Connection Status */}
               <div className="flex items-center gap-4 text-sm">
@@ -1045,7 +1050,7 @@ export default function GBPSyncStatusPage() {
           <li>• <strong>Business Info:</strong> {linkedLocation ? '✅ Click "Sync to Google" above' : '⚠️ Link a GBP location to enable'}</li>
           <li>• <strong>Categories:</strong> {linkedLocation ? '✅ Click "Sync to Google" above' : '⚠️ Link a GBP location to enable'}</li>
           <li>• <strong>Business Hours:</strong> ✅ Auto-syncs when hours are updated</li>
-          <li>• <strong>Products:</strong> {gmcStatus?.hasMerchantLink ? '✅ Click "Sync Products" above' : '⚠️ Link a Merchant Center account to enable'}</li>
+          <li>• <strong>Products:</strong> {gmcStatus?.gmcSyncAllowed === false ? '⚠️ Not available — see the notice above' : gmcStatus?.hasMerchantLink ? '✅ Click "Sync Products" above' : '⚠️ Link a Merchant Center account to enable'}</li>
         </ul>
       </div>
 
