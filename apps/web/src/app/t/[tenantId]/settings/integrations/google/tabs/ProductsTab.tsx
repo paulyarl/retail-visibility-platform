@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Fragment } from 'react';
+import Link from 'next/link';
 import { Button } from '@mantine/core';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import {
@@ -19,6 +20,7 @@ import {
   ShoppingBag,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -477,6 +479,15 @@ export default function ProductsTab({
                                 </li>
                               ))}
                             </ul>
+                            <Link
+                              href={`/t/${tenantId}/items/${product.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Edit product to fix {validation.errors > 0 ? 'these errors' : 'these recommendations'}
+                            </Link>
                           </td>
                         </tr>
                       )}
