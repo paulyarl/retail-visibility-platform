@@ -389,7 +389,10 @@ Missing `gbp_posts_scheduler` = rows sit `SCHEDULED` forever.
   (`needsPriceConfirmation`) cannot save/publish until priced — AI never
   invents a price, and repertoire history fills misses by dish name.
 - Image flyers cannot be extracted yet — the AI provider interface is
-  text-only (`ChatMessage.content: string`). Hero images stay manual uploads.
+  text-only (`ChatMessage.content: string`). Hero artwork goes through
+  `POST /:tenantId/flyers/hero-image` (gated by `flyer_image`; accepts
+  multipart `file`, JSON `dataUrl`, or passthrough `url`; stores to the
+  TENANTS bucket under `flyer/:tenantId/`).
 - Chatbot: specials intent + `chatbot_skill_product_search` + module ON → live
   flyer context is queried per-request (never embedded — too short-lived).
   Only `published` + in-window flyers are injected; suppressed/draft/expired

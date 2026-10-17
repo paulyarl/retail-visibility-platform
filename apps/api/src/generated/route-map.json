@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-17T18:06:01.482Z",
+  "generatedAt": "2026-10-17T21:25:25.413Z",
   "totalMounts": 245,
-  "totalRoutes": 2932,
+  "totalRoutes": 2933,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -8983,6 +8983,18 @@
             "authenticateToken",
             "checkTenantAccess",
             "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/flyers/hero-image",
+          "fullPath": "/api/tenants/:tenantId/flyers/hero-image",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "multerMiddleware",
             "AsyncFunction"
           ]
         },

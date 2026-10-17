@@ -487,6 +487,13 @@ export const ImageUploadPresets = {
     allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
   },
 
+  /** Flyer hero artwork - MEDIUM compression (few images per tenant, showcase quality) */
+  flyer: {
+    compressionLevel: 'medium' as CompressionLevel,
+    maxSizeMB: 8,
+    allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
+  },
+
   /** Diagnostic screenshots - LOW compression (evidence must stay legible at full width) */
   diagnostic: {
     compressionLevel: 'low' as CompressionLevel,

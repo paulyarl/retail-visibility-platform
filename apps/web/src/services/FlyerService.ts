@@ -211,6 +211,16 @@ class FlyerService extends TenantApiSingleton {
     return result.data.data.flyer;
   }
 
+  async uploadFlyerHeroImage(tenantId: string, dataUrl: string): Promise<string> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ url: string }>>(
+      `/api/tenants/${tenantId}/flyers/hero-image`,
+      { method: 'POST', body: JSON.stringify({ dataUrl }) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to upload flyer image');
+    return result.data.data.url;
+  }
+
   async archiveFlyer(tenantId: string, flyerId: string): Promise<void> {
     const result = await this.makeDefaultRequest<ApiEnvelope<null>>(
       `/api/tenants/${tenantId}/flyers/${flyerId}`,

@@ -7,11 +7,12 @@
  * here: title, window, image, dishes/items (spec §1, §6).
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ChangeEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { AlertCircle, Copy, Plus, Sparkles, Calendar, ImageIcon, Share2, Archive, RefreshCw, Upload } from 'lucide-react';
+import { AlertCircle, Copy, Plus, Sparkles, Calendar, ImageIcon, Share2, Archive, RefreshCw, Upload, Loader2, X } from 'lucide-react';
+import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 import Link from 'next/link';
 import { useFlyerCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerRecurrence, type FlyerExtractionDraft } from '@/services/FlyerService';
@@ -69,6 +70,8 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [heroUploading, setHeroUploading] = useState(false);
+  const heroFileRef = useRef<HTMLInputElement>(null);
   const [preset, setPreset] = useState<WindowPreset>('week');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
@@ -183,6 +186,27 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
       setError(err?.message || 'Failed to save flyer');
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** Seed-page pattern: client-side validate + compress → dataUrl → API → stored URL into heroImageUrl. */
+  const handleHeroFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setHeroUploading(true);
+    setError(null);
+    try {
+      const result = await uploadImage(file, ImageUploadPresets.flyer);
+      if (result.error || !result.dataUrl) {
+        throw new Error(result.error?.message || 'Could not process that image');
+      }
+      const url = await flyerService.uploadFlyerHeroImage(tenantId, result.dataUrl);
+      setHeroImageUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      setHeroUploading(false);
     }
   };
 
@@ -399,11 +423,42 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
             </div>
             {flyerCap.image && (
               <div>
-                <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Flyer image URL <span className="text-neutral-400 font-normal">(optional)</span></label>
+                <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Flyer image <span className="text-neutral-400 font-normal">(optional)</span></label>
+                <div className="mt-1 flex items-start gap-3">
+                  {heroImageUrl && (
+                    <div className="relative shrink-0">
+                      <img src={heroImageUrl} alt="Flyer artwork preview" className="h-20 w-32 rounded-lg border border-neutral-200 dark:border-neutral-700 object-cover" />
+                      <button
+                        type="button" onClick={() => setHeroImageUrl('')} aria-label="Remove image"
+                        className="absolute -top-1.5 -right-1.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      ref={heroFileRef} type="file" className="hidden"
+                      accept={getAcceptString([...ImageUploadPresets.flyer.allowedTypes])}
+                      onChange={handleHeroFile}
+                    />
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      onClick={() => heroFileRef.current?.click()}
+                      disabled={heroUploading}
+                    >
+                      {heroUploading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                      {heroUploading ? 'Uploading…' : heroImageUrl ? 'Replace image' : 'Upload image'}
+                    </Button>
+                    <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                      Wide artwork works best — PNG, JPG, or WebP up to 8 MB.
+                    </p>
+                  </div>
+                </div>
                 <input
                   value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)}
-                  placeholder="https://…"
-                  className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+                  placeholder="or paste an image URL — https://…"
+                  className="mt-2 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
                 />
               </div>
             )}

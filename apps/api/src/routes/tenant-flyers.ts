@@ -17,6 +17,9 @@
  */
 
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import { createClient } from '@supabase/supabase-js';
+import { StorageBuckets } from '../storage-config';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { requireInventoryAccess, requireTenantAdmin } from '../middleware/permissions';
@@ -45,6 +48,15 @@ import { extractFlyerDraft } from '../services/FlyerExtractionService';
 import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
+
+const heroImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+const supabaseService = unifiedConfig.supabaseServiceRoleKey
+  ? createClient(unifiedConfig.supabaseUrl, unifiedConfig.supabaseServiceRoleKey)
+  : null;
 
 const WEB_BASE_URL = (
   unifiedConfig.frontendUrl ||
@@ -885,6 +897,71 @@ router.post('/:tenantId/flyers/card-orders', authenticateToken, checkTenantAcces
     res.status(201).json({ success: true, data: { order } });
   } catch (error) {
     logErr('POST /:tenantId/flyers/card-orders', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── POST /:tenantId/flyers/hero-image — hero artwork upload → TENANTS bucket ──
+// Mirrors the directory-photos storage pattern: multipart 'file', JSON
+// 'dataUrl', or passthrough JSON 'url'. The composer normalizes through
+// uploadImage() (client-side compress + validate) and sends dataUrl.
+// Requires flyer_image — the capability gate that pays for hero artwork.
+router.post('/:tenantId/flyers/hero-image', authenticateToken, checkTenantAccess, requireInventoryAccess, heroImageUpload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+
+    const flyer = await flyerState(tenantId);
+    if (!flyer?.enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled' });
+    }
+    if (!flyer.image) {
+      return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_image' });
+    }
+
+    if (req.is('application/json') && typeof req.body?.url === 'string' && /^https?:\/\//.test(req.body.url)) {
+      return res.json({ success: true, data: { url: req.body.url } });
+    }
+
+    if (!supabaseService) {
+      return res.status(503).json({ success: false, error: 'storage_unavailable' });
+    }
+
+    let buffer: Buffer;
+    let contentType = 'application/octet-stream';
+    let fileName = 'hero.jpg';
+
+    if (req.file) {
+      buffer = req.file.buffer;
+      contentType = req.file.mimetype || contentType;
+      fileName = (req.file.originalname || 'hero.jpg').replace(/\s+/g, '_');
+    } else if (req.is('application/json') && typeof req.body?.dataUrl === 'string') {
+      if (req.body.dataUrl.length > 14 * 1024 * 1024) {
+        return res.status(413).json({ success: false, error: 'image_too_large' });
+      }
+      const match = req.body.dataUrl.match(/^data:(.+);base64,(.+)$/);
+      if (!match) {
+        return res.status(400).json({ success: false, error: 'invalid_data_url' });
+      }
+      contentType = match[1];
+      buffer = Buffer.from(match[2], 'base64');
+      fileName = `hero.${contentType.split('/')[1]?.replace('svg+xml', 'svg') || 'jpg'}`;
+    } else {
+      return res.status(400).json({ success: false, error: 'missing_image', message: "Provide multipart 'file', JSON 'dataUrl', or JSON 'url'" });
+    }
+
+    const path = `flyer/${tenantId}/${Date.now()}-${fileName}`;
+    const { error: uploadError, data } = await supabaseService.storage
+      .from(StorageBuckets.TENANTS.name)
+      .upload(path, buffer, { cacheControl: '3600', contentType, upsert: false });
+    if (uploadError) {
+      logErr('POST /:tenantId/flyers/hero-image upload', new Error(uploadError.message), tenantId);
+      return res.status(500).json({ success: false, error: 'upload_failed' });
+    }
+
+    const pub = supabaseService.storage.from(StorageBuckets.TENANTS.name).getPublicUrl(data.path);
+    res.json({ success: true, data: { url: pub.data.publicUrl } });
+  } catch (error) {
+    logErr('POST /:tenantId/flyers/hero-image', error, req.params.tenantId);
     res.status(500).json({ success: false, error: 'internal_error' });
   }
 });
