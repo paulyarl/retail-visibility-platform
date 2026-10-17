@@ -106,10 +106,12 @@ class CheckoutService extends PublicApiSingleton {
           phone: request.customerInfo.phone,
         },
         items: request.cartItems.map(item => ({
-          id: item.id,
+          id: item.variantId || item.id,
           tenantId: item.tenantId,
           sku: item.sku,  
           quantity: item.quantity,
+          ...(item.variantId ? { variantId: item.variantId } : {}),
+          ...(item.flyer_id || item.flyerId ? { flyer_id: item.flyer_id || item.flyerId } : {}),
         })),
         shipping_address: request.shippingAddress,
         fulfillment_method: request.fulfillmentMethod,

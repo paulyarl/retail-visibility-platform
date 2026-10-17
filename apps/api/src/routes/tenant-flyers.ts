@@ -30,6 +30,7 @@ import {
   generateFlyerItemId,
   generateFlyerOptionsSettingsId,
   generateFlyerShareCode,
+  generateFlyerCardOrderId,
   generateTenantItemId,
   generateTenantVariantId,
   generateVariantSkuFromParent,
@@ -37,6 +38,9 @@ import {
   generateTenantKey,
 } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
+import { generateFlyerCardPdf } from '../services/FlyerCardArtService';
+import { submitCardOrder, unitCostForPackSize } from '../services/FlyerPrintProvider';
 import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
@@ -56,6 +60,7 @@ const flyerWindowSchema = z.object({
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
   ctaMode: z.enum(['auto', 'order', 'view']).optional(),
+  recurrence: z.enum(['none', 'daily', 'weekly']).optional(),
 });
 
 const flyerItemSchema = z.object({
@@ -199,6 +204,10 @@ router.post('/:tenantId/flyers', authenticateToken, checkTenantAccess, requireIn
     if (parsed.data.heroImageUrl && !flyer.image) {
       return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_image' });
     }
+    const recurrence = parsed.data.recurrence ?? 'none';
+    if (recurrence !== 'none' && !flyer.recurring) {
+      return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_recurring' });
+    }
 
     const status = (req.body.status as string) === 'published' ? 'published' : 'draft';
     if (status === 'published' && (await liveFlyerCount(tenantId)) >= MAX_LIVE_FLYERS) {
@@ -216,6 +225,7 @@ router.post('/:tenantId/flyers', authenticateToken, checkTenantAccess, requireIn
         ends_at: parsed.data.endsAt,
         status,
         cta_mode: parsed.data.ctaMode ?? 'auto',
+        recurrence,
         share_code: generateFlyerShareCode(),
       },
     });
@@ -296,10 +306,13 @@ router.patch('/:tenantId/flyers/:flyerId', authenticateToken, checkTenantAccess,
     if (endsAt <= startsAt) {
       return res.status(400).json({ success: false, error: 'invalid_window', message: 'endsAt must be after startsAt' });
     }
-    if (parsed.data.heroImageUrl) {
+    if (parsed.data.heroImageUrl || (parsed.data.recurrence && parsed.data.recurrence !== 'none')) {
       const flyer = await flyerState(tenantId);
-      if (!flyer?.image) {
+      if (parsed.data.heroImageUrl && !flyer?.image) {
         return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_image' });
+      }
+      if (parsed.data.recurrence && parsed.data.recurrence !== 'none' && !flyer?.recurring) {
+        return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_recurring' });
       }
     }
 
@@ -312,6 +325,7 @@ router.patch('/:tenantId/flyers/:flyerId', authenticateToken, checkTenantAccess,
         ...(parsed.data.startsAt !== undefined ? { starts_at: parsed.data.startsAt } : {}),
         ...(parsed.data.endsAt !== undefined ? { ends_at: parsed.data.endsAt } : {}),
         ...(parsed.data.ctaMode !== undefined ? { cta_mode: parsed.data.ctaMode } : {}),
+        ...(parsed.data.recurrence !== undefined ? { recurrence: parsed.data.recurrence } : {}),
         updated_at: new Date(),
       },
     });
@@ -649,6 +663,288 @@ router.put('/:tenantId/flyer-options', authenticateToken, checkTenantAccess, req
     res.json({ success: true, settings });
   } catch (error) {
     logErr('PUT /:tenantId/flyer-options', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── POST /:tenantId/flyers/:flyerId/publish-gbp — dual-publish to GBP ──
+// Creates a SCHEDULED gbp_posts row consumed by gbpPostScheduler (spec §7).
+// Three gates: flyer module on, flyer_gbp_publish tier key, and the
+// gbp_posts_scheduler entitlement (the scheduler also re-checks at publish).
+router.post('/:tenantId/flyers/:flyerId/publish-gbp', authenticateToken, checkTenantAccess, requireInventoryAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId, flyerId } = req.params;
+
+    const flyer = await prisma.tenant_flyers.findFirst({ where: { id: flyerId, tenant_id: tenantId } });
+    if (!flyer) return res.status(404).json({ success: false, error: 'not_found' });
+    if (flyer.status === 'suppressed') {
+      return res.status(403).json({ success: false, error: 'flyer_suppressed' });
+    }
+    if (flyer.status === 'archived' || flyer.status === 'expired') {
+      return res.status(400).json({ success: false, error: 'flyer_inactive', message: 'Only live or scheduled flyers can be published to GBP' });
+    }
+
+    const caps = await flyerState(tenantId);
+    if (!caps?.can_use_gbp_publish) {
+      return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_gbp_publish' });
+    }
+    const entitled = await permissionServiceFactory.hasFeature(tenantId, 'gbp_posts_scheduler');
+    if (!entitled) {
+      return res.status(403).json({ success: false, error: 'scheduling_not_entitled', message: 'GBP post scheduling requires the GBP Posts Scheduler capability' });
+    }
+
+    // Dedupe: one active GBP post per flyer window (re-publish after edit is
+    // allowed only when the prior post FAILED or the window moved)
+    const existingPost = await prisma.gbp_posts.findFirst({
+      where: {
+        tenant_id: tenantId,
+        event_title: flyer.title,
+        event_start_date: flyer.starts_at,
+        status: { in: ['SCHEDULED', 'PUBLISHED'] },
+      },
+      select: { id: true, status: true },
+    });
+    if (existingPost) {
+      return res.status(409).json({ success: false, error: 'already_published', data: { post: existingPost } });
+    }
+
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenantId }, select: { slug: true, name: true } });
+    const shareUrl = tenant?.slug ? `${WEB_BASE_URL}/flyer/${tenant.slug}` : `${WEB_BASE_URL}/flyer/${flyer.share_code}`;
+
+    const summary = [
+      `${flyer.title} — specials at ${tenant?.name ?? 'our store'}`,
+      flyer.summary ?? null,
+      `Now through ${flyer.ends_at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`,
+    ].filter(Boolean).join('\n\n').slice(0, 1500);
+
+    const post = await prisma.gbp_posts.create({
+      data: {
+        id: `post_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        tenant_id: tenantId,
+        summary,
+        topic_type: 'EVENT',
+        call_to_action_type: 'ORDER',
+        call_to_action_url: shareUrl,
+        media_url: flyer.hero_image_url,
+        event_title: flyer.title,
+        event_start_date: flyer.starts_at,
+        event_end_date: flyer.ends_at,
+        status: 'SCHEDULED',
+        // Flyer already live → post goes out on the next scheduler pass;
+        // scheduled flyer → post lands when the window opens
+        scheduled_for: flyer.starts_at <= new Date() ? new Date() : flyer.starts_at,
+      },
+    });
+
+    res.status(201).json({ success: true, data: { post, shareUrl } });
+  } catch (error) {
+    logErr('POST /:tenantId/flyers/:flyerId/publish-gbp', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── GET /:tenantId/flyers/card-art — print-ready double-sided card PDF ──
+router.get('/:tenantId/flyers/card-art', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const art = await generateFlyerCardPdf(tenantId);
+    if (!art) return res.status(404).json({ success: false, error: 'not_found' });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${art.filename}"`);
+    res.send(art.pdfBuffer);
+  } catch (error) {
+    logErr('GET /:tenantId/flyers/card-art', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+const cardOrderSchema = z.object({
+  packSize: z.union([z.literal(25), z.literal(50), z.literal(100)]),
+  packCount: z.number().int().min(1).max(20).default(1),
+  shippingAddress: z.object({
+    name: z.string().min(1).max(200),
+    line1: z.string().min(1).max(200),
+    line2: z.string().max(200).nullish(),
+    city: z.string().min(1).max(100),
+    state: z.string().max(100).nullish(),
+    zip: z.string().min(1).max(20),
+    country: z.string().max(2).default('US'),
+  }),
+});
+
+// ── GET /:tenantId/flyers/card-orders — order history ──
+router.get('/:tenantId/flyers/card-orders', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const orders = await prisma.tenant_flyer_card_orders.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+    res.json({ success: true, data: { orders } });
+  } catch (error) {
+    logErr('GET /:tenantId/flyers/card-orders', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── POST /:tenantId/flyers/card-orders — reorder a card pack ──
+// Platform takes the order, renders art, delegates print+ship to the vendor
+// (spec §10 — no inventory, no shipping).
+router.post('/:tenantId/flyers/card-orders', authenticateToken, checkTenantAccess, requireInventoryAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const parsed = cardOrderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    const flyer = await flyerState(tenantId);
+    if (!flyer?.enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled' });
+    }
+    if (unitCostForPackSize(parsed.data.packSize) == null) {
+      return res.status(400).json({ success: false, error: 'invalid_pack_size' });
+    }
+
+    const art = await generateFlyerCardPdf(tenantId);
+    if (!art) return res.status(404).json({ success: false, error: 'not_found' });
+
+    const orderId = generateFlyerCardOrderId(tenantId);
+    const submission = await submitCardOrder({
+      orderId,
+      packSize: parsed.data.packSize,
+      packCount: parsed.data.packCount,
+      artPdfBase64: art.pdfBuffer.toString('base64'),
+      artFilename: art.filename,
+      shippingAddress: parsed.data.shippingAddress,
+    });
+
+    const order = await prisma.tenant_flyer_card_orders.create({
+      data: {
+        id: orderId,
+        tenant_id: tenantId,
+        pack_size: parsed.data.packSize,
+        pack_count: parsed.data.packCount,
+        vendor: submission.vendor,
+        vendor_order_id: submission.vendorOrderId,
+        status: 'submitted',
+        shipping_address: parsed.data.shippingAddress as any,
+        unit_cost_cents: submission.unitCostCents,
+        total_cost_cents: submission.totalCostCents,
+      },
+    });
+
+    res.status(201).json({ success: true, data: { order } });
+  } catch (error) {
+    logErr('POST /:tenantId/flyers/card-orders', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── GET /:tenantId/flyers/analytics — per-flyer engagement + attribution ──
+// Event-level series from tenant_flyer_events (spec §5: counters are not
+// analytics) plus order attribution via order_items.metadata.flyer_id.
+// Reported as engagement, never demand (spec §10).
+router.get('/:tenantId/flyers/analytics', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const days = Math.min(90, Math.max(7, parseInt(String(req.query.days)) || 30));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const flyers = await prisma.tenant_flyers.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+      select: {
+        id: true, title: true, status: true, share_code: true,
+        starts_at: true, ends_at: true, impressions: true, clicks: true,
+      },
+    });
+
+    const [dailyRows, srcRows, orderRows] = await Promise.all([
+      prisma.$queryRaw<Array<{ flyer_id: string; day: string; event_type: string; n: bigint }>>`
+        SELECT flyer_id, created_at::date AS day, event_type, COUNT(*) AS n
+        FROM tenant_flyer_events
+        WHERE tenant_id = ${tenantId} AND created_at >= ${since}
+        GROUP BY flyer_id, created_at::date, event_type
+        ORDER BY day ASC
+      `,
+      prisma.$queryRaw<Array<{ flyer_id: string; src: string | null; event_type: string; n: bigint }>>`
+        SELECT flyer_id, src, event_type, COUNT(*) AS n
+        FROM tenant_flyer_events
+        WHERE tenant_id = ${tenantId} AND created_at >= ${since}
+        GROUP BY flyer_id, src, event_type
+      `,
+      prisma.$queryRaw<Array<{ flyer_id: string; orders: bigint; revenue_cents: bigint }>>`
+        SELECT oi.metadata->>'flyer_id' AS flyer_id,
+               COUNT(DISTINCT o.id) AS orders,
+               COALESCE(SUM(oi.total_cents), 0) AS revenue_cents
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.tenant_id = ${tenantId}
+          AND oi.metadata->>'flyer_id' IS NOT NULL
+          AND o.order_status NOT IN ('draft', 'cancelled')
+        GROUP BY 1
+      `,
+    ]);
+
+    const byFlyer = new Map<string, {
+      daily: Record<string, { impressions: number; clicks: number; add_to_cart: number }>;
+      bySrc: Record<string, number>;
+      orders: number;
+      revenueCents: number;
+    }>();
+    const bucket = (id: string) => {
+      if (!byFlyer.has(id)) byFlyer.set(id, { daily: {}, bySrc: {}, orders: 0, revenueCents: 0 });
+      return byFlyer.get(id)!;
+    };
+
+    for (const r of dailyRows) {
+      const b = bucket(r.flyer_id);
+      const day = String(r.day).slice(0, 10);
+      if (!b.daily[day]) b.daily[day] = { impressions: 0, clicks: 0, add_to_cart: 0 };
+      const n = Number(r.n);
+      if (r.event_type === 'impression') b.daily[day].impressions = n;
+      else if (r.event_type === 'click') b.daily[day].clicks = n;
+      else if (r.event_type === 'add_to_cart') b.daily[day].add_to_cart = n;
+    }
+    for (const r of srcRows) {
+      const b = bucket(r.flyer_id);
+      const key = r.src ?? 'direct';
+      b.bySrc[key] = (b.bySrc[key] ?? 0) + Number(r.n);
+    }
+    for (const r of orderRows) {
+      if (!r.flyer_id) continue;
+      const b = bucket(r.flyer_id);
+      b.orders = Number(r.orders);
+      b.revenueCents = Number(r.revenue_cents);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        windowDays: days,
+        flyers: flyers.map((f) => {
+          const b = byFlyer.get(f.id) ?? { daily: {}, bySrc: {}, orders: 0, revenueCents: 0 };
+          return {
+            id: f.id,
+            title: f.title,
+            status: f.status,
+            shareCode: f.share_code,
+            window: { startsAt: f.starts_at, endsAt: f.ends_at },
+            totals: { impressions: f.impressions, clicks: f.clicks },
+            orders: b.orders,
+            revenueCents: b.revenueCents,
+            bySrc: b.bySrc,
+            daily: Object.entries(b.daily).map(([date, v]) => ({ date, ...v })),
+          };
+        }),
+      },
+    });
+  } catch (error) {
+    logErr('GET /:tenantId/flyers/analytics', error, req.params.tenantId);
     res.status(500).json({ success: false, error: 'internal_error' });
   }
 });

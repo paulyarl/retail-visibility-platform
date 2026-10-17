@@ -309,7 +309,13 @@ router.post('/orders', async (req: Request, res: Response) => {
       inventory_item_id: string;
       total_price_cents: number;
       product_type: 'physical' | 'digital' | 'hybrid' | 'service';
+      flyer_id?: string;
     }> = [];
+
+    // Flyer attribution: verify each submitted flyer_id belongs to this tenant
+    // once, then attach to the order line (spec §5 — order_items.metadata.flyer_id).
+    const verifiedFlyerIds = new Set<string>();
+    const checkedFlyerIds = new Set<string>();
 
     for (const item of items) {
       // Require id, quantity, and tenant info for reliable lookup
@@ -324,7 +330,7 @@ router.post('/orders', async (req: Request, res: Response) => {
 
       let inventoryItem;
       let variant;
-      let itemData;
+      let itemData: (typeof validatedItems)[number];
 
       // Extract parent item ID from variant ID (handle both vid- and variant- prefixes)
       let parentItemId;
@@ -349,6 +355,21 @@ router.post('/orders', async (req: Request, res: Response) => {
           inventory_items: true,
         },
       });
+
+      // Fallback: cart lines that carry the parent id + explicit variantId
+      if (!variant && typeof item.variantId === 'string' && item.variantId) {
+        variant = await prisma.product_variants.findFirst({
+          where: {
+            tenant_id: tenant_id,
+            id: item.variantId,
+            sku: item.sku,
+            is_active: true,
+          },
+          include: {
+            inventory_items: true,
+          },
+        });
+      }
 
       if (variant) {
         // Variant found - use variant data
@@ -441,8 +462,21 @@ router.post('/orders', async (req: Request, res: Response) => {
         };
         validatedItems.push(itemData);
       }
-      
-    
+
+      // Flyer attribution — accept flyer_id only if the flyer belongs to this tenant
+      const flyerId = typeof item.flyer_id === 'string' ? item.flyer_id : (item.metadata as any)?.flyer_id;
+      if (typeof flyerId === 'string' && flyerId.length > 0) {
+        if (!checkedFlyerIds.has(flyerId)) {
+          checkedFlyerIds.add(flyerId);
+          const flyer = await prisma.tenant_flyers.findFirst({
+            where: { id: flyerId, tenant_id },
+            select: { id: true },
+          });
+          if (flyer) verifiedFlyerIds.add(flyerId);
+        }
+        if (verifiedFlyerIds.has(flyerId)) itemData.flyer_id = flyerId;
+      }
+
     }
 
     // Validate fulfillment_method compatibility with product types
@@ -947,6 +981,7 @@ router.post('/orders', async (req: Request, res: Response) => {
             variant_id: validatedItems[index]?.variant_id || null,
             inventory_item_id: validatedItems[index]?.inventory_item_id || validatedItems[index]?.id, // Link to inventory item (or parent for variants)
             product_type: validatedItems[index]?.product_type || 'physical',
+            metadata: validatedItems[index]?.flyer_id ? { flyer_id: validatedItems[index].flyer_id } : {},
             updated_at: new Date(),
           })),
         },

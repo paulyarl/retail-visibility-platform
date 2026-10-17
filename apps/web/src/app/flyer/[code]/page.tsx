@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ code: string }>;
+  searchParams: Promise<{ src?: string }>;
 }
 
 export const metadata: Metadata = {
@@ -19,13 +20,14 @@ export const metadata: Metadata = {
   description: 'Current specials flyer',
 };
 
-export default async function FlyerPage({ params }: PageProps) {
+export default async function FlyerPage({ params, searchParams }: PageProps) {
   const { code } = await params;
+  const { src } = await searchParams;
   if (!code) notFound();
 
   let payload;
   try {
-    payload = await publicFlyerService.getFlyerByCode(code);
+    payload = await publicFlyerService.getFlyerByCode(code, src);
   } catch (error) {
     clientLogger.error('[FlyerPage] fetch failed', { detail: error });
     payload = null;

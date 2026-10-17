@@ -48,9 +48,12 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
 
   useEffect(() => {
     let cancelled = false;
+    const src = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('src') ?? undefined
+      : undefined;
     (async () => {
       try {
-        const data = await publicFlyerService.getFlyers(tenantSlug || tenantId, surface);
+        const data = await publicFlyerService.getFlyers(tenantSlug || tenantId, surface, src);
         if (!cancelled) setPayload(data);
       } catch (error) {
         clientLogger.error('[FlyerSection] failed to load flyers', { detail: error });
@@ -64,7 +67,7 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
   if (!loaded || !payload?.enabled || !payload.flyers?.length) return null;
 
   const handleOrder = async (flyerId: string, shareCode: string, item: PublicFlyerItem) => {
-    publicFlyerService.trackClick(shareCode);
+    publicFlyerService.trackEvent(shareCode, { type: 'add_to_cart', itemId: item.id, surface });
     if (!item.productId || !item.sku || item.priceCents == null) return;
     const priceCents = item.salePriceCents ?? item.priceCents;
     const result = await addToCart(tenantId, tenantName || 'Store', {
@@ -77,6 +80,7 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
       list_price_cents: item.salePriceCents ? item.priceCents : undefined,
       variant_id: item.kind === 'variant' ? item.id : undefined,
       variant_name: item.kind === 'variant' ? item.name ?? undefined : undefined,
+      flyer_id: flyerId,
       productType: 'physical',
     }, tenantLogo ?? undefined);
     if (result.success) {

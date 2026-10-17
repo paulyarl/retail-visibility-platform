@@ -88,12 +88,15 @@ class PublicFlyerService extends PublicApiSingleton {
   }
 
   /** Flyers for a surface-scoped read (directory/place/storefront pages). */
-  async getFlyers(slug: string, surface?: FlyerSurface): Promise<PublicFlyerPayload> {
-    const qs = surface ? `?surface=${surface}` : '';
+  async getFlyers(slug: string, surface?: FlyerSurface, src?: string): Promise<PublicFlyerPayload> {
+    const params = new URLSearchParams();
+    if (surface) params.set('surface', surface);
+    if (src) params.set('src', src);
+    const qs = params.size ? `?${params.toString()}` : '';
     const result = await this.makeDefaultRequest<ApiEnvelope<PublicFlyerPayload>>(
       `/api/public/directory/${slug}/flyers${qs}`,
       { method: 'GET' },
-      `public-flyer-${slug}-${surface ?? 'any'}`,
+      `public-flyer-${slug}-${surface ?? 'any'}-${src ?? 'direct'}`,
       this.cacheTTL,
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
@@ -101,9 +104,10 @@ class PublicFlyerService extends PublicApiSingleton {
   }
 
   /** Standalone /flyer/[code] page — share_code or tenant slug. */
-  async getFlyerByCode(code: string): Promise<PublicFlyerPayload> {
+  async getFlyerByCode(code: string, src?: string): Promise<PublicFlyerPayload> {
+    const qs = src ? `?src=${encodeURIComponent(src)}` : '';
     const result = await this.makeDefaultRequest<ApiEnvelope<PublicFlyerPayload>>(
-      `/api/public/flyer/${code}`,
+      `/api/public/flyer/${code}${qs}`,
       { method: 'GET' },
       `public-flyer-code-${code}`,
       this.cacheTTL,
@@ -120,11 +124,14 @@ class PublicFlyerService extends PublicApiSingleton {
     if (!result.success) throw new Error(getErrorMessage(result.error));
   }
 
-  /** Counter increment — directional only (spec §10). */
-  async trackClick(code: string): Promise<void> {
+  /** Event write — directional only, never demand (spec §10). */
+  async trackEvent(
+    code: string,
+    event: { type: 'click' | 'add_to_cart'; itemId?: string; surface?: FlyerSurface | 'standalone'; src?: string },
+  ): Promise<void> {
     await this.makeDefaultRequest<ApiEnvelope<null>>(
       `/api/public/flyer/${code}/events`,
-      { method: 'POST', body: JSON.stringify({ type: 'click' }) },
+      { method: 'POST', body: JSON.stringify(event) },
     ).catch(() => {});
   }
 }

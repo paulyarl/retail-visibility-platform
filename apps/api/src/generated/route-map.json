@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-17T17:30:48.266Z",
+  "generatedAt": "2026-10-17T17:57:30.837Z",
   "totalMounts": 245,
-  "totalRoutes": 2925,
+  "totalRoutes": 2931,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -8945,6 +8945,58 @@
           ]
         },
         {
+          "method": "POST",
+          "path": "/:tenantId/flyers/:flyerId/publish-gbp",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId/publish-gbp",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/flyers/card-art",
+          "fullPath": "/api/tenants/:tenantId/flyers/card-art",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/flyers/card-orders",
+          "fullPath": "/api/tenants/:tenantId/flyers/card-orders",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/flyers/card-orders",
+          "fullPath": "/api/tenants/:tenantId/flyers/card-orders",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/flyers/analytics",
+          "fullPath": "/api/tenants/:tenantId/flyers/analytics",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
           "method": "GET",
           "path": "/",
           "fullPath": "/api/tenants",
@@ -16092,6 +16144,14 @@
       "authLevel": "public",
       "comment": "Standalone flyer page + report + events at /api/public/flyer/:code{,/report,/events}",
       "routes": [
+        {
+          "method": "POST",
+          "path": "/card-order-webhook",
+          "fullPath": "/api/public/flyer/card-order-webhook",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
         {
           "method": "GET",
           "path": "/:code",

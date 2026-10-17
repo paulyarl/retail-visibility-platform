@@ -2414,6 +2414,15 @@ export function generateFlyerCardOrderId(tenantId: string): string {
 }
 
 /**
+ * Generate flyer event ID (tenant-scoped)
+ * Format: fle-{tenantKey}-{nanoid}
+ */
+export function generateFlyerEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fle-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate flyer share code (12-char nanoid, no prefix)
  * Format: {nanoid} — matches preview/dispute token style; used in /flyer/<code> URLs
  */

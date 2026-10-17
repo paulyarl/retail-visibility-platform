@@ -14,8 +14,10 @@ import { Switch } from '@/components/ui/Switch';
 import { AlertCircle, Copy, Plus, Sparkles, Calendar, ImageIcon, Share2, Archive, RefreshCw, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useFlyerCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { flyerService, type TenantFlyer, type FlyerVariant } from '@/services/FlyerService';
+import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerRecurrence } from '@/services/FlyerService';
 import FlyerShareKit from './FlyerShareKit';
+import FlyerAnalyticsCard from './FlyerAnalyticsCard';
+import FlyerCardOrderPanel from './FlyerCardOrderPanel';
 import { clientLogger } from '@/lib/client-logger';
 
 interface Props { tenantId: string }
@@ -70,6 +72,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [ctaMode, setCtaMode] = useState<'auto' | 'order' | 'view'>('auto');
+  const [recurrence, setRecurrence] = useState<FlyerRecurrence>('none');
   const [selectedVariants, setSelectedVariants] = useState<Set<string>>(new Set());
   const [newDishes, setNewDishes] = useState<{ name: string; priceCents: number; stock: number }[]>([]);
   const [dishName, setDishName] = useState('');
@@ -118,6 +121,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setTitle(''); setSummary(''); setHeroImageUrl('');
     setPreset('week'); setStartsAt(''); setEndsAt('');
     setCtaMode('auto');
+    setRecurrence('none');
     setSelectedVariants(new Set());
     setNewDishes([]);
     setDishName(''); setDishPrice(''); setDishStock('');
@@ -135,12 +139,12 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
       if (editingId) {
         flyer = await flyerService.updateFlyer(tenantId, editingId, {
           title, summary: summary || null, heroImageUrl: heroImageUrl || null,
-          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode,
+          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode, recurrence,
         });
       } else {
         flyer = await flyerService.createFlyer(tenantId, {
           title, summary: summary || null, heroImageUrl: heroImageUrl || null,
-          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode,
+          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode, recurrence,
           status: 'draft',
         });
       }
@@ -190,6 +194,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setSummary(f.summary ?? '');
     setHeroImageUrl(f.hero_image_url ?? '');
     setCtaMode(f.cta_mode);
+    setRecurrence(f.recurrence ?? 'none');
     setPreset('custom');
     setStartsAt(f.starts_at.slice(0, 16));
     setEndsAt(f.ends_at.slice(0, 16));
@@ -293,6 +298,25 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
               )}
             </div>
 
+            {flyerCap.recurring && (
+              <div>
+                <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Repeat</label>
+                <div className="mt-2 flex gap-2">
+                  {(['none', 'daily', 'weekly'] as FlyerRecurrence[]).map(r => (
+                    <button key={r} type="button" onClick={() => setRecurrence(r)}
+                      className={`text-sm rounded-lg px-3 py-1.5 border ${recurrence === r ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-transparent' : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300'}`}>
+                      {r === 'none' ? 'One-time' : r === 'daily' ? 'Daily' : 'Weekly'}
+                    </button>
+                  ))}
+                </div>
+                {recurrence !== 'none' && (
+                  <p className="text-xs text-neutral-500 mt-1.5">
+                    When this flyer ends, the next window rolls out automatically with the same items.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Order button</label>
               <div className="mt-2 flex gap-2">
@@ -394,9 +418,19 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                       {new Date(f.starts_at).toLocaleDateString()} → {new Date(f.ends_at).toLocaleDateString()}
                       {' · '}{(f.tenant_flyer_items ?? []).length} items
                       {f.impressions > 0 && ` · ${f.impressions} views`}
+                      {f.recurrence && f.recurrence !== 'none' && ` · repeats ${f.recurrence}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {flyerCap.canUseGbpPublish && (f.status === 'published' || f.status === 'scheduled') && (
+                      <Button variant="outline" size="sm" disabled={saving} title="Also publish to Google Business Profile"
+                        onClick={() => flyerAction(
+                          () => flyerService.publishFlyerToGbp(tenantId, f.id),
+                          'GBP post scheduled — goes out when the flyer window opens',
+                        )}>
+                        GBP
+                      </Button>
+                    )}
                     {(f.status === 'draft' || f.status === 'scheduled' || f.status === 'expired') && (
                       <Button variant="outline" size="sm" disabled={saving}
                         onClick={() => flyerAction(() => flyerService.publishFlyer(tenantId, f.id), 'Flyer published')}>
@@ -426,6 +460,10 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <FlyerAnalyticsCard tenantId={tenantId} />
+
+      <FlyerCardOrderPanel tenantId={tenantId} />
 
       {/* Display options */}
       <Card>

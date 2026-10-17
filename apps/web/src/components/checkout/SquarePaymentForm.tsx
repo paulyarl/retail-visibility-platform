@@ -42,6 +42,8 @@ interface SquarePaymentFormProps {
     listPrice?: number;
     imageUrl?: string;
     inventoryItemId?: string;
+    variantId?: string;
+    flyer_id?: string;
     tenantId: string;
   }>;
   onSuccess: (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => void;
@@ -477,13 +479,15 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
             phone: customerInfo.phone,
           },
           cartItems: cartItems.map((item) => ({
-            id: item.inventoryItemId,
+            id: item.variantId || item.inventoryItemId,
             sku: item.sku,
             name: item.name,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             listPrice: item.listPrice,
             image_url: item.imageUrl,
+            variantId: item.variantId,
+            flyer_id: item.flyer_id,
             tenant_id: item.tenantId,
           })),
           fulfillmentMethod: fulfillmentMethod || 'pickup',

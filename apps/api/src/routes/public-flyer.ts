@@ -21,7 +21,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
-import { generateFlyerReportId } from '../lib/id-generator';
+import { generateFlyerReportId, generateFlyerEventId } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
 import type { EffectiveCapabilities } from '../services/resolvers/types';
@@ -41,8 +41,35 @@ const reportSchema = z.object({
 });
 
 const eventSchema = z.object({
-  type: z.enum(['click']),
+  type: z.enum(['click', 'add_to_cart']),
+  itemId: z.string().max(50).optional(),
+  surface: z.enum(['storefront', 'directory', 'place', 'standalone']).optional(),
+  src: z.string().max(32).optional(),
 });
+
+const VALID_SRC = /^(qr-customer|qr-merchant|share|direct|[a-z0-9_-]{1,24})$/;
+
+/** Fire-and-forget event row — never blocks the public response (spec §5). */
+function recordFlyerEvent(
+  flyerId: string,
+  tenantId: string,
+  eventType: 'impression' | 'click' | 'add_to_cart',
+  surface?: string,
+  src?: string | null,
+  flyerItemId?: string,
+): void {
+  prisma.tenant_flyer_events.create({
+    data: {
+      id: generateFlyerEventId(tenantId),
+      flyer_id: flyerId,
+      tenant_id: tenantId,
+      event_type: eventType,
+      surface: surface ?? 'standalone',
+      src: src && VALID_SRC.test(src) ? src : null,
+      flyer_item_id: flyerItemId ?? null,
+    },
+  }).catch(() => {});
+}
 
 function logErr(route: string, error: unknown, extra?: Record<string, string>) {
   logger.error(`[public-flyer] ${route} error`, undefined, {
@@ -211,8 +238,14 @@ flyerPublicDirectoryRoutes.get('/:slug/flyers', async (req: Request, res: Respon
     const surface = ['storefront', 'directory', 'place'].includes(String(req.query.surface))
       ? (req.query.surface as FlyerSurface)
       : undefined;
+    const src = typeof req.query.src === 'string' ? req.query.src : undefined;
     const data = await buildFlyerPayload(tenant, surface ?? 'directory');
     if (!data) return res.json({ success: true, data: { enabled: false } });
+
+    // Impression events for every flyer the surface rendered (spec §5)
+    for (const f of data.flyers) {
+      recordFlyerEvent(f.id, tenant.id, 'impression', surface ?? 'directory', src);
+    }
 
     res.json({ success: true, data });
   } catch (error) {
@@ -225,6 +258,55 @@ flyerPublicDirectoryRoutes.get('/:slug/flyers', async (req: Request, res: Respon
 // Standalone mount — /api/public/flyer/:code
 // :code is a per-flyer share_code OR the tenant slug (stable always-current URL)
 // ══════════════════════════════════════════════════════════════════════════
+// ── POST /card-order-webhook — print vendor status callbacks (spec §4.3) ──
+// Declared BEFORE /:code — 'card-order-webhook' is a single segment that
+// would otherwise bind to the :code param. Shared-secret auth: the vendor
+// POSTs {vendorOrderId, status, trackingUrl?} with the webhook token.
+const cardWebhookSchema = z.object({
+  vendorOrderId: z.string().min(1).max(128),
+  status: z.enum(['submitted', 'printed', 'shipped', 'delivered', 'cancelled']),
+  token: z.string().min(1).max(128),
+});
+
+flyerPublicStandaloneRoutes.post('/card-order-webhook', async (req: Request, res: Response) => {
+  try {
+    const expected = unifiedConfig.get('FLYER_PRINT_WEBHOOK_SECRET');
+    if (!expected) {
+      // Webhook unconfigured — refuse rather than accept unauthenticated updates
+      return res.status(503).json({ success: false, error: 'webhook_not_configured' });
+    }
+    const parsed = cardWebhookSchema.safeParse(req.body);
+    if (!parsed.success || parsed.data.token !== expected) {
+      return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+
+    const order = await prisma.tenant_flyer_card_orders.findFirst({
+      where: { vendor_order_id: parsed.data.vendorOrderId },
+      select: { id: true, status: true },
+    });
+    if (!order) return res.status(404).json({ success: false, error: 'not_found' });
+
+    // Statuses only move forward — vendor replays/out-of-order events are
+    // absorbed, never regress a delivered order back to printed
+    const ORDER = ['submitted', 'printed', 'shipped', 'delivered'];
+    const cur = ORDER.indexOf(order.status);
+    const next = ORDER.indexOf(parsed.data.status);
+    if (parsed.data.status === 'cancelled' || next > cur) {
+      await prisma.tenant_flyer_card_orders.update({
+        where: { id: order.id },
+        data: { status: parsed.data.status, updated_at: new Date() },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[public-flyer] card-order-webhook error', undefined, {
+      error: { message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
 flyerPublicStandaloneRoutes.get('/:code', async (req: Request, res: Response) => {
   try {
     const { code } = req.params;
@@ -243,6 +325,7 @@ flyerPublicStandaloneRoutes.get('/:code', async (req: Request, res: Response) =>
       // otherwise report its window state so the page can show "ended".
       const mine = data.flyers.find(f => f.id === byCode.id);
       await prisma.tenant_flyers.update({ where: { id: byCode.id }, data: { impressions: { increment: 1 } } }).catch(() => {});
+      recordFlyerEvent(byCode.id, tenant.id, 'impression', 'standalone', typeof req.query.src === 'string' ? req.query.src : undefined);
       return res.json({ success: true, data: { ...data, flyers: mine ? [mine] : [], ended: !mine } });
     }
 
@@ -251,8 +334,10 @@ flyerPublicStandaloneRoutes.get('/:code', async (req: Request, res: Response) =>
     if (!tenant) return res.status(404).json({ success: false, error: 'not_found' });
     const data = await buildFlyerPayload(tenant);
     if (!data) return res.json({ success: true, data: { enabled: false } });
-    if (data.flyers[0]) {
-      await prisma.tenant_flyers.update({ where: { id: data.flyers[0].id }, data: { impressions: { increment: 1 } } }).catch(() => {});
+    // Every rendered flyer gets the impression — the page shows them all
+    for (const f of data.flyers) {
+      await prisma.tenant_flyers.update({ where: { id: f.id }, data: { impressions: { increment: 1 } } }).catch(() => {});
+      recordFlyerEvent(f.id, tenant.id, 'impression', 'standalone', typeof req.query.src === 'string' ? req.query.src : undefined);
     }
     return res.json({ success: true, data });
   } catch (error) {
@@ -315,11 +400,12 @@ flyerPublicStandaloneRoutes.post('/:code/events', async (req: Request, res: Resp
 
     const flyer = await prisma.tenant_flyers.findFirst({
       where: { share_code: code, status: { not: 'suppressed' } },
-      select: { id: true },
+      select: { id: true, tenant_id: true },
     });
     if (!flyer) return res.status(404).json({ success: false, error: 'not_found' });
 
     await prisma.tenant_flyers.update({ where: { id: flyer.id }, data: { clicks: { increment: 1 } } });
+    recordFlyerEvent(flyer.id, flyer.tenant_id, parsed.data.type, parsed.data.surface, parsed.data.src, parsed.data.itemId);
     res.json({ success: true });
   } catch (error) {
     logErr('POST /flyer/:code/events', error);

@@ -540,6 +540,8 @@ function CheckoutPageContent() {
     listPrice: item.list_price_cents,
     imageUrl: item.product_image,
     inventoryItemId: item.product_id,
+    variantId: item.variant_id,
+    flyer_id: item.flyer_id,
     tenantId: tenantId || ''
   })), [cartItems, tenantId]);
 

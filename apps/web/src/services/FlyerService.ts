@@ -14,6 +14,7 @@ import type { FlyerState } from './CapabilityResolutionService';
 
 export type FlyerStatus = 'draft' | 'scheduled' | 'published' | 'expired' | 'archived' | 'suppressed';
 export type FlyerCtaMode = 'auto' | 'order' | 'view';
+export type FlyerRecurrence = 'none' | 'daily' | 'weekly';
 
 export interface TenantFlyerItem {
   id: string;
@@ -34,6 +35,7 @@ export interface TenantFlyer {
   ends_at: string;
   status: FlyerStatus;
   cta_mode: FlyerCtaMode;
+  recurrence?: FlyerRecurrence;
   share_code: string | null;
   impressions: number;
   clicks: number;
@@ -80,6 +82,39 @@ export interface FlyerOptionsSettings {
   default_title: string;
 }
 
+export interface FlyerAnalyticsEntry {
+  id: string;
+  title: string;
+  status: FlyerStatus;
+  shareCode: string | null;
+  window: { startsAt: string; endsAt: string };
+  totals: { impressions: number; clicks: number };
+  orders: number;
+  revenueCents: number;
+  bySrc: Record<string, number>;
+  daily: Array<{ date: string; impressions: number; clicks: number; add_to_cart: number }>;
+}
+
+export interface FlyerAnalytics {
+  windowDays: number;
+  flyers: FlyerAnalyticsEntry[];
+}
+
+export interface FlyerCardOrder {
+  id: string;
+  tenant_id: string;
+  pack_size: number;
+  pack_count: number;
+  vendor: string;
+  vendor_order_id: string | null;
+  status: 'submitted' | 'printed' | 'shipped' | 'delivered' | 'cancelled';
+  shipping_address: Record<string, unknown> | null;
+  unit_cost_cents: number | null;
+  total_cost_cents: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ApiEnvelope<T> {
   success: boolean;
   data: T;
@@ -95,7 +130,7 @@ class FlyerService extends TenantApiSingleton {
   }
 
   getServiceCachePatterns(): string[] {
-    return ['flyer-list-*', 'flyer-repertoire-*', 'flyer-options-*', 'flyer-share-*'];
+    return ['flyer-list-*', 'flyer-repertoire-*', 'flyer-options-*', 'flyer-share-*', 'flyer-analytics-*', 'flyer-card-orders-*'];
   }
 
   async invalidateServiceCaches(_tenantId?: string): Promise<void> {
@@ -129,6 +164,7 @@ class FlyerService extends TenantApiSingleton {
   async createFlyer(tenantId: string, input: {
     title: string; summary?: string | null; heroImageUrl?: string | null;
     startsAt: string; endsAt: string; status?: 'draft' | 'published'; ctaMode?: FlyerCtaMode;
+    recurrence?: FlyerRecurrence;
   }): Promise<TenantFlyer> {
     const result = await this.makeDefaultRequest<ApiEnvelope<{ flyer: TenantFlyer }>>(
       `/api/tenants/${tenantId}/flyers`,
@@ -142,7 +178,7 @@ class FlyerService extends TenantApiSingleton {
 
   async updateFlyer(tenantId: string, flyerId: string, input: Partial<{
     title: string; summary: string | null; heroImageUrl: string | null;
-    startsAt: string; endsAt: string; ctaMode: FlyerCtaMode;
+    startsAt: string; endsAt: string; ctaMode: FlyerCtaMode; recurrence: FlyerRecurrence;
   }>): Promise<TenantFlyer> {
     const result = await this.makeDefaultRequest<ApiEnvelope<{ flyer: TenantFlyer }>>(
       `/api/tenants/${tenantId}/flyers/${flyerId}`,
@@ -218,6 +254,65 @@ class FlyerService extends TenantApiSingleton {
     if (!result.data.success) throw new Error(result.data.error || 'Failed to duplicate flyer');
     await this.invalidateServiceCaches(tenantId);
     return result.data.data.flyer;
+  }
+
+  /** Dual-publish a flyer to GBP — creates a SCHEDULED gbp_posts row (spec §7). */
+  async publishFlyerToGbp(tenantId: string, flyerId: string): Promise<{ post: unknown; shareUrl: string }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ post: unknown; shareUrl: string }>>(
+      `/api/tenants/${tenantId}/flyers/${flyerId}/publish-gbp`,
+      { method: 'POST' },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to schedule GBP post');
+    return result.data.data;
+  }
+
+  /** Engagement + order attribution — directional only, never demand (spec §10). */
+  async getAnalytics(tenantId: string, days = 30): Promise<FlyerAnalytics> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<FlyerAnalytics>>(
+      `/api/tenants/${tenantId}/flyers/analytics?days=${days}`,
+      { method: 'GET' },
+      `flyer-analytics-${tenantId}-${days}`,
+      this.cacheTTL,
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to load analytics');
+    return result.data.data;
+  }
+
+  async getCardOrders(tenantId: string): Promise<FlyerCardOrder[]> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ orders: FlyerCardOrder[] }>>(
+      `/api/tenants/${tenantId}/flyers/card-orders`,
+      { method: 'GET' },
+      `flyer-card-orders-${tenantId}`,
+      this.cacheTTL,
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to load card orders');
+    return result.data.data.orders;
+  }
+
+  async createCardOrder(tenantId: string, input: {
+    packSize: 25 | 50 | 100;
+    packCount: number;
+    shippingAddress: {
+      name: string; line1: string; line2?: string | null;
+      city: string; state?: string | null; zip: string; country?: string;
+    };
+  }): Promise<FlyerCardOrder> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ order: FlyerCardOrder }>>(
+      `/api/tenants/${tenantId}/flyers/card-orders`,
+      { method: 'POST', body: JSON.stringify(input) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to place card order');
+    await this.invalidateServiceCaches(tenantId);
+    return result.data.data.order;
+  }
+
+  /** Print-ready double-sided card PDF — anchor href, not a fetch. */
+  cardArtUrl(tenantId: string): string {
+    return `/api/tenants/${tenantId}/flyers/card-art`;
   }
 
   async getOptions(tenantId: string): Promise<{ settings: FlyerOptionsSettings; tierState: FlyerState | null }> {

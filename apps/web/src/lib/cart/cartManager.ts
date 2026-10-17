@@ -59,6 +59,9 @@ export interface CartItem {
   stock?: number; // Available stock for this item/variant
   // Product type for type-aware cart display
   productType?: string; // 'physical' | 'digital' | 'service' | 'hybrid'
+  // Flyer attribution — set when the item was added from a flyer surface
+  // (transported to order_items.metadata.flyer_id at checkout; spec §5)
+  flyer_id?: string;
 }
 
 export interface Cart {
