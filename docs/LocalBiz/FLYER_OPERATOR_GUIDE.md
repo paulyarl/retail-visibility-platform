@@ -46,6 +46,7 @@ Two capability modules (migrations 344):
 | `flyer_storefront_on` / `flyer_directory_on` / `flyer_place_on` | surface | Which public surfaces may render the flyer's strip |
 | `flyer_image` | option | Hero image upload |
 | `flyer_items_5` / `flyer_items_10` / `flyer_items_20` | limit | Max items per flyer (best-match wins) |
+| `flyer_live_3` / `flyer_live_5` | expansion | Max **concurrent live flyers** — purchasable BSaaS keys, granted to no tier; `flyer_flexible` sweeps to 5. **Expansion, not activation**: a lone `flyer_live_*` grant does not enable the module |
 | `flyer_frozen` | option | Frozen-twin merchandising (frozen copies of fresh variants) |
 | `flyer_recurring` | option | `daily`/`weekly` auto-roll presets in the composer |
 
@@ -104,6 +105,7 @@ Typical operator actions:
 | Give a `storefront` merchant the directory surface | `flyer_directory_on` | `true` |
 | Give GBP dual-publish | `flyer_gbp_publish` **and** entitlement `gbp_posts_scheduler` | `true` |
 | Raise the item cap | `flyer_items_10` or `flyer_items_20` (best-match wins) | `true` |
+| Raise the concurrent live-flyer cap (enables carousel display) | `flyer_live_3` or `flyer_live_5` | `true` |
 | Hard-disable flyer for one tenant | `flyer_disabled` | `true` |
 | Re-enable after `flyer_disabled` | `flyer_disabled` | `false` (revoke the veto) |
 
@@ -152,6 +154,15 @@ writes it today.)
 
 Stable links: `share_code` (12-char) → `/flyer/<code>` always resolves to the
 tenant's **current** live flyer — printed QR cards never go stale.
+
+**Concurrent flyers & display layout.** A tenant may run multiple live flyers
+at once — default cap **2** (`flyer.max_live`), raised to 3/5 by the
+purchasable `flyer_live_3`/`flyer_live_5` keys or `flyer_flexible`. Publishing
+past the cap returns `409 live_flyer_cap` (scheduled flyers don't count until
+live). Display follows the count: **≤2** live flyers render as a vertical
+stack (each flyer = title + window pill + hero + item grid, soonest-expiring
+first); **>2** switch to a snap carousel with arrows and dots — one flyer per
+slide. No flyer → the surface renders nothing at all (fail-closed).
 
 ---
 

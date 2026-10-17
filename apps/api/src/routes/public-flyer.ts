@@ -125,6 +125,7 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
       ends_at: { gt: now },
     },
     orderBy: { ends_at: 'asc' },
+    take: flyerCaps.max_live || 2,
     include: {
       tenant_flyer_items: {
         orderBy: { sort_order: 'asc' },
@@ -134,7 +135,6 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
         },
       },
     },
-    take: 2,
   });
 
   // Order CTAs are derived, not granted (spec §2): commerce + gateway must both

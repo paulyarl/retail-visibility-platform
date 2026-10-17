@@ -1069,6 +1069,7 @@ export interface EffectiveFlyer {
   place_on: boolean;
   image: boolean;
   items_limit: number;
+  max_live: number;
   frozen: boolean;
   gbp_publish: boolean;
   recurring: boolean;

@@ -89,6 +89,19 @@ describe('resolveFlyer', () => {
     expect(mid.items_limit).toBe(10);
   });
 
+  it('max_live defaults to 2 and expansion keys raise it', () => {
+    expect(resolveFlyer({ flyer_enabled: true }, {}, null).max_live).toBe(2);
+    expect(resolveFlyer({ flyer_enabled: true, flyer_live_3: true }, {}, null).max_live).toBe(3);
+    expect(resolveFlyer({ flyer_enabled: true, flyer_live_3: true, flyer_live_5: true }, {}, null).max_live).toBe(5);
+    expect(resolveFlyer({ flyer_flexible: true }, {}, null).max_live).toBe(5);
+  });
+
+  it('a lone flyer_live_* grant does not activate the module', () => {
+    const result = resolveFlyer({ flyer_live_5: true }, {}, null);
+    expect(result.enabled).toBe(false);
+    expect(result.max_live).toBe(0);
+  });
+
   it('merchant master display toggle gates can_use_* but not tier fields', () => {
     const features = { flyer_enabled: true, flyer_storefront_on: true, flyer_frozen: true };
     const result = resolveFlyer(features, {}, { flyer_display: false });

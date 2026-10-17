@@ -30,8 +30,11 @@ export function resolveFlyer(
   const disabled = !!features.flyer_disabled;
   const flexible = !!features.flyer_flexible;
 
+  // flyer_live_* are expansion keys, not activations — granting one to a
+  // non-flyer tenant must not light up the module, so they're excluded
+  // from mainOn alongside the veto key.
   const mainOn = !disabled && Object.entries(features).some(
-    ([k, v]) => v && k.startsWith('flyer_') && k !== 'flyer_disabled',
+    ([k, v]) => v && k.startsWith('flyer_') && k !== 'flyer_disabled' && !k.startsWith('flyer_live_'),
   );
 
   // Surface gates (tier-level)
@@ -46,6 +49,14 @@ export function resolveFlyer(
     : features.flyer_items_10 ? 10
     : features.flyer_items_5 ? 5
     : 0;
+
+  // Concurrent live-flyer cap — flat default of 2 (spec §3); purchasable
+  // expansion keys raise it, flexible sweeps to the max. >2 live flyers
+  // render as a carousel on display surfaces.
+  const maxLive = !mainOn ? 0
+    : flexible || features.flyer_live_5 ? 5
+    : features.flyer_live_3 ? 3
+    : 2;
 
   const frozen = mainOn && (flexible || !!features.flyer_frozen);
   const recurring = mainOn && (flexible || !!features.flyer_recurring);
@@ -70,6 +81,7 @@ export function resolveFlyer(
     place_on: placeOn,
     image,
     items_limit: itemsLimit,
+    max_live: maxLive,
     frozen,
     gbp_publish: gbpPublish,
     recurring,

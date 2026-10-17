@@ -52,7 +52,9 @@ const WEB_BASE_URL = (
   'https://app.visibleshelf.com'
 ).replace(/\/+$/, '');
 
-const MAX_LIVE_FLYERS = 2; // spec §3 — scheduled flyers don't count until live
+// Concurrent live-flyer cap resolves per-tenant: default 2 (spec §3),
+// raised by purchasable flyer_live_3/flyer_live_5 keys or flyer_flexible.
+// Scheduled flyers don't count until live.
 
 const flyerWindowSchema = z.object({
   title: z.string().min(1).max(160),
@@ -220,8 +222,8 @@ router.post('/:tenantId/flyers', authenticateToken, checkTenantAccess, requireIn
     }
 
     const status = (req.body.status as string) === 'published' ? 'published' : 'draft';
-    if (status === 'published' && (await liveFlyerCount(tenantId)) >= MAX_LIVE_FLYERS) {
-      return res.status(409).json({ success: false, error: 'live_flyer_cap', message: `At most ${MAX_LIVE_FLYERS} live flyers per tenant` });
+    if (status === 'published' && (await liveFlyerCount(tenantId)) >= flyer.max_live) {
+      return res.status(409).json({ success: false, error: 'live_flyer_cap', message: `At most ${flyer.max_live} live flyers per tenant` });
     }
 
     const created = await prisma.tenant_flyers.create({
@@ -512,8 +514,8 @@ router.post('/:tenantId/flyers/:flyerId/publish', authenticateToken, checkTenant
 
     const now = new Date();
     const goesLiveNow = existing.starts_at <= now && existing.ends_at > now;
-    if (goesLiveNow && (await liveFlyerCount(tenantId, flyerId)) >= MAX_LIVE_FLYERS) {
-      return res.status(409).json({ success: false, error: 'live_flyer_cap', message: `At most ${MAX_LIVE_FLYERS} live flyers per tenant` });
+    if (goesLiveNow && (await liveFlyerCount(tenantId, flyerId)) >= flyer.max_live) {
+      return res.status(409).json({ success: false, error: 'live_flyer_cap', message: `At most ${flyer.max_live} live flyers per tenant` });
     }
     if (existing.ends_at <= now) {
       return res.status(400).json({ success: false, error: 'window_elapsed', message: 'Flyer window has already ended — reschedule before publishing' });
