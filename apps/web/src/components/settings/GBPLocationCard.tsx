@@ -25,7 +25,11 @@ interface GBPLocation {
   name: string;
   locationId: string;
   title?: string;
-  address?: {
+  /**
+   * GET /google/business/locations returns a pre-formatted string; the raw GBP
+   * shape (addressLines / locality / …) is still accepted defensively.
+   */
+  address?: string | {
     addressLines?: string[];
     locality?: string;
     administrativeArea?: string;
@@ -33,6 +37,14 @@ interface GBPLocation {
   };
   phoneNumbers?: { primaryPhone?: string };
   websiteUri?: string;
+}
+
+function formatLocationAddress(address: GBPLocation['address']): string {
+  if (!address) return '';
+  if (typeof address === 'string') return address;
+  const addressStr = address.addressLines?.join(', ') || '';
+  const cityState = [address.locality, address.administrativeArea].filter(Boolean).join(', ');
+  return [addressStr, cityState, address.postalCode].filter(Boolean).join(' ');
 }
 
 
@@ -75,7 +87,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
     try {
       setLoadingLocations(true);
       setError(null);
-      const data = await tenantInfoService.getGBPLocations(tenantId);
+      const data = await tenantInfoService.getGoogleBusinessProfileLocations(tenantId);
       if (data?.success === false) {
         setError(data.error?.userMessage || data.error?.message || 'Failed to fetch GBP locations');
         return;
@@ -95,11 +107,14 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       setLinkingLocation(true);
       setError(null);
 
-      const addressStr = location.address?.addressLines?.join(', ') || '';
-      const cityState = [location.address?.locality, location.address?.administrativeArea].filter(Boolean).join(', ');
-      const fullAddress = [addressStr, cityState, location.address?.postalCode].filter(Boolean).join(' ');
+      const fullAddress = formatLocationAddress(location.address);
 
-      await tenantInfoService.linkGBPLocation(tenantId, location.locationId, location.title || location.name, fullAddress);
+      await tenantInfoService.linkGoogleBusinessProfileLocation(tenantId, {
+        tenantId,
+        locationId: location.locationId,
+        locationName: location.title || location.name,
+        address: fullAddress,
+      });
 
       setLinkedLocation({
         locationId: location.locationId,
@@ -120,7 +135,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       setLinkingLocation(true);
       setError(null);
 
-      await tenantInfoService.unlinkGBPLocation(tenantId);
+      await tenantInfoService.unlinkGoogleBusinessProfileLocation(tenantId, linkedLocation?.locationId);
       setLinkedLocation(null);
     } catch (err) {
       clientLogger.error('Failed to unlink location:', { detail: err });
@@ -278,8 +293,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {gbpLocations.map((location) => {
-                      const addressStr = location.address?.addressLines?.join(', ') || '';
-                      const cityState = [location.address?.locality, location.address?.administrativeArea].filter(Boolean).join(', ');
+                      const fullAddress = formatLocationAddress(location.address);
 
                       return (
                         <button
@@ -291,9 +305,9 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
                           <p className="font-medium text-neutral-900 dark:text-neutral-100">
                             {location.title || location.name}
                           </p>
-                          {(addressStr || cityState) && (
+                          {fullAddress && (
                             <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                              {[addressStr, cityState].filter(Boolean).join(', ')}
+                              {fullAddress}
                             </p>
                           )}
                         </button>

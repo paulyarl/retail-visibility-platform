@@ -21,10 +21,18 @@ import * as path from 'path';
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
-const { mockFindGoogleToken, mockResolveGoogleAccessToken, mockTenantsFindUnique } = vi.hoisted(() => ({
+const {
+  mockFindGoogleToken,
+  mockResolveGoogleAccessToken,
+  mockTenantsFindUnique,
+  mockOauthAccountFindFirst,
+  mockLocationsDeleteMany,
+} = vi.hoisted(() => ({
   mockFindGoogleToken: vi.fn(),
   mockResolveGoogleAccessToken: vi.fn(),
   mockTenantsFindUnique: vi.fn(),
+  mockOauthAccountFindFirst: vi.fn(),
+  mockLocationsDeleteMany: vi.fn(),
 }));
 
 vi.mock('../logger', () => ({
@@ -38,8 +46,13 @@ vi.mock('../context', () => ({
 vi.mock('../prisma', () => ({
   prisma: {
     tenants: { findUnique: mockTenantsFindUnique, update: vi.fn() },
-    google_oauth_accounts_list: { findFirst: vi.fn(), create: vi.fn() },
-    gbp_locations_list: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    google_oauth_accounts_list: { findFirst: mockOauthAccountFindFirst, create: vi.fn() },
+    gbp_locations_list: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      deleteMany: mockLocationsDeleteMany,
+    },
   },
 }));
 
@@ -82,6 +95,8 @@ beforeEach(() => {
   mockFindGoogleToken.mockResolvedValue({ id: 'goa_1', tenant_id: TENANT_ID });
   mockResolveGoogleAccessToken.mockResolvedValue('ya29.test-access-token');
   mockTenantsFindUnique.mockResolvedValue(null);
+  mockOauthAccountFindFirst.mockResolvedValue({ id: 'goa_1' });
+  mockLocationsDeleteMany.mockResolvedValue({ count: 0 });
 
   process.env.GBP_TRANSPORT = 'fixture';
   clearGbpFixtureCache();
@@ -157,5 +172,61 @@ describe('GET /google/business/locations — guards', () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error).toBe('not_connected');
+  });
+});
+
+// ── POST /google/business/unlink-location ───────────────────────────────
+//
+// The inverse of link-location, and the route the settings card's "Unlink
+// Location" button calls. It had no server side at all — the card posted to
+// /api/tenants/:id/gbp/unlink, which was never registered — so the button
+// 404'd silently.
+
+describe('POST /google/business/unlink-location', () => {
+  const UNLINK_URL = '/api/google/business/unlink-location';
+
+  it('removes only the linked location when a locationId is given', async () => {
+    mockOauthAccountFindFirst.mockResolvedValue({ id: 'goa_1' });
+    mockLocationsDeleteMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(app)
+      .post(UNLINK_URL)
+      .send({ tenantId: TENANT_ID, locationId: '998877665544332211' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.removed).toBe(1);
+    expect(mockLocationsDeleteMany).toHaveBeenCalledWith({
+      where: { account_id: 'goa_1', location_id: '998877665544332211' },
+    });
+  });
+
+  it('removes every location on the account when no locationId is given', async () => {
+    mockOauthAccountFindFirst.mockResolvedValue({ id: 'goa_1' });
+    mockLocationsDeleteMany.mockResolvedValue({ count: 3 });
+
+    const response = await request(app).post(UNLINK_URL).send({ tenantId: TENANT_ID });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.removed).toBe(3);
+    expect(mockLocationsDeleteMany).toHaveBeenCalledWith({ where: { account_id: 'goa_1' } });
+  });
+
+  it('is a no-op when the tenant has no GBP account', async () => {
+    mockOauthAccountFindFirst.mockResolvedValue(null);
+
+    const response = await request(app).post(UNLINK_URL).send({ tenantId: TENANT_ID });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.removed).toBe(0);
+    expect(mockLocationsDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it('still 400s without a tenantId', async () => {
+    const response = await request(app).post(UNLINK_URL).send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('missing_tenantId');
   });
 });

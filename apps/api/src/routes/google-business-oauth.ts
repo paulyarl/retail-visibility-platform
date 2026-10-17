@@ -729,6 +729,64 @@ router.get('/google/business/linked-location', async (req, res) => {
   }
 });
 
+/**
+ * Unlink a GBP location from this tenant, keeping the Google authorization.
+ * POST /google/business/unlink-location
+ *
+ * The inverse of /google/business/link-location. Scoped to a single location
+ * when `locationId` is supplied — the row GET /google/business/linked-location
+ * returns — and to every location on the tenant's account when it isn't, which
+ * is the same cleanup /google/business/disconnect performs.
+ */
+router.post('/google/business/unlink-location', async (req, res) => {
+  try {
+    const { tenantId, locationId } = req.body;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenantId',
+        message: 'tenantId is required'
+      });
+    }
+
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      select: { id: true },
+    });
+
+    if (!account) {
+      return res.json({
+        success: true,
+        message: 'No GBP location linked',
+        data: { removed: 0 }
+      });
+    }
+
+    const { count } = await prisma.gbp_locations_list.deleteMany({
+      where: {
+        account_id: account.id,
+        ...(typeof locationId === 'string' && locationId ? { location_id: locationId } : {}),
+      }
+    });
+
+    console.log(`[GBP] Unlinked ${count} location(s) from tenant ${tenantId}`);
+
+    res.json({
+      success: true,
+      message: 'GBP location unlinked successfully',
+      data: { removed: count }
+    });
+  } catch (error) {
+    logger.error('[GBP] Error unlinking location:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'unlink_location_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Helper function to format GBP address
 function formatGBPAddress(address: any): string {
   const parts = [

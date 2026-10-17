@@ -265,104 +265,6 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
-   * Unlink a GBP (Google Business Profile) location from tenant
-   * Uses the /api/tenants/:tenantId/gbp/unlink endpoint
-   */
-  async unlinkGBPLocation(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        clientLogger.error('[TenantInfoService] unlinkGBPLocation: tenantId is required');
-        return null;
-      }
-
-      const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/gbp/unlink`,
-        {
-          method: 'POST',
-          body: JSON.stringify({})
-        },
-        `tenant-gbp-unlink-${tenantId}`
-      );
-      if (!result.success) {
-        clientLogger.error('[TenantInfoService] Failed to unlink GBP location:', { detail: result.error });
-        return null;
-      }
-
-      return result.data || null;
-    } catch (error) {
-      clientLogger.error('[TenantInfoService] Failed to unlink GBP location:', { detail: error });
-      return null;
-    }
-  }
-
-  /**
-   * Link a GBP (Google Business Profile) location to tenant
-   * Uses the /api/tenants/:tenantId/gbp/link endpoint
-   */
-  async linkGBPLocation(tenantId: string, locationId: string, locationName: string, fullAddress: string): Promise<any> {
-    try {
-      if (!tenantId || !locationId) {
-        clientLogger.error('[TenantInfoService] linkGBPLocation: tenantId and locationId are required');
-        return null;
-      }
-
-      const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/gbp/link`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            locationId,
-            locationName,
-            fullAddress
-          })
-        },
-        `tenant-gbp-link-${tenantId}-${locationId}`
-      );
-      if (!result.success) {
-        clientLogger.error('[TenantInfoService] Failed to link GBP location:', { detail: result.error });
-        return null;
-      }
-
-      return result.data || null;
-    } catch (error) {
-      clientLogger.error('[TenantInfoService] Failed to link GBP location:', { detail: error });
-      return null;
-    }
-  }
-
-  /**
-   * Get GBP (Google Business Profile) available locations
-   * Uses the /api/tenants/:tenantId/gbp/locations endpoint
-   */
-  async getGBPLocations(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        clientLogger.error('[TenantInfoService] getGBPLocations: tenantId is required');
-        return null;
-      }
-
-      const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/gbp/locations`,
-        {},
-        `tenant-gbp-locations-${tenantId}`,
-        this.cacheTTL
-      );
-      if (!result.success) {
-        clientLogger.error('[TenantInfoService] Failed to get GBP locations:', { detail: result.error });
-        // Surface the failure rather than collapsing it to null: null is
-        // indistinguishable from "this account has no locations", and the
-        // caller then blames the tenant for a platform-side failure.
-        return { success: false, error: result.error };
-      }
-
-      return result.data || null;
-    } catch (error) {
-      clientLogger.error('[TenantInfoService] Failed to get GBP locations:', { detail: error });
-      return null;
-    }
-  }
-
-  /**
    * Get GBP (Google Business Profile) linked location
    * Uses the /google/business/linked-location endpoint
    */
@@ -1687,7 +1589,10 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         clientLogger.error('[TenantInfoService] Failed to get Google Business Profile locations:', { detail: result.error });
-        return null;
+        // Surface the failure rather than collapsing it to null: null is
+        // indistinguishable from "this account has no locations", and the
+        // caller then blames the tenant for a platform-side failure.
+        return { success: false, error: result.error };
       }
 
       return result.data;
@@ -1729,7 +1634,7 @@ class TenantInfoService extends TenantApiSingleton {
   /**
    * Unlink Google Business Profile location
    */
-  async unlinkGoogleBusinessProfileLocation(tenantId: string): Promise<any> {
+  async unlinkGoogleBusinessProfileLocation(tenantId: string, locationId?: string): Promise<any> {
     try {
       if (!tenantId) {
         throw new Error('Tenant ID is required');
@@ -1739,7 +1644,7 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/google/business/unlink-location`,
         { 
           method: 'POST',
-          body: JSON.stringify({})
+          body: JSON.stringify({ tenantId, locationId })
         },
         `tenant-gbp-unlink-location-${tenantId}`
       );
