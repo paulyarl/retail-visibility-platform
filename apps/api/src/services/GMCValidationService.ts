@@ -130,14 +130,16 @@ export function validateProductForGMC(item: any): ValidationResult {
     });
   }
 
-  // GTIN validation (warning for branded products)
+  // GTIN validation. A branded product with no GTIN is normal for store brands
+  // and private label — the sync declares identifierExists=false for those, which
+  // Google accepts — so this is a visibility note, not a rejection risk.
   const gtin = item.gtin || item.upc || item.barcode;
   const brand = item.brand;
   if (brand && !gtin) {
     issues.push({
       field: 'gtin',
       severity: 'warning',
-      message: `Branded product "${brand}" has no GTIN/UPC. Google may reject or limit visibility without a valid GTIN.`,
+      message: `Branded product "${brand}" has no GTIN/UPC. It syncs with identifierExists=false, which Google accepts for store brands — adding a real GTIN usually improves Shopping visibility.`,
     });
   }
   if (gtin && !isValidGtin(gtin)) {
@@ -164,7 +166,7 @@ export function validateProductForGMC(item: any): ValidationResult {
     issues.push({
       field: 'mpn',
       severity: 'warning',
-      message: 'No GTIN, MPN, or brand set. Set identifierExists=false or provide at least one identifier.',
+      message: 'No GTIN, MPN, or brand set. The product syncs with identifierExists=false; adding any one identifier improves Shopping visibility.',
     });
   }
 

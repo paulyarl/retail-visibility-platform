@@ -260,11 +260,14 @@ function recordFixture(dir: string, url: URL, method: string, status: number, bo
  */
 export async function gbpFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
   const mode = gbpTransportMode();
-  const url = toUrl(input);
 
+  // Live is a pure passthrough — no URL parsing, so a non-absolute input behaves
+  // exactly as it did before this seam existed.
   if (mode === 'live') {
     return fetch(input as any, init as any);
   }
+
+  const url = toUrl(input);
 
   if (mode === 'fixture') {
     // Non-API hosts (media upload references) are storage endpoints — pass them

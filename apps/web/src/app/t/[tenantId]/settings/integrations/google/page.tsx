@@ -78,7 +78,8 @@ export default function GoogleIntegrationsPage() {
   const [gmcSyncResult, setGmcSyncResult] = useState<any>(null);
   const [savingGmcSettings, setSavingGmcSettings] = useState(false);
   const [gmcSettingsResult, setGmcSettingsResult] = useState<any>(null);
-  const [validationIssuesCount, setValidationIssuesCount] = useState(0);
+  const [validationErrors, setValidationErrors] = useState(0);
+  const [validationWarnings, setValidationWarnings] = useState(0);
   const [merchants, setMerchants] = useState<Array<{ id: string; name: string }>>([]);
   const [showMerchantSelector, setShowMerchantSelector] = useState(false);
   const [loadingMerchants, setLoadingMerchants] = useState(false);
@@ -121,9 +122,11 @@ export default function GoogleIntegrationsPage() {
     try {
       const { gmcValidationService } = await import('@/services/GMCValidationService');
       const report = await gmcValidationService.getValidationReport(tenantId);
-      setValidationIssuesCount(report ? report.itemsWithErrors + report.itemsWithWarnings : 0);
+      setValidationErrors(report?.itemsWithErrors ?? 0);
+      setValidationWarnings(report?.itemsWithWarnings ?? 0);
     } catch {
-      setValidationIssuesCount(0);
+      setValidationErrors(0);
+      setValidationWarnings(0);
     }
   }
 
@@ -393,7 +396,8 @@ export default function GoogleIntegrationsPage() {
           setupStatus={setupStatus}
           gbpStatus={gbpStatus}
           gmcStatus={gmcStatus}
-          validationIssuesCount={validationIssuesCount}
+          validationErrors={validationErrors}
+          validationWarnings={validationWarnings}
           onConnectGoogle={handleConnectGoogle}
           onConnectGBP={handleConnectGBP}
           onDisconnect={handleDisconnect}

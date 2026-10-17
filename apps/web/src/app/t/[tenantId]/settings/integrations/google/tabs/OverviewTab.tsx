@@ -68,7 +68,8 @@ interface OverviewTabProps {
   setupStatus: SetupStatus | null;
   gbpStatus: GBPStatus | null;
   gmcStatus: GMCStatus | null;
-  validationIssuesCount: number;
+  validationErrors: number;
+  validationWarnings: number;
   onConnectGoogle: () => void;
   onConnectGBP: () => void;
   onDisconnect: () => void;
@@ -92,7 +93,8 @@ export default function OverviewTab({
   setupStatus,
   gbpStatus,
   gmcStatus,
-  validationIssuesCount,
+  validationErrors,
+  validationWarnings,
   onConnectGoogle,
   onConnectGBP,
   onDisconnect,
@@ -110,12 +112,15 @@ export default function OverviewTab({
   onLinkMerchant,
   onCancelMerchantSelector,
 }: OverviewTabProps) {
-  const productCoverage = gmcStatus && gmcStatus.totalProducts > 0
-    ? Math.round((gmcStatus.syncedProducts / gmcStatus.totalProducts) * 100)
+  // Trashed and private items are excluded from the feed, so the denominator for
+  // "synced" is what can actually sync — otherwise a complete sync read as 34/36.
+  const syncableTotal = gmcStatus ? (gmcStatus.syncableProducts || gmcStatus.totalProducts) : 0;
+  const productCoverage = gmcStatus && syncableTotal > 0
+    ? Math.round((gmcStatus.syncedProducts / syncableTotal) * 100)
     : 0;
 
-  const syncHealthScore = gmcStatus
-    ? Math.round((gmcStatus.syncedProducts / Math.max(gmcStatus.totalProducts, 1)) * 100)
+  const syncHealthScore = gmcStatus && syncableTotal > 0
+    ? Math.round((gmcStatus.syncedProducts / syncableTotal) * 100)
     : 0;
 
   return (
@@ -149,7 +154,7 @@ export default function OverviewTab({
             <div className="text-xs text-neutral-500 space-y-1">
               <div className="flex justify-between">
                 <span>Products synced:</span>
-                <span className="font-medium text-neutral-700 dark:text-neutral-300">{gmcStatus.syncedProducts}/{gmcStatus.totalProducts}</span>
+                <span className="font-medium text-neutral-700 dark:text-neutral-300">{gmcStatus.syncedProducts}/{syncableTotal}</span>
               </div>
               <div className="flex justify-between">
                 <span>Pending:</span>
@@ -219,9 +224,15 @@ export default function OverviewTab({
               <span className="font-medium text-neutral-700 dark:text-neutral-300">{productCoverage}%</span>
             </div>
             <div className="flex justify-between">
-              <span>Validation issues:</span>
-              <span className={`font-medium ${validationIssuesCount > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                {validationIssuesCount}
+              <span>Validation errors:</span>
+              <span className={`font-medium ${validationErrors > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {validationErrors}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Recommendations:</span>
+              <span className={`font-medium ${validationWarnings > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                {validationWarnings}
               </span>
             </div>
           </div>
@@ -475,16 +486,33 @@ export default function OverviewTab({
         </div>
       </div>
 
-      {/* Validation Issues Alert */}
-      {validationIssuesCount > 0 && (
+      {/* Validation errors — blocking. Only these will be rejected by Google. */}
+      {validationErrors > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-red-800 dark:text-red-200 font-medium">
+              {validationErrors} product{validationErrors !== 1 ? 's' : ''} will be rejected by Google Shopping
+            </p>
+            <p className="text-red-700 dark:text-red-300 text-sm">
+              Missing a required field (image, price, availability). Fix {validationErrors !== 1 ? 'these' : 'it'} before
+              syncing — check the Products tab for details.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Validation recommendations — advisory. These products still sync. */}
+      {validationWarnings > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <p className="text-amber-800 dark:text-amber-200 font-medium">
-              {validationIssuesCount} product{validationIssuesCount !== 1 ? 's' : ''} with validation issues
+              {validationWarnings} product{validationWarnings !== 1 ? 's' : ''} with Google Shopping recommendations
             </p>
             <p className="text-amber-700 dark:text-amber-300 text-sm">
-              These products may be rejected by Google Shopping. Check the Products tab for details.
+              These sync normally, but addressing the suggestions improves how they perform on Google Shopping —
+              check the Products tab for details.
             </p>
           </div>
         </div>

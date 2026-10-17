@@ -122,7 +122,7 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; m
  * Convert platform inventory item to Google Product format.
  * If `variant` is provided, adds variant-specific GMC fields (itemGroupId, color, size, etc.).
  */
-function convertToGoogleProduct(
+export function convertToGoogleProduct(
   item: any,
   tenantId: string,
   websiteUrl: string,
@@ -185,8 +185,9 @@ function convertToGoogleProduct(
   }
 
   // Add optional fields if present
+  const gtin = item.gtin || item.upc || item.barcode;
   if (item.brand) googleProduct.brand = item.brand;
-  if (item.gtin || item.upc || item.barcode) googleProduct.gtin = item.gtin || item.upc || item.barcode;
+  if (gtin) googleProduct.gtin = gtin;
   if (item.mpn) googleProduct.mpn = item.mpn;
   if (additionalImages.length > 0) googleProduct.additionalImageLinks = additionalImages;
   
@@ -200,8 +201,14 @@ function convertToGoogleProduct(
     googleProduct.productTypes = [item.category_path];
   }
 
-  // Identifier exists flag
-  if (!item.gtin && !item.mpn && !item.brand) {
+  // Identifier exists flag.
+  // Google requires a GTIN for branded products unless the product genuinely has
+  // none — the store-brand / private-label case (an independent grocer's own
+  // label has no manufacturer GTIN). `brand` is NOT a substitute for a GTIN, so
+  // the flag must be declared whenever we have neither a GTIN nor an MPN.
+  // Previously brand also had to be absent, so store-branded goods synced with a
+  // "Missing GTIN" disapproval instead.
+  if (!gtin && !item.mpn) {
     googleProduct.identifierExists = false;
   }
 
