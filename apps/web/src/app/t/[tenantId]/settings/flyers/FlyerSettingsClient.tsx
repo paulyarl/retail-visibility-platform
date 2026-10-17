@@ -74,6 +74,8 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
   const [endsAt, setEndsAt] = useState('');
   const [ctaMode, setCtaMode] = useState<'auto' | 'order' | 'view'>('auto');
   const [recurrence, setRecurrence] = useState<FlyerRecurrence>('none');
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [kwInput, setKwInput] = useState('');
   const [selectedVariants, setSelectedVariants] = useState<Set<string>>(new Set());
   // Catalog-item links (inventory_item_id) — picked via ItemPickerModal
   const [selectedItems, setSelectedItems] = useState<Map<string, { name: string; priceCents: number | null }>>(new Map());
@@ -134,6 +136,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setPreset('week'); setStartsAt(''); setEndsAt('');
     setCtaMode('auto');
     setRecurrence('none');
+    setKeywords([]); setKwInput('');
     setSelectedVariants(new Set());
     setSelectedItems(new Map());
     setNewDishes([]);
@@ -152,12 +155,12 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
       if (editingId) {
         flyer = await flyerService.updateFlyer(tenantId, editingId, {
           title, summary: summary || null, heroImageUrl: heroImageUrl || null,
-          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode, recurrence,
+          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode, recurrence, keywords,
         });
       } else {
         flyer = await flyerService.createFlyer(tenantId, {
           title, summary: summary || null, heroImageUrl: heroImageUrl || null,
-          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode, recurrence,
+          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode, recurrence, keywords,
           status: 'draft',
         });
       }
@@ -204,6 +207,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setEditingId(null);
     setTitle(draft.title);
     setSummary(draft.summary ?? '');
+    setKeywords(draft.keywords ?? []);
     const presetMap: Record<string, WindowPreset> = {
       today: 'today', this_weekend: 'weekend', this_week: 'week', custom: 'custom',
     };
@@ -243,6 +247,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setHeroImageUrl(f.hero_image_url ?? '');
     setCtaMode(f.cta_mode);
     setRecurrence(f.recurrence ?? 'none');
+    setKeywords(f.keywords ?? []);
     setPreset('custom');
     setStartsAt(f.starts_at.slice(0, 16));
     setEndsAt(f.ends_at.slice(0, 16));
@@ -338,16 +343,59 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
               <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Title</label>
               <input
                 value={title} onChange={e => setTitle(e.target.value)} maxLength={160}
-                placeholder="This Week's Specials"
+                placeholder="Weekend specials: fresh fish & sides"
                 className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
               />
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Becomes the page title on your public flyer link, share previews, and Google post — say what's on offer and when.
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Summary <span className="text-neutral-400 font-normal">(optional)</span></label>
               <textarea
                 value={summary} onChange={e => setSummary(e.target.value)} maxLength={2000} rows={2}
+                placeholder="Fresh dishes prepared daily — order ahead for pickup or call the store."
                 className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
               />
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Shown on the flyer page and link previews — include items, timing, and how to buy (pickup, call, order online).
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Search keywords <span className="text-neutral-400 font-normal">(optional)</span></label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {keywords.map((kw) => (
+                  <span key={kw} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs text-neutral-800 dark:text-neutral-200">
+                    {kw}
+                    <button type="button" aria-label={`Remove ${kw}`} onClick={() => setKeywords(keywords.filter(k => k !== kw))} className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-100">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  value={kwInput}
+                  onChange={e => setKwInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const kw = kwInput.trim().toLowerCase();
+                      if (kw && keywords.length < 10 && !keywords.includes(kw)) setKeywords([...keywords, kw]);
+                      setKwInput('');
+                    }
+                  }}
+                  maxLength={60}
+                  placeholder="fish fry, weekend specials, fresh okra…"
+                  className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+                />
+                <Button size="sm" variant="outline" onClick={() => {
+                  const kw = kwInput.trim().toLowerCase();
+                  if (kw && keywords.length < 10 && !keywords.includes(kw)) setKeywords([...keywords, kw]);
+                  setKwInput('');
+                }} disabled={!kwInput.trim() || keywords.length >= 10}>Add</Button>
+              </div>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Terms shoppers search for — they feed the flyer page's meta keywords and structured data. {keywords.length}/10
+              </p>
             </div>
             {flyerCap.image && (
               <div>

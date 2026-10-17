@@ -64,6 +64,7 @@ const flyerWindowSchema = z.object({
   endsAt: z.coerce.date(),
   ctaMode: z.enum(['auto', 'order', 'view']).optional(),
   recurrence: z.enum(['none', 'daily', 'weekly']).optional(),
+  keywords: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
 });
 
 const flyerItemSchema = z.object({
@@ -238,6 +239,7 @@ router.post('/:tenantId/flyers', authenticateToken, checkTenantAccess, requireIn
         status,
         cta_mode: parsed.data.ctaMode ?? 'auto',
         recurrence,
+        keywords: parsed.data.keywords ?? [],
         share_code: generateFlyerShareCode(),
       },
     });
@@ -338,6 +340,7 @@ router.patch('/:tenantId/flyers/:flyerId', authenticateToken, checkTenantAccess,
         ...(parsed.data.endsAt !== undefined ? { ends_at: parsed.data.endsAt } : {}),
         ...(parsed.data.ctaMode !== undefined ? { cta_mode: parsed.data.ctaMode } : {}),
         ...(parsed.data.recurrence !== undefined ? { recurrence: parsed.data.recurrence } : {}),
+        ...(parsed.data.keywords !== undefined ? { keywords: parsed.data.keywords } : {}),
         updated_at: new Date(),
       },
     });

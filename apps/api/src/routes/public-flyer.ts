@@ -79,16 +79,19 @@ function logErr(route: string, error: unknown, extra?: Record<string, string>) {
 }
 
 /** Resolve slug → tenant (mirrors directory-gbp-public.ts). */
-async function resolveTenantIdentifier(identifier: string): Promise<{ id: string; slug: string | null } | null> {
-  const byId = await prisma.tenants.findUnique({ where: { id: identifier }, select: { id: true, slug: true } });
+async function resolveTenantIdentifier(identifier: string): Promise<{ id: string; slug: string | null; name: string | null } | null> {
+  const byId = await prisma.tenants.findUnique({ where: { id: identifier }, select: { id: true, slug: true, name: true } });
   if (byId) return byId;
-  const bySlug = await prisma.tenants.findFirst({ where: { slug: identifier }, select: { id: true, slug: true } });
+  const bySlug = await prisma.tenants.findFirst({ where: { slug: identifier }, select: { id: true, slug: true, name: true } });
   if (bySlug) return bySlug;
   const dirListing = await prisma.directory_listings_list.findFirst({
     where: { slug: identifier },
     select: { tenant_id: true },
   });
-  if (dirListing) return { id: dirListing.tenant_id, slug: identifier };
+  if (dirListing) {
+    const t = await prisma.tenants.findUnique({ where: { id: dirListing.tenant_id }, select: { name: true } });
+    return { id: dirListing.tenant_id, slug: identifier, name: t?.name ?? null };
+  }
   return null;
 }
 
@@ -110,7 +113,7 @@ function surfaceAllowed(caps: EffectiveCapabilities, surface: FlyerSurface | und
  * Build the public flyer payload for a tenant. Returns null when the flyer
  * surface is gated off — callers fail closed to { enabled: false }.
  */
-async function buildFlyerPayload(tenant: { id: string; slug: string | null }, surface?: FlyerSurface) {
+async function buildFlyerPayload(tenant: { id: string; slug: string | null; name: string | null }, surface?: FlyerSurface) {
   const caps = await resolveEffectiveCapabilitiesFromMV(tenant.id);
   if (!caps || !caps.effective?.flyer || !surfaceAllowed(caps, surface)) return null;
 
@@ -175,6 +178,7 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
       id: f.id,
       title: f.title,
       summary: f.summary,
+      keywords: f.keywords ?? [],
       heroImageUrl: f.hero_image_url,
       window: { startsAt: f.starts_at, endsAt: f.ends_at },
       shareCode: f.share_code,
@@ -220,6 +224,7 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
 
   return {
     enabled: true,
+    tenant: { name: tenant.name, slug: tenant.slug },
     surfaces: {
       storefront: flyerCaps.can_use_storefront,
       directory: flyerCaps.can_use_directory,
@@ -320,7 +325,7 @@ flyerPublicStandaloneRoutes.get('/:code', async (req: Request, res: Response) =>
       select: { id: true, tenant_id: true },
     });
     if (byCode) {
-      const tenant = await prisma.tenants.findUnique({ where: { id: byCode.tenant_id }, select: { id: true, slug: true } });
+      const tenant = await prisma.tenants.findUnique({ where: { id: byCode.tenant_id }, select: { id: true, slug: true, name: true } });
       if (!tenant) return res.status(404).json({ success: false, error: 'not_found' });
       const data = await buildFlyerPayload(tenant);
       if (!data) return res.json({ success: true, data: { enabled: false } });

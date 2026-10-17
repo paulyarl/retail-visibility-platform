@@ -31,6 +31,7 @@ export interface PublicFlyer {
   id: string;
   title: string;
   summary: string | null;
+  keywords?: string[];
   heroImageUrl: string | null;
   window: { startsAt: string; endsAt: string };
   shareCode: string;
@@ -53,6 +54,7 @@ export interface PublicFlyerFrozenItem {
 
 export interface PublicFlyerPayload {
   enabled: boolean;
+  tenant?: { name: string | null; slug: string | null };
   surfaces?: { storefront: boolean; directory: boolean; place: boolean };
   flyers?: PublicFlyer[];
   frozen?: PublicFlyerFrozenItem[];

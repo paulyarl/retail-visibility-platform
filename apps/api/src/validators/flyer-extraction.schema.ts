@@ -48,6 +48,7 @@ const suggestedWindowEnum = z.enum(['today', 'this_weekend', 'this_week', 'custo
 export const flyerExtractionOutputSchema = z.object({
   title: z.string().min(1).max(160),
   summary: z.string().max(2000).nullish(),
+  keywords: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
   dishes: z.array(flyerDraftDishSchema).min(1).max(20),
   suggestedWindow: suggestedWindowEnum.optional(),
 }).passthrough();

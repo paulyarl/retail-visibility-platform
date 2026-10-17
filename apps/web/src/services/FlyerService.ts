@@ -37,6 +37,7 @@ export interface TenantFlyer {
   status: FlyerStatus;
   cta_mode: FlyerCtaMode;
   recurrence?: FlyerRecurrence;
+  keywords?: string[];
   share_code: string | null;
   impressions: number;
   clicks: number;
@@ -115,6 +116,7 @@ export interface FlyerDraftDish {
 export interface FlyerExtractionDraft {
   title: string;
   summary?: string | null;
+  keywords?: string[];
   dishes: FlyerDraftDish[];
   suggestedWindow?: 'today' | 'this_weekend' | 'this_week' | 'custom';
 }
@@ -183,7 +185,7 @@ class FlyerService extends TenantApiSingleton {
   async createFlyer(tenantId: string, input: {
     title: string; summary?: string | null; heroImageUrl?: string | null;
     startsAt: string; endsAt: string; status?: 'draft' | 'published'; ctaMode?: FlyerCtaMode;
-    recurrence?: FlyerRecurrence;
+    recurrence?: FlyerRecurrence; keywords?: string[];
   }): Promise<TenantFlyer> {
     const result = await this.makeDefaultRequest<ApiEnvelope<{ flyer: TenantFlyer }>>(
       `/api/tenants/${tenantId}/flyers`,
@@ -197,7 +199,7 @@ class FlyerService extends TenantApiSingleton {
 
   async updateFlyer(tenantId: string, flyerId: string, input: Partial<{
     title: string; summary: string | null; heroImageUrl: string | null;
-    startsAt: string; endsAt: string; ctaMode: FlyerCtaMode; recurrence: FlyerRecurrence;
+    startsAt: string; endsAt: string; ctaMode: FlyerCtaMode; recurrence: FlyerRecurrence; keywords: string[];
   }>): Promise<TenantFlyer> {
     const result = await this.makeDefaultRequest<ApiEnvelope<{ flyer: TenantFlyer }>>(
       `/api/tenants/${tenantId}/flyers/${flyerId}`,

@@ -4,7 +4,14 @@ Operator-facing runbook for the `flyer` capability module: gating model, grants,
 moderation, card-pack fulfillment, GBP dual-publish, and troubleshooting.
 
 Design spec: `docs/LocalBiz/FLYER_SURFACE_SPEC.md` (§2 gating, §8 phasing).
-Migrations: `database/migrations/344_tenant_flyers.sql`, `345_tenant_flyer_events_recurrence.sql`.
+Migrations: `database/migrations/344_tenant_flyers.sql`, `345_tenant_flyer_events_recurrence.sql`,
+`346_flyer_live_expansion.sql`, `347_tenant_flyer_keywords.sql`.
+
+> **Positioning:** the flyer is the on-ramp from closed-group distribution
+> (WhatsApp-class chats: ephemeral, unindexed, invisible to search) to public
+> search surfaces — stable share URLs, indexable standalone pages, directory/
+> place strips, GBP posts, and QR cards that always resolve to the current
+> flyer. One more reason to be on the platform; promotion requires presence.
 
 ---
 
@@ -161,6 +168,13 @@ writes it today.)
 
 Stable links: `share_code` (12-char) → `/flyer/<code>` always resolves to the
 tenant's **current** live flyer — printed QR cards never go stale.
+
+**SEO & keywords.** The standalone page is an indexable surface: dynamic
+`<title>`/`description`/`openGraph` per flyer, JSON-LD `ItemList` with `Offer`
+nodes (price, `validThrough` = window end, `seller` = tenant name), `noindex`
+on the dead-end state. Flyers carry optional merchant-authored `keywords`
+(`TEXT[]`, max 10 — `tenant_flyers.keywords`, migration 347) feeding meta
+keywords + JSON-LD; the AI draft can propose them, the merchant confirms.
 
 **Concurrent flyers & display layout.** A tenant may run multiple live flyers
 at once — default cap **2** (`flyer.max_live`), raised to 3/5 by the

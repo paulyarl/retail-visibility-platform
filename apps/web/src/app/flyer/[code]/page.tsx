@@ -2,7 +2,8 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { publicFlyerService } from '@/services/PublicFlyerService';
+import { cache } from 'react';
+import { publicFlyerService, type PublicFlyerPayload } from '@/services/PublicFlyerService';
 import FlyerReportButton from './FlyerReportButton';
 import { formatPrice } from '@/lib/pricing';
 import { clientLogger } from '@/lib/client-logger';
@@ -15,23 +16,92 @@ interface PageProps {
   searchParams: Promise<{ src?: string }>;
 }
 
-export const metadata: Metadata = {
-  title: 'Specials',
-  description: 'Current specials flyer',
-};
+// Shared fetch — generateMetadata + page render hit the API once per request.
+const getFlyer = cache(async (code: string, src?: string): Promise<PublicFlyerPayload | null> => {
+  try {
+    return await publicFlyerService.getFlyerByCode(code, src);
+  } catch (error) {
+    clientLogger.error('[FlyerPage] fetch failed', { detail: error });
+    return null;
+  }
+});
+
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const { code } = await params;
+  const { src } = await searchParams;
+  const payload = await getFlyer(code, src);
+
+  if (!payload?.enabled || !payload.flyers?.length) {
+    return {
+      title: 'Specials',
+      description: 'Current specials flyer',
+      // Thin dead-end state — keep it out of the index.
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const tenantName = payload.tenant?.name;
+  const flyer = payload.flyers[0];
+  const itemNames = flyer.items.map(i => i.name).filter(Boolean).slice(0, 6).join(', ');
+  const description = flyer.summary
+    || (itemNames ? `${flyer.title} — ${itemNames}` : `${flyer.title} — current specials${tenantName ? ` at ${tenantName}` : ''}`);
+
+  return {
+    title: tenantName ? `${flyer.title} — ${tenantName}` : flyer.title,
+    description,
+    keywords: flyer.keywords?.length ? flyer.keywords : undefined,
+    openGraph: {
+      title: tenantName ? `${flyer.title} — ${tenantName}` : flyer.title,
+      description,
+      type: 'website',
+      images: flyer.heroImageUrl ? [{ url: flyer.heroImageUrl }] : undefined,
+    },
+  };
+}
+
+/** schema.org ItemList — priced items become Offers with the flyer window as validity. */
+function flyerJsonLd(payload: PublicFlyerPayload) {
+  const tenantName = payload.tenant?.name ?? undefined;
+  return payload.flyers!.map((flyer) => ({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: flyer.title,
+    description: flyer.summary ?? undefined,
+    keywords: flyer.keywords?.length ? flyer.keywords.join(', ') : undefined,
+    url: flyer.shareUrl,
+    itemListElement: flyer.items.map((item, i) => {
+      const priced = item.salePriceCents ?? item.priceCents;
+      return {
+        '@type': 'ListItem',
+        position: i + 1,
+        item: {
+          '@type': 'Product',
+          name: item.name ?? 'Special',
+          description: item.note ?? undefined,
+          image: item.imageUrl ?? undefined,
+          ...(priced != null ? {
+            offers: {
+              '@type': 'Offer',
+              price: (priced / 100).toFixed(2),
+              priceCurrency: 'USD',
+              availability: item.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+              validThrough: flyer.window.endsAt,
+              url: flyer.shareUrl,
+              ...(tenantName ? { seller: { '@type': 'Organization', name: tenantName } } : {}),
+            },
+          } : {}),
+        },
+      };
+    }),
+  }));
+}
 
 export default async function FlyerPage({ params, searchParams }: PageProps) {
   const { code } = await params;
   const { src } = await searchParams;
   if (!code) notFound();
 
-  let payload;
-  try {
-    payload = await publicFlyerService.getFlyerByCode(code, src);
-  } catch (error) {
-    clientLogger.error('[FlyerPage] fetch failed', { detail: error });
-    payload = null;
-  }
+  const payload = await getFlyer(code, src);
 
   if (!payload?.enabled) {
     return (
@@ -48,8 +118,13 @@ export default async function FlyerPage({ params, searchParams }: PageProps) {
     );
   }
 
+  const jsonLd = flyerJsonLd(payload);
+
   return (
     <main className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+      {jsonLd.map((doc, i) => (
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(doc) }} />
+      ))}
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-10">
         {payload.flyers?.map((flyer) => (
           <article key={flyer.id}>

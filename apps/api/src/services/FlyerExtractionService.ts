@@ -47,6 +47,7 @@ Output shape:
 {
   "title": "<flyer title, e.g. 'This Week's Specials'>",
   "summary": "<1-2 sentence summary or null>",
+  "keywords": ["<search terms shoppers would use, e.g. 'fish fry', 'weekend specials' — max 10>"],
   "dishes": [
     {
       "name": "<item name>",
