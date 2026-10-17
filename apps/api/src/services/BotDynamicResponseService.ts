@@ -122,7 +122,7 @@ async function getLiveFlyerContext(tenantId: string): Promise<string | null> {
     orderBy: { sort_order: 'asc' },
     select: {
       flyer_id: true, note: true,
-      product_variants: { select: { variant_name: true, price_cents: true, sale_price_cents: true, stock: true } },
+      product_variants: { select: { variant_name: true, price_cents: true, sale_price_cents: true, stock: true, attributes: true } },
       inventory_items: { select: { name: true, price_cents: true, sale_price_cents: true, stock: true } },
     },
   });
@@ -133,7 +133,9 @@ async function getLiveFlyerContext(tenantId: string): Promise<string | null> {
       .filter(i => i.flyer_id === flyer.id)
       .map((i) => {
         const name = i.product_variants?.variant_name ?? i.inventory_items?.name ?? 'Special';
-        const price = fmt(i.product_variants?.sale_price_cents ?? i.product_variants?.price_cents
+        // no_price promo variants store price_cents=0 — never quote it
+        const noPrice = (i.product_variants?.attributes as any)?.no_price === true;
+        const price = noPrice ? null : fmt(i.product_variants?.sale_price_cents ?? i.product_variants?.price_cents
           ?? i.inventory_items?.sale_price_cents ?? i.inventory_items?.price_cents);
         const stock = i.product_variants?.stock ?? i.inventory_items?.stock;
         return `  - ${name}${price ? ` — ${price}` : ''}${stock != null && stock <= 0 ? ' (sold out)' : ''}${i.note ? ` — ${i.note}` : ''}`;

@@ -372,6 +372,15 @@ router.post('/orders', async (req: Request, res: Response) => {
       }
 
       if (variant) {
+        // Flyer promo-only dishes (attributes.no_price) are display items —
+        // never orderable; a crafted add-to-cart must not order them at $0
+        if ((variant.attributes as any)?.no_price === true) {
+          return res.status(400).json({
+            success: false,
+            error: 'item_not_orderable',
+            message: `${variant.variant_name} is a display-only special`,
+          });
+        }
         // Variant found - use variant data
         // Skip stock check for digital and service products
         const variantProductType = variant.inventory_items?.product_type || 'physical';

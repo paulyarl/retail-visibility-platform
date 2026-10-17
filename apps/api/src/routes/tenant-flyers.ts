@@ -69,7 +69,9 @@ const flyerItemSchema = z.object({
   variantId: z.string().max(255).optional(),
   dish: z.object({
     name: z.string().min(1).max(160),
-    priceCents: z.number().int().min(0),
+    // price-less dishes are legitimate — flyer is promo surface, not a
+    // completeness contract (stored price_cents=0 + attributes.no_price)
+    priceCents: z.number().int().min(0).nullish(),
     salePriceCents: z.number().int().min(0).nullish(),
     stock: z.number().int().min(0).optional(),
     imageUrl: z.string().url().max(2000).nullish(),
@@ -174,7 +176,14 @@ router.get('/:tenantId/flyers', authenticateToken, checkTenantAccess, async (req
       prisma.tenant_flyers.findMany({
         where: { tenant_id: tenantId },
         orderBy: { created_at: 'desc' },
-        include: { tenant_flyer_items: { orderBy: { sort_order: 'asc' } } },
+        include: {
+          tenant_flyer_items: {
+            orderBy: { sort_order: 'asc' },
+            // Composer needs the linked catalog item's display fields when
+            // editing a flyer (variants resolve via the repertoire instead)
+            include: { inventory_items: { select: { name: true, image_url: true, price_cents: true, sale_price_cents: true } } },
+          },
+        },
       }),
       flyerState(tenantId),
     ]);
@@ -391,6 +400,35 @@ router.put('/:tenantId/flyers/:flyerId/items', authenticateToken, checkTenantAcc
       }
     }
 
+    // Linked catalog items must belong to this tenant and must not be a flyer
+    // container (the private "Specials"/"Frozen Specials" parents) — linking
+    // the shell itself would put a $0 card on the flyer
+    const linkedItemIds = parsed.data.filter(e => e.inventoryItemId).map(e => e.inventoryItemId!);
+    if (linkedItemIds.length > 0) {
+      const bad = await prisma.inventory_items.count({
+        where: {
+          id: { in: linkedItemIds },
+          OR: [
+            { tenant_id: { not: tenantId } },
+            { metadata: { path: ['flyer_special_parent'], equals: true } },
+            { metadata: { path: ['flyer_frozen_parent'], equals: true } },
+          ],
+        },
+      });
+      if (bad > 0) {
+        return res.status(400).json({ success: false, error: 'invalid_item_target', message: 'Catalog item not found or not linkable to a flyer' });
+      }
+    }
+    const linkedVariantCheckIds = parsed.data.filter(e => e.variantId).map(e => e.variantId!);
+    if (linkedVariantCheckIds.length > 0) {
+      const badV = await prisma.product_variants.count({
+        where: { id: { in: linkedVariantCheckIds }, tenant_id: { not: tenantId } },
+      });
+      if (badV > 0) {
+        return res.status(400).json({ success: false, error: 'invalid_item_target', message: 'Variant not found' });
+      }
+    }
+
     const items = await prisma.$transaction(async (tx) => {
       // Create any new dish variants on the specials parent
       const dishEntries = parsed.data.filter(e => e.dish);
@@ -411,10 +449,12 @@ router.put('/:tenantId/flyers/:flyerId/items', authenticateToken, checkTenantAcc
             tenant_id: tenantId,
             variant_name: entry.dish.name,
             sku: generateVariantSkuFromParent(parentSku, i),
-            price_cents: entry.dish.priceCents,
+            price_cents: entry.dish.priceCents ?? 0,
             sale_price_cents: entry.dish.salePriceCents ?? null,
             stock: entry.dish.stock ?? 0,
             image_url: entry.dish.imageUrl ?? null,
+            // promo-only dish: no price shown anywhere + never orderable
+            ...(entry.dish.priceCents == null ? { attributes: { no_price: true } } : {}),
             is_active: true,
           },
         });

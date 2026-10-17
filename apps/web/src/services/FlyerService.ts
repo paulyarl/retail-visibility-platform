@@ -23,6 +23,7 @@ export interface TenantFlyerItem {
   variant_id: string | null;
   sort_order: number;
   note: string | null;
+  inventory_items?: { name: string; image_url: string | null; price_cents: number | null; sale_price_cents: number | null } | null;
 }
 
 export interface TenantFlyer {
@@ -47,7 +48,7 @@ export interface TenantFlyer {
 export interface FlyerItemInput {
   inventoryItemId?: string;
   variantId?: string;
-  dish?: { name: string; priceCents: number; salePriceCents?: number | null; stock?: number; imageUrl?: string | null };
+  dish?: { name: string; priceCents: number | null; salePriceCents?: number | null; stock?: number; imageUrl?: string | null };
   note?: string | null;
   sortOrder?: number;
 }

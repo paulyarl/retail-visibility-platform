@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-16T10:45:16.479Z",
+  "generated_at": "2026-10-17T18:14:51.387Z",
   "env": "prd",
   "tiers": [
     {
@@ -5058,6 +5058,34 @@
         "is_enabled": false
       },
       {
+        "feature_key": "flyer_directory_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_frozen",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_10",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_place_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
+      },
+      {
         "feature_key": "fulfillment_delivery",
         "is_enabled": false
       },
@@ -8280,6 +8308,34 @@
         "is_enabled": false
       },
       {
+        "feature_key": "flyer_directory_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_frozen",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_10",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_place_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
+      },
+      {
         "feature_key": "fulfillment_delivery",
         "is_enabled": true
       },
@@ -9716,6 +9772,42 @@
       {
         "feature_key": "featured_trending",
         "is_enabled": false
+      },
+      {
+        "feature_key": "flyer_directory_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_flexible",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_frozen",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_20",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_place_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_recurring",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
       },
       {
         "feature_key": "fulfillment_delivery",
@@ -11396,6 +11488,42 @@
         "is_enabled": false
       },
       {
+        "feature_key": "flyer_directory_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_flexible",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_frozen",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_20",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_place_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_recurring",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
+      },
+      {
         "feature_key": "fulfillment_delivery",
         "is_enabled": true
       },
@@ -12808,6 +12936,42 @@
       {
         "feature_key": "featured_trending",
         "is_enabled": false
+      },
+      {
+        "feature_key": "flyer_directory_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_flexible",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_frozen",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_20",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_place_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_recurring",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
       },
       {
         "feature_key": "fulfillment_delivery",
@@ -15006,6 +15170,42 @@
         "is_enabled": false
       },
       {
+        "feature_key": "flyer_directory_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_flexible",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_frozen",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_20",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_place_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_recurring",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
+      },
+      {
         "feature_key": "fulfillment_delivery",
         "is_enabled": true
       },
@@ -16858,6 +17058,22 @@
       {
         "feature_key": "featured_trending",
         "is_enabled": false
+      },
+      {
+        "feature_key": "flyer_image",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_items_5",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "flyer_storefront_on",
+        "is_enabled": true
       },
       {
         "feature_key": "fulfillment_delivery",
@@ -20824,6 +21040,24 @@
       "featured_tenant_on",
       "featured_trending"
     ],
+    "flyer": [
+      "flyer_directory_on",
+      "flyer_disabled",
+      "flyer_enabled",
+      "flyer_flexible",
+      "flyer_frozen",
+      "flyer_image",
+      "flyer_items_10",
+      "flyer_items_20",
+      "flyer_items_5",
+      "flyer_on",
+      "flyer_place_on",
+      "flyer_recurring",
+      "flyer_storefront_on"
+    ],
+    "flyer_gbp": [
+      "flyer_gbp_publish"
+    ],
     "fulfillment_options": [
       "fulfillment_delivery",
       "fulfillment_disabled",
@@ -20847,9 +21081,11 @@
     ],
     "gbp_management": [
       "gbp_ai_response",
+      "gbp_attributes",
       "gbp_directory_content",
       "gbp_directory_reviews",
       "gbp_management_flexible",
+      "gbp_media_upload",
       "gbp_posts_scheduler"
     ],
     "integration_options": [

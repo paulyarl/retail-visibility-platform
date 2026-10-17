@@ -13,8 +13,9 @@
  *   - Server-side price defaulting: a dish with no parsed price inherits the
  *     LAST price used for the same dish name in the tenant's repertoire
  *     (product_variants on the flyer parent). If no history exists, the dish
- *     is flagged `needsPriceConfirmation` and renders "confirm price" in the
- *     review step — never silently zero-priced.
+ *     is flagged `needsPriceConfirmation` — informational: price-less dishes
+ *     are legitimate promo lines (variant gets attributes.no_price, shown
+ *     without a price, never orderable until completed).
  *
  * Image-input note: the provider abstraction (AiProvider.chat completions) is
  * text-only — flyer-image extraction needs a multimodal request shape the
@@ -33,7 +34,7 @@ import {
 export interface FlyerDraftItem extends FlyerExtractionOutput {
   dishes: Array<FlyerExtractionOutput['dishes'][number] & {
     /** true when no price was parsed and no repertoire default exists —
-     *  the review step must render "confirm price" (never auto-zero). */
+     *  informational marker (price-less promo lines are allowed). */
     needsPriceConfirmation: boolean;
     /** provenance for the review step: agent | repertoire_history | none */
     priceSource: 'agent' | 'repertoire_history' | 'none';

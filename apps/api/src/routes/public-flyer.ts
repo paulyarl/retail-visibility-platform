@@ -149,7 +149,10 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
       const v = item.product_variants;
       const inv = item.inventory_items;
       if (v?.id) liveVariantIds.push(v.id);
-      const orderable = orderEnabled && (
+      // Promo-only dishes (no_price attribute) are display items — shown
+      // without a price and never orderable, even on order-enabled flyers
+      const noPrice = v != null && (v.attributes as any)?.no_price === true;
+      const orderable = !noPrice && orderEnabled && (
         v ? (v.is_active !== false && v.stock > 0)
           : inv ? (inv.item_status === 'active' && inv.visibility === 'public' && (inv.stock ?? 0) > 0)
           : false
@@ -160,8 +163,8 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
         productId: v?.parent_item_id ?? inv?.id ?? null,
         sku: v?.sku ?? inv?.sku ?? null,
         name: v?.variant_name ?? inv?.name ?? null,
-        priceCents: v?.price_cents ?? inv?.price_cents ?? null,
-        salePriceCents: v?.sale_price_cents ?? inv?.sale_price_cents ?? null,
+        priceCents: noPrice ? null : (v?.price_cents ?? inv?.price_cents ?? null),
+        salePriceCents: noPrice ? null : (v?.sale_price_cents ?? inv?.sale_price_cents ?? null),
         imageUrl: v?.image_url ?? inv?.image_url ?? null,
         note: item.note,
         orderable,

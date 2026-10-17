@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import SetTenantId from "@/components/client/SetTenantId";
 import ItemCreationWizard from "@/components/inventory/wizards/ItemCreationWizard";
+import FlyerItemHint from "@/components/items/FlyerItemHint";
 import CartButton from "@/components/inventory/CartButton";
 import ItemPickerModal from "@/components/inventory/ItemPickerModal";
 import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
@@ -245,6 +246,10 @@ export default function CreateItemPage({
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="mb-4">
+        <FlyerItemHint tenantId={tenantId} />
       </div>
 
       <ItemCreationWizard

@@ -18,6 +18,7 @@ import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerRecurrence
 import FlyerShareKit from './FlyerShareKit';
 import FlyerAnalyticsCard from './FlyerAnalyticsCard';
 import FlyerCardOrderPanel from './FlyerCardOrderPanel';
+import ItemPickerModal from '@/components/inventory/ItemPickerModal';
 import { clientLogger } from '@/lib/client-logger';
 
 interface Props { tenantId: string }
@@ -74,6 +75,9 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
   const [ctaMode, setCtaMode] = useState<'auto' | 'order' | 'view'>('auto');
   const [recurrence, setRecurrence] = useState<FlyerRecurrence>('none');
   const [selectedVariants, setSelectedVariants] = useState<Set<string>>(new Set());
+  // Catalog-item links (inventory_item_id) — picked via ItemPickerModal
+  const [selectedItems, setSelectedItems] = useState<Map<string, { name: string; priceCents: number | null }>>(new Map());
+  const [showItemPicker, setShowItemPicker] = useState(false);
   const [newDishes, setNewDishes] = useState<{ name: string; priceCents: number | null; stock: number; needsPriceConfirmation?: boolean }[]>([]);
   const [dishName, setDishName] = useState('');
   const [dishPrice, setDishPrice] = useState('');
@@ -116,12 +120,12 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  const itemCount = selectedVariants.size + newDishes.length;
+  const itemCount = selectedVariants.size + selectedItems.size + newDishes.length;
   const itemsLimit = flyerCap?.itemsLimit ?? 0;
   const overLimit = itemCount > itemsLimit;
-  // Draft-then-confirm: extracted dishes with no parsed price and no
-  // repertoire history stay flagged — the merchant must set a price (spec §7a.1)
-  const unconfirmedPrices = newDishes.some(d => d.priceCents == null);
+  // Price-less dishes are legitimate promo lines — the flag is informational
+  // ("no price shown / not orderable"), not a blocker (merchant owns attributes)
+  const hasPriceless = newDishes.some(d => d.priceCents == null);
 
   const resetComposer = () => {
     setComposing(false);
@@ -131,6 +135,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setCtaMode('auto');
     setRecurrence('none');
     setSelectedVariants(new Set());
+    setSelectedItems(new Map());
     setNewDishes([]);
     setDishName(''); setDishPrice(''); setDishStock('');
   };
@@ -159,8 +164,8 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
 
       const items = [
         ...[...selectedVariants].map(variantId => ({ variantId })),
-        // unconfirmedPrices blocks save above — every dish has a real price here
-        ...newDishes.map(d => ({ dish: { name: d.name, priceCents: d.priceCents!, stock: d.stock } })),
+        ...[...selectedItems.keys()].map(inventoryItemId => ({ inventoryItemId })),
+        ...newDishes.map(d => ({ dish: { name: d.name, priceCents: d.priceCents, stock: d.stock } })),
       ];
       if (items.length > 0) {
         await flyerService.setFlyerItems(tenantId, flyer.id, items);
@@ -242,6 +247,12 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     setStartsAt(f.starts_at.slice(0, 16));
     setEndsAt(f.ends_at.slice(0, 16));
     setSelectedVariants(new Set((f.tenant_flyer_items ?? []).map(i => i.variant_id).filter(Boolean) as string[]));
+    setSelectedItems(new Map((f.tenant_flyer_items ?? [])
+      .filter(i => i.inventory_item_id)
+      .map(i => [i.inventory_item_id!, {
+        name: i.inventory_items?.name ?? i.inventory_item_id!,
+        priceCents: i.inventory_items?.sale_price_cents ?? i.inventory_items?.price_cents ?? null,
+      }])));
   };
 
   if (capLoading || loading) {
@@ -426,6 +437,26 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                 </div>
               )}
 
+              {/* Catalog items — link inventory created via the item wizard */}
+              <div className="mt-3">
+                <Button type="button" variant="outline" size="sm" className="flex items-center gap-1.5"
+                  onClick={() => setShowItemPicker(true)}>
+                  <Plus className="w-3.5 h-3.5" /> Link catalog item
+                </Button>
+                {selectedItems.size > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[...selectedItems.entries()].map(([itemId, info]) => (
+                      <span key={itemId} className="inline-flex items-center gap-1.5 rounded-full text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200">
+                        {info.name}{info.priceCents != null ? ` · $${(info.priceCents / 100).toFixed(2)}` : ''}
+                        <button type="button" onClick={() => {
+                          const next = new Map(selectedItems); next.delete(itemId); setSelectedItems(next);
+                        }} className="hover:text-red-600">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* New dish quick-add */}
               <div className="mt-3 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 p-3">
                 <p className="text-xs text-neutral-500 mb-2">New special — saved to your repertoire, reusable on future flyers</p>
@@ -436,9 +467,10 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                     className="w-24 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm" />
                   <input value={dishStock} onChange={e => setDishStock(e.target.value)} placeholder="Qty" type="number" min="0"
                     className="w-20 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm" />
-                  <Button type="button" variant="outline" size="sm" disabled={!dishName || !dishPrice}
+                  <Button type="button" variant="outline" size="sm" disabled={!dishName}
                     onClick={() => {
-                      setNewDishes([...newDishes, { name: dishName, priceCents: Math.round(parseFloat(dishPrice) * 100), stock: parseInt(dishStock || '0', 10) }]);
+                      const p = parseFloat(dishPrice);
+                      setNewDishes([...newDishes, { name: dishName, priceCents: dishPrice && !Number.isNaN(p) ? Math.round(p * 100) : null, stock: parseInt(dishStock || '0', 10) }]);
                       setDishName(''); setDishPrice(''); setDishStock('');
                     }}>
                     Add
@@ -448,14 +480,14 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                   <div className="mt-2 flex flex-wrap gap-2">
                     {newDishes.map((d, i) => (
                       <span key={i} className={`inline-flex items-center gap-1.5 rounded-full text-xs px-2.5 py-1 ${
-                        d.needsPriceConfirmation
-                          ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+                        d.priceCents == null
+                          ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600'
                           : 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
                       }`}>
-                        {d.name} · {d.priceCents != null ? `$${(d.priceCents / 100).toFixed(2)}` : (
+                        {d.name} · {d.priceCents != null ? `$${(d.priceCents / 100).toFixed(2)}` : 'no price'} {d.priceCents == null && (
                           <input
-                            type="number" min="0" step="0.01" placeholder="confirm price"
-                            className="w-24 rounded border border-red-300 dark:border-red-700 bg-white dark:bg-neutral-900 px-1.5 py-0.5 text-xs"
+                            type="number" min="0" step="0.01" placeholder="add price"
+                            className="w-24 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-1.5 py-0.5 text-xs"
                             onChange={(e) => {
                               const v = parseFloat(e.target.value);
                               if (!Number.isNaN(v) && v >= 0) {
@@ -469,19 +501,19 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                     ))}
                   </div>
                 )}
-                {unconfirmedPrices && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">
-                    Set a price for flagged items before publishing — AI never invents prices.
+                {hasPriceless && (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1.5">
+                    Items without a price are shown without one and aren't orderable — set a price only if you want them sellable.
                   </p>
                 )}
               </div>
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button onClick={() => saveFlyer(true)} disabled={saving || !title || overLimit || unconfirmedPrices}>
+              <Button onClick={() => saveFlyer(true)} disabled={saving || !title || overLimit}>
                 {saving ? 'Saving…' : 'Publish'}
               </Button>
-              <Button variant="outline" onClick={() => saveFlyer(false)} disabled={saving || !title || overLimit || unconfirmedPrices}>
+              <Button variant="outline" onClick={() => saveFlyer(false)} disabled={saving || !title || overLimit}>
                 Save draft
               </Button>
               <Button variant="ghost" onClick={resetComposer} disabled={saving}>Cancel</Button>
@@ -591,6 +623,20 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
       </Card>
 
       <FlyerShareKit tenantId={tenantId} flyer={shareFlyer} onClose={() => setShareFlyer(null)} />
+      <ItemPickerModal
+        isOpen={showItemPicker}
+        onClose={() => setShowItemPicker(false)}
+        title="Link catalog item to flyer"
+        tenantId={tenantId}
+        onSelect={(itemId, itemName) => {
+          if (!selectedItems.has(itemId)) {
+            const next = new Map(selectedItems);
+            next.set(itemId, { name: itemName, priceCents: null });
+            setSelectedItems(next);
+          }
+          setShowItemPicker(false);
+        }}
+      />
     </div>
   );
 }

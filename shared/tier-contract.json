@@ -95,23 +95,50 @@
     "chain_professional": "Chain Professional",
     "chain_enterprise": "Chain Enterprise"
   },
-
   "tier_layers": {
     "$comment": "V3 layer model for the active tiers (tier-hierarchy.md 'Layer model'). Rendered into the generated tier-order table. Inactive-legacy and pseudo tiers carry no layer.",
-    "gateway": ["directory_presence"],
-    "entry_presence": ["presence", "discovery", "storefront"],
-    "commerce": ["commitment", "ecommerce", "omnichannel"],
-    "scale": ["professional", "organization", "enterprise"]
+    "gateway": [
+      "directory_presence"
+    ],
+    "entry_presence": [
+      "presence",
+      "discovery",
+      "storefront"
+    ],
+    "commerce": [
+      "commitment",
+      "ecommerce",
+      "omnichannel"
+    ],
+    "scale": [
+      "professional",
+      "organization",
+      "enterprise"
+    ]
   },
-
   "key_contract": {
     "$comment": "Phase 5.3 — the capability-key contract rendered into capability-module-cheatsheet.md by scripts/gen-tier-doc-blocks.cjs. Every rule here is behavior-pinned by tier-merge-contract.test.ts; edit the fixture, regenerate the doc, and the diff test keeps them honest.",
     "sentinels": [
-      ["<module>_enabled", "module ON explicitly (grants nothing alone)"],
-      ["<module>_disabled", "module OFF — absolute veto, wins over every other source (resolved in merge, post-332)"],
-      ["<module>_flexible", "module ON + every active feature key linked to the module (expansion excludes *_disabled and *_off)"],
-      ["<any other active key>", "implicit _enabled (R17 §4)"],
-      ["no keys at all", "module OFF"]
+      [
+        "<module>_enabled",
+        "module ON explicitly (grants nothing alone)"
+      ],
+      [
+        "<module>_disabled",
+        "module OFF — absolute veto, wins over every other source (resolved in merge, post-332)"
+      ],
+      [
+        "<module>_flexible",
+        "module ON + every active feature key linked to the module (expansion excludes *_disabled and *_off)"
+      ],
+      [
+        "<any other active key>",
+        "implicit _enabled (R17 §4)"
+      ],
+      [
+        "no keys at all",
+        "module OFF"
+      ]
     ],
     "rules": [
       "_disabled is a veto, not a grant — never counts as engagement, and a module whose enabled tier rows are all veto is not purchase-eligible (capabilitySaleAllowed, D7).",
@@ -121,7 +148,6 @@
       "Resolver fields: allowed_* = tier hard gate; can_use_*/effective_* = tier AND merchant soft gate (R33 — merchant prefs never touch tier fields)."
     ]
   },
-
   "critical_order_invariants": {
     "$comment": "Phase 1.2. Asserted by INDEX POSITION, not membership — the failure mode is mis-ordering, not absence. The doc's own warning: 'missing either collapses index fallbacks and mis-gates capabilities.'",
     "ecommerce_between": [
@@ -462,7 +488,6 @@
       "apps/web/src/app/(platform)/settings/subscription/page.tsx": "imports the fixture order inline after the 1.1 fix — no runtime import path for vitest; the guard watches it statically"
     }
   },
-
   "feature_namespaces": {
     "$comment": "Phase 1.5d — exempt-with-reason. `TIER_FEATURES` (the bags) and `FEATURE_TIER_MAP` are NOT inverses: they carry overlapping but different namespaces. Recorded so a future contributor does not 'reconcile' them and break a working model.",
     "bag_only": {
@@ -485,7 +510,7 @@
     }
   },
   "capability_modules": {
-    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=prd, generated_at=2026-10-16T10:45:16.479Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
+    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=prd, generated_at=2026-10-17T18:14:51.387Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
     "barcode_scan_options": [
       "barcode_camera",
       "barcode_disabled",
@@ -677,6 +702,24 @@
       "featured_tenant_enabled",
       "featured_tenant_on",
       "featured_trending"
+    ],
+    "flyer": [
+      "flyer_directory_on",
+      "flyer_disabled",
+      "flyer_enabled",
+      "flyer_flexible",
+      "flyer_frozen",
+      "flyer_image",
+      "flyer_items_10",
+      "flyer_items_20",
+      "flyer_items_5",
+      "flyer_on",
+      "flyer_place_on",
+      "flyer_recurring",
+      "flyer_storefront_on"
+    ],
+    "flyer_gbp": [
+      "flyer_gbp_publish"
     ],
     "fulfillment_options": [
       "fulfillment_delivery",
