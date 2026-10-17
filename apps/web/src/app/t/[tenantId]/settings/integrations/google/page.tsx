@@ -84,7 +84,7 @@ export default function GoogleIntegrationsPage() {
     try {
       setLoading(true);
       const data = await platformHomeService.getGoogleFeedJobsSetupStatus(tenantId);
-      setSetupStatus(data?.data || null);
+      setSetupStatus(data || null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -105,7 +105,7 @@ export default function GoogleIntegrationsPage() {
   async function fetchGMCStatus() {
     try {
       const data = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
-      setGmcStatus(data.data);
+      setGmcStatus(data);
     } catch (err) {
       clientLogger.error('Failed to fetch GMC status:', { detail: err });
     }

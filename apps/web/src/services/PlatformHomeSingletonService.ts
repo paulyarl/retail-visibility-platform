@@ -2646,7 +2646,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google feed jobs setup status:', { detail: error });
       throw error;
@@ -2669,7 +2669,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result?.data || null;
+      return unwrapApiBody<GoogleGBPStatus>(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google GBP status:', { detail: error });
       return null;
@@ -3125,7 +3125,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return unwrapApiBody(result);
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get Google Merchant sync status:', { detail: error });
       throw error;

@@ -271,12 +271,12 @@ export default function GBPSyncStatusPage() {
     async function fetchGMCStatus() {
       try {
         const data = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
-        setGmcStatus(data.data);
+        setGmcStatus(data);
 
         // Initialize pickup settings
-        setGmcFulfillmentMode((data.data?.fulfillmentMode as any) || (data.data?.pickupOnly ? 'pickup_only' : 'standard'));
-        setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
-        setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
+        setGmcFulfillmentMode((data?.fulfillmentMode as any) || (data?.pickupOnly ? 'pickup_only' : 'standard'));
+        setGmcPickupMethod((data?.pickupMethod as any) || 'buy');
+        setGmcPickupSla((data?.pickupSla as any) || 'same day');
       } catch (error) {
         clientLogger.error('Failed to fetch GMC status:', { detail: error });
       }
@@ -325,7 +325,7 @@ export default function GBPSyncStatusPage() {
       // Refresh GMC status after sync
       if (data.success) {
         const statusData = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
-        setGmcStatus(statusData.data);
+        setGmcStatus(statusData);
       }
     } catch (error) {
       clientLogger.error('Failed to sync products to GMC:', { detail: error });
