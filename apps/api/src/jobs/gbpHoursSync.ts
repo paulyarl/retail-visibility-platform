@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { prisma } from '../prisma'
 import { audit } from '../audit'
+import { gbpFetch, GBP_BUSINESS_INFORMATION_BASE } from '../lib/google/gbp-transport'
 
 export type GbpHoursPayload = {
   tenantId: string
@@ -43,7 +44,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
   }
 
   // Attempt a real call if configured
-  const base = process.env.GOOGLE_BUSINESS_API_URL || 'https://mybusinessbusinessinformation.googleapis.com'
+  const base = process.env.GOOGLE_BUSINESS_API_URL || GBP_BUSINESS_INFORMATION_BASE.replace(/\/v1$/, '')
   const realCall = String(process.env.GBP_HOURS_REAL_CALL || '').toLowerCase() === 'true'
   const locationName = process.env.GBP_LOCATION_NAME // e.g. accounts/123/locations/456
   const accessToken = process.env.GBP_ACCESS_TOKEN // ideally retrieved per-tenant; env for pilot simplicity
@@ -68,7 +69,7 @@ export async function runGbpHoursSync(payload: GbpHoursPayload) {
           },
           locationTimeZone: gbpPayload.timezone,
         }
-        const res = await fetch(url, {
+        const res = await gbpFetch(url, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${accessToken}`,

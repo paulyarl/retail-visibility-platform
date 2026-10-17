@@ -81,6 +81,7 @@ interface OverviewTabProps {
   loadingMerchants: boolean;
   linkingMerchantId: string | null;
   merchantLinkError: string | null;
+  merchantNeedsReconnect: boolean;
   onLoadMerchants: () => void;
   onLinkMerchant: (merchant: MerchantAccount) => void;
   onCancelMerchantSelector: () => void;
@@ -104,6 +105,7 @@ export default function OverviewTab({
   loadingMerchants,
   linkingMerchantId,
   merchantLinkError,
+  merchantNeedsReconnect,
   onLoadMerchants,
   onLinkMerchant,
   onCancelMerchantSelector,
@@ -327,6 +329,16 @@ export default function OverviewTab({
           {merchantLinkError && (
             <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-700 dark:text-red-300">{merchantLinkError}</p>
+              {merchantNeedsReconnect && (
+                <Button
+                  onClick={onConnectGoogle}
+                  loading={connecting}
+                  className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  Reconnect Google Account
+                </Button>
+              )}
             </div>
           )}
 
@@ -335,7 +347,7 @@ export default function OverviewTab({
               <RefreshCw className="w-4 h-4 animate-spin" />
               Loading Merchant Center accounts...
             </div>
-          ) : merchants.length === 0 ? (
+          ) : merchantLinkError ? null : merchants.length === 0 ? (
             <div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
                 No Merchant Center accounts were found for the connected Google account.

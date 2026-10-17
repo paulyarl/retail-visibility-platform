@@ -43,7 +43,6 @@ interface RateLimitEntry {
 
 class GBPCategorySyncSingletonService extends UniversalSingleton {
   private static instance: GBPCategorySyncSingletonService;
-  private readonly API_BASE = 'https://mybusiness.googleapis.com/v4';
   private rateLimitState: Map<string, RateLimitEntry>;
   private syncInProgress: boolean = false;
   

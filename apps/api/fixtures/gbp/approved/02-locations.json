@@ -1,0 +1,46 @@
+{
+  "name": "Business Information — list locations for an account (approved project)",
+  "match": {
+    "method": "GET",
+    "host": "mybusinessbusinessinformation.googleapis.com",
+    "path": "/v1/accounts/*/locations"
+  },
+  "status": 200,
+  "body": {
+    "locations": [
+      {
+        "name": "locations/998877665544332211",
+        "title": "Baraka International Market Inc.",
+        "storeCode": "BARAKA-01",
+        "storefrontAddress": {
+          "addressLines": ["1000 Sample Street"],
+          "locality": "Milwaukee",
+          "administrativeArea": "WI",
+          "postalCode": "53215",
+          "regionCode": "US"
+        },
+        "phoneNumbers": {
+          "primaryPhone": "+1 414-555-0100"
+        },
+        "websiteUri": "https://baraka-international-market.visibleshelf.com",
+        "categories": {
+          "primaryCategory": {
+            "name": "gcid:grocery_store",
+            "displayName": "Grocery store"
+          },
+          "additionalCategories": [
+            {
+              "name": "gcid:international_grocery_store",
+              "displayName": "International grocery store"
+            }
+          ]
+        },
+        "metadata": {
+          "hasVoiceOfMerchant": true,
+          "duplicate": false,
+          "mapsUrl": "https://maps.google.com/?cid=998877665544332211"
+        }
+      }
+    ]
+  }
+}

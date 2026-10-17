@@ -1049,6 +1049,8 @@ export interface CouponOptionsMerchantSettings {
 export interface GbpManagementMerchantSettings {
   gbp_reviews_display?: boolean | null;
   gbp_content_display?: boolean | null;
+  gbp_autopilot_enabled?: boolean | null;
+  gbp_autopilot_min_rating?: number | null;
 }
 
 export interface EffectiveGbpManagement {
@@ -1062,9 +1064,12 @@ export interface EffectiveGbpManagement {
   can_use_attributes: boolean;
   reviews_enabled: boolean;
   content_enabled: boolean;
+  autopilot_enabled: boolean;
   merchant_preferences: {
     gbp_reviews_display: boolean;
     gbp_content_display: boolean;
+    gbp_autopilot_enabled: boolean;
+    gbp_autopilot_min_rating: number;
   };
   features: Record<string, boolean>;
 }

@@ -881,7 +881,13 @@ export interface GbpManagementState {
   canUseAttributes: boolean;
   reviewsEnabled: boolean;
   contentEnabled: boolean;
-  merchantPreferences: { gbpReviewsDisplay: boolean; gbpContentDisplay: boolean } | null;
+  autopilotEnabled: boolean;
+  merchantPreferences: {
+    gbpReviewsDisplay: boolean;
+    gbpContentDisplay: boolean;
+    gbpAutopilotEnabled: boolean;
+    gbpAutopilotMinRating: number;
+  } | null;
   features: Record<string, boolean>;
 }
 

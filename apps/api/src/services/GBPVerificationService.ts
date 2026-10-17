@@ -23,6 +23,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { getValidAccessToken, getLinkedLocation } from './GBPAdvancedSync';
+import { gbpFetch, GBP_V4_BASE } from '../lib/google/gbp-transport';
 import { CrmAlertService } from './CrmAlertService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -58,8 +59,6 @@ export interface CompleteResult {
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────
-
-const GBP_VERIFICATIONS_API = 'https://mybusiness.googleapis.com/v4';
 
 // Human-readable labels for Google's verification methods
 const METHOD_LABELS: Record<string, string> = {
@@ -103,8 +102,8 @@ export class GBPVerificationService extends BaseService {
         return { success: false, options: [], error: 'No GBP location linked' };
       }
 
-      const response = await fetch(
-        `${GBP_VERIFICATIONS_API}/accounts/${location.accountId}/locations/${location.locationId}:fetchVerificationOptions`,
+      const response = await gbpFetch(
+        `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}:fetchVerificationOptions`,
         {
           method: 'POST',
           headers: {
@@ -158,8 +157,8 @@ export class GBPVerificationService extends BaseService {
         return { success: false, pending: false, error: 'No GBP location linked' };
       }
 
-      const response = await fetch(
-        `${GBP_VERIFICATIONS_API}/accounts/${location.accountId}/locations/${location.locationId}:verify`,
+      const response = await gbpFetch(
+        `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}:verify`,
         {
           method: 'POST',
           headers: {
@@ -226,8 +225,8 @@ export class GBPVerificationService extends BaseService {
       }
 
       // Fetch the latest pending verification for this location
-      const verificationsResponse = await fetch(
-        `${GBP_VERIFICATIONS_API}/accounts/${location.accountId}/locations/${location.locationId}/verifications`,
+      const verificationsResponse = await gbpFetch(
+        `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/verifications`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -254,8 +253,8 @@ export class GBPVerificationService extends BaseService {
       }
 
       // Submit the PIN/code to Google
-      const completeResponse = await fetch(
-        `${GBP_VERIFICATIONS_API}/accounts/${location.accountId}/locations/${location.locationId}/verifications/${pendingVerification.name}:complete`,
+      const completeResponse = await gbpFetch(
+        `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/verifications/${pendingVerification.name}:complete`,
         {
           method: 'POST',
           headers: {

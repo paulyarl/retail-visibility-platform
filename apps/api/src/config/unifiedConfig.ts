@@ -219,6 +219,20 @@ class UnifiedConfig {
     const parsed = parseInt(this.env.MARKETING_OPS_REVIEW_RESPONSE_INTERVAL_HOURS || '', 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 6;
   }
+
+  // ─── GBP Autopilot (Tier B review responses) ───────────────────────────
+  // Phase 2.5 gate: autopilot is OFF unless explicitly switched on. Even with
+  // the flag set, `runAutopilot` still requires the `gbp_ai_response`
+  // entitlement AND the merchant's own opt-in (`gbp_autopilot_enabled`).
+  get gbpAutopilotEnabled(): boolean {
+    const v = (this.env.GBP_AUTOPILOT_ENABLED || '').toLowerCase();
+    return v === 'true' || v === '1';
+  }
+  /** Max reviews autopilot will publish replies for in a single pass. */
+  get gbpAutopilotBatchLimit(): number {
+    const parsed = parseInt(this.env.GBP_AUTOPILOT_BATCH_LIMIT || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 50) : 5;
+  }
   // Default platform priority order (lower = work first). Drives which
   // platform's backlog an operator should tackle first for a campaign.
   get marketingOpsReviewResponsePlatformPriority(): Record<string, number> {

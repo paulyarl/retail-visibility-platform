@@ -7,6 +7,7 @@
 
 import { prisma } from '../prisma';
 import { getValidGoogleAccessToken } from '../lib/google/token-store';
+import { gbpFetch, GBP_BUSINESS_INFORMATION_BASE } from '../lib/google/gbp-transport';
 import { logger } from '../logger';
 
 type LocationStatus = 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
@@ -144,8 +145,8 @@ export async function syncLocationStatusToGoogle(
 
     // Make API call to Google My Business API
     // Note: accessTokenEncrypted would need to be decrypted in production
-    const response = await fetch(
-      `https://mybusinessbusinessinformation.googleapis.com/v1/${gbpLocation.location_id}?updateMask=openInfo`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/${gbpLocation.location_id}?updateMask=openInfo`,
       {
         method: 'PATCH',
         headers: {

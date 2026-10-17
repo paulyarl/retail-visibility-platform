@@ -1,0 +1,40 @@
+{
+  "name": "Account Management — quota 0 (project not yet allowlisted)",
+  "match": {
+    "method": "GET",
+    "host": "mybusinessaccountmanagement.googleapis.com",
+    "path": "/v1/accounts"
+  },
+  "status": 429,
+  "body": {
+    "error": {
+      "code": 429,
+      "message": "Quota exceeded for quota metric 'Requests' and limit 'Requests per minute' of service 'mybusinessaccountmanagement.googleapis.com' for consumer 'project_number:407743626849'.",
+      "status": "RESOURCE_EXHAUSTED",
+      "details": [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          "reason": "RATE_LIMIT_EXCEEDED",
+          "domain": "googleapis.com",
+          "metadata": {
+            "service": "mybusinessaccountmanagement.googleapis.com",
+            "quota_limit": "DefaultRequestsPerMinutePerProject",
+            "quota_location": "global",
+            "quota_metric": "mybusinessaccountmanagement.googleapis.com/default_requests",
+            "quota_limit_value": "0",
+            "consumer": "projects/407743626849"
+          }
+        },
+        {
+          "@type": "type.googleapis.com/google.rpc.Help",
+          "links": [
+            {
+              "description": "Request a higher quota limit.",
+              "url": "https://cloud.google.com/docs/quota#requesting_higher_quota"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

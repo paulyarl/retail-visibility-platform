@@ -94,4 +94,40 @@ describe('resolveGbpManagement', () => {
     expect(result.reviews_enabled).toBe(false);
     expect(result.content_enabled).toBe(true);
   });
+
+  it('autopilot is opt-in — entitled but not opted in stays off', () => {
+    const result = resolveGbpManagement({ gbp_ai_response: true }, { gbp_autopilot_enabled: false });
+    expect(result.can_use_ai_response).toBe(true);
+    expect(result.autopilot_enabled).toBe(false);
+    expect(result.merchant_preferences.gbp_autopilot_enabled).toBe(false);
+  });
+
+  it('autopilot defaults to off and 5★ when no prefs exist', () => {
+    const result = resolveGbpManagement({ gbp_ai_response: true }, null);
+    expect(result.autopilot_enabled).toBe(false);
+    expect(result.merchant_preferences.gbp_autopilot_min_rating).toBe(5);
+  });
+
+  it('autopilot turns on only when entitled AND opted in', () => {
+    const result = resolveGbpManagement(
+      { gbp_ai_response: true },
+      { gbp_autopilot_enabled: true, gbp_autopilot_min_rating: 4 }
+    );
+    expect(result.autopilot_enabled).toBe(true);
+    expect(result.merchant_preferences.gbp_autopilot_min_rating).toBe(4);
+  });
+
+  it('autopilot stays off when opted in but not entitled', () => {
+    const result = resolveGbpManagement({}, { gbp_autopilot_enabled: true });
+    expect(result.can_use_ai_response).toBe(false);
+    expect(result.autopilot_enabled).toBe(false);
+  });
+
+  it('flexible tier + opt-in turns autopilot on', () => {
+    const result = resolveGbpManagement(
+      { gbp_management_flexible: true },
+      { gbp_autopilot_enabled: true }
+    );
+    expect(result.autopilot_enabled).toBe(true);
+  });
 });

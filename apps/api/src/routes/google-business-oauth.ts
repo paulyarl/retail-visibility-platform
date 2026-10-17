@@ -5,6 +5,11 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { findGoogleToken, resolveGoogleAccessToken, upsertGoogleToken, deleteGoogleToken } from '../lib/google/token-store';
 import { isGBPSyncAllowed, isGbpManagementFeatureAllowed } from '../lib/google/capability-gate';
+import {
+  gbpFetch,
+  GBP_ACCOUNT_MANAGEMENT_BASE,
+  GBP_BUSINESS_INFORMATION_BASE,
+} from '../lib/google/gbp-transport';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
 import { requestContextStorage } from '../context';
@@ -418,7 +423,7 @@ router.get('/google/business/locations', async (req, res) => {
     }
 
     // First, get the accounts
-    const accountsResponse = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+    const accountsResponse = await gbpFetch(`${GBP_ACCOUNT_MANAGEMENT_BASE}/accounts`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -504,8 +509,8 @@ router.get('/google/business/locations', async (req, res) => {
     for (const account of accounts) {
       const accountName = account.name; // e.g., "accounts/123456789"
       
-      const locationsResponse = await fetch(
-        `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title,storefrontAddress,phoneNumbers,websiteUri,categories,metadata`,
+      const locationsResponse = await gbpFetch(
+        `${GBP_BUSINESS_INFORMATION_BASE}/${accountName}/locations?readMask=name,title,storefrontAddress,phoneNumbers,websiteUri,categories,metadata`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,

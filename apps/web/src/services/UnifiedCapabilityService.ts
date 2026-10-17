@@ -1211,7 +1211,13 @@ interface BackendEffectiveGbpManagement {
   can_use_attributes: boolean;
   reviews_enabled: boolean;
   content_enabled: boolean;
-  merchant_preferences: { gbp_reviews_display: boolean; gbp_content_display: boolean };
+  autopilot_enabled: boolean;
+  merchant_preferences: {
+    gbp_reviews_display: boolean;
+    gbp_content_display: boolean;
+    gbp_autopilot_enabled: boolean;
+    gbp_autopilot_min_rating: number;
+  };
   features: Record<string, boolean>;
 }
 
@@ -1227,8 +1233,14 @@ function mapGbpManagement(b: BackendEffectiveGbpManagement): GbpManagementState 
     canUseAttributes: b.can_use_attributes,
     reviewsEnabled: b.reviews_enabled,
     contentEnabled: b.content_enabled,
+    autopilotEnabled: b.autopilot_enabled,
     merchantPreferences: b.merchant_preferences
-      ? { gbpReviewsDisplay: b.merchant_preferences.gbp_reviews_display, gbpContentDisplay: b.merchant_preferences.gbp_content_display }
+      ? {
+          gbpReviewsDisplay: b.merchant_preferences.gbp_reviews_display,
+          gbpContentDisplay: b.merchant_preferences.gbp_content_display,
+          gbpAutopilotEnabled: b.merchant_preferences.gbp_autopilot_enabled,
+          gbpAutopilotMinRating: b.merchant_preferences.gbp_autopilot_min_rating,
+        }
       : null,
     features: {},
   };

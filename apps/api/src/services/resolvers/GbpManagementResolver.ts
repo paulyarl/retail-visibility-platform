@@ -14,6 +14,8 @@
 export interface GbpManagementMerchantSettings {
   gbp_reviews_display?: boolean | null;
   gbp_content_display?: boolean | null;
+  gbp_autopilot_enabled?: boolean | null;
+  gbp_autopilot_min_rating?: number | null;
 }
 
 export interface EffectiveGbpManagement {
@@ -29,10 +31,13 @@ export interface EffectiveGbpManagement {
   // Effective state (hard gate AND soft gate)
   reviews_enabled: boolean;
   content_enabled: boolean;
+  autopilot_enabled: boolean;
   // Merchant preferences (soft gate raw values)
   merchant_preferences: {
     gbp_reviews_display: boolean;
     gbp_content_display: boolean;
+    gbp_autopilot_enabled: boolean;
+    gbp_autopilot_min_rating: number;
   };
   features: Record<string, boolean>;
 }
@@ -54,10 +59,14 @@ export function resolveGbpManagement(
   // Soft gate (merchant-gated fields: tier AND merchant)
   const reviewsDisplayEnabled = merchantPrefs?.gbp_reviews_display !== false;
   const contentDisplayEnabled = merchantPrefs?.gbp_content_display !== false;
+  // Autopilot is opt-IN: the merchant must explicitly turn it on.
+  const autopilotOptIn = merchantPrefs?.gbp_autopilot_enabled === true;
+  const autopilotMinRating = merchantPrefs?.gbp_autopilot_min_rating ?? 5;
 
   // Effective state
   const reviewsEnabled = canShowReviews && reviewsDisplayEnabled;
   const contentEnabled = canShowContent && contentDisplayEnabled;
+  const autopilotEnabled = canUseAiResponse && autopilotOptIn;
 
   return {
     enabled:
@@ -76,9 +85,12 @@ export function resolveGbpManagement(
     can_use_attributes: canUseAttributes,
     reviews_enabled: reviewsEnabled,
     content_enabled: contentEnabled,
+    autopilot_enabled: autopilotEnabled,
     merchant_preferences: {
       gbp_reviews_display: reviewsDisplayEnabled,
       gbp_content_display: contentDisplayEnabled,
+      gbp_autopilot_enabled: autopilotOptIn,
+      gbp_autopilot_min_rating: autopilotMinRating,
     },
     features: {},
   };

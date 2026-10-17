@@ -84,6 +84,7 @@ export default function GoogleIntegrationsPage() {
   const [loadingMerchants, setLoadingMerchants] = useState(false);
   const [linkingMerchantId, setLinkingMerchantId] = useState<string | null>(null);
   const [merchantLinkError, setMerchantLinkError] = useState<string | null>(null);
+  const [merchantNeedsReconnect, setMerchantNeedsReconnect] = useState(false);
 
   async function fetchSetupStatus() {
     try {
@@ -215,11 +216,18 @@ export default function GoogleIntegrationsPage() {
 
   async function handleLoadMerchants() {
     setMerchantLinkError(null);
+    setMerchantNeedsReconnect(false);
     setShowMerchantSelector(true);
     setLoadingMerchants(true);
     try {
       const data = await platformHomeService.getGoogleOAuthMerchants(tenantId);
-      setMerchants(data?.merchants || []);
+      if (data.unavailable) {
+        setMerchantLinkError(data.unavailable.message);
+        setMerchantNeedsReconnect(data.unavailable.code === 'gmc_reconnect_required');
+        setMerchants([]);
+      } else {
+        setMerchants(data.merchants);
+      }
     } catch (err) {
       setMerchantLinkError(err instanceof Error ? err.message : 'Failed to load Merchant Center accounts');
     } finally {
@@ -403,6 +411,7 @@ export default function GoogleIntegrationsPage() {
           loadingMerchants={loadingMerchants}
           linkingMerchantId={linkingMerchantId}
           merchantLinkError={merchantLinkError}
+          merchantNeedsReconnect={merchantNeedsReconnect}
           onLoadMerchants={handleLoadMerchants}
           onLinkMerchant={handleLinkMerchant}
           onCancelMerchantSelector={() => setShowMerchantSelector(false)}

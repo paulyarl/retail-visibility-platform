@@ -7,6 +7,7 @@
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
 import { resolveGoogleAccessToken } from '../lib/google/token-store';
+import { gbpFetch, GBP_BUSINESS_INFORMATION_BASE } from '../lib/google/gbp-transport';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 
@@ -25,7 +26,6 @@ interface GBPCategoryChange {
 }
 
 export class GBPCategorySyncService {
-  private readonly API_BASE = 'https://mybusiness.googleapis.com/v4';
   
   /**
    * Refresh directory_category_products materialized view after GBP category changes
@@ -241,8 +241,8 @@ export class GBPCategorySyncService {
           ...(nextPageToken && { pageToken: nextPageToken })
         });
 
-        const response = await fetch(
-          `https://mybusinessbusinessinformation.googleapis.com/v1/categories?${params}`,
+        const response = await gbpFetch(
+          `${GBP_BUSINESS_INFORMATION_BASE}/categories?${params}`,
           {
             headers: {
               'Authorization': `Bearer ${accessToken}`,

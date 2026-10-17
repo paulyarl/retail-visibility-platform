@@ -5,11 +5,7 @@
 
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 import { prisma } from '../prisma';
-
-const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
-const GBP_MEDIA_API = 'https://mybusiness.googleapis.com/v4';
-const GBP_REVIEWS_API = 'https://mybusiness.googleapis.com/v4';
-const GBP_POSTS_API = 'https://mybusiness.googleapis.com/v4';
+import { gbpFetch, GBP_V4_BASE } from '../lib/google/gbp-transport';
 
 interface GBPMediaItem {
   name: string;
@@ -232,8 +228,8 @@ class GBPAdvancedSyncSingletonService extends UniversalSingleton {
       }
 
       // Fetch media items
-      const response = await fetch(
-        `${GBP_MEDIA_API}/${location.locationId}/media`,
+      const response = await gbpFetch(
+        `${GBP_V4_BASE}/${location.locationId}/media`,
         {
           method: 'GET',
           headers: {
@@ -317,8 +313,8 @@ class GBPAdvancedSyncSingletonService extends UniversalSingleton {
       }
 
       // Fetch reviews
-      const response = await fetch(
-        `${GBP_REVIEWS_API}/${location.locationId}/reviews`,
+      const response = await gbpFetch(
+        `${GBP_V4_BASE}/${location.locationId}/reviews`,
         {
           method: 'GET',
           headers: {
@@ -402,8 +398,8 @@ class GBPAdvancedSyncSingletonService extends UniversalSingleton {
       }
 
       // Create post
-      const response = await fetch(
-        `${GBP_POSTS_API}/${location.locationId}/localPosts`,
+      const response = await gbpFetch(
+        `${GBP_V4_BASE}/${location.locationId}/localPosts`,
         {
           method: 'POST',
           headers: {

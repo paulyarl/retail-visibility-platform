@@ -12,12 +12,12 @@
 
 import { prisma } from '../prisma';
 import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
+import {
+  gbpFetch,
+  GBP_BUSINESS_INFORMATION_BASE,
+  GBP_V4_BASE,
+} from '../lib/google/gbp-transport';
 import { logger } from '../logger';
-
-const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
-const GBP_MEDIA_API = 'https://mybusiness.googleapis.com/v4';
-const GBP_REVIEWS_API = 'https://mybusiness.googleapis.com/v4';
-const GBP_POSTS_API = 'https://mybusiness.googleapis.com/v4';
 
 // ============================================================================
 // TOKEN MANAGEMENT
@@ -150,8 +150,8 @@ export async function listMedia(tenantId: string): Promise<{
       return { success: false, media: [], error: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_MEDIA_API}/accounts/${location.accountId}/locations/${location.locationId}/media`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/media`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -194,8 +194,8 @@ export async function uploadPhoto(
     }
 
     // Create media item with source URL
-    const response = await fetch(
-      `${GBP_MEDIA_API}/accounts/${location.accountId}/locations/${location.locationId}/media`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/media`,
       {
         method: 'POST',
         headers: {
@@ -257,10 +257,10 @@ export async function uploadPhotoBinary(
       return { success: false, error: 'No GBP location linked' };
     }
 
-    const mediaBase = `${GBP_MEDIA_API}/accounts/${location.accountId}/locations/${location.locationId}/media`;
+    const mediaBase = `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/media`;
 
     // Step 1: startUpload — get an upload reference
-    const startResponse = await fetch(`${mediaBase}:startUpload`, {
+    const startResponse = await gbpFetch(`${mediaBase}:startUpload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -298,7 +298,7 @@ export async function uploadPhotoBinary(
     }
 
     // Step 3: create the media item from the upload reference
-    const createResponse = await fetch(mediaBase, {
+    const createResponse = await gbpFetch(mediaBase, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -340,8 +340,8 @@ export async function deleteMedia(
       return { success: false, error: 'No valid access token' };
     }
 
-    const response = await fetch(
-      `${GBP_MEDIA_API}/${mediaItemName}`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/${mediaItemName}`,
       {
         method: 'DELETE',
         headers: {
@@ -437,8 +437,8 @@ export async function createPost(
       postPayload.offer = post.offer;
     }
 
-    const response = await fetch(
-      `${GBP_POSTS_API}/accounts/${location.accountId}/locations/${location.locationId}/localPosts`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/localPosts`,
       {
         method: 'POST',
         headers: {
@@ -487,8 +487,8 @@ export async function listPosts(tenantId: string): Promise<{
       return { success: false, posts: [], error: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_POSTS_API}/accounts/${location.accountId}/locations/${location.locationId}/localPosts`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/localPosts`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -521,8 +521,8 @@ export async function deletePost(
       return { success: false, error: 'No valid access token' };
     }
 
-    const response = await fetch(
-      `${GBP_POSTS_API}/${postName}`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/${postName}`,
       {
         method: 'DELETE',
         headers: {
@@ -603,12 +603,12 @@ export async function listReviews(
       return { success: false, reviews: [], error: 'No GBP location linked' };
     }
 
-    let url = `${GBP_REVIEWS_API}/accounts/${location.accountId}/locations/${location.locationId}/reviews?pageSize=${pageSize}`;
+    let url = `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/reviews?pageSize=${pageSize}`;
     if (pageToken) {
       url += `&pageToken=${pageToken}`;
     }
 
-    const response = await fetch(url, {
+    const response = await gbpFetch(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -659,8 +659,8 @@ export async function replyToReview(
       return { success: false, error: 'No valid access token' };
     }
 
-    const response = await fetch(
-      `${GBP_REVIEWS_API}/${reviewName}/reply`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/${reviewName}/reply`,
       {
         method: 'PUT',
         headers: {
@@ -700,8 +700,8 @@ export async function deleteReviewReply(
       return { success: false, error: 'No valid access token' };
     }
 
-    const response = await fetch(
-      `${GBP_REVIEWS_API}/${reviewName}/reply`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/${reviewName}/reply`,
       {
         method: 'DELETE',
         headers: {
@@ -755,8 +755,8 @@ export async function getAvailableAttributes(tenantId: string): Promise<{
       return { success: false, attributes: [], error: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/attributes?parent=locations/${location.locationId}&regionCode=US&languageCode=en&pageSize=200`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/attributes?parent=locations/${location.locationId}&regionCode=US&languageCode=en&pageSize=200`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -797,8 +797,8 @@ export async function getLocationAttributes(tenantId: string): Promise<{
       return { success: false, attributes: [], error: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${location.locationId}/attributes`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${location.locationId}/attributes`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -848,8 +848,8 @@ export async function updateAttributes(
       .map((id) => (id.startsWith('attributes/') ? id : `attributes/${id}`))
       .join(',');
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${location.locationId}/attributes?attributeMask=${encodeURIComponent(mask)}`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${location.locationId}/attributes?attributeMask=${encodeURIComponent(mask)}`,
       {
         method: 'PATCH',
         headers: {

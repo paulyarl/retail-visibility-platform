@@ -102,19 +102,37 @@ export async function getValidGoogleAccessToken(
   provider: GoogleTokenProvider,
   scope: { tenantId?: string; accountId?: string },
 ): Promise<string | null> {
+  return (await resolveGoogleTokenState(provider, scope)).token;
+}
+
+/** Why a provider's token could not be used. */
+export type GoogleTokenFailure = 'not_connected' | 'refresh_failed';
+
+/**
+ * Like `getValidGoogleAccessToken`, but reports *why* it failed so a route can
+ * tell the merchant whether to connect or reconnect. `refresh_failed` means the
+ * row exists but its refresh token is dead (revoked/expired) — only the merchant
+ * can fix that, by re-running the OAuth flow.
+ */
+export async function resolveGoogleTokenState(
+  provider: GoogleTokenProvider,
+  scope: { tenantId?: string; accountId?: string },
+): Promise<{ token: string | null; failure: GoogleTokenFailure | null }> {
   try {
     const tokenRecord = await findGoogleToken(provider, scope);
-    if (!tokenRecord) return null;
-    return await resolveGoogleAccessToken(provider, tokenRecord);
+    if (!tokenRecord) return { token: null, failure: 'not_connected' };
+
+    const token = await resolveGoogleAccessToken(provider, tokenRecord);
+    return token ? { token, failure: null } : { token: null, failure: 'refresh_failed' };
   } catch (error) {
-    logger.error(`[GoogleTokenStore] Error resolving ${provider} access token:`, undefined, {
+    logger.error(`[GoogleTokenStore] Error resolving ${provider} token state:`, undefined, {
       error: {
         name: (error as any)?.name || 'Error',
         message: (error as any)?.message || String(error),
         stack: (error as any)?.stack,
       },
     });
-    return null;
+    return { token: null, failure: 'refresh_failed' };
   }
 }
 

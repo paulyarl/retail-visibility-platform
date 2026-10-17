@@ -26,6 +26,8 @@ import { permissionServiceFactory } from './permissions/PermissionServiceFactory
 import { OwnerVoiceService } from './deliverable/OwnerVoiceService';
 import { MarketingCategoryToneService } from './MarketingCategoryToneService';
 import { buildGbpReviewReplyPrompt, buildGbpReviewReplyPreviewPrompt } from './gbp/prompts';
+import { replyToReview } from './GBPAdvancedSync';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,46 @@ export interface GenerateDraftsResult {
   drafts: AiDraft[];
   previewMode: boolean;
   upgradeCta?: string;
+}
+
+/** Outcome of one Tier B autopilot pass for a tenant. */
+export interface AutopilotResult {
+  /** False when a gate blocked the pass (see `reason`). */
+  activated: boolean;
+  reason?: 'not_activated' | 'not_entitled' | 'merchant_opt_out';
+  scanned: number;
+  published: number;
+  skipped: number;
+  failed: number;
+}
+
+/**
+ * Pure draft scorer — picks the draft Tier B should auto-publish.
+ *
+ * Heuristic (no LLM call): reject placeholders and stubs, prefer replies in a
+ * natural length band, and give a small edge to drafts that open with thanks.
+ * Deterministic so it is unit-testable and reproducible.
+ */
+export function selectBestAutopilotDraft(drafts: AiDraft[]): AiDraft | null {
+  const scored = drafts
+    .filter((d) => typeof d?.text === 'string' && d.text.trim().length > 0)
+    .map((draft) => {
+      const text = draft.text.trim();
+      let score = 0;
+      const lower = text.toLowerCase();
+
+      if (text.length < 40) score -= 100;
+      if (/[{}]/.test(text) || lower.includes('todo') || lower.includes('lorem ipsum')) score -= 50;
+      if (text.length >= 80 && text.length <= 600) score += 10;
+      else score += 2;
+      if (lower.includes('thank')) score += 3;
+
+      return { draft: { ...draft, text }, score };
+    });
+
+  if (scored.length === 0) return null;
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].draft;
 }
 
 // ── Service ──────────────────────────────────────────────────────────────
@@ -264,27 +306,127 @@ export class GBPReviewReplyService extends BaseService {
     }
   }
 
-  // ── Tier B: runAutopilot (IMPLEMENTED but NOT INVOKED in Phase 2) ──────
+  // ── Tier B: runAutopilot ───────────────────────────────────────────────
 
   /**
-   * Tier B: Autopilot — automatically generates drafts AND publishes the
-   * best-scoring draft as a reply without human review.
+   * Tier B: Autopilot — generates drafts and publishes the best-scoring one
+   * as a reply without human review.
    *
-   * IMPLEMENTED but NOT WIRED to any job in Phase 2. Phase 2.5 gates Tier B
-   * activation after a quality review. Calling this method before Phase 2.5
-   * activation is a no-op that logs a warning.
+   * Three gates must all pass before a single reply is published:
+   *   1. `GBP_AUTOPILOT_ENABLED` — the Phase 2.5 activation flag (default OFF).
+   *   2. `gbp_ai_response` entitlement (tier / BSaaS / grant / flexible).
+   *   3. The merchant's own opt-in — `tenant_gbp_options_settings.gbp_autopilot_enabled`.
+   *
+   * Only reviews at or above the merchant's `gbp_autopilot_min_rating`
+   * (default 5★) are auto-replied; lower ratings are left for a human. Each
+   * pass publishes at most `GBP_AUTOPILOT_BATCH_LIMIT` replies (default 5) and
+   * never touches a review that already has a reply or a non-NONE status.
+   *
+   * NOT scheduled — the `gbp-review-autopilot` job is a catalog-only entry
+   * until the platform flips the flag (see jobs/gbpReviewAutopilot.ts).
    */
-  async runAutopilot(tenantId: string, ctx?: RequestCtx): Promise<void> {
-    logger.warn('[GBPReviewReply] runAutopilot invoked but Tier B is not activated (Phase 2.5 gate)', ctx, {
-      tenantId,
+  async runAutopilot(tenantId: string, ctx?: RequestCtx): Promise<AutopilotResult> {
+    const blocked = (reason: AutopilotResult['reason']): AutopilotResult => ({
+      activated: false,
+      reason,
+      scanned: 0,
+      published: 0,
+      skipped: 0,
+      failed: 0,
     });
-    // Phase 2.5 will implement the actual autopilot logic here:
-    // 1. Fetch all reviews with reply_status = 'NONE' for this tenant
-    // 2. For each, generate drafts (Tier A)
-    // 3. Score drafts (sentiment match, length, tone alignment)
-    // 4. Publish the best-scoring draft via GBPAdvancedSync.replyToReview
-    // 5. Set reply_status = 'PUBLISHED'
-    // Until then, this is a no-op.
+
+    if (!unifiedConfig.gbpAutopilotEnabled) {
+      logger.warn('[GBPReviewReply] runAutopilot skipped — Tier B not activated (Phase 2.5 gate)', ctx, { tenantId });
+      return blocked('not_activated');
+    }
+
+    if (!(await this.isEntitled(tenantId))) {
+      logger.info('[GBPReviewReply] runAutopilot skipped — gbp_ai_response not entitled', ctx, { tenantId });
+      return blocked('not_entitled');
+    }
+
+    const prefs = await (this.prisma as any).tenant_gbp_options_settings?.findUnique({
+      where: { tenant_id: tenantId },
+      select: { gbp_autopilot_enabled: true, gbp_autopilot_min_rating: true },
+    });
+    if (prefs?.gbp_autopilot_enabled !== true) {
+      logger.info('[GBPReviewReply] runAutopilot skipped — merchant has not opted in', ctx, { tenantId });
+      return blocked('merchant_opt_out');
+    }
+
+    const minRating = prefs?.gbp_autopilot_min_rating ?? 5;
+    const limit = unifiedConfig.gbpAutopilotBatchLimit;
+
+    const pending = await this.prisma.gbp_reviews.findMany({
+      where: {
+        tenant_id: tenantId,
+        reply_status: 'NONE',
+        review_reply: null,
+        google_review_id: { not: null },
+        star_rating: { gte: minRating },
+      },
+      orderBy: { google_create_time: 'asc' },
+      take: limit,
+    });
+
+    let published = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const review of pending) {
+      try {
+        // Full 3-draft generation — we are entitled (checked above).
+        const generated = await this.generateDrafts(tenantId, review.id, ctx);
+        const best = selectBestAutopilotDraft(generated.drafts);
+        if (!best || !review.google_review_id) {
+          skipped++;
+          continue;
+        }
+
+        const result = await replyToReview(tenantId, review.google_review_id, best.text);
+        if (!result.success) {
+          failed++;
+          logger.warn('[GBPReviewReply] Autopilot publish failed', ctx, {
+            tenantId,
+            reviewId: review.id,
+            error: result.error,
+          });
+          continue;
+        }
+
+        await this.prisma.gbp_reviews.update({
+          where: { id: review.id },
+          data: {
+            review_reply: best.text,
+            reply_status: 'PUBLISHED',
+            is_replied: true,
+            reply_update_time: new Date(),
+            updated_at: new Date(),
+          },
+        });
+        published++;
+      } catch (error) {
+        failed++;
+        logger.warn('[GBPReviewReply] Autopilot error on review', ctx, {
+          tenantId,
+          reviewId: review.id,
+          error: (error as Error).message,
+        });
+      }
+
+      // Be respectful to the Google API between publishes.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    logger.info('[GBPReviewReply] Autopilot pass complete', ctx, {
+      tenantId,
+      scanned: pending.length,
+      published,
+      skipped,
+      failed,
+    });
+
+    return { activated: true, scanned: pending.length, published, skipped, failed };
   }
 }
 

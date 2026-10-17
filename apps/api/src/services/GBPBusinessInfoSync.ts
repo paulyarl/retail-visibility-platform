@@ -15,9 +15,8 @@
 
 import { prisma } from '../prisma';
 import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
+import { gbpFetch, GBP_BUSINESS_INFORMATION_BASE } from '../lib/google/gbp-transport';
 import { logger } from '../logger';
-
-const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 
 interface BusinessInfo {
   name?: string;
@@ -165,8 +164,8 @@ export async function syncBusinessName(
       return { success: true, field: 'name', skipped: true, reason: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=title`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=title`,
       {
         method: 'PATCH',
         headers: {
@@ -211,8 +210,8 @@ export async function syncPhoneNumber(
       return { success: true, field: 'phone', skipped: true, reason: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=phoneNumbers`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=phoneNumbers`,
       {
         method: 'PATCH',
         headers: {
@@ -259,8 +258,8 @@ export async function syncWebsite(
       return { success: true, field: 'website', skipped: true, reason: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=websiteUri`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=websiteUri`,
       {
         method: 'PATCH',
         headers: {
@@ -311,8 +310,8 @@ export async function syncAddress(
       return { success: true, field: 'address', skipped: true, reason: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=storefrontAddress`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=storefrontAddress`,
       {
         method: 'PATCH',
         headers: {
@@ -363,8 +362,8 @@ export async function syncDescription(
       return { success: true, field: 'description', skipped: true, reason: 'No GBP location linked' };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=profile`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=profile`,
       {
         method: 'PATCH',
         headers: {
@@ -425,8 +424,8 @@ export async function syncCategories(
       }));
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=categories`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=categories`,
       {
         method: 'PATCH',
         headers: {
@@ -498,8 +497,8 @@ export async function syncBusinessHours(tenantId: string): Promise<SyncResult> {
       closeTime: p.close,
     }));
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=regularHours`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=regularHours`,
       {
         method: 'PATCH',
         headers: {
@@ -581,8 +580,8 @@ export async function syncSpecialHours(tenantId: string): Promise<SyncResult> {
       return period;
     });
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=specialHours`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=specialHours`,
       {
         method: 'PATCH',
         headers: {
@@ -700,8 +699,8 @@ export async function syncAllBusinessInfo(
       };
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?updateMask=${updateMaskParts.join(',')}`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?updateMask=${updateMaskParts.join(',')}`,
       {
         method: 'PATCH',
         headers: {
@@ -937,8 +936,8 @@ export async function readFromGoogle(tenantId: string): Promise<{
     }
 
     // Fetch location data from Google
-    const response = await fetch(
-      `${GBP_API_BASE}/locations/${locationId}?readMask=name,title,phoneNumbers,websiteUri,storefrontAddress,profile,categories,openInfo,regularHours,metadata`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/locations/${locationId}?readMask=name,title,phoneNumbers,websiteUri,storefrontAddress,profile,categories,openInfo,regularHours,metadata`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,

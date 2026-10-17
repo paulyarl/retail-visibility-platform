@@ -159,6 +159,9 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'supplier-opensource-sync-nightly', scheduleLabel: 'nightly backfill', description: 'Open-source supplier nightly backfill' },
           { name: 'gbp-review-ingestion', scheduleLabel: 'hourly', description: 'Polls Google reviews, refreshes ratings, fires CRM alerts' },
           { name: 'gbp-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled GBP posts' },
+          // Tier B autopilot — declared but NOT scheduled. Flip on via
+          // startGbpReviewAutopilot() + GBP_AUTOPILOT_ENABLED (see jobs/gbpReviewAutopilot.ts).
+          { name: 'gbp-review-autopilot', scheduleLabel: 'not scheduled — awaiting green light', description: 'Tier B: auto-publishes AI review replies for opted-in tenants' },
         ]);
       } catch (err) {
         logger.error('Failed to declare job catalog', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });

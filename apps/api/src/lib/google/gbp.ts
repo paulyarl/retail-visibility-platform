@@ -6,11 +6,9 @@
  */
 
 import { getValidGoogleAccessToken } from './token-store';
+import { gbpFetch, GBP_ACCOUNT_MANAGEMENT_BASE, GBP_BUSINESS_INFORMATION_BASE, GBP_V4_BASE } from './gbp-transport';
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
-
-const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
-const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1';
 
 /**
  * Get valid access token (refresh if expired)
@@ -33,7 +31,7 @@ export async function listBusinessAccounts(account_id: string): Promise<any[]> {
       throw new Error('No valid access token');
     }
 
-    const response = await fetch(`${GBP_INSIGHTS_API}/accounts`, {
+    const response = await gbpFetch(`${GBP_ACCOUNT_MANAGEMENT_BASE}/accounts`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -67,8 +65,8 @@ export async function listLocations(
       throw new Error('No valid access token');
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/${businessAccountName}/locations?readMask=name,title,storefrontAddress,phoneNumbers,websiteUri,categories,metadata`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/${businessAccountName}/locations?readMask=name,title,storefrontAddress,phoneNumbers,websiteUri,categories,metadata`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -104,8 +102,8 @@ export async function getLocation(
       throw new Error('No valid access token');
     }
 
-    const response = await fetch(
-      `${GBP_API_BASE}/${locationName}?readMask=*`,
+    const response = await gbpFetch(
+      `${GBP_BUSINESS_INFORMATION_BASE}/${locationName}?readMask=*`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -235,8 +233,8 @@ export async function getLocationInsights(
       },
     };
 
-    const response = await fetch(
-      `https://mybusiness.googleapis.com/v4/${locationName}/locations:reportInsights`,
+    const response = await gbpFetch(
+      `${GBP_V4_BASE}/${locationName}/locations:reportInsights`,
       {
         method: 'POST',
         headers: {

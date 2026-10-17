@@ -1,0 +1,22 @@
+{
+  "name": "Account Management — list accounts (approved project)",
+  "match": {
+    "method": "GET",
+    "host": "mybusinessaccountmanagement.googleapis.com",
+    "path": "/v1/accounts"
+  },
+  "status": 200,
+  "body": {
+    "accounts": [
+      {
+        "name": "accounts/112233445566778899",
+        "accountName": "Baraka International Market Inc.",
+        "type": "LOCATION_GROUP",
+        "verificationState": "VERIFIED",
+        "vettedState": "VETTED",
+        "permissionLevel": "OWNER",
+        "role": "OWNER"
+      }
+    ]
+  }
+}

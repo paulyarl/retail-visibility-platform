@@ -471,6 +471,15 @@ export interface FulfillmentSettings {
   shipping_provider: string | null;
 }
 
+export interface GbpOptionsSettings {
+  gbp_reviews_display: boolean;
+  gbp_content_display: boolean;
+  /** Owner opt-in for the Tier B review autopilot (default off). */
+  gbp_autopilot_enabled: boolean;
+  /** Lowest star rating that may be auto-replied (1–5, default 5). */
+  gbp_autopilot_min_rating: number;
+}
+
 export interface CloverStatus {
   enabled: boolean;
   mode: 'demo' | 'production' | null;
@@ -581,6 +590,22 @@ export interface SquareSyncLog {
  * - Scan sessions
  * - Upgrade requests
  */
+export interface GoogleOAuthMerchant {
+  id: string;
+  name: string;
+}
+
+export interface GoogleOAuthMerchantsResult {
+  merchants: GoogleOAuthMerchant[];
+  email?: string | null;
+  /**
+   * Set when the Merchant Center authorization isn't usable at all
+   * (`gmc_not_connected` / `gmc_reconnect_required`). Distinct from an empty
+   * `merchants` list, which means the account genuinely has none.
+   */
+  unavailable?: { code: string; message: string };
+}
+
 export class PlatformHomeSingletonService extends TenantApiSingleton {
   private static instance: PlatformHomeSingletonService;
   protected readonly cacheTTL = 10 * 60 * 1000; // 10 minutes
@@ -2677,27 +2702,38 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
-   * Get Google OAuth merchants
+   * Get Google OAuth merchants (the Link Merchant Center picker's data source).
+   *
+   * Distinguishes "this Google account has no Merchant Center accounts" from
+   * "the authorization isn't usable". `unwrapApiBody` collapses both to null,
+   * which made the picker tell merchants to create an account they already had.
    */
-  async getGoogleOAuthMerchants(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      const result = await this.makeDefaultRequest<any>(
-        `/api/google/oauth/merchants?tenantId=${tenantId}`,
-        {},
-        `platform-google-oauth-merchants-${tenantId}`,
-        this.cacheTTL
-      );
-      
-
-      return unwrapApiBody(result);
-    } catch (error) {
-      clientLogger.error('[PlatformHomeSingleton] Failed to get Google OAuth merchants:', { detail: error });
-      throw error;
+  async getGoogleOAuthMerchants(tenantId: string): Promise<GoogleOAuthMerchantsResult> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/google/oauth/merchants?tenantId=${tenantId}`,
+      {},
+      `platform-google-oauth-merchants-${tenantId}`,
+      this.cacheTTL
+    );
+
+    if (!result.success) {
+      const failure = (result as any).error || {};
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google OAuth merchants:', { detail: failure });
+      return {
+        merchants: [],
+        unavailable: {
+          code: failure.code || 'unknown',
+          message: failure.message || 'Failed to load Merchant Center accounts',
+        },
+      };
+    }
+
+    const body = unwrapApiBody<{ merchants: GoogleOAuthMerchant[]; email?: string | null }>(result);
+    return { merchants: body?.merchants || [], email: body?.email ?? null };
   }
 
   /**
@@ -3098,16 +3134,16 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   /**
    * Get GBP options (merchant soft-gate toggles)
    */
-  async getGbpOptionsSettings(tenantId: string): Promise<{ gbp_reviews_display: boolean; gbp_content_display: boolean } | null> {
+  async getGbpOptionsSettings(tenantId: string): Promise<GbpOptionsSettings | null> {
     try {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const result = await this.makeDefaultRequest<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(
+      const result = await this.makeDefaultRequest<{ success: boolean; settings: GbpOptionsSettings }>(
         `/api/tenants/${tenantId}/gbp-options`,
         {},
         `platform-tenant-gbp-options-${tenantId}`,
         this.cacheTTL
       );
-      return unwrapApiBody<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(result)?.settings ?? null;
+      return unwrapApiBody<{ success: boolean; settings: GbpOptionsSettings }>(result)?.settings ?? null;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to get GBP options settings:', { detail: error });
       throw error;
@@ -3119,17 +3155,17 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    */
   async updateGbpOptionsSettings(
     tenantId: string,
-    settings: { gbp_reviews_display?: boolean; gbp_content_display?: boolean }
-  ): Promise<{ gbp_reviews_display: boolean; gbp_content_display: boolean } | null> {
+    settings: Partial<GbpOptionsSettings>
+  ): Promise<GbpOptionsSettings | null> {
     try {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const result = await this.makeDefaultRequest<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(
+      const result = await this.makeDefaultRequest<{ success: boolean; settings: GbpOptionsSettings }>(
         `/api/tenants/${tenantId}/gbp-options`,
         { method: 'PUT', body: JSON.stringify(settings) },
         `platform-tenant-gbp-options-update-${tenantId}`
       );
       await this.invalidateCachePattern(`platform-tenant-gbp-options-${tenantId}*`);
-      return unwrapApiBody<{ success: boolean; settings: { gbp_reviews_display: boolean; gbp_content_display: boolean } }>(result)?.settings ?? null;
+      return unwrapApiBody<{ success: boolean; settings: GbpOptionsSettings }>(result)?.settings ?? null;
     } catch (error) {
       clientLogger.error('[PlatformHomeSingleton] Failed to update GBP options settings:', { detail: error });
       throw error;

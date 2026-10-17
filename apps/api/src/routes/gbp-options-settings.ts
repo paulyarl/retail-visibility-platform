@@ -20,12 +20,25 @@ const router = Router();
 const gbpOptionsSettingsSchema = z.object({
   gbp_reviews_display: z.boolean().optional(),
   gbp_content_display: z.boolean().optional(),
+  gbp_autopilot_enabled: z.boolean().optional(),
+  gbp_autopilot_min_rating: z.number().int().min(1).max(5).optional(),
 });
 
 const DEFAULT_SETTINGS = {
   gbp_reviews_display: true,
   gbp_content_display: true,
+  gbp_autopilot_enabled: false,
+  gbp_autopilot_min_rating: 5,
 };
+
+function serializeSettings(settings: any) {
+  return {
+    gbp_reviews_display: settings?.gbp_reviews_display ?? DEFAULT_SETTINGS.gbp_reviews_display,
+    gbp_content_display: settings?.gbp_content_display ?? DEFAULT_SETTINGS.gbp_content_display,
+    gbp_autopilot_enabled: settings?.gbp_autopilot_enabled ?? DEFAULT_SETTINGS.gbp_autopilot_enabled,
+    gbp_autopilot_min_rating: settings?.gbp_autopilot_min_rating ?? DEFAULT_SETTINGS.gbp_autopilot_min_rating,
+  };
+}
 
 // Get GBP options settings for a tenant
 router.get('/:tenantId/gbp-options', authenticateToken, async (req, res) => {
@@ -40,13 +53,7 @@ router.get('/:tenantId/gbp-options', authenticateToken, async (req, res) => {
       return res.json({ success: true, settings: DEFAULT_SETTINGS });
     }
 
-    res.json({
-      success: true,
-      settings: {
-        gbp_reviews_display: settings.gbp_reviews_display,
-        gbp_content_display: settings.gbp_content_display,
-      },
-    });
+    res.json({ success: true, settings: serializeSettings(settings) });
   } catch (error) {
     logger.error('Error fetching GBP options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch GBP options settings' });
@@ -106,13 +113,7 @@ router.put('/:tenantId/gbp-options', authenticateToken, requireTenantAdmin, asyn
 
     invalidateEffectiveCapabilities(tenantId);
 
-    res.json({
-      success: true,
-      settings: {
-        gbp_reviews_display: settings.gbp_reviews_display,
-        gbp_content_display: settings.gbp_content_display,
-      },
-    });
+    res.json({ success: true, settings: serializeSettings(settings) });
   } catch (error) {
     logger.error('Error updating GBP options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update GBP options settings' });

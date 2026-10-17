@@ -1412,6 +1412,21 @@ Wiring: `GbpManagementResolver` adds `can_use_media_upload` / `can_use_attribute
 - `gbp-options/page.tsx` — merchant-facing **GBP Display Settings** page for the soft gates (`gbp_reviews_display` / `gbp_content_display`), reading `GbpManagementState.canShowReviews/canShowContent` to label features not in plan. Linked from the advanced page ("Display settings →").
 - `PlatformHomeSingletonService` gained `getGoogleBusinessAvailableAttributes`, `updateGoogleBusinessAttributes`, `deleteGoogleBusinessReviewReply`, `generateGoogleBusinessReviewDrafts`, `submitGoogleBusinessReviewDispute`, `uploadGoogleBusinessMediaFile` (FormData), `getGbpOptionsSettings`, `updateGbpOptionsSettings`.
 
+### Tier B review autopilot — plumbing in place, NOT scheduled (2026-10-17)
+
+The "bot agent" that auto-responds to reviews is wired but inert. Activation is **two independent switches**, and neither publishes a reply alone:
+
+1. **Operator flag** `GBP_AUTOPILOT_ENABLED` (default off) — `unifiedConfig.gbpAutopilotEnabled`. `GBPReviewReplyService.runAutopilot` returns `{ activated: false, reason: 'not_activated' }` when unset.
+2. **Merchant opt-in** `tenant_gbp_options_settings.gbp_autopilot_enabled` (default false, migration 343). `reason: 'merchant_opt_out'` when off.
+
+Plus the existing hard gate: `gbp_ai_response` entitlement (`reason: 'not_entitled'`).
+
+- `GBPReviewReplyService.runAutopilot(tenantId)` — real implementation: only reviews with `reply_status='NONE'`, no reply, and `star_rating >= gbp_autopilot_min_rating` (default 5★); generates Tier A drafts, scores them with the pure `selectBestAutopilotDraft` (rejects placeholders/stubs, prefers 80–600 chars, small thanks bonus), publishes via `replyToReview`, sets `reply_status='PUBLISHED'`. Capped at `GBP_AUTOPILOT_BATCH_LIMIT` (default 5) per pass.
+- `apps/api/src/jobs/gbpReviewAutopilot.ts` — `runGbpReviewAutopilotPass()` (scans only opted-in tenants) + `startGbpReviewAutopilot()` (the hourly `scheduleJob`, `DISABLE_GBP_REVIEW_AUTOPILOT` kill switch). **Not called from `index.ts`** — it's a catalog-only JobRegistry entry (`declareJobs`, `scheduleLabel: 'not scheduled — awaiting green light'`), so it shows in `/settings/admin/jobs` with no timer. Green light = call `startGbpReviewAutopilot()` next to `startGbpReviewIngestion()` + set the flag.
+- Resolver: `autopilot_enabled` = `can_use_ai_response && merchant opt-in` (effective field, R33 — tier fields untouched); `merchant_preferences` gained `gbp_autopilot_enabled` / `gbp_autopilot_min_rating`. Mirrored in `resolvers/types.ts`, `UnifiedCapabilityService.ts`, `CapabilityResolutionService.ts`.
+- Settings UI: the GBP Display Settings page (`gbp-options/page.tsx`) has an "AI review autopilot" **Preview** section — opt-in toggle + auto-reply threshold (5★/4★/3★), gated by `canUseAiResponse`. Copy is explicit that replies begin once autopilot is switched on for the account.
+- Tests: `GbpManagementResolver.test.ts` (opt-in matrix), `GBPReviewReplyService.test.ts` (scorer + the four gates + publish/fail paths).
+
 ## Directory Claim Operator Approval Flow (Migration 246)
 
 Closes the gap where `DirectoryClaimService.initiateClaim` returned `operatorApprovalRequired: true` but persisted nothing — the request was lost and operators had no review queue. Also fixes `computeContexts` so directory-claim owners get platform context (and thus see Marketing/GBP nav).

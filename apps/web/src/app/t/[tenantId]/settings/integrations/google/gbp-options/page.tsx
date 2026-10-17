@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Star, Image as ImageIcon, Loader2, AlertCircle, CheckCircle, Save } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Star, Image as ImageIcon, Loader2, AlertCircle, CheckCircle, Save, Sparkles } from 'lucide-react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -31,6 +31,7 @@ export default function GbpOptionsSettingsPage() {
   const gbp = capabilities?.gbpManagement;
   const canShowReviews = !!gbp?.canShowReviews;
   const canShowContent = !!gbp?.canShowContent;
+  const canUseAiResponse = !!gbp?.canUseAiResponse;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,8 @@ export default function GbpOptionsSettingsPage() {
   const [saved, setSaved] = useState(false);
   const [reviewsDisplay, setReviewsDisplay] = useState(true);
   const [contentDisplay, setContentDisplay] = useState(true);
+  const [autopilotEnabled, setAutopilotEnabled] = useState(false);
+  const [autopilotMinRating, setAutopilotMinRating] = useState(5);
 
   useEffect(() => {
     async function load() {
@@ -47,6 +50,8 @@ export default function GbpOptionsSettingsPage() {
         if (settings) {
           setReviewsDisplay(settings.gbp_reviews_display);
           setContentDisplay(settings.gbp_content_display);
+          setAutopilotEnabled(settings.gbp_autopilot_enabled);
+          setAutopilotMinRating(settings.gbp_autopilot_min_rating ?? 5);
         }
       } catch (err) {
         clientLogger.error('Failed to load GBP display settings:', { detail: err });
@@ -66,6 +71,8 @@ export default function GbpOptionsSettingsPage() {
       await platformHomeService.updateGbpOptionsSettings(tenantId, {
         gbp_reviews_display: reviewsDisplay,
         gbp_content_display: contentDisplay,
+        gbp_autopilot_enabled: autopilotEnabled,
+        gbp_autopilot_min_rating: autopilotMinRating,
       });
       setSaved(true);
     } catch (err) {
@@ -154,6 +161,65 @@ export default function GbpOptionsSettingsPage() {
           entitled={canShowContent}
           featureHref={`/t/${tenantId}/settings/feature-store?feature=gbp_directory_content`}
         />
+
+        {/* Tier B autopilot — opt-in + autonomy threshold */}
+        <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-4 h-4 text-indigo-500" />
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">AI review autopilot</h2>
+            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+              Preview
+            </span>
+          </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+            Let the platform reply to positive reviews for you. Your preference is saved now — replies begin
+            automatically once autopilot is switched on for your account.
+          </p>
+
+          <label className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+            canUseAiResponse ? 'cursor-pointer border-neutral-200 dark:border-neutral-700 hover:border-neutral-300' : 'border-neutral-200 dark:border-neutral-700 opacity-70'
+          }`}>
+            <input
+              type="checkbox"
+              checked={autopilotEnabled}
+              disabled={!canUseAiResponse}
+              onChange={(e) => { setAutopilotEnabled(e.target.checked); setSaved(false); }}
+              className="mt-1 rounded border-neutral-300 dark:border-neutral-600"
+            />
+            <div>
+              <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Auto-reply to positive reviews</p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Publishes an AI-drafted reply without review. Lower ratings are always left for you.
+              </p>
+              {!canUseAiResponse && (
+                <Link
+                  href={`/t/${tenantId}/settings/feature-store?feature=gbp_ai_response`}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                >
+                  Not included in your plan — activate AI review response
+                </Link>
+              )}
+            </div>
+          </label>
+
+          {canUseAiResponse && autopilotEnabled && (
+            <div className="mt-3 flex items-center gap-3">
+              <label htmlFor="autopilot-min-rating" className="text-sm text-neutral-700 dark:text-neutral-300">
+                Auto-reply only at
+              </label>
+              <select
+                id="autopilot-min-rating"
+                value={autopilotMinRating}
+                onChange={(e) => { setAutopilotMinRating(Number(e.target.value)); setSaved(false); }}
+                className="px-2.5 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
+              >
+                {[5, 4, 3].map((r) => (
+                  <option key={r} value={r}>{r}★ and above</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-end pt-2">
           <button

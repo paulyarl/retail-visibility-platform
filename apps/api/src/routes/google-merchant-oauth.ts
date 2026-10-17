@@ -7,7 +7,7 @@ import {
   getUserInfo
 } from '../lib/google/oauth';
 import { listMerchantAccounts } from '../lib/google/gmc';
-import { upsertGoogleToken, deleteGoogleToken } from '../lib/google/token-store';
+import { upsertGoogleToken, deleteGoogleToken, resolveGoogleTokenState } from '../lib/google/token-store';
 import { generateQuickStart } from '../lib/id-generator';
 import { evaluateGMCSyncGate, gmcSyncGateError } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -315,6 +315,21 @@ router.get('/google/oauth/merchants', async (req, res) => {
         success: false,
         error: 'no_oauth_account',
         message: 'No Google account connected. Please connect your Google account first.'
+      });
+    }
+
+    // A usable Merchant Center token is a precondition for listing accounts.
+    // Without this the dead-token case surfaced as a 500 with an opaque message,
+    // and the picker fell back to "no accounts found" — wrong guidance.
+    const tokenState = await resolveGoogleTokenState('gmc', { accountId: account.id });
+    if (!tokenState.token) {
+      const reconnectRequired = tokenState.failure === 'refresh_failed';
+      return res.status(409).json({
+        success: false,
+        error: reconnectRequired ? 'gmc_reconnect_required' : 'gmc_not_connected',
+        message: reconnectRequired
+          ? 'Your Google authorization has expired. Reconnect your Google account, then try again.'
+          : 'Connect your Google account before linking a Merchant Center account.'
       });
     }
 

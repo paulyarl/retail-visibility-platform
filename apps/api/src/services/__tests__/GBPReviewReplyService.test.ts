@@ -25,27 +25,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockHasFeature,
   mockGbpReviewsFindFirst,
+  mockGbpReviewsFindMany,
   mockGbpReviewsUpdate,
   mockGbpLocationsFindFirst,
   mockMktCampaignsFindFirst,
   mockOwnerVoiceGetProfile,
   mockCategoryToneGetPreset,
   mockAiGenerateChatCompletion,
+  mockReplyToReview,
+  mockTenantGbpOptionsFindUnique,
 } = vi.hoisted(() => ({
   mockHasFeature: vi.fn(),
   mockGbpReviewsFindFirst: vi.fn(),
+  mockGbpReviewsFindMany: vi.fn(),
   mockGbpReviewsUpdate: vi.fn(),
   mockGbpLocationsFindFirst: vi.fn(),
   mockMktCampaignsFindFirst: vi.fn(),
   mockOwnerVoiceGetProfile: vi.fn(),
   mockCategoryToneGetPreset: vi.fn(),
   mockAiGenerateChatCompletion: vi.fn(),
+  mockReplyToReview: vi.fn(),
+  mockTenantGbpOptionsFindUnique: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
   prisma: {
     gbp_reviews: {
       findFirst: mockGbpReviewsFindFirst,
+      findMany: mockGbpReviewsFindMany,
       update: mockGbpReviewsUpdate,
     },
     gbp_locations_list: {
@@ -54,7 +61,19 @@ vi.mock('../../prisma', () => ({
     mkt_campaigns_list: {
       findFirst: mockMktCampaignsFindFirst,
     },
+    tenant_gbp_options_settings: {
+      findUnique: mockTenantGbpOptionsFindUnique,
+    },
   },
+}));
+
+vi.mock('../GBPAdvancedSync', () => ({
+  replyToReview: mockReplyToReview,
+}));
+
+// Mutable config double — the autopilot activation flag is flipped per test.
+vi.mock('../../config/unifiedConfig', () => ({
+  unifiedConfig: { gbpAutopilotEnabled: false, gbpAutopilotBatchLimit: 5 },
 }));
 
 vi.mock('../../logger', () => ({
@@ -90,8 +109,9 @@ vi.mock('../MarketingCategoryToneService', () => ({
 }));
 
 // Import after mocks are set up
-import { GBPReviewReplyService } from '../GBPReviewReplyService';
+import { GBPReviewReplyService, selectBestAutopilotDraft } from '../GBPReviewReplyService';
 import { buildGbpReviewReplyPrompt, buildGbpReviewReplyPreviewPrompt } from '../gbp/prompts';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 // ── Test constants ───────────────────────────────────────────────────────
 
@@ -327,13 +347,132 @@ describe('GBPReviewReplyService.generateDrafts', () => {
     expect(updateCall.data.reply_status).toBe('AI_DRAFTED');
   });
 
-  it('12. runAutopilot exists but is NOT invoked by any Phase 2 job (no-op + warning)', async () => {
+  it('12. runAutopilot is inert while GBP_AUTOPILOT_ENABLED is off (no-op + no writes)', async () => {
     const svc = GBPReviewReplyService.getInstance();
-    // Should not throw — should be a no-op that logs a warning
-    await expect(svc.runAutopilot(TENANT_ID)).resolves.toBeUndefined();
+    const result = await svc.runAutopilot(TENANT_ID);
+    expect(result).toEqual({ activated: false, reason: 'not_activated', scanned: 0, published: 0, skipped: 0, failed: 0 });
     // Should NOT call any AI or DB update (no draft generation, no reply publishing)
     expect(mockAiGenerateChatCompletion).not.toHaveBeenCalled();
     expect(mockGbpReviewsUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// ── Tier B autopilot ─────────────────────────────────────────────────────
+
+const THREE_DRAFTS = {
+  drafts: [
+    { angle: 'grateful', text: 'Thank you so much for the kind words — it means a lot to our whole team!' },
+    { angle: 'brief', text: 'Thanks!' },
+    { angle: 'placeholder', text: 'Dear {reviewer}, TODO: personalise this reply about our business.' },
+  ],
+  previewMode: false,
+};
+
+describe('selectBestAutopilotDraft', () => {
+  it('picks a natural-length thank-you over a stub and a placeholder', () => {
+    const best = selectBestAutopilotDraft(THREE_DRAFTS.drafts);
+    expect(best?.angle).toBe('grateful');
+  });
+
+  it('returns null when every draft is empty', () => {
+    expect(selectBestAutopilotDraft([{ angle: 'a', text: '   ' }])).toBeNull();
+  });
+
+  it('returns null for an empty list', () => {
+    expect(selectBestAutopilotDraft([])).toBeNull();
+  });
+});
+
+describe('runAutopilot gates', () => {
+  const svc = GBPReviewReplyService.getInstance();
+
+  beforeEach(() => {
+    mockReplyToReview.mockReset();
+    mockGbpReviewsFindMany.mockReset();
+    mockTenantGbpOptionsFindUnique.mockReset();
+    mockGbpReviewsUpdate.mockReset();
+    unifiedConfig.gbpAutopilotEnabled = false;
+  });
+
+  it('does not run when the platform flag is off', async () => {
+    const result = await svc.runAutopilot(TENANT_ID);
+    expect(result.reason).toBe('not_activated');
+    expect(mockGbpReviewsFindMany).not.toHaveBeenCalled();
+  });
+
+  it('does not run without the gbp_ai_response entitlement', async () => {
+    unifiedConfig.gbpAutopilotEnabled = true;
+    mockHasFeature.mockResolvedValue(false);
+    const result = await svc.runAutopilot(TENANT_ID);
+    expect(result.reason).toBe('not_entitled');
+    expect(mockGbpReviewsFindMany).not.toHaveBeenCalled();
+  });
+
+  it('does not run when the merchant has not opted in', async () => {
+    unifiedConfig.gbpAutopilotEnabled = true;
+    mockHasFeature.mockResolvedValue(true);
+    mockTenantGbpOptionsFindUnique.mockResolvedValue({ gbp_autopilot_enabled: false, gbp_autopilot_min_rating: 5 });
+    const result = await svc.runAutopilot(TENANT_ID);
+    expect(result.reason).toBe('merchant_opt_out');
+    expect(mockGbpReviewsFindMany).not.toHaveBeenCalled();
+  });
+
+  it('publishes the best draft and marks the review PUBLISHED when all gates pass', async () => {
+    unifiedConfig.gbpAutopilotEnabled = true;
+    mockHasFeature.mockResolvedValue(true);
+    mockTenantGbpOptionsFindUnique.mockResolvedValue({ gbp_autopilot_enabled: true, gbp_autopilot_min_rating: 5 });
+    mockGbpReviewsFindMany.mockResolvedValue([BASE_REVIEW]);
+
+    // generateDrafts() path
+    mockGbpReviewsFindFirst.mockResolvedValue(BASE_REVIEW);
+    mockGbpLocationsFindFirst.mockResolvedValue(BASE_LOCATION);
+    mockMktCampaignsFindFirst.mockResolvedValue(BASE_CAMPAIGN);
+    mockOwnerVoiceGetProfile.mockResolvedValue(null);
+    mockCategoryToneGetPreset.mockResolvedValue(null);
+    mockAiGenerateChatCompletion.mockResolvedValue({ content: JSON.stringify(THREE_DRAFTS.drafts) });
+    mockGbpReviewsUpdate.mockResolvedValue({});
+    mockReplyToReview.mockResolvedValue({ success: true });
+
+    const result = await svc.runAutopilot(TENANT_ID);
+
+    expect(result).toMatchObject({ activated: true, scanned: 1, published: 1, failed: 0 });
+    // Publishes the 'grateful' draft, not the stub or the placeholder
+    expect(mockReplyToReview).toHaveBeenCalledWith(
+      TENANT_ID,
+      BASE_REVIEW.google_review_id,
+      expect.stringContaining('Thank you so much'),
+    );
+    expect(mockGbpReviewsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: REVIEW_ID },
+        data: expect.objectContaining({ reply_status: 'PUBLISHED', is_replied: true }),
+      }),
+    );
+  });
+
+  it('counts a failed publish without writing a reply', async () => {
+    unifiedConfig.gbpAutopilotEnabled = true;
+    mockHasFeature.mockResolvedValue(true);
+    mockTenantGbpOptionsFindUnique.mockResolvedValue({ gbp_autopilot_enabled: true, gbp_autopilot_min_rating: 5 });
+    mockGbpReviewsFindMany.mockResolvedValue([BASE_REVIEW]);
+
+    mockGbpReviewsFindFirst.mockResolvedValue(BASE_REVIEW);
+    mockGbpLocationsFindFirst.mockResolvedValue(BASE_LOCATION);
+    mockMktCampaignsFindFirst.mockResolvedValue(BASE_CAMPAIGN);
+    mockOwnerVoiceGetProfile.mockResolvedValue(null);
+    mockCategoryToneGetPreset.mockResolvedValue(null);
+    mockAiGenerateChatCompletion.mockResolvedValue({ content: JSON.stringify(THREE_DRAFTS.drafts) });
+    mockReplyToReview.mockResolvedValue({ success: false, error: 'API error: 403' });
+
+    const result = await svc.runAutopilot(TENANT_ID);
+
+    expect(result).toMatchObject({ activated: true, scanned: 1, published: 0, failed: 1 });
+    // Tier A still stored the drafts (reply_status = AI_DRAFTED), but nothing
+    // was published — no PUBLISHED write must appear.
+    const publishedWrites = mockGbpReviewsUpdate.mock.calls.filter(
+      (call) => call[0]?.data?.reply_status === 'PUBLISHED',
+    );
+    expect(publishedWrites).toHaveLength(0);
   });
 });
 
