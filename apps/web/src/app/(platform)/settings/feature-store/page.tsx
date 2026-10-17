@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
-import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag, IconLock, IconPalette } from '@tabler/icons-react';
+import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid, TextInput } from '@mantine/core';
+import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag, IconLock, IconPalette, IconSearch, IconX } from '@tabler/icons-react';
 import { TrendingUp, Eye, Zap, BarChart3, Wrench, Package } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +51,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [grantError, setGrantError] = useState<string | null>(null);
   const [grantSuccess, setGrantSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'features' | 'bundles' | 'services'>('features');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [featureFocus, setFeatureFocus] = useState<string | null>(null);
 
   // Tier + capability awareness for "Recommended for your plan" grouping.
   // Mirrors the growth-tip engine's context: effective tier level + resolved
@@ -111,7 +113,41 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
     if (grantFromUrl) {
       setGrantToken(grantFromUrl);
     }
+    const featureFromUrl = searchParams?.get('feature');
+    if (featureFromUrl) {
+      setSearchQuery(featureFromUrl);
+      setFeatureFocus(featureFromUrl);
+    }
   }, [searchParams]);
+
+  // ?feature=<key> deep-links: once the catalogs land, jump to the tab that
+  // actually contains the key so the prefilled search shows a result.
+  useEffect(() => {
+    // Wait for data — while loading both catalogs are empty.
+    if (!featureFocus || (catalog.length === 0 && bundleCatalog.length === 0)) return;
+    const inFeatures = catalog.some(i => i.key === featureFocus && i.capabilityType !== 'platform_services');
+    const inServices = catalog.some(i => i.key === featureFocus && i.capabilityType === 'platform_services');
+    const inBundles = bundleCatalog.some(b => b.bundleKey === featureFocus || b.items.some(i => i.featureKey === featureFocus));
+    if (inServices) setActiveTab('services');
+    else if (inBundles && !inFeatures) setActiveTab('bundles');
+    setFeatureFocus(null);
+  }, [catalog, bundleCatalog, featureFocus]);
+
+  const searchTerm = searchQuery.trim().toLowerCase();
+  const featureMatches = (item: BsaasCatalogItem) =>
+    !searchTerm ||
+    [item.key, item.name, item.description, item.category, item.capabilityType]
+      .some(v => v?.toLowerCase().includes(searchTerm));
+  const bundleMatches = (bundle: BsaasBundleCatalogItem) =>
+    !searchTerm ||
+    [bundle.bundleKey, bundle.name, bundle.description, ...bundle.items.map(i => i.featureKey)]
+      .some(v => v?.toLowerCase().includes(searchTerm));
+
+  const featureItems = catalog.filter(i => i.capabilityType !== 'platform_services');
+  const serviceItems = catalog.filter(i => i.capabilityType === 'platform_services');
+  const visibleFeatures = featureItems.filter(featureMatches);
+  const visibleServices = serviceItems.filter(featureMatches);
+  const visibleBundles = bundleCatalog.filter(b => !b.allActive && bundleMatches(b));
 
   const handlePurchaseClick = (item: BsaasCatalogItem) => {
     if (item.tierAvailability === 'in_tier_active') {
@@ -696,6 +732,21 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           </button>
         </div>
 
+        {/* Search — matches name, description, category, or exact feature key */}
+        <TextInput
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.currentTarget.value)}
+          placeholder={activeTab === 'bundles'
+            ? 'Search bundles by name or feature key…'
+            : 'Search by name, keyword, or feature key (e.g. gbp_ai_response)…'}
+          leftSection={<IconSearch size={16} />}
+          rightSection={searchQuery ? (
+            <IconX size={14} className="cursor-pointer text-neutral-400 hover:text-neutral-600" onClick={() => setSearchQuery('')} />
+          ) : null}
+          size="sm"
+          className="max-w-md"
+        />
+
         {catalog.length === 0 && bundleCatalog.length === 0 && !loading && (
           <Card withBorder p="xl" className="text-center">
             <IconInfoCircle size={48} className="mx-auto text-neutral-400 mb-4" />
@@ -707,47 +758,76 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
         {/* Bundles Tab */}
         {activeTab === 'bundles' && bundleCatalog.filter(b => !b.allActive).length > 0 && (
           <div className="space-y-4">
-            {/* Recommended for your plan — tier-aware grouping */}
-            {bundleRecs.length > 0 && renderRecommendedSection(
-              tierName,
-              'violet',
-              Array.from(new Set(bundleRecs.flatMap((r) => r.reasons))).map((r) => RECOMMENDATION_REASON_LABELS[r]),
-              bundleRecs.map((r) => renderBundleCard(r.bundle, true))
-            )}
+            {visibleBundles.length === 0 ? (
+              <Card withBorder p="xl" className="text-center">
+                <IconSearch size={40} className="mx-auto text-neutral-400 mb-3" />
+                <Text c="dimmed">No bundles match &quot;{searchQuery.trim()}&quot;.</Text>
+              </Card>
+            ) : (
+              <>
+                {/* Recommended for your plan — tier-aware grouping */}
+                {!searchTerm && bundleRecs.length > 0 && renderRecommendedSection(
+                  tierName,
+                  'violet',
+                  Array.from(new Set(bundleRecs.flatMap((r) => r.reasons))).map((r) => RECOMMENDATION_REASON_LABELS[r]),
+                  bundleRecs.map((r) => renderBundleCard(r.bundle, true))
+                )}
 
-            <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-violet-600" />
-              <h2 className="text-xl font-bold text-gray-900">All Bundles</h2>
-              <Badge color="violet" variant="light" size="sm">Save more</Badge>
-            </div>
-            <Grid>
-              {bundleCatalog.filter(b => !b.allActive).map((bundle) => renderBundleCard(bundle))}
-            </Grid>
+                <div className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-violet-600" />
+                  <h2 className="text-xl font-bold text-gray-900">All Bundles</h2>
+                  <Badge color="violet" variant="light" size="sm">Save more</Badge>
+                </div>
+                <Grid>
+                  {visibleBundles.map((bundle) => renderBundleCard(bundle))}
+                </Grid>
+              </>
+            )}
           </div>
         )}
 
         {/* Individual Features Tab */}
-        {activeTab === 'features' && catalog.filter(item => item.capabilityType !== 'platform_services').length > 0 && (
+        {activeTab === 'features' && featureItems.length > 0 && (
           <div className="space-y-4">
-            {/* Recommended for your plan — tier-aware grouping */}
-            {featureRecs.length > 0 && renderRecommendedSection(
-              tierName,
-              'blue',
-              Array.from(new Set(featureRecs.flatMap((r) => r.reasons))).map((r) => RECOMMENDATION_REASON_LABELS[r]),
-              featureRecs.map((r) => renderFeatureCard(r.item, true))
-            )}
+            {visibleFeatures.length === 0 ? (
+              <Card withBorder p="xl" className="text-center">
+                <IconSearch size={40} className="mx-auto text-neutral-400 mb-3" />
+                <Text c="dimmed">No features match &quot;{searchQuery.trim()}&quot;.</Text>
+              </Card>
+            ) : (
+              <>
+                {/* Recommended for your plan — tier-aware grouping */}
+                {!searchTerm && featureRecs.length > 0 && renderRecommendedSection(
+                  tierName,
+                  'blue',
+                  Array.from(new Set(featureRecs.flatMap((r) => r.reasons))).map((r) => RECOMMENDATION_REASON_LABELS[r]),
+                  featureRecs.map((r) => renderFeatureCard(r.item, true))
+                )}
 
-            <h2 className="text-xl font-bold text-gray-900">All Features</h2>
-            <Grid>
-              {catalog.filter(item => item.capabilityType !== 'platform_services').map((item) => renderFeatureCard(item))}
-            </Grid>
+                <h2 className="text-xl font-bold text-gray-900">All Features</h2>
+                <Grid>
+                  {visibleFeatures.map((item) => renderFeatureCard(item))}
+                </Grid>
+              </>
+            )}
           </div>
         )}
 
         {/* Services Tab */}
         {activeTab === 'services' && (
           <div className="space-y-4">
-            {catalog.filter(item => item.capabilityType === 'platform_services').length > 0 ? (
+            {serviceItems.length === 0 ? (
+              <Card withBorder p="xl" className="text-center">
+                <Wrench size={48} className="mx-auto text-neutral-400 mb-4" />
+                <Text size="lg" c="dimmed">No platform services are currently available.</Text>
+                <Text size="sm" c="dimmed" mt="xs">Check back later as new services are added.</Text>
+              </Card>
+            ) : visibleServices.length === 0 ? (
+              <Card withBorder p="xl" className="text-center">
+                <IconSearch size={40} className="mx-auto text-neutral-400 mb-3" />
+                <Text c="dimmed">No services match &quot;{searchQuery.trim()}&quot;.</Text>
+              </Card>
+            ) : (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Wrench className="w-5 h-5 text-amber-600" />
@@ -758,7 +838,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                   Professional services to help you get set up and grow your business. Logo design, store setup, SEO optimization, and more.
                 </Text>
                 <Grid>
-                  {catalog.filter(item => item.capabilityType === 'platform_services').map((item) => {
+                  {visibleServices.map((item) => {
                     const isActive = item.purchase?.status === 'active';
                     const isSuspended = item.purchase?.status === 'suspended';
                     const inTier = item.tierAvailability === 'in_tier_active';
@@ -832,12 +912,6 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                   })}
                 </Grid>
               </div>
-            ) : (
-              <Card withBorder p="xl" className="text-center">
-                <Wrench size={48} className="mx-auto text-neutral-400 mb-4" />
-                <Text size="lg" c="dimmed">No platform services are currently available.</Text>
-                <Text size="sm" c="dimmed" mt="xs">Check back later as new services are added.</Text>
-              </Card>
             )}
           </div>
         )}

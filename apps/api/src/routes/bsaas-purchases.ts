@@ -418,6 +418,261 @@ async function checkBundleEngagement(
   return { eligible: failedDomains.length === 0, failedDomains };
 }
 
+// ====================
+// Batched tier evaluation (catalog list endpoints)
+// ====================
+//
+// checkTierFeatureStatus / checkCapabilityEngagement each run 5-12 sequential
+// queries — fine for a single-feature purchase, but the catalog endpoints were
+// invoking them per item (~400 round trips per page load). The context below
+// loads the same data in ~8 queries and the evaluators reproduce the exact
+// semantics of the per-item helpers in memory.
+
+interface TierEvalContext {
+  hasTenant: boolean;
+  hasTierKeys: boolean;
+  now: Date;
+  featureKeyToId: Map<string, string>;
+  featureIdToCap: Map<string, { capabilityTypeId: string; capabilityKey: string }>;
+  featureIdToActiveCap: Map<string, { capabilityTypeId: string; capabilityKey: string }>;
+  capTypeGateKeys: Map<string, { disabledKey?: string; enabledKey?: string; flexibleKey?: string }>;
+  tierFeatureCapKeyByFeature: Map<string, string | null>;
+  tierFeatureKeysByCapType: Map<string, string[]>;
+  purchasesByKey: Map<string, { id: string; feature_key: string; status: string; expires_at: Date | null; source: string }>;
+  overrideExpiryByKey: Map<string, Date | null>;
+  merchantGates: Map<string, boolean | null>;
+}
+
+async function loadTierEvalContext(tenantId: string): Promise<TierEvalContext> {
+  const tenant = await prisma.tenants.findUnique({
+    where: { id: tenantId },
+    select: {
+      subscription_tier: true,
+      organization_id: true,
+      organizations_list: { select: { subscription_tier: true } },
+    },
+  });
+
+  // Trial keys proxy to their base tier (the trial_map contract) — a raw
+  // `trial_*` key matches no subscription_tiers_list row.
+  const tierKeys = [tenant?.subscription_tier, tenant?.organizations_list?.subscription_tier]
+    .filter((k): k is string => !!k)
+    .map(getEffectiveTier);
+
+  const tiers = tierKeys.length
+    ? await prisma.subscription_tiers_list.findMany({
+        where: { tier_key: { in: tierKeys } },
+        select: { id: true },
+      })
+    : [];
+  const tierIds = tiers.map(t => t.id);
+
+  const [features, capLinks, tierFeatures, purchases, overrides] = await Promise.all([
+    prisma.features_list.findMany({ select: { id: true, key: true } }),
+    prisma.capability_features_list.findMany({
+      select: {
+        feature_id: true,
+        capability_type_id: true,
+        is_active: true,
+        capability_type_list: { select: { key: true } },
+        features_list: { select: { key: true, is_active: true } },
+      },
+    }),
+    tierIds.length
+      ? prisma.tier_features_list.findMany({
+          where: { tier_id: { in: tierIds }, is_enabled: true },
+          select: {
+            feature_key: true,
+            capability_type_id: true,
+            capability_type_list: { select: { key: true } },
+          },
+        })
+      : Promise.resolve([]),
+    prisma.tenant_feature_purchases.findMany({
+      where: {
+        tenant_id: tenantId,
+        status: { in: ['active', 'past_due', 'trial', 'suspended'] },
+      },
+      select: { id: true, feature_key: true, status: true, expires_at: true, source: true },
+    }),
+    prisma.tenant_feature_overrides_list.findMany({
+      where: { tenant_id: tenantId, granted: true },
+      select: { feature: true, expires_at: true },
+    }),
+  ]);
+
+  const featureKeyToId = new Map(features.map(f => [f.key, f.id]));
+
+  const featureIdToCap = new Map<string, { capabilityTypeId: string; capabilityKey: string }>();
+  const featureIdToActiveCap = new Map<string, { capabilityTypeId: string; capabilityKey: string }>();
+  const capTypeGateKeys = new Map<string, { disabledKey?: string; enabledKey?: string; flexibleKey?: string }>();
+  for (const link of capLinks) {
+    const capKey = link.capability_type_list?.key;
+    if (capKey && !featureIdToCap.has(link.feature_id)) {
+      featureIdToCap.set(link.feature_id, { capabilityTypeId: link.capability_type_id, capabilityKey: capKey });
+    }
+    if (link.is_active !== true) continue;
+    if (capKey && !featureIdToActiveCap.has(link.feature_id)) {
+      featureIdToActiveCap.set(link.feature_id, { capabilityTypeId: link.capability_type_id, capabilityKey: capKey });
+    }
+    const featureKey = link.features_list?.key;
+    if (!capKey || !featureKey || link.features_list?.is_active !== true) continue;
+    const gates = capTypeGateKeys.get(link.capability_type_id) ?? {};
+    if (featureKey === `${capKey}_disabled`) gates.disabledKey = featureKey;
+    else if (featureKey === `${capKey}_enabled`) gates.enabledKey = featureKey;
+    else if (featureKey.endsWith('_flexible')) gates.flexibleKey = featureKey;
+    capTypeGateKeys.set(link.capability_type_id, gates);
+  }
+
+  const tierFeatureCapKeyByFeature = new Map<string, string | null>();
+  const tierFeatureKeysByCapType = new Map<string, string[]>();
+  for (const tf of tierFeatures) {
+    if (!tierFeatureCapKeyByFeature.has(tf.feature_key)) {
+      tierFeatureCapKeyByFeature.set(tf.feature_key, tf.capability_type_list?.key ?? null);
+    }
+    if (tf.capability_type_id) {
+      const list = tierFeatureKeysByCapType.get(tf.capability_type_id) ?? [];
+      list.push(tf.feature_key);
+      tierFeatureKeysByCapType.set(tf.capability_type_id, list);
+    }
+  }
+
+  const merchantGates = new Map<string, boolean | null>();
+  await Promise.all(Object.entries(MERCHANT_GATE_MAP).map(async ([capKey, gateInfo]) => {
+    try {
+      const rows = await prisma.$queryRawUnsafe(
+        `SELECT ${gateInfo.toggleColumn} as enabled FROM ${gateInfo.table} WHERE tenant_id = $1`,
+        tenantId
+      ) as any[];
+      merchantGates.set(capKey, rows.length > 0 ? rows[0].enabled === true : true);
+    } catch {
+      merchantGates.set(capKey, null); // table may not exist — assume no gate
+    }
+  }));
+
+  return {
+    hasTenant: !!tenant,
+    hasTierKeys: tierKeys.length > 0,
+    now: new Date(),
+    featureKeyToId,
+    featureIdToCap,
+    featureIdToActiveCap,
+    capTypeGateKeys,
+    tierFeatureCapKeyByFeature,
+    tierFeatureKeysByCapType,
+    purchasesByKey: new Map(purchases.map(p => [p.feature_key, p])),
+    overrideExpiryByKey: new Map(overrides.map(o => [o.feature, o.expires_at])),
+    merchantGates,
+  };
+}
+
+/** In-memory equivalent of checkTierFeatureStatus — see that fn for semantics. */
+function evalTierFeatureStatus(
+  ctx: TierEvalContext,
+  featureKey: string
+): { inTier: boolean; merchantGateOn: boolean | null; capabilityKey: string | null } {
+  if (!ctx.hasTenant || !ctx.hasTierKeys) {
+    return { inTier: false, merchantGateOn: null, capabilityKey: null };
+  }
+
+  let capabilityKey: string | null = null;
+  if (!ctx.tierFeatureCapKeyByFeature.has(featureKey)) {
+    const featureId = ctx.featureKeyToId.get(featureKey);
+    const capLink = featureId ? ctx.featureIdToCap.get(featureId) : undefined;
+    if (!capLink) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
+
+    capabilityKey = capLink.capabilityKey;
+    const gates = ctx.capTypeGateKeys.get(capLink.capabilityTypeId);
+
+    // Type gate precedence: _disabled > _enabled (see checkTierFeatureStatus R17 notes)
+    if (gates?.disabledKey && ctx.tierFeatureCapKeyByFeature.has(gates.disabledKey)) {
+      return { inTier: false, merchantGateOn: null, capabilityKey };
+    }
+
+    const flexibleKey = gates?.flexibleKey;
+    if (!flexibleKey) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
+
+    const purchase = ctx.purchasesByKey.get(flexibleKey);
+    const purchasedFlex = !!purchase
+      && ['active', 'past_due', 'trial'].includes(purchase.status)
+      && (purchase.expires_at === null || purchase.expires_at > ctx.now);
+    const overrideExp = ctx.overrideExpiryByKey.get(flexibleKey);
+    const overrideFlex = overrideExp !== undefined
+      && (overrideExp === null || overrideExp > ctx.now);
+    if (!ctx.tierFeatureCapKeyByFeature.has(flexibleKey) && !purchasedFlex && !overrideFlex) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
+    // Feature is in-tier via flexible expansion (from any source)
+  } else {
+    capabilityKey = ctx.tierFeatureCapKeyByFeature.get(featureKey) ?? null;
+  }
+
+  const merchantGateOn = capabilityKey ? (ctx.merchantGates.get(capabilityKey) ?? null) : null;
+  return { inTier: true, merchantGateOn, capabilityKey };
+}
+
+/** In-memory equivalent of checkCapabilityEngagement — see that fn for semantics. */
+function evalCapabilityEngagement(
+  ctx: TierEvalContext,
+  featureKey: string
+): { eligible: boolean; reason: string | null; capabilityKey: string | null } {
+  const featureId = ctx.featureKeyToId.get(featureKey);
+  if (!featureId) {
+    return { eligible: false, reason: 'Feature not found', capabilityKey: null };
+  }
+
+  const capLink = ctx.featureIdToCap.get(featureId);
+  if (!capLink) {
+    // No capability type association — allow purchase (standalone feature)
+    return { eligible: true, reason: null, capabilityKey: null };
+  }
+  const { capabilityKey, capabilityTypeId } = capLink;
+
+  if (!ctx.hasTenant) {
+    return { eligible: false, reason: 'Tenant not found', capabilityKey };
+  }
+  if (!ctx.hasTierKeys) {
+    return { eligible: false, reason: 'No subscription tier assigned', capabilityKey };
+  }
+
+  const tierFeaturesInCapType = ctx.tierFeatureKeysByCapType.get(capabilityTypeId) ?? [];
+  const domainLabel = capabilityKey.replace(/_options$/, '').replace(/_/g, ' ');
+  if (tierFeaturesInCapType.length === 0) {
+    return {
+      eligible: false,
+      reason: `Your current plan doesn't include any features in the ${domainLabel} category. Upgrade your plan to unlock this feature.`,
+      capabilityKey,
+    };
+  }
+
+  // D7 veto — same contract as checkCapabilityEngagement
+  if (!capabilitySaleAllowed(capabilityKey, tierFeaturesInCapType)) {
+    return {
+      eligible: false,
+      reason: `The ${domainLabel} capability is explicitly disabled for your plan.`,
+      capabilityKey,
+    };
+  }
+
+  return { eligible: true, reason: null, capabilityKey };
+}
+
+/** In-memory equivalent of checkBundleEngagement. */
+function evalBundleEngagement(
+  ctx: TierEvalContext,
+  featureKeys: string[]
+): { eligible: boolean; failedDomains: Array<{ capabilityKey: string; reason: string }> } {
+  const failedDomains = featureKeys
+    .map(fk => evalCapabilityEngagement(ctx, fk))
+    .filter(r => !r.eligible && r.capabilityKey)
+    .map(r => ({ capabilityKey: r.capabilityKey!, reason: r.reason! }));
+  return { eligible: failedDomains.length === 0, failedDomains };
+}
+
 /**
  * Helper to get tenant ID from request
  */
@@ -664,27 +919,19 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
     });
 
     const featureKeys = catalogEntries.map(e => e.feature_key);
-    const features = await prisma.features_list.findMany({
-      where: { key: { in: featureKeys }, is_active: true },
-      select: { id: true, key: true, name: true, description: true, category: true },
-    });
+    const [features, ctx] = await Promise.all([
+      prisma.features_list.findMany({
+        where: { key: { in: featureKeys }, is_active: true },
+        select: { id: true, key: true, name: true, description: true, category: true },
+      }),
+      loadTierEvalContext(tenantId),
+    ]);
     const featureMap = new Map(features.map(f => [f.key, f]));
 
-    // Fetch capability type for each feature via capability_features_list
-    const capLinks = await prisma.capability_features_list.findMany({
-      where: { feature_id: { in: features.map(f => f.id || '') }, is_active: true },
-      include: { capability_type_list: { select: { key: true } } },
-    });
-    const featureIdToCapKey = new Map<string, string>();
-    for (const link of capLinks) {
-      if (link.capability_type_list?.key) {
-        featureIdToCapKey.set(link.feature_id, link.capability_type_list.key);
-      }
-    }
-    // Also build a feature-key → capability-key map for convenience
+    // feature-key → capability-key map (active links only)
     const featureKeyToCapKey = new Map<string, string>();
     for (const f of features) {
-      const capKey = featureIdToCapKey.get(f.id || '');
+      const capKey = ctx.featureIdToActiveCap.get(f.id)?.capabilityKey;
       if (capKey) featureKeyToCapKey.set(f.key, capKey);
     }
 
@@ -707,41 +954,18 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
         };
       });
 
-    // Fetch tenant's current purchases to show status
-    const purchases = await prisma.tenant_feature_purchases.findMany({
-      where: {
-        tenant_id: tenantId,
-        status: { in: ['active', 'past_due', 'trial', 'suspended'] },
-      },
-      select: {
-        id: true,
-        feature_key: true,
-        status: true,
-        expires_at: true,
-        source: true,
-      },
-    });
-
-    const purchaseMap = new Map(purchases.map(p => [p.feature_key, p]));
-
-    // Check tier status for each catalog item (batch)
-    const tierStatusPromises = catalog.map(item => checkTierFeatureStatus(tenantId, item.key));
-    const tierStatuses = await Promise.all(tierStatusPromises);
-
-    // Check capability engagement eligibility for each catalog item (batch)
-    const engagementPromises = catalog.map(item => checkCapabilityEngagement(tenantId, item.key));
-    const engagementResults = await Promise.all(engagementPromises);
-
-    const catalogWithStatus = catalog.map((item, i) => {
-      const tierStatus = tierStatuses[i];
-      const engagement = engagementResults[i];
+    // Tenant purchase map + per-item tier/engagement status — all evaluated
+    // in memory from the preloaded context (was ~10 queries per item).
+    const catalogWithStatus = catalog.map((item) => {
+      const tierStatus = evalTierFeatureStatus(ctx, item.key);
+      const engagement = evalCapabilityEngagement(ctx, item.key);
       let tierAvailability: 'not_in_tier' | 'in_tier_active' | 'in_tier_gate_off' = 'not_in_tier';
       if (tierStatus.inTier) {
         tierAvailability = tierStatus.merchantGateOn === false ? 'in_tier_gate_off' : 'in_tier_active';
       }
       return {
         ...item,
-        purchase: purchaseMap.get(item.key) || null,
+        purchase: ctx.purchasesByKey.get(item.key) || null,
         tierAvailability,
         tierCapabilityKey: tierStatus.capabilityKey,
         tierEligible: engagement.eligible,
@@ -768,34 +992,26 @@ router.get('/bundle-catalog', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Tenant ID is required' });
     }
 
-    const bundles = await prisma.bsaas_bundles.findMany({
-      where: { is_active: true, is_private: false },
-      orderBy: { sort_order: 'asc' },
-      include: { bsaas_bundle_items: { orderBy: { sort_order: 'asc' } } },
-    });
+    const [bundles, ctx] = await Promise.all([
+      prisma.bsaas_bundles.findMany({
+        where: { is_active: true, is_private: false },
+        orderBy: { sort_order: 'asc' },
+        include: { bsaas_bundle_items: { orderBy: { sort_order: 'asc' } } },
+      }),
+      loadTierEvalContext(tenantId),
+    ]);
 
-    // Fetch tenant's current purchases
-    const purchases = await prisma.tenant_feature_purchases.findMany({
-      where: {
-        tenant_id: tenantId,
-        status: { in: ['active', 'past_due', 'trial', 'suspended'] },
-      },
-      select: { feature_key: true, status: true, source: true },
-    });
-    const purchaseKeys = new Set(purchases.map(p => p.feature_key));
+    const purchaseKeys = new Set(ctx.purchasesByKey.keys());
 
-    const bundleData = await Promise.all(
-      bundles.map(async (bundle) => {
+    const bundleData = bundles.map((bundle) => {
         const featureKeys = bundle.bsaas_bundle_items.map(i => i.feature_key);
-        const engagement = await checkBundleEngagement(tenantId, featureKeys);
+        const engagement = evalBundleEngagement(ctx, featureKeys);
 
         // Check if all components are already active
         const allActive = featureKeys.every(fk => purchaseKeys.has(fk));
 
         // Check tier status for each component
-        const tierStatuses = await Promise.all(
-          featureKeys.map(fk => checkTierFeatureStatus(tenantId, fk))
-        );
+        const tierStatuses = featureKeys.map(fk => evalTierFeatureStatus(ctx, fk));
         const allInTier = tierStatuses.every(ts => ts.inTier);
 
         return {
@@ -821,8 +1037,7 @@ router.get('/bundle-catalog', async (req: Request, res: Response) => {
           allActive,
           allInTier,
         };
-      })
-    );
+    });
 
     res.json({ success: true, data: bundleData });
   } catch (error: any) {
