@@ -115,8 +115,14 @@ class BsaasPurchaseService extends TenantApiSingleton {
     await this.invalidateAllTenantCaches(tenantId);
   }
 
+  // Sweep every cache pattern this service declares (catalog, bundle catalog,
+  // purchases list). Called after any purchase mutation so the next
+  // getFeatureCatalog()/getBundleCatalog() read misses the 10-min GET cache
+  // instead of showing stale purchase state.
   private async invalidateAllTenantCaches(_tenantId?: string): Promise<void> {
-    // Placeholder for cache invalidation
+    await Promise.all(
+      this.getServiceCachePatterns().map(pattern => this.invalidateCachePattern(pattern))
+    );
   }
 
   public getServiceCachePatterns(): string[] {
@@ -187,6 +193,7 @@ class BsaasPurchaseService extends TenantApiSingleton {
       };
     }
 
+    await this.invalidateAllTenantCaches();
     const innerData = (response.data as any)?.data || response.data;
     return { success: true, data: innerData };
   }
@@ -211,6 +218,7 @@ class BsaasPurchaseService extends TenantApiSingleton {
       };
     }
 
+    await this.invalidateAllTenantCaches();
     return { success: true };
   }
 
@@ -259,6 +267,7 @@ class BsaasPurchaseService extends TenantApiSingleton {
       };
     }
 
+    await this.invalidateAllTenantCaches();
     const innerData = (response.data as any)?.data || response.data;
     return { success: true, data: innerData };
   }
@@ -321,6 +330,7 @@ class BsaasPurchaseService extends TenantApiSingleton {
       };
     }
 
+    await this.invalidateAllTenantCaches();
     const innerData = (response.data as any)?.data || response.data;
     return { success: true, data: innerData };
   }
