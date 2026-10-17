@@ -510,7 +510,7 @@
     }
   },
   "capability_modules": {
-    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=prd, generated_at=2026-10-17T18:14:51.387Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
+    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=unknown, generated_at=2026-10-17T19:21:33.761Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
     "barcode_scan_options": [
       "barcode_camera",
       "barcode_disabled",
@@ -713,6 +713,8 @@
       "flyer_items_10",
       "flyer_items_20",
       "flyer_items_5",
+      "flyer_live_3",
+      "flyer_live_5",
       "flyer_on",
       "flyer_place_on",
       "flyer_recurring",

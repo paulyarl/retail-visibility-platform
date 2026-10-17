@@ -116,6 +116,13 @@ Notes:
   Prefer explicit keys when you want a narrower grant.
 - Overrides are override-first in `hasFeature`/`resolveEffectiveCapabilities` —
   they beat tier rows. A `flyer_disabled=true` override beats **everything**.
+- **Seeds don't get flyers.** `directory_presence` and below hold no flyer keys
+  by design: unclaimed listings have no merchant to author content, and
+  platform-authored "specials" on a real business would be fabricated
+  promotion. Granting keys to a seed would be inert anyway (surfaces render
+  nothing without a live flyer). The supported path is a per-tenant comp grant
+  **after claim**, or a managed `is_demo` tenant where someone actually
+  authors.
 - `flyer_gbp_publish` without `gbp_posts_scheduler`: the merchant's
   "publish to GBP" button exists but the post never leaves `SCHEDULED` — the
   scheduler skips the tenant (see §8). Grant both or neither.

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-17T18:14:51.387Z",
-  "env": "prd",
+  "generated_at": "2026-10-17T19:21:33.761Z",
+  "env": "unknown",
   "tiers": [
     {
       "tier_key": "directory_presence",
@@ -21050,6 +21050,8 @@
       "flyer_items_10",
       "flyer_items_20",
       "flyer_items_5",
+      "flyer_live_3",
+      "flyer_live_5",
       "flyer_on",
       "flyer_place_on",
       "flyer_recurring",
