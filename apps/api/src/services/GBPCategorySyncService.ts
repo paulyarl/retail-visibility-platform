@@ -6,7 +6,7 @@
 
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
-import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { resolveGoogleAccessToken } from '../lib/google/token-store';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 
@@ -49,6 +49,7 @@ export class GBPCategorySyncService {
   private async getAnyValidAccessToken(): Promise<string | null> {
     try {
       const tokenRecord = await prisma.google_oauth_tokens_list.findFirst({
+        where: { provider: 'gbp' },
         orderBy: { created_at: 'desc' },
       });
 
@@ -57,32 +58,7 @@ export class GBPCategorySyncService {
         return null;
       }
 
-      const now = new Date();
-      if (tokenRecord.expires_at <= now) {
-        console.log('[GBPCategorySync] Token expired, refreshing for GBP categories...');
-
-        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
-
-        if (!newTokens) {
-          logger.error('[GBPCategorySync] Failed to refresh token for GBP categories', undefined);
-          return null;
-        }
-
-        const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-        await prisma.google_oauth_tokens_list.update({
-          where: { account_id: tokenRecord.account_id },
-          data: {
-            access_token_encrypted: encryptToken(newTokens.access_token),
-            expires_at: newExpiresAt,
-            scopes: newTokens.scope.split(' '),
-          },
-        });
-
-        return newTokens.access_token;
-      }
-
-      return decryptToken(tokenRecord.access_token_encrypted);
+      return await resolveGoogleAccessToken('gbp', tokenRecord);
     } catch (error) {
       logger.error('[GBPCategorySync] Error getting valid access token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;

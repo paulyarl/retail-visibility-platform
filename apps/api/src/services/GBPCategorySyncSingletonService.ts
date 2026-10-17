@@ -6,7 +6,7 @@
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 import { google } from 'googleapis';
 import { prisma } from '../prisma';
-import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { resolveGoogleAccessToken } from '../lib/google/token-store';
 import { getDirectPool } from '../utils/db-pool';
 
 export interface GBPCategory {
@@ -263,6 +263,7 @@ class GBPCategorySyncSingletonService extends UniversalSingleton {
   private async getAnyValidAccessToken(): Promise<string | null> {
     try {
       const tokenRecord = await prisma.google_oauth_tokens_list.findFirst({
+        where: { provider: 'gbp' },
         orderBy: { created_at: 'desc' },
       });
 
@@ -271,32 +272,7 @@ class GBPCategorySyncSingletonService extends UniversalSingleton {
         return null;
       }
 
-      const now = new Date();
-      if (tokenRecord.expires_at <= now) {
-        this.logInfo('Token expired, refreshing for GBP categories...');
-
-        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
-
-        if (!newTokens) {
-          this.logError('Failed to refresh token for GBP categories');
-          return null;
-        }
-
-        const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-        await prisma.google_oauth_tokens_list.update({
-          where: { account_id: tokenRecord.account_id },
-          data: {
-            access_token_encrypted: encryptToken(newTokens.access_token),
-            expires_at: newExpiresAt,
-            scopes: newTokens.scope.split(' '),
-          },
-        });
-
-        return newTokens.access_token;
-      }
-
-      return decryptToken(tokenRecord.access_token_encrypted);
+      return await resolveGoogleAccessToken('gbp', tokenRecord);
     } catch (error) {
       this.logError('Error getting valid access token', error);
       return null;

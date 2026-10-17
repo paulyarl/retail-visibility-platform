@@ -2730,7 +2730,7 @@ model google_oauth_accounts_list {
   gbp_locations_list         gbp_locations_list[]
   google_merchant_links_list google_merchant_links_list[]
   tenants                    tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  google_oauth_tokens_list   google_oauth_tokens_list?
+  google_oauth_tokens_list   google_oauth_tokens_list[]
 
   @@unique([tenant_id, google_account_id])
   @@index([tenant_id])
@@ -2738,7 +2738,7 @@ model google_oauth_accounts_list {
 
 model google_oauth_tokens_list {
   id                         String                     @id
-  account_id                 String                     @unique
+  account_id                 String
   access_token_encrypted     String
   refresh_token_encrypted    String
   token_type                 String                     @default("Bearer")
@@ -2746,7 +2746,10 @@ model google_oauth_tokens_list {
   scopes                     String[]
   created_at                 DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime                   @db.Timestamptz(6)
+  provider                   String                     @default("gmc")
   google_oauth_accounts_list google_oauth_accounts_list @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@unique([account_id, provider])
 }
 
 model google_taxonomy_list {

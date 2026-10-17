@@ -5,7 +5,7 @@
  * Read-only access to GBP data (v1)
  */
 
-import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
+import { getValidGoogleAccessToken } from './token-store';
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
 
@@ -16,48 +16,11 @@ const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1'
  * Get valid access token (refresh if expired)
  */
 async function getValidAccessToken(account_id: string): Promise<string | null> {
-  try {
-    const tokenRecord = await prisma.google_oauth_tokens_list.findUnique({
-      where: { account_id: account_id },
-    });
-
-    if (!tokenRecord) {
-      logger.error('[GBP] No token found for account:', undefined, { error: { name: (account_id as any)?.name || 'Error', message: (account_id as any)?.message || String(account_id), stack: (account_id as any)?.stack } });
-      return null;
-    }
-
-    // Check if token is expired
-    const now = new Date();
-    if (tokenRecord.expires_at <= now) {
-      console.log('[GBP] Token expired, refreshing...');
-      
-      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-      const newTokens = await refreshAccessToken(refreshToken);
-      
-      if (!newTokens) {
-        logger.error('[GBP] Failed to refresh token', undefined);
-        return null;
-      }
-
-      const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.google_oauth_tokens_list.update({
-        where: { account_id: account_id }, 
-        data: {
-          access_token_encrypted: encryptToken(newTokens.access_token),
-          expires_at: newExpiresAt,
-          scopes: newTokens.scope.split(' '),
-          updated_at: new Date(),
-        },
-      });
-
-      return newTokens.access_token;
-    }
-
-    return decryptToken(tokenRecord.access_token_encrypted);
-  } catch (error) {
-    logger.error('[GBP] Error getting valid token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return null;
+  const token = await getValidGoogleAccessToken('gbp', { accountId: account_id });
+  if (!token) {
+    logger.error('[GBP] No valid access token for account:', undefined, { error: { name: 'Error', message: String(account_id) } });
   }
+  return token;
 }
 
 /**

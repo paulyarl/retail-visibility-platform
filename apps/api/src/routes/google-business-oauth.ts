@@ -3,7 +3,7 @@ import { google } from 'googleapis';
 import multer from 'multer';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { findGoogleToken, resolveGoogleAccessToken, upsertGoogleToken, deleteGoogleToken } from '../lib/google/token-store';
 import { isGBPSyncAllowed, isGbpManagementFeatureAllowed } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
@@ -24,42 +24,16 @@ const mediaUpload = multer({
  */
 async function getValidGBPToken(tenantId: string): Promise<string | null> {
   try {
-    // First, try the unified OAuth token store
-    const account = await prisma.google_oauth_accounts_list.findFirst({
-      where: { tenant_id: tenantId },
-      include: { google_oauth_tokens_list: true },
-    });
+    // First, try the unified OAuth token store (Business Profile client)
+    const tokenRecord = await findGoogleToken('gbp', { tenantId });
 
-    if (account?.google_oauth_tokens_list) {
-      const tokenRecord = account.google_oauth_tokens_list;
-      const now = new Date();
-
-      if (tokenRecord.expires_at <= now) {
-        // Token expired — refresh with the GBP client that minted it
-        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken, {
-          clientId: unifiedConfig.googleBusinessClientId,
-          clientSecret: unifiedConfig.googleBusinessClientSecret,
-        });
-
-        if (!newTokens) {
-          logger.error(`[GBP] Token refresh failed for tenant ${tenantId}`, undefined);
-          return null;
-        }
-
-        await prisma.google_oauth_tokens_list.update({
-          where: { id: tokenRecord.id },
-          data: {
-            access_token_encrypted: encryptToken(newTokens.access_token),
-            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
-            updated_at: new Date(),
-          },
-        });
-
-        return newTokens.access_token;
+    if (tokenRecord) {
+      const token = await resolveGoogleAccessToken('gbp', tokenRecord);
+      if (!token) {
+        logger.error(`[GBP] Token refresh failed for tenant ${tenantId}`, undefined);
+        return null;
       }
-
-      return decryptToken(tokenRecord.access_token_encrypted);
+      return token;
     }
 
     // Fallback: legacy tenants table columns (plain text, unencrypted)
@@ -131,11 +105,13 @@ router.get('/google/business/status', async (req, res) => {
     // Check unified OAuth token store first
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },
-      include: { google_oauth_tokens_list: true },
+      include: { google_oauth_tokens_list: { where: { provider: 'gbp' }, take: 1 } },
     });
 
+    const gbpToken = account?.google_oauth_tokens_list[0] ?? null;
+
     // Fallback to legacy tenants table columns
-    const tenant = account?.google_oauth_tokens_list
+    const tenant = gbpToken
       ? null
       : await prisma.tenants.findUnique({
           where: { id: tenantId },
@@ -154,8 +130,8 @@ router.get('/google/business/status', async (req, res) => {
       });
     }
 
-    const isConnected = !!(account?.google_oauth_tokens_list || (tenant?.google_business_access_token && tenant?.google_business_refresh_token));
-    const tokenExpiry = account?.google_oauth_tokens_list?.expires_at || tenant?.google_business_token_expiry || null;
+    const isConnected = !!(gbpToken || (tenant?.google_business_access_token && tenant?.google_business_refresh_token));
+    const tokenExpiry = gbpToken?.expires_at || tenant?.google_business_token_expiry || null;
     const isExpired = tokenExpiry ? new Date(tokenExpiry) < new Date() : false;
 
     res.json({
@@ -331,27 +307,14 @@ router.get('/google/business/callback', async (req, res) => {
       });
     }
 
-    // Upsert tokens (encrypted)
-    const tokenId = `got_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    // Upsert tokens (encrypted) — Business Profile client, its own row
     const expiresAt = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
 
-    await prisma.google_oauth_tokens_list.upsert({
-      where: { account_id: accountId },
-      create: {
-        id: tokenId,
-        account_id: accountId,
-        access_token_encrypted: encryptToken(tokens.access_token),
-        refresh_token_encrypted: encryptToken(tokens.refresh_token),
-        expires_at: expiresAt,
-        scopes: ['https://www.googleapis.com/auth/business.manage'],
-        updated_at: new Date(),
-      },
-      update: {
-        access_token_encrypted: encryptToken(tokens.access_token),
-        refresh_token_encrypted: encryptToken(tokens.refresh_token),
-        expires_at: expiresAt,
-        updated_at: new Date(),
-      },
+    await upsertGoogleToken(accountId, 'gbp', {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: expiresAt,
+      scopes: ['https://www.googleapis.com/auth/business.manage'],
     });
 
     // Also clear legacy tenants table columns (migration step)
@@ -390,17 +353,18 @@ router.post('/google/business/disconnect', async (req, res) => {
       });
     }
 
-    // Remove from unified OAuth token store
+    // Remove the Business Profile authorization only — the Merchant Center
+    // authorization lives in its own token row and stays connected.
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },
+      select: { id: true },
     });
 
     if (account) {
-      // Delete the account (cascade will delete tokens and GBP location links)
-      await prisma.google_oauth_accounts_list.delete({
-        where: { id: account.id },
-      });
+      await prisma.gbp_locations_list.deleteMany({ where: { account_id: account.id } });
     }
+
+    await deleteGoogleToken(tenantId, 'gbp');
 
     // Also clear legacy tenants table columns (if any)
     await prisma.tenants.update({

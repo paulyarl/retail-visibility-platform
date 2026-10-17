@@ -5,7 +5,7 @@
 
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 import { prisma } from '../prisma';
-import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
+import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
 
 const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
 const CONTENT_API_VERSION = 'v2.1';
@@ -132,7 +132,6 @@ class GMCProductSyncSingletonService extends UniversalSingleton {
       const account = await prisma.google_oauth_accounts_list.findFirst({
         where: { tenant_id: tenantId },
         include: {
-          google_oauth_tokens_list: true,
           google_merchant_links_list: {
             where: { is_active: true },
             take: 1,
@@ -140,53 +139,25 @@ class GMCProductSyncSingletonService extends UniversalSingleton {
         },
       });
 
-      if (!account?.google_oauth_tokens_list) {
+      const tokenRecord = await findGoogleToken('gmc', { tenantId });
+      if (!tokenRecord) {
         this.logInfo(`No OAuth token for tenant ${tenantId}`);
         return null;
       }
 
-      const merchantLink = account.google_merchant_links_list[0];
+      const merchantLink = account?.google_merchant_links_list[0];
       if (!merchantLink) {
         this.logInfo(`No merchant link for tenant ${tenantId}`);
         return null;
       }
 
-      const tokenRecord = account.google_oauth_tokens_list;
-
-      // Check if token is expired
-      const now = new Date();
-      if (tokenRecord.expires_at <= now) {
-        this.logInfo('Token expired, refreshing...');
-        
-        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
-        
-        if (!newTokens) {
-          this.logError('Failed to refresh token');
-          return null;
-        }
-
-        // Update token in database
-        await prisma.google_oauth_tokens_list.update({
-          where: { id: tokenRecord.id },
-          data: {
-            access_token_encrypted: encryptToken(newTokens.access_token),
-            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
-            updated_at: new Date(),
-          },
-        });
-
-        return {
-          token: newTokens.access_token,
-          merchantId: merchantLink.merchant_id
-        };
+      const token = await resolveGoogleAccessToken('gmc', tokenRecord);
+      if (!token) {
+        this.logError('Failed to refresh token');
+        return null;
       }
 
-      const accessToken = decryptToken(tokenRecord.access_token_encrypted);
-      return {
-        token: accessToken,
-        merchantId: merchantLink.merchant_id
-      };
+      return { token, merchantId: merchantLink.merchant_id };
     } catch (error) {
       this.logError('Error getting valid access token', error);
       return null;

@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '../prisma';
-import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
 import { logger } from '../logger';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
@@ -25,41 +25,16 @@ const GBP_POSTS_API = 'https://mybusiness.googleapis.com/v4';
 
 export async function getValidAccessToken(tenantId: string): Promise<string | null> {
   try {
-    // First, try the unified OAuth token store
-    const account = await prisma.google_oauth_accounts_list.findFirst({
-      where: { tenant_id: tenantId },
-      include: { google_oauth_tokens_list: true },
-    });
+    // First, try the unified OAuth token store (Business Profile client)
+    const tokenRecord = await findGoogleToken('gbp', { tenantId });
 
-    if (account?.google_oauth_tokens_list) {
-      const tokenRecord = account.google_oauth_tokens_list;
-      const now = new Date();
-
-      if (tokenRecord.expires_at <= now) {
-        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken, {
-          clientId: process.env.GOOGLE_BUSINESS_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_BUSINESS_CLIENT_SECRET,
-        });
-
-        if (!newTokens) {
-          logger.error(`[GBPAdvanced] Token refresh failed for tenant ${tenantId}`, undefined);
-          return null;
-        }
-
-        await prisma.google_oauth_tokens_list.update({
-          where: { id: tokenRecord.id },
-          data: {
-            access_token_encrypted: encryptToken(newTokens.access_token),
-            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
-            updated_at: new Date(),
-          },
-        });
-
-        return newTokens.access_token;
+    if (tokenRecord) {
+      const token = await resolveGoogleAccessToken('gbp', tokenRecord);
+      if (!token) {
+        logger.error(`[GBPAdvanced] Token refresh failed for tenant ${tenantId}`, undefined);
+        return null;
       }
-
-      return decryptToken(tokenRecord.access_token_encrypted);
+      return token;
     }
 
     // Fallback: legacy tenants table columns

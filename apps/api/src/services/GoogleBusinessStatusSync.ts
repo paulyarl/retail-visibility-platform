@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../prisma';
+import { getValidGoogleAccessToken } from '../lib/google/token-store';
 import { logger } from '../logger';
 
 type LocationStatus = 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
@@ -95,7 +96,6 @@ export async function syncLocationStatusToGoogle(
         google_oauth_accounts_list: { 
           include: {
             gbp_locations_list: true,
-            google_oauth_tokens_list: true,
           },
           take: 1, // Get first connected account
         },
@@ -132,27 +132,13 @@ export async function syncLocationStatusToGoogle(
       };
     }
 
-    // Get access token (prefer OAuth token, fallback to legacy)
-    const accessToken = googleAccount?.google_oauth_tokens_list?.access_token_encrypted || tenant.google_business_access_token;
+    // Get access token (Business Profile client; falls back to legacy columns)
+    const accessToken = (await getValidGoogleAccessToken('gbp', { tenantId })) || tenant.google_business_access_token;
 
     if (!accessToken) {
       return {
         success: false,
         error: 'No Google access token available',
-      };
-    }
-
-    // Check if token is expired
-    const now = new Date();
-    const tokenExpiry = googleAccount?.google_oauth_tokens_list?.expires_at || tenant.google_business_token_expiry;
-    
-    if (tokenExpiry && new Date(tokenExpiry) < now) {
-      // Token expired - would need to refresh
-      // For now, log and skip (refresh logic should be in separate service)
-      console.warn(`[GoogleBusinessStatusSync] Token expired for tenant ${tenantId}`);
-      return {
-        success: false,
-        error: 'Google access token expired',
       };
     }
 

@@ -23,7 +23,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
           where: { is_active: true },
           take: 1,
         },
-        google_oauth_tokens_list: true,
+        google_oauth_tokens_list: { where: { provider: 'gmc' }, take: 1 },
       },
     });
 
@@ -38,7 +38,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
     });
 
     const hasGoogleAccount = !!googleAccount;
-    const hasOAuthTokens = !!googleAccount?.google_oauth_tokens_list;
+    const hasOAuthTokens = (googleAccount?.google_oauth_tokens_list?.length || 0) > 0;
     const hasMerchantLink = (googleAccount?.google_merchant_links_list?.length || 0) > 0;
     const hasDirectBusinessTokens = !!(tenant?.google_business_access_token && tenant?.google_business_refresh_token);
     const hasSubdomain = !!(tenant?.subdomain && tenant.subdomain.trim().length > 0);

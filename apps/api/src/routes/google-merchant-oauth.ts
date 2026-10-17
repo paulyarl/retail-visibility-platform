@@ -4,10 +4,10 @@ import {
   getAuthorizationUrl, 
   decodeState, 
   exchangeCodeForTokens, 
-  encryptToken,
   getUserInfo
 } from '../lib/google/oauth';
 import { listMerchantAccounts } from '../lib/google/gmc';
+import { upsertGoogleToken, deleteGoogleToken } from '../lib/google/token-store';
 import { generateQuickStart } from '../lib/id-generator';
 import { evaluateGMCSyncGate, gmcSyncGateError } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -45,6 +45,8 @@ router.get('/google/oauth/status', async (req, res) => {
       where: { tenant_id: tenantId },
       include: {
         google_oauth_tokens_list: {
+          where: { provider: 'gmc' },
+          take: 1,
           select: {
             id: true,
             expires_at: true,
@@ -59,8 +61,8 @@ router.get('/google/oauth/status', async (req, res) => {
 
     const processingStart = Date.now();
 
-    const isConnected = !!accountRecord?.google_oauth_tokens_list;
-    const tokenRecord = accountRecord?.google_oauth_tokens_list;
+    const tokenRecord = accountRecord?.google_oauth_tokens_list[0] ?? null;
+    const isConnected = !!tokenRecord;
     const isExpired = tokenRecord?.expires_at 
       ? new Date(tokenRecord.expires_at) < new Date() 
       : false;
@@ -188,9 +190,7 @@ router.get('/google/oauth/callback', async (req, res) => {
       return res.redirect(`${WEB_URL}/t/${tenantId}/settings/integrations/google?error=userinfo_failed`);
     }
 
-    // Encrypt tokens for storage
-    const encryptedAccessToken = encryptToken(tokens.access_token);
-    const encryptedRefreshToken = encryptToken(tokens.refresh_token);
+    // Tokens are encrypted inside the token store
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
     const scopes = tokens.scope.split(' ');
     const now = new Date();
@@ -225,26 +225,12 @@ router.get('/google/oauth/callback', async (req, res) => {
       }
     });
 
-    // Create or update token record
-    const tokenId = generateQuickStart('got'); // google_oauth_token
-    await prisma.google_oauth_tokens_list.upsert({
-      where: { account_id: account.id },
-      create: {
-        id: tokenId,
-        account_id: account.id,
-        access_token_encrypted: encryptedAccessToken,
-        refresh_token_encrypted: encryptedRefreshToken,
-        expires_at: expiresAt,
-        scopes,
-        updated_at: now,
-      },
-      update: {
-        access_token_encrypted: encryptedAccessToken,
-        refresh_token_encrypted: encryptedRefreshToken,
-        expires_at: expiresAt,
-        scopes,
-        updated_at: now,
-      }
+    // Create or update token record — Merchant Center client, its own row
+    await upsertGoogleToken(account.id, 'gmc', {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: expiresAt,
+      scopes,
     });
 
     console.log(`[Google Merchant OAuth] Successfully stored tokens for tenant ${tenantId}, email: ${userInfo.email}`);
@@ -273,10 +259,18 @@ router.post('/google/oauth/disconnect', async (req, res) => {
       });
     }
 
-    // Delete all OAuth accounts and tokens for this tenant (cascade will delete tokens)
-    await prisma.google_oauth_accounts_list.deleteMany({
-      where: { tenant_id: tenantId }
+    // Remove the Merchant Center authorization only — the Business Profile
+    // authorization lives in its own token row and stays connected.
+    const account = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      select: { id: true },
     });
+
+    if (account) {
+      await prisma.google_merchant_links_list.deleteMany({ where: { account_id: account.id } });
+    }
+
+    await deleteGoogleToken(tenantId, 'gmc');
 
     console.log(`[Google Merchant OAuth] Disconnected tenant ${tenantId}`);
 

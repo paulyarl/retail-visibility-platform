@@ -16,10 +16,10 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockFindUnique } = vi.hoisted(() => ({ mockFindUnique: vi.fn() }));
+const { mockFindFirst } = vi.hoisted(() => ({ mockFindFirst: vi.fn() }));
 
 vi.mock('../../../prisma', () => ({
-  prisma: { google_oauth_tokens_list: { findUnique: mockFindUnique } },
+  prisma: { google_oauth_tokens_list: { findFirst: mockFindFirst } },
 }));
 
 vi.mock('../oauth', () => ({
@@ -35,6 +35,9 @@ vi.mock('../../../logger', () => ({
 import { listMerchantAccounts } from '../gmc';
 
 const TOKEN_ROW = {
+  id: 'got-1',
+  account_id: 'goa-1',
+  provider: 'gmc',
   access_token_encrypted: 'access-token',
   refresh_token_encrypted: 'refresh-token',
   expires_at: new Date(Date.now() + 60 * 60 * 1000),
@@ -49,7 +52,7 @@ const stubFetch = (response: unknown) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockFindUnique.mockResolvedValue(TOKEN_ROW);
+  mockFindFirst.mockResolvedValue(TOKEN_ROW);
 });
 
 afterEach(() => {
@@ -87,7 +90,7 @@ describe('listMerchantAccounts', () => {
   });
 
   it('throws when there is no valid access token', async () => {
-    mockFindUnique.mockResolvedValue(null);
+    mockFindFirst.mockResolvedValue(null);
 
     await expect(listMerchantAccounts('goa-1')).rejects.toThrow(/no valid access token/);
   });

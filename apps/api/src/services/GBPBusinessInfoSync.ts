@@ -14,7 +14,7 @@
  */
 
 import { prisma } from '../prisma';
-import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
 import { logger } from '../logger';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
@@ -61,38 +61,16 @@ interface FullSyncResult {
  */
 async function getValidAccessToken(tenantId: string): Promise<string | null> {
   try {
-    // First, try the unified OAuth token store
-    const account = await prisma.google_oauth_accounts_list.findFirst({
-      where: { tenant_id: tenantId },
-      include: { google_oauth_tokens_list: true },
-    });
+    // First, try the unified OAuth token store (Business Profile client)
+    const tokenRecord = await findGoogleToken('gbp', { tenantId });
 
-    if (account?.google_oauth_tokens_list) {
-      const tokenRecord = account.google_oauth_tokens_list;
-      const now = new Date();
-
-      if (tokenRecord.expires_at <= now) {
-        const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
-
-        if (!newTokens) {
-          logger.error(`[GBPBusinessInfoSync] Token refresh failed for tenant ${tenantId}`, undefined);
-          return null;
-        }
-
-        await prisma.google_oauth_tokens_list.update({
-          where: { id: tokenRecord.id },
-          data: {
-            access_token_encrypted: encryptToken(newTokens.access_token),
-            expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
-            updated_at: new Date(),
-          },
-        });
-
-        return newTokens.access_token;
+    if (tokenRecord) {
+      const token = await resolveGoogleAccessToken('gbp', tokenRecord);
+      if (!token) {
+        logger.error(`[GBPBusinessInfoSync] Token refresh failed for tenant ${tenantId}`, undefined);
+        return null;
       }
-
-      return decryptToken(tokenRecord.access_token_encrypted);
+      return token;
     }
 
     // Fallback: legacy tenants table columns (plain text, unencrypted)
@@ -833,12 +811,12 @@ export async function getSyncStatus(tenantId: string): Promise<{
     // Check unified OAuth token store first
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },
-      include: { google_oauth_tokens_list: true },
+      include: { google_oauth_tokens_list: { where: { provider: 'gbp' }, take: 1 } },
     });
 
     // Fallback to legacy tenants table
     let hasLegacyToken = false;
-    if (!account?.google_oauth_tokens_list) {
+    if (account?.google_oauth_tokens_list.length === 0) {
       const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
         select: { google_business_access_token: true }
@@ -846,7 +824,7 @@ export async function getSyncStatus(tenantId: string): Promise<{
       hasLegacyToken = !!tenant?.google_business_access_token;
     }
 
-    const hasGBPConnection = !!(account?.google_oauth_tokens_list || hasLegacyToken);
+    const hasGBPConnection = !!(account?.google_oauth_tokens_list.length || hasLegacyToken);
 
     const locationId = await getLinkedLocation(tenantId);
 

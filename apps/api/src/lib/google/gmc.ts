@@ -6,7 +6,7 @@
  * Uses Merchant API (replaces deprecated Content API for Shopping)
  */
 
-import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
+import { getValidGoogleAccessToken } from './token-store';
 import { prisma } from '../../prisma';
 import { generateQuickStart } from '../id-generator';
 import { logger } from '../../logger';
@@ -20,52 +20,11 @@ const MERCHANT_API_VERSION = 'v2.1';
  * Get valid access token (refresh if expired)
  */
 async function getValidAccessToken(account_id: string): Promise<string | null> {
-  try {
-    const tokenRecord = await prisma.google_oauth_tokens_list.findUnique({
-      where: { account_id: account_id },
-    });
-
-    if (!tokenRecord) {
-      logger.error('[GMC] No token found for account:', undefined, { error: { name: (account_id as any)?.name || 'Error', message: (account_id as any)?.message || String(account_id), stack: (account_id as any)?.stack } });
-      return null;
-    }
-
-    // Check if token is expired
-    const now = new Date();
-    if (tokenRecord.expires_at <= now) {
-      console.log('[GMC] Token expired, refreshing...');
-      
-      // Decrypt refresh token
-      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-      
-      // Get new access token
-      const newTokens = await refreshAccessToken(refreshToken);
-      if (!newTokens) {
-        logger.error('[GMC] Failed to refresh token', undefined);
-        return null;
-      }
-
-      // Update in database
-      const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.google_oauth_tokens_list.update({
-        where: { account_id: account_id }, 
-        data: {
-          access_token_encrypted: encryptToken(newTokens.access_token),
-          expires_at: newExpiresAt,
-          scopes: newTokens.scope.split(' '),
-          updated_at: new Date(),
-        },
-      });
-
-      return newTokens.access_token;
-    }
-
-    // Token still valid
-    return decryptToken(tokenRecord.access_token_encrypted);
-  } catch (error) {
-    logger.error('[GMC] Error getting valid token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return null;
+  const token = await getValidGoogleAccessToken('gmc', { accountId: account_id });
+  if (!token) {
+    logger.error('[GMC] No valid access token for account:', undefined, { error: { name: 'Error', message: String(account_id) } });
   }
+  return token;
 }
 
 /**

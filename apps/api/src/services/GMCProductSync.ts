@@ -11,8 +11,8 @@
  */
 
 import { prisma } from '../prisma';
-import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
 import { evaluateGMCSyncGate } from '../lib/google/capability-gate';
+import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
 import { canonicalStorefrontBaseUrl, platformApex, resolveStorefrontCanonical } from '../lib/storefront-url';
 import { validateProductForGMC } from './GMCValidationService';
 import { logger } from '../logger';
@@ -86,7 +86,6 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; m
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },
       include: {
-        google_oauth_tokens_list: true,
         google_merchant_links_list: {
           where: { is_active: true },
           take: 1,
@@ -94,49 +93,25 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; m
       },
     });
 
-    if (!account?.google_oauth_tokens_list) {
+    const tokenRecord = await findGoogleToken('gmc', { tenantId });
+    if (!tokenRecord) {
       console.log(`[GMCProductSync] No OAuth token for tenant ${tenantId}`);
       return null;
     }
 
-    const merchantLink = account.google_merchant_links_list[0];
+    const merchantLink = account?.google_merchant_links_list[0];
     if (!merchantLink) {
       console.log(`[GMCProductSync] No merchant link for tenant ${tenantId}`);
       return null;
     }
 
-    const tokenRecord = account.google_oauth_tokens_list;
-
-    // Check if token is expired
-    const now = new Date();
-    if (tokenRecord.expires_at <= now) {
-      console.log('[GMCProductSync] Token expired, refreshing...');
-      
-      const refreshToken = decryptToken(tokenRecord.refresh_token_encrypted);
-      const newTokens = await refreshAccessToken(refreshToken);
-      
-      if (!newTokens) {
-        logger.error('[GMCProductSync] Failed to refresh token', undefined);
-        return null;
-      }
-
-      const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-      await prisma.google_oauth_tokens_list.update({
-        where: { account_id: account.id },
-        data: {
-          access_token_encrypted: encryptToken(newTokens.access_token),
-          expires_at: newExpiresAt,
-          updated_at: new Date(),
-        },
-      });
-
-      return { token: newTokens.access_token, merchantId: merchantLink.merchant_id };
+    const token = await resolveGoogleAccessToken('gmc', tokenRecord);
+    if (!token) {
+      logger.error('[GMCProductSync] Failed to refresh token', undefined);
+      return null;
     }
 
-    return { 
-      token: decryptToken(tokenRecord.access_token_encrypted), 
-      merchantId: merchantLink.merchant_id 
-    };
+    return { token, merchantId: merchantLink.merchant_id };
   } catch (error) {
     logger.error(`[GMCProductSync] Error getting token for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
@@ -1022,7 +997,7 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },
       include: {
-        google_oauth_tokens_list: true,
+        google_oauth_tokens_list: { where: { provider: 'gmc' }, take: 1 },
         google_merchant_links_list: {
           where: { is_active: true },
           take: 1,
@@ -1063,7 +1038,7 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     ]);
 
     return {
-      hasGMCConnection: !!account?.google_oauth_tokens_list,
+      hasGMCConnection: (account?.google_oauth_tokens_list?.length || 0) > 0,
       hasMerchantLink: !!merchantLink,
       hasSubdomain: !!canon?.subdomain,
       subdomain: canon?.subdomain ?? null,
