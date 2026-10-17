@@ -13,6 +13,7 @@ import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { DisputeIntakeRepository } from '../repositories/DisputeIntakeRepository';
 import MarketingCampaignService from './MarketingCampaignService';
+import { normalizeRepairIssueType } from '../lib/repair-issue-type';
 import type { RequestCtx } from '../context';
 import type { IntakeSubmitInput } from '../validators/recovery-intake.schema';
 
@@ -361,11 +362,17 @@ export class DisputeIntakeService extends BaseService {
         },
       });
 
-      // Update the campaign's repair_issue_type if the owner provided a revised one
-      await this.prisma.mkt_campaigns_list.update({
-        where: { id: record.campaign_id },
-        data: { repair_issue_type: input.issueType },
-      });
+      // Update the campaign's repair_issue_type if the owner provided a revised
+      // one. Normalize to the canonical triage token — the intake form is
+      // public and the column is VarChar(40); a token that carries no
+      // alphanumerics leaves the existing diagnosis untouched.
+      const revisedIssueType = normalizeRepairIssueType(input.issueType);
+      if (revisedIssueType) {
+        await this.prisma.mkt_campaigns_list.update({
+          where: { id: record.campaign_id },
+          data: { repair_issue_type: revisedIssueType },
+        });
+      }
 
       // Transition the campaign to intake_submitted
       const updated = await MarketingCampaignService.transitionStage({

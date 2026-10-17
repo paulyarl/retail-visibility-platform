@@ -61,6 +61,31 @@ describe('profileRepairTriageSchema', () => {
     expect(parsed.profile_repair_triage.pitch.opener_hook).toContain('suspended');
   });
 
+  it('normalizes a free-form issue_type_confirmed to a canonical token', () => {
+    // Regression: the compound diagnosis overflowed repair_issue_type
+    // (VarChar(40)) and 500'd POST /switch-track when the operator confirmed.
+    const v = {
+      profile_repair_triage: {
+        severity_score: 6,
+        recommended_track: 'standard',
+        issue_type_confirmed:
+          'listing_hygiene_and_shelf_visibility (nap_drift + missing_category + missing_hours + no_website)',
+        scope: { summary: 'test', broken_platforms: [], drift_details: '', missing_assets: [] },
+        viability: { pursuit_recommendation: 'pursue', rationale: 'test' },
+        pitch: { primary_angle: 'test', opener_hook: 'test', pain_points: [], marketplace_positioning: 'test' },
+        risks: [],
+        outreach_problems: [
+          { problem: 'p', regular: 'r', hook: 'h', solution: 's', evidence: 'e', outreach_use: 'u' },
+        ],
+        rationale: 'test',
+      },
+    };
+
+    const parsed = profileRepairTriageSchema.parse(v);
+    expect(parsed.profile_repair_triage.issue_type_confirmed).toBe('nap_drift');
+    expect(parsed.profile_repair_triage.issue_type_confirmed.length).toBeLessThanOrEqual(40);
+  });
+
   it('rejects invalid severity_score outside 1-10 range', () => {
     const invalid = {
       profile_repair_triage: {

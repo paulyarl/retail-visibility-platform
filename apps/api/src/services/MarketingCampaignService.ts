@@ -31,6 +31,7 @@ import { deriveDiscoverySignals } from './triage/discovery-verdict';
 import type { IdentityFieldKey } from './directory/identityScoring';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { isBuildDeliveryMode, deliveryModeLockReasons, modesForScope } from '../lib/website-build';
+import { normalizeRepairIssueType } from '../lib/repair-issue-type';
 
 /** Call outcome — mirrors the queue's VerificationOutcome. */
 export type CampaignVerificationOutcome =
@@ -841,7 +842,7 @@ export class MarketingCampaignService extends BaseService {
           scope: input.scope ?? 'business',
           campaign_category: campaignCategory,
           repair_track: input.repairTrack || null,
-          repair_issue_type: input.repairIssueType || null,
+          repair_issue_type: normalizeRepairIssueType(input.repairIssueType),
           title: input.title || defaultTitle || null,
           business_name: input.businessName || null,
           category: input.category || '',
@@ -3638,8 +3639,11 @@ export class MarketingCampaignService extends BaseService {
         updateData.campaign_category = 'profile_repair';
       }
 
+      // The triage AI emits a free-form diagnosis here and the column is
+      // VarChar(40) — normalize to the canonical triage token so the write
+      // cannot overflow and resolveSeekTemplateId can match it.
       if (input.issueType) {
-        updateData.repair_issue_type = input.issueType;
+        updateData.repair_issue_type = normalizeRepairIssueType(input.issueType);
       }
 
       const updated = await this.prisma.mkt_campaigns_list.update({

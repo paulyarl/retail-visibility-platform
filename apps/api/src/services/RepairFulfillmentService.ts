@@ -32,6 +32,7 @@ import {
 import { generateCampaignId, generateStageHistoryId, generateBusinessProspectId } from '../lib/id-generator';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { recommendDeliveryMode, type DeliveryModeRecommendation } from '../lib/delivery-mode';
+import { normalizeRepairIssueType } from '../lib/repair-issue-type';
 
 export interface RepairFulfillmentPatch {
   tier?: RepairTier;
@@ -412,7 +413,7 @@ export class RepairFulfillmentService extends BaseService {
             scope: 'business',
             campaign_category: 'profile_repair',
             repair_track: 'escalated',
-            repair_issue_type: input.issueType,
+            repair_issue_type: normalizeRepairIssueType(input.issueType),
             title: parent.title,
             business_name: parent.business_name,
             category: parent.category,

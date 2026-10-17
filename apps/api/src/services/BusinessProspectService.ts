@@ -21,6 +21,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError } from '../middleware/errorHandler';
 import { generateCampaignId, generateBusinessProspectId, generateStageHistoryId, generateCampaignTriageId } from '../lib/id-generator';
+import { normalizeRepairIssueType } from '../lib/repair-issue-type';
 import { ARCHETYPE_LABELS, type ArchetypeCodeWithA6, type PlaybookCode, type PlaybookCategory } from './triage/types';
 
 // ─── Inputs ──────────────────────────────────────────────────────────────
@@ -212,7 +213,7 @@ export class BusinessProspectService extends BaseService {
         campaign_category: siblingCategory,
         playbook_code: siblingPlaybookCode,
         repair_track: siblingRepairTrack,
-        repair_issue_type: repairIssueType || null,
+        repair_issue_type: normalizeRepairIssueType(repairIssueType),
         business_name: source.business_name,
         category: source.category,
         city: source.city,

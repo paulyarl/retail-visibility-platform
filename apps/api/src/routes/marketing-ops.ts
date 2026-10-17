@@ -223,6 +223,7 @@ import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { normalizeRepairIssueType } from '../lib/repair-issue-type';
 
 const router = Router();
 
@@ -1046,7 +1047,11 @@ const createSiblingSchema = z.object({
   playbook_code: playbookCodeEnum.optional(),
   campaign_category: playbookCategoryEnum.optional(),
   repair_track: z.enum(['standard', 'escalated']).optional(),
-  repair_issue_type: z.string().max(255).optional(),
+  repair_issue_type: z
+    .string()
+    .max(200)
+    .optional()
+    .transform((value) => normalizeRepairIssueType(value) ?? undefined),
   assigned_to: z.string().max(255).optional(),
   notes: z.string().max(2000).optional(),
 }).refine(
@@ -1675,7 +1680,14 @@ router.patch('/:id/repair-fulfillment/platforms/:platform', async (req: any, res
 
 // W7 — escalate a platform to a Track B sibling campaign (atomic).
 const platformEscalateSchema = z.object({
-  issue_type: z.string().min(1, 'issue_type is required'),
+  issue_type: z
+    .string()
+    .min(1, 'issue_type is required')
+    .max(200)
+    .transform((value) => normalizeRepairIssueType(value))
+    .refine((value): value is string => value !== null, {
+      message: 'issue_type must contain at least one alphanumeric character',
+    }),
   notes: z.string().max(2000).optional(),
 });
 
@@ -1701,7 +1713,15 @@ router.post('/:id/repair-fulfillment/platforms/:platform/escalate', async (req: 
 // Profile Repair — switch track (standard ↔ escalated) with stage remap
 const switchTrackSchema = z.object({
   to_track: z.enum(['standard', 'escalated']),
-  issue_type: z.string().optional(),
+  // Free-form in the triage briefing ("listing_hygiene (nap_drift + ...)").
+  // Normalized to the canonical triage token before it reaches the
+  // VarChar(40) column; unrecognizable input is dropped rather than rejected
+  // so the track switch itself still succeeds.
+  issue_type: z
+    .string()
+    .max(200)
+    .optional()
+    .transform((value) => normalizeRepairIssueType(value) ?? undefined),
   reason: z.string().min(1, 'Reason is required'),
 });
 

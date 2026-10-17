@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { normalizeRepairIssueType } from '../lib/repair-issue-type';
 
 const coercedNumber = z.coerce.number();
 
@@ -32,7 +33,12 @@ export const profileRepairTriageSchema = z.object({
       message: 'severity_score must be between 1 and 10',
     }),
     recommended_track: z.enum(['standard', 'escalated']),
-    issue_type_confirmed: z.string(),
+    // The AI writes a free-form diagnosis here, but the value is persisted to
+    // `mkt_campaigns_list.repair_issue_type` (VarChar(40)) and used as a
+    // template-lookup key — normalize it to the canonical triage token.
+    issue_type_confirmed: z
+      .string()
+      .transform((value) => normalizeRepairIssueType(value) ?? ''),
 
     // Operator briefing — the actual value of the AI call
     scope: z.object({
@@ -83,7 +89,7 @@ Return valid JSON only matching this shape:
   "profile_repair_triage": {
     "severity_score": <number 1-10>,
     "recommended_track": "standard" | "escalated",
-    "issue_type_confirmed": "<string>",
+    "issue_type_confirmed": "<one token: nap_drift | unclaimed_profile | platform_gap | missing_category | missing_hours | suspension | duplicate_listing | hijacked_listing | ownership_dispute | address_verification_block>",
     "scope": {
       "summary": "<1-2 sentence plain-language summary of what is broken>",
       "broken_platforms": ["<platform name>", ...],
