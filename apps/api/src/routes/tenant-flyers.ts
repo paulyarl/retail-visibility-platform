@@ -41,6 +41,7 @@ import { unifiedConfig } from '../config/unifiedConfig';
 import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
 import { generateFlyerCardPdf } from '../services/FlyerCardArtService';
 import { submitCardOrder, unitCostForPackSize } from '../services/FlyerPrintProvider';
+import { extractFlyerDraft } from '../services/FlyerExtractionService';
 import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
@@ -839,6 +840,38 @@ router.post('/:tenantId/flyers/card-orders', authenticateToken, checkTenantAcces
     res.status(201).json({ success: true, data: { order } });
   } catch (error) {
     logErr('POST /:tenantId/flyers/card-orders', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── POST /:tenantId/flyers/extract — agent-drafted flyer (spec §7a.1) ──
+// Returns a structured DRAFT only — never persists. The composer opens it
+// prefilled; draft-then-confirm is mandatory.
+const extractSchema = z.object({
+  brief: z.string().min(3).max(4000),
+});
+
+router.post('/:tenantId/flyers/extract', authenticateToken, checkTenantAccess, requireInventoryAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const parsed = extractSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    const flyer = await flyerState(tenantId);
+    if (!flyer?.enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled' });
+    }
+
+    const draft = await extractFlyerDraft(tenantId, parsed.data.brief);
+    res.json({ success: true, data: { draft } });
+  } catch (error) {
+    const msg = (error as Error).message;
+    if (msg === 'extraction_invalid_json' || msg === 'extraction_invalid_shape') {
+      return res.status(422).json({ success: false, error: msg, message: 'Could not extract a draft from that brief — try rephrasing with item names and prices' });
+    }
+    logErr('POST /:tenantId/flyers/extract', error, req.params.tenantId);
     res.status(500).json({ success: false, error: 'internal_error' });
   }
 });

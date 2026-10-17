@@ -100,6 +100,24 @@ export interface FlyerAnalytics {
   flyers: FlyerAnalyticsEntry[];
 }
 
+export interface FlyerDraftDish {
+  name: string;
+  priceCents: number | null;
+  salePriceCents?: number | null;
+  stock?: number | null;
+  attributes?: string[] | null;
+  note?: string | null;
+  needsPriceConfirmation: boolean;
+  priceSource: 'agent' | 'repertoire_history' | 'none';
+}
+
+export interface FlyerExtractionDraft {
+  title: string;
+  summary?: string | null;
+  dishes: FlyerDraftDish[];
+  suggestedWindow?: 'today' | 'this_weekend' | 'this_week' | 'custom';
+}
+
 export interface FlyerCardOrder {
   id: string;
   tenant_id: string;
@@ -308,6 +326,17 @@ class FlyerService extends TenantApiSingleton {
     if (!result.data.success) throw new Error(result.data.error || 'Failed to place card order');
     await this.invalidateServiceCaches(tenantId);
     return result.data.data.order;
+  }
+
+  /** Agent-drafted flyer from a merchant brief — draft only, never persists (spec §7a.1). */
+  async extractFlyerDraft(tenantId: string, brief: string): Promise<FlyerExtractionDraft> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ draft: FlyerExtractionDraft }>>(
+      `/api/tenants/${tenantId}/flyers/extract`,
+      { method: 'POST', body: JSON.stringify({ brief }) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error((result.data as any).message || result.data.error || 'Failed to extract draft');
+    return result.data.data.draft;
   }
 
   /** Print-ready double-sided card PDF — anchor href, not a fetch. */

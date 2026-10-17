@@ -56,6 +56,14 @@ const COUPON_KEYWORDS = [
   'free shipping', 'buy one get one', 'bogo', 'code', 'coupon code',
 ];
 
+// Specials/flyer intent (spec §7a.2) — "what's this week's special?"
+const SPECIALS_KEYWORDS = [
+  'special', 'specials', 'flyer', 'weekly deal', 'daily deal',
+  "this week's", "this week special", 'today special', "today's special",
+  'weekly special', 'what is on special', "what's on special",
+  'any specials', 'weekly flyer', 'deals this week',
+];
+
 const POLICY_KEYWORDS = [
   'return policy', 'shipping policy', 'refund policy', 'privacy policy',
   'terms of service', 'terms and conditions', 'refund', 'return',
@@ -81,6 +89,60 @@ function isPolicyQuery(message: string): boolean {
 function isCouponQuery(message: string): boolean {
   const lower = message.toLowerCase();
   return COUPON_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isSpecialsQuery(message: string): boolean {
+  const lower = message.toLowerCase();
+  return SPECIALS_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+/**
+ * Live flyer context for the bot (spec §7a.2) — queried directly from
+ * tenant_flyers, NOT embeddings: flyer windows are too short-lived for a
+ * knowledge sync, and the public surfaces read this same data.
+ * Returns null when no live flyer exists — never throws.
+ */
+async function getLiveFlyerContext(tenantId: string): Promise<string | null> {
+  const now = new Date();
+  const flyers = await prisma.tenant_flyers.findMany({
+    where: {
+      tenant_id: tenantId,
+      status: 'published',
+      starts_at: { lte: now },
+      ends_at: { gt: now },
+    },
+    orderBy: { starts_at: 'desc' },
+    take: 2,
+    select: { id: true, title: true, summary: true, ends_at: true },
+  });
+  if (flyers.length === 0) return null;
+
+  const items = await prisma.tenant_flyer_items.findMany({
+    where: { flyer_id: { in: flyers.map(f => f.id) } },
+    orderBy: { sort_order: 'asc' },
+    select: {
+      flyer_id: true, note: true,
+      product_variants: { select: { variant_name: true, price_cents: true, sale_price_cents: true, stock: true } },
+      inventory_items: { select: { name: true, price_cents: true, sale_price_cents: true, stock: true } },
+    },
+  });
+
+  const fmt = (cents: number | null | undefined) => cents != null ? `$${(cents / 100).toFixed(2)}` : null;
+  const lines = flyers.map((flyer) => {
+    const itemLines = items
+      .filter(i => i.flyer_id === flyer.id)
+      .map((i) => {
+        const name = i.product_variants?.variant_name ?? i.inventory_items?.name ?? 'Special';
+        const price = fmt(i.product_variants?.sale_price_cents ?? i.product_variants?.price_cents
+          ?? i.inventory_items?.sale_price_cents ?? i.inventory_items?.price_cents);
+        const stock = i.product_variants?.stock ?? i.inventory_items?.stock;
+        return `  - ${name}${price ? ` — ${price}` : ''}${stock != null && stock <= 0 ? ' (sold out)' : ''}${i.note ? ` — ${i.note}` : ''}`;
+      })
+      .join('\n');
+    return `${flyer.title} (ends ${flyer.ends_at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})${flyer.summary ? `\n${flyer.summary}` : ''}\n${itemLines}`;
+  });
+
+  return '\n\nCurrent specials flyer context (mention these specials when relevant; do not invent items or prices):\n' + lines.join('\n\n');
 }
 
 const SYSTEM_PROMPT_TEMPLATE = (config: BotConfig, surface?: string) => {
@@ -194,6 +256,7 @@ class BotDynamicResponseService {
     // Resolve effective capabilities once for skill gating
     let allowedSkills: string[] = [];
     let effectiveProductTypes: string[] | undefined;
+    let flyerEnabled = false;
     try {
       const caps = await resolveEffectiveCapabilities(tenantId);
       if (caps?.effective?.chatbot) {
@@ -202,6 +265,7 @@ class BotDynamicResponseService {
       if (caps?.effective?.product_types) {
         effectiveProductTypes = caps.effective.product_types.effective_types;
       }
+      flyerEnabled = !!caps?.effective?.flyer?.enabled;
     } catch (capError) {
       logger.warn('[BotDynamicResponseService] Failed to resolve capabilities, allowing all skills', undefined, {
         tenantId,
@@ -448,6 +512,23 @@ class BotDynamicResponseService {
     } catch (knowledgeError) {
       logger.warn('[BotDynamicResponseService] Knowledge RAG search failed, continuing without knowledge context', undefined, {
         error: knowledgeError instanceof Error ? knowledgeError.message : String(knowledgeError),
+      });
+    }
+
+    // 2.7. Live specials flyer context — queried directly (window-scoped data
+    // doesn't belong in embeddings). Gated by the flyer capability +
+    // chatbot_skill_product_search + specials intent (spec §7a.2).
+    try {
+      if (flyerEnabled && hasSkill('chatbot_skill_product_search') && isSpecialsQuery(message)) {
+        const flyerCtx = await getLiveFlyerContext(tenantId);
+        if (flyerCtx) {
+          knowledgeContext += flyerCtx;
+          knowledgeContextUsed = true;
+        }
+      }
+    } catch (flyerError) {
+      logger.warn('[BotDynamicResponseService] Flyer context lookup failed, continuing without it', undefined, {
+        error: flyerError instanceof Error ? flyerError.message : String(flyerError),
       });
     }
 

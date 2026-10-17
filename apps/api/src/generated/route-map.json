@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-17T17:57:30.837Z",
+  "generatedAt": "2026-10-17T18:06:01.482Z",
   "totalMounts": 245,
-  "totalRoutes": 2931,
+  "totalRoutes": 2932,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -8979,6 +8979,17 @@
           "method": "POST",
           "path": "/:tenantId/flyers/card-orders",
           "fullPath": "/api/tenants/:tenantId/flyers/card-orders",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/flyers/extract",
+          "fullPath": "/api/tenants/:tenantId/flyers/extract",
           "middleware": [
             "authenticateToken",
             "checkTenantAccess",

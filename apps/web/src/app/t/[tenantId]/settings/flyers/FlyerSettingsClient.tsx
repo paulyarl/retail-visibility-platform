@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/Switch';
 import { AlertCircle, Copy, Plus, Sparkles, Calendar, ImageIcon, Share2, Archive, RefreshCw, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useFlyerCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerRecurrence } from '@/services/FlyerService';
+import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerRecurrence, type FlyerExtractionDraft } from '@/services/FlyerService';
 import FlyerShareKit from './FlyerShareKit';
 import FlyerAnalyticsCard from './FlyerAnalyticsCard';
 import FlyerCardOrderPanel from './FlyerCardOrderPanel';
@@ -74,10 +74,15 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
   const [ctaMode, setCtaMode] = useState<'auto' | 'order' | 'view'>('auto');
   const [recurrence, setRecurrence] = useState<FlyerRecurrence>('none');
   const [selectedVariants, setSelectedVariants] = useState<Set<string>>(new Set());
-  const [newDishes, setNewDishes] = useState<{ name: string; priceCents: number; stock: number }[]>([]);
+  const [newDishes, setNewDishes] = useState<{ name: string; priceCents: number | null; stock: number; needsPriceConfirmation?: boolean }[]>([]);
   const [dishName, setDishName] = useState('');
   const [dishPrice, setDishPrice] = useState('');
   const [dishStock, setDishStock] = useState('');
+
+  // AI draft state (spec §7a.1 — draft-then-confirm; nothing saves on load)
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiBrief, setAiBrief] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
 
   // Options state
   const [options, setOptions] = useState({
@@ -114,6 +119,9 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
   const itemCount = selectedVariants.size + newDishes.length;
   const itemsLimit = flyerCap?.itemsLimit ?? 0;
   const overLimit = itemCount > itemsLimit;
+  // Draft-then-confirm: extracted dishes with no parsed price and no
+  // repertoire history stay flagged — the merchant must set a price (spec §7a.1)
+  const unconfirmedPrices = newDishes.some(d => d.priceCents == null);
 
   const resetComposer = () => {
     setComposing(false);
@@ -151,7 +159,8 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
 
       const items = [
         ...[...selectedVariants].map(variantId => ({ variantId })),
-        ...newDishes.map(dish => ({ dish })),
+        // unconfirmedPrices blocks save above — every dish has a real price here
+        ...newDishes.map(d => ({ dish: { name: d.name, priceCents: d.priceCents!, stock: d.stock } })),
       ];
       if (items.length > 0) {
         await flyerService.setFlyerItems(tenantId, flyer.id, items);
@@ -167,6 +176,40 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  /** AI extract → prefill composer. Merchant reviews every field; nothing saves on load. */
+  const runExtraction = async () => {
+    setAiBusy(true);
+    setError(null);
+    try {
+      const draft = await flyerService.extractFlyerDraft(tenantId, aiBrief);
+      applyDraft(draft);
+      setAiOpen(false);
+      setAiBrief('');
+    } catch (err: any) {
+      setError(err?.message || 'Extraction failed — try rephrasing the brief');
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const applyDraft = (draft: FlyerExtractionDraft) => {
+    setComposing(true);
+    setEditingId(null);
+    setTitle(draft.title);
+    setSummary(draft.summary ?? '');
+    const presetMap: Record<string, WindowPreset> = {
+      today: 'today', this_weekend: 'weekend', this_week: 'week', custom: 'custom',
+    };
+    setPreset(presetMap[draft.suggestedWindow ?? 'this_week'] ?? 'week');
+    setNewDishes(draft.dishes.map(d => ({
+      name: d.name,
+      priceCents: d.priceCents,
+      stock: d.stock ?? 0,
+      needsPriceConfirmation: d.needsPriceConfirmation,
+    })));
+    setNotice('Draft loaded — review every field before publishing');
   };
 
   const flyerAction = async (fn: () => Promise<unknown>, ok: string) => {
@@ -238,11 +281,39 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
           </p>
         </div>
         {!composing && (
-          <Button onClick={() => setComposing(true)} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New flyer
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setAiOpen(!aiOpen)} className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> Draft with AI
+            </Button>
+            <Button onClick={() => setComposing(true)} className="flex items-center gap-2">
+              <Plus className="w-4 h-4" /> New flyer
+            </Button>
+          </div>
         )}
       </div>
+
+      {/* AI extraction brief — returns a draft for review, never publishes */}
+      {aiOpen && !composing && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+              Describe this run's specials in plain text — e.g. <em>"jollof plate $14 vegan, catfish $16, friday only"</em>.
+              AI drafts the flyer; you review and publish.
+            </p>
+            <textarea
+              value={aiBrief} onChange={e => setAiBrief(e.target.value)} rows={3}
+              placeholder="item name + price, one per line or comma-separated…"
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            />
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={runExtraction} disabled={aiBusy || aiBrief.trim().length < 3}>
+                {aiBusy ? 'Extracting…' : 'Extract draft'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAiOpen(false)} disabled={aiBusy}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {error && <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       {notice && <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-sm text-green-700 dark:text-green-300">{notice}</div>}
@@ -376,21 +447,41 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                 {newDishes.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {newDishes.map((d, i) => (
-                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs px-2.5 py-1">
-                        {d.name} · ${(d.priceCents / 100).toFixed(2)}
+                      <span key={i} className={`inline-flex items-center gap-1.5 rounded-full text-xs px-2.5 py-1 ${
+                        d.needsPriceConfirmation
+                          ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+                          : 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
+                      }`}>
+                        {d.name} · {d.priceCents != null ? `$${(d.priceCents / 100).toFixed(2)}` : (
+                          <input
+                            type="number" min="0" step="0.01" placeholder="confirm price"
+                            className="w-24 rounded border border-red-300 dark:border-red-700 bg-white dark:bg-neutral-900 px-1.5 py-0.5 text-xs"
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (!Number.isNaN(v) && v >= 0) {
+                                setNewDishes(newDishes.map((x, j) => j === i ? { ...x, priceCents: Math.round(v * 100), needsPriceConfirmation: false } : x));
+                              }
+                            }}
+                          />
+                        )}
                         <button type="button" onClick={() => setNewDishes(newDishes.filter((_, j) => j !== i))} className="hover:text-red-600">×</button>
                       </span>
                     ))}
                   </div>
                 )}
+                {unconfirmedPrices && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">
+                    Set a price for flagged items before publishing — AI never invents prices.
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button onClick={() => saveFlyer(true)} disabled={saving || !title || overLimit}>
+              <Button onClick={() => saveFlyer(true)} disabled={saving || !title || overLimit || unconfirmedPrices}>
                 {saving ? 'Saving…' : 'Publish'}
               </Button>
-              <Button variant="outline" onClick={() => saveFlyer(false)} disabled={saving || !title || overLimit}>
+              <Button variant="outline" onClick={() => saveFlyer(false)} disabled={saving || !title || overLimit || unconfirmedPrices}>
                 Save draft
               </Button>
               <Button variant="ghost" onClick={resetComposer} disabled={saving}>Cancel</Button>
