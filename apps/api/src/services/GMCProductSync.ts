@@ -12,7 +12,7 @@
 
 import { prisma } from '../prisma';
 import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
-import { canonicalStorefrontBaseUrl, resolveStorefrontCanonical } from '../lib/storefront-url';
+import { canonicalStorefrontBaseUrl, platformApex, resolveStorefrontCanonical } from '../lib/storefront-url';
 import { validateProductForGMC } from './GMCValidationService';
 import { logger } from '../logger';
 
@@ -992,6 +992,15 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
   hasMerchantLink: boolean;
   hasSubdomain: boolean;
   subdomain: string | null;
+  // Canonical storefront resolution — custom-domain aware. `storefrontBaseUrl`
+  // is the address GMC product links actually use (active custom domain →
+  // platform subdomain → null for a path-only tenant); the raw platform
+  // subdomain stays in `hasSubdomain`/`subdomain` above.
+  storefrontKind: 'custom' | 'subdomain' | 'path' | null;
+  storefrontHost: string | null;
+  storefrontBaseUrl: string | null;
+  platformSubdomainUrl: string | null;
+  customDomain: string | null;
   merchantId: string | null;
   merchantName: string | null;
   fulfillmentMode: string | null;
@@ -1005,34 +1014,6 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
   lastSyncAt: Date | null;
   storefrontReady: boolean;
   syncableProducts: number;
-  // Domain validation warnings
-  domainValidation?: {
-    hasWebsiteConfigured: boolean;
-    websiteUrl: string | null;
-    willCauseMismatchedDomains: boolean;
-    complianceOptions: {
-      configureDomain: {
-        title: string;
-        description: string;
-        actionRequired: string;
-        difficulty: 'easy' | 'medium' | 'hard';
-      };
-      useSubdomain: {
-        title: string;
-        description: string;
-        actionRequired: string;
-        difficulty: 'easy' | 'medium' | 'hard';
-      };
-      customDomainHosting: {
-        title: string;
-        description: string;
-        actionRequired: string;
-        difficulty: 'easy' | 'medium' | 'hard';
-        pricing: string;
-        available: boolean;
-      };
-    };
-  };
 }> {
   try {
     const account = await prisma.google_oauth_accounts_list.findFirst({
@@ -1051,6 +1032,12 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
     // Canonical ladder — the same resolution syncProduct uses for the product
     // link, so "storefront ready" can't disagree with what the sync accepts.
     const canon = await resolveStorefrontCanonical(tenantId);
+    const canonicalBase = canonicalStorefrontBaseUrl(canon);
+    // Absolute platform address, apex derived from config (staging serves on
+    // visibleshelf.store) — never a hardcoded literal.
+    const platformSubdomainUrl = canon?.subdomain
+      ? `https://${canon.subdomain}.${platformApex()}`
+      : null;
 
     // Get product sync stats using existing fields
     const [total, synced, pending, errors] = await Promise.all([
@@ -1073,6 +1060,11 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       hasMerchantLink: !!merchantLink,
       hasSubdomain: !!canon?.subdomain,
       subdomain: canon?.subdomain ?? null,
+      storefrontKind: canon?.kind ?? null,
+      storefrontHost: canon?.host ?? null,
+      storefrontBaseUrl: canonicalBase,
+      platformSubdomainUrl,
+      customDomain: canon?.kind === 'custom' ? canon.host : null,
       merchantId: merchantLink?.merchant_id || null,
       merchantName: merchantLink?.merchant_name || null,
       fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
@@ -1084,7 +1076,7 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       pendingProducts: pending,
       errorProducts: errors,
       lastSyncAt: merchantLink?.last_sync_at || null,
-      storefrontReady: !!canonicalStorefrontBaseUrl(canon),
+      storefrontReady: !!canonicalBase,
       syncableProducts: await prisma.inventory_items.count({
         where: {
           tenant_id: tenantId,
@@ -1101,6 +1093,11 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       hasMerchantLink: false,
       hasSubdomain: false,
       subdomain: null,
+      storefrontKind: null,
+      storefrontHost: null,
+      storefrontBaseUrl: null,
+      platformSubdomainUrl: null,
+      customDomain: null,
       merchantId: null,
       merchantName: null,
       fulfillmentMode: null,

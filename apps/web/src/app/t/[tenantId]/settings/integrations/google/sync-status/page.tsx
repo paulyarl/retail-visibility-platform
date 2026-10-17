@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { gmcValidationService, BulkValidationReport } from '@/services/GMCValidationService';
+import { StorefrontDomainSummary } from '@/components/google/StorefrontDomainSummary';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { 
   ArrowLeft,
@@ -791,16 +792,7 @@ export default function GBPSyncStatusPage() {
                     {gmcStatus.hasMerchantLink ? `Merchant: ${gmcStatus.merchantName}` : 'No Merchant Linked'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {gmcStatus.hasSubdomain ? (
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  )}
-                  <span className={gmcStatus.hasSubdomain ? 'text-green-700 dark:text-green-300' : 'text-amber-600'}>
-                    {gmcStatus.hasSubdomain ? `Subdomain: ${gmcStatus.subdomain}` : 'No Subdomain Set'}
-                  </span>
-                </div>
+                <StorefrontDomainSummary variant="inline" status={gmcStatus} />
               </div>
 
               {/* GMC Settings */}

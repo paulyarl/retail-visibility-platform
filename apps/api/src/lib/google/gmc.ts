@@ -73,42 +73,43 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
  * This returns all merchant accounts the authenticated user has access to
  */
 export async function listMerchantAccounts(account_id: string): Promise<any[]> {
-  try {
-    const accessToken = await getValidAccessToken(account_id);
-    if (!accessToken) {
-      throw new Error('No valid access token');
-    }
-
-    // Content API authinfo endpoint returns all accounts the user has access to
-    const response = await fetch(`${GMC_API_BASE}/content/${CONTENT_API_VERSION}/accounts/authinfo`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('[GMC] Failed to fetch merchant accounts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-      return [];
-    }
-
-    const data = await response.json() as { accountIdentifiers?: any[] };
-    console.log('[GMC] authinfo response:', JSON.stringify(data, null, 2));
-    
-    // authinfo returns accountIdentifiers array with accountId
-    const accountIds = data.accountIdentifiers || [];
-    
-    // Return formatted accounts
-    return accountIds.map((acc: any) => ({
-      accountId: acc.aggregatorId || acc.merchantId,
-      name: `Merchant ${acc.aggregatorId || acc.merchantId}`,
-      accountName: `Merchant Account ${acc.aggregatorId || acc.merchantId}`,
-    }));
-  } catch (error) {
-    logger.error('[GMC] Error listing merchant accounts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return [];
+  const accessToken = await getValidAccessToken(account_id);
+  if (!accessToken) {
+    throw new Error('merchant_accounts_failed: no valid access token for account');
   }
+
+  // Content API authinfo endpoint returns all accounts the user has access to
+  const response = await fetch(`${GMC_API_BASE}/content/${CONTENT_API_VERSION}/accounts/authinfo`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logger.error('[GMC] Failed to fetch merchant accounts:', undefined, {
+      status: response.status,
+      body: body.slice(0, 500),
+    });
+    // Surface the failure. Returning [] here is indistinguishable from "this
+    // Google account has no Merchant Center account", which sent us chasing the
+    // account itself when the call had never succeeded — a Merchant Center
+    // account (6311349) was linked the whole time.
+    throw new Error(`merchant_accounts_failed: ${response.status} ${body.slice(0, 300)}`);
+  }
+
+  const data = await response.json() as { accountIdentifiers?: any[] };
+
+  // authinfo returns accountIdentifiers array with accountId
+  const accountIds = data.accountIdentifiers || [];
+
+  // Return formatted accounts
+  return accountIds.map((acc: any) => ({
+    accountId: acc.aggregatorId || acc.merchantId,
+    name: `Merchant ${acc.aggregatorId || acc.merchantId}`,
+    accountName: `Merchant Account ${acc.aggregatorId || acc.merchantId}`,
+  }));
 }
 
 /**

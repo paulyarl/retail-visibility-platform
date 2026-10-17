@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { StorefrontDomainSummary } from '@/components/google/StorefrontDomainSummary';
 import {
   CheckCircle,
   XCircle,
   AlertTriangle,
   RefreshCw,
   ShoppingBag,
-  Globe,
   Settings as SettingsIcon,
 } from 'lucide-react';
 
@@ -246,42 +245,8 @@ export default function SettingsTab({
         )}
       </div>
 
-      {/* Domain Configuration */}
-      <div className="bg-white dark:bg-neutral-800 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-6">
-        <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
-          <Globe className="w-5 h-5 text-blue-600" />
-          Domain Configuration
-        </h3>
-        <p className="text-sm text-neutral-500 mb-4">
-          Google Merchant Center requires product links to point to a valid domain. Use a subdomain or custom domain for GMC compliance.
-        </p>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Globe className="w-4 h-4 text-neutral-400" />
-              <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Current Subdomain</span>
-            </div>
-            <span className={`text-sm font-medium ${gmcStatus?.hasSubdomain ? 'text-green-600' : 'text-amber-600'}`}>
-              {gmcStatus?.subdomain ? `${gmcStatus.subdomain}.visibleshelf.com` : 'Not configured'}
-            </span>
-          </div>
-          {gmcStatus?.domainValidation?.willCauseMismatchedDomains && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                    Mismatched Domains Warning
-                  </p>
-                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                    Your website URL is configured but doesn't match your subdomain. This may cause Google to reject product listings.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Domain Configuration — shared with the sync-status chip (StorefrontDomainSummary) */}
+      <StorefrontDomainSummary variant="card" status={gmcStatus} tenantId={tenantId} />
     </div>
   );
 }
