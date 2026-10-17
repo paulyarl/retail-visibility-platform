@@ -25,7 +25,7 @@ import directoryPresenceAdminService, {
 } from '@/services/DirectoryPresenceAdminService';
 import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
 import { clientLogger } from '@/lib/client-logger';
-import { generateQrDataUrl, type PersistedQrStyle, type QrTemplateName } from '@/lib/qr-engine';
+import { generateQrDataUrl, type PersistedQrStyle, type QrEngineOptions, type QrTemplateName } from '@/lib/qr-engine';
 import { bannerQrOptions } from '@/components/place/MarketIntelBanner';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
@@ -230,12 +230,33 @@ function ClaimQrPreview({
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const opts = qrStyle
+    const classicOpts: QrEngineOptions = {
+      data: url,
+      exportSize: 512,
+      styled: false,
+      errorCorrection: 'H',
+    };
+    const styledOpts = qrStyle
       ? { ...bannerQrOptions(url, qrStyle, logoUrl), exportSize: 512 }
       : styledFallback
         ? { ...bannerQrOptions(url, null, logoUrl), exportSize: 512 }
-        : { data: url, exportSize: 512, styled: false as const, errorCorrection: 'H' as const };
-    generateQrDataUrl(opts)
+        : null;
+    // qr-code-styling rasterizes its svg through an internal Image with only an
+    // onload wired — a suppressed data-URI load never settles the promise, so
+    // bound the styled attempt and degrade to the classic QR instead of
+    // stranding the card on the empty placeholder.
+    const attempt = styledOpts
+      ? Promise.race<string>([
+          generateQrDataUrl(styledOpts),
+          new Promise<string>((_, reject) =>
+            setTimeout(() => reject(new Error('styled_qr_timeout')), 4000),
+          ),
+        ]).catch((err) => {
+          clientLogger.error('[ClaimQrPreview] styled QR generation failed — falling back to classic:', { detail: err });
+          return generateQrDataUrl(classicOpts);
+        })
+      : generateQrDataUrl(classicOpts);
+    attempt
       .then((d) => {
         if (!cancelled) setDataUrl(d);
       })
@@ -709,6 +730,10 @@ function PresenceSeedDetailClient() {
       await directoryPresenceAdminService.publishSeed(seedId);
       setActionSuccess('Listing published.');
       fetchDetail();
+      // Publish fires the courtesy-outreach trigger, which mints the claim
+      // token server-side — refetch the kit so the Claim QR Kit previews
+      // appear without a manual reload.
+      loadQrKit();
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : 'Failed to publish listing',
