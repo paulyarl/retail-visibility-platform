@@ -147,6 +147,7 @@ async function buildFlyerPayload(tenant: { id: string; slug: string | null }, su
       summary: f.summary,
       heroImageUrl: f.hero_image_url,
       window: { startsAt: f.starts_at, endsAt: f.ends_at },
+      shareCode: f.share_code,
       shareUrl: `${WEB_BASE_URL}/flyer/${f.share_code}`,
       items,
       cta: {

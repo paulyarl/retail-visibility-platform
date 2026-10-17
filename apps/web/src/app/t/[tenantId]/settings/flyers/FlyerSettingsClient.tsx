@@ -14,7 +14,8 @@ import { Switch } from '@/components/ui/Switch';
 import { AlertCircle, Copy, Plus, Sparkles, Calendar, ImageIcon, Share2, Archive, RefreshCw, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useFlyerCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerShareAssets } from '@/services/FlyerService';
+import { flyerService, type TenantFlyer, type FlyerVariant } from '@/services/FlyerService';
+import FlyerShareKit from './FlyerShareKit';
 import { clientLogger } from '@/lib/client-logger';
 
 interface Props { tenantId: string }
@@ -171,13 +172,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
     finally { setSaving(false); }
   };
 
-  const copyShareLink = async (flyer: TenantFlyer) => {
-    try {
-      const assets: FlyerShareAssets = await flyerService.getShareAssets(tenantId, flyer.id);
-      await navigator.clipboard.writeText(assets.url);
-      setNotice('Share link copied');
-    } catch { setError('Failed to load share link'); }
-  };
+  const [shareFlyer, setShareFlyer] = useState<TenantFlyer | null>(null);
 
   const saveOptions = async () => {
     setSaving(true); setError(null);
@@ -415,7 +410,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                           onClick={() => flyerAction(() => flyerService.duplicateFlyer(tenantId, f.id), 'Flyer duplicated to next window')}>
                           <RefreshCw className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => copyShareLink(f)}>
+                        <Button variant="outline" size="sm" onClick={() => setShareFlyer(f)} title="Share kit">
                           <Share2 className="w-3.5 h-3.5" />
                         </Button>
                         <Button variant="ghost" size="sm" disabled={saving}
@@ -465,6 +460,8 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
           <Button onClick={saveOptions} disabled={saving} size="sm">{saving ? 'Saving…' : 'Save display settings'}</Button>
         </CardContent>
       </Card>
+
+      <FlyerShareKit tenantId={tenantId} flyer={shareFlyer} onClose={() => setShareFlyer(null)} />
     </div>
   );
 }

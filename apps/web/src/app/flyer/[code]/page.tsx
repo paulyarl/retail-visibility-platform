@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { publicFlyerService } from '@/services/PublicFlyerService';
+import FlyerReportButton from './FlyerReportButton';
 import { formatPrice } from '@/lib/pricing';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -118,9 +119,12 @@ export default async function FlyerPage({ params }: PageProps) {
           </section>
         )}
 
-        <p className="text-xs text-neutral-400 pt-6 border-t border-neutral-200 dark:border-neutral-800">
-          Specials rotate — this page always shows what's current.
-        </p>
+        <div className="flex items-center justify-between pt-6 border-t border-neutral-200 dark:border-neutral-800">
+          <p className="text-xs text-neutral-400">
+            Specials rotate — this page always shows what's current.
+          </p>
+          <FlyerReportButton code={code} />
+        </div>
       </div>
     </main>
   );

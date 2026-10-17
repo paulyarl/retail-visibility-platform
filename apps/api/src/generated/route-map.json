@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-17T17:02:43.221Z",
+  "generatedAt": "2026-10-17T17:30:48.266Z",
   "totalMounts": 245,
-  "totalRoutes": 2922,
+  "totalRoutes": 2925,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -2550,6 +2550,33 @@
           "method": "DELETE",
           "path": "/",
           "fullPath": "/api/admin",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/",
+          "fullPath": "/api/admin",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:reportId/resolve",
+          "fullPath": "/api/admin/:reportId/resolve",
+          "middleware": [
+            "requirePlatformAdmin",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/flyers/:flyerId/restore",
+          "fullPath": "/api/admin/flyers/:flyerId/restore",
           "middleware": [
             "requirePlatformAdmin",
             "AsyncFunction"

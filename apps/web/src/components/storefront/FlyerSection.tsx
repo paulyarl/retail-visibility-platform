@@ -63,7 +63,8 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
 
   if (!loaded || !payload?.enabled || !payload.flyers?.length) return null;
 
-  const handleOrder = async (flyerId: string, item: PublicFlyerItem) => {
+  const handleOrder = async (flyerId: string, shareCode: string, item: PublicFlyerItem) => {
+    publicFlyerService.trackClick(shareCode);
     if (!item.productId || !item.sku || item.priceCents == null) return;
     const priceCents = item.salePriceCents ?? item.priceCents;
     const result = await addToCart(tenantId, tenantName || 'Store', {
@@ -133,7 +134,7 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
                         {item.orderable && flyer.cta.orderEnabled && (
                           <button
                             type="button"
-                            onClick={() => handleOrder(flyer.id, item)}
+                            onClick={() => handleOrder(flyer.id, flyer.shareCode, item)}
                             disabled={!item.inStock}
                             className="text-xs font-medium rounded-lg px-2.5 py-1.5 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                           >

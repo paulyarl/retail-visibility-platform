@@ -50,6 +50,7 @@ import adminUsersRoutes from './admin-users';
 import adminToolsRoutes from './admin-tools';
 import sentryRoutes from './admin/sentry';
 import errorLogRoutes from './admin/errors';
+import flyerReportRoutes from './admin/flyer-reports';
 import manualBillingRoutes from './admin/manual-billing';
 import platformRevenueRoutes from './platform-revenue';
 import platformFeeInvoiceRoutes from './platform-fee-invoices';
@@ -143,6 +144,7 @@ router.use('/billing', authenticateToken, requireAdmin, adminTenantBillingRoutes
 router.use('/billing', authenticateToken, requireAdmin, adminPlatformBillingRoutes);
 router.use('/billing', authenticateToken, requireAdmin, adminAutomationRoutes);
 router.use('/capability-types', authenticateToken, requireAdmin, capabilityTypesRoutes);
+router.use('/flyer-reports', authenticateToken, requireAdmin, flyerReportRoutes);
 router.use('/features', authenticateToken, requireAdmin, featuresRoutes);
 router.use('/capabilities', authenticateToken, requireAdmin, capabilitiesRoutes);
 router.use('/tier-capabilities', authenticateToken, requireAdmin, tierCapabilitiesRoutes);

@@ -33,6 +33,7 @@ export interface PublicFlyer {
   summary: string | null;
   heroImageUrl: string | null;
   window: { startsAt: string; endsAt: string };
+  shareCode: string;
   shareUrl: string;
   items: PublicFlyerItem[];
   cta: { orderEnabled: boolean; pickupEnabled: boolean; pickupReadyMinutes: number | null };
