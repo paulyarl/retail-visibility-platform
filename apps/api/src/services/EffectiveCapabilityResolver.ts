@@ -47,6 +47,7 @@ import {
   resolveCouponOptions,
   resolveMarketingOps,
   resolveGbpManagement,
+  resolveFlyer,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -268,6 +269,11 @@ export async function resolveEffectiveCapabilities(
     resolveStorefrontDomains(
       rawCaps.capabilities.storefront_domains?.features || {}
     ),
+    resolveFlyer(
+      rawCaps.capabilities.flyer?.features || {},
+      rawCaps.capabilities.flyer_gbp?.features || {},
+      merchantBundle.flyerOptions
+    ),
   ]);
 
   // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
@@ -316,6 +322,7 @@ export async function resolveEffectiveCapabilities(
       marketing_ops: effective[27],
       gbp_management: effective[28],
       storefront_domains: effective[29],
+      flyer: effective[30],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -391,6 +398,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
     result.effective.marketing_ops.enabled = false;
+    result.effective.flyer.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -422,6 +430,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
     result.effective.marketing_ops.enabled = false;
+    result.effective.flyer.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance
@@ -780,6 +789,11 @@ export async function resolveEffectiveCapabilitiesFromMV(
     resolveStorefrontDomains(
       rawCaps.capabilities.storefront_domains?.features || {}
     ),
+    resolveFlyer(
+      rawCaps.capabilities.flyer?.features || {},
+      rawCaps.capabilities.flyer_gbp?.features || {},
+      merchantBundle.flyerOptions
+    ),
   ]);
 
   // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
@@ -828,6 +842,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       marketing_ops: effective[27],
       gbp_management: effective[28],
       storefront_domains: effective[29],
+      flyer: effective[30],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -897,6 +912,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
     result.effective.marketing_ops.enabled = false;
+    result.effective.flyer.enabled = false;
   }
 
   if (isLimited) {
@@ -910,6 +926,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
     result.effective.marketing_ops.enabled = false;
+    result.effective.flyer.enabled = false;
   }
 
   // Org-level subscription status check
@@ -1174,6 +1191,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     couponOptions,
     funnelOptions,
     gbpManagement,
+    flyerOptions,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1200,6 +1218,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_coupon_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_funnel_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => (prisma as any).tenant_gbp_options_settings?.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_flyer_options_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
   return {
@@ -1228,6 +1247,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     couponOptions: couponOptions as any,
     funnelOptions: funnelOptions as any,
     gbpManagement: gbpManagement as any,
+    flyerOptions: flyerOptions as any,
   };
 }
 
@@ -1346,6 +1366,15 @@ function buildMerchantSoftGates(bundle: MerchantSettingsBundle): Record<string, 
   if (bundle.wholesaleMatching) {
     gates.wholesale_matching = {
       wholesale_matching_enabled: bundle.wholesaleMatching.wholesale_matching_enabled ?? true,
+    };
+  }
+  if (bundle.flyerOptions) {
+    gates.flyer = {
+      flyer_display: bundle.flyerOptions.flyer_display ?? true,
+      flyer_storefront_display: bundle.flyerOptions.flyer_storefront_display ?? true,
+      flyer_directory_display: bundle.flyerOptions.flyer_directory_display ?? true,
+      flyer_place_display: bundle.flyerOptions.flyer_place_display ?? true,
+      flyer_frozen_display: bundle.flyerOptions.flyer_frozen_display ?? true,
     };
   }
 

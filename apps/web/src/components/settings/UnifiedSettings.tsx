@@ -74,6 +74,7 @@ const CAPABILITY_KEY_TO_GATE_KEY: Record<string, string> = {
   socialCommerceOptions: 'social_commerce_options',
   directoryPromotion: 'directory_promotion',
   storefrontQr: 'storefront_qr',
+  flyer: 'flyer',
 };
 
 type CapabilityStatus = 'available' | 'tier-gated' | 'merchant-gated';

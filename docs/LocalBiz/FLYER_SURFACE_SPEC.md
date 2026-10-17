@@ -145,6 +145,16 @@ per-surface keys — following the `directory_entry` section-key convention rath
 than living inside it (the storefront surface would be awkward to gate from
 `directory_entry_*`).
 
+**Why not fold into `featured`?** Rejected — `featured_flexible` is granted to
+~11 tiers *and* is a purchasable BSaaS bundle (migration 088), so every
+`flyer_*` key under that module would leak to all holders: `flyer_frozen` would
+reach tiers below `commitment`, the storefront-vs-commerce tier split would
+collapse, and `featured_disabled` would veto flyers as a side effect. Featured's
+footprint is reused at the *implementation* level instead —
+`FeaturedBucketsShowcase` card path, `featured-expiration-enforcer` job,
+`featured-options-settings.ts` route template, `tenant_featured_options_settings`
+RLS precedent.
+
 | Feature key | Meaning |
 |---|---|
 | `flyer_enabled` / `flyer_on` | Master module on |

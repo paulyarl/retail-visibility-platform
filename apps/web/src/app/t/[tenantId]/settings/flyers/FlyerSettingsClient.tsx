@@ -1,0 +1,470 @@
+'use client';
+
+/**
+ * FlyerSettingsClient — merchant flyer composer + display options.
+ *
+ * The capability key unlocks tooling only — the merchant authors every flyer
+ * here: title, window, image, dishes/items (spec §1, §6).
+ */
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Switch';
+import { AlertCircle, Copy, Plus, Sparkles, Calendar, ImageIcon, Share2, Archive, RefreshCw, Upload } from 'lucide-react';
+import Link from 'next/link';
+import { useFlyerCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerShareAssets } from '@/services/FlyerService';
+import { clientLogger } from '@/lib/client-logger';
+
+interface Props { tenantId: string }
+
+type WindowPreset = 'today' | 'weekend' | 'week' | 'custom';
+
+function presetWindow(preset: WindowPreset): { startsAt: string; endsAt: string } {
+  const start = new Date();
+  const end = new Date();
+  if (preset === 'today') {
+    end.setHours(23, 59, 59, 0);
+  } else if (preset === 'weekend') {
+    const day = start.getDay();
+    const daysToSunday = (7 - day) % 7 || 7;
+    end.setDate(end.getDate() + daysToSunday);
+    end.setHours(23, 59, 59, 0);
+  } else {
+    end.setDate(end.getDate() + 7);
+    end.setHours(23, 59, 59, 0);
+  }
+  return { startsAt: start.toISOString(), endsAt: end.toISOString() };
+}
+
+function statusBadge(status: string) {
+  const map: Record<string, string> = {
+    draft: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+    scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    published: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+    expired: 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500',
+    archived: 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500',
+    suppressed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  };
+  return map[status] ?? map.draft;
+}
+
+export default function FlyerSettingsClient({ tenantId }: Props) {
+  const { data: flyerCap, loading: capLoading } = useFlyerCapability(tenantId);
+  const [flyers, setFlyers] = useState<TenantFlyer[]>([]);
+  const [repertoire, setRepertoire] = useState<FlyerVariant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Composer state
+  const [composing, setComposing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [summary, setSummary] = useState('');
+  const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [preset, setPreset] = useState<WindowPreset>('week');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [ctaMode, setCtaMode] = useState<'auto' | 'order' | 'view'>('auto');
+  const [selectedVariants, setSelectedVariants] = useState<Set<string>>(new Set());
+  const [newDishes, setNewDishes] = useState<{ name: string; priceCents: number; stock: number }[]>([]);
+  const [dishName, setDishName] = useState('');
+  const [dishPrice, setDishPrice] = useState('');
+  const [dishStock, setDishStock] = useState('');
+
+  // Options state
+  const [options, setOptions] = useState({
+    flyer_display: true,
+    flyer_storefront_display: true,
+    flyer_directory_display: true,
+    flyer_place_display: true,
+    flyer_frozen_display: true,
+    default_title: 'Featured Specials',
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [list, rep, opts] = await Promise.all([
+        flyerService.listFlyers(tenantId),
+        flyerService.getRepertoire(tenantId).catch(() => ({ parentItemId: null, dishes: [] as FlyerVariant[], frozen: [] as FlyerVariant[] })),
+        flyerService.getOptions(tenantId).catch(() => null),
+      ]);
+      setFlyers(list.flyers);
+      setRepertoire(rep.dishes);
+      if (opts?.settings) setOptions(opts.settings);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load flyers');
+      clientLogger.error('[FlyerSettings] load failed', { detail: err });
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const itemCount = selectedVariants.size + newDishes.length;
+  const itemsLimit = flyerCap?.itemsLimit ?? 0;
+  const overLimit = itemCount > itemsLimit;
+
+  const resetComposer = () => {
+    setComposing(false);
+    setEditingId(null);
+    setTitle(''); setSummary(''); setHeroImageUrl('');
+    setPreset('week'); setStartsAt(''); setEndsAt('');
+    setCtaMode('auto');
+    setSelectedVariants(new Set());
+    setNewDishes([]);
+    setDishName(''); setDishPrice(''); setDishStock('');
+  };
+
+  const saveFlyer = async (publish: boolean) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const window = preset === 'custom'
+        ? { startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString() }
+        : presetWindow(preset);
+
+      let flyer: TenantFlyer;
+      if (editingId) {
+        flyer = await flyerService.updateFlyer(tenantId, editingId, {
+          title, summary: summary || null, heroImageUrl: heroImageUrl || null,
+          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode,
+        });
+      } else {
+        flyer = await flyerService.createFlyer(tenantId, {
+          title, summary: summary || null, heroImageUrl: heroImageUrl || null,
+          startsAt: window.startsAt, endsAt: window.endsAt, ctaMode,
+          status: 'draft',
+        });
+      }
+
+      const items = [
+        ...[...selectedVariants].map(variantId => ({ variantId })),
+        ...newDishes.map(dish => ({ dish })),
+      ];
+      if (items.length > 0) {
+        await flyerService.setFlyerItems(tenantId, flyer.id, items);
+      }
+      if (publish) {
+        await flyerService.publishFlyer(tenantId, flyer.id);
+      }
+      setNotice(publish ? 'Flyer published' : 'Flyer saved');
+      resetComposer();
+      await load();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save flyer');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const flyerAction = async (fn: () => Promise<unknown>, ok: string) => {
+    setSaving(true); setError(null);
+    try { await fn(); setNotice(ok); await load(); }
+    catch (err: any) { setError(err?.message || 'Action failed'); }
+    finally { setSaving(false); }
+  };
+
+  const copyShareLink = async (flyer: TenantFlyer) => {
+    try {
+      const assets: FlyerShareAssets = await flyerService.getShareAssets(tenantId, flyer.id);
+      await navigator.clipboard.writeText(assets.url);
+      setNotice('Share link copied');
+    } catch { setError('Failed to load share link'); }
+  };
+
+  const saveOptions = async () => {
+    setSaving(true); setError(null);
+    try {
+      await flyerService.updateOptions(tenantId, options);
+      setNotice('Display settings saved');
+    } catch (err: any) { setError(err?.message || 'Failed to save settings'); }
+    finally { setSaving(false); }
+  };
+
+  const startEdit = (f: TenantFlyer) => {
+    setEditingId(f.id);
+    setComposing(true);
+    setTitle(f.title);
+    setSummary(f.summary ?? '');
+    setHeroImageUrl(f.hero_image_url ?? '');
+    setCtaMode(f.cta_mode);
+    setPreset('custom');
+    setStartsAt(f.starts_at.slice(0, 16));
+    setEndsAt(f.ends_at.slice(0, 16));
+    setSelectedVariants(new Set((f.tenant_flyer_items ?? []).map(i => i.variant_id).filter(Boolean) as string[]));
+  };
+
+  if (capLoading || loading) {
+    return <div className="p-8 text-sm text-neutral-500">Loading flyer settings…</div>;
+  }
+
+  if (!flyerCap?.enabled) {
+    return (
+      <div className="p-8">
+        <Card>
+          <CardContent className="p-6 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <h2 className="font-semibold text-neutral-900 dark:text-white">Specials Flyer isn't included in your plan</h2>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                Flyers let you publish time-boxed specials to your storefront, directory listing, and share links.
+              </p>
+              <Link href={`/t/${tenantId}/settings/subscription`} className="text-sm text-blue-600 hover:underline mt-2 inline-block">
+                View plans →
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-5xl space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-amber-500" /> Specials Flyer
+          </h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+            Publish a time-boxed flyer of specials — it appears on your surfaces for the window you choose, then retires itself.
+          </p>
+        </div>
+        {!composing && (
+          <Button onClick={() => setComposing(true)} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" /> New flyer
+          </Button>
+        )}
+      </div>
+
+      {error && <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
+      {notice && <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-sm text-green-700 dark:text-green-300">{notice}</div>}
+
+      {/* Composer */}
+      {composing && (
+        <Card>
+          <CardHeader><CardTitle>{editingId ? 'Edit flyer' : 'New flyer'}</CardTitle></CardHeader>
+          <CardContent className="space-y-5">
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Title</label>
+              <input
+                value={title} onChange={e => setTitle(e.target.value)} maxLength={160}
+                placeholder="This Week's Specials"
+                className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Summary <span className="text-neutral-400 font-normal">(optional)</span></label>
+              <textarea
+                value={summary} onChange={e => setSummary(e.target.value)} maxLength={2000} rows={2}
+                className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+              />
+            </div>
+            {flyerCap.image && (
+              <div>
+                <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Flyer image URL <span className="text-neutral-400 font-normal">(optional)</span></label>
+                <input
+                  value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-1"><Calendar className="w-4 h-4" /> Window</label>
+              <div className="mt-2 flex gap-2 flex-wrap">
+                {(['today', 'weekend', 'week', 'custom'] as WindowPreset[]).map(p => (
+                  <button key={p} type="button" onClick={() => setPreset(p)}
+                    className={`text-sm rounded-lg px-3 py-1.5 border ${preset === p ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-transparent' : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300'}`}>
+                    {p === 'today' ? 'Today' : p === 'weekend' ? 'This weekend' : p === 'week' ? 'This week' : 'Custom'}
+                  </button>
+                ))}
+              </div>
+              {preset === 'custom' && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <input type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)}
+                    className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm" />
+                  <input type="datetime-local" value={endsAt} onChange={e => setEndsAt(e.target.value)}
+                    className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm" />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Order button</label>
+              <div className="mt-2 flex gap-2">
+                {(['auto', 'order', 'view'] as const).map(m => (
+                  <button key={m} type="button" onClick={() => setCtaMode(m)}
+                    className={`text-sm rounded-lg px-3 py-1.5 border ${ctaMode === m ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-transparent' : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300'}`}>
+                    {m === 'auto' ? 'Auto (if checkout is on)' : m === 'order' ? 'Show ordering' : 'Display only'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Items */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  Items <span className={overLimit ? 'text-red-600' : 'text-neutral-400'}>({itemCount}/{itemsLimit})</span>
+                </label>
+              </div>
+
+              {repertoire.length > 0 && (
+                <div className="mt-3 rounded-lg border border-neutral-200 dark:border-neutral-700 divide-y divide-neutral-100 dark:divide-neutral-800 max-h-56 overflow-y-auto">
+                  {repertoire.map(v => (
+                    <label key={v.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                      <input type="checkbox" checked={selectedVariants.has(v.id)}
+                        onChange={e => {
+                          const next = new Set(selectedVariants);
+                          e.target.checked ? next.add(v.id) : next.delete(v.id);
+                          setSelectedVariants(next);
+                        }} />
+                      <span className="flex-1 text-neutral-900 dark:text-white">{v.variant_name}</span>
+                      {v.price_cents != null && <span className="text-neutral-500">${(v.price_cents / 100).toFixed(2)}</span>}
+                      {v.is_active === false && <span className="text-xs text-neutral-400">(inactive)</span>}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {/* New dish quick-add */}
+              <div className="mt-3 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 p-3">
+                <p className="text-xs text-neutral-500 mb-2">New special — saved to your repertoire, reusable on future flyers</p>
+                <div className="flex gap-2">
+                  <input value={dishName} onChange={e => setDishName(e.target.value)} placeholder="Name (e.g., Jollof Rice Plate)"
+                    className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm" />
+                  <input value={dishPrice} onChange={e => setDishPrice(e.target.value)} placeholder="Price" type="number" step="0.01" min="0"
+                    className="w-24 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm" />
+                  <input value={dishStock} onChange={e => setDishStock(e.target.value)} placeholder="Qty" type="number" min="0"
+                    className="w-20 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm" />
+                  <Button type="button" variant="outline" size="sm" disabled={!dishName || !dishPrice}
+                    onClick={() => {
+                      setNewDishes([...newDishes, { name: dishName, priceCents: Math.round(parseFloat(dishPrice) * 100), stock: parseInt(dishStock || '0', 10) }]);
+                      setDishName(''); setDishPrice(''); setDishStock('');
+                    }}>
+                    Add
+                  </Button>
+                </div>
+                {newDishes.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {newDishes.map((d, i) => (
+                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs px-2.5 py-1">
+                        {d.name} · ${(d.priceCents / 100).toFixed(2)}
+                        <button type="button" onClick={() => setNewDishes(newDishes.filter((_, j) => j !== i))} className="hover:text-red-600">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button onClick={() => saveFlyer(true)} disabled={saving || !title || overLimit}>
+                {saving ? 'Saving…' : 'Publish'}
+              </Button>
+              <Button variant="outline" onClick={() => saveFlyer(false)} disabled={saving || !title || overLimit}>
+                Save draft
+              </Button>
+              <Button variant="ghost" onClick={resetComposer} disabled={saving}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Flyer list */}
+      <Card>
+        <CardHeader><CardTitle>Your flyers</CardTitle></CardHeader>
+        <CardContent>
+          {flyers.length === 0 ? (
+            <p className="text-sm text-neutral-500 py-4">No flyers yet. Create one — it takes about a minute.</p>
+          ) : (
+            <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {flyers.map(f => (
+                <div key={f.id} className="py-4 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-neutral-900 dark:text-white">{f.title}</p>
+                      <span className={`text-xs rounded-full px-2 py-0.5 ${statusBadge(f.status)}`}>{f.status}</span>
+                    </div>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      {new Date(f.starts_at).toLocaleDateString()} → {new Date(f.ends_at).toLocaleDateString()}
+                      {' · '}{(f.tenant_flyer_items ?? []).length} items
+                      {f.impressions > 0 && ` · ${f.impressions} views`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(f.status === 'draft' || f.status === 'scheduled' || f.status === 'expired') && (
+                      <Button variant="outline" size="sm" disabled={saving}
+                        onClick={() => flyerAction(() => flyerService.publishFlyer(tenantId, f.id), 'Flyer published')}>
+                        <Upload className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {f.status !== 'suppressed' && f.status !== 'archived' && (
+                      <>
+                        <Button variant="outline" size="sm" disabled={saving} onClick={() => startEdit(f)}>Edit</Button>
+                        <Button variant="outline" size="sm" disabled={saving}
+                          onClick={() => flyerAction(() => flyerService.duplicateFlyer(tenantId, f.id), 'Flyer duplicated to next window')}>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => copyShareLink(f)}>
+                          <Share2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={saving}
+                          onClick={() => flyerAction(() => flyerService.archiveFlyer(tenantId, f.id), 'Flyer archived')}>
+                          <Archive className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Display options */}
+      <Card>
+        <CardHeader><CardTitle>Where your flyer appears</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {([
+            ['flyer_display', 'Show flyers', 'Master switch — hides the flyer everywhere', flyerCap.enabled],
+            ['flyer_storefront_display', 'Storefront', 'Your online store page', flyerCap.storefrontOn],
+            ['flyer_directory_display', 'Directory listing', 'Your public directory page', flyerCap.directoryOn],
+            ['flyer_place_display', 'Place page', 'Your /place business page', flyerCap.placeOn],
+            ['flyer_frozen_display', 'Frozen panel', '"From the freezer" section on live flyers', flyerCap.frozen],
+          ] as [keyof typeof options, string, string, boolean][]).map(([key, label, hint, allowed]) => (
+            <div key={key} className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-neutral-900 dark:text-white">{label}</p>
+                <p className="text-xs text-neutral-500">{hint}{!allowed && ' — not included in your plan'}</p>
+              </div>
+              <Switch
+                checked={!!options[key] && allowed}
+                disabled={!allowed}
+                onCheckedChange={(v) => setOptions({ ...options, [key]: v })}
+              />
+            </div>
+          ))}
+          <div>
+            <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Default flyer title</label>
+            <input
+              value={options.default_title} onChange={e => setOptions({ ...options, default_title: e.target.value })} maxLength={160}
+              className="mt-1 w-full max-w-sm rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            />
+          </div>
+          <Button onClick={saveOptions} disabled={saving} size="sm">{saving ? 'Saving…' : 'Save display settings'}</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

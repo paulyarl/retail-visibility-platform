@@ -159,6 +159,7 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'supplier-opensource-sync-nightly', scheduleLabel: 'nightly backfill', description: 'Open-source supplier nightly backfill' },
           { name: 'gbp-review-ingestion', scheduleLabel: 'hourly', description: 'Polls Google reviews, refreshes ratings, fires CRM alerts' },
           { name: 'gbp-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled GBP posts' },
+          { name: 'flyer-expiry-enforcer', scheduleLabel: 'every 5 minutes', description: 'Transitions flyer windows and releases orphan variants' },
           // Tier B autopilot — declared but NOT scheduled. Flip on via
           // startGbpReviewAutopilot() + GBP_AUTOPILOT_ENABLED (see jobs/gbpReviewAutopilot.ts).
           { name: 'gbp-review-autopilot', scheduleLabel: 'not scheduled — awaiting green light', description: 'Tier B: auto-publishes AI review replies for opted-in tenants' },
@@ -239,6 +240,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Featured products expiry monitor started (daily at midnight)');
       } catch (err) {
         logger.error('Failed to start featured products expiry monitor', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start flyer expiry enforcer (every 5 minutes) — scheduled→published→expired
+      try {
+        const { startFlyerExpiryEnforcer } = await import('./jobs/flyer-expiry-enforcer');
+        startFlyerExpiryEnforcer();
+        logger.info('Flyer expiry enforcer started (every 5 minutes)');
+      } catch (err) {
+        logger.error('Failed to start flyer expiry enforcer', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start featured expiration enforcer (every 5 minutes) — deactivates expired featured_products

@@ -48,6 +48,7 @@ import {
   PlatformServicesState,
   FunnelState,
   CouponOptionsState,
+  FlyerState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -847,6 +848,36 @@ export function useCouponOptionsCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch coupon options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useFlyerCapability
+// ====================
+
+export function useFlyerCapability(
+  tenantId: string | null
+): CapabilityHookState<FlyerState> {
+  const [data, setData] = useState<FlyerState | null>(null);
+  const [loading, setLoading] = useState(!!tenantId);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await unifiedCapabilityService.getFlyerState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch flyer capability');
     } finally {
       setLoading(false);
     }

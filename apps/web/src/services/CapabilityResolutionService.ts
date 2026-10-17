@@ -891,6 +891,36 @@ export interface GbpManagementState {
   features: Record<string, boolean>;
 }
 
+// --- Flyer (time-boxed specials surface) ---
+
+export interface FlyerState {
+  enabled: boolean;
+  isFlexible: boolean;
+  storefrontOn: boolean;
+  directoryOn: boolean;
+  placeOn: boolean;
+  image: boolean;
+  itemsLimit: number;
+  frozen: boolean;
+  gbpPublish: boolean;
+  recurring: boolean;
+  canUseStorefront: boolean;
+  canUseDirectory: boolean;
+  canUsePlace: boolean;
+  canUseFrozenPanel: boolean;
+  canUseGbpPublish: boolean;
+  canUseRecurring: boolean;
+  merchantPreferences: {
+    flyer_display: boolean;
+    flyer_storefront_display: boolean;
+    flyer_directory_display: boolean;
+    flyer_place_display: boolean;
+    flyer_frozen_display: boolean;
+    default_title: string;
+  } | null;
+  features: Record<string, boolean>;
+}
+
 /** Tier-only coupon allowance — what the plan offers, before merchant gates. */
 export interface CouponOptionsTierState {
   enabled: boolean;
@@ -1193,6 +1223,7 @@ export interface AllCapabilitiesState {
   couponOptions: CouponOptionsState;
   marketingOps: MarketingOpsState;
   gbpManagement: GbpManagementState;
+  flyer: FlyerState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -1239,6 +1270,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   marketing_ops_: 'marketing_ops',
   marketing_ops: 'marketing_ops',
   gbp_: 'gbp_management',
+  flyer_gbp_: 'flyer_gbp',
+  flyer_: 'flyer',
 };
 
 /**
@@ -3176,6 +3209,74 @@ export function resolveMarketingOpsState(
     canUseBatchExecution: enabled && (flexible || !!features.marketing_ops_batch_execution),
     canUseRevenueTracking: enabled && (flexible || !!features.marketing_ops_revenue_tracking),
     isFlexible: flexible,
+  };
+}
+
+/**
+ * Resolve flyer state from raw capability features.
+ * Feature prefix: flyer_ (module 'flyer'); flyer_gbp_ is a separate module —
+ * pass its features as gbpFeatures (kept out of flyer_flexible expansion).
+ * Spec: docs/LocalBiz/FLYER_SURFACE_SPEC.md §2.
+ */
+export function resolveFlyerState(
+  features: Record<string, boolean>,
+  gbpFeatures: Record<string, boolean> = {},
+  merchantPrefs?: {
+    flyer_display?: boolean | null;
+    flyer_storefront_display?: boolean | null;
+    flyer_directory_display?: boolean | null;
+    flyer_place_display?: boolean | null;
+    flyer_frozen_display?: boolean | null;
+    default_title?: string | null;
+  } | null,
+): FlyerState {
+  const disabled = !!features.flyer_disabled;
+  const flexible = !!features.flyer_flexible;
+  const mainOn = !disabled && Object.entries(features).some(
+    ([k, v]) => v && k.startsWith('flyer_') && k !== 'flyer_disabled',
+  );
+
+  const storefrontOn = mainOn && (flexible || !!features.flyer_storefront_on);
+  const directoryOn = mainOn && (flexible || !!features.flyer_directory_on);
+  const placeOn = mainOn && (flexible || !!features.flyer_place_on);
+  const image = mainOn && (flexible || !!features.flyer_image);
+  const itemsLimit = !mainOn ? 0
+    : flexible || features.flyer_items_20 ? 20
+    : features.flyer_items_10 ? 10
+    : features.flyer_items_5 ? 5
+    : 0;
+  const frozen = mainOn && (flexible || !!features.flyer_frozen);
+  const recurring = mainOn && (flexible || !!features.flyer_recurring);
+  const gbpPublish = !!gbpFeatures.flyer_gbp_publish;
+
+  const prefs = {
+    flyer_display: merchantPrefs?.flyer_display !== false,
+    flyer_storefront_display: merchantPrefs?.flyer_storefront_display !== false,
+    flyer_directory_display: merchantPrefs?.flyer_directory_display !== false,
+    flyer_place_display: merchantPrefs?.flyer_place_display !== false,
+    flyer_frozen_display: merchantPrefs?.flyer_frozen_display !== false,
+    default_title: merchantPrefs?.default_title || 'Featured Specials',
+  };
+
+  return {
+    enabled: mainOn,
+    isFlexible: flexible,
+    storefrontOn,
+    directoryOn,
+    placeOn,
+    image,
+    itemsLimit,
+    frozen,
+    gbpPublish,
+    recurring,
+    canUseStorefront: storefrontOn && prefs.flyer_display && prefs.flyer_storefront_display,
+    canUseDirectory: directoryOn && prefs.flyer_display && prefs.flyer_directory_display,
+    canUsePlace: placeOn && prefs.flyer_display && prefs.flyer_place_display,
+    canUseFrozenPanel: frozen && prefs.flyer_display && prefs.flyer_frozen_display,
+    canUseGbpPublish: mainOn && gbpPublish,
+    canUseRecurring: recurring,
+    merchantPreferences: prefs,
+    features,
   };
 }
 // UnifiedCapabilityService is the single service entry-point now.

@@ -62,6 +62,7 @@ export interface MerchantSettingsBundle {
   couponOptions: CouponOptionsMerchantSettings | null;
   funnelOptions: FunnelOptionsMerchantSettings | null;
   gbpManagement: GbpManagementMerchantSettings | null;
+  flyerOptions: FlyerMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -1046,6 +1047,48 @@ export interface CouponOptionsMerchantSettings {
 // GBP MANAGEMENT
 // ====================
 
+/**
+ * Flyer — time-boxed specials surface (migration 344, spec
+ * docs/LocalBiz/FLYER_SURFACE_SPEC.md). Merchant prefs are the per-surface
+ * soft-display toggles; tier keys grant the surfaces/sub-capabilities.
+ */
+export interface FlyerMerchantSettings {
+  flyer_display?: boolean | null;
+  flyer_storefront_display?: boolean | null;
+  flyer_directory_display?: boolean | null;
+  flyer_place_display?: boolean | null;
+  flyer_frozen_display?: boolean | null;
+  default_title?: string | null;
+}
+
+export interface EffectiveFlyer {
+  enabled: boolean;
+  is_flexible: boolean;
+  storefront_on: boolean;
+  directory_on: boolean;
+  place_on: boolean;
+  image: boolean;
+  items_limit: number;
+  frozen: boolean;
+  gbp_publish: boolean;
+  recurring: boolean;
+  can_use_storefront: boolean;
+  can_use_directory: boolean;
+  can_use_place: boolean;
+  can_use_frozen_panel: boolean;
+  can_use_gbp_publish: boolean;
+  can_use_recurring: boolean;
+  merchant_preferences: {
+    flyer_display: boolean;
+    flyer_storefront_display: boolean;
+    flyer_directory_display: boolean;
+    flyer_place_display: boolean;
+    flyer_frozen_display: boolean;
+    default_title: string;
+  };
+  features: Record<string, boolean>;
+}
+
 export interface GbpManagementMerchantSettings {
   gbp_reviews_display?: boolean | null;
   gbp_content_display?: boolean | null;
@@ -1125,6 +1168,7 @@ export interface EffectiveCapabilities {
     coupon_options: EffectiveCouponOptions;
     marketing_ops: EffectiveMarketingOps;
     gbp_management: EffectiveGbpManagement;
+    flyer: EffectiveFlyer;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

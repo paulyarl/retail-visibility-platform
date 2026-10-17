@@ -53,6 +53,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'coupon_options', label: 'Coupons', icon: '🏷️', prefix: 'coupon_', settingsPath: '/settings/coupon-options' },
   { key: 'marketing_ops', label: 'Marketing Ops', icon: '📣', prefix: 'marketing_ops_', settingsPath: '/settings/admin/marketing-ops' },
   { key: 'gbp_management', label: 'GBP Management', icon: '📍', prefix: 'gbp_', settingsPath: '/settings/integration-options' },
+  { key: 'flyer', label: 'Specials Flyer', icon: '📄', prefix: 'flyer_', settingsPath: '/settings/flyers' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {
@@ -114,6 +115,7 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'coupon_options': return !!caps.couponOptions?.enabled;
     case 'marketing_ops': return !!caps.marketingOps?.enabled;
     case 'gbp_management': return !!caps.gbpManagement?.enabled;
+    case 'flyer': return !!caps.flyer?.enabled;
     default: return false;
   }
 }

@@ -2892,6 +2892,7 @@ model inventory_items {
   product_variants                                                                product_variants[]
   shopping_cart_items                                                             shopping_cart_items[]
   store_reviews                                                                   store_reviews[]
+  tenant_flyer_items                                                              tenant_flyer_items[]
   tenant_sales_funnels                                                            tenant_sales_funnels[]
 
   @@unique([tenant_id, sku])
@@ -5338,25 +5339,26 @@ model product_suppliers {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model product_variants {
-  id                String              @id
-  parent_item_id    String
-  tenant_id         String
-  sku               String
-  variant_name      String
-  price_cents       Int?
-  sale_price_cents  Int?
-  stock             Int                 @default(0)
-  image_url         String?
-  attributes        Json                @default("{}")
-  sort_order        Int?                @default(0)
-  is_active         Boolean?            @default(true)
-  created_at        DateTime?           @default(now()) @db.Timestamp(6)
-  updated_at        DateTime?           @default(now()) @db.Timestamp(6)
-  digital_downloads digital_downloads[]
-  order_items       order_items[]
-  photo_assets      photo_assets[]
-  tenants           tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant")
-  inventory_items   inventory_items     @relation(fields: [parent_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 String               @id
+  parent_item_id     String
+  tenant_id          String
+  sku                String
+  variant_name       String
+  price_cents        Int?
+  sale_price_cents   Int?
+  stock              Int                  @default(0)
+  image_url          String?
+  attributes         Json                 @default("{}")
+  sort_order         Int?                 @default(0)
+  is_active          Boolean?             @default(true)
+  created_at         DateTime?            @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamp(6)
+  digital_downloads  digital_downloads[]
+  order_items        order_items[]
+  photo_assets       photo_assets[]
+  tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant")
+  inventory_items    inventory_items      @relation(fields: [parent_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant_flyer_items tenant_flyer_items[]
 
   @@unique([tenant_id, sku], map: "unique_tenant_variant_sku")
   @@index([parent_item_id], map: "idx_product_variants_parent")
@@ -6750,10 +6752,10 @@ model tenant_gbp_options_settings {
   tenant_id                String    @unique @db.VarChar(50)
   gbp_reviews_display      Boolean?  @default(true)
   gbp_content_display      Boolean?  @default(true)
-  gbp_autopilot_enabled    Boolean?  @default(false)
-  gbp_autopilot_min_rating Int?      @default(5)
   created_at               DateTime? @default(now()) @db.Timestamptz(6)
   updated_at               DateTime? @default(now()) @db.Timestamptz(6)
+  gbp_autopilot_enabled    Boolean?  @default(false)
+  gbp_autopilot_min_rating Int?      @default(5)
   tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id], map: "idx_tenant_gbp_options_settings_tenant")
@@ -7380,6 +7382,9 @@ model tenants {
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
   tenant_feature_purchases                                                               tenant_feature_purchases[]
   tenant_featured_options_settings                                                       tenant_featured_options_settings?
+  tenant_flyer_card_orders                                                               tenant_flyer_card_orders[]
+  tenant_flyer_options_settings                                                          tenant_flyer_options_settings?
+  tenant_flyers                                                                          tenant_flyers[]
   tenant_fulfillment_settings                                                            tenant_fulfillment_settings?
   tenant_funnel_options_settings                                                         tenant_funnel_options_settings?
   tenant_gbp_options_settings                                                            tenant_gbp_options_settings?
@@ -8305,6 +8310,100 @@ model custom_domains {
 
   @@index([status], map: "idx_custom_domains_status")
   @@index([tenant_id], map: "idx_custom_domains_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_flyer_card_orders {
+  id               String   @id @db.VarChar(50)
+  tenant_id        String   @db.VarChar(255)
+  pack_size        Int
+  pack_count       Int      @default(1)
+  vendor           String   @db.VarChar(32)
+  vendor_order_id  String?  @db.VarChar(128)
+  status           String   @default("submitted") @db.VarChar(16)
+  shipping_address Json?
+  unit_cost_cents  Int?
+  total_cost_cents Int?
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+  tenants          tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_tenant_flyer_card_orders_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_flyer_items {
+  id                String            @id @db.VarChar(50)
+  flyer_id          String            @db.VarChar(50)
+  inventory_item_id String?           @db.VarChar(255)
+  variant_id        String?           @db.VarChar(255)
+  sort_order        Int               @default(0)
+  note              String?           @db.VarChar(120)
+  tenant_flyers     tenant_flyers     @relation(fields: [flyer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  inventory_items   inventory_items?  @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_variants  product_variants? @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([flyer_id, sort_order], map: "idx_flyer_items_flyer")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_flyer_options_settings {
+  id                       String    @id @db.VarChar(255)
+  tenant_id                String    @unique @db.VarChar(255)
+  flyer_display            Boolean?  @default(true)
+  flyer_storefront_display Boolean?  @default(true)
+  flyer_directory_display  Boolean?  @default(true)
+  flyer_place_display      Boolean?  @default(true)
+  flyer_frozen_display     Boolean?  @default(true)
+  default_title            String?   @default("Featured Specials") @db.VarChar(160)
+  created_at               DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime? @default(now()) @db.Timestamptz(6)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_tenant_flyer_options_settings_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_flyer_reports {
+  id            String        @id @db.VarChar(50)
+  flyer_id      String        @db.VarChar(50)
+  reason        String        @db.VarChar(32)
+  detail        String?
+  reporter_ip   String?       @db.VarChar(64)
+  status        String        @default("open") @db.VarChar(16)
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  tenant_flyers tenant_flyers @relation(fields: [flyer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([flyer_id, created_at(sort: Desc)], map: "idx_tenant_flyer_reports_flyer")
+  @@index([status, created_at(sort: Desc)], map: "idx_tenant_flyer_reports_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_flyers {
+  id                   String                 @id @db.VarChar(50)
+  tenant_id            String                 @db.VarChar(255)
+  title                String                 @db.VarChar(160)
+  summary              String?
+  hero_image_url       String?
+  starts_at            DateTime               @db.Timestamptz(6)
+  ends_at              DateTime               @db.Timestamptz(6)
+  status               String                 @default("draft") @db.VarChar(20)
+  cta_mode             String                 @default("auto") @db.VarChar(16)
+  share_code           String?                @unique @db.VarChar(12)
+  impressions          Int                    @default(0)
+  clicks               Int                    @default(0)
+  gbp_post_id          String?                @db.VarChar(50)
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime               @default(now()) @db.Timestamptz(6)
+  tenant_flyer_items   tenant_flyer_items[]
+  tenant_flyer_reports tenant_flyer_reports[]
+  tenants              tenants                @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id, status, ends_at(sort: Desc)], map: "idx_tenant_flyers_tenant_status")
 }
 
 enum action {

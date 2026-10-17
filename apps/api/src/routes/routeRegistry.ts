@@ -225,6 +225,7 @@ import gbpCustomerRoutes from '../routes/gbp-customer';
 import gbpOptionsSettingsRoutes from '../routes/gbp-options-settings';
 import gbpMonitorRoutes from '../routes/gbp-monitor';
 import directoryGbpPublicRoutes from '../routes/directory-gbp-public';
+import { flyerPublicDirectoryRoutes, flyerPublicStandaloneRoutes } from '../routes/public-flyer';
 import recoveryIntakePublicRoutes from '../routes/recovery-intake-public';
 
 // Inline handler route files (extracted from index.ts)
@@ -1341,6 +1342,20 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'public',
     authLevel: 'public',
     comment: 'Public GBP content surfacing — reviews, posts, photos (Subsystems 6+7)',
+  },
+  {
+    path: '/api/public/directory',
+    router: flyerPublicDirectoryRoutes,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Public flyer surfacing — GET /:slug/flyers (spec: FLYER_SURFACE_SPEC §5)',
+  },
+  {
+    path: '/api/public/flyer',
+    router: flyerPublicStandaloneRoutes,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Standalone flyer page + report + events at /api/public/flyer/:code{,/report,/events}',
   },
   {
     path: '/api',

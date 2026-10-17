@@ -26,6 +26,7 @@ import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
+import FlyerSection from '@/components/storefront/FlyerSection';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 
@@ -141,6 +142,8 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
         <section className="max-w-6xl mx-auto px-6 -mt-6 relative z-20 mb-8">
           <CouponSpotlight tenantId={listing.tenantId} variant="banner" />
         </section>
+
+        <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
 
         {/* Asymmetric Content Grid */}
         <div className="max-w-6xl mx-auto px-6 py-12">

@@ -2367,3 +2367,58 @@ export function generateCustomDomainId(tenantId: string): string {
   return `cdm-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
+/**
+ * Generate flyer ID (tenant-scoped)
+ * Format: fly-{tenantKey}-{nanoid}
+ * tenant_flyers — time-boxed specials flyer (migration 344)
+ */
+export function generateFlyerId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fly-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate flyer item link ID (tenant-scoped)
+ * Format: fli-{tenantKey}-{nanoid}
+ */
+export function generateFlyerItemId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fli-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate flyer options settings row ID (tenant-scoped)
+ * Format: flos-{tenantKey}-{nanoid}
+ */
+export function generateFlyerOptionsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `flos-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate flyer report ID (tenant-scoped via flyer ownership)
+ * Format: flr-{tenantKey}-{nanoid}
+ */
+export function generateFlyerReportId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `flr-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate flyer card-order ID (tenant-scoped)
+ * Format: fco-{tenantKey}-{nanoid}
+ */
+export function generateFlyerCardOrderId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fco-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate flyer share code (12-char nanoid, no prefix)
+ * Format: {nanoid} — matches preview/dispute token style; used in /flyer/<code> URLs
+ */
+export function generateFlyerShareCode(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return nanoid();
+}
+

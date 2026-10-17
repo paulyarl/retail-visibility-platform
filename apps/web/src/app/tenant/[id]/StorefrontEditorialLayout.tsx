@@ -20,6 +20,7 @@ import TenantMapSection from '@/components/tenant/TenantMapSection';
 // Products & catalog
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
+import FlyerSection from '@/components/storefront/FlyerSection';
 import ProductSearch from '@/components/storefront/ProductSearch';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 
@@ -954,6 +955,13 @@ export default function StorefrontEditorialLayout({
             </div>
           </div>
         </section>
+      )}
+
+      {/* ================================================================= */}
+      {/* FLYER — time-boxed specials (self-gating)                          */}
+      {/* ================================================================= */}
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (
+        <FlyerSection tenantId={tenantId} tenantSlug={tenant.slug} tenantName={tenant.name} surface="storefront" />
       )}
 
       {/* ================================================================= */}

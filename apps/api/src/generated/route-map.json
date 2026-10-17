@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-17T14:34:37.077Z",
-  "totalMounts": 243,
-  "totalRoutes": 2907,
+  "generatedAt": "2026-10-17T17:02:43.221Z",
+  "totalMounts": 245,
+  "totalRoutes": 2922,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -8802,6 +8802,123 @@
         },
         {
           "method": "GET",
+          "path": "/:tenantId/flyers",
+          "fullPath": "/api/tenants/:tenantId/flyers",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/flyers",
+          "fullPath": "/api/tenants/:tenantId/flyers",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/flyers/repertoire",
+          "fullPath": "/api/tenants/:tenantId/flyers/repertoire",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PATCH",
+          "path": "/:tenantId/flyers/:flyerId",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "DELETE",
+          "path": "/:tenantId/flyers/:flyerId",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/:tenantId/flyers/:flyerId/items",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId/items",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/flyers/:flyerId/publish",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId/publish",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/flyers/:flyerId/share-assets",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId/share-assets",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:tenantId/flyers/:flyerId/duplicate",
+          "fullPath": "/api/tenants/:tenantId/flyers/:flyerId/duplicate",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/flyer-options",
+          "fullPath": "/api/tenants/:tenantId/flyer-options",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/:tenantId/flyer-options",
+          "fullPath": "/api/tenants/:tenantId/flyer-options",
+          "middleware": [
+            "authenticateToken",
+            "checkTenantAccess",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
           "path": "/",
           "fullPath": "/api/tenants",
           "middleware": [
@@ -15920,6 +16037,54 @@
           "method": "GET",
           "path": "/:slug/gbp-photos",
           "fullPath": "/api/public/directory/:slug/gbp-photos",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        }
+      ]
+    },
+    {
+      "mountPath": "/api/public/directory",
+      "domain": "public",
+      "authLevel": "public",
+      "comment": "Public flyer surfacing — GET /:slug/flyers (spec: FLYER_SURFACE_SPEC §5)",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/:slug/flyers",
+          "fullPath": "/api/public/directory/:slug/flyers",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        }
+      ]
+    },
+    {
+      "mountPath": "/api/public/flyer",
+      "domain": "public",
+      "authLevel": "public",
+      "comment": "Standalone flyer page + report + events at /api/public/flyer/:code{,/report,/events}",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/:code",
+          "fullPath": "/api/public/flyer/:code",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:code/report",
+          "fullPath": "/api/public/flyer/:code/report",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/:code/events",
+          "fullPath": "/api/public/flyer/:code/events",
           "middleware": [
             "AsyncFunction"
           ]

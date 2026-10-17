@@ -12,6 +12,7 @@ import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursColla
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
+import FlyerSection from '@/components/storefront/FlyerSection';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import LastViewed from '@/components/directory/LastViewed';
@@ -602,6 +603,11 @@ export default function StorefrontImmersiveLayout({
           isSocialStore={isSocialStore}
           socialCommerceFlags={socialCommerceFlags}
         />
+      )}
+
+      {/* FLYER — time-boxed specials (self-gating) */}
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (
+        <FlyerSection tenantId={tenantId} tenantSlug={tenant.slug} tenantName={tenant.name ?? businessName} surface="storefront" />
       )}
 
       {/* TABBED FEATURED SECTIONS */}

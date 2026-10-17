@@ -19,6 +19,7 @@ import UnclaimedDirectoryBanner from '@/components/directory/UnclaimedDirectoryB
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
+import FlyerSection from '@/components/storefront/FlyerSection';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import { MarketIntelSidebar } from '@/components/place/MarketIntelSidebar';
@@ -221,6 +222,8 @@ export default function PlaceEntryEditorialLayout({
         <section className="max-w-6xl mx-auto px-6 -mt-4 relative z-20 mb-4">
           <CouponSpotlight tenantId={tenantId} variant="banner" />
         </section>
+
+        <FlyerSection tenantSlug={tenantId} tenantId={tenantId} surface="place" />
 
         <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
           <UnclaimedDirectoryBanner businessName={listing.businessName} />

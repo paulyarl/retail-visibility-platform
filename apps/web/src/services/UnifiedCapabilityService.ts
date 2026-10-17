@@ -99,6 +99,7 @@ import {
   CouponDiscountType,
   MarketingOpsState,
   GbpManagementState,
+  FlyerState,
 } from './CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -167,6 +168,7 @@ export interface BackendEffectiveCapabilities {
     coupon_options: BackendEffectiveCouponOptions;
     marketing_ops: BackendEffectiveMarketingOps;
     gbp_management: BackendEffectiveGbpManagement;
+    flyer: BackendEffectiveFlyer;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -1221,6 +1223,70 @@ interface BackendEffectiveGbpManagement {
   features: Record<string, boolean>;
 }
 
+interface BackendEffectiveFlyer {
+  enabled: boolean;
+  is_flexible: boolean;
+  storefront_on: boolean;
+  directory_on: boolean;
+  place_on: boolean;
+  image: boolean;
+  items_limit: number;
+  frozen: boolean;
+  gbp_publish: boolean;
+  recurring: boolean;
+  can_use_storefront: boolean;
+  can_use_directory: boolean;
+  can_use_place: boolean;
+  can_use_frozen_panel: boolean;
+  can_use_gbp_publish: boolean;
+  can_use_recurring: boolean;
+  merchant_preferences: {
+    flyer_display: boolean;
+    flyer_storefront_display: boolean;
+    flyer_directory_display: boolean;
+    flyer_place_display: boolean;
+    flyer_frozen_display: boolean;
+    default_title: string;
+  };
+  features: Record<string, boolean>;
+}
+
+const FLYER_FALLBACK: BackendEffectiveFlyer = {
+  enabled: false, is_flexible: false,
+  storefront_on: false, directory_on: false, place_on: false,
+  image: false, items_limit: 0, frozen: false, gbp_publish: false, recurring: false,
+  can_use_storefront: false, can_use_directory: false, can_use_place: false,
+  can_use_frozen_panel: false, can_use_gbp_publish: false, can_use_recurring: false,
+  merchant_preferences: {
+    flyer_display: false, flyer_storefront_display: false, flyer_directory_display: false,
+    flyer_place_display: false, flyer_frozen_display: false, default_title: 'Featured Specials',
+  },
+  features: {},
+};
+
+function mapFlyer(b: BackendEffectiveFlyer): FlyerState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    storefrontOn: b.storefront_on,
+    directoryOn: b.directory_on,
+    placeOn: b.place_on,
+    image: b.image,
+    itemsLimit: b.items_limit,
+    frozen: b.frozen,
+    gbpPublish: b.gbp_publish,
+    recurring: b.recurring,
+    canUseStorefront: b.can_use_storefront,
+    canUseDirectory: b.can_use_directory,
+    canUsePlace: b.can_use_place,
+    canUseFrozenPanel: b.can_use_frozen_panel,
+    canUseGbpPublish: b.can_use_gbp_publish,
+    canUseRecurring: b.can_use_recurring,
+    merchantPreferences: b.merchant_preferences ?? null,
+    features: b.features ?? {},
+  };
+}
+
 function mapGbpManagement(b: BackendEffectiveGbpManagement): GbpManagementState {
   return {
     enabled: b.enabled,
@@ -1363,6 +1429,7 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     couponOptions: mapCouponOptions(b.effective.coupon_options),
     marketingOps: mapMarketingOps(b.effective.marketing_ops),
     gbpManagement: mapGbpManagement(b.effective.gbp_management),
+    flyer: mapFlyer(b.effective.flyer ?? FLYER_FALLBACK),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1681,6 +1748,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.wholesaleMatching;
   }
 
+  async getFlyerState(tenantId: string, ssrAuth?: SsrAuth): Promise<FlyerState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.flyer;
+  }
+
   async checkFeatureByCapability(tenantId: string, featureKey: string, ssrAuth?: SsrAuth): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
@@ -1717,6 +1789,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   platform_service_: 'platformServices',
   platform_services_: 'platformServices',
   coupon_: 'couponOptions',
+  flyer_: 'flyer',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

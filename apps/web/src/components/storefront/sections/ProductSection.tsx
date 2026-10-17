@@ -11,6 +11,7 @@ import ProductCategorySidebar from '@/components/storefront/ProductCategorySideb
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
+import FlyerSection from '@/components/storefront/FlyerSection';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
@@ -251,6 +252,11 @@ function ClassicProductSection({
             )}
           </div>
         </div>
+      )}
+
+      {/* Flyer — time-boxed specials (self-gating on capability + live flyer) */}
+      {!storefrontStatus.shouldShowPanel && (
+        <FlyerSection tenantId={tenantId} tenantSlug={tenant.slug} tenantName={businessName} surface="storefront" />
       )}
 
       {/* Featured Products Showcase */}
