@@ -51,6 +51,7 @@ import socialCommerceOptionsSettingsRoutes from './social-commerce-options-setti
 import chatbotOptionsSettingsRoutes from './chatbot-options-settings';
 import barcodeScanSettingsRoutes from './barcode-scan-settings';
 import integrationOptionsSettingsRoutes from './integration-options-settings';
+import gbpOptionsSettingsRoutes from './gbp-options-settings';
 import wholesaleMatchingRoutes from './wholesale-matching';
 import wholesaleMatchingOptionsSettingsRoutes from './wholesale-matching-options-settings';
 import paymentGatewaySettingsRoutes from './payment-gateway-settings';
@@ -102,6 +103,7 @@ router.use('/', socialCommerceOptionsSettingsRoutes);
 router.use('/', chatbotOptionsSettingsRoutes);
 router.use('/', barcodeScanSettingsRoutes);
 router.use('/', integrationOptionsSettingsRoutes);
+router.use('/', gbpOptionsSettingsRoutes);
 router.use('/', paymentGatewaySettingsRoutes);
 router.use('/', wholesaleMatchingRoutes);
 router.use('/', wholesaleMatchingOptionsSettingsRoutes);

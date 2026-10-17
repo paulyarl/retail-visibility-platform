@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-16T19:29:08.814Z",
+  "generatedAt": "2026-10-17T14:34:37.077Z",
   "totalMounts": 243,
-  "totalRoutes": 2894,
+  "totalRoutes": 2907,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -8520,6 +8520,34 @@
         },
         {
           "method": "GET",
+          "path": "/:tenantId/gbp-options",
+          "fullPath": "/api/tenants/:tenantId/gbp-options",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/gbp-options/capability",
+          "fullPath": "/api/tenants/:tenantId/gbp-options/capability",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/:tenantId/gbp-options",
+          "fullPath": "/api/tenants/:tenantId/gbp-options",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
           "path": "/:tenantId/payment-gateway-settings",
           "fullPath": "/api/tenants/:tenantId/payment-gateway-settings",
           "middleware": [
@@ -13779,6 +13807,14 @@
         },
         {
           "method": "POST",
+          "path": "/google/business/unlink-location",
+          "fullPath": "/api/google/business/unlink-location",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
           "path": "/google/business/sync",
           "fullPath": "/api/google/business/sync",
           "middleware": [
@@ -13814,6 +13850,7 @@
           "path": "/google/business/media",
           "fullPath": "/api/google/business/media",
           "middleware": [
+            "multerMiddleware",
             "AsyncFunction"
           ]
         },
@@ -13869,6 +13906,22 @@
           "method": "DELETE",
           "path": "/google/business/reviews/:reviewName/reply",
           "fullPath": "/api/google/business/reviews/:reviewName/reply",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/google/business/reviews/:reviewName/ai-draft",
+          "fullPath": "/api/google/business/reviews/:reviewName/ai-draft",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/google/business/reviews/:reviewName/dispute",
+          "fullPath": "/api/google/business/reviews/:reviewName/dispute",
           "middleware": [
             "AsyncFunction"
           ]
@@ -14019,6 +14072,14 @@
         },
         {
           "method": "POST",
+          "path": "/google/business/unlink-location",
+          "fullPath": "/auth/google/business/unlink-location",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
           "path": "/google/business/sync",
           "fullPath": "/auth/google/business/sync",
           "middleware": [
@@ -14054,6 +14115,7 @@
           "path": "/google/business/media",
           "fullPath": "/auth/google/business/media",
           "middleware": [
+            "multerMiddleware",
             "AsyncFunction"
           ]
         },
@@ -14109,6 +14171,22 @@
           "method": "DELETE",
           "path": "/google/business/reviews/:reviewName/reply",
           "fullPath": "/auth/google/business/reviews/:reviewName/reply",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/google/business/reviews/:reviewName/ai-draft",
+          "fullPath": "/auth/google/business/reviews/:reviewName/ai-draft",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/google/business/reviews/:reviewName/dispute",
+          "fullPath": "/auth/google/business/reviews/:reviewName/dispute",
           "middleware": [
             "AsyncFunction"
           ]
@@ -15790,6 +15868,15 @@
           "method": "GET",
           "path": "/:tenantId/gbp-options",
           "fullPath": "/api/:tenantId/gbp-options",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/gbp-options/capability",
+          "fullPath": "/api/:tenantId/gbp-options/capability",
           "middleware": [
             "authenticateToken",
             "AsyncFunction"
@@ -24840,6 +24927,14 @@
         },
         {
           "method": "POST",
+          "path": "/google/business/unlink-location",
+          "fullPath": "/api/google-business/google/business/unlink-location",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
           "path": "/google/business/sync",
           "fullPath": "/api/google-business/google/business/sync",
           "middleware": [
@@ -24875,6 +24970,7 @@
           "path": "/google/business/media",
           "fullPath": "/api/google-business/google/business/media",
           "middleware": [
+            "multerMiddleware",
             "AsyncFunction"
           ]
         },
@@ -24930,6 +25026,22 @@
           "method": "DELETE",
           "path": "/google/business/reviews/:reviewName/reply",
           "fullPath": "/api/google-business/google/business/reviews/:reviewName/reply",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/google/business/reviews/:reviewName/ai-draft",
+          "fullPath": "/api/google-business/google/business/reviews/:reviewName/ai-draft",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/google/business/reviews/:reviewName/dispute",
+          "fullPath": "/api/google-business/google/business/reviews/:reviewName/dispute",
           "middleware": [
             "AsyncFunction"
           ]

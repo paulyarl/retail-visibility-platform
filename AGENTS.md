@@ -1310,6 +1310,7 @@ A capability module (`gbp_management`) that converts Marketing Ops prospects int
 - `gbp_content_display` (default true) — controls whether entitled posts/photos surface on public pages
 - Settings route: `apps/api/src/routes/gbp-options-settings.ts` (`GET/PUT /api/tenants/:tenantId/gbp-options`)
 - PUT handler calls `invalidateEffectiveCapabilities(tenantId)` to clear in-memory + MV caches
+- **Mount requirement:** the router declares orchestrator-style paths (`/:tenantId/gbp-options`), so it must be mounted in the tenant orchestrator (`router.use('/', gbpOptionsSettingsRoutes)` in `tenant.routes.ts`) to be reachable at the documented `/api/tenants/:tenantId/gbp-options`. Registering it at `/api` in `routeRegistry.ts` alone yields only `/api/:tenantId/gbp-options` — every other tenant-scoped settings router (product/featured/storefront/…) lives in the orchestrator for this reason. Regression: `apps/api/src/tests/tenant-gbp-options-routes.test.ts` (added 2026-10-17 after the page 404'd).
 
 ### Two-Gate Architecture (R33 Compliant)
 - **Hard gate (entitlement):** `gbp_directory_reviews` / `gbp_directory_content` / `gbp_ai_response` / `gbp_posts_scheduler` from tier, BSaaS, grants, or admin complimentary
