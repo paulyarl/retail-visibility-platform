@@ -2041,3 +2041,11 @@ Regression guard: `PlatformHomeSingletonService.gbpLocations.test.ts` (six cases
 
 Guard: `src/tests/gbp-locations-fixture.test.ts` gained four `unlink-location` cases (locationId-scoped delete, account-wide delete, no-op without an account, 400 without tenantId).
 
+
+### Server-resolved auth user has no `tenants` — normalize before consumers read it (added 2026-10-17)
+
+The root `layout.tsx` seeds `AuthProvider` with the Auth0 profile decoded from the session cookie (`ServerResolvedAuth['user']`) — **it carries no `tenants` array and no DB `role`**. `AuthProvider` stores that partial object as `user` while `isLoading` is still `true`, so any consumer that reads `user.tenants` without a guard crashes on first client render. Symptom: a page-level error boundary reading `can't access property "find", o.tenants is undefined` (e.g. `/t/{tenantId}/settings/integrations`, stack pointing at `useTenantTier`). Fixes applied: `AuthProvider` normalizes the seed (`tenants: serverUser.tenants ?? []`), and `useTenantTier` guards its lookup (`userData.tenants?.find(...)`). The `User` type declares `tenants` as required, so TypeScript will not flag the unguarded reads — grep `\.tenants\.(find|map|length|some)` when touching auth-consuming code.
+
+### GMC Products tab surfaces validation detail inline (added 2026-10-17)
+
+The Overview banners say "check the Products tab for details" for the Google Shopping validation counts, but `ProductsTab` only rendered the compliance report behind a manual "Run Validation" click and showed nothing per-product in the table. The tab now auto-loads `gmcValidationService.getValidationReport` on mount (and after a successful sync), adds a **Validation** column keyed by `inventory_items.id` via the exported pure helper `buildValidationIndex` (only items with ≥1 issue are indexed), and expands a row to list every `field: message` so the merchant sees exactly what to fix. The report covers `visibility='public'` + `product_type IN ('physical','hybrid')` + non-trashed items only, so rows outside that set render `—`. Note the API validator's ERROR set is title/description(<30)/image_url/price — *not* availability, despite the Overview banner's parenthetical.

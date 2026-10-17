@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Button } from '@mantine/core';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { gmcValidationService, BulkValidationReport } from '@/services/GMCValidationService';
+import {
+  gmcValidationService,
+  BulkValidationReport,
+  ValidationResult,
+} from '@/services/GMCValidationService';
 import GmcSyncAvailabilityNotice from '@/components/google/GmcSyncAvailabilityNotice';
 import {
   CheckCircle,
@@ -13,6 +17,8 @@ import {
   RefreshCw,
   Search,
   ShoppingBag,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -42,6 +48,23 @@ interface ProductsTabProps {
 
 type StatusFilter = 'all' | 'success' | 'pending' | 'error';
 
+/**
+ * Index a bulk validation report by inventory item id so each table row can
+ * surface its own issues. Only items carrying at least one issue are indexed —
+ * everything else reads as clean/not-validated.
+ */
+export function buildValidationIndex(
+  report: BulkValidationReport | null
+): Map<string, ValidationResult> {
+  const index = new Map<string, ValidationResult>();
+  for (const result of report?.results || []) {
+    if (result.validation.issues.length > 0) {
+      index.set(result.itemId, result.validation);
+    }
+  }
+  return index;
+}
+
 export default function ProductsTab({
   tenantId,
   gmcConnected,
@@ -61,6 +84,9 @@ export default function ProductsTab({
   const [validationReport, setValidationReport] = useState<BulkValidationReport | null>(null);
   const [loadingValidation, setLoadingValidation] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const validationIndex = buildValidationIndex(validationReport);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -113,7 +139,7 @@ export default function ProductsTab({
     }
   }, [syncResult, fetchProducts]);
 
-  async function handleLoadValidation() {
+  const loadValidation = useCallback(async () => {
     try {
       setLoadingValidation(true);
       const report = await gmcValidationService.getValidationReport(tenantId);
@@ -123,7 +149,24 @@ export default function ProductsTab({
     } finally {
       setLoadingValidation(false);
     }
-  }
+  }, [tenantId]);
+
+  // Load the compliance report up front — the Overview banners point merchants
+  // here for the per-product "what to fix" detail, so it must not sit behind a
+  // manual button click.
+  useEffect(() => {
+    if (tenantId && gmcConnected) {
+      loadValidation();
+    }
+  }, [tenantId, gmcConnected, loadValidation]);
+
+  // Re-run the compliance check after a successful sync so the table reflects
+  // what Google actually received.
+  useEffect(() => {
+    if (syncResult?.success) {
+      loadValidation();
+    }
+  }, [syncResult, loadValidation]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -140,6 +183,35 @@ export default function ProductsTab({
     } else {
       setSelectedIds(new Set(products.map((p) => p.id)));
     }
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function getValidationBadge(validation?: ValidationResult) {
+    if (!validation) {
+      return <span className="text-xs text-neutral-400">—</span>;
+    }
+    if (validation.errors > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200">
+          <XCircle className="w-3 h-3" />
+          {validation.errors} error{validation.errors !== 1 ? 's' : ''}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+        <AlertTriangle className="w-3 h-3" />
+        {validation.warnings} recommendation{validation.warnings !== 1 ? 's' : ''}
+      </span>
+    );
   }
 
   function getStatusBadge(status: string) {
@@ -311,6 +383,7 @@ export default function ProductsTab({
                 </th>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">SKU</th>
+                <th className="px-4 py-3">Validation</th>
                 <th className="px-4 py-3">Sync Status</th>
                 <th className="px-4 py-3">Last Synced</th>
                 <th className="px-4 py-3">Error</th>
@@ -319,52 +392,97 @@ export default function ProductsTab({
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center">
+                  <td colSpan={7} className="px-4 py-8 text-center">
                     <RefreshCw className="w-6 h-6 animate-spin text-neutral-400 mx-auto mb-2" />
                     <p className="text-sm text-neutral-500">Loading products...</p>
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center">
+                  <td colSpan={7} className="px-4 py-8 text-center">
                     <p className="text-sm text-neutral-500">No products found.</p>
                   </td>
                 </tr>
               ) : (
-                products.map((product) => (
-                  <tr key={product.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-900/30">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(product.id)}
-                        onChange={() => toggleSelect(product.id)}
-                        className="rounded border-neutral-300"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                        {product.title}
-                      </div>
-                      {product.productType && (
-                        <div className="text-xs text-neutral-400 capitalize">{product.productType}</div>
+                products.map((product) => {
+                  const validation = validationIndex.get(product.id);
+                  const isExpanded = expandedIds.has(product.id);
+                  return (
+                    <Fragment key={product.id}>
+                      <tr className="hover:bg-neutral-50 dark:hover:bg-neutral-900/30">
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(product.id)}
+                            onChange={() => toggleSelect(product.id)}
+                            className="rounded border-neutral-300"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                            {product.title}
+                          </div>
+                          {product.productType && (
+                            <div className="text-xs text-neutral-400 capitalize">{product.productType}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 font-mono">
+                          {product.sku || '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {getValidationBadge(validation)}
+                            {validation && (
+                              <button
+                                onClick={() => toggleExpand(product.id)}
+                                aria-expanded={isExpanded}
+                                aria-label={isExpanded ? 'Hide validation details' : 'Show validation details'}
+                                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {getStatusBadge(product.syncStatus)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-neutral-500">
+                          {product.syncedAt
+                            ? new Date(product.syncedAt).toLocaleDateString()
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-red-600 dark:text-red-400 max-w-[200px] truncate">
+                          {product.syncError || '—'}
+                        </td>
+                      </tr>
+                      {validation && isExpanded && (
+                        <tr className="bg-neutral-50 dark:bg-neutral-900/30">
+                          <td colSpan={7} className="px-4 py-3">
+                            <ul className="space-y-1">
+                              {validation.issues.map((issue, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-xs">
+                                  {issue.severity === 'error' ? (
+                                    <XCircle className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
+                                  ) : (
+                                    <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
+                                  )}
+                                  <span className="text-neutral-700 dark:text-neutral-300">
+                                    <span className="font-medium">{issue.field}:</span> {issue.message}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400 font-mono">
-                      {product.sku || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getStatusBadge(product.syncStatus)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-500">
-                      {product.syncedAt
-                        ? new Date(product.syncedAt).toLocaleDateString()
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-red-600 dark:text-red-400 max-w-[200px] truncate">
-                      {product.syncError || '—'}
-                    </td>
-                  </tr>
-                ))
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -384,7 +502,7 @@ export default function ProductsTab({
             <p className="text-sm text-neutral-500">Pre-sync compliance check for Google Shopping</p>
           </div>
           <button
-            onClick={handleLoadValidation}
+            onClick={loadValidation}
             disabled={loadingValidation}
             className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-lg transition-colors disabled:opacity-50"
           >

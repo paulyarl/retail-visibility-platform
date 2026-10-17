@@ -66,7 +66,9 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   const userData = useMemo(() => authUser || null, [authUser]);
   const userRole = useMemo(() => {
     if (!userData || !tenantId) return null;
-    const userTenant = userData.tenants.find(t => t.id === tenantId);
+    // The server-seeded auth user is the Auth0 profile only and may have no
+    // `tenants` array until the client fetch resolves — never assume it exists.
+    const userTenant = userData.tenants?.find(t => t.id === tenantId);
     return userTenant?.role || null;
   }, [userData, tenantId]);
   

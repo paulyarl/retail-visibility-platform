@@ -495,8 +495,8 @@ export default function OverviewTab({
               {validationErrors} product{validationErrors !== 1 ? 's' : ''} will be rejected by Google Shopping
             </p>
             <p className="text-red-700 dark:text-red-300 text-sm">
-              Missing a required field (image, price, availability). Fix {validationErrors !== 1 ? 'these' : 'it'} before
-              syncing — check the Products tab for details.
+              Missing or invalid required field (image, price, title, description). Fix{' '}
+              {validationErrors !== 1 ? 'these' : 'it'} before syncing — check the Products tab for details.
             </p>
           </div>
         </div>

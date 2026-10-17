@@ -100,7 +100,12 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
   // Server-resolved auth from the root layout only contains the Auth0 profile (no DB role).
   // If the role is missing, treat the server state as incomplete and fetch the full user.
   const isServerUserComplete = !!serverUser?.role;
-  const [user, setUser] = useState<User | null>(serverUser as User | null);
+  // The server-resolved user is the Auth0 profile only — it carries no `tenants`
+  // array. Normalize it here so consumers that read `user.tenants` don't crash
+  // before fetchUser() fills in the tenant memberships.
+  const [user, setUser] = useState<User | null>(
+    serverUser ? ({ ...serverUser, tenants: serverUser.tenants ?? [] } as User) : null
+  );
   const [isLoading, setIsLoading] = useState(!serverUser || !isServerUserComplete);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
 
@@ -234,7 +239,7 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
 
   // Switch tenant
   const switchTenant = useCallback((tenantId: string) => {
-    if (user?.tenants.find(t => t.id === tenantId)) {
+    if (user?.tenants?.find(t => t.id === tenantId)) {
       setCurrentTenantId(tenantId);
       localStorage.setItem('current_tenant_id', tenantId);
     }
