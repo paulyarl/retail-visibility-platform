@@ -207,9 +207,81 @@ Its `redirect_uri` is `GOOGLE_REDIRECT_URI` — the **platform's own** callback.
 involved at any point. This is the platform's own OAuth client, registered in its own
 Google Cloud project.
 
-### 3c. ⚠️ Dev keys on the login connection
+**The Google Cloud project is shared — confirmed 2026-10-16.** It is the "Visible Shelf" project
+(project number `487743626849`) and it already holds **two** OAuth clients:
 
-The production login page renders Auth0's own warning:
+| Client | Created | Type | Notes |
+|---|---|---|---|
+| `Visible Shelf - Business Profile` | 2025-11-03 | Web application | carries a ⚠️ — most likely sensitive-scope (`business.manage`) verification, pre-existing and unrelated to the login work |
+| `Visible Shelf - Merchant Center` | 2025-10-22 | Web application | |
+
+Because the **OAuth consent screen is per-project**, all clients in here share one screen —
+including its branding and its publishing status.
+
+**The screen is in `Testing`, with only 3 test users** (`lupidanja@…`, `shelfvisible@…`,
+`yarlimoment@…`). User type is `External`; the user cap is 100 while unverified.
+
+That has two consequences:
+
+1. **Do not put the login client in this project.** In Testing, only listed test users can
+   authorize — login would be restricted to those three accounts. A **separate Google Cloud
+   project** for login is required: it needs only non-sensitive scopes (`openid`, `email`,
+   `profile`), so it can be published to **In production** immediately with no cap and no
+   verification, independent of this project's state.
+
+   **Done 2026-10-16:** project `VisibleShelfLogin` (id `visibleshelflogin`) created, consent
+   screen published to **In production**, user type `External`, client `Auth0 Login` (Web
+   application) with the redirect URI below. Because the only scopes in play are non-sensitive,
+   the user cap does **not** apply here.
+2. **The same restriction gates Business Profile / Merchant Center onboarding — and it is
+   currently biting.** Only those three accounts can authorize `business.manage`. Checked
+   2026-10-16: `google_oauth_accounts_list` = **0** rows, `google_oauth_tokens_list` = **0**,
+   `gbp_locations_list` = **0**, `google_merchant_links_list` = **0**. No merchant has ever
+   connected, which is exactly why this has gone unnoticed — the first real merchant to click
+   "Connect Google Business Profile" will be refused with an unverified/access-blocked error.
+
+   **Partially unblocked 2026-10-16:** the project was **published to `In production`**, which lifts
+   the Testing restriction — real merchants can now authorize, no longer limited to the three test
+   users. Two things still stand, and they are easy to conflate:
+
+   - **The Verification Center is authoritative, and it says nothing needs verifying.** Its Data
+     access panel reads *"Verification is not required since your app is not requesting any
+     sensitive or restricted scopes."* So the scopes in play are not classified as
+     sensitive/restricted, and no "unverified app" screen should appear.
+   - **Do not read the user cap counter as evidence.** The Audience page shows `3 users / 100 user
+     cap`, which looks like a live limit — but Google's own text on that page says the counter is
+     *displayed even for verified apps*, and the cap *"does not apply if you are requesting only
+     approved sensitive or restricted scopes."* It is informational decoration, not proof of
+     enforcement. This was mis-read once during the audit; the Verification Center is the signal.
+   - **Branding verification is a separate check, and it is genuinely done** — *"Your branding has
+     been verified and is being shown to users."* That approves the app name and logo.
+
+   **Open question, cheap to settle:** have a merchant who is **not** a test user attempt a Google
+   Business Profile connect and watch for an "unverified app" warning. Zero connections exist, so
+   there is nothing to disturb. A clean connect closes this out.
+
+   Google's wording on the Audience page is precise about the cap
+   and worth keeping: *"The user cap limits the number of users that can grant permission to your
+   app when requesting unapproved sensitive or restricted scopes… the user cap does not apply if
+   you are requesting only approved sensitive or restricted scopes."* So the cap is scoped to
+   requests that include an **unapproved** sensitive scope — which is why it binds here
+   (`business.manage` unapproved) and would **not** bind a project asking only for `openid` /
+   `email` / `profile`. The "unverified app" screen has the same trigger: the request includes a
+   scope that hasn't been approved.
+
+### 3c. Dev keys on the login connection — **RESOLVED 2026-10-16**
+
+> **Fixed.** The `google-oauth2` connection now carries our own Google OAuth client from the
+> dedicated `VisibleShelfLogin` project, and Auth0's dev-keys warning is **gone from both login
+> pages** (verified externally: neither `visibleshelf.com/auth/login` nor
+> `visibleshelf.store/auth/login` renders it, and `Continue with Google` still resolves on both).
+> This unblocks MFA, SSO, federated logout, `prompt=none`, Redirect Actions, and Auth0 custom
+> domains — all of which dev keys had broken (§"Why this is not cosmetic").
+>
+> Still to confirm by hand: an actual Google sign-in, and whether `users.auth0_id` moved for the
+> three Google-linked accounts.
+
+Historically, the production login page rendered Auth0's own warning:
 
 > **Alerts — Dev Keys:** One or more of your connections are currently using Auth0
 > development keys and should not be used in production.
@@ -221,6 +293,47 @@ Canonical reference: [Test Social Connections with Auth0 Developer Keys](https:/
 (the older `/docs/connections/social/devkeys` path that Auth0 renders in the banner redirects
 there). There is also a step-by-step walkthrough for this exact migration:
 [Google social connection → production keys](https://developer.auth0.com/resources/labs/authentication/google-social-connection-to-login#set-up-google-production-keys).
+
+#### Google Cloud: do **not** add the Auth0 domain to "Authorized domains"
+
+Google Cloud Console → Google Auth Platform → **Branding** has an **Authorized domains** list, and
+its help text reads: *"When a domain is used on the consent screen or in an OAuth client's
+configuration, it must be pre-registered here."* **That text is broader than the enforcement.**
+
+- Authorized domains is for domains **we control** — Google requires you to be able to verify
+  ownership of anything added, so Auth0's tenant domain could not be added even if wanted.
+- What it actually gates: the **consent screen's own links** (application home page, privacy
+  policy, terms of service) and JavaScript origins.
+- The **redirect URI** is validated separately, per-client, against that client's own *Authorized
+  redirect URIs* field — which is where `https://dev-jaiggvvi3zsttaoo.us.auth0.com/login/callback`
+  goes. It does not belong in Authorized domains.
+
+So `visibleshelf.com` / `visibleshelf.store` are the correct entries, and the login client's
+redirect URI lives on the client. If Google ever disagreed it would reject the client save
+immediately and by name — not silently later.
+
+Confirmed at the source: the **Create OAuth client ID** screen says *"The domains of the URIs you
+add below will be automatically added to your OAuth consent screen as authorized domains."*
+Google adds the redirect URI's domain itself — which is why leaving this list alone is correct
+rather than merely safe.
+
+#### Leave "Use this client for an AI-powered agent" unchecked
+
+The Create-client screen carries this checkbox. Per [Google's Manage OAuth Clients doc](https://support.google.com/cloud/answer/15549257#agentic-client)
+it is a **self-declaration**, not a capability: *"Tagging an OAuth client does not grant additional
+scopes or privileges to access user data."* It identifies the client as representing AI agents
+acting on users' behalf.
+
+Google's stated best practice is one client ID per workflow — a **standard** client for
+human-driven interactive sessions, an **agentic** client used exclusively for AI agents,
+automation, and MCP integrations. This client exists solely for a human login redirect brokered by
+Auth0, so it is a standard client and must not carry the tag. The tag drives monitoring and admin
+policy ("granular access and security policies to AI agents without impacting human user access"),
+so mis-declaring a login client is a real problem even though no access changes.
+
+**Also:** Google states the client secret *"will only be shown after you create the client"* and
+*"will not be visible or accessible again."* Capture the Client ID and Secret — or download the
+JSON — before leaving the creation screen, and put the secret straight into the Auth0 connection.
 
 #### Why this is not cosmetic
 
@@ -271,9 +384,11 @@ Google back to the tenant-agnostic `https://login.auth0.com/login/callback`; **y
 route it to *this tenant's* `/login/callback`. That is why SSO starts working once the keys
 are yours.
 
-**One client, both environments.** The connection is tenant-scoped, so a single Google OAuth
-client covers production and staging — see [§1](#what-is-shared-across-environments-and-what-is-not).
-There is no staging-specific variant to maintain.
+**One client, both environments — but a new Google Cloud project.** The connection is
+tenant-scoped, so a single Google OAuth client covers production and staging; there is no
+staging-specific variant to maintain (see [§1](#what-is-shared-across-environments-and-what-is-not)).
+It must **not** live in the existing "Visible Shelf" project, because that project's consent
+screen is in `Testing` and login would inherit the 3-test-user restriction — see §3b.
 
 Two things that will bite if missed:
 
@@ -281,29 +396,33 @@ Two things that will bite if missed:
    Testing, only explicitly added test users can sign in — every other user is refused.
    The scopes in play here (`openid`, `email`, `profile`) are non-sensitive, so publishing
    needs no Google review.
-2. **Existing Google-linked users may need a re-link.** Google's `sub` — which becomes the
-   Auth0 user ID `google-oauth2|<sub>` — is scoped to the OAuth client, so switching client
-   IDs can change it. If it does, Auth0 treats each existing Google user as a *new* Auth0
-   user on their next login. The app absorbs this: `/api/auth/sync-user` matches `auth0_id`
-   first and then **falls back to matching by email**, so the existing `users` row is reused
-   and login keeps working. Roles live in the DB (`users.role`), not Auth0 `app_metadata`,
-   so access is not lost. One wart: that handler writes
-   `auth0_id: user.auth0_id || auth0Id`, so a switched user keeps the **stale** `auth0_id`
-   rather than the new one.
+2. **Existing Google-linked users do *not* need a re-link — verified.** The concern going in was
+   that Google's `sub` (which becomes the Auth0 user ID `google-oauth2|<sub>`) is scoped to the
+   OAuth client, so a new client ID would change it, Auth0 would see a *new* user, and the app
+   would have to fall back to email matching.
 
-   Blast radius at the time of writing: **3 of 11 users** are `google-oauth2|…`; 2 are
-   `auth0|…` (password, unaffected) and 6 have no `auth0_id` (unaffected).
+   **It did not happen.** Tested 2026-10-16 with `yarlmoment@gmail.com` — a live
+   `google-oauth2|…` account — signing in through the app on the new client:
 
-   Verify with one of the three before rolling out:
+   | | before | after |
+   |---|---|---|
+   | row | `uid-li9gr` | `uid-li9gr` (same) |
+   | `auth0_id` | `google-oauth2\|101197082777619041667` | unchanged |
+   | total `users` | 11 | 11 (no duplicate) |
 
-   ```sql
-   SELECT email, auth0_id FROM users WHERE auth0_id LIKE 'google-oauth2|%';
-   ```
+   The `sub` held not just across a new client ID but across an entirely different Google Cloud
+   project (Auth0's dev app → `VisibleShelfLogin`). So the identifier is stable per Google
+   account, not per client — as Google's own wording implies ("unique among all Google
+   accounts").
 
-   Note the `auth0_id`, switch the connection keys, sign in with Google for that account,
-   then confirm login succeeds, the same `users` row is reused, and whether `auth0_id`
-   changed. Also check any Auth0 Actions for `app_metadata` reads — a new Auth0 user would
-   not carry the old `app_metadata`.
+   The email fallback in `/api/auth/sync-user` (match `auth0_id` first, then email) remains the
+   safety net if that ever changes, and it is why roles survive regardless: they live in the DB
+   (`users.role`), not Auth0 `app_metadata`. Note the handler writes
+   `auth0_id: user.auth0_id || auth0Id`, so a hypothetical future change would leave a *stale*
+   `auth0_id` rather than updating it.
+
+   Worth checking anyway if any Auth0 Actions read `app_metadata` — a genuinely new Auth0 user
+   would not carry the old `app_metadata`.
 
 Note the ownership distinction, because it is the whole point: Auth0 is the runtime broker
 in both cases, but with dev keys **Auth0 owns the Google client**; with own keys **we** do.
@@ -492,15 +611,27 @@ rotation, then the per-application tidy-ups.
 
 ---
 
-- [ ] **Dev keys** (§3c) — **the highest-value item.** Until it is fixed: MFA is unavailable on
-      the Google connection, SSO does not work, federated logout and `prompt=none` fail, and the
-      tenant cannot adopt an Auth0 custom domain. One edit covers both environments.
+- [x] ~~Dev keys (§3c)~~ — **done 2026-10-16.** The connection now uses our own Google OAuth
+      client from the `VisibleShelfLogin` project; the warning is gone from both login pages
+      (verified). MFA, SSO, federated logout, `prompt=none`, Redirect Actions, and Auth0 custom
+      domains are all unblocked.
+- [x] ~~Confirm a real Google sign-in works~~ — **done 2026-10-16.** Full app login succeeded with
+      `yarlmoment@gmail.com`; the same `users` row was reused and `auth0_id` was **unchanged**
+      (no re-link needed, no duplicate). See §3c.
 - [ ] **Rotate `AUTH0_SECRET`** if it has been disclosed anywhere outside Vercel's env store
       — procedure in §6. Two distinct values, staging first. While dev keys remain in place,
       expect **visible re-prompts**; after §3c it becomes a silent bounce.
 - [x] ~~Staging app rename~~ — done 2026-10-16. `Visible Shelf` → `visible-shelf-staging`, and
       production's `visible-shelf-production-admin-dashboard` → `visible-shelf-production`.
       Client IDs unchanged (verified).
+- [x] ~~GBP / Merchant onboarding blocked by a `Testing` consent screen~~ — **published
+      2026-10-16.** `In production` lifts the Testing restriction, so real merchants can authorize
+      again. Verified: zero connections had ever been made (`google_oauth_accounts_list` = 0), so
+      nothing was broken by it, only prevented.
+- [ ] **Confirm GBP connect works for a non-test-user merchant** (§3b). The Verification Center
+      says no scope verification is required, so the publish should have unblocked this outright —
+      but the only way to be sure is a real connect from outside the test-user list. Watch for an
+      "unverified app" warning.
 - [ ] **Check the Node 12/16 runtime deprecation banner** on the tenant. Auth0 warns that
       tenants with a deprecated runtime configured in advanced settings now run on Node 22,
       which can break Custom Databases, Custom Social Connections, and legacy Rules/Hooks.
@@ -514,9 +645,9 @@ rotation, then the per-application tidy-ups.
       returns `Unknown client`.
 - [ ] **Review** Auth0 Attack Protection (brute-force, suspicious-IP) plus refresh-token
       rotation and session lifetime, since the flow requests `offline_access`.
-- [ ] **MFA — blocked on the dev-keys fix.** MFA cannot work on the Google connection while it
-      uses Auth0 dev keys (§3c). Since this tenant fronts `PLATFORM_ADMIN` / `SUPER_ADMIN`,
-      replacing the keys is a prerequisite for enabling MFA, not a parallel task.
+- [ ] **Enable MFA — now unblocked.** MFA could not work on the Google connection while it used
+      Auth0 dev keys (§3c); that is fixed, so this is now a normal hardening task. The tenant
+      fronts `PLATFORM_ADMIN` / `SUPER_ADMIN`, so it is worth doing.
 - [ ] **Consider** a `docs/AUTH0_SETUP.md` rewrite; it has drifted (see the note in §2).
 
 ---
@@ -532,6 +663,12 @@ rotation, then the per-application tidy-ups.
 | 2026-10-16 | Dropped the per-deployment `-<hash>-` hosts from both applications (single-build URLs that never match again). Verified `403` for both retired hashes; the `-git-<branch>-` aliases stay `302`. Each app is now exactly: two canonical hosts + its own branch alias, per field. |
 | 2026-10-16 | Renamed the applications to match their environments: `Visible Shelf` → `visible-shelf-staging`, `visible-shelf-production-admin-dashboard` → `visible-shelf-production`. Verified the rename left Client IDs untouched (`visibleshelf.com` → `Nv81…`, `visibleshelf.store` → `qa3ls…`). |
 | 2026-10-16 | Confirmed the dev-keys state at its source: the `google-oauth2` connection's Settings tab shows the warning banner and empty Client ID/Secret with the "Leave blank to use Auth0 dev keys" placeholder, and its Applications tab shows both apps attached to the one connection. |
+| 2026-10-16 | Corrected the GBP assessment. The Verification Center's Data access panel states *"Verification is not required since your app is not requesting any sensitive or restricted scopes"* — so publishing should have unblocked GBP onboarding outright, and no "unverified app" screen is expected. The `3 / 100` user-cap counter was initially mis-read as proof the cap was enforced; Google's own text on that page says the counter displays even for verified apps. Remaining unknown: a real non-test-user connect. |
+| 2026-10-16 | Published the **`Visible Shelf`** project (the GBP/Merchant one) to `In production`, lifting the Testing restriction that had blocked real merchants from authorizing `business.manage`. Branding also verified. *(Initially recorded here that the `3 / 100` user cap still applied and that scope verification was the next step — **corrected in the entry above**, which was written after reading the Verification Center.)* |
+| 2026-10-16 | **End-to-end login verified** after the dev-keys switch: signed in via the app with `yarlmoment@gmail.com` and confirmed in the DB that the same `users` row (`uid-li9gr`) was reused with an **unchanged** `auth0_id`, and no duplicate was created (11 users before and after). The anticipated Google `sub` change did not occur — the identifier is stable per Google account, not per OAuth client. §3c corrected accordingly. |
+| 2026-10-16 | **Dev keys fixed.** Created a dedicated Google OAuth client in the new `VisibleShelfLogin` project (redirect URI `https://dev-jaiggvvi3zsttaoo.us.auth0.com/login/callback`, no sensitive scopes, consent screen published to In production), and saved the credentials into the tenant-scoped `google-oauth2` connection. Verified externally: the dev-keys warning is gone from **both** login pages and `Continue with Google` still resolves. The first client created had its secret exposed in a screenshot; it was deleted and recreated before being wired up, so nothing needed rotating. |
+| 2026-10-16 | Created the login Google Cloud project `VisibleShelfLogin` (`visibleshelflogin`) with its own consent screen, published to **In production**. Recorded the exact redirect URI to register (`https://dev-jaiggvvi3zsttaoo.us.auth0.com/login/callback`, quoted from Auth0's dev-keys doc) and the two facts that resolve earlier open questions: Google auto-adds a redirect URI's domain to Authorized domains, and the 100-user cap only binds requests containing an *unapproved* sensitive scope — so it does not apply to this login project. |
+| 2026-10-16 | Found the "Visible Shelf" Google Cloud project's consent screen is in **`Testing`** with 3 test users, shared by the Business Profile and Merchant Center clients. Two consequences recorded: the login client must go in a **separate project** (it would otherwise be limited to those 3 accounts), and GBP/Merchant onboarding is **latently blocked** for real merchants — confirmed zero rows in `google_oauth_accounts_list`, `google_oauth_tokens_list`, `gbp_locations_list`, and `google_merchant_links_list`. |
 | 2026-10-16 | Added §1 "What is shared across environments, and what is not" — the tenant-vs-application-vs-env-var scope model, plus the rule that **one** Google OAuth client covers both environments (a second one would mean a second connection, maintained in two places). Added a suggested fix order to §7, with dev keys first because it is a prerequisite for MFA and it makes the secret rotation silent. |
 | 2026-10-16 | Read Auth0's dev-keys documentation and recorded the real impact in §3c: with Universal Login, dev keys break **MFA**, SSO, federated logout, `prompt=none`/`checkSession()`, Redirect Actions, and Auth0 custom domains. Corrected the §6 `AUTH0_SECRET` rotation note — with dev keys there is no SSO cookie on the tenant domain, so that rotation produces visible re-prompts rather than a silent bounce. MFA is now tracked as **blocked on this fix** in §7. |
 | 2026-10-16 | Deleted `Default App` (`zjVeIs…`); `/authorize` now returns `Unknown client`. Confirmed the dev-keys warning appears on **both** the production and staging login pages — the Google connection is tenant-scoped and shared, so one fix covers both. |

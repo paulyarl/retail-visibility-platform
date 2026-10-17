@@ -7,6 +7,7 @@
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { clientLogger } from '@/lib/client-logger';
+import { unwrapApiBody } from '@/lib/api-envelope';
 
 export interface GoogleCategory {
   id: string;
@@ -43,6 +44,22 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
     return GoogleIntegrationService.instance;
   }
 
+  /*
+   * Every read below goes through `unwrapApiBody` (lib/api-envelope).
+   *
+   * A payload is wrapped twice on the way here — the route replies
+   * `{ success, data: <payload> }` and `makeDefaultRequest` returns
+   * `{ success, data: <parsed body> }` — so the payload is at `result.data.data`.
+   * Reading `result.data` directly yields the *envelope*.
+   *
+   * That single mistake made `getGBPAuthorizeUrl` throw "Failed to get Google
+   * Business Profile OAuth URL" on a perfectly good `200` (Connect Business
+   * Profile), broke `getOAuthAuthorizeUrl` identically (Connect Google Account),
+   * reported a connected tenant as "Not connected", returned empty category and
+   * review lists, and rendered "NaN% healthy". The same bug class already hit the
+   * tenant subdomain settings page, which is why the shared helper exists.
+   */
+
   /**
    * Search Google Business Profile categories
    */
@@ -54,7 +71,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
         `gbp-categories-${query}-${limit}`
       );
       
-      return result.data?.categories || [];
+      return unwrapApiBody<{ categories: GoogleCategory[] }>(result)?.categories || [];
     } catch (error) {
       clientLogger.error('[GoogleIntegrationService] Failed to get categories:', { detail: error });
       return [];
@@ -72,7 +89,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
         `gbp-popular-categories-${limit}`
       );
       
-      return result.data?.categories || [];
+      return unwrapApiBody<{ categories: GoogleCategory[] }>(result)?.categories || [];
     } catch (error) {
       clientLogger.error('[GoogleIntegrationService] Failed to get popular categories:', { detail: error });
       return [];
@@ -90,11 +107,12 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
         `google-auth-${tenantId}`
       );
       
-      if (!result.success || !result.data) {
+      const payload = unwrapApiBody<GoogleAuthUrl>(result);
+      if (!payload) {
         throw new Error('Failed to get Google auth URL');
       }
       
-      return result.data;
+      return payload;
     } catch (error) {
       clientLogger.error('[GoogleIntegrationService] Failed to get auth URL:', { detail: error });
       throw new Error('Failed to get Google authorization URL');
@@ -134,7 +152,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
         `google-status-${tenantId}`
       );
       
-      return result.data || { isConnected: false };
+      return unwrapApiBody<GoogleAuthStatus>(result) || { isConnected: false };
     } catch (error) {
       clientLogger.error('[GoogleIntegrationService] Failed to get status:', { detail: error });
       return { isConnected: false, error: 'Failed to get connection status' };
@@ -180,7 +198,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
         `gbp-insights-${tenantId}-${dateRange?.start || 'default'}`
       );
       
-      return result.data || null;
+      return unwrapApiBody<any>(result);
     } catch (error) {
       clientLogger.error('[GoogleIntegrationService] Failed to get insights:', { detail: error });
       return null;
@@ -223,7 +241,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
         `gbp-reviews-${tenantId}`
       );
       
-      return result.data?.reviews || [];
+      return unwrapApiBody<{ reviews: any[] }>(result)?.reviews || [];
     } catch (error) {
       clientLogger.error('[GoogleIntegrationService] Failed to get reviews:', { detail: error });
       return [];
@@ -267,11 +285,12 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       `google-oauth-authorize-${tenantId}`
     );
 
-    if (!result.success || !result.data?.url) {
+    const url = unwrapApiBody<{ url: string }>(result)?.url;
+    if (!url) {
       throw new Error('Failed to get Google OAuth URL');
     }
 
-    return result.data.url;
+    return url;
   }
 
   /**
@@ -285,11 +304,12 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       `google-gbp-authorize-${tenantId}`
     );
 
-    if (!result.success || !result.data?.url) {
+    const url = unwrapApiBody<{ url: string }>(result)?.url;
+    if (!url) {
       throw new Error('Failed to get Google Business Profile OAuth URL');
     }
 
-    return result.data.url;
+    return url;
   }
 }
 export const googleIntegrationService = GoogleIntegrationService.getInstance();
