@@ -143,6 +143,12 @@ export interface ApiResult<T> {
     status: number;
     message: string;
     code: string;
+    /**
+     * Tenant-facing copy from the response envelope's `userMessage`, when the
+     * API supplied one. Prefer it over `message` for anything a tenant reads —
+     * `message` is the developer-facing description of the same failure.
+     */
+    userMessage?: string;
   };
   status?: number;
   metadata?: {

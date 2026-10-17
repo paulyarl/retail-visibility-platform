@@ -606,6 +606,17 @@ export interface GoogleOAuthMerchantsResult {
   unavailable?: { code: string; message: string };
 }
 
+export interface GoogleBusinessLocationsResult {
+  locations: any[];
+  /**
+   * Set when the request failed for a reason that isn't "this account has no
+   * locations" — `api_not_approved`, while the platform's own GBP API access is
+   * still pending Google's allowlist, for instance. Distinct from an empty
+   * `locations` list, which means the account genuinely has none.
+   */
+  unavailable?: { code: string; message: string };
+}
+
 export class PlatformHomeSingletonService extends TenantApiSingleton {
   private static instance: PlatformHomeSingletonService;
   protected readonly cacheTTL = 10 * 60 * 1000; // 10 minutes
@@ -3196,26 +3207,39 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
-   * Get Google Business locations
+   * Get Google Business locations (the Link Location picker's data source).
+   *
+   * Distinguishes "this account has no GBP locations" from "the platform can't
+   * ask Google yet". `unwrapApiBody` collapses both to null, which made the
+   * picker tell merchants to set up a profile they already had while the
+   * platform's own GBP API access was still pending Google's allowlist.
    */
-  async getGoogleBusinessLocations(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      const result = await this.makeDefaultRequest<any>(
-        `/api/google/business/locations?tenantId=${tenantId}`,
-        {},
-        `platform-google-business-locations-${tenantId}`,
-        this.cacheTTL
-      );
-
-      return unwrapApiBody(result);
-    } catch (error) {
-      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business locations:', { detail: error });
-      throw error;
+  async getGoogleBusinessLocations(tenantId: string): Promise<GoogleBusinessLocationsResult> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/google/business/locations?tenantId=${tenantId}`,
+      {},
+      `platform-google-business-locations-${tenantId}`,
+      this.cacheTTL
+    );
+
+    if (!result.success) {
+      const failure = (result as any).error || {};
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business locations:', { detail: failure });
+      return {
+        locations: [],
+        unavailable: {
+          code: failure.code || 'unknown',
+          message: failure.userMessage || failure.message || 'Failed to load GBP locations',
+        },
+      };
+    }
+
+    const body = unwrapApiBody<{ locations: any[] }>(result);
+    return { locations: body?.locations || [] };
   }
 
   /**

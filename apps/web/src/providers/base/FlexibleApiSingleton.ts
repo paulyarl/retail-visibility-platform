@@ -191,6 +191,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         // Try to parse error response from API
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         let errorCode = 'HTTP_ERROR';
+        let errorUserMessage: string | undefined;
 
         try {
           const errorData = await response.json();
@@ -227,6 +228,9 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           if (errorData.error) {
             errorCode = errorData.error;
           }
+          if (typeof errorData.userMessage === 'string') {
+            errorUserMessage = errorData.userMessage;
+          }
         } catch (parseError) {
           // If we can't parse JSON, use default message
           clientLogger.warn('[FlexibleApiSingleton] Could not parse error response:', { detail: parseError });
@@ -238,7 +242,8 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           error: {
             status: response.status,
             message: errorMessage,
-            code: errorCode
+            code: errorCode,
+            userMessage: errorUserMessage
           }
         } as ApiResult<T>;
       }

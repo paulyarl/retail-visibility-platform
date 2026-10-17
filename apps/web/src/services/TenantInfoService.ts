@@ -349,7 +349,10 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success) {
         clientLogger.error('[TenantInfoService] Failed to get GBP locations:', { detail: result.error });
-        return null;
+        // Surface the failure rather than collapsing it to null: null is
+        // indistinguishable from "this account has no locations", and the
+        // caller then blames the tenant for a platform-side failure.
+        return { success: false, error: result.error };
       }
 
       return result.data || null;

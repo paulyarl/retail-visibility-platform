@@ -67,6 +67,7 @@ export default function GBPSyncStatusPage() {
   const [tenantData, setTenantData] = useState<any>(null);
   const [linkedLocation, setLinkedLocation] = useState<any>(null);
   const [gbpLocations, setGbpLocations] = useState<any[]>([]);
+  const [locationsUnavailable, setLocationsUnavailable] = useState<{ code: string; message: string } | null>(null);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [linkingLocation, setLinkingLocation] = useState(false);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
@@ -193,11 +194,18 @@ export default function GBPSyncStatusPage() {
   async function fetchGBPLocations() {
     try {
       setLoadingLocations(true);
+      setLocationsUnavailable(null);
       const data = await platformHomeService.getGoogleBusinessLocations(tenantId);
       setGbpLocations(data?.locations || []);
+      setLocationsUnavailable(data?.unavailable || null);
       setShowLocationSelector(true);
     } catch (error) {
       clientLogger.error('Failed to fetch GBP locations:', { detail: error });
+      setLocationsUnavailable({
+        code: 'unknown',
+        message: 'Could not load your GBP locations. Please try again.',
+      });
+      setShowLocationSelector(true);
     } finally {
       setLoadingLocations(false);
     }
@@ -517,7 +525,18 @@ export default function GBPSyncStatusPage() {
               <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-3">
                 Select GBP Location to Link
               </h4>
-              {gbpLocations.length === 0 ? (
+              {locationsUnavailable ? (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    {locationsUnavailable.message}
+                  </p>
+                  {locationsUnavailable.code === 'api_not_approved' && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                      This one is on our side, not yours — no change is needed in your Google Business Profile.
+                    </p>
+                  )}
+                </div>
+              ) : gbpLocations.length === 0 ? (
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   No GBP locations found. Make sure you have locations set up in your Google Business Profile.
                 </p>

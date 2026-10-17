@@ -76,7 +76,11 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       setLoadingLocations(true);
       setError(null);
       const data = await tenantInfoService.getGBPLocations(tenantId);
-      setGbpLocations(data.data?.locations || []);
+      if (data?.success === false) {
+        setError(data.error?.userMessage || data.error?.message || 'Failed to fetch GBP locations');
+        return;
+      }
+      setGbpLocations(data?.data?.locations || []);
       setShowLocationSelector(true);
     } catch (err) {
       clientLogger.error('Failed to fetch GBP locations:', { detail: err });

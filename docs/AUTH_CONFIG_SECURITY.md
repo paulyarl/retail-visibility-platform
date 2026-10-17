@@ -208,18 +208,28 @@ involved at any point. This is the platform's own OAuth client, registered in it
 Google Cloud project.
 
 **The Google Cloud project is shared — confirmed 2026-10-16.** It is the "Visible Shelf" project
-(project number `487743626849`) and it already holds **two** OAuth clients:
+(project number `407743626849`) and it already holds **two** OAuth clients:
+
+> **Number corrected 2026-10-17.** This line previously read `487743626849` — a single-digit
+> transposition. `407743626849` is confirmed three independent ways: the client-ID prefix
+> (`407743626849-14md…`, and a client ID's prefix *is* its project number), `gcloud projects
+> describe retail-visibility-platform --format='value(projectNumber)'` → `407743626849`
+> (`lifecycle=ACTIVE`), and Google's own live error body, which names the billed consumer as
+> `projects/407743626849` (`apps/api/fixtures/gbp/pending/01-accounts-quota.json`). The
+> access-request form requires the exact number, so the transposition was not cosmetic.
 
 | Client | Created | Type | Notes |
 |---|---|---|---|
-| `Visible Shelf - Business Profile` | 2025-11-03 | Web application | carries a ⚠️ — most likely sensitive-scope (`business.manage`) verification, pre-existing and unrelated to the login work |
+| `Visible Shelf - Business Profile` | 2025-11-03 | Web application | the ⚠️ (sensitive-scope `business.manage`) is cleared as of 2026-10-17 — the console's Project Checkup now reads *"Your app has been verified by Google"* |
 | `Visible Shelf - Merchant Center` | 2025-10-22 | Web application | |
 
 Because the **OAuth consent screen is per-project**, all clients in here share one screen —
 including its branding and its publishing status.
 
-**The screen is in `Testing`, with only 3 test users** (`lupidanja@…`, `shelfvisible@…`,
-`yarlimoment@…`). User type is `External`; the user cap is 100 while unverified.
+**The screen is `In production`** — published 2026-10-16, and verified as of 2026-10-17 (Project
+Checkup: *"Your app has been verified by Google"*). User type is `External`. It was previously
+`Testing` with only 3 test users (`lupidanja@…`, `shelfvisible@…`, `yarlimoment@…`) and a 100-user
+cap; neither applies now.
 
 That has two consequences:
 
@@ -268,6 +278,46 @@ That has two consequences:
    (`business.manage` unapproved) and would **not** bind a project asking only for `openid` /
    `email` / `profile`. The "unverified app" screen has the same trigger: the request includes a
    scope that hasn't been approved.
+
+#### Gate B — GBP API project allowlisting (the gate that actually blocks the feature)
+
+Everything above is **Gate A** — the OAuth consent screen. It is **passed**: the app is verified
+and published to production, so merchants can authorize. It is *not* what returns
+`503 api_not_approved`.
+
+**Gate B is a separate allowlist on the Google Cloud project itself**, granted only by the
+*Application for Basic API Access* form (`support.google.com/business/contact/api_default`, option
+*Application for Basic API Access*). Until it lands, every Business Profile call returns
+`429 RATE_LIMIT_EXCEEDED` with `quota_limit_value: '0'` — which can only happen *after* the token
+was accepted (`401` would mean a bad token) and *after* the API was found enabled (`403
+SERVICE_DISABLED` would mean it wasn't). `apps/api/src/routes/google-business-oauth.ts` maps that
+shape to the user-facing `503 api_not_approved`.
+
+**Status 2026-10-17: submitted, pending.** Case ID **`3-3112000041953`**, project
+`407743626849`, quoted review window **7–10 business days** (~Oct 27–30). Do not file a second case
+or a quota-increase request — both slow it down, and only one project per business can ever be
+granted access.
+
+**Checking status** (there is no tracker on the form itself):
+
+- Cloud Console → IAM & Admin → Quotas → filter `mybusinessaccountmanagement.googleapis.com`:
+  `0` QPM = not approved, `300` QPM = approved. Direct link:
+  `https://console.cloud.google.com/iam-admin/quotas?project=407743626849`.
+- Programmatically:
+  `GET https://cloudquotas.googleapis.com/v1/projects/407743626849/locations/global/services/mybusinessaccountmanagement.googleapis.com/quotaInfos`
+  — needs `cloudquotas.googleapis.com` enabled on the project plus an `x-goog-user-project:
+  407743626849` header (without it the call 403s on Cloud Shell's own default quota project). An
+  unallocated / empty `quotaBuckets` entry is the same fact as `0`.
+- The legacy `mybusiness.googleapis.com` API only becomes *visible* to an approved project, so its
+  absence from `gcloud services list --available` is a second tell.
+
+**Eligibility is the real long pole**, ahead of the ~7–10 day review: a verified GBP active 60+
+days, owned by the applicant *or* a client they manage, with a website representing that business
+on the profile, submitted from an email that is an owner/manager on that GBP, with the website
+domain matching the email domain.
+
+Full mechanics — the transport seam, fixture profiles, and the two-gate framing — live in
+`AGENTS.md` under "GBP transport seam".
 
 ### 3c. Dev keys on the login connection — **RESOLVED 2026-10-16**
 
