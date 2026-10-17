@@ -1990,3 +1990,39 @@ Hard-won facts recorded there:
 - **Two Google OAuths, don't conflate them.** Login is brokered by Auth0 (Google's allowlist is *Authorized redirect URIs* in Google Cloud Console, pointing at Auth0's `/login/callback` — Allowed Callback URLs is the Auth0→app leg, which Google never reads). GBP + Merchant Center is direct and platform-owned (`lib/google/oauth.ts`, `GOOGLE_CLIENT_ID`/`GOOGLE_REDIRECT_URI`).
 - **Login runs on Auth0 dev keys** (Auth0 renders the warning on the production login page): shared quota, "Auth0" on the Google consent screen, rotatable without notice. Fix = own Google Cloud OAuth client (§3c).
 - **A Vercel edge redirect has no `X-Matched-Path`** — that header only appears when the request reaches the Next.js app, which is how the apex→www hop was distinguished from app code.
+
+## GBP transport seam — develop the Business Profile flow without Google's allowlisting (added 2026-10-17)
+
+**Two independent Google gates, and until now the repo only tracked one.** `docs/AUTH_CONFIG_SECURITY.md` §3b is a careful record of **Gate A — the OAuth consent screen** (unverified-app screen, 100-user cap; published to `In production` 2026-10-16). It contains zero mentions of **Gate B — GBP API project allowlisting**, which is a different gate on a different axis and is what actually blocks the feature.
+
+Gate B is the one behind `GET /api/google/business/locations` returning `503 api_not_approved`. Proof that it is Gate B and not A or a code bug: the response is `429 RATE_LIMIT_EXCEEDED` with `quota_limit_value: '0'`, which can only be produced *after* the token was accepted (an invalid token is 401) and *after* the API was found enabled (a disabled API is 403 `SERVICE_DISABLED`). Google's own wording: *"If your quota limit for the Google Business Profile API is 0, you have not yet been granted access. Don't request a quota increase. Instead, submit the Application For Basic API Access."* So the fix is the **access-request form** (`support.google.com/business/contact/api_default`, option *Application for Basic API Access*) — **not** a quota-increase request, which auto-rejects with *"your company may not have an allowlisted project"*, and **not** anything in the OAuth consent screen.
+
+**The project number recorded in `docs/AUTH_CONFIG_SECURITY.md` line 211 is wrong.** It says `487743626849`; the real number is **`407743626849`**, derived from the client IDs the repo actually uses (`407743626849-14md…` Business Profile, `407743626849-l1na…` Merchant Center — a client ID's prefix *is* its project number; see `INSERT_GOOGLE_BUSINESS_OAUTH.sql` and `GoogleIntegrationService.test.ts`). The application form requires the exact project number, so the digit transposition matters. Also: *"Only one project per business can be granted access to the Business Profile APIs"* — do not spin up a separate test project, because it can never be approved.
+
+Eligibility (Google's current prerequisites, and the real long pole — not the ~14-day review): a **verified GBP active for 60+ days**, owned by the applicant *or* one of the clients they manage, with a **website representing that business** on the profile, submitted from an email that is an **owner/manager on that GBP**, with the website domain matching the email domain. Check status in Cloud Console → **IAM & Admin → Quotas** (`mybusinessaccountmanagement.googleapis.com`): **0 QPM = not approved, 300 QPM = approved**. The legacy "Google My Business API" only becomes *visible* in the console once you are approved — that visibility is the tell.
+
+### The seam itself
+
+Google ships no sandbox for these APIs (*"There's no Sandbox environment for the Business Profile APIs"*), permits no fake listings (*"there's no direct way to create a fake GBP listing in prod… Most of the fake listings that are created get flagged by our moderation and suspended"*), and offers `validateOnly` as a dry-run flag that still requires quota. Asked point-blank whether partners can create a test account, Google's FAQ answers **"No"** and recommends the only remaining option: *"you can use mock API responses."*
+
+`apps/api/src/lib/google/gbp-transport.ts` is that, as one seam. Three modes, **off by default**:
+
+| `GBP_TRANSPORT` | Behaviour |
+|---|---|
+| `live` (default) | Transparent passthrough to the global `fetch` — zero behaviour change. |
+| `fixture` | Serves recorded JSON from `GBP_FIXTURE_DIR`; never touches Google, so it works at 0 QPM. |
+| `record` | Calls Google for real *and* writes each response into `GBP_FIXTURE_DIR`, so fixtures can be refreshed from a real approved account. Never overwrites an existing file. |
+
+- **The module owns the Google hostnames.** `GBP_BUSINESS_INFORMATION_BASE` / `GBP_ACCOUNT_MANAGEMENT_BASE` / `GBP_V4_BASE` are exported from it, and it is the **only file under `src/` allowed to name a `mybusiness*.googleapis.com` host** — enforced by a guard test in `lib/google/__tests__/gbp-transport.test.ts`. That guard is the point: a new call site with a hardcoded URL would silently bypass fixtures and, in dev, resurface as the very quota error the harness exists to remove. All ~41 call sites across 10 files now go through `gbpFetch`; two dead `private readonly API_BASE` fields were dropped in the process.
+- **A fixture miss is a loud `501 FIXTURE_MISSING`, never a fall-through to Google.** In fixture mode you must always be able to tell what came from the harness.
+- **Interception is host-scoped.** The media flow's `PUT` to the `startUpload` upload reference is a storage endpoint, not an API call, so it is left on raw `fetch` and passes through in every mode.
+- **`gbpFetch` resolves the global `fetch` at call time, not at import.** That is deliberate: the existing suites that do `global.fetch = mockFetch` (e.g. `GBPVerificationService.test.ts`) keep intercepting exactly as before, which is why the ~41-site swap landed with no test churn.
+- Fixture files declare `{ match: { method, host, path, queryIncludes }, status, body }`; `path` globs with `*` (one segment) and `**` (any). Two fixtures matching one request **throws** rather than letting filename order decide.
+- Fixture mode **throws under `NODE_ENV=production`** unless `GBP_FIXTURE_ALLOW_PROD=true` is set explicitly.
+
+**Profiles:** `apps/api/fixtures/gbp/approved/` (the happy path, the default) and `apps/api/fixtures/gbp/pending/` (a real `429`/`quota_limit_value: '0'` body, i.e. today's live behaviour on demand). Point `GBP_FIXTURE_DIR` at the latter to develop the pending-approval UI state, or at the former to build the link-location flow.
+
+**Run it:** `cd apps/api && GBP_TRANSPORT=fixture npx vitest run src/tests/gbp-locations-fixture.test.ts` — drives the **real route** through the **real transport** and asserts both halves: the pending profile still 503s with `api_not_approved`, and the approved profile returns locations where the live project cannot. `npx vitest run src/lib/google/__tests__/gbp-transport.test.ts` covers mode resolution, matching, the production guard, record mode, and the host guard.
+
+**Still unaddressed:** the UI discards the API's `userMessage`. `sync-status/page.tsx` `fetchGBPLocations` calls `platformHomeService.getGoogleBusinessLocations()`, which returns `unwrapApiBody(result)` — `null` whenever `success === false` (`lib/api-envelope.ts`) — so `data?.locations || []` yields `[]`, no error is thrown, and the selector renders *"No GBP locations found. Make sure you have locations set up in your Google Business Profile."* The tenant is blamed for a platform-side approval gap. `GBPLocationCard.tsx` has the same discard-the-error shape.
+
