@@ -45,6 +45,7 @@ interface LinkContext {
     hasPublishedDirectory: boolean;
     hasFAQs: boolean;
     faqEnabled: boolean;
+    liveFlyerCount: number;
     hasStorefront: boolean;
     locationStatus: string;
     subscriptionStatus: string;
@@ -109,6 +110,10 @@ function hasSocialCommerce(ctx: LinkContext): boolean {
 
 function hasDirectoryEntry(ctx: LinkContext): boolean {
   return ctx.capabilities?.effective.directory_entry.enabled ?? false;
+}
+
+function hasFlyer(ctx: LinkContext): boolean {
+  return ctx.capabilities?.effective.flyer?.enabled ?? false;
 }
 
 function hasOrganization(ctx: LinkContext): boolean {
@@ -271,6 +276,20 @@ const LINKS: LinkDefinition[] = [
     category: 'store',
     condition: () => true,
     score: () => 88,
+  },
+
+  {
+    id: 'flyers',
+    label: () => 'Specials Flyer',
+    description: (ctx) => ctx.businessState.liveFlyerCount > 0
+      ? `${ctx.businessState.liveFlyerCount} live flyer${ctx.businessState.liveFlyerCount !== 1 ? 's' : ''}`
+      : 'Promote specials & events',
+    href: (ctx) => `/t/${ctx.tenantId}/settings/flyers`,
+    icon: 'Megaphone',
+    category: 'visibility',
+    badge: (ctx) => ctx.businessState.liveFlyerCount > 0 ? 'Live' : undefined,
+    condition: (ctx) => hasFlyer(ctx),
+    score: () => 86,
   },
 
   // ── COMMERCE: Payment and fulfillment (tier-gated) ──
@@ -562,6 +581,7 @@ interface BusinessState {
   hasPublishedDirectory: boolean;
   hasFAQs: boolean;
   faqEnabled: boolean;
+  liveFlyerCount: number;
   hasStorefront: boolean;
   locationStatus: string;
   subscriptionStatus: string;
@@ -571,12 +591,14 @@ interface BusinessState {
 }
 
 async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
+  const now = new Date();
   const [
     tenant,
     itemCounts,
     directoryListing,
     faqCount,
     faqOptions,
+    liveFlyerCount,
   ] = await Promise.all([
     prisma.tenants.findUnique({
       where: { id: tenantId },
@@ -606,6 +628,15 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
       where: { tenant_id: tenantId },
       select: { faq_enabled: true },
     }).catch(() => null),
+
+    prisma.tenant_flyers.count({
+      where: {
+        tenant_id: tenantId,
+        status: 'published',
+        starts_at: { lte: now },
+        ends_at: { gt: now },
+      },
+    }).catch(() => 0),
   ]);
 
   const [totalItems, activeItems] = itemCounts as [number, number];
@@ -627,6 +658,7 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
     hasPublishedDirectory: directoryListing?.is_published === true,
     hasFAQs: faqCount > 0,
     faqEnabled: faqOptions?.faq_enabled ?? true,
+    liveFlyerCount,
     hasStorefront: false,
     locationStatus: tenant?.location_status || 'active',
     subscriptionStatus: tenant?.subscription_status || 'active',

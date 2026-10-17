@@ -240,8 +240,8 @@ as expected, not a bug.
 
 "Draft with AI" dishes become ordinary `dish` entries at composer save —
 they materialize as variants only when the merchant confirms. The draft itself
-persists nothing; flagged `needsPriceConfirmation` items block save until
-priced.
+persists nothing; flagged `needsPriceConfirmation` items save as price-less
+`no_price` promo lines unless the merchant adds a price.
 
 ### Discovery from the item workflow
 
@@ -251,6 +251,15 @@ Merchants who arrive through the standard item creation flow
 flyers through the composer's "Link catalog item"; name+price specials skip the
 wizard entirely. Discovery stays merchant-initiated — the hint points, the
 platform doesn't push.
+
+### Dashboard quick link
+
+`GET /api/tenants/:tenantId/quick-links` (`QuickLinksService`) emits a
+**Specials Flyer** destination (`/t/<tid>/settings/flyers`, Megaphone icon,
+`visibility` category) whenever `effective.flyer.enabled` — gated tenants never
+see it. With ≥1 live flyer it shows an "N live flyers" description and a `Live`
+badge; otherwise "Promote specials & events". Ranked below setup/storefront/
+directory/items so core destinations keep top slots.
 
 ---
 
