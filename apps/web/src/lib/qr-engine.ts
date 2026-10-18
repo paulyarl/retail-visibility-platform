@@ -734,6 +734,24 @@ export async function overlayLogoOnQRAsync(
   const logoSize = Math.floor(canvas.width * 0.30);
   const logoX = (canvas.width - logoSize) / 2;
   const logoY = (canvas.height - logoSize) / 2;
+  const bx = Math.floor(logoX), by = Math.floor(logoY);
+
+  const sampleRegion = () => {
+    const rd = ctx.getImageData(bx, by, logoSize, logoSize).data;
+    let white = 0, nonWhite = 0, transparent = 0;
+    for (let i = 0; i < rd.length; i += 64) {
+      if (rd[i + 3] < 16) { transparent++; continue; }
+      if (rd[i] > 235 && rd[i + 1] > 235 && rd[i + 2] > 235) white++;
+      else nonWhite++;
+    }
+    return { white, nonWhite, transparent };
+  };
+  // eslint-disable-next-line no-console
+  console.info('[qr-engine] logo pre-paint', {
+    canvasW: canvas.width, canvasH: canvas.height, logoSize, bx, by,
+    gco: ctx.globalCompositeOperation, alpha: ctx.globalAlpha,
+    before: sampleRegion(),
+  });
 
   ctx.fillStyle = '#FFFFFF';
   if (isCircle) {
@@ -743,6 +761,8 @@ export async function overlayLogoOnQRAsync(
   } else {
     ctx.fillRect(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12);
   }
+  // eslint-disable-next-line no-console
+  console.info('[qr-engine] logo after-box', sampleRegion());
 
   ctx.save();
   if (isCircle) {
@@ -757,6 +777,8 @@ export async function overlayLogoOnQRAsync(
   }
   ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
   ctx.restore();
+  // eslint-disable-next-line no-console
+  console.info('[qr-engine] logo after-img', sampleRegion());
 
   ctx.strokeStyle = '#FFFFFF';
   ctx.lineWidth = 6;
@@ -772,18 +794,8 @@ export async function overlayLogoOnQRAsync(
   // landed in the bitmap that toDataURL is about to serialize, so a "logo
   // drew but preview shows nothing" report can be split between the
   // generation and display paths.
-  {
-    const bx = Math.floor(logoX), by = Math.floor(logoY);
-    const rd = ctx.getImageData(bx, by, logoSize, logoSize).data;
-    let white = 0, nonWhite = 0;
-    for (let i = 0; i < rd.length; i += 64) {
-      if (rd[i + 3] < 16) continue;
-      if (rd[i] > 235 && rd[i + 1] > 235 && rd[i + 2] > 235) white++;
-      else nonWhite++;
-    }
-    // eslint-disable-next-line no-console
-    console.info('[qr-engine] logo painted', { white, nonWhite });
-  }
+  // eslint-disable-next-line no-console
+  console.info('[qr-engine] logo painted', sampleRegion());
 
   return canvas;
 }
