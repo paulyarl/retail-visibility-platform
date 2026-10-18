@@ -5,6 +5,7 @@ import { storefrontService } from '@/services/StorefrontService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
 import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { StorefrontOptionFlags, StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { StyledTenantQR } from '@/components/public/StyledTenantQR';
 import { clientLogger } from '@/lib/client-logger';
@@ -127,7 +128,18 @@ export function TenantQRCode({
               const profile = await tenantPublicService.getPublicTenantInfo(tenantId);
               if (profile) {
                 const profileData = profile?.profileData || profile;
-                setTenantLogo(profileData.logo_url || null);
+                let logo = profileData.logo_url || null;
+                // Directory surfaces share the seed kit's semantic — when the
+                // design wants a logo but the business has none (unclaimed
+                // seeds never do), fall back to the platform mark, same as
+                // MarketIntelBanner's resolveLogo.
+                if (!logo && pageType === 'directory') {
+                  try {
+                    const s = await platformSettingsService.getPlatformSettings();
+                    logo = s?.logoUrl ?? null;
+                  } catch { /* no platform logo configured */ }
+                }
+                setTenantLogo(logo);
               }
             } catch (profileError) {
               clientLogger.error('Error fetching tenant profile:', { detail: profileError });
