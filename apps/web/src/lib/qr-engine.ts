@@ -509,7 +509,7 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not get canvas context');
   ctx.drawImage(qrImg, 0, 0, exportSize, exportSize);
-  if (!canvasHasVisiblePixels(ctx, exportSize)) {
+  if (!canvasHasQrContent(ctx, exportSize)) {
     throw new Error('styled_qr_blank');
   }
 
@@ -557,16 +557,35 @@ function rejectAfter(ms: number, message: string): Promise<never> {
 }
 
 /**
- * True when the canvas contains at least one non-transparent pixel — a
- * suppressed svg raster produces a fully transparent canvas that would
- * otherwise surface as an empty white box.
+ * True when the canvas contains real QR content, not just a blank or
+ * background-only raster. Two failure modes are covered:
+ *
+ * - fully transparent output (suppressed svg raster, zero-size drawImage)
+ * - background-only output (a fill that fails to rasterize — e.g. an svg
+ *   linearGradient that some GPU-accelerated img rasters render as
+ *   transparent — leaves every pixel at the bg color)
+ *
+ * (0,0) sits inside the QR quiet zone, so it samples the background. A real
+ * QR has thousands of module pixels that differ from it; a contentless
+ * raster has ~none.
  */
-function canvasHasVisiblePixels(ctx: CanvasRenderingContext2D, size: number): boolean {
+function canvasHasQrContent(ctx: CanvasRenderingContext2D, size: number): boolean {
   const { data } = ctx.getImageData(0, 0, size, size);
-  for (let i = 3; i < data.length; i += 64) {
-    if (data[i] !== 0) return true;
+  const br = data[0], bg = data[1], bb = data[2], ba = data[3];
+  let opaque = 0, content = 0;
+  for (let i = 0; i < data.length; i += 64) {
+    const a = data[i + 3];
+    if (a !== 0) opaque++;
+    if (
+      Math.abs(data[i] - br) > 24 ||
+      Math.abs(data[i + 1] - bg) > 24 ||
+      Math.abs(data[i + 2] - bb) > 24 ||
+      Math.abs(a - ba) > 24
+    ) {
+      content++;
+    }
   }
-  return false;
+  return opaque > 0 && content > 64;
 }
 
 /**
