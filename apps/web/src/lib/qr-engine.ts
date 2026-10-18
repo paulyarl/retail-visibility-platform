@@ -501,8 +501,9 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
     try {
       const finalCanvas = await overlayLogoOnQRAsync(canvas, logoUrl, logoShape);
       return finalCanvas.toDataURL('image/png', 1.0);
-    } catch {
-      // fallback to plain QR
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[qr-engine] logo overlay failed — plain QR', String((err as Error)?.message ?? err));
     }
   }
 
@@ -659,8 +660,9 @@ async function generateClassicQr(opts: QrEngineOptions): Promise<string> {
     try {
       const finalCanvas = await overlayLogoOnQRAsync(canvas, logoUrl, logoShape);
       return finalCanvas.toDataURL('image/png', 1.0);
-    } catch {
-      // fallback to plain QR
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[qr-engine] logo overlay failed — plain QR', String((err as Error)?.message ?? err));
     }
   }
 
@@ -688,6 +690,39 @@ export async function overlayLogoOnQRAsync(
   // interception, etc.) must degrade to a plain QR rather than hang the
   // caller's generation promise forever.
   const img = await loadImageWithTimeout(logoSrc, 4000, 'anonymous');
+
+  // Raster-probe the logo on a scratch canvas before touching the QR. An
+  // image with no intrinsic size, a raster that drops the draw, or a fully
+  // transparent / all-white image would paint invisibly onto the white box —
+  // throwing here keeps the QR clean and surfaces the reason instead of
+  // emitting a QR with an empty center cutout.
+  const probeSize = 64;
+  const probe = document.createElement('canvas');
+  probe.width = probeSize;
+  probe.height = probeSize;
+  const pctx = probe.getContext('2d');
+  if (!pctx) throw new Error('Could not get canvas context');
+  pctx.drawImage(img, 0, 0, probeSize, probeSize);
+  const pdata = pctx.getImageData(0, 0, probeSize, probeSize).data;
+  let visible = 0;
+  for (let i = 0; i < pdata.length; i += 4) {
+    if (
+      pdata[i + 3] > 16 &&
+      (pdata[i] < 235 || pdata[i + 1] < 235 || pdata[i + 2] < 235)
+    ) {
+      visible++;
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.info('[qr-engine] logo raster probe', {
+    w: img.naturalWidth,
+    h: img.naturalHeight,
+    visible,
+    src: logoSrc.slice(0, 48),
+  });
+  if (visible === 0) {
+    throw new Error('logo_raster_empty');
+  }
 
   // Draw directly onto the QR canvas rather than a copy — a canvas→canvas
   // blit of a canvas whose content came from a revoked object-URL image can
