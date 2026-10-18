@@ -683,9 +683,6 @@ export async function overlayLogoOnQRAsync(
   logoSrc: string,
   logoShape: string,
 ): Promise<HTMLCanvasElement> {
-  const ctx = qrCanvas.getContext('2d');
-  if (!ctx) throw new Error('Could not get canvas context');
-
   const isCircle = logoShape === 'circle';
 
   // Bounded load — a stalled logo request (remote storage URL, service-worker
@@ -726,10 +723,22 @@ export async function overlayLogoOnQRAsync(
     throw new Error('logo_raster_empty');
   }
 
-  // Draw directly onto the QR canvas rather than a copy — a canvas→canvas
-  // blit of a canvas whose content came from a revoked object-URL image can
-  // read back empty on some raster paths.
-  const canvas = qrCanvas;
+  // Paint onto a FRESH canvas seeded with a byte-exact copy of the QR
+  // bitmap — getImageData/putImageData bypass the raster pipeline entirely.
+  // A QR canvas whose first draw came through a deferred GPU raster path
+  // (createImageBitmap→drawImage→bitmap.close) can silently drop every
+  // subsequent raster op — observed: fillRect/drawImage landed zero pixels
+  // while getImageData still read the original bitmap, gco 'source-over',
+  // alpha 1. A fresh context guarantees source-over compositing, identity
+  // transform, and no residual clip.
+  const canvas = document.createElement('canvas');
+  canvas.width = qrCanvas.width;
+  canvas.height = qrCanvas.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get canvas context');
+  const srcCtx = qrCanvas.getContext('2d');
+  if (!srcCtx) throw new Error('Could not get canvas context');
+  ctx.putImageData(srcCtx.getImageData(0, 0, qrCanvas.width, qrCanvas.height), 0, 0);
 
   const logoSize = Math.floor(canvas.width * 0.30);
   const logoX = (canvas.width - logoSize) / 2;
@@ -749,7 +758,6 @@ export async function overlayLogoOnQRAsync(
   // eslint-disable-next-line no-console
   console.info('[qr-engine] logo pre-paint', {
     canvasW: canvas.width, canvasH: canvas.height, logoSize, bx, by,
-    gco: ctx.globalCompositeOperation, alpha: ctx.globalAlpha,
     before: sampleRegion(),
   });
 
