@@ -768,5 +768,22 @@ export async function overlayLogoOnQRAsync(
     ctx.strokeRect(logoX - 3, logoY - 3, logoSize + 6, logoSize + 6);
   }
 
+  // Post-draw readback of the logo region — proves the box+logo actually
+  // landed in the bitmap that toDataURL is about to serialize, so a "logo
+  // drew but preview shows nothing" report can be split between the
+  // generation and display paths.
+  {
+    const bx = Math.floor(logoX), by = Math.floor(logoY);
+    const rd = ctx.getImageData(bx, by, logoSize, logoSize).data;
+    let white = 0, nonWhite = 0;
+    for (let i = 0; i < rd.length; i += 64) {
+      if (rd[i + 3] < 16) continue;
+      if (rd[i] > 235 && rd[i + 1] > 235 && rd[i + 2] > 235) white++;
+      else nonWhite++;
+    }
+    // eslint-disable-next-line no-console
+    console.info('[qr-engine] logo painted', { white, nonWhite });
+  }
+
   return canvas;
 }
