@@ -52,6 +52,8 @@ export function StyledTenantQR({
         exportSize: targetSize,
         styled: false,
         errorCorrection,
+        logoUrl: prefs?.qr_logo ? tenantLogo : null,
+        logoShape: prefs?.qr_logo_shape || 'square',
       });
     return generateQrDataUrl({
       data: trackingUrl,

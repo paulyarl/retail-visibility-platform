@@ -230,26 +230,31 @@ function ClaimQrPreview({
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const classicOpts: QrEngineOptions = {
-      data: url,
-      exportSize: 512,
-      styled: false,
-      errorCorrection: 'H',
-    };
     const styledOpts = qrStyle
       ? { ...bannerQrOptions(url, qrStyle, logoUrl), exportSize: 512 }
       : styledFallback
         ? { ...bannerQrOptions(url, null, logoUrl), exportSize: 512 }
         : null;
+    const classicOpts: QrEngineOptions = {
+      data: url,
+      exportSize: 512,
+      styled: false,
+      errorCorrection: 'H',
+      // Carry the resolved logo into the fallback — a styled attempt that
+      // loses the race (e.g. a slow logo fetch) still yields a logo'd QR.
+      logoUrl: styledOpts?.logoUrl ?? null,
+      logoShape: styledOpts?.logoShape,
+    };
     // qr-code-styling rasterizes its svg through an internal Image with only an
     // onload wired — a suppressed data-URI load never settles the promise, so
     // bound the styled attempt and degrade to the classic QR instead of
-    // stranding the card on the empty placeholder.
+    // stranding the card on the empty placeholder. The bound sits above the
+    // engine's own 6s styled cap so a legitimate slow render isn't discarded.
     const attempt = styledOpts
       ? Promise.race<string>([
           generateQrDataUrl(styledOpts),
           new Promise<string>((_, reject) =>
-            setTimeout(() => reject(new Error('styled_qr_timeout')), 4000),
+            setTimeout(() => reject(new Error('styled_qr_timeout')), 8000),
           ),
         ]).catch((err) => {
           clientLogger.error('[ClaimQrPreview] styled QR generation failed — falling back to classic:', { detail: err });

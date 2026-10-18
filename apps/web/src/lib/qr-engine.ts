@@ -530,7 +530,9 @@ function loadImageWithTimeout(src: string, ms: number, crossOrigin?: string): Pr
       clearTimeout(timer);
       reject(new Error('image_load_error'));
     };
-    if (crossOrigin) img.crossOrigin = crossOrigin;
+    // data:/blob: sources are same-origin — a CORS-mode load gains nothing
+    // and some engines reject it, so only ask for CORS on remote URLs.
+    if (crossOrigin && /^https?:/i.test(src)) img.crossOrigin = crossOrigin;
     img.src = src;
   });
 }

@@ -254,19 +254,25 @@ export default function ReportQrDesignerModal({
       try {
         const s = await platformSettingsService.getPlatformSettings();
         const url = s?.logoUrl ?? null;
+        // eslint-disable-next-line no-console
+        console.info('[ReportDesignerLogo] settings resolved', { hasUrl: !!url, head: url?.slice(0, 48) ?? null });
         if (!url) {
           if (!cancelled) setPlatformLogoUrl(null);
           return;
         }
         await new Promise<void>((resolve, reject) => {
           const probe = new Image();
-          probe.crossOrigin = 'anonymous';
+          if (/^https?:/i.test(url)) probe.crossOrigin = 'anonymous';
           probe.onload = () => resolve();
           probe.onerror = () => reject(new Error('logo probe failed'));
           probe.src = url;
         });
+        // eslint-disable-next-line no-console
+        console.info('[ReportDesignerLogo] platform logo probe ok', { head: url.slice(0, 48) });
         if (!cancelled) setPlatformLogoUrl(url);
-      } catch {
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[ReportDesignerLogo] platform logo unavailable', String((err as Error)?.message ?? err));
         if (!cancelled) {
           setPlatformLogoUrl(null);
           setLogoLoadFailed(true);
@@ -290,8 +296,14 @@ export default function ReportQrDesignerModal({
     const dbg = (stage: string, extra?: Record<string, unknown>) =>
       // eslint-disable-next-line no-console
       console.info(`[ReportDesignerPreview #${runId}] ${stage}`, extra ?? '');
-    dbg('start');
-    generateQrDataUrl(buildOpts(512))
+    const logoKind = !logoEnabled
+      ? 'disabled'
+      : isBanner
+        ? (persistedLogoUrl ? 'persisted' : businessLogoUrl ? 'business' : platformLogoUrl ? 'platform' : 'none')
+        : (customLogoDataUrl ? 'custom' : platformLogoUrl ? 'platform' : 'none');
+    dbg('start', { logoKind, logoLoading, isBanner });
+    const opts = buildOpts(512);
+    generateQrDataUrl(opts)
       .then((d) => {
         dbg('styled resolved', { cancelled, bytes: d.length, head: d.slice(0, 32) });
         if (!cancelled) setQrDataUrl(d);
@@ -305,6 +317,8 @@ export default function ReportQrDesignerModal({
             exportSize: 512,
             styled: false,
             errorCorrection: 'H',
+            logoUrl: opts.logoUrl,
+            logoShape: opts.logoShape,
           });
           dbg('classic resolved', { cancelled, bytes: d.length });
           if (!cancelled) {
@@ -343,6 +357,8 @@ export default function ReportQrDesignerModal({
     reader.onload = async () => {
       const dataUrl = typeof reader.result === 'string' ? reader.result : null;
       if (!dataUrl) return;
+      // eslint-disable-next-line no-console
+      console.info('[ReportDesignerLogo] upload read', { type: file.type, size: file.size, head: dataUrl.slice(0, 48) });
       if (!isBanner) {
         setCustomLogoDataUrl(dataUrl);
         setError(null);

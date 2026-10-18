@@ -210,6 +210,8 @@ export function MarketIntelBanner({
                 exportSize: 256,
                 styled: false,
                 errorCorrection: 'H',
+                logoUrl: resolved,
+                logoShape: qrStyle?.logoShape,
               }),
             ),
       )
