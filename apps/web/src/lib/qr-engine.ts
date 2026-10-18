@@ -712,13 +712,6 @@ export async function overlayLogoOnQRAsync(
       visible++;
     }
   }
-  // eslint-disable-next-line no-console
-  console.info('[qr-engine] logo raster probe', {
-    w: img.naturalWidth,
-    h: img.naturalHeight,
-    visible,
-    src: logoSrc.slice(0, 48),
-  });
   if (visible === 0) {
     throw new Error('logo_raster_empty');
   }
@@ -743,23 +736,6 @@ export async function overlayLogoOnQRAsync(
   const logoSize = Math.floor(canvas.width * 0.30);
   const logoX = (canvas.width - logoSize) / 2;
   const logoY = (canvas.height - logoSize) / 2;
-  const bx = Math.floor(logoX), by = Math.floor(logoY);
-
-  const sampleRegion = () => {
-    const rd = ctx.getImageData(bx, by, logoSize, logoSize).data;
-    let white = 0, nonWhite = 0, transparent = 0;
-    for (let i = 0; i < rd.length; i += 64) {
-      if (rd[i + 3] < 16) { transparent++; continue; }
-      if (rd[i] > 235 && rd[i + 1] > 235 && rd[i + 2] > 235) white++;
-      else nonWhite++;
-    }
-    return { white, nonWhite, transparent };
-  };
-  // eslint-disable-next-line no-console
-  console.info('[qr-engine] logo pre-paint', {
-    canvasW: canvas.width, canvasH: canvas.height, logoSize, bx, by,
-    before: sampleRegion(),
-  });
 
   ctx.fillStyle = '#FFFFFF';
   if (isCircle) {
@@ -769,8 +745,6 @@ export async function overlayLogoOnQRAsync(
   } else {
     ctx.fillRect(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12);
   }
-  // eslint-disable-next-line no-console
-  console.info('[qr-engine] logo after-box', sampleRegion());
 
   ctx.save();
   if (isCircle) {
@@ -785,8 +759,6 @@ export async function overlayLogoOnQRAsync(
   }
   ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
   ctx.restore();
-  // eslint-disable-next-line no-console
-  console.info('[qr-engine] logo after-img', sampleRegion());
 
   ctx.strokeStyle = '#FFFFFF';
   ctx.lineWidth = 6;
@@ -797,13 +769,6 @@ export async function overlayLogoOnQRAsync(
   } else {
     ctx.strokeRect(logoX - 3, logoY - 3, logoSize + 6, logoSize + 6);
   }
-
-  // Post-draw readback of the logo region — proves the box+logo actually
-  // landed in the bitmap that toDataURL is about to serialize, so a "logo
-  // drew but preview shows nothing" report can be split between the
-  // generation and display paths.
-  // eslint-disable-next-line no-console
-  console.info('[qr-engine] logo painted', sampleRegion());
 
   return canvas;
 }

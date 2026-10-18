@@ -129,7 +129,6 @@ export default function ReportQrDesignerModal({
   const [previewFallback, setPreviewFallback] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const qrInstanceRef = useRef<any>(null);
-  const previewRunRef = useRef(0);
 
   const applyTemplate = (name: QrTemplateName) => {
     setSelectedTemplate(name);
@@ -254,8 +253,6 @@ export default function ReportQrDesignerModal({
       try {
         const s = await platformSettingsService.getPlatformSettings();
         const url = s?.logoUrl ?? null;
-        // eslint-disable-next-line no-console
-        console.info('[ReportDesignerLogo] settings resolved', { hasUrl: !!url, head: url?.slice(0, 48) ?? null });
         if (!url) {
           if (!cancelled) setPlatformLogoUrl(null);
           return;
@@ -267,8 +264,6 @@ export default function ReportQrDesignerModal({
           probe.onerror = () => reject(new Error('logo probe failed'));
           probe.src = url;
         });
-        // eslint-disable-next-line no-console
-        console.info('[ReportDesignerLogo] platform logo probe ok', { head: url.slice(0, 48) });
         if (!cancelled) setPlatformLogoUrl(url);
       } catch (err) {
         // eslint-disable-next-line no-console
@@ -292,24 +287,12 @@ export default function ReportQrDesignerModal({
     setQrDataUrl(null);
     setPreviewFallback(false);
     setPreviewFailed(false);
-    const runId = ++previewRunRef.current;
-    const dbg = (stage: string, extra?: Record<string, unknown>) =>
-      // eslint-disable-next-line no-console
-      console.info(`[ReportDesignerPreview #${runId}] ${stage}`, extra ?? '');
-    const logoKind = !logoEnabled
-      ? 'disabled'
-      : isBanner
-        ? (persistedLogoUrl ? 'persisted' : businessLogoUrl ? 'business' : platformLogoUrl ? 'platform' : 'none')
-        : (customLogoDataUrl ? 'custom' : platformLogoUrl ? 'platform' : 'none');
-    dbg('start', { logoKind, logoLoading, isBanner });
     const opts = buildOpts(512);
     generateQrDataUrl(opts)
       .then((d) => {
-        dbg('styled resolved', { cancelled, bytes: d.length, head: d.slice(0, 32) });
         if (!cancelled) setQrDataUrl(d);
       })
       .catch(async (err) => {
-        dbg('styled rejected', { cancelled, err: String((err as Error)?.message ?? err) });
         clientLogger.error('[ReportQrDesignerModal] styled QR preview failed — falling back to classic:', { detail: err });
         try {
           const d = await generateQrDataUrl({
@@ -320,20 +303,17 @@ export default function ReportQrDesignerModal({
             logoUrl: opts.logoUrl,
             logoShape: opts.logoShape,
           });
-          dbg('classic resolved', { cancelled, bytes: d.length });
           if (!cancelled) {
             setQrDataUrl(d);
             setPreviewFallback(true);
           }
         } catch (err2) {
-          dbg('classic rejected', { err: String((err2 as Error)?.message ?? err2) });
           clientLogger.error('[ReportQrDesignerModal] classic QR preview fallback failed:', { detail: err2 });
           if (!cancelled) setPreviewFailed(true);
         }
       });
     return () => {
       cancelled = true;
-      dbg('cleanup');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -357,8 +337,6 @@ export default function ReportQrDesignerModal({
     reader.onload = async () => {
       const dataUrl = typeof reader.result === 'string' ? reader.result : null;
       if (!dataUrl) return;
-      // eslint-disable-next-line no-console
-      console.info('[ReportDesignerLogo] upload read', { type: file.type, size: file.size, head: dataUrl.slice(0, 48) });
       if (!isBanner) {
         setCustomLogoDataUrl(dataUrl);
         setError(null);
@@ -839,14 +817,6 @@ export default function ReportQrDesignerModal({
                 alt="QR preview"
                 className="max-w-full rounded"
                 style={{ width: 200, height: 200 }}
-                onLoad={() => {
-                  // eslint-disable-next-line no-console
-                  console.info(`[ReportDesignerPreview #${previewRunRef.current}] img decoded`);
-                }}
-                onError={() => {
-                  // eslint-disable-next-line no-console
-                  console.warn(`[ReportDesignerPreview #${previewRunRef.current}] img decode failed`);
-                }}
               />
             ) : (
               <div className="flex h-48 w-48 items-center justify-center text-sm text-gray-400">

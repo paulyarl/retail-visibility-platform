@@ -107,7 +107,6 @@ export default function ClaimQrDesignerModal({
   const [previewFallback, setPreviewFallback] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const qrInstanceRef = useRef<any>(null);
-  const previewRunRef = useRef(0);
 
   const applyTemplate = (name: QrTemplateName) => {
     setSelectedTemplate(name);
@@ -167,8 +166,6 @@ export default function ClaimQrDesignerModal({
       try {
         const s = await platformSettingsService.getPlatformSettings();
         const url = s?.logoUrl ?? null;
-        // eslint-disable-next-line no-console
-        console.info('[ClaimDesignerLogo] settings resolved', { hasUrl: !!url, head: url?.slice(0, 48) ?? null });
         if (!url) {
           if (!cancelled) setPlatformLogoUrl(null);
           return;
@@ -180,8 +177,6 @@ export default function ClaimQrDesignerModal({
           probe.onerror = () => reject(new Error('logo probe failed'));
           probe.src = url;
         });
-        // eslint-disable-next-line no-console
-        console.info('[ClaimDesignerLogo] platform logo probe ok', { head: url.slice(0, 48) });
         if (!cancelled) setPlatformLogoUrl(url);
       } catch (err) {
         // eslint-disable-next-line no-console
@@ -237,22 +232,12 @@ export default function ClaimQrDesignerModal({
     setQrDataUrl(null);
     setPreviewFallback(false);
     setPreviewFailed(false);
-    const runId = ++previewRunRef.current;
-    const dbg = (stage: string, extra?: Record<string, unknown>) =>
-      // eslint-disable-next-line no-console
-      console.info(`[ClaimDesignerPreview #${runId}] ${stage}`, extra ?? '');
-    const logoKind = !logoEnabled
-      ? 'disabled'
-      : (customLogoDataUrl ? 'custom' : platformLogoUrl ? 'platform' : 'none');
-    dbg('start', { logoKind, logoLoading });
     const opts = buildOpts(512);
     generateQrDataUrl(opts)
       .then((d) => {
-        dbg('styled resolved', { cancelled, bytes: d.length, head: d.slice(0, 32) });
         if (!cancelled) setQrDataUrl(d);
       })
       .catch(async (err) => {
-        dbg('styled rejected', { cancelled, err: String((err as Error)?.message ?? err) });
         clientLogger.error('[ClaimQrDesignerModal] styled QR preview failed — falling back to classic:', { detail: err });
         try {
           const d = await generateQrDataUrl({
@@ -263,20 +248,17 @@ export default function ClaimQrDesignerModal({
             logoUrl: opts.logoUrl,
             logoShape: opts.logoShape,
           });
-          dbg('classic resolved', { cancelled, bytes: d.length });
           if (!cancelled) {
             setQrDataUrl(d);
             setPreviewFallback(true);
           }
         } catch (err2) {
-          dbg('classic rejected', { err: String((err2 as Error)?.message ?? err2) });
           clientLogger.error('[ClaimQrDesignerModal] classic QR preview fallback failed:', { detail: err2 });
           if (!cancelled) setPreviewFailed(true);
         }
       });
     return () => {
       cancelled = true;
-      dbg('cleanup');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -298,8 +280,6 @@ export default function ClaimQrDesignerModal({
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = typeof reader.result === 'string' ? reader.result : null;
-      // eslint-disable-next-line no-console
-      console.info('[ClaimDesignerLogo] upload read', { type: file.type, size: file.size, head: dataUrl?.slice(0, 48) ?? null });
       setCustomLogoDataUrl(dataUrl);
       setError(null);
     };
@@ -432,14 +412,6 @@ export default function ClaimQrDesignerModal({
                 alt="Styled claim QR preview"
                 className="rounded-lg border border-gray-200 shadow-sm"
                 style={{ width: 256, height: 256 }}
-                onLoad={() => {
-                  // eslint-disable-next-line no-console
-                  console.info(`[ClaimDesignerPreview #${previewRunRef.current}] img decoded`);
-                }}
-                onError={() => {
-                  // eslint-disable-next-line no-console
-                  console.warn(`[ClaimDesignerPreview #${previewRunRef.current}] img decode failed`);
-                }}
               />
             ) : (
               <div className="w-64 h-64 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1">
