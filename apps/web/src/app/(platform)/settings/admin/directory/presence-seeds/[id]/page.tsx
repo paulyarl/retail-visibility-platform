@@ -245,6 +245,15 @@ function ClaimQrPreview({
       logoUrl: styledOpts?.logoUrl ?? null,
       logoShape: styledOpts?.logoShape,
     };
+    // eslint-disable-next-line no-console
+    console.info('[QrCardPreview] opts', {
+      tail: url.slice(-14),
+      hasStyle: !!qrStyle,
+      logoFlag: qrStyle?.logo ?? null,
+      logoShape: styledOpts?.logoShape ?? null,
+      logoUrl: styledOpts?.logoUrl ? styledOpts.logoUrl.slice(0, 60) : null,
+      styledFallback,
+    });
     // qr-code-styling rasterizes its svg through an internal Image with only an
     // onload wired — a suppressed data-URI load never settles the promise, so
     // bound the styled attempt and degrade to the classic QR instead of
