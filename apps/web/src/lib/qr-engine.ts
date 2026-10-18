@@ -410,7 +410,13 @@ export async function generateQrDataUrl(opts: QrEngineOptions): Promise<string> 
   const { styled } = resolved;
 
   if (styled) {
-    return generateStyledQr(resolved);
+    // Overall bound on the styled path — every image load inside is
+    // individually timeout-guarded, but a caller should never be left
+    // pending if the library itself stalls for an unforeseen reason.
+    return Promise.race([
+      generateStyledQr(resolved),
+      rejectAfter(6000, 'styled_qr_timeout'),
+    ]);
   }
   return generateClassicQr(resolved);
 }
@@ -524,7 +530,7 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
  * internal raster path wires onload only, so a failed data/blob-URI load
  * never settles. Our own path must not inherit that hang.
  */
-function loadImageWithTimeout(src: string, ms: number): Promise<HTMLImageElement> {
+function loadImageWithTimeout(src: string, ms: number, crossOrigin?: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const timer = setTimeout(() => {
@@ -539,7 +545,14 @@ function loadImageWithTimeout(src: string, ms: number): Promise<HTMLImageElement
       clearTimeout(timer);
       reject(new Error('image_load_error'));
     };
+    if (crossOrigin) img.crossOrigin = crossOrigin;
     img.src = src;
+  });
+}
+
+function rejectAfter(ms: number, message: string): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
   });
 }
 
@@ -610,63 +623,57 @@ export async function overlayLogoOnQRAsync(
   logoSrc: string,
   logoShape: string,
 ): Promise<HTMLCanvasElement> {
-  return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      reject(new Error('Could not get canvas context'));
-      return;
-    }
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get canvas context');
 
-    const isCircle = logoShape === 'circle';
+  const isCircle = logoShape === 'circle';
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      canvas.width = qrCanvas.width;
-      canvas.height = qrCanvas.height;
-      ctx.drawImage(qrCanvas, 0, 0);
+  // Bounded load — a stalled logo request (remote storage URL, service-worker
+  // interception, etc.) must degrade to a plain QR rather than hang the
+  // caller's generation promise forever.
+  const img = await loadImageWithTimeout(logoSrc, 4000, 'anonymous');
 
-      const logoSize = Math.floor(canvas.width * 0.30);
-      const logoX = (canvas.width - logoSize) / 2;
-      const logoY = (canvas.height - logoSize) / 2;
+  canvas.width = qrCanvas.width;
+  canvas.height = qrCanvas.height;
+  ctx.drawImage(qrCanvas, 0, 0);
 
-      ctx.fillStyle = '#FFFFFF';
-      if (isCircle) {
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.fillRect(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12);
-      }
+  const logoSize = Math.floor(canvas.width * 0.30);
+  const logoX = (canvas.width - logoSize) / 2;
+  const logoY = (canvas.height - logoSize) / 2;
 
-      ctx.save();
-      if (isCircle) {
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-      } else {
-        ctx.beginPath();
-        ctx.rect(logoX, logoY, logoSize, logoSize);
-        ctx.clip();
-      }
-      ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
-      ctx.restore();
+  ctx.fillStyle = '#FFFFFF';
+  if (isCircle) {
+    ctx.beginPath();
+    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillRect(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12);
+  }
 
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 6;
-      if (isCircle) {
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        ctx.strokeRect(logoX - 3, logoY - 3, logoSize + 6, logoSize + 6);
-      }
+  ctx.save();
+  if (isCircle) {
+    ctx.beginPath();
+    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+  } else {
+    ctx.beginPath();
+    ctx.rect(logoX, logoY, logoSize, logoSize);
+    ctx.clip();
+  }
+  ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
+  ctx.restore();
 
-      resolve(canvas);
-    };
-    img.onerror = () => reject(new Error('Failed to load logo image'));
-    img.src = logoSrc;
-  });
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 6;
+  if (isCircle) {
+    ctx.beginPath();
+    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.strokeRect(logoX - 3, logoY - 3, logoSize + 6, logoSize + 6);
+  }
+
+  return canvas;
 }
