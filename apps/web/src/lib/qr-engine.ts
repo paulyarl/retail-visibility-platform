@@ -479,18 +479,33 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
     qrOptions: { errorCorrectionLevel: errorCorrection },
   });
 
-  const blob = await qr.getRawData('png');
-  if (!(blob instanceof Blob)) {
-    throw new Error('Failed to generate styled QR blob');
+  // Rasterize the svg ourselves — the lib's internal png path loads the
+  // serialized svg through an Image with only onload wired (no onerror/
+  // timeout) and draws it at its intrinsic size, so a suppressed or
+  // zero-size raster resolves to a fully transparent PNG. Drawing
+  // explicitly-sized and verifying the output isn't blank turns those
+  // silent failures into rejections callers can fall back from.
+  const svgBlob = await qr.getRawData('svg');
+  if (!(svgBlob instanceof Blob)) {
+    throw new Error('Failed to generate styled QR svg');
+  }
+  const svgUrl = URL.createObjectURL(svgBlob);
+  let qrImg: HTMLImageElement;
+  try {
+    qrImg = await loadImageWithTimeout(svgUrl, 4000);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
   }
 
-  const qrImg = await createImageBitmap(blob);
   const canvas = document.createElement('canvas');
   canvas.width = exportSize;
   canvas.height = exportSize;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not get canvas context');
-  ctx.drawImage(qrImg, 0, 0);
+  ctx.drawImage(qrImg, 0, 0, exportSize, exportSize);
+  if (!canvasHasVisiblePixels(ctx, exportSize)) {
+    throw new Error('styled_qr_blank');
+  }
 
   if (logoUrl) {
     try {
@@ -502,6 +517,43 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
   }
 
   return canvas.toDataURL('image/png', 1.0);
+}
+
+/**
+ * Load an image with both error and timeout handling — qr-code-styling's
+ * internal raster path wires onload only, so a failed data/blob-URI load
+ * never settles. Our own path must not inherit that hang.
+ */
+function loadImageWithTimeout(src: string, ms: number): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const timer = setTimeout(() => {
+      img.src = '';
+      reject(new Error('image_load_timeout'));
+    }, ms);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error('image_load_error'));
+    };
+    img.src = src;
+  });
+}
+
+/**
+ * True when the canvas contains at least one non-transparent pixel — a
+ * suppressed svg raster produces a fully transparent canvas that would
+ * otherwise surface as an empty white box.
+ */
+function canvasHasVisiblePixels(ctx: CanvasRenderingContext2D, size: number): boolean {
+  const { data } = ctx.getImageData(0, 0, size, size);
+  for (let i = 3; i < data.length; i += 64) {
+    if (data[i] !== 0) return true;
+  }
+  return false;
 }
 
 /**

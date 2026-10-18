@@ -44,6 +44,15 @@ export function StyledTenantQR({
 
   const generateStyledQR = async (targetSize: number): Promise<string> => {
     const trackingUrl = url.includes('source=qr') ? url : `${url}${url.includes('?') ? '&' : '?'}source=qr`;
+    // qr-engine rejects when the styled svg can't be rasterized — fall back
+    // to the classic QR so the scannable code always renders.
+    const classicFallback = () =>
+      generateQrDataUrl({
+        data: trackingUrl,
+        exportSize: targetSize,
+        styled: false,
+        errorCorrection,
+      });
     return generateQrDataUrl({
       data: trackingUrl,
       exportSize: targetSize,
@@ -64,6 +73,9 @@ export function StyledTenantQR({
       gradientOnDots: prefs?.qr_gradient_on_dots ?? true,
       gradientOnCorners: prefs?.qr_gradient_on_corners ?? true,
       gradientOnCornerDots: prefs?.qr_gradient_on_corner_dots ?? true,
+    }).catch((err) => {
+      clientLogger.error('[StyledTenantQR] styled QR raster failed — falling back to classic:', { detail: err });
+      return classicFallback();
     });
   };
 

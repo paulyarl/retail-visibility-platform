@@ -198,9 +198,20 @@ export function MarketIntelBanner({
 
     resolveLogo()
       .then((resolved) =>
-        cancelled ? null : generateQrDataUrl(
-          bannerQrOptions(`${window.location.origin}${trackedPath}`, qrStyle, resolved),
-        ),
+        cancelled
+          ? null
+          : generateQrDataUrl(
+              bannerQrOptions(`${window.location.origin}${trackedPath}`, qrStyle, resolved),
+              // A suppressed styled raster now rejects in qr-engine — the
+              // catch below degrades to classic so the scan affordance survives.
+            ).catch(() =>
+              generateQrDataUrl({
+                data: `${window.location.origin}${trackedPath}`,
+                exportSize: 256,
+                styled: false,
+                errorCorrection: 'H',
+              }),
+            ),
       )
       .then((url) => {
         if (url && !cancelled) setQrDataUrl(url);
