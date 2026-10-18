@@ -129,6 +129,7 @@ export default function ReportQrDesignerModal({
   const [previewFallback, setPreviewFallback] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const qrInstanceRef = useRef<any>(null);
+  const previewRunRef = useRef(0);
 
   const applyTemplate = (name: QrTemplateName) => {
     setSelectedTemplate(name);
@@ -285,11 +286,18 @@ export default function ReportQrDesignerModal({
     setQrDataUrl(null);
     setPreviewFallback(false);
     setPreviewFailed(false);
+    const runId = ++previewRunRef.current;
+    const dbg = (stage: string, extra?: Record<string, unknown>) =>
+      // eslint-disable-next-line no-console
+      console.info(`[ReportDesignerPreview #${runId}] ${stage}`, extra ?? '');
+    dbg('start');
     generateQrDataUrl(buildOpts(512))
       .then((d) => {
+        dbg('styled resolved', { cancelled, bytes: d.length, head: d.slice(0, 32) });
         if (!cancelled) setQrDataUrl(d);
       })
       .catch(async (err) => {
+        dbg('styled rejected', { cancelled, err: String((err as Error)?.message ?? err) });
         clientLogger.error('[ReportQrDesignerModal] styled QR preview failed — falling back to classic:', { detail: err });
         try {
           const d = await generateQrDataUrl({
@@ -298,17 +306,20 @@ export default function ReportQrDesignerModal({
             styled: false,
             errorCorrection: 'H',
           });
+          dbg('classic resolved', { cancelled, bytes: d.length });
           if (!cancelled) {
             setQrDataUrl(d);
             setPreviewFallback(true);
           }
         } catch (err2) {
+          dbg('classic rejected', { err: String((err2 as Error)?.message ?? err2) });
           clientLogger.error('[ReportQrDesignerModal] classic QR preview fallback failed:', { detail: err2 });
           if (!cancelled) setPreviewFailed(true);
         }
       });
     return () => {
       cancelled = true;
+      dbg('cleanup');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -807,7 +818,20 @@ export default function ReportQrDesignerModal({
         <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-4">
           <div className="flex justify-center">
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR preview" className="max-w-full rounded" style={{ width: 200, height: 200 }} />
+              <img
+                src={qrDataUrl}
+                alt="QR preview"
+                className="max-w-full rounded"
+                style={{ width: 200, height: 200 }}
+                onLoad={() => {
+                  // eslint-disable-next-line no-console
+                  console.info(`[ReportDesignerPreview #${previewRunRef.current}] img decoded`);
+                }}
+                onError={() => {
+                  // eslint-disable-next-line no-console
+                  console.warn(`[ReportDesignerPreview #${previewRunRef.current}] img decode failed`);
+                }}
+              />
             ) : (
               <div className="flex h-48 w-48 items-center justify-center text-sm text-gray-400">
                 {previewFailed ? 'Preview unavailable' : 'Generating preview...'}
