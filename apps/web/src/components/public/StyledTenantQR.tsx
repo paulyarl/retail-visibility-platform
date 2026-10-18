@@ -82,6 +82,16 @@ export function StyledTenantQR({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info('[TenantQR] render', {
+      label,
+      pageType: pageType ?? null,
+      hasUrl: !!url,
+      alreadyRendered: !!qrImageUrl,
+      qrLogoFlag: prefs?.qr_logo ?? null,
+      logoShape: prefs?.qr_logo_shape ?? null,
+      logoUrl: tenantLogo ? `${tenantLogo.slice(0, 62)}…` : null,
+    });
     if (!url || qrImageUrl) return;
     let cancelled = false;
 
