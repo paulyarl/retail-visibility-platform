@@ -557,23 +557,29 @@ function rejectAfter(ms: number, message: string): Promise<never> {
 }
 
 /**
- * True when the canvas contains real QR content, not just a blank or
- * background-only raster. Two failure modes are covered:
+ * True when the canvas contains real QR content, not a blank or partial
+ * raster. Failure modes covered:
  *
  * - fully transparent output (suppressed svg raster, zero-size drawImage)
  * - background-only output (a fill that fails to rasterize — e.g. an svg
  *   linearGradient that some GPU-accelerated img rasters render as
  *   transparent — leaves every pixel at the bg color)
+ * - partial output (corner marks paint but dots don't — a handful of big
+ *   shapes still differs from bg enough to pass a coarse count)
  *
- * (0,0) sits inside the QR quiet zone, so it samples the background. A real
- * QR has thousands of module pixels that differ from it; a contentless
- * raster has ~none.
+ * The check samples the CENTER of the canvas: QR data modules always cover
+ * the middle while the failure modes above leave it at the background
+ * color. (0,0) sits inside the quiet zone, so it samples the background.
  */
 function canvasHasQrContent(ctx: CanvasRenderingContext2D, size: number): boolean {
-  const { data } = ctx.getImageData(0, 0, size, size);
-  const br = data[0], bg = data[1], bb = data[2], ba = data[3];
+  const { data: outer } = ctx.getImageData(0, 0, 1, 1);
+  const br = outer[0], bg = outer[1], bb = outer[2], ba = outer[3];
+
+  const midStart = Math.floor(size * 0.25);
+  const midSize = size - midStart * 2;
+  const { data } = ctx.getImageData(midStart, midStart, midSize, midSize);
   let opaque = 0, content = 0;
-  for (let i = 0; i < data.length; i += 64) {
+  for (let i = 0; i < data.length; i += 16) {
     const a = data[i + 3];
     if (a !== 0) opaque++;
     if (
