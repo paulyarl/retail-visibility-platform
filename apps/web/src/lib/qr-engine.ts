@@ -489,29 +489,13 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
   // serialized svg through an Image with only onload wired (no onerror/
   // timeout) and draws it at its intrinsic size, so a suppressed or
   // zero-size raster resolves to a fully transparent PNG. Drawing
-  // explicitly-sized and verifying the output isn't blank turns those
-  // silent failures into rejections callers can fall back from.
+  // explicitly-sized and verifying the output has real QR content turns
+  // those silent failures into rejections callers can fall back from.
   const svgBlob = await qr.getRawData('svg');
   if (!(svgBlob instanceof Blob)) {
     throw new Error('Failed to generate styled QR svg');
   }
-  const svgUrl = URL.createObjectURL(svgBlob);
-  let qrImg: HTMLImageElement;
-  try {
-    qrImg = await loadImageWithTimeout(svgUrl, 4000);
-  } finally {
-    URL.revokeObjectURL(svgUrl);
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = exportSize;
-  canvas.height = exportSize;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not get canvas context');
-  ctx.drawImage(qrImg, 0, 0, exportSize, exportSize);
-  if (!canvasHasQrContent(ctx, exportSize)) {
-    throw new Error('styled_qr_blank');
-  }
+  const canvas = await rasterizeSvgToCanvas(svgBlob, exportSize);
 
   if (logoUrl) {
     try {
@@ -554,6 +538,53 @@ function rejectAfter(ms: number, message: string): Promise<never> {
   return new Promise((_, reject) => {
     setTimeout(() => reject(new Error(message)), ms);
   });
+}
+
+/**
+ * Rasterize an svg blob onto a canvas of `size`×`size` and verify the
+ * result contains real QR content.
+ *
+ * Prefers createImageBitmap, which rasterizes the svg eagerly — the
+ * returned bitmap holds decoded pixels, so subsequent canvas draws don't
+ * depend on the svg still being resolvable. The Image fallback exists for
+ * engines that can't rasterize svg blobs (older Safari); the object URL is
+ * revoked only AFTER the canvas is drawn and content-verified — svg raster
+ * can be deferred until readback, and revoking early can blank the draw.
+ */
+async function rasterizeSvgToCanvas(svgBlob: Blob, size: number): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get canvas context');
+
+  let bitmap: ImageBitmap | null = null;
+  if (typeof createImageBitmap === 'function') {
+    try {
+      bitmap = await createImageBitmap(svgBlob);
+    } catch {
+      // fall through to the Image path
+    }
+  }
+
+  let objectUrl: string | null = null;
+  try {
+    if (bitmap) {
+      ctx.drawImage(bitmap, 0, 0, size, size);
+    } else {
+      objectUrl = URL.createObjectURL(svgBlob);
+      ctx.drawImage(await loadImageWithTimeout(objectUrl, 4000), 0, 0, size, size);
+    }
+    // Forced readback while the object URL is still valid — materializes
+    // any deferred raster before it could be invalidated.
+    if (!canvasHasQrContent(ctx, size)) {
+      throw new Error('styled_qr_blank');
+    }
+    return canvas;
+  } finally {
+    if (bitmap) bitmap.close();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
 }
 
 /**
@@ -648,8 +679,7 @@ export async function overlayLogoOnQRAsync(
   logoSrc: string,
   logoShape: string,
 ): Promise<HTMLCanvasElement> {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = qrCanvas.getContext('2d');
   if (!ctx) throw new Error('Could not get canvas context');
 
   const isCircle = logoShape === 'circle';
@@ -659,9 +689,10 @@ export async function overlayLogoOnQRAsync(
   // caller's generation promise forever.
   const img = await loadImageWithTimeout(logoSrc, 4000, 'anonymous');
 
-  canvas.width = qrCanvas.width;
-  canvas.height = qrCanvas.height;
-  ctx.drawImage(qrCanvas, 0, 0);
+  // Draw directly onto the QR canvas rather than a copy — a canvas→canvas
+  // blit of a canvas whose content came from a revoked object-URL image can
+  // read back empty on some raster paths.
+  const canvas = qrCanvas;
 
   const logoSize = Math.floor(canvas.width * 0.30);
   const logoX = (canvas.width - logoSize) / 2;
