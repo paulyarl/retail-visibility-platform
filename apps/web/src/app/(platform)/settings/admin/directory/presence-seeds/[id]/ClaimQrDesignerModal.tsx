@@ -36,6 +36,7 @@ import {
   CORNER_DOT_STYLES,
   SIZE_OPTIONS,
 } from '@/lib/qr-style-constants';
+import { clientLogger } from '@/lib/client-logger';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 
@@ -103,6 +104,8 @@ export default function ClaimQrDesignerModal({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewFallback, setPreviewFallback] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const qrInstanceRef = useRef<any>(null);
 
   const applyTemplate = (name: QrTemplateName) => {
@@ -225,12 +228,29 @@ export default function ClaimQrDesignerModal({
     if (!open || !url) return;
     let cancelled = false;
     setQrDataUrl(null);
+    setPreviewFallback(false);
+    setPreviewFailed(false);
     generateQrDataUrl(buildOpts(512))
       .then((d) => {
         if (!cancelled) setQrDataUrl(d);
       })
-      .catch(() => {
-        if (!cancelled) setQrDataUrl(null);
+      .catch(async (err) => {
+        clientLogger.error('[ClaimQrDesignerModal] styled QR preview failed — falling back to classic:', { detail: err });
+        try {
+          const d = await generateQrDataUrl({
+            data: url,
+            exportSize: 512,
+            styled: false,
+            errorCorrection: 'H',
+          });
+          if (!cancelled) {
+            setQrDataUrl(d);
+            setPreviewFallback(true);
+          }
+        } catch (err2) {
+          clientLogger.error('[ClaimQrDesignerModal] classic QR preview fallback failed:', { detail: err2 });
+          if (!cancelled) setPreviewFailed(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -388,11 +408,19 @@ export default function ClaimQrDesignerModal({
                 style={{ width: 256, height: 256 }}
               />
             ) : (
-              <div className="w-64 h-64 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
+              <div className="w-64 h-64 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1">
                 <QrCode className="w-10 h-10 text-gray-300" />
+                {previewFailed && (
+                  <span className="text-xs text-gray-400">Preview unavailable</span>
+                )}
               </div>
             )}
           </div>
+          {previewFallback && qrDataUrl && (
+            <p className="text-center text-[11px] text-amber-600">
+              Styled preview unavailable — showing the standard QR.
+            </p>
+          )}
           <p className="text-xs font-mono text-gray-500 break-all text-center">{url}</p>
 
           {/* Templates */}

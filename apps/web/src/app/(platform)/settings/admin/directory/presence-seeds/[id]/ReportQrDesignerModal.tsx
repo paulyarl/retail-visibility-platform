@@ -41,6 +41,7 @@ import {
   CORNER_DOT_STYLES,
   SIZE_OPTIONS,
 } from '@/lib/qr-style-constants';
+import { clientLogger } from '@/lib/client-logger';
 import directoryPresenceAdminService, {
   type BannerQrStyleUpdate,
 } from '@/services/DirectoryPresenceAdminService';
@@ -125,6 +126,8 @@ export default function ReportQrDesignerModal({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewFallback, setPreviewFallback] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const qrInstanceRef = useRef<any>(null);
 
   const applyTemplate = (name: QrTemplateName) => {
@@ -280,12 +283,29 @@ export default function ReportQrDesignerModal({
     if (!open || !url) return;
     let cancelled = false;
     setQrDataUrl(null);
+    setPreviewFallback(false);
+    setPreviewFailed(false);
     generateQrDataUrl(buildOpts(512))
       .then((d) => {
         if (!cancelled) setQrDataUrl(d);
       })
-      .catch(() => {
-        if (!cancelled) setQrDataUrl(null);
+      .catch(async (err) => {
+        clientLogger.error('[ReportQrDesignerModal] styled QR preview failed — falling back to classic:', { detail: err });
+        try {
+          const d = await generateQrDataUrl({
+            data: url,
+            exportSize: 512,
+            styled: false,
+            errorCorrection: 'H',
+          });
+          if (!cancelled) {
+            setQrDataUrl(d);
+            setPreviewFallback(true);
+          }
+        } catch (err2) {
+          clientLogger.error('[ReportQrDesignerModal] classic QR preview fallback failed:', { detail: err2 });
+          if (!cancelled) setPreviewFailed(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -784,13 +804,20 @@ export default function ReportQrDesignerModal({
         </div>
 
         {/* Preview */}
-        <div className="mb-4 flex justify-center rounded-md border border-gray-200 bg-gray-50 p-4">
-          {qrDataUrl ? (
-            <img src={qrDataUrl} alt="QR preview" className="max-w-full rounded" style={{ width: 200, height: 200 }} />
-          ) : (
-            <div className="flex h-48 w-48 items-center justify-center text-sm text-gray-400">
-              Generating preview...
-            </div>
+        <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-4">
+          <div className="flex justify-center">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR preview" className="max-w-full rounded" style={{ width: 200, height: 200 }} />
+            ) : (
+              <div className="flex h-48 w-48 items-center justify-center text-sm text-gray-400">
+                {previewFailed ? 'Preview unavailable' : 'Generating preview...'}
+              </div>
+            )}
+          </div>
+          {previewFallback && qrDataUrl && (
+            <p className="mt-2 text-center text-[11px] text-amber-600">
+              Styled preview unavailable — showing the standard QR.
+            </p>
           )}
         </div>
 
