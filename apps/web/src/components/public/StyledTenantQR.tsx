@@ -82,16 +82,6 @@ export function StyledTenantQR({
   };
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.info('[TenantQR] render', {
-      label,
-      pageType: pageType ?? null,
-      hasUrl: !!url,
-      alreadyRendered: !!qrImageUrl,
-      qrLogoFlag: prefs?.qr_logo ?? null,
-      logoShape: prefs?.qr_logo_shape ?? null,
-      logoUrl: tenantLogo ? `${tenantLogo.slice(0, 62)}…` : null,
-    });
     if (!url || qrImageUrl) return;
     let cancelled = false;
 
@@ -201,7 +191,7 @@ export function StyledTenantQR({
       <div className="mt-3 space-y-1">
         <p className="text-xs text-neutral-500 text-center">Scan to visit</p>
         {tenantLogo && prefs?.qr_logo && (
-          <p className="text-xs text-purple-600 font-medium text-center">✨ Branded with store logo</p>
+          <p className="text-xs text-purple-600 font-medium text-center">✨ Branded with logo</p>
         )}
       </div>
     </div>

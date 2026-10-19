@@ -197,19 +197,8 @@ export function MarketIntelBanner({
     };
 
     resolveLogo()
-      .then((resolved) => {
-        if (!cancelled) {
-          // eslint-disable-next-line no-console
-          console.info('[BannerQR] opts', {
-            tail: trackedPath.slice(-14),
-            variant,
-            hasStyle: !!qrStyle,
-            logoFlag: qrStyle?.logo ?? null,
-            logoShape: qrStyle?.logoShape ?? null,
-            logoUrl: resolved ? `${resolved.slice(0, 62)}…` : null,
-          });
-        }
-        return cancelled
+      .then((resolved) =>
+        cancelled
           ? null
           : generateQrDataUrl(
               bannerQrOptions(`${window.location.origin}${trackedPath}`, qrStyle, resolved),
@@ -224,8 +213,8 @@ export function MarketIntelBanner({
                 logoUrl: resolved,
                 logoShape: qrStyle?.logoShape,
               }),
-            );
-      })
+            ),
+      )
       .then((url) => {
         if (url && !cancelled) setQrDataUrl(url);
       })
