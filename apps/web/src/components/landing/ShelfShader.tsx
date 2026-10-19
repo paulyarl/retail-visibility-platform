@@ -105,7 +105,13 @@ export function ShelfShader({ className, style }: ShelfShaderProps) {
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
-    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+    } catch {
+      mm.revert();
+      return;
+    }
     renderer.setPixelRatio(EFFECT_PR);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
