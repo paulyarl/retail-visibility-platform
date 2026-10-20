@@ -70,6 +70,7 @@ import TrafficEngagementPanel from './TrafficEngagementPanel';
 import SeedPhotoCapturePanel from './SeedPhotoCapturePanel';
 import SeedLogoUploadPanel from './SeedLogoUploadPanel';
 import DemoWindowPanel from './DemoWindowPanel';
+import SeedCascadeCard from '@/components/marketing-ops/SeedCascadeCard';
 import OwnerRequestsPanel from './OwnerRequestsPanel';
 import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
@@ -3515,6 +3516,16 @@ function PresenceSeedDetailClient() {
           </div>
         )}
       </section>
+
+      {/* Cascade (VAST) — the seed's own act position, not a navigation hop. */}
+      <SeedCascadeCard
+        seedId={seedId}
+        businessName={listing?.business_name}
+        onChanged={async () => {
+          await fetchDetail();
+          await loadTouches();
+        }}
+      />
 
       {/* Outreach & Enrichment */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">

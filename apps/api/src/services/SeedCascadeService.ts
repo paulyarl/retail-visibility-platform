@@ -49,6 +49,10 @@ export interface SeedCascadeSummary {
   announceScheduledAt: string | null;
   announceDeliveredAt: string | null;
   announceChannel: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  listingPhone: string | null;
+  listingEmail: string | null;
   acts: CascadeAct[];
   gate: {
     act1Cleared: boolean;
@@ -402,6 +406,10 @@ export class SeedCascadeService extends BaseService {
       announceScheduledAt: iso(announceScheduled?.occurred_at ?? null),
       announceDeliveredAt: iso(announceDelivered?.occurred_at ?? null),
       announceChannel: announceDelivered?.channel ?? announceScheduled?.channel ?? null,
+      ownerPhone: seed.owner_phone ?? null,
+      ownerEmail: seed.owner_email ?? null,
+      listingPhone: seed.listing_phone ?? null,
+      listingEmail: seed.listing_email ?? null,
       acts,
       gate: {
         act1Cleared,

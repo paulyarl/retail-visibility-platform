@@ -4,15 +4,19 @@
  * ProspectChannelTargets — the value behind each contact channel the prospect
  * is reachable on, with a direct action link (Call / Text / Email / Open).
  *
- * Extracted from LogContactModal so the two surfaces that show a prospect's
- * reachable channels — the Log Contact modal and the Outreach Prep worksheet
- * tab — cannot drift. The modal passes `onSelect`, which also makes each row
- * select that channel for the log entry; the worksheet tab omits it, so the
- * rows are plain reference rather than controls.
+ * The single shared block for the three surfaces that show reachable channels:
+ * the Log Contact modal, the Outreach Prep worksheet tab, and the Log Touch
+ * modal. Campaign-backed surfaces pass a `Campaign`; queue/seed surfaces pass
+ * the `resolveProspectChannels` result. Same rows, same actions, no drift.
+ *
+ * The modal passes `onSelect`, which also makes each row select that channel
+ * for the log entry; the worksheet tab omits it, so the rows are plain
+ * reference rather than controls.
  */
 
 import { Phone, Mail, Globe, Share2 } from 'lucide-react';
 import type { Campaign, ContactChannel } from '@/services/MarketingOpsService';
+import type { ProspectChannels } from '@/lib/prospect-channels';
 
 export interface ChannelTarget {
   key: string;
@@ -23,13 +27,21 @@ export interface ChannelTarget {
   links: { href: string; label: string; external?: boolean }[];
 }
 
+export interface ChannelTargetSource {
+  phone?: string | null;
+  phones?: Array<{ number?: string | null; label?: string | null }> | null;
+  email?: string | null;
+  website?: string | null;
+  socials?: Array<{ platform?: string | null; url: string }> | null;
+}
+
 /**
- * Build the reachable-channel rows for a campaign. Pure — exported so the row
- * contract is unit-testable without rendering.
+ * Build the reachable-channel rows from the normalized source. Pure — exported
+ * so the row contract is unit-testable without rendering.
  */
-export function buildChannelTargets(campaign: Campaign): ChannelTarget[] {
+export function buildChannelTargetsFromSource(source: ChannelTargetSource): ChannelTarget[] {
   const targets: ChannelTarget[] = [];
-  const pushPhoneTarget = (key: string, label: string, number: string) =>
+  const pushPhone = (key: string, label: string, number: string) =>
     targets.push({
       key,
       channel: 'phone',
@@ -42,31 +54,31 @@ export function buildChannelTargets(campaign: Campaign): ChannelTarget[] {
       ],
     });
 
-  if (campaign.phone) pushPhoneTarget('phone', 'Phone', campaign.phone);
-  (campaign.phones ?? []).forEach((p, i) => {
-    if (p.number) pushPhoneTarget(`phone-${i}`, p.label || 'Phone', p.number);
+  if (source.phone) pushPhone('phone', 'Phone', source.phone);
+  (source.phones ?? []).forEach((p, i) => {
+    if (p.number) pushPhone(`phone-${i}`, p.label || 'Phone', p.number);
   });
-  if (campaign.email) {
+  if (source.email) {
     targets.push({
       key: 'email',
       channel: 'email',
       icon: <Mail className="h-3.5 w-3.5 text-gray-400" />,
       label: 'Email',
-      value: campaign.email,
-      links: [{ href: `mailto:${campaign.email}`, label: 'Email' }],
+      value: source.email,
+      links: [{ href: `mailto:${source.email}`, label: 'Email' }],
     });
   }
-  if (campaign.website_url) {
+  if (source.website) {
     targets.push({
       key: 'website',
       channel: 'website',
       icon: <Globe className="h-3.5 w-3.5 text-gray-400" />,
       label: 'Website',
-      value: campaign.website_url,
-      links: [{ href: campaign.website_url, label: 'Open', external: true }],
+      value: source.website,
+      links: [{ href: source.website, label: 'Open', external: true }],
     });
   }
-  (campaign.social_profiles ?? []).forEach((sp, i) => {
+  (source.socials ?? []).forEach((sp, i) => {
     if (sp.url) {
       targets.push({
         key: `social-${i}`,
@@ -82,18 +94,49 @@ export function buildChannelTargets(campaign: Campaign): ChannelTarget[] {
   return targets;
 }
 
+/** Campaign-backed surfaces (Log Contact, Outreach Prep). */
+export function buildChannelTargets(campaign: Campaign): ChannelTarget[] {
+  return buildChannelTargetsFromSource({
+    phone: campaign.phone,
+    phones: campaign.phones,
+    email: campaign.email,
+    website: campaign.website_url,
+    socials: (campaign.social_profiles ?? []).map((sp) => ({
+      platform: sp.platform,
+      url: sp.url,
+    })),
+  });
+}
+
+/** Queue/seed surfaces (Log Touch) — the same rows from the resolved channels. */
+export function buildChannelTargetsFromChannels(channels: ProspectChannels): ChannelTarget[] {
+  return buildChannelTargetsFromSource({
+    phone: channels.phone,
+    email: channels.email,
+    website: channels.website,
+    socials: channels.socials,
+  });
+}
+
 export default function ProspectChannelTargets({
   campaign,
+  channels,
   onSelect,
   activeChannel,
 }: {
-  campaign: Campaign;
+  campaign?: Campaign;
+  /** Queue/seed path — takes precedence when provided. */
+  channels?: ProspectChannels;
   /** When provided, each row becomes a button that selects that channel. */
   onSelect?: (channel: ContactChannel) => void;
   /** Highlights the row for the currently-selected channel. */
   activeChannel?: ContactChannel;
 }) {
-  const targets = buildChannelTargets(campaign);
+  const targets = channels
+    ? buildChannelTargetsFromChannels(channels)
+    : campaign
+      ? buildChannelTargets(campaign)
+      : [];
   if (targets.length === 0) return null;
 
   return (

@@ -57,6 +57,10 @@ export interface SeedCascadeSummary {
   announceScheduledAt: string | null;
   announceDeliveredAt: string | null;
   announceChannel: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  listingPhone: string | null;
+  listingEmail: string | null;
   acts: CascadeAct[];
   gate: {
     act1Cleared: boolean;

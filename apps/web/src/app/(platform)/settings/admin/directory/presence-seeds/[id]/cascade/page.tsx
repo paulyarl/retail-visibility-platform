@@ -9,7 +9,8 @@ import directoryPresenceAdminService, {
   type CascadeActStatus,
   type SeedCascadeSummary,
 } from '@/services/DirectoryPresenceAdminService';
-import { ArrowLeft, CheckCircle2, Circle, Clock, ExternalLink, RefreshCw, XCircle } from 'lucide-react';
+import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
+import { ArrowLeft, CheckCircle2, Circle, Clock, ExternalLink, Megaphone, RefreshCw, XCircle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +62,35 @@ function CascadeContent() {
     fetchSummary();
   }, [fetchSummary]);
 
+  const [logOpen, setLogOpen] = useState(false);
+  const [announceBusy, setAnnounceBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  const canAnnounce =
+    !!summary &&
+    (summary.seedStatus === 'published' || summary.seedStatus === 'invited');
+
+  const handleMarkAnnounced = async () => {
+    if (!seedId || !summary) return;
+    setAnnounceBusy(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const channel =
+        summary.announceChannel === 'call' || summary.announceChannel === 'email'
+          ? summary.announceChannel
+          : undefined;
+      await directoryPresenceAdminService.markAnnounceDelivered(seedId, { channel });
+      setActionSuccess('Announce marked delivered.');
+      await fetchSummary();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to mark the announce delivered');
+    } finally {
+      setAnnounceBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -68,7 +98,43 @@ function CascadeContent() {
         description="Four-act position derived from the seed touch ledger, linked campaign logs, gallery events, and tagged scans."
         icon={<Clock className="w-6 h-6" />}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLogOpen(true)}
+              disabled={!canAnnounce}
+              title={canAnnounce ? 'Log an announce/touch against this seed' : 'Publish the seed first'}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Megaphone className="w-4 h-4" />
+              Log announce
+            </button>
+            <button
+              type="button"
+              onClick={handleMarkAnnounced}
+              disabled={!canAnnounce || !!summary?.announceDeliveredAt || announceBusy}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {announceBusy
+                ? 'Saving…'
+                : summary?.announceDeliveredAt
+                  ? 'Announced'
+                  : 'Mark announced'}
+            </button>
+            <Link
+              href={seedId ? `/settings/admin/directory/presence-seeds/${seedId}` : '/settings/admin/directory/presence-seeds'}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open seed
+            </Link>
+            <Link
+              href="/settings/admin/directory/presence-seeds/announce-queue"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Clock className="w-4 h-4" />
+              Announce queue
+            </Link>
             <button
               type="button"
               onClick={fetchSummary}
@@ -88,6 +154,26 @@ function CascadeContent() {
           </div>
         }
       />
+
+      {actionError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
+      {actionSuccess && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {actionSuccess}
+        </div>
+      )}
+      {summary && !canAnnounce && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          {summary.seedStatus === 'claimed'
+            ? 'This seed is claimed — the cascade is complete. Use Open seed for the claimed listing.'
+            : summary.seedStatus === 'suppressed'
+              ? 'This seed is suppressed — the cascade is paused.'
+              : `This seed is ${summary.seedStatus}. Act 1 starts after the listing is published; use Open seed to finish QC and publish.`}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -112,7 +198,8 @@ function CascadeContent() {
               return (
                 <div
                   key={act.act}
-                  className="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800"
+                  id={`act-${act.act}`}
+                  className="scroll-mt-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -190,6 +277,28 @@ function CascadeContent() {
             </div>
           </div>
         </>
+      )}
+
+      {logOpen && seedId && summary && (
+        <ProspectTouchLogModal
+          entry={{
+            id: seedId,
+            business_name: summary.businessName,
+            title: null,
+            business_snapshot: {
+              verified_nap: {
+                phone: summary.ownerPhone || summary.listingPhone,
+                email: summary.ownerEmail || summary.listingEmail,
+              },
+            },
+          }}
+          seedId={seedId}
+          onClose={() => setLogOpen(false)}
+          onLogged={async () => {
+            setLogOpen(false);
+            await fetchSummary();
+          }}
+        />
       )}
     </div>
   );

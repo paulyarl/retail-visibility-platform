@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Phone, Mail, Globe, Share2, PhoneCall, Loader2 } from 'lucide-react';
+import { X, PhoneCall, Loader2 } from 'lucide-react';
 import { marketingOpsService } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
+import ProspectChannelTargets from './ProspectChannelTargets';
 import { resolveProspectChannels, type ProspectChannelSource } from '@/lib/prospect-channels';
 
 /**
@@ -157,45 +158,19 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged, seedId
           </div>
         )}
 
-        {/* Known channels — the resolved contact values (verified NAP →
-            discovery snapshot → ladder contacts) with in-place actions. */}
-        {(channels.phone || channels.email || channels.website || channels.socials.length > 0) && (
-          <div className="mb-3 rounded-md border border-gray-200 dark:border-neutral-700 divide-y divide-gray-100 dark:divide-neutral-700">
-            {channels.phone && (
-              <div className="flex items-center gap-2 px-3 py-1.5">
-                <Phone className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                <span className="w-14 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Phone</span>
-                <span className="flex-1 truncate text-xs text-gray-800 dark:text-gray-200">{channels.phone}</span>
-                <a href={`tel:${channels.phone}`} className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30">Call</a>
-                <a href={`sms:${channels.phone}`} className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30">Text</a>
-              </div>
-            )}
-            {channels.email && (
-              <div className="flex items-center gap-2 px-3 py-1.5">
-                <Mail className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                <span className="w-14 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Email</span>
-                <span className="flex-1 truncate text-xs text-gray-800 dark:text-gray-200">{channels.email}</span>
-                <a href={`mailto:${channels.email}`} className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30">Email</a>
-              </div>
-            )}
-            {channels.website && (
-              <div className="flex items-center gap-2 px-3 py-1.5">
-                <Globe className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                <span className="w-14 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Website</span>
-                <span className="flex-1 truncate text-xs text-gray-800 dark:text-gray-200">{channels.website}</span>
-                <a href={channels.website} target="_blank" rel="noopener noreferrer" className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30">Open</a>
-              </div>
-            )}
-            {channels.socials.map((sp, i) => (
-              <div key={`${sp.platform}-${i}`} className="flex items-center gap-2 px-3 py-1.5">
-                <Share2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                <span className="w-14 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">{sp.platform || 'Social'}</span>
-                <span className="flex-1 truncate text-xs text-gray-800 dark:text-gray-200">{sp.url}</span>
-                <a href={sp.url} target="_blank" rel="noopener noreferrer" className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30">Open</a>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Reachable contact channels — the same shared block as Log Contact
+            and Outreach Prep. Clicking a row selects the touch channel. */}
+        <div className="mb-3">
+          <ProspectChannelTargets
+            channels={channels}
+            onSelect={(ch) =>
+              setChannel(ch === 'phone' ? 'call' : ch === 'email' ? 'email' : 'other')
+            }
+            activeChannel={
+              channel === 'call' ? 'phone' : channel === 'email' ? 'email' : 'other'
+            }
+          />
+        </div>
 
         {/* Channel ladder — the cadence's ordered rungs; current highlighted. */}
         {ladder.length > 0 && (

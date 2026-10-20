@@ -10,8 +10,12 @@
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import ProspectChannelTargets, { buildChannelTargets } from './ProspectChannelTargets';
+import ProspectChannelTargets, {
+  buildChannelTargets,
+  buildChannelTargetsFromChannels,
+} from './ProspectChannelTargets';
 import type { Campaign } from '@/services/MarketingOpsService';
+import type { ProspectChannels } from '@/lib/prospect-channels';
 
 const campaign = (overrides: Partial<Campaign> = {}): Campaign =>
   ({
@@ -53,6 +57,37 @@ describe('buildChannelTargets', () => {
 
   it('returns nothing when the campaign has no reachable channels', () => {
     expect(buildChannelTargets(noChannels())).toEqual([]);
+  });
+});
+
+const resolvedChannels: ProspectChannels = {
+  phone: '(317) 555-0100',
+  email: 'owner@example.com',
+  website: 'https://marias.example',
+  socials: [{ platform: 'Facebook', url: 'https://facebook.com/marias' }],
+  source: 'snapshot',
+};
+
+describe('buildChannelTargetsFromChannels', () => {
+  it('builds the same row contract from resolved queue/seed channels', () => {
+    const targets = buildChannelTargetsFromChannels(resolvedChannels);
+
+    expect(targets.map((t) => t.label)).toEqual(['Phone', 'Email', 'Website', 'Facebook']);
+    expect(targets[0].links.map((l) => l.href)).toEqual([
+      'tel:(317) 555-0100',
+      'sms:(317) 555-0100',
+    ]);
+  });
+
+  it('renders the shared block from channels for the Log touch modal', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProspectChannelTargets, { channels: resolvedChannels }),
+    );
+
+    expect(html).toContain('(317) 555-0100');
+    expect(html).toContain('owner@example.com');
+    expect(html).toContain('https://marias.example');
+    expect(html).toContain('https://facebook.com/marias');
   });
 });
 

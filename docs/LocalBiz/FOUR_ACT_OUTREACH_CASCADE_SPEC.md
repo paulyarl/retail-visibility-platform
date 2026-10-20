@@ -739,6 +739,7 @@ each scoped to where the operator is working:
 |---|---|---|---|
 | **Campaign → Project Plan → Execution** | Campaign-backed prospect | Campaign detail (`#execution`) | `CampaignExecutionPanel`: announce status + Log announce / Mark announced, VAST cards, walk-in gate, recent activity. Resolves the campaign's primary seed via `GET /campaigns/:id/cascade`. |
 | **PG cockpit → VAST** | PG-scope queued prospects | Proving Ground cockpit (`#vast`) | `VastPanel`: PG-level act counts, per-prospect V/A/S/T chips, next action, Log announce / Seed / Cascade. Resolves `seed_id` first, then the campaign's primary seed via `GET /campaigns/cascade-batch`; campaign-linked unseeded rows show “No seed (campaign)”; unseeded rows show “Promote to listings.” |
+| **Seed detail → Cascade (VAST) card** | Single seed | Seed detail page | `SeedCascadeCard`: announce state + Log announce / Mark announced, VAST act cards, walk-in gate, Full cascade link. This is the seed's own display surface — cascade awareness without a navigation hop. |
 | **Seeds admin → Announce queue / Cohort** | Cross-prospect and seed-only | Seeds admin | The announce queue is the delivery worklist (age, channel, Log announce / Mark announced); the cohort page reports the VAST stages as the funnel. |
 
 The existing review-pipeline **Cascade** tab is a different feature

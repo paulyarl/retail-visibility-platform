@@ -100,7 +100,19 @@ const CHIP_STYLES: Record<CascadeActStatus, string> = {
   blocked: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 };
 
-function ActChip({ letter, status }: { letter: string; status: CascadeActStatus | null }) {
+function cascadeHref(seedId: string, act: number): string {
+  return `/settings/admin/directory/presence-seeds/${seedId}/cascade#act-${act}`;
+}
+
+function ActChip({
+  letter,
+  status,
+  href,
+}: {
+  letter: string;
+  status: CascadeActStatus | null;
+  href?: string;
+}) {
   if (!status) {
     return (
       <span
@@ -111,13 +123,20 @@ function ActChip({ letter, status }: { letter: string; status: CascadeActStatus 
       </span>
     );
   }
-  return (
+  const chip = (
     <span
       title={status.replace(/_/g, ' ')}
       className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${CHIP_STYLES[status]}`}
     >
       {letter}
     </span>
+  );
+  return href ? (
+    <Link href={href} title="Open the full cascade at this act" className="inline-flex hover:opacity-80">
+      {chip}
+    </Link>
+  ) : (
+    chip
   );
 }
 
@@ -249,10 +268,10 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <ActChip letter="V" status={row.v} />
-                <ActChip letter="A" status={row.a} />
-                <ActChip letter="S" status={row.s} />
-                <ActChip letter="T" status={row.t} />
+                <ActChip letter="V" status={row.v} href={row.seedId ? cascadeHref(row.seedId, 1) : undefined} />
+                <ActChip letter="A" status={row.a} href={row.seedId ? cascadeHref(row.seedId, 2) : undefined} />
+                <ActChip letter="S" status={row.s} href={row.seedId ? cascadeHref(row.seedId, 3) : undefined} />
+                <ActChip letter="T" status={row.t} href={row.seedId ? cascadeHref(row.seedId, 4) : undefined} />
               </div>
             </div>
             <p className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
@@ -295,10 +314,10 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                       ? 'No seed (campaign)'
                       : 'Not seeded'}
                 </td>
-                <td className="px-3 py-3 text-center"><ActChip letter="V" status={row.v} /></td>
-                <td className="px-3 py-3 text-center"><ActChip letter="A" status={row.a} /></td>
-                <td className="px-3 py-3 text-center"><ActChip letter="S" status={row.s} /></td>
-                <td className="px-3 py-3 text-center"><ActChip letter="T" status={row.t} /></td>
+                <td className="px-3 py-3 text-center"><ActChip letter="V" status={row.v} href={row.seedId ? cascadeHref(row.seedId, 1) : undefined} /></td>
+                <td className="px-3 py-3 text-center"><ActChip letter="A" status={row.a} href={row.seedId ? cascadeHref(row.seedId, 2) : undefined} /></td>
+                <td className="px-3 py-3 text-center"><ActChip letter="S" status={row.s} href={row.seedId ? cascadeHref(row.seedId, 3) : undefined} /></td>
+                <td className="px-3 py-3 text-center"><ActChip letter="T" status={row.t} href={row.seedId ? cascadeHref(row.seedId, 4) : undefined} /></td>
                 <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-300">{row.nextAction}</td>
                 <td className="px-4 py-3">
                   <VastActions row={row} onLogAnnounce={onLogAnnounce} />
