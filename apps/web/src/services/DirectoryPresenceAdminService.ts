@@ -2589,7 +2589,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   async listSeedBatches(seedBatch?: string): Promise<SeedBatchSummary[]> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/seed-batches${seedBatch ? `?seedBatch=${encodeURIComponent(seedBatch)}` : ''}`,
-      { method: 'GET' },
+      { method: 'GET', cache: 'no-store' },
       undefined,
       0,
     );

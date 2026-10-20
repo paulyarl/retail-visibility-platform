@@ -87,6 +87,14 @@ export default function SeedCascadeCard({
     !!summary &&
     (summary.seedStatus === 'published' || summary.seedStatus === 'invited');
 
+  const primaryCampaign = summary
+    ? summary.linkedCampaigns.find((c) => c.linkRole === 'primary') ??
+      summary.linkedCampaigns[0] ??
+      null
+    : null;
+  const galleryStageOk =
+    !!primaryCampaign?.stage && !['seek', 'seed'].includes(primaryCampaign.stage);
+
   const handleMarkAnnounced = async () => {
     if (!summary) return;
     setBusy(true);
@@ -207,6 +215,25 @@ export default function SeedCascadeCard({
               );
             })}
           </div>
+
+          {summary.acts[2] && summary.acts[2].status !== 'done' && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-neutral-700 dark:bg-neutral-900">
+              <span className="text-gray-600 dark:text-gray-400">
+                Show is {summary.acts[2].status.replace(/_/g, ' ')}: {summary.acts[2].detail}
+              </span>
+              {primaryCampaign ? (
+                <Link
+                  href={`/settings/admin/marketing-ops/campaigns/${primaryCampaign.id}?tab=gallery`}
+                  className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {galleryStageOk ? 'Open Outreach Kit' : 'Advance to Preview Built'}
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              ) : (
+                <span className="text-gray-500">Link a campaign to unlock Show</span>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-neutral-700 dark:bg-neutral-900">
             <span className="font-semibold text-gray-900 dark:text-white">Walk-in gate</span>

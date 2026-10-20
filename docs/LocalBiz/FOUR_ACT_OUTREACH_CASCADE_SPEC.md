@@ -749,6 +749,16 @@ The existing review-pipeline **Cascade** tab is a different feature
 named **Execution/VAST** to avoid that collision. The “enriched” chip on the PG
 Promote tab is shelf-market enrichment, not seed status.
 
+**Act 3 (Show) gate actions.** The execution surfaces do not leave a blocked
+Show card inert. The Campaign Execution card and the seed card show the gate
+reason and link to the owning surface with the matching action: **Advance to
+Preview Built** / **Upload screenshots** / **Generate gallery link** → the
+campaign's **Outreach Kit** tab (`?tab=gallery`); **Run business analysis** /
+**Resolve archetype** → the **Prompts** tab (`?tab=prompts`). The VAST row
+carries the same **Gallery** link when the row has a campaign and Show is not
+done. The link is navigation, not a duplicate gallery control — the Outreach
+Kit remains the owner of screenshots, eligibility, and token minting.
+
 ## 8. Guardrails & Failure Modes
 
 - **Published precondition (act 1).** No call goes out for a seed that is not

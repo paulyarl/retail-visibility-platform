@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
   type CascadeCohortSummary,
+  type SeedBatchSummary,
 } from '@/services/DirectoryPresenceAdminService';
 import { ArrowLeft, BarChart3, CheckCircle2, Circle, RefreshCw } from 'lucide-react';
 
@@ -25,13 +26,15 @@ function Flag({ on }: { on: boolean }) {
 
 function CohortContent() {
   const [seedBatch, setSeedBatch] = useState('');
+  const [batches, setBatches] = useState<SeedBatchSummary[]>([]);
+  const [batchesLoading, setBatchesLoading] = useState(true);
   const [summary, setSummary] = useState<CascadeCohortSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!seedBatch.trim()) {
-      setError('Enter a seed batch (for example, cohort-1) to load the cohort.');
+      setError('Select a seed batch to load the cohort.');
       return;
     }
     try {
@@ -51,6 +54,34 @@ function CohortContent() {
       setLoading(false);
     }
   }, [seedBatch]);
+
+  // The cohort is seed-batch scoped. Discover the batches and auto-load the
+  // most recent one so the page is useful on first visit; the operator can
+  // switch batches without guessing a name.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await directoryPresenceAdminService.listSeedBatches();
+        if (cancelled) return;
+        setBatches(list);
+        if (list.length > 0) {
+          setSeedBatch((current) => current || list[0].seedBatch);
+        }
+      } catch {
+        if (!cancelled) setBatches([]);
+      } finally {
+        if (!cancelled) setBatchesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (seedBatch) load();
+  }, [seedBatch, load]);
 
   const totals = summary?.totals;
   const rates = summary?.rates;
@@ -96,13 +127,21 @@ function CohortContent() {
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Seed batch</span>
-          <input
-            type="text"
+          <select
             value={seedBatch}
             onChange={(e) => setSeedBatch(e.target.value)}
-            placeholder="e.g. cohort-1"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-900"
-          />
+            disabled={batchesLoading}
+            className="min-w-[16rem] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-900"
+          >
+            <option value="">
+              {batchesLoading ? 'Loading batches…' : 'Select a seed batch…'}
+            </option>
+            {batches.map((b) => (
+              <option key={b.seedBatch} value={b.seedBatch}>
+                {b.seedBatch} ({b.totalSeeds})
+              </option>
+            ))}
+          </select>
         </label>
         <button
           type="button"
@@ -114,6 +153,20 @@ function CohortContent() {
           Load cohort
         </button>
       </div>
+
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        The cohort measures <span className="font-semibold">seeds</span> by seed batch. The
+        prospect queue is pre-seed — promote prospects to listings first. Campaign seeds carry
+        <code className="mx-1">from-campaign-…</code> batches; PG preflight seeds carry
+        <code className="mx-1">pg-…</code>.
+      </p>
+
+      {!batchesLoading && batches.length === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          No seed batches yet. Publish or promote seeds first; the cohort page only measures
+          seeds, not the prospect queue.
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

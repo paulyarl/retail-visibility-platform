@@ -14,7 +14,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import marketingOpsService, { type CampaignCascadeResponse } from '@/services/MarketingOpsService';
+import marketingOpsService, {
+  type CampaignCascadeResponse,
+  type GalleryEligibility,
+} from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
   type CascadeActStatus,
 } from '@/services/DirectoryPresenceAdminService';
@@ -79,6 +82,25 @@ export default function CampaignExecutionPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [galleryEligibility, setGalleryEligibility] = useState<GalleryEligibility | null>(null);
+
+  // Act 3's gate lives on the campaign's Outreach Kit tab. Fetch the gate
+  // reason so the Show card can show the actual unblock action (advance stage,
+  // upload screenshots, run the audit, or generate the link).
+  useEffect(() => {
+    let cancelled = false;
+    marketingOpsService
+      .getGalleryEligibility(campaignId)
+      .then((result) => {
+        if (!cancelled) setGalleryEligibility(result);
+      })
+      .catch(() => {
+        if (!cancelled) setGalleryEligibility(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
 
   const load = useCallback(async () => {
     try {
@@ -156,6 +178,26 @@ export default function CampaignExecutionPanel({
 
   const cascade = data.cascade;
 
+  const galleryReason = galleryEligibility?.reason ?? null;
+  const galleryHref =
+    galleryReason === 'no_business_analysis_audit' || galleryReason === 'archetype_unresolved'
+      ? `/settings/admin/marketing-ops/campaigns/${campaignId}?tab=prompts`
+      : `/settings/admin/marketing-ops/campaigns/${campaignId}?tab=gallery`;
+  const galleryActionLabel = !galleryEligibility
+    ? 'Open Outreach Kit'
+    : galleryReason === 'invalid_stage'
+      ? 'Advance to Preview Built'
+      : galleryReason === 'no_screenshots'
+        ? 'Upload screenshots'
+        : galleryReason === 'no_business_analysis_audit'
+          ? 'Run business analysis'
+          : galleryReason === 'archetype_unresolved'
+            ? 'Resolve archetype'
+            : galleryEligibility.eligible
+              ? 'Generate gallery link'
+              : 'Open Outreach Kit';
+  const galleryActionTitle = galleryEligibility?.action ?? 'Open the gallery gate';
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
@@ -223,6 +265,16 @@ export default function CampaignExecutionPanel({
               </div>
               <p className="mt-1.5 text-[11px] text-gray-600 dark:text-gray-400">{act.detail}</p>
               <p className="mt-1 text-[10px] text-gray-400">Last event: {formatDate(act.lastEventAt)}</p>
+              {act.act === 3 && act.status !== 'done' && (
+                <Link
+                  href={galleryHref}
+                  title={galleryActionTitle}
+                  className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {galleryActionLabel}
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
             </div>
           );
         })}
@@ -236,6 +288,16 @@ export default function CampaignExecutionPanel({
           </span>
         </div>
         <p className="mt-1 text-[11px] text-gray-600 dark:text-gray-400">{cascade.gate.reason}</p>
+        {!cascade.gate.gateCleared && (
+          <Link
+            href={galleryHref}
+            title={galleryActionTitle}
+            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Unblock Act 3 — {galleryActionLabel}
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        )}
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">

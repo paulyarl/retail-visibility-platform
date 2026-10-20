@@ -172,6 +172,16 @@ function VastActions({
           <ExternalLink className="h-3 w-3" />
         </Link>
       )}
+      {row.campaignId && row.s !== 'done' && (
+        <Link
+          href={`/settings/admin/marketing-ops/campaigns/${row.campaignId}?tab=gallery`}
+          title="Open the Outreach Kit to unblock Show"
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+        >
+          Gallery
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
       {row.seedId && (
         <>
           <Link
