@@ -1167,6 +1167,7 @@ class DirectoryPresenceSeedService {
     // Wedge fidelity: a misaligned seed never sends a claim CTA — the invite
     // email is suppressed (the token is still minted; the seed needs repair
     // before the owner sees a claim link).
+    let emailSent = false;
     if (seed[0]?.owner_email && seed[0].seed_fidelity !== 'misaligned') {
       const html = `
         <h1>Your business listing is ready to claim</h1>
@@ -1187,11 +1188,36 @@ class DirectoryPresenceSeedService {
           html,
           text,
         });
+        emailSent = true;
       } catch (error) {
         logger.error('[DirectoryPresenceSeedService.approveAndInvite] Failed to send claim invite:', undefined, {
           error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
           seedId,
           to: seed[0].owner_email,
+        });
+      }
+    }
+
+    // Four-Act cascade (migration 348): the owner-initiated invite email is a
+    // delivered announce, so it must not sit in the announce queue. Only mark
+    // when the email actually sent; a suppressed/misaligned seed stays queued
+    // for the operator.
+    if (emailSent) {
+      try {
+        const { default: announceService } = await import('./SeedAnnounceService.js');
+        await announceService.markDelivered(
+          seedId,
+          {
+            channel: 'email',
+            notes: 'Claim invite emailed by approveAndInvite (owner-initiated path).',
+            metadata: { trigger_source: 'approveAndInvite' },
+          },
+          ctx,
+        );
+      } catch (err) {
+        logger.warn('approveAndInvite: announce delivery marker failed (non-fatal)', undefined, {
+          seedId,
+          error: err instanceof Error ? err.message : String(err),
         });
       }
     }
@@ -2244,6 +2270,30 @@ class DirectoryPresenceSeedService {
           });
         }
 
+        // Four-Act cascade (migration 348): every published seed gets an
+        // announce marker. Campaign-linked entries reuse the trigger (which
+        // writes the campaign log + seed marker); campaign-less entries use
+        // the seed touch ledger directly. The mint above stays at publish
+        // (Q3/Q20 reversed) — the trigger will see the active token.
+        try {
+          if (entry.source_campaign_id) {
+            await SeedOutreachTriggerService.getInstance().onSeedCreated({
+              campaignId: entry.source_campaign_id,
+              seedId: result.id,
+              ctx,
+            });
+          } else {
+            const { default: announceService } = await import('./SeedAnnounceService.js');
+            await announceService.scheduleForSeed(result.id, ctx);
+          }
+        } catch (err) {
+          logger.warn('createSeedsForProvingGround: announce scheduling failed (non-fatal)', undefined, {
+            queueEntryId: entry.id,
+            seedId: result.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
         if (entry.seek_batch_id) {
           await prisma.$executeRaw`
             UPDATE directory_presence_seeds
@@ -2326,6 +2376,19 @@ class DirectoryPresenceSeedService {
 
         await this.publishSeed(seedId, ctx);
         published.push(seedId);
+
+        // Four-Act cascade (migration 348): batch-published seeds still get
+        // the announce marker so the queue is complete. The announce copy is
+        // operator-composed (batch stays outside the trigger path).
+        try {
+          const { default: announceService } = await import('./SeedAnnounceService.js');
+          await announceService.scheduleForSeed(seedId, ctx);
+        } catch (err) {
+          logger.warn('publishBatch: announce scheduling failed (non-fatal)', undefined, {
+            seedId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       } catch (err) {
         failed.push({ seedId, error: (err as Error).message });
       }
@@ -3139,12 +3202,20 @@ class DirectoryPresenceSeedService {
       // Migration 262 — extended with the full cadence signal set
       // ('no_answer','no_reply','bounce','unread','read_no_reply',
       // 'form_submitted','referral_asked'); 'no_response' remains as the
-      // legacy alias of 'no_answer'.
+      // legacy alias of 'no_answer'. Migration 289 added the report-delivery
+      // lifecycle; migration 348 added the announce markers.
       outcome?: 'connected' | 'no_response' | 'no_answer' | 'no_reply' | 'voicemail'
         | 'bad_number' | 'bounce' | 'unread' | 'read_no_reply' | 'form_submitted'
-        | 'referral_asked' | 'claimed' | 'not_interested';
+        | 'referral_asked' | 'claimed' | 'not_interested'
+        | 'report_delivered' | 'report_viewed' | 'report_claimed' | 'report_declined'
+        | 'claim_qr_generated'
+        | 'announce_scheduled' | 'announce_delivered';
       notes?: string;
       occurredAt?: Date;
+      /** Migration 348 — structured payload for the announce markers (claim/place
+       *  URLs, identification values + snapshot date) and C3/C4 capture for
+       *  campaign-less seeds. */
+      metadata?: Record<string, any>;
       // Migration 295 — optional call recording captured at log time. Usually
       // attached after the fact via attachTouchRecording.
       recordingUrl?: string;
@@ -3166,7 +3237,7 @@ class DirectoryPresenceSeedService {
       INSERT INTO directory_seed_outreach_touches (
         id, seed_id, tenant_id, channel, outcome, notes, operator_id, occurred_at, created_at,
         recording_url, recording_duration_seconds, recording_provider,
-        recording_attached_at, recording_attached_by
+        recording_attached_at, recording_attached_by, metadata
       ) VALUES (
         ${touchId}::uuid,
         ${seedId},
@@ -3181,7 +3252,8 @@ class DirectoryPresenceSeedService {
         ${input.recordingDurationSeconds ?? null},
         ${input.recordingProvider || null},
         ${hasRecording ? new Date() : null},
-        ${hasRecording ? (ctx?.actorId || null) : null}
+        ${hasRecording ? (ctx?.actorId || null) : null},
+        ${input.metadata ? JSON.stringify(input.metadata) : null}::jsonb
       )
     `;
 

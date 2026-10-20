@@ -1018,6 +1018,8 @@ export interface CallDetails {
   hook_angle?: string | null;
   trigger_source?: string | null;
   profile_quality_findings?: Array<{ signal: string; severity: string; label: string }> | null;
+  /** Four-Act cascade C2 — the announce was actually delivered. */
+  announce_delivered?: boolean | null;
 }
 
 // ─── Outreach Follow-Up Types ───────────────────────────────────────────
@@ -1799,6 +1801,9 @@ export interface LogContactInput {
   // Non-phone channels may include call_details with contact_result + other_subtype.
   call_details?: CallDetails;
   update_worksheet?: boolean;
+  // Four-Act cascade (C3 pain / C4 permission). Structured verification
+  // results ride the outreach log's existing verification_results array.
+  verification_results?: Array<Record<string, any>>;
 }
 
 export interface Audit {
@@ -6235,6 +6240,7 @@ class MarketingOpsService extends AdminApiSingleton {
     recording_url?: string;
     recording_duration_seconds?: number;
     recording_provider?: string;
+    verification_results?: Array<Record<string, any>>;
   }): Promise<{
     touchId: string;
     queueEntryId: string;
@@ -6838,6 +6844,7 @@ class MarketingOpsService extends AdminApiSingleton {
       update_worksheet?: boolean;
       follow_up_date?: string;
       notes?: string;
+      verification_results?: Array<Record<string, any>>;
     },
   ): Promise<any> {
     const result = await this.makeDefaultRequest<any>(

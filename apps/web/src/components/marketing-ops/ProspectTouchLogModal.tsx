@@ -51,6 +51,8 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
   );
   const [outcome, setOutcome] = useState('');
   const [notes, setNotes] = useState('');
+  const [painOutcome, setPainOutcome] = useState<'not_asked' | 'confirmed' | 'disputed'>('not_asked');
+  const [followUpPermission, setFollowUpPermission] = useState<'not_asked' | 'yes' | 'no'>('not_asked');
   const [recordingUrl, setRecordingUrl] = useState('');
   const [recordingDuration, setRecordingDuration] = useState('');
   const [busy, setBusy] = useState(false);
@@ -63,6 +65,14 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
     setBusy(true);
     setError(null);
     try {
+      const verificationResults: Array<Record<string, any>> = [];
+      if (painOutcome === 'confirmed') verificationResults.push({ type: 'pain_confirmed' });
+      if (painOutcome === 'disputed') verificationResults.push({ type: 'fact_disputed' });
+      if (followUpPermission === 'yes') verificationResults.push({ type: 'follow_up_requested' });
+      if (followUpPermission === 'no') {
+        verificationResults.push({ type: 'other', field: 'follow_up_permission', value: 'no' });
+      }
+
       await marketingOpsService.logProspectTouch(entry.id, {
         channel,
         outcome: (outcome || undefined) as any,
@@ -71,6 +81,7 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
         recording_duration_seconds: recordingDuration.trim()
           ? Number(recordingDuration.trim())
           : undefined,
+        verification_results: verificationResults.length > 0 ? verificationResults : undefined,
       });
       await onLogged();
     } catch (err: any) {
@@ -219,6 +230,38 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
           placeholder="What happened…"
           className="w-full mb-4 px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
         />
+
+        {/* Four-Act cascade — C3 pain + C4 permission. Structured so the
+            act-1 gate and the funnel are measurable; not a pitch. */}
+        <div className="mb-4 space-y-2 rounded-md border border-gray-200 p-2 dark:border-neutral-700">
+          <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">Cascade (act 1)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-medium text-gray-500 dark:text-gray-400">Pain (C3)</span>
+              <select
+                value={painOutcome}
+                onChange={(e) => setPainOutcome(e.target.value as 'not_asked' | 'confirmed' | 'disputed')}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              >
+                <option value="not_asked">Not asked</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="disputed">Disputed</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-medium text-gray-500 dark:text-gray-400">Follow-up permission (C4)</span>
+              <select
+                value={followUpPermission}
+                onChange={(e) => setFollowUpPermission(e.target.value as 'not_asked' | 'yes' | 'no')}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-gray-900 dark:text-white"
+              >
+                <option value="not_asked">Not asked</option>
+                <option value="yes">Granted</option>
+                <option value="no">Declined</option>
+              </select>
+            </label>
+          </div>
+        </div>
 
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
           Recording <span className="font-normal text-gray-400 dark:text-gray-500">— optional link</span>

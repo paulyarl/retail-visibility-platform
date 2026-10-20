@@ -71,7 +71,7 @@ export class SeedOutreachTriggerService extends BaseService {
 
     // 1. Load campaign + seed
     const campaign = await prisma.$queryRaw<any[]>`
-      SELECT id, phone, email, business_name FROM mkt_campaigns_list WHERE id = ${campaignId} LIMIT 1
+      SELECT id, phone, email, business_name, stage FROM mkt_campaigns_list WHERE id = ${campaignId} LIMIT 1
     `;
     if (!campaign[0]) {
       logger.warn('SeedOutreachTriggerService: campaign not found', undefined, { campaignId, seedId });
@@ -260,6 +260,39 @@ export class SeedOutreachTriggerService extends BaseService {
             outreach_scheduled_at = now(),
             updated_at = now()
         WHERE id = ${seedId}
+      `;
+
+      // Four-Act cascade (migration 348): the announce queue reads explicit
+      // markers on the seed touch ledger, not outreach_state. Write the
+      // scheduled marker in the same transaction as the campaign log + state.
+      // The NOT EXISTS guard makes a later publish/trigger pass idempotent.
+      const touchChannel = contactChannel === 'phone' ? 'call' : contactChannel;
+      await tx.$executeRaw`
+        INSERT INTO directory_seed_outreach_touches (
+          seed_id, tenant_id, channel, outcome, notes, operator_id,
+          occurred_at, created_at, metadata
+        )
+        SELECT
+          ${seedId},
+          ${seed[0].tenant_id},
+          ${touchChannel},
+          'announce_scheduled',
+          ${messageSnapshot || null},
+          'system',
+          now(),
+          now(),
+          ${JSON.stringify({
+            trigger_source: 'createFromCampaign',
+            channel: touchChannel,
+            claim_url: claimUrl,
+            place_url: placeUrl,
+            hook_angle: hookAngle,
+          })}::jsonb
+        WHERE NOT EXISTS (
+          SELECT 1 FROM directory_seed_outreach_touches
+          WHERE seed_id = ${seedId}
+            AND outcome IN ('announce_scheduled', 'announce_delivered')
+        )
       `;
     });
 

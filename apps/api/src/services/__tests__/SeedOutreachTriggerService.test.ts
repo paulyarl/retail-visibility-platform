@@ -490,7 +490,7 @@ describe('SeedOutreachTriggerService', () => {
   });
 
   describe('atomic transaction', () => {
-    it('wraps outreach log INSERT and state UPDATE in a single transaction', async () => {
+    it('wraps outreach log INSERT, state UPDATE, and announce marker in one transaction', async () => {
       const txExecuteRaw = vi.fn().mockResolvedValue(undefined);
       mockTransaction.mockImplementation(async (cb: any) => cb({ $executeRaw: txExecuteRaw }));
 
@@ -500,15 +500,20 @@ describe('SeedOutreachTriggerService', () => {
       });
 
       expect(mockTransaction).toHaveBeenCalledTimes(1);
-      // Two $executeRaw calls inside the transaction: INSERT + UPDATE
-      expect(txExecuteRaw).toHaveBeenCalledTimes(2);
+      // Three $executeRaw calls inside the transaction: log INSERT + state
+      // UPDATE + the announce_scheduled marker (migration 348).
+      expect(txExecuteRaw).toHaveBeenCalledTimes(3);
       const insertSql = txExecuteRaw.mock.calls[0][0];
       const updateSql = txExecuteRaw.mock.calls[1][0];
+      const markerSql = txExecuteRaw.mock.calls[2][0];
       const insertStr = typeof insertSql === 'string' ? insertSql : (insertSql?.[0] || '');
       const updateStr = typeof updateSql === 'string' ? updateSql : (updateSql?.[0] || '');
+      const markerStr = Array.isArray(markerSql) ? markerSql.join('?') : String(markerSql ?? '');
       expect(insertStr).toContain('INSERT INTO mkt_outreach_log');
       expect(updateStr).toContain('UPDATE directory_presence_seeds');
       expect(updateStr).toContain('outreach_scheduled');
+      expect(markerStr).toContain('INSERT INTO directory_seed_outreach_touches');
+      expect(markerStr).toContain('announce_scheduled');
     });
   });
 

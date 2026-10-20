@@ -27,6 +27,27 @@ export interface DirectoryListingPhoto {
   caption?: string | null;
 }
 
+/** Four-Act cascade announce queue row (migration 348). */
+export interface DirectoryAnnounceQueueRow {
+  seedId: string;
+  tenantId: string;
+  status: string;
+  businessName: string | null;
+  category: string;
+  city: string;
+  state: string;
+  publishedAt: string | null;
+  ageDays: number | null;
+  announceScheduledAt: string | null;
+  channel: string | null;
+  claimUrl: string | null;
+  placeUrl: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  listingPhone: string | null;
+  listingEmail: string | null;
+}
+
 // ─── Identity Packet (source-scored seed decision) ───────────────────────
 export type IdentitySourceTier =
   | 'authoritative'
@@ -1210,6 +1231,50 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     );
   }
 
+  /** GET /api/admin/directory-presence/presence-seeds/announce-queue
+   *  Four-Act cascade: published/invited seeds with a scheduled announce and
+   *  no delivered marker, oldest-first. */
+  async listAnnounceQueue(options?: { limit?: number; offset?: number }): Promise<DirectoryAnnounceQueueRow[]> {
+    const params = new URLSearchParams();
+    if (options?.limit != null) params.set('limit', String(options.limit));
+    if (options?.offset != null) params.set('offset', String(options.offset));
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/announce-queue${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data?.queue ?? data ?? []) as DirectoryAnnounceQueueRow[];
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/:id/announce-delivered
+   *  Writes the `announce_delivered` marker; `verification_results` carries the
+   *  C3/C4 capture for campaign-less seeds. */
+  async markAnnounceDelivered(
+    id: string,
+    input: {
+      channel?: 'call' | 'email' | 'other';
+      notes?: string;
+      verification_results?: Array<Record<string, any>>;
+    } = {},
+  ): Promise<{ delivered: boolean; reason?: string; channel?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/announce-delivered`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(
+        typeof result.error === 'string' ? result.error : 'Failed to mark announce delivered',
+      );
+    }
+    return (result.data?.data ?? result.data) as { delivered: boolean; reason?: string; channel?: string };
+  }
+
   // ─── Seed listing photos (walk-in capture) ─────────────────────────────
   //
   // Wraps /api/directory/:listingId/photos. The identifier may be a tenant id,
@@ -1457,6 +1522,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       recordingUrl?: string;
       recordingDurationSeconds?: number;
       recordingProvider?: string;
+      verification_results?: Array<Record<string, any>>;
     },
   ): Promise<{ touchId: string } | null> {
     const result = await this.makeDefaultRequest<any>(

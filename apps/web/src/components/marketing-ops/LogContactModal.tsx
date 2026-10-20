@@ -167,6 +167,9 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   const [callResult, setCallResult] = useState<CallResult>('connected');
   const [identityVerified, setIdentityVerified] = useState(false);
   const [operatingConfirmed, setOperatingConfirmed] = useState(false);
+  // Four-Act cascade C2 — the operator actually said the listing is published
+  // (not voicemail). Drives the announce_delivered marker.
+  const [announceDelivered, setAnnounceDelivered] = useState(false);
   const [angleUsed, setAngleUsed] = useState<string>(initialAngleUsed ?? '');
   const [hookResponseNotes, setHookResponseNotes] = useState('');
   const [objectionsRaised, setObjectionsRaised] = useState<string[]>([]);
@@ -188,6 +191,12 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
     initialWorksheet?.preferred_contact_channel ?? '',
   );
   const [updateWorksheet, setUpdateWorksheet] = useState(true);
+
+  // ─── Four-Act cascade — C3 pain + C4 permission (spec §2.1 / §11 B4) ──
+  // Structured, not free-text: rides verification_results so the gate and
+  // funnel are measurable. 'not_asked' is the absence of a result.
+  const [painOutcome, setPainOutcome] = useState<'not_asked' | 'confirmed' | 'disputed'>('not_asked');
+  const [followUpPermission, setFollowUpPermission] = useState<'not_asked' | 'yes' | 'no'>('not_asked');
 
   // ─── Non-phone-mode contact result + Other subtype state ─────────────
   const contactResultOptions = contactResultOptionsForChannel(channel);
@@ -276,6 +285,20 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
     setSaving(true);
     setError(null);
     try {
+      // Four-Act cascade — C3/C4 as structured verification results. The
+      // campaign outreach route already accepts this array; the gate reads it.
+      const verificationResults: Array<Record<string, any>> = [];
+      if (painOutcome === 'confirmed') verificationResults.push({ type: 'pain_confirmed' });
+      if (painOutcome === 'disputed') verificationResults.push({ type: 'fact_disputed' });
+      if (followUpPermission === 'yes') verificationResults.push({ type: 'follow_up_requested' });
+      if (followUpPermission === 'no') {
+        verificationResults.push({
+          type: 'other',
+          field: 'follow_up_permission',
+          value: 'no',
+        });
+      }
+
       if (isPhoneMode) {
         // Phone mode — send call_details via the phone-aware log endpoint
         const callDetails: CallDetails = {
@@ -291,6 +314,7 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
           owner_name_confirmed: isConnected && ownerNameConfirmed.trim() ? ownerNameConfirmed.trim() : null,
           team_signal_confirmed: isConnected && teamSignalConfirmed ? (teamSignalConfirmed as any) : null,
           preferred_channel_confirmed: isConnected && preferredChannelConfirmed.trim() ? preferredChannelConfirmed.trim() : null,
+          announce_delivered: isConnected ? announceDelivered : null,
         };
         await marketingOpsService.logCallContact(campaign.id, {
           contact_channel: 'phone',
@@ -300,6 +324,7 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
           update_worksheet: hasWriteBackFields ? updateWorksheet : false,
           follow_up_date: followUpDate || undefined,
           notes: notes || undefined,
+          verification_results: verificationResults.length > 0 ? verificationResults : undefined,
         });
       } else {
         await marketingOpsService.logContact(campaign.id, {
@@ -314,6 +339,7 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
             contact_result: contactResult,
             other_subtype: isOtherChannel ? otherSubtype : null,
           },
+          verification_results: verificationResults.length > 0 ? verificationResults : undefined,
         });
       }
       onLogged();
@@ -489,6 +515,10 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
                           <input type="checkbox" checked={operatingConfirmed} onChange={(e) => setOperatingConfirmed(e.target.checked)} className="rounded" />
                           Operating status confirmed
                         </label>
+                        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          <input type="checkbox" checked={announceDelivered} onChange={(e) => setAnnounceDelivered(e.target.checked)} className="rounded" />
+                          Announce delivered (C2 spoken)
+                        </label>
                       </div>
 
                       <label className="block">
@@ -531,6 +561,38 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
                   )}
                 </div>
               )}
+
+              {/* Four-Act cascade — C3 pain + C4 permission. Structured so the
+                  act-1 gate and the funnel are measurable; not a pitch. */}
+              <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cascade (act 1)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Pain (C3)</span>
+                    <select
+                      value={painOutcome}
+                      onChange={(e) => setPainOutcome(e.target.value as 'not_asked' | 'confirmed' | 'disputed')}
+                      className={inputClass}
+                    >
+                      <option value="not_asked">Not asked</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="disputed">Disputed</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Follow-up permission (C4)</span>
+                    <select
+                      value={followUpPermission}
+                      onChange={(e) => setFollowUpPermission(e.target.value as 'not_asked' | 'yes' | 'no')}
+                      className={inputClass}
+                    >
+                      <option value="not_asked">Not asked</option>
+                      <option value="yes">Granted</option>
+                      <option value="no">Declined</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
 
               {channel === 'email' && (
                 <label className="block">

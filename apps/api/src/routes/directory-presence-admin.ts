@@ -54,6 +54,7 @@ import {
 } from '../services/directory/identityScoring';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
+import SeedAnnounceService from '../services/SeedAnnounceService';
 import {
   generateClaimInvitePng,
   generateClaimInvitePostcard,
@@ -489,6 +490,8 @@ const touchSchema = z.object({
   recordingUrl: z.string().max(2000).optional(),
   recordingDurationSeconds: z.number().int().nonnegative().optional(),
   recordingProvider: z.string().max(40).optional(),
+  // Four-Act cascade — C3 pain / C4 permission (stored on touch metadata).
+  verification_results: z.array(z.record(z.string(), z.any())).optional(),
 });
 
 router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Request, res: Response) => {
@@ -511,6 +514,9 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
         recordingUrl: parsed.data.recordingUrl,
         recordingDurationSeconds: parsed.data.recordingDurationSeconds,
         recordingProvider: parsed.data.recordingProvider,
+        metadata: parsed.data.verification_results
+          ? { verification_results: parsed.data.verification_results }
+          : undefined,
       },
       ctx,
     );
@@ -852,6 +858,73 @@ router.get('/presence-seeds', requirePlatformStaff, async (req: Request, res: Re
     res.json({ success: true, seeds });
   } catch (error) {
     logger.error('[GET /api/admin/directory/presence-seeds] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory/presence-seeds/announce-queue
+ *
+ * Four-Act cascade announce queue (migration 348): published/invited seeds
+ * with an `announce_scheduled` marker and no `announce_delivered` marker,
+ * oldest-first by published_at. The predicate is marker-based, not
+ * outreach_state-based — `owner_contacted` covers voicemail/no-answer too.
+ */
+router.get('/presence-seeds/announce-queue', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(String(req.query.limit ?? ''), 10) || 100;
+    const offset = parseInt(String(req.query.offset ?? ''), 10) || 0;
+    const queue = await SeedAnnounceService.listQueue({ limit, offset });
+    res.json({ success: true, queue });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory/presence-seeds/announce-queue] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+const announceDeliveredSchema = z.object({
+  channel: z.enum(['call', 'email', 'other']).optional(),
+  notes: z.string().max(4000).optional(),
+  verification_results: z.array(z.record(z.string(), z.any())).optional(),
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/announce-delivered
+ *
+ * Record the announce as delivered (writes the `announce_delivered` marker).
+ * Idempotent. `verification_results` carries the C3/C4 capture for
+ * campaign-less seeds (spec §11 B4).
+ */
+router.post('/presence-seeds/:id/announce-delivered', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const parsed = announceDeliveredSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'validation_error', details: parsed.error.flatten() });
+    }
+    const result = await SeedAnnounceService.markDelivered(
+      req.params.id,
+      {
+        channel: parsed.data.channel,
+        notes: parsed.data.notes,
+        verificationResults: parsed.data.verification_results,
+      },
+      {
+        actorType: 'user',
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+    );
+    if (!result.delivered && result.reason === 'seed_not_found') {
+      return res.status(404).json({ error: 'seed_not_found' });
+    }
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/announce-delivered] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
@@ -1268,6 +1341,18 @@ router.post('/presence-seeds/:id/publish', requirePlatformAdmin, async (req: Req
           seedId: id,
           ctx,
         });
+      } else {
+        // Four-Act cascade (migration 348): campaign-less seeds still get an
+        // announce marker on the canonical seed touch ledger. The queue reads
+        // the marker, not outreach_state.
+        const announce = await SeedAnnounceService.scheduleForSeed(id, ctx);
+        if (!announce.scheduled && announce.reason !== 'already_scheduled') {
+          logger.info('SeedAnnounceService.scheduleForSeed skipped on publish', undefined, {
+            seedId: id,
+            reason: announce.reason,
+            missingRequired: announce.missingRequired,
+          });
+        }
       }
     } catch (err) {
       logger.warn('SeedOutreachTriggerService.onSeedCreated failed on publish', undefined, {

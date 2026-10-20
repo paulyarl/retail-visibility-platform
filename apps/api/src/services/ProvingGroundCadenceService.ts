@@ -63,6 +63,8 @@ export interface LogTouchInput {
   recordingUrl?: string;
   recordingDurationSeconds?: number;
   recordingProvider?: string;
+  // Four-Act cascade (C3 pain / C4 permission) — stored on the touch metadata.
+  verificationResults?: Array<Record<string, any>>;
 }
 
 export interface LogTouchResult {
@@ -189,6 +191,9 @@ class ProvingGroundCadenceServiceClass extends BaseService {
           recordingUrl: input.recordingUrl,
           recordingDurationSeconds: input.recordingDurationSeconds,
           recordingProvider: input.recordingProvider,
+          metadata: input.verificationResults
+            ? { verification_results: input.verificationResults }
+            : undefined,
         },
         ctx ? { actorId: ctx.userId, actorType: 'user' } : undefined,
       );

@@ -156,3 +156,20 @@ describe('LogContactModal worksheet parity', () => {
     expect(html).not.toContain('value="Maria"');
   });
 });
+
+describe('LogContactModal cascade capture', () => {
+  it('renders the C3 pain and C4 permission fields', () => {
+    const html = render(campaign());
+
+    expect(html).toContain('Cascade (act 1)');
+    expect(html).toContain('Pain (C3)');
+    expect(html).toContain('Follow-up permission (C4)');
+    expect(html).toContain('Not asked');
+    expect(html).toContain('Confirmed');
+    expect(html).toContain('Disputed');
+    expect(html).toContain('Granted');
+    expect(html).toContain('Declined');
+    // C2 is captured on the phone block (connected calls only).
+    expect(html).toContain('Announce delivered (C2 spoken)');
+  });
+});

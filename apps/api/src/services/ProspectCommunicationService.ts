@@ -191,6 +191,8 @@ const OUTCOME_LABELS: Record<string, string> = {
   report_claimed: 'Report claimed',
   report_declined: 'Report declined',
   claim_qr_generated: 'Claim QR generated',
+  announce_scheduled: 'Announce scheduled',
+  announce_delivered: 'Announce delivered',
   other: 'Other',
 };
 
@@ -208,6 +210,7 @@ const SYSTEM_OUTCOMES = new Set([
   'report_claimed',
   'report_declined',
   'claim_qr_generated',
+  'announce_scheduled',
 ]);
 
 // ─── Service ────────────────────────────────────────────────────────────

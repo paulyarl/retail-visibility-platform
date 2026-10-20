@@ -92,6 +92,10 @@ export interface CallDetails {
   hook_angle?: string | null;
   trigger_source?: string | null;
   profile_quality_findings?: Array<{ signal: string; severity: string; label: string }> | null;
+  /** Four-Act cascade C2 — the operator actually told the owner the listing is
+   *  published (phone spoken, email sent, mail/DM sent). Drives the
+   *  announce_delivered marker; voicemail/no-answer do not count. */
+  announce_delivered?: boolean | null;
 }
 
 export interface LogContactInput {

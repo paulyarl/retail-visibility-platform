@@ -525,6 +525,8 @@ const callDetailsSchema = z.object({
     severity: z.string().max(20),
     label: z.string().max(200),
   })).nullable().default(null),
+  // Four-Act cascade C2 — the announce was actually delivered (not voicemail).
+  announce_delivered: z.boolean().nullable().default(null),
 });
 
 // Structured verification result for manual outreach anchors (§11.6, §13.4)
@@ -2135,6 +2137,38 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
         error: syncErr instanceof Error ? syncErr.message : String(syncErr),
       });
     }
+    // Four-Act cascade (migration 348): C2 delivered writes the announce
+    // marker the queue reads. A voicemail/no-answer log never ticks the flag.
+    if (parsed.call_details?.announce_delivered === true) {
+      try {
+        const { default: announceService } = await import('../services/SeedAnnounceService.js');
+        const channel =
+          parsed.contact_channel === 'phone'
+            ? 'call'
+            : parsed.contact_channel === 'email'
+              ? 'email'
+              : 'other';
+        await announceService.markDeliveredForCampaign(
+          req.params.id,
+          {
+            channel,
+            notes: parsed.notes,
+            verificationResults: parsed.verification_results,
+          },
+          {
+            actorId: (req as any).user?.userId || (req as any).user?.id,
+            actorType: 'user',
+            ip: req.ip,
+            userAgent: req.get('User-Agent'),
+          },
+        );
+      } catch (announceErr) {
+        logger.warn('SeedAnnounceService.markDeliveredForCampaign failed (swallowed)', getCtx(req), {
+          campaignId: req.params.id,
+          error: announceErr instanceof Error ? announceErr.message : String(announceErr),
+        });
+      }
+    }
     res.status(201).json({ success: true, data: log });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -2802,7 +2836,7 @@ router.post('/:id/category-identification/act', async (req: any, res: Response) 
             // primary — otherwise it births the successor (created: true).
             const created = await DirectoryPresenceSeedService.createFromCampaign(
               campaignId,
-              { publish: linked.some((s) => s.status === 'published') },
+              { publish: linked.some((s) => s.status === 'published' || s.status === 'invited') },
               seedCtx,
             );
             if (created.created) {
@@ -6190,6 +6224,9 @@ const logTouchSchema = z.object({
   recording_url: z.string().max(2000).optional(),
   recording_duration_seconds: z.number().int().nonnegative().optional(),
   recording_provider: z.string().max(40).optional(),
+  // Four-Act cascade — C3 pain / C4 permission as structured verification
+  // results (stored on the seed touch metadata).
+  verification_results: z.array(z.record(z.string(), z.any())).optional(),
 });
 
 router.post('/prospect-queue/:id/log-touch', async (req: any, res: Response) => {
@@ -6202,6 +6239,7 @@ router.post('/prospect-queue/:id/log-touch', async (req: any, res: Response) => 
       recordingUrl: parsed.recording_url,
       recordingDurationSeconds: parsed.recording_duration_seconds,
       recordingProvider: parsed.recording_provider,
+      verificationResults: parsed.verification_results,
     }, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {

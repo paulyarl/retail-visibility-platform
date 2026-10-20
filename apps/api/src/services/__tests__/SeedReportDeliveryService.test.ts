@@ -254,6 +254,8 @@ describe('SeedReportDeliveryService', () => {
           'report_claimed',
           'report_declined',
           'claim_qr_generated',
+          'announce_scheduled',
+          'announce_delivered',
         ]) {
           expect(
             allowed.has(outcome),

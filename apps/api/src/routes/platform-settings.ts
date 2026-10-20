@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
+import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 
 const router = Router();
 
@@ -119,8 +120,12 @@ router.get('/platform-settings', async (_req, res) => {
 });
 
 // POST /platform-settings - Update platform branding settings
+// Auth: the announce identification block reads this record, so the writer is
+// platform-admin only. GET stays public (the storefront/header needs it).
 router.post(
   '/platform-settings',
+  authenticateToken,
+  requirePlatformAdmin,
   upload.fields([
     { name: 'logo', maxCount: 1 },
     { name: 'favicon', maxCount: 1 },
