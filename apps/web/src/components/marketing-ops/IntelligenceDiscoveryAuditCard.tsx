@@ -59,6 +59,16 @@ export interface DiscoveredBusiness {
     source_url?: string;
     as_of?: string;
   }>;
+  /** Suggested categories (ranked by evidence). Same item shape as
+   *  category-identification's candidate_categories; `basis` names the
+   *  recorded evidence behind each suggestion. */
+  suggested_categories?: Array<{
+    category: string;
+    confidence: 'high' | 'medium' | 'low';
+    is_known_category: boolean;
+    subcategory?: string | null;
+    basis?: string[];
+  }> | null;
   /** Bronze Standard attribution (spec §7.4) — the catalog reason(s)
    *  directly responsible for surfacing this business, emitted only when a
    *  bronze market-calibration block was injected into the scan prompt. */
@@ -349,6 +359,7 @@ export default function IntelligenceDiscoveryAuditCard({
           discovery_provenance: biz.discovery_provenance,
           bronze_attribution: Array.isArray(biz.bronze_attribution) ? biz.bronze_attribution : undefined,
           competitive_weaknesses: Array.isArray(biz.competitive_weaknesses) ? biz.competitive_weaknesses : undefined,
+          suggested_categories: Array.isArray(biz.suggested_categories) ? biz.suggested_categories : undefined,
         },
         intelligence_run_id: audit.import_metadata?.run_id ?? undefined,
       });
@@ -360,7 +371,11 @@ export default function IntelligenceDiscoveryAuditCard({
     }
   };
 
-  const handleQueue = async (biz: DiscoveredBusiness, initialStatus?: 'queued' | 'verify_then_outreach') => {
+  const handleQueue = async (
+    biz: DiscoveredBusiness,
+    initialStatus?: 'queued' | 'verify_then_outreach',
+    categoryOverride?: string,
+  ) => {
     const idx = sortedBusinesses.indexOf(biz);
     setQueueingIdx(idx);
     setDeriveError(null);
@@ -369,7 +384,7 @@ export default function IntelligenceDiscoveryAuditCard({
       const result = await service.addToQueue({
         business_name: biz.business_name,
         title: biz.business_name,
-        category: biz.category,
+        category: categoryOverride ?? biz.category,
         city: biz.city,
         state: biz.state,
         source_kind: 'intelligence_seek',
@@ -605,6 +620,34 @@ export default function IntelligenceDiscoveryAuditCard({
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {biz.address && <div>{biz.address}</div>}
                         {biz.phone && <div>{biz.phone}</div>}
+                      </div>
+                    )}
+                    {/* Suggested categories — the analyst's ranked category
+                        suggestions. "Queue as" queues this prospect under that
+                        category; +Secondary / Promote then run on its own
+                        campaign's category audit. */}
+                    {Array.isArray(biz.suggested_categories) && biz.suggested_categories.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap mt-1.5" aria-label="Suggested categories">
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">Suggested:</span>
+                        {biz.suggested_categories.map((sc, ci) => (
+                          <span
+                            key={`${sc.category}-${ci}`}
+                            title={(sc.basis ?? []).join('; ') || undefined}
+                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700"
+                          >
+                            <span className={`px-1 rounded ${CONFIDENCE_STYLES[sc.confidence] ?? ''}`}>{sc.confidence}</span>
+                            <span>{sc.category}</span>
+                            {!sc.is_known_category && <span className="text-gray-400">(new)</span>}
+                            <button
+                              type="button"
+                              onClick={() => handleQueue(biz, undefined, sc.category)}
+                              disabled={queueingIdx === sortedBusinesses.indexOf(biz)}
+                              className="ml-0.5 text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                            >
+                              Queue as
+                            </button>
+                          </span>
+                        ))}
                       </div>
                     )}
                     {/* Discovery signals */}

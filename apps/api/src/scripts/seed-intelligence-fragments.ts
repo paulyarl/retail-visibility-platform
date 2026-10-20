@@ -157,6 +157,16 @@ Use these signal codes in discovery_signals[]:
     body: `=== FOCUS: EMERGING DISCOVERY ===
 Focus modifier: EMERGING
 
+=== SUGGESTED CATEGORIES (every candidate) ===
+Each discovered candidate carries suggested_categories: the directory categories the
+analyst would assign, ranked by the evidence recorded for that business. Under
+EMERGING focus, a platform label that conflicts with the assortment evidence (for
+example "Convenience store" with a specialist product range) is itself evidence for
+the specialist category. Keep every suggestion grounded in recorded evidence; never
+invent a category to fill the field. Do not hold, exclude or downgrade a candidate
+because its suggested category differs from this scan's category. Category assignment
+happens downstream; this scan records fit for its own category separately.
+
 Target emerging businesses — those with thin digital footprints that represent
 untapped opportunity. Specifically seek:
 
@@ -348,6 +358,15 @@ designed to surface.`,
     fragmentKind: 'seek_intelligence_focus_competitive',
     body: `=== FOCUS: COMPETITIVE BENCHMARKING ===
 Focus modifier: COMPETITIVE
+
+=== SUGGESTED CATEGORIES (every candidate) ===
+Each discovered candidate carries suggested_categories: the directory categories the
+analyst would assign, ranked by the evidence recorded for that business. Under
+COMPETITIVE focus, suggest a category only when the business's assortment supports it;
+a label-only suggestion is low confidence. Keep every suggestion grounded in recorded
+evidence; never invent a category to fill the field. Do not hold, exclude or downgrade
+a candidate because its suggested category differs from this scan's category. Category
+assignment happens downstream; this scan records fit for its own category separately.
 
 Target the competitive landscape — businesses with established digital footprints
 that represent the benchmark for the category in this market. Specifically seek:

@@ -81,6 +81,51 @@ const cleanContract = {
   reconciliation: null,
 };
 
+describe('IntelligenceDiscoveryAuditCard — suggested categories', () => {
+  const businessWithSuggestions = {
+    business_name: 'Cc&Cee International Food Market',
+    category: 'Market',
+    city: 'Indianapolis',
+    state: 'IN',
+    location_status: 'inside_city',
+    ownership_type: 'independent',
+    category_fit: 'probable',
+    identity_confidence: 'medium',
+    discovery_signals: [],
+    discovery_provenance: [],
+    business_seek_recommended: false,
+    business_seek_priority: 'hold',
+    suggested_categories: [
+      { category: 'Fresh Food Market', confidence: 'medium', is_known_category: false, subcategory: null, basis: ['Google Business Profile: Fresh food market'] },
+      { category: 'African Grocery Store', confidence: 'low', is_known_category: true, subcategory: null, basis: ['business name / category field'] },
+    ],
+  };
+
+  it('renders each suggested category with its confidence, new flag and a Queue as action', () => {
+    const html = render(auditOf(baseAuditData({
+      discovered_businesses: [businessWithSuggestions],
+      candidate_count: 1,
+      hold_count: 1,
+    })));
+    expect(html).toContain('Suggested:');
+    expect(html).toContain('Fresh Food Market');
+    expect(html).toContain('(new)');
+    expect(html).toContain('African Grocery Store');
+    expect(html).toContain('Queue as');
+    expect(html).toContain('Google Business Profile: Fresh food market');
+  });
+
+  it('omits the suggestion row for a candidate without suggested_categories', () => {
+    const { suggested_categories, ...bare } = businessWithSuggestions;
+    const html = render(auditOf(baseAuditData({
+      discovered_businesses: [bare],
+      candidate_count: 1,
+      hold_count: 1,
+    })));
+    expect(html).not.toContain('Suggested:');
+  });
+});
+
 describe('IntelligenceDiscoveryAuditCard — scan contract section', () => {
   it('renders unverified for a pre-contract audit (no scan_contract)', () => {
     const html = render(auditOf(baseAuditData()));
