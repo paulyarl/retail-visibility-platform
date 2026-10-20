@@ -8677,5 +8677,35 @@ export interface CampaignCascadeResponse {
     channel: string | null;
     inQueue: boolean;
   };
+  /** Pipeline-stage readiness hint — derived server-side from the same
+   *  predicates the transition route enforces. Null for non-business scopes. */
+  stageAdvice: StageAdvice | null;
   reason?: 'no_primary_seed';
+}
+
+export type StageAdviceReadiness = 'ready' | 'ready_with_ack' | 'blocked' | 'terminal';
+
+export interface StageAdviceCheck {
+  key: string;
+  label: string;
+  met: boolean;
+  advisory: boolean;
+}
+
+export interface StageAdviceBlocker {
+  code: string;
+  message: string;
+  hard: boolean;
+  actionLabel?: string | null;
+}
+
+export interface StageAdvice {
+  campaignId: string;
+  currentStage: string | null;
+  nextStage: string | null;
+  readiness: StageAdviceReadiness;
+  checks: StageAdviceCheck[];
+  blockers: StageAdviceBlocker[];
+  tip: string | null;
+  acknowledgeRequired: boolean;
 }

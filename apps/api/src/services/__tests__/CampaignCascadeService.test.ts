@@ -4,9 +4,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const { mockQueryRaw, mockGetSummary } = vi.hoisted(() => ({
+const { mockQueryRaw, mockGetSummary, mockResolveAdvice } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
   mockGetSummary: vi.fn(),
+  mockResolveAdvice: vi.fn(),
 }));
 
 vi.mock('../../prisma', () => ({
@@ -15,6 +16,10 @@ vi.mock('../../prisma', () => ({
 
 vi.mock('../SeedCascadeService', () => ({
   default: { getSummary: mockGetSummary },
+}));
+
+vi.mock('../StageAdviceService', () => ({
+  default: { resolveForCampaign: mockResolveAdvice },
 }));
 
 import campaignCascadeService from '../CampaignCascadeService';
@@ -52,6 +57,16 @@ beforeEach(() => {
     return Promise.resolve([]);
   });
   mockGetSummary.mockResolvedValue(summary());
+  mockResolveAdvice.mockResolvedValue({
+    campaignId: 'camp-1',
+    currentStage: 'seed',
+    nextStage: 'preview_built',
+    readiness: 'ready',
+    checks: [],
+    blockers: [],
+    tip: 'Act 1 cleared.',
+    acknowledgeRequired: false,
+  });
 });
 
 describe('CampaignCascadeService', () => {
@@ -63,6 +78,7 @@ describe('CampaignCascadeService', () => {
     expect(result.cascade?.announceScheduledAt).toBe('2026-10-01T00:00:00.000Z');
     expect(result.announce.inQueue).toBe(true);
     expect(result.announce.deliveredAt).toBeNull();
+    expect(result.stageAdvice?.nextStage).toBe('preview_built');
   });
 
   it('is not in the queue once delivered', async () => {
@@ -81,6 +97,9 @@ describe('CampaignCascadeService', () => {
     expect(result.cascade).toBeNull();
     expect(result.reason).toBe('no_primary_seed');
     expect(result.announce.inQueue).toBe(false);
+    // The seek edge is about the audit, not the listing — advice must still
+    // resolve with a null cascade.
+    expect(mockResolveAdvice).toHaveBeenCalledWith('camp-1', null, undefined);
   });
 
   it('is not in the queue for a draft seed', async () => {

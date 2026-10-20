@@ -759,6 +759,26 @@ carries the same **Gallery** link when the row has a campaign and Show is not
 done. The link is navigation, not a duplicate gallery control — the Outreach
 Kit remains the owner of screenshots, eligibility, and token minting.
 
+**Stage advice (implemented 2026-10-20).** The same surfaces also answer the
+orthogonal pipeline question — *is the next stage true yet* — without becoming
+a second gate. `StageAdviceService` derives a `stageAdvice` block on the
+campaign cascade payload (so the campaign Execution tab, the VAST rows, and the
+seed card all read one derivation) from the predicates the transition route
+already enforces: the archetype hard gate, the checklist soft gate, gallery
+eligibility, and the act 1 / act 3 gates. Readiness is `ready` /
+`ready_with_ack` / `blocked` / `terminal`; a blocker marked `hard` is a 409 the
+operator cannot acknowledge away, so the banner disables the advance and links
+the owning surface. The only mutation is the existing
+`POST /:id/transition` — the 409 `checklist_incomplete` payload becomes the
+acknowledgement list. Two mechanics are encoded because they make the ordering
+non-obvious: the mailer is only available up to `preview_built` (§2.2), so the
+act-2 postcard must ship before `shown`; and the act-2 confirm page leads
+onward to the gallery, so the gallery has to exist before the postcard is
+mailed. Advice covers the first four stages and stops at `shown` — what remains
+after it (the visit, payment) is not a stage predicate the cascade can observe.
+The seek edge resolves with no seed, because that edge is about the audit. Per
+§8 this remains a view: no new state store, no new gate.
+
 ## 8. Guardrails & Failure Modes
 
 - **Published precondition (act 1).** No call goes out for a seed that is not

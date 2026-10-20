@@ -13,7 +13,9 @@
 
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
+import type { RequestCtx } from '../context';
 import SeedCascadeService, { type SeedCascadeSummary } from './SeedCascadeService';
+import StageAdviceService, { type StageAdvice } from './StageAdviceService';
 
 export interface CampaignCascadeResponse {
   seedId: string | null;
@@ -29,6 +31,13 @@ export interface CampaignCascadeResponse {
     channel: string | null;
     inQueue: boolean;
   };
+  /**
+   * Pipeline-stage readiness (the "is the next stage green" hint). Derived
+   * from the same predicates the transition route enforces, so the board
+   * cannot drift from the API. Present even without a seed — the seek edge is
+   * about the audit, not the listing.
+   */
+  stageAdvice: StageAdvice | null;
   reason?: 'no_primary_seed';
 }
 
@@ -52,20 +61,21 @@ export class CampaignCascadeService extends BaseService {
    */
   async getForCampaigns(
     campaignIds: string[],
+    ctx?: RequestCtx,
   ): Promise<Record<string, CampaignCascadeResponse>> {
     const ids = [...new Set(campaignIds.filter(Boolean))];
     const out: Record<string, CampaignCascadeResponse> = {};
     for (let i = 0; i < ids.length; i += 5) {
       await Promise.all(
         ids.slice(i, i + 5).map(async (id) => {
-          out[id] = await this.getForCampaign(id);
+          out[id] = await this.getForCampaign(id, ctx);
         }),
       );
     }
     return out;
   }
 
-  async getForCampaign(campaignId: string): Promise<CampaignCascadeResponse> {
+  async getForCampaign(campaignId: string, ctx?: RequestCtx): Promise<CampaignCascadeResponse> {
     const links = await prisma.$queryRaw<any[]>`
       SELECT seed_id
       FROM directory_seed_campaign_links
@@ -81,6 +91,7 @@ export class CampaignCascadeService extends BaseService {
         seed: null,
         cascade: null,
         announce: { scheduledAt: null, deliveredAt: null, channel: null, inQueue: false },
+        stageAdvice: await StageAdviceService.resolveForCampaign(campaignId, null, ctx),
         reason: 'no_primary_seed',
       };
     }
@@ -115,6 +126,7 @@ export class CampaignCascadeService extends BaseService {
         channel: cascade?.announceChannel ?? null,
         inQueue,
       },
+      stageAdvice: await StageAdviceService.resolveForCampaign(campaignId, cascade, ctx),
     };
   }
 }

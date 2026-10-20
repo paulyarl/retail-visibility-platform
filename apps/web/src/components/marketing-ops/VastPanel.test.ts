@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { VastBoard, buildVastRow, countVast, type VastRow } from './VastPanel';
-import type { ProspectQueueEntry } from '@/services/MarketingOpsService';
+import type { ProspectQueueEntry, StageAdvice } from '@/services/MarketingOpsService';
 import type { SeedCascadeSummary } from '@/services/DirectoryPresenceAdminService';
 
 const entry = (overrides: Partial<ProspectQueueEntry> = {}): ProspectQueueEntry =>
@@ -136,5 +136,65 @@ describe('VastBoard', () => {
       createElement(VastBoard, { rows: [], onLogAnnounce: () => {} }),
     );
     expect(html).toContain('No PG prospects yet.');
+  });
+});
+
+const stageAdvice = (overrides: Partial<StageAdvice> = {}): StageAdvice => ({
+  campaignId: 'camp-1',
+  currentStage: 'seed',
+  nextStage: 'preview_built',
+  readiness: 'ready',
+  checks: [],
+  blockers: [],
+  tip: 'Act 1 cleared.',
+  acknowledgeRequired: false,
+  ...overrides,
+});
+
+describe('VastBoard stage advice', () => {
+  it('passes the campaign advice through to the row', () => {
+    const row = buildVastRow(
+      entry({ processed_campaign_id: 'camp-1' }),
+      summary(['done', 'done', 'in_progress', 'blocked']),
+      'camp-1',
+      stageAdvice(),
+    );
+    expect(row.stageAdvice?.nextStage).toBe('preview_built');
+  });
+
+  it('leaves seed-only rows without stage advice', () => {
+    const row = buildVastRow(entry(), summary(['done', 'not_started', 'not_started', 'blocked']));
+    expect(row.stageAdvice).toBeNull();
+  });
+
+  it('renders the next-stage chip and the ready-to-advance banner', () => {
+    const withAdvice = [
+      buildVastRow(
+        entry({ processed_campaign_id: 'camp-1' }),
+        summary(['done', 'done', 'in_progress', 'blocked']),
+        'camp-1',
+        stageAdvice(),
+      ),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(VastBoard, { rows: withAdvice, onLogAnnounce: () => {} }),
+    );
+    expect(html).toContain('Preview Built');
+    expect(html).toContain('ready to advance a pipeline stage');
+  });
+
+  it('does not show the banner when nothing is green', () => {
+    const blockedRows = [
+      buildVastRow(
+        entry({ processed_campaign_id: 'camp-1' }),
+        summary(['in_progress', 'not_started', 'not_started', 'blocked']),
+        'camp-1',
+        stageAdvice({ readiness: 'blocked' }),
+      ),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(VastBoard, { rows: blockedRows, onLogAnnounce: () => {} }),
+    );
+    expect(html).not.toContain('ready to advance a pipeline stage');
   });
 });

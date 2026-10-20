@@ -22,6 +22,7 @@ import directoryPresenceAdminService, {
   type CascadeActStatus,
 } from '@/services/DirectoryPresenceAdminService';
 import ProspectTouchLogModal from './ProspectTouchLogModal';
+import StageAdviceBanner from './StageAdviceBanner';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -73,9 +74,11 @@ function announceChip(announce: CampaignCascadeResponse['announce']): string {
 export default function CampaignExecutionPanel({
   campaignId,
   businessName,
+  onStageChanged,
 }: {
   campaignId: string;
   businessName?: string | null;
+  onStageChanged?: () => void | Promise<void>;
 }) {
   const [data, setData] = useState<CampaignCascadeResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,20 +90,17 @@ export default function CampaignExecutionPanel({
   // Act 3's gate lives on the campaign's Outreach Kit tab. Fetch the gate
   // reason so the Show card can show the actual unblock action (advance stage,
   // upload screenshots, run the audit, or generate the link).
-  useEffect(() => {
-    let cancelled = false;
-    marketingOpsService
-      .getGalleryEligibility(campaignId)
-      .then((result) => {
-        if (!cancelled) setGalleryEligibility(result);
-      })
-      .catch(() => {
-        if (!cancelled) setGalleryEligibility(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+  const refreshGalleryEligibility = useCallback(async () => {
+    try {
+      setGalleryEligibility(await marketingOpsService.getGalleryEligibility(campaignId));
+    } catch {
+      setGalleryEligibility(null);
+    }
   }, [campaignId]);
+
+  useEffect(() => {
+    refreshGalleryEligibility();
+  }, [refreshGalleryEligibility]);
 
   const load = useCallback(async () => {
     try {
@@ -136,6 +136,12 @@ export default function CampaignExecutionPanel({
     }
   };
 
+  const handleAdvanced = async () => {
+    await load();
+    await refreshGalleryEligibility();
+    await onStageChanged?.();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 p-6 text-sm text-gray-500 dark:text-gray-400">
@@ -154,24 +160,36 @@ export default function CampaignExecutionPanel({
   }
 
   if (!data || data.reason === 'no_primary_seed' || !data.cascade) {
+    // No seed yet — but the stage hint is most useful here: at `seek` the next
+    // move is the audit, and at `seed` it is creating/publishing the listing.
+    const awaitingSeedStage = data?.stageAdvice?.nextStage === 'seed';
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-600 dark:border-neutral-600 dark:text-gray-300">
-        <div className="flex items-center gap-2 font-medium">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          No place listing linked
+      <div className="space-y-3">
+        {data?.stageAdvice && (
+          <StageAdviceBanner
+            campaignId={campaignId}
+            advice={data.stageAdvice}
+            onAdvanced={handleAdvanced}
+          />
+        )}
+        <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-600 dark:border-neutral-600 dark:text-gray-300">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            No place listing linked
+          </div>
+          <p className="mt-2">
+            {awaitingSeedStage
+              ? 'The seed-first wedge starts at the Seed stage: advance to Seed, create the place listing from this campaign, QC it, then publish.'
+              : 'The Four-Act cascade runs on the campaign\u2019s published place listing. Add the listing from this campaign (the seed is parked in draft for QC), publish it, then return here.'}
+          </p>
+          <Link
+            href={`/settings/admin/directory/presence-seeds?status=draft`}
+            className="mt-3 inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Open draft seeds
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
         </div>
-        <p className="mt-2">
-          The Four-Act cascade runs on the campaign&apos;s published place listing. Add the
-          listing from this campaign (the seed is parked in draft for QC), publish it, then
-          return here.
-        </p>
-        <Link
-          href={`/settings/admin/directory/presence-seeds?status=draft`}
-          className="mt-3 inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
-        >
-          Open draft seeds
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Link>
       </div>
     );
   }
@@ -244,6 +262,14 @@ export default function CampaignExecutionPanel({
           </Link>
         </div>
       </div>
+
+      {data.stageAdvice && (
+        <StageAdviceBanner
+          campaignId={campaignId}
+          advice={data.stageAdvice}
+          onAdvanced={handleAdvanced}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {cascade.acts.map((act) => {

@@ -2785,7 +2785,7 @@ export default function CampaignDetailClient({
             )}
 
             {activeTab === 'plan' && campaign && (
-              <ProjectPlanTab campaign={campaign} />
+              <ProjectPlanTab campaign={campaign} onStageChanged={fetchCampaign} />
             )}
           </>
         ) : (

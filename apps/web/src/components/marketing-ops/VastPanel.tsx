@@ -17,12 +17,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import marketingOpsService, {
   type ProspectQueueEntry,
+  type StageAdvice,
 } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
   type CascadeActStatus,
   type SeedCascadeSummary,
 } from '@/services/DirectoryPresenceAdminService';
 import ProspectTouchLogModal from './ProspectTouchLogModal';
+import { StageAdviceChip } from './StageAdviceBanner';
 import { ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 
 export interface VastRow {
@@ -37,6 +39,8 @@ export interface VastRow {
   s: CascadeActStatus | null;
   t: CascadeActStatus | null;
   nextAction: string;
+  /** Pipeline-stage readiness (campaign-backed rows only). */
+  stageAdvice: StageAdvice | null;
 }
 
 export interface VastCounts {
@@ -52,6 +56,7 @@ export function buildVastRow(
   entry: ProspectQueueEntry,
   summary: SeedCascadeSummary | null,
   campaignId: string | null = entry.processed_campaign_id ?? null,
+  stageAdvice: StageAdvice | null = null,
 ): VastRow {
   const seedId = entry.seed_id ?? null;
   const acts = summary?.acts ?? [];
@@ -79,6 +84,7 @@ export function buildVastRow(
     s,
     t,
     nextAction,
+    stageAdvice,
   };
 }
 
@@ -211,6 +217,9 @@ export interface VastBoardProps {
 
 export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
   const counts = countVast(rows);
+  const readyToAdvance = rows.filter(
+    (r) => r.stageAdvice?.readiness === 'ready' || r.stageAdvice?.readiness === 'ready_with_ack',
+  ).length;
 
   if (rows.length === 0) {
     return (
@@ -255,6 +264,13 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
         ))}
       </div>
 
+      {readyToAdvance > 0 && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">
+          {readyToAdvance} {readyToAdvance === 1 ? 'prospect is' : 'prospects are'} ready to advance a
+          pipeline stage — open the campaign&apos;s Execution tab to advance.
+        </div>
+      )}
+
       {/* Small screens: card layout. The table needs ~8 columns; below md it
           clipped the actions and forced horizontal scrolling. */}
       <div className="space-y-2 md:hidden">
@@ -284,9 +300,10 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                 <ActChip letter="T" status={row.t} href={row.seedId ? cascadeHref(row.seedId, 4) : undefined} />
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
-              Next: {row.nextAction}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300">
+              <span>Next: {row.nextAction}</span>
+              <StageAdviceChip advice={row.stageAdvice} />
+            </div>
             <div className="mt-2">
               <VastActions row={row} onLogAnnounce={onLogAnnounce} align="start" />
             </div>
@@ -328,7 +345,12 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                 <td className="px-3 py-3 text-center"><ActChip letter="A" status={row.a} href={row.seedId ? cascadeHref(row.seedId, 2) : undefined} /></td>
                 <td className="px-3 py-3 text-center"><ActChip letter="S" status={row.s} href={row.seedId ? cascadeHref(row.seedId, 3) : undefined} /></td>
                 <td className="px-3 py-3 text-center"><ActChip letter="T" status={row.t} href={row.seedId ? cascadeHref(row.seedId, 4) : undefined} /></td>
-                <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-300">{row.nextAction}</td>
+                <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-300">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {row.nextAction}
+                    <StageAdviceChip advice={row.stageAdvice} />
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   <VastActions row={row} onLogAnnounce={onLogAnnounce} />
                 </td>
@@ -368,16 +390,18 @@ export default function VastPanel({
       const seedIds = entries.map((e) => e.seed_id).filter(Boolean) as string[];
       // campaign_created rows may have their seed linked through the campaign
       // (directory_seed_campaign_links) rather than stamped on the queue row.
+      // Fetch every linked campaign, not just the unseeded ones: the stage
+      // readiness hint lives on the campaign cascade.
       const campaignIds = entries
-        .filter((e) => !e.seed_id && !!e.processed_campaign_id)
-        .map((e) => e.processed_campaign_id as string);
+        .map((e) => e.processed_campaign_id)
+        .filter(Boolean) as string[];
       const [seedSummaries, campaignCascades] = await Promise.all([
         directoryPresenceAdminService.getSeedCascadeBatch(seedIds),
         marketingOpsService.getCampaignCascadeBatch(campaignIds),
       ]);
       setRows(
         entries.map((entry) => {
-          const campaign = !entry.seed_id && entry.processed_campaign_id
+          const campaign = entry.processed_campaign_id
             ? campaignCascades[entry.processed_campaign_id] ?? null
             : null;
           const resolvedSeedId = entry.seed_id ?? campaign?.seedId ?? null;
@@ -388,6 +412,7 @@ export default function VastPanel({
             { ...entry, seed_id: resolvedSeedId },
             summary,
             entry.processed_campaign_id ?? null,
+            campaign?.stageAdvice ?? null,
           );
         }),
       );

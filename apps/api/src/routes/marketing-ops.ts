@@ -2195,7 +2195,7 @@ router.get('/campaigns/cascade-batch', async (req: any, res: Response) => {
     if (!campaignIds || campaignIds.length === 0) {
       return res.status(400).json({ success: false, error: 'campaign_ids_required' });
     }
-    const cascades = await CampaignCascadeService.getForCampaigns(campaignIds);
+    const cascades = await CampaignCascadeService.getForCampaigns(campaignIds, getCtx(req));
     res.json({ success: true, cascades });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
@@ -2211,7 +2211,7 @@ router.get('/campaigns/cascade-batch', async (req: any, res: Response) => {
  */
 router.get('/campaigns/:id/cascade', async (req: any, res: Response) => {
   try {
-    const data = await CampaignCascadeService.getForCampaign(req.params.id);
+    const data = await CampaignCascadeService.getForCampaign(req.params.id, getCtx(req));
     res.json({ success: true, data });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

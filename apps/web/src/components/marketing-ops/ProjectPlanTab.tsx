@@ -33,7 +33,13 @@ const PLAN_SURFACES: { key: PlanSurface; label: string; live: boolean }[] = [
   { key: 'execution', label: 'Execution', live: true },
 ];
 
-export default function ProjectPlanTab({ campaign }: { campaign: any }) {
+export default function ProjectPlanTab({
+  campaign,
+  onStageChanged,
+}: {
+  campaign: any;
+  onStageChanged?: () => void | Promise<void>;
+}) {
   const [surface, setSurface] = useState<PlanSurface>('plan');
   useEffect(() => {
     const apply = () => {
@@ -123,6 +129,7 @@ export default function ProjectPlanTab({ campaign }: { campaign: any }) {
         <CampaignExecutionPanel
           campaignId={campaign.id}
           businessName={campaign.business_name ?? null}
+          onStageChanged={onStageChanged}
         />
       ) : (
         <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">

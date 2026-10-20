@@ -13,11 +13,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import marketingOpsService, { type StageAdvice } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
   type CascadeActStatus,
   type SeedCascadeSummary,
 } from '@/services/DirectoryPresenceAdminService';
 import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
+import { StageAdviceChip } from '@/components/marketing-ops/StageAdviceBanner';
 import {
   CheckCircle2,
   Circle,
@@ -66,6 +68,7 @@ export default function SeedCascadeCard({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [campaignAdvice, setCampaignAdvice] = useState<StageAdvice | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -92,8 +95,34 @@ export default function SeedCascadeCard({
       summary.linkedCampaigns[0] ??
       null
     : null;
-  const galleryStageOk =
-    !!primaryCampaign?.stage && !['seek', 'seed'].includes(primaryCampaign.stage);
+
+  // Stage readiness comes from the campaign cascade (the server derivation),
+  // not a local stage guess — the gallery is only mintable at preview_built or
+  // shown, and that list lives in GalleryEligibilityService.
+  const primaryCampaignId = primaryCampaign?.id ?? null;
+  const loadAdvice = useCallback(async () => {
+    if (!primaryCampaignId) {
+      setCampaignAdvice(null);
+      return;
+    }
+    try {
+      const result = await marketingOpsService.getCampaignCascade(primaryCampaignId);
+      setCampaignAdvice(result?.stageAdvice ?? null);
+    } catch {
+      setCampaignAdvice(null);
+    }
+  }, [primaryCampaignId]);
+
+  useEffect(() => {
+    loadAdvice();
+  }, [loadAdvice]);
+
+  // Below preview_built the gallery cannot be minted yet, so the Show row's
+  // link is an advance prompt; from preview_built onward it is a navigation
+  // link into the Outreach Kit (which owns screenshots, eligibility, minting).
+  const galleryStageOk = campaignAdvice
+    ? !['seek', 'seed'].includes(campaignAdvice.currentStage ?? '')
+    : true;
 
   const handleMarkAnnounced = async () => {
     if (!summary) return;
@@ -106,6 +135,7 @@ export default function SeedCascadeCard({
           : undefined;
       await directoryPresenceAdminService.markAnnounceDelivered(seedId, { channel });
       await load();
+      await loadAdvice();
       await onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark the announce delivered');
@@ -143,6 +173,7 @@ export default function SeedCascadeCard({
             <Megaphone className="w-3 h-3" />
             {announceLabel}
           </span>
+          <StageAdviceChip advice={campaignAdvice} />
           <button
             type="button"
             onClick={() => setLogOpen(true)}
@@ -263,6 +294,7 @@ export default function SeedCascadeCard({
           onLogged={async () => {
             setLogOpen(false);
             await load();
+            await loadAdvice();
             await onChanged?.();
           }}
         />
