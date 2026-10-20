@@ -826,7 +826,21 @@ export class ProfileRepairPromptService extends BaseService {
       repair_platforms: repairPlatforms
         .map((p) => REPAIR_PLATFORM_LABELS[p as keyof typeof REPAIR_PLATFORM_LABELS] ?? p)
         .join(', '),
+      campaign_categories: this.serializeCampaignCategories(campaign),
     };
+  }
+
+  /** Primary + secondary category set the campaign carries, for platform category choices. */
+  serializeCampaignCategories(campaign: any): string {
+    const primary = String(campaign?.category ?? '').trim();
+    const secondary: string[] = Array.isArray(campaign?.secondary_categories)
+      ? campaign.secondary_categories.map((c: any) => String(c).trim()).filter(Boolean)
+      : [];
+    if (!primary && secondary.length === 0) return 'NONE — no categories set on this campaign.';
+    return [
+      `- Primary category: ${primary || 'NONE'}`,
+      secondary.length > 0 ? `- Secondary categories: ${secondary.join(', ')}` : '- Secondary categories: NONE',
+    ].join('\n');
   }
 
   buildResolutionVariables(campaign: any, intake: any): Record<string, any> {

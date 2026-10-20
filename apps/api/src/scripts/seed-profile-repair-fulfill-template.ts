@@ -38,7 +38,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 
 const TEMPLATE_ID = 'mpt-profile-repair-citation-package-fulfill';
-const SEED_VERSION_MARKER = 'fulfill-package-v5-2026-10-signal-weight-order';
+const SEED_VERSION_MARKER = 'fulfill-package-v6-2026-10-campaign-categories';
 
 const NEW_BODY = `<!-- ${SEED_VERSION_MARKER} -->
 You are a local business profile repair specialist constructing the Citation & Profile Repair Package — the single shared artifact for both DIY and DFY fulfillment.
@@ -52,6 +52,10 @@ PURCHASED PACKAGE:
 - Tier: {{repair_tier}}
 - Fulfillment mode: {{delivery_mode}}
 - Platform scope (purchased ∩ diagnosed): {{repair_platforms}}
+
+CAMPAIGN CATEGORIES (the operator-assigned set for this business):
+{{campaign_categories}}
+Rule: when a platform asks for a category (Google primary category, directory category, Facebook category), choose from this set. Use the primary category unless the platform's own category list only carries a secondary label that matches it better. Do not invent a category outside this set; if the set is empty, say so in the package and leave the category field for the owner to choose.
 
 AUDIT RESULTS:
 {{audit_results}}
