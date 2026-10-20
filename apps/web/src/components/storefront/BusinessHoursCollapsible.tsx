@@ -123,28 +123,13 @@ export default function BusinessHoursCollapsible({
                         ? 'text-blue-700 dark:text-blue-300'
                         : hasHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
                     }`}>
-                      {hasHours && compact ? (
-                        <div className="flex flex-col items-end gap-0.5">
-                          {timeSlots.map((slot, idx) => (
-                            <span key={idx} className="whitespace-nowrap">{slot.open} – {slot.close}</span>
-                          ))}
+                      {hasHours ? (
+                        <span className="whitespace-nowrap">
+                          {timeSlots.map(slot => `${slot.open} – ${slot.close}`).join(', ')}
                           {tzLabel && (
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">{tzLabel}</span>
+                            <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-1.5">{tzLabel}</span>
                           )}
-                        </div>
-                      ) : hasHours ? (
-                        <div className="flex flex-col gap-1">
-                          {timeSlots.map((slot, idx) => (
-                            <div key={idx} className="flex flex-col items-end">
-                              <span>{slot.open}</span>
-                              <span className="text-neutral-400 dark:text-neutral-500 leading-none">—</span>
-                              <span>{slot.close}</span>
-                            </div>
-                          ))}
-                          {tzLabel && (
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{tzLabel}</span>
-                          )}
-                        </div>
+                        </span>
                       ) : (
                         <span>Closed</span>
                       )}
