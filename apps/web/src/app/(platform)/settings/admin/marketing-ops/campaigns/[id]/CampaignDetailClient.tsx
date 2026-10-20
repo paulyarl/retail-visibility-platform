@@ -27,6 +27,7 @@ import { isWebsiteGapCampaign } from '@/components/marketing-ops/repairCampaignG
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import EnrichmentAuditCard from '@/components/marketing-ops/EnrichmentAuditCard';
 import CategoryIdentificationAuditCard from '@/components/marketing-ops/CategoryIdentificationAuditCard';
+import SuggestedCategoryChips from '@/components/marketing-ops/SuggestedCategoryChips';
 import IntelligenceEstablishmentPanel from '@/components/marketing-ops/IntelligenceEstablishmentPanel';
 import GoldStandardDiscoveryPanel from '@/components/marketing-ops/GoldStandardDiscoveryPanel';
 import BronzeStandardDiscoveryPanel from '@/components/marketing-ops/BronzeStandardDiscoveryPanel';
@@ -2167,26 +2168,16 @@ export default function CampaignDetailClient({
                           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             {(audit.audit_data as any)?.summary ?? 'Detected signals seeded at queue promotion.'}
                           </p>
-                          {(() => {
-                            const sugg = (campaign as any).discovery_context?.suggested_categories;
-                            if (!Array.isArray(sugg) || sugg.length === 0) return null;
-                            return (
-                              <div className="mt-2 flex items-center gap-1 flex-wrap" aria-label="Suggested categories">
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400">Suggested categories:</span>
-                                {sugg.map((sc: any, si: number) => (
-                                  <span
-                                    key={`${sc.category}-${si}`}
-                                    title={Array.isArray(sc.basis) ? sc.basis.join('; ') : undefined}
-                                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
-                                  >
-                                    <span className="uppercase tracking-wide text-[9px] text-gray-400">{sc.confidence}</span>
-                                    <span>{sc.category}</span>
-                                    {sc.is_known_category === false && <span className="text-gray-400">(new)</span>}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          })()}
+                          {Array.isArray((campaign as any).discovery_context?.suggested_categories) && (
+                            <SuggestedCategoryChips
+                              campaignId={campaignId}
+                              businessName={campaign.business_name ?? ''}
+                              suggestions={(campaign as any).discovery_context.suggested_categories}
+                              currentCategory={campaign.category}
+                              currentSecondaryCategories={campaign.secondary_categories ?? []}
+                              onSynced={fetchCampaign}
+                            />
+                          )}
                         </div>
                       ) : audit.platform === 'business_analysis' && audit.audit_data ? (
                         <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} isNonPrimarySibling={campaign.isPrimarySibling === false && !!campaign.businessProspectId} />
