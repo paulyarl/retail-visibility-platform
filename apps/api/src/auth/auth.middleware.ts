@@ -11,6 +11,7 @@ import { logger } from '../logger';
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Check for Auth0 session headers (set by web app from cookies)
+    // Forced deployment to prod
     const auth0Id = req.headers['x-auth0-id'] as string;
     const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
 
