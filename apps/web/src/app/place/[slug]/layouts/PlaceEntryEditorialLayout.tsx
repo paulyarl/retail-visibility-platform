@@ -223,11 +223,11 @@ export default function PlaceEntryEditorialLayout({
           <CouponSpotlight tenantId={tenantId} variant="banner" />
         </section>
 
-        <FlyerSection tenantSlug={tenantId} tenantId={tenantId} surface="place" />
-
         <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
           <UnclaimedDirectoryBanner businessName={listing.businessName} />
         </section>
+
+        <FlyerSection tenantSlug={tenantId} tenantId={tenantId} surface="place" />
 
         {/* Balanced content grid — map on left (wider), NAP data on right.
             NAP is the shopper's primary task, so it leads the page body;

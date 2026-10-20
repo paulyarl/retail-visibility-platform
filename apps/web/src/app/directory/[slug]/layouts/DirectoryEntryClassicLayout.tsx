@@ -168,8 +168,6 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           <CouponSpotlight tenantId={listing.tenantId} variant="card" />
         </section>
 
-        <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-6">
             <div className="space-y-6">
@@ -511,6 +509,8 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           </div>
         </div>
       </div>
+
+      <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
 
       {/* Related Stores */}
       {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}

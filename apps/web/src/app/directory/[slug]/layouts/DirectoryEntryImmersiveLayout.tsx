@@ -147,8 +147,6 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
           <CouponSpotlight tenantId={listing.tenantId} variant="strip" />
         </section>
 
-        <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
-
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-12">
           {listing.keywords && listing.keywords.length > 0 && (
@@ -358,6 +356,8 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
             </div>
           </div>
         </div>
+
+        <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
 
         {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}
         <LastViewed />
