@@ -367,12 +367,19 @@ export class SeedAnnounceService extends BaseService {
         dl.phone AS listing_phone,
         dl.email AS listing_email,
         sched.occurred_at AS announce_scheduled_at,
-        sched.metadata->>'channel' AS channel,
+        COALESCE(
+          sched.metadata->>'channel',
+          CASE
+            WHEN dps.owner_phone IS NOT NULL OR dl.phone IS NOT NULL THEN 'call'
+            WHEN dps.owner_email IS NOT NULL OR dl.email IS NOT NULL THEN 'email'
+            ELSE 'other'
+          END
+        ) AS channel,
         sched.metadata->>'claim_url' AS claim_url,
         sched.metadata->>'place_url' AS place_url
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
-      JOIN LATERAL (
+      LEFT JOIN LATERAL (
         SELECT occurred_at, metadata
         FROM directory_seed_outreach_touches
         WHERE seed_id = dps.id AND outcome = 'announce_scheduled'

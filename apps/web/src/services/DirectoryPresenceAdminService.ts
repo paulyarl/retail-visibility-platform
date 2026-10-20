@@ -1336,7 +1336,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/announce-queue${qs ? `?${qs}` : ''}`,
-      { method: 'GET' },
+      { method: 'GET', cache: 'no-store' },
       undefined,
       0,
     );

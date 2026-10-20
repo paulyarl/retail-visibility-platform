@@ -257,6 +257,14 @@ describe('SeedAnnounceService', () => {
       expect(rows[0].claimUrl).toBe('https://example.com/place/claim/TOKEN');
       expect(rows[0].ageDays).toBeGreaterThanOrEqual(4);
     });
+
+    it('uses LEFT JOIN so published seeds without a scheduled marker are included', async () => {
+      await announceService.listQueue();
+      const sqls = mockQueryRaw.mock.calls.map((call) =>
+        Array.isArray(call[0]) ? call[0].join('?') : String(call[0]),
+      );
+      expect(sqls.some((s) => s.includes('LEFT JOIN LATERAL'))).toBe(true);
+    });
   });
 
   describe('isAnnounced', () => {

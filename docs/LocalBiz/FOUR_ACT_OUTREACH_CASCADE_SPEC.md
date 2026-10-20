@@ -220,10 +220,12 @@ no-answer), and `freshness_verified` can be entered without C2. The queue
 therefore reads a dedicated marker on the seed's canonical touch ledger:
 `directory_seed_outreach_touches` with outcome `announce_scheduled` (written
 at publish) and `announce_delivered` (written when the operator records the
-actual announce). The queue is every `published`/`invited` seed with an
-`announce_scheduled` marker and **no** `announce_delivered` marker — the
-operator sees all published-but-unannounced seeds at a glance, including
-never-contacted seeds the courtesy job has since flipped to `no_response`.
+actual announce). The queue is every `published`/`invited` seed with **no**
+`announce_delivered` marker. An `announce_scheduled` marker is optional: it
+supplies the pre-composed channel/claim context, but legacy or manually
+published seeds without one still appear in the queue (channel falls back to
+the seed/listing contact). The queue therefore cannot silently drop a
+published seed just because the publish-time marker is missing.
 `outreach_state` continues to track the courtesy-window/verification
 lifecycle; it is not the queue predicate. Each row carries its **age** — days
 since `dps.published_at` (verified) — sorted oldest-first so the worst
