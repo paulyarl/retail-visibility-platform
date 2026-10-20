@@ -37,6 +37,9 @@ export interface ProspectTouchEntry extends ProspectChannelSource {
   id: string;
   business_name?: string | null;
   title?: string | null;
+  /** Linked seed (when the queue entry has one) — enables the C2 marker in
+   *  queue-entry mode. */
+  seed_id?: string | null;
 }
 
 interface ProspectTouchLogModalProps {
@@ -65,6 +68,8 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged, seedId
 
   const channels = resolveProspectChannels(entry);
   const name = entry.business_name || entry.title || 'Prospect';
+  const announceSeedId = seedId ?? entry.seed_id ?? null;
+  const canMarkAnnounced = !!announceSeedId;
 
   const handleSubmit = async () => {
     setBusy(true);
@@ -87,10 +92,10 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged, seedId
           notes: notes || undefined,
           verification_results: verificationResults.length > 0 ? verificationResults : undefined,
         });
-        if (announceDelivered) {
+        if (announceDelivered && announceSeedId) {
           const announceChannel =
             channel === 'call' ? 'call' : channel === 'email' ? 'email' : 'other';
-          await directoryPresenceAdminService.markAnnounceDelivered(seedId, {
+          await directoryPresenceAdminService.markAnnounceDelivered(announceSeedId, {
             channel: announceChannel,
             notes: notes || undefined,
             verification_results: verificationResults.length > 0 ? verificationResults : undefined,
@@ -107,6 +112,15 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged, seedId
             : undefined,
           verification_results: verificationResults.length > 0 ? verificationResults : undefined,
         });
+        if (announceDelivered && announceSeedId) {
+          const announceChannel =
+            channel === 'call' ? 'call' : channel === 'email' ? 'email' : 'other';
+          await directoryPresenceAdminService.markAnnounceDelivered(announceSeedId, {
+            channel: announceChannel,
+            notes: notes || undefined,
+            verification_results: verificationResults.length > 0 ? verificationResults : undefined,
+          });
+        }
       }
       await onLogged();
     } catch (err: any) {
@@ -286,15 +300,17 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged, seedId
               </select>
             </label>
           </div>
-          <label className="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              checked={announceDelivered}
-              onChange={(e) => setAnnounceDelivered(e.target.checked)}
-              className="rounded"
-            />
-            Announce delivered (C2)
-          </label>
+          {canMarkAnnounced && (
+            <label className="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-400">
+              <input
+                type="checkbox"
+                checked={announceDelivered}
+                onChange={(e) => setAnnounceDelivered(e.target.checked)}
+                className="rounded"
+              />
+              Announce delivered (C2)
+            </label>
+          )}
         </div>
 
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
