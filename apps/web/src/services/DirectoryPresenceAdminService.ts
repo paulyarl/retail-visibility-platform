@@ -1380,6 +1380,25 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return (data?.cascade ?? data ?? null) as SeedCascadeSummary | null;
   }
 
+  /** GET /api/admin/directory-presence/presence-seeds/cascade-batch?seedIds=…
+   *  Batch summaries for the PG VAST board. */
+  async getSeedCascadeBatch(
+    seedIds: string[],
+  ): Promise<Record<string, SeedCascadeSummary | null>> {
+    const ids = [...new Set(seedIds.filter(Boolean))];
+    if (ids.length === 0) return {};
+    const params = new URLSearchParams({ seedIds: ids.join(',') });
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/cascade-batch?${params.toString()}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return {};
+    const data = result.data?.data ?? result.data;
+    return (data?.summaries ?? data ?? {}) as Record<string, SeedCascadeSummary | null>;
+  }
+
   /** GET /api/admin/directory-presence/presence-seeds/cascade-cohort
    *  Cohort funnel measurement (seed batch or explicit seed ids). */
   async getCascadeCohort(options?: {

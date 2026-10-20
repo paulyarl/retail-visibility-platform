@@ -960,6 +960,31 @@ router.get('/presence-seeds/cascade-cohort', requirePlatformStaff, async (req: R
 });
 
 /**
+ * GET /api/admin/directory/presence-seeds/cascade-batch?seedIds=a,b,c
+ *
+ * Batch cascade summaries for the PG VAST board (one request for the
+ * proving ground's seeded prospects).
+ */
+router.get('/presence-seeds/cascade-batch', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const seedIds = (req.query.seedIds as string | undefined)
+      ?.split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (!seedIds || seedIds.length === 0) {
+      return res.status(400).json({ error: 'seed_ids_required' });
+    }
+    const summaries = await SeedCascadeService.getSummaries(seedIds);
+    res.json({ success: true, summaries });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory/presence-seeds/cascade-batch] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
  * GET /api/admin/directory/presence-seeds/:id/cascade
  *
  * Per-prospect four-act position + act-3 gate summary. Reads the seed touch

@@ -39,6 +39,7 @@ import CampaignChecklistTab from '@/app/(platform)/settings/admin/marketing-ops/
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import ProspectArtifactChips from '@/components/marketing-ops/ProspectArtifactChips';
 import ProspectCommsPanel from '@/components/marketing-ops/ProspectCommsPanel';
+import VastPanel from '@/components/marketing-ops/VastPanel';
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
 import VerificationBadge from '@/components/marketing-ops/VerificationBadge';
 import { STAGE_LABELS, STAGE_COLORS } from '@/components/marketing-ops/StageBadge';
@@ -84,7 +85,7 @@ function gateChip(pass: boolean | null): string {
 // Cockpit tab keys — the operational surfaces (preflight, promotion,
 // communications, discovery) each own a panel so any of them can grow
 // without lengthening the page.
-type CockpitTab = 'preflight' | 'promote' | 'communications' | 'discovery';
+type CockpitTab = 'preflight' | 'promote' | 'communications' | 'vast' | 'discovery';
 
 // Deep-link fragments minted by OutreachChecklistBridgeService.resolveInternalLinkUrl
 // resolve to the tab that owns the anchor. A panel is unmounted while its tab
@@ -92,6 +93,7 @@ type CockpitTab = 'preflight' | 'promote' | 'communications' | 'discovery';
 const HASH_TABS: Record<string, CockpitTab> = {
   queue: 'promote',
   communications: 'communications',
+  vast: 'vast',
   prospects: 'discovery',
   children: 'discovery',
 };
@@ -931,6 +933,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     { key: 'preflight', label: 'Preflight checklist', count: dupGroups.length, warn: true },
     { key: 'promote', label: 'Promote to listings', count: promoteEntries.filter((e) => !e.seed_id).length },
     { key: 'communications', label: 'Communications', count: promoteEntries.length },
+    { key: 'vast', label: 'VAST', count: promoteEntries.filter((e) => e.seed_id).length },
     { key: 'discovery', label: 'Discovery prospects', count: children.length },
   ];
 
@@ -1910,6 +1913,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
           onResolve={(e) => setResolveEntry(e)}
         />
 
+        </div>
+      )}
+
+      {tab === 'vast' && (
+        <div role="tabpanel" id="cockpit-panel-vast" aria-labelledby="cockpit-tab-vast" className="space-y-6">
+          {/* VAST — the PG-scope execution board: Verification → Awareness →
+              Show → Tell. Campaign-backed prospects continue the same acts on
+              the campaign detail Project Plan → Execution tab. */}
+          <VastPanel entries={promoteEntries} onChanged={load} />
         </div>
       )}
 

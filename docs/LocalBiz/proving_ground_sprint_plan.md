@@ -101,6 +101,7 @@ Phases 2, 3, 4 require only Phase 1. Phase 5 requires all API surfaces. Phase 6 
 |---|---|---|
 | `MarketingOpsService` client methods (attach/detach children, dedup groups/verdicts, log-touch, seed-batch, queue filters) | §5 | `apps/web/src/services/MarketingOpsService.ts` |
 | Proving Ground cockpit page (header gate chips, children panel, preflight checklist, funnel dashboard, gap log, due-today mini-list) | §5.1 | new `marketing-ops/proving-grounds/[id]/` |
+| **VAST** tab — PG-scope queued prospects' Verification → Awareness → Show → Tell board. Batched `SeedCascadeService` summaries; unseeded prospects show "Promote to listings"; row actions Log announce / Seed / Cascade. Campaign-backed prospects continue on the campaign detail Project Plan → Execution tab. | Four-Act cascade spec §7 | `ProvingGroundCockpitClient.tsx`, `components/marketing-ops/VastPanel.tsx` |
 | Worklist: due-today sort, ladder viz, log-outcome dialog, preflight gate banner, family grouping, per-row actions (QR kit, gap-map PDF, claim link), tree + status filters | §5.2 | `queue/ProspectQueueClient.tsx`, `ProspectQueueBoard` |
 | Checklist tab resolution (unchanged component, new resolution branch) | §5.3 | — (server-side only) |
 | Campaign list entry point: link proving grounds (category badge `proving_ground` → cockpit) | §5.1 | `campaigns/CampaignListClient.tsx` |

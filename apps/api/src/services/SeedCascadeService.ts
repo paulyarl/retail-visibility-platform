@@ -149,6 +149,23 @@ export class SeedCascadeService extends BaseService {
     return SeedCascadeService.instance;
   }
 
+  /**
+   * Batch form for the PG VAST board. Small concurrency window so a 50-prospect
+   * proving ground does not open hundreds of simultaneous queries.
+   */
+  async getSummaries(seedIds: string[]): Promise<Record<string, SeedCascadeSummary | null>> {
+    const ids = [...new Set(seedIds.filter(Boolean))];
+    const out: Record<string, SeedCascadeSummary | null> = {};
+    for (let i = 0; i < ids.length; i += 5) {
+      await Promise.all(
+        ids.slice(i, i + 5).map(async (id) => {
+          out[id] = await this.getSummary(id);
+        }),
+      );
+    }
+    return out;
+  }
+
   async getSummary(seedId: string): Promise<SeedCascadeSummary | null> {
     const seedRows = await prisma.$queryRaw<SeedRow[]>`
       SELECT
