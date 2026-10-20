@@ -19,6 +19,7 @@ import { flyerService, type TenantFlyer, type FlyerVariant, type FlyerRecurrence
 import FlyerShareKit from './FlyerShareKit';
 import FlyerAnalyticsCard from './FlyerAnalyticsCard';
 import FlyerCardOrderPanel from './FlyerCardOrderPanel';
+import FrozenSpecialsCard from './FrozenSpecialsCard';
 import ItemPickerModal from '@/components/inventory/ItemPickerModal';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -690,6 +691,8 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
       <FlyerAnalyticsCard tenantId={tenantId} />
 
       <FlyerCardOrderPanel tenantId={tenantId} />
+
+      {flyerCap.frozen && <FrozenSpecialsCard tenantId={tenantId} />}
 
       {/* Display options */}
       <Card>

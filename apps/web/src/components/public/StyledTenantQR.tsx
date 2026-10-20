@@ -17,6 +17,7 @@ export interface StyledTenantQRProps {
   showDownload?: boolean;
   className?: string;
   pageType?: 'storefront' | 'directory' | 'product' | 'map';
+  hideBadges?: boolean;
 }
 
 export function StyledTenantQR({
@@ -31,6 +32,7 @@ export function StyledTenantQR({
   showDownload = true,
   className = '',
   pageType,
+  hideBadges = false,
 }: StyledTenantQRProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -142,9 +144,11 @@ export function StyledTenantQR({
     <div className={`bg-white rounded-lg shadow-sm p-4 ${className}`}>
       <div className="flex items-center gap-2 mb-3">
         <h3 className="text-lg font-semibold text-neutral-900">{label}</h3>
-        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-          ✨ Styled
-        </span>
+        {!hideBadges && (
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+            ✨ Styled
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col items-center">
@@ -190,7 +194,7 @@ export function StyledTenantQR({
 
       <div className="mt-3 space-y-1">
         <p className="text-xs text-neutral-500 text-center">Scan to visit</p>
-        {tenantLogo && prefs?.qr_logo && (
+        {!hideBadges && tenantLogo && prefs?.qr_logo && (
           <p className="text-xs text-purple-600 font-medium text-center">✨ Branded with logo</p>
         )}
       </div>

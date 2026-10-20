@@ -32,6 +32,7 @@ export interface TenantQRCodeProps {
   capabilityFlags?: StorefrontOptionFlags | null;
   /** Whether this is rendered on a public (unauthenticated) page */
   isPublic?: boolean;
+  hideBadges?: boolean;
 }
 
 /**
@@ -49,6 +50,7 @@ export function TenantQRCode({
   pageType,
   capabilityFlags,
   isPublic = false,
+  hideBadges = false,
 }: TenantQRCodeProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -477,6 +479,7 @@ export function TenantQRCode({
         showDownload={showDownload}
         className={className}
         pageType={pageType}
+        hideBadges={hideBadges}
       />
     );
   }
@@ -623,7 +626,7 @@ export function TenantQRCode({
 
               return (
                 <>
-                  {shouldShowLogo && (
+                  {shouldShowLogo && !hideBadges && (
                     <span className={`block text-xs ${colors.primaryIcon} font-medium`}>✨ Branded with store logo</span>
                   )}
 

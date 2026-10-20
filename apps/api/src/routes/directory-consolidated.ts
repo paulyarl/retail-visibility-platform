@@ -90,6 +90,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.public_disclaimer,
           dll.attributes,
           dps.id AS seed_id,
+          dps.status AS seed_status,
           dps.seo_enrichment->>'meta_title' as meta_title,
           dps.seo_enrichment->>'schema_type_hint' as schema_type_hint,
           (SELECT json_build_object('token', dct.token, 'short_code', dct.short_code)
@@ -403,6 +404,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       attributes: Array.isArray((listing as any).attributes) ? (listing as any).attributes : [],
       activeClaimToken: (listing as any).active_claim?.token || null,
       claimShortCode: (listing as any).active_claim?.short_code || null,
+      isClaimed: (listing as any).seed_status === 'claimed',
       // On-page report-banner QR design — the seed tenant's storefront_qr
       // style row (operator-authored; seed-scoped surface only).
       qrStyle: (listing as any).seed_id && (listing as any).qr_dot_type ? {

@@ -253,6 +253,17 @@ class FlyerService extends TenantApiSingleton {
     return result.data.data;
   }
 
+  async freezeDishes(tenantId: string, dishes: { sourceVariantId: string; quantity: number; priceCents?: number | null; salePriceCents?: number | null }[]): Promise<FlyerVariant[]> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ frozen: FlyerVariant[] }>>(
+      `/api/tenants/${tenantId}/flyers/freeze`,
+      { method: 'POST', body: JSON.stringify({ dishes }) },
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (!result.data.success) throw new Error(result.data.error || 'Failed to freeze dishes');
+    await this.invalidateServiceCaches(tenantId);
+    return result.data.data.frozen;
+  }
+
   async publishFlyer(tenantId: string, flyerId: string): Promise<TenantFlyer> {
     const result = await this.makeDefaultRequest<ApiEnvelope<{ flyer: TenantFlyer }>>(
       `/api/tenants/${tenantId}/flyers/${flyerId}/publish`,

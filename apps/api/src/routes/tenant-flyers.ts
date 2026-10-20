@@ -132,12 +132,17 @@ async function liveFlyerCount(tenantId: string, excludeId?: string): Promise<num
 }
 
 /**
- * Find-or-create the stable "specials" parent item — dishes are variants on it
- * (spec §3). Private visibility so the container never merchandises itself.
+ * Find-or-create a merchant-managed flyer container item, keyed by its metadata
+ * marker. Private visibility so the container never merchandises itself.
  */
-async function ensureSpecialsParent(tenantId: string) {
+async function ensureFlyerParent(
+  tenantId: string,
+  marker: 'flyer_special_parent' | 'flyer_frozen_parent',
+  name: string,
+  description: string,
+) {
   const existing = await prisma.inventory_items.findFirst({
-    where: { tenant_id: tenantId, metadata: { path: ['flyer_special_parent'], equals: true } },
+    where: { tenant_id: tenantId, metadata: { path: [marker], equals: true } },
     select: { id: true, sku: true, product_type: true },
   });
   if (existing) return existing;
@@ -147,8 +152,8 @@ async function ensureSpecialsParent(tenantId: string) {
       id: generateTenantItemId(tenantId),
       tenant_id: tenantId,
       sku: generateSKU({ tenantKey: generateTenantKey(tenantId), productType: 'physical' }),
-      name: 'Specials',
-      title: 'Specials',
+      name,
+      title: name,
       brand: 'House',
       price: 0,
       price_cents: 0,
@@ -156,12 +161,20 @@ async function ensureSpecialsParent(tenantId: string) {
       has_variants: true,
       visibility: 'private',
       item_status: 'active',
-      description: 'Rotating specials — merchant-managed flyer items live here as variants.',
-      metadata: { flyer_special_parent: true },
+      description,
+      metadata: { [marker]: true },
       updated_at: new Date(),
     },
     select: { id: true, sku: true, product_type: true },
   });
+}
+
+/**
+ * Find-or-create the stable "specials" parent item — dishes are variants on it
+ * (spec §3). Private visibility so the container never merchandises itself.
+ */
+function ensureSpecialsParent(tenantId: string) {
+  return ensureFlyerParent(tenantId, 'flyer_special_parent', 'Specials', 'Rotating specials — merchant-managed flyer items live here as variants.');
 }
 
 /** Deactivate variants that are no longer referenced by any non-expired flyer. */
@@ -508,6 +521,99 @@ router.put('/:tenantId/flyers/:flyerId/items', authenticateToken, checkTenantAcc
     res.json({ success: true, data: { items } });
   } catch (error) {
     logErr('PUT /:tenantId/flyers/:flyerId/items', error, req.params.tenantId);
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+// ── POST /:tenantId/flyers/freeze — "Freeze N" on dishes → mirrored frozen variants (spec §4.1a, §6) ──
+// Each dish gets one frozen variant on the Frozen Specials parent, keyed by
+// attributes.source_variant_id. Re-freezing tops up stock on the same variant.
+const freezeSchema = z.object({
+  dishes: z.array(z.object({
+    sourceVariantId: z.string().min(1).max(255),
+    quantity: z.number().int().min(1).max(100000),
+    priceCents: z.number().int().min(0).nullish(),
+    salePriceCents: z.number().int().min(0).nullish(),
+  })).min(1).max(50),
+});
+
+router.post('/:tenantId/flyers/freeze', authenticateToken, checkTenantAccess, requireInventoryAccess, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const parsed = freezeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+
+    const flyer = await flyerState(tenantId);
+    if (!flyer?.enabled) {
+      return res.status(403).json({ success: false, error: 'capability_disabled' });
+    }
+    if (!flyer.frozen) {
+      return res.status(403).json({ success: false, error: 'tier_restricted', feature_key: 'flyer_frozen' });
+    }
+
+    const { dishes } = parsed.data;
+    const specials = await prisma.inventory_items.findFirst({
+      where: { tenant_id: tenantId, metadata: { path: ['flyer_special_parent'], equals: true } },
+      select: { id: true },
+    });
+    const sources = specials
+      ? await prisma.product_variants.findMany({
+          where: { id: { in: dishes.map(d => d.sourceVariantId) }, parent_item_id: specials.id, tenant_id: tenantId },
+        })
+      : [];
+    const sourceById = new Map(sources.map(s => [s.id, s]));
+    if (new Set(dishes.map(d => d.sourceVariantId)).size !== dishes.length || sourceById.size !== dishes.length) {
+      return res.status(400).json({ success: false, error: 'invalid_dish', message: 'Dish not found on your specials list' });
+    }
+    if (sources.some(s => (s.attributes as any)?.no_price)) {
+      return res.status(400).json({ success: false, error: 'dish_has_no_price', message: 'Give the dish a price before freezing it' });
+    }
+
+    const frozenParent = await ensureFlyerParent(tenantId, 'flyer_frozen_parent', 'Frozen Specials', 'Frozen specials — mirrored copies of flyer dishes, sold while supplies last.');
+    const existing = await prisma.product_variants.findMany({
+      where: { parent_item_id: frozenParent.id, tenant_id: tenantId },
+      select: { id: true, attributes: true },
+    });
+    const frozenBySource = new Map(existing.map(v => [(v.attributes as any)?.source_variant_id as string, v.id]));
+
+    const frozen = await prisma.$transaction(async (tx) => {
+      const out = [];
+      for (const [i, d] of dishes.entries()) {
+        const src = sourceById.get(d.sourceVariantId)!;
+        const frozenId = frozenBySource.get(src.id);
+        const priceData = {
+          ...(d.priceCents != null ? { price_cents: d.priceCents } : {}),
+          ...(d.salePriceCents !== undefined ? { sale_price_cents: d.salePriceCents } : {}),
+        };
+        out.push(frozenId
+          ? await tx.product_variants.update({
+              where: { id: frozenId },
+              data: { stock: { increment: d.quantity }, is_active: true, ...priceData },
+            })
+          : await tx.product_variants.create({
+              data: {
+                id: generateTenantVariantId(frozenParent.id, tenantId),
+                parent_item_id: frozenParent.id,
+                tenant_id: tenantId,
+                variant_name: `${src.variant_name} — Frozen`,
+                sku: generateVariantSkuFromParent(frozenParent.sku, existing.length + i),
+                price_cents: d.priceCents ?? src.price_cents ?? 0,
+                sale_price_cents: d.salePriceCents ?? null,
+                stock: d.quantity,
+                image_url: src.image_url,
+                attributes: { source_variant_id: src.id },
+                is_active: true,
+              },
+            }));
+      }
+      return out;
+    });
+
+    res.json({ success: true, data: { frozen } });
+  } catch (error) {
+    logErr('POST /:tenantId/flyers/freeze', error, req.params.tenantId);
     res.status(500).json({ success: false, error: 'internal_error' });
   }
 });

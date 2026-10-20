@@ -143,6 +143,8 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
           <CouponSpotlight tenantId={listing.tenantId} variant="banner" />
         </section>
 
+        <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
+
         {/* Asymmetric Content Grid */}
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -366,8 +368,6 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             </div>
           </div>
         </div>
-
-        <FlyerSection tenantSlug={listing.tenantId} tenantId={listing.tenantId} surface="directory" />
 
         {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}
         <LastViewed />

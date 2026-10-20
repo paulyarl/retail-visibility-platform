@@ -186,14 +186,16 @@ export default function PlaceEntryEditorialLayout({
                   {listing.primaryCategory && (
                     <p className="text-neutral-300 mt-2 text-lg">{listing.primaryCategory}</p>
                   )}
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 mt-3 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-sm font-medium text-yellow-300">
-                    <span className="w-2 h-2 rounded-full bg-yellow-400" aria-hidden="true" />
-                    Unclaimed listing
-                  </span>
+                  {!listing.isClaimed && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 mt-3 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-sm font-medium text-yellow-300">
+                      <span className="w-2 h-2 rounded-full bg-yellow-400" aria-hidden="true" />
+                      Unclaimed listing
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4">
-                {hasClaimToken ? (
+                {listing.isClaimed ? null : hasClaimToken ? (
                   <a
                     href={claimHref}
                     onClick={trackClaimClick}
@@ -223,11 +225,13 @@ export default function PlaceEntryEditorialLayout({
           <CouponSpotlight tenantId={tenantId} variant="banner" />
         </section>
 
-        <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
-          <UnclaimedDirectoryBanner businessName={listing.businessName} />
-        </section>
-
         <FlyerSection tenantSlug={tenantId} tenantId={tenantId} surface="place" />
+
+        {!listing.isClaimed && (
+          <section className="max-w-6xl mx-auto px-6 relative z-20 mb-4">
+            <UnclaimedDirectoryBanner businessName={listing.businessName} />
+          </section>
+        )}
 
         {/* Balanced content grid — map on left (wider), NAP data on right.
             NAP is the shopper's primary task, so it leads the page body;
@@ -316,18 +320,20 @@ export default function PlaceEntryEditorialLayout({
                     {listing.description}
                   </p>
                 )}
-                {!publicNarrative && !listing.description && (
+                {!publicNarrative && !listing.description && !listing.isClaimed && (
                   <p className="text-neutral-600 leading-relaxed">
                     {disclaimer}
                   </p>
                 )}
-                <p className="text-neutral-500 leading-relaxed mt-3">
-                  Free to claim — verify your details, update hours, add a photo,
-                  and showcase up to 5 products for nearby shoppers.
-                </p>
+                {!listing.isClaimed && (
+                  <p className="text-neutral-500 leading-relaxed mt-3">
+                    Free to claim — verify your details, update hours, add a photo,
+                    and showcase up to 5 products for nearby shoppers.
+                  </p>
+                )}
               </div>
               <div className="flex flex-col items-center lg:items-end gap-3">
-                {hasClaimToken ? (
+                {listing.isClaimed ? null : hasClaimToken ? (
                   <a
                     href={claimHref}
                     onClick={trackClaimClick}
@@ -361,6 +367,7 @@ export default function PlaceEntryEditorialLayout({
                       showDownload={true}
                       pageType="directory"
                       isPublic
+                      hideBadges
                     />
                   </div>
                 )}
@@ -405,7 +412,7 @@ export default function PlaceEntryEditorialLayout({
         {/* Market Intel — the "How We Found" card shows above the collapsed
             panel as its teaser, so the 5-products offer, the report card,
             and the intel panel form a mini funnel. Seed pages only. */}
-        {listing.listingOrigin === 'directory_seed' && (
+        {listing.listingOrigin === 'directory_seed' && !listing.isClaimed && (
           <div className="max-w-6xl mx-auto px-6 mb-6">
             <MarketIntelSidebar
               slug={slug}
@@ -422,7 +429,7 @@ export default function PlaceEntryEditorialLayout({
         {/* Claim inquiry form — shown when no claim token has been minted.
             Uses the same anonymous PublicInquiryForm pattern as storefront contact,
             routed to the platform tenant so the operator can mint a claim token. */}
-        {!hasClaimToken && (
+        {!hasClaimToken && !listing.isClaimed && (
           <div id="claim-inquiry" className="max-w-3xl mx-auto px-6 py-12 scroll-mt-8">
             <div className="bg-white rounded-xl p-8 border border-neutral-200 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
