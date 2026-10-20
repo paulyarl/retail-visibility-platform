@@ -56,6 +56,7 @@ import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import SeedAnnounceService from '../services/SeedAnnounceService';
 import SeedCascadeService from '../services/SeedCascadeService';
+import SeedCascadeCohortService from '../services/SeedCascadeCohortService';
 import {
   generateClaimInvitePng,
   generateClaimInvitePostcard,
@@ -926,6 +927,32 @@ router.post('/presence-seeds/:id/announce-delivered', requirePlatformStaff, asyn
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error('[POST /api/admin/directory/presence-seeds/:id/announce-delivered] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory/presence-seeds/cascade-cohort
+ *
+ * Cohort funnel measurement for the Four-Act cascade. Filter by seed batch or
+ * an explicit seed-id list (comma-separated). Cohort 1 is 20 prospects.
+ */
+router.get('/presence-seeds/cascade-cohort', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const seedBatch = (req.query.seedBatch as string | undefined)?.trim() || undefined;
+    const seedIds = (req.query.seedIds as string | undefined)
+      ?.split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (!seedBatch && (!seedIds || seedIds.length === 0)) {
+      return res.status(400).json({ error: 'cohort_filter_required' });
+    }
+    const summary = await SeedCascadeCohortService.getCohortSummary({ seedBatch, seedIds });
+    res.json({ success: true, cohort: summary });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory/presence-seeds/cascade-cohort] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

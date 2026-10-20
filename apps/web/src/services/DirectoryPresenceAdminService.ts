@@ -78,6 +78,46 @@ export interface SeedCascadeSummary {
   timeline: CascadeTimelineEvent[];
 }
 
+/** Four-Act cascade cohort funnel row. */
+export interface CascadeCohortRow {
+  seedId: string;
+  businessName: string | null;
+  seedBatch: string | null;
+  status: string;
+  act1Verified: boolean;
+  act2Aware: boolean;
+  act3Cleared: boolean;
+  act4Scheduled: boolean;
+  act4Done: boolean;
+  claimed: boolean;
+  organicClaim: boolean;
+  announceScheduledAt: string | null;
+  announceDeliveredAt: string | null;
+  ageDays: number | null;
+}
+
+export interface CascadeCohortSummary {
+  cohort: { seedBatch: string | null; seedIds: string[] | null };
+  totals: {
+    seeds: number;
+    act1Verified: number;
+    act2Aware: number;
+    act3Cleared: number;
+    act4Scheduled: number;
+    act4Done: number;
+    claimed: number;
+    organicClaims: number;
+  };
+  rates: {
+    act1Verified: number;
+    act2Aware: number;
+    act3Cleared: number;
+    act4Scheduled: number;
+    claimed: number;
+  };
+  rows: CascadeCohortRow[];
+}
+
 /** Four-Act cascade announce queue row (migration 348). */
 export interface DirectoryAnnounceQueueRow {
   seedId: string;
@@ -1338,6 +1378,27 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (!result.success) return null;
     const data = result.data?.data ?? result.data;
     return (data?.cascade ?? data ?? null) as SeedCascadeSummary | null;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/cascade-cohort
+   *  Cohort funnel measurement (seed batch or explicit seed ids). */
+  async getCascadeCohort(options?: {
+    seedBatch?: string;
+    seedIds?: string[];
+  }): Promise<CascadeCohortSummary | null> {
+    const params = new URLSearchParams();
+    if (options?.seedBatch) params.set('seedBatch', options.seedBatch);
+    if (options?.seedIds?.length) params.set('seedIds', options.seedIds.join(','));
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/cascade-cohort${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data?.cohort ?? data ?? null) as CascadeCohortSummary | null;
   }
 
   // ─── Seed listing photos (walk-in capture) ─────────────────────────────

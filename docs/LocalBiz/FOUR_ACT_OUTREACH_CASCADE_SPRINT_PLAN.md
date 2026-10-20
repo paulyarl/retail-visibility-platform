@@ -103,13 +103,13 @@ These block phases or run on external clocks; start them all on day 1.
 
 **Exit:** postcard QR → named-fact page → gallery; a scan/form submit clears the record gate for non-phone prospects; a disputed fact is suppressed.
 
-### Phase 5 — Cohort 1 pilot (ops; no code)
+### Phase 5 — Cohort 1 pilot (ops; measurement surface implemented)
 
 Run the manual cadence (spec §4) on the 20-prospect list:
 
 1. Publish seeds post-QC (continuous); announce in daily call blocks off the queue.
 2. Act 2 postcards in triage-priority order; act 3 gallery email; act 4 walk-ins on gate-cleared prospects only.
-3. Measure the hypotheses: postal transit (Q8), funnel conversion at each gate, 5-day tracked-signal window validity (Q16), organic claim requests during the organic window (§1). Define the six stages up front: verified, aware, gate-cleared, walk-in scheduled, claim, organic claim.
+3. Measure the hypotheses: postal transit (Q8), funnel conversion at each gate, 5-day tracked-signal window validity (Q16), organic claim requests during the organic window (§1). The six stages are defined and reported by `SeedCascadeCohortService` (`GET /presence-seeds/cascade-cohort`, `/presence-seeds/cascade-cohort` UI): verified, aware, gate-cleared, walk-in scheduled/done, claimed, organic claim. Postal transit remains a manual observation.
 4. Retro → update spec §6 funnel numbers from hypotheses to measured; adjust thresholds (Q16/Q22) with data.
 
 **Exit:** first real funnel numbers + spec updated to measured baselines.

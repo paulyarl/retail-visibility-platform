@@ -9,7 +9,7 @@ import directoryPresenceAdminService, {
   DirectoryClaimRequest,
 } from '@/services/DirectoryPresenceAdminService';
 import PresenceSeedsBulkUploadModal from '@/components/directory/PresenceSeedsBulkUploadModal';
-import { List, Plus, Upload, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText, Trash2 } from 'lucide-react';
+import { List, Plus, Upload, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText, Trash2, BarChart3 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -296,6 +296,13 @@ function PresenceSeedsContent() {
             >
               <Clock className="w-4 h-4" />
               Announce queue
+            </Link>
+            <Link
+              href="/settings/admin/directory/presence-seeds/cascade-cohort"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Cohort
             </Link>
             <Link
               href="/settings/admin/directory/presence-seeds/new"
