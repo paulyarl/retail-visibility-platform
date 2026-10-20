@@ -255,6 +255,9 @@ export class BusinessProspectService extends BaseService {
         // shared business_prospect_id); this copy is backwards-compat for
         // consumers that still read the campaign row directly.
         discovery_context: (source as any).discovery_context ?? null,
+        // Secondary categories copy at birth so external profile work on the
+        // sibling starts from the same category set as the primary.
+        secondary_categories: (source as any).secondary_categories ?? [],
         business_prospect_id: prospectId,
         is_primary_sibling: false,
         engagement_cycle: 1,
