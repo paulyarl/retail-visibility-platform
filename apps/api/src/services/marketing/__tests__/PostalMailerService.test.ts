@@ -203,6 +203,23 @@ describe('PostalMailerService QR destination', () => {
     expect(payload.qrUrl).toBe('https://app.example.com/account/marketing');
     expect(mockGenerateCampaignToken).not.toHaveBeenCalled();
   });
+
+  it('tags a cascade gallery QR with the /cf short link', async () => {
+    mockResolveEligibility.mockResolvedValue(eligible());
+    mockTokensFindFirst.mockResolvedValue({
+      token: 'TOK1',
+      short_code: 'SHORT1',
+      expires_at: new Date('2026-11-15'),
+    });
+
+    const target = await PostalMailerService.getInstance().resolveQrTarget(CAMPAIGN_ID, {
+      destination: 'cascade_gallery',
+    });
+
+    expect(target.qrDestination).toBe('cascade_gallery');
+    expect(target.qrUrl).toBe('https://app.example.com/cf/SHORT1?surface=cascade_gallery');
+    expect(target.ctaLabel).toBe('Scan to see your free diagnostic');
+  });
 });
 
 describe('PostalMailerService auto destination with existing gallery links', () => {

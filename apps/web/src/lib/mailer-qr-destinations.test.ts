@@ -69,7 +69,7 @@ describe('resolveMailerDestinations', () => {
       campaign: seekCampaign,
     });
 
-    expect(values(options)).toEqual(['auto', 'site', 'custom']);
+    expect(values(options)).toEqual(['auto', 'cascade_confirm', 'site', 'custom']);
   });
 
   it('offers the gallery destination when a live link exists even though the campaign cannot mint', () => {
@@ -80,7 +80,8 @@ describe('resolveMailerDestinations', () => {
     });
 
     expect(values(options)).toContain('diagnostic_gallery');
-    expect(values(options)).toEqual(['auto', 'diagnostic_gallery', 'site', 'custom']);
+    expect(values(options)).toContain('cascade_gallery');
+    expect(values(options)).toEqual(['auto', 'diagnostic_gallery', 'cascade_gallery', 'cascade_confirm', 'site', 'custom']);
   });
 
   it('offers the gallery destination when the campaign is mint-eligible', () => {

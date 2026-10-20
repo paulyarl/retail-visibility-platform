@@ -6455,6 +6455,33 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /** POST /:campaignId/confirm-page-token — mint the Four-Act confirm page
+   *  token with the desk-picked fact in its metadata. */
+  async mintConfirmPage(
+    campaignId: string,
+    fact: {
+      field?: string;
+      label?: string;
+      expected?: string;
+      actual?: string;
+      sources?: string[];
+    },
+  ): Promise<{ token: string; shortCode: string | null; url: string; qrUrl: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/marketing-ops/campaigns/${campaignId}/confirm-page-token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fact }),
+      },
+    );
+    if (!result.success) {
+      const message = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(message || 'Failed to mint the confirm page');
+    }
+    return result.data?.data ?? result.data;
+  }
+
   async generateMailer(
     campaignId: string,
     options?: {
@@ -7104,6 +7131,8 @@ export interface GalleryToken {
 export type MailerQrDestination =
   | 'auto'
   | 'diagnostic_gallery'
+  | 'cascade_gallery'
+  | 'cascade_confirm'
   | 'claim'
   | 'portal'
   | 'site'

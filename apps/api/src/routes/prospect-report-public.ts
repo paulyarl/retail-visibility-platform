@@ -21,6 +21,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { trackQrScanEvent, type QrSurfaceType } from '../services/QrAnalyticsService';
+import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { logger } from '../logger';
 import prospectReportService from '../services/ProspectReportService';
 
@@ -161,6 +162,102 @@ router.get('/r/pr-scan/:code', async (req: Request, res: Response) => {
   }
 
   res.json({ success: true, url: `/prospect-report/${link.token}` });
+});
+
+/**
+ * GET /api/public/cascade/scan/:code
+ *
+ * Four-Act cascade tagged short link. Resolves a gallery/confirm short code,
+ * records a `qr_scan_events` row on the cascade surface with `product_id` =
+ * business_prospect_id (or campaign id), and returns the destination URL for
+ * the /cf/[code] web redirect.
+ *
+ * Surfaces:
+ *   cascade_postcard — act-2 postcard QR
+ *   cascade_confirm  — confirm-page QR (act-2 delivery, not act-3)
+ *   cascade_gallery  — gallery QR (act-3 gate input)
+ */
+const CASCADE_SURFACES = new Set<QrSurfaceType>([
+  'cascade_postcard',
+  'cascade_confirm',
+  'cascade_gallery',
+]);
+
+router.get('/cascade/scan/:code', async (req: Request, res: Response) => {
+  const { code } = req.params;
+  const requested = String(req.query.surface ?? 'cascade_postcard') as QrSurfaceType;
+  const surface: QrSurfaceType = CASCADE_SURFACES.has(requested)
+    ? requested
+    : 'cascade_postcard';
+
+  let resolved: { token: string; tokenType: string } | null = null;
+  try {
+    resolved = await MarketingDeliverableService.getInstance().resolveShortCode(code);
+  } catch {
+    // Resolution failure — fall through to 404
+  }
+  if (!resolved) {
+    return res.status(404).json({ success: false, error: 'not_found' });
+  }
+
+  let tokenRow: any = null;
+  try {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, token, token_type, campaign_id, tenant_id, metadata, expires_at
+      FROM mkt_deliverable_preview_tokens
+      WHERE token = ${resolved.token}
+      LIMIT 1
+    `;
+    tokenRow = rows[0] ?? null;
+  } catch {
+    // Scan tracking / tenant resolution must not block the redirect.
+  }
+
+  let tenantId = tokenRow?.tenant_id || 'platform';
+  if (tokenRow?.campaign_id && !tokenRow?.tenant_id) {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT COALESCE(dps.tenant_id, mc.tenant_id) AS tenant_id
+        FROM mkt_campaigns_list mc
+        LEFT JOIN directory_seed_campaign_links dscl
+          ON dscl.campaign_id = mc.id AND dscl.link_role = 'primary'
+        LEFT JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+        WHERE mc.id = ${tokenRow.campaign_id}
+        LIMIT 1
+      `;
+      if (rows[0]?.tenant_id) tenantId = rows[0].tenant_id;
+    } catch {
+      // Platform attribution fallback.
+    }
+  }
+
+  const metadata = tokenRow?.metadata ?? {};
+  const productId = metadata?.business_prospect_id || tokenRow?.campaign_id || undefined;
+
+  try {
+    await trackQrScanEvent({
+      tenantId,
+      surface,
+      consumer: 'merchant',
+      productId,
+      source: 'cascade_qr',
+      referrer: req.get('referer') ?? undefined,
+      userAgent: req.get('user-agent') ?? undefined,
+      geoCountry: (req as any).geoCountry ?? undefined,
+      geoCity: (req as any).geoCity ?? undefined,
+    });
+  } catch {
+    // Scan tracking failure — don't block the redirect.
+  }
+
+  const url =
+    resolved.tokenType === 'multi_diagnostic_gallery'
+      ? `/preview/${resolved.token}?prospect=true`
+      : resolved.tokenType === 'confirm_page'
+        ? `/confirm/${resolved.token}`
+        : `/preview/${resolved.token}`;
+
+  return res.json({ success: true, url, surface, productId });
 });
 
 export default router;

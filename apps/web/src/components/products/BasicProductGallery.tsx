@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import ImageLightbox from '@/components/ui/ImageLightbox';
 
 type Photo = {
   url: string;
@@ -15,6 +16,7 @@ interface BasicProductGalleryProps {
 
 export default function BasicProductGallery({ gallery, productTitle }: BasicProductGalleryProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (gallery.length === 0) return null;
 
@@ -77,7 +79,7 @@ export default function BasicProductGallery({ gallery, productTitle }: BasicProd
 
               {/* Zoom Button */}
               <button
-                onClick={() => window.open(currentPhoto.url, '_blank')}
+                onClick={() => setLightboxOpen(true)}
                 className="absolute top-4 right-4 bg-white/90 hover:bg-white text-neutral-900 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
                 aria-label="View full size"
               >
@@ -112,6 +114,16 @@ export default function BasicProductGallery({ gallery, productTitle }: BasicProd
           </div>
         )}
       </div>
+
+      {lightboxOpen && (
+        <ImageLightbox
+          photos={gallery}
+          index={currentIndex}
+          onIndexChange={setCurrentIndex}
+          onClose={() => setLightboxOpen(false)}
+          fallbackAlt={productTitle}
+        />
+      )}
     </div>
   );
 }

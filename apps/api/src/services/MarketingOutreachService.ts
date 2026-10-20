@@ -115,6 +115,9 @@ export interface LogContactInput {
   retryAfter?: string;
   callDetails?: CallDetails | null;
   updateWorksheet?: boolean;
+  /** Four-Act cascade — structured C1/C3/C4 capture from the confirm page or
+   *  the log modal. Persisted on mkt_outreach_log.verification_results. */
+  verificationResults?: Array<Record<string, any>>;
 }
 
 export interface FreshSnapshot {
@@ -218,6 +221,7 @@ export class MarketingOutreachService extends BaseService {
           last_delivery_error: input.lastDeliveryError || null,
           retry_after: input.retryAfter ? new Date(input.retryAfter) : null,
           call_details: (input.callDetails ?? undefined) as any,
+          verification_results: (input.verificationResults ?? undefined) as any,
         },
       });
 

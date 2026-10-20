@@ -35,6 +35,8 @@ import type { ArchetypeCode } from '../outreach-openers/archetype-selection';
 export type MailerQrDestination =
   | 'auto'
   | 'diagnostic_gallery'
+  | 'cascade_gallery'
+  | 'cascade_confirm'
   | 'claim'
   | 'portal'
   | 'site'
@@ -66,7 +68,7 @@ export interface PostalMailerPayload {
   body: string;
   ctaLabel: string;
   qrUrl: string;
-  qrDestination: 'diagnostic_gallery' | 'claim' | 'portal' | 'site' | 'custom' | 'none';
+  qrDestination: 'diagnostic_gallery' | 'cascade_gallery' | 'cascade_confirm' | 'claim' | 'portal' | 'site' | 'custom' | 'none';
   archetype: string;
   token: string | null;
   /** Styled QR PNG data URL from the admin QR designer — when present the
@@ -313,6 +315,50 @@ class PostalMailerService {
             );
           }
           return this.galleryQrTarget(campaign, eligibility.archetype, baseUrl, ctx);
+        }
+        case 'cascade_gallery': {
+          // Tagged gallery link — the QR encodes /cf/{shortCode}?surface=
+          // cascade_gallery so the scan is attributable per prospect and
+          // clears the act-3 gate.
+          if (qrOptions?.galleryTokenId) {
+            const target = await this.explicitGalleryQrTarget(campaign, qrOptions.galleryTokenId, baseUrl);
+            return this.withCascadeTag(target, baseUrl, 'cascade_gallery');
+          }
+          const eligibility = await GalleryEligibilityService.resolveEligibility(campaign.id, ctx);
+          if (!eligibility.eligible || !eligibility.archetype) {
+            throw new ValidationError(
+              `Diagnostic gallery is not available: ${eligibility.reason}. ${eligibility.action ?? ''}`.trim(),
+            );
+          }
+          const target = await this.galleryQrTarget(campaign, eligibility.archetype, baseUrl, ctx);
+          return this.withCascadeTag(target, baseUrl, 'cascade_gallery');
+        }
+        case 'cascade_confirm': {
+          // The confirm page is Phase 4; the destination is scaffolded so the
+          // mailer can carry it as soon as a confirm_page token exists.
+          const row = await prisma.mkt_deliverable_preview_tokens.findFirst({
+            where: {
+              campaign_id: campaign.id,
+              token_type: 'confirm_page',
+              converted_at: null,
+              expires_at: { gt: new Date() },
+            },
+            orderBy: { created_at: 'desc' },
+            select: { token: true, short_code: true, expires_at: true },
+          });
+          if (!row) {
+            throw new ValidationError(
+              'Confirm page link is not available yet — mint a confirm page token first.',
+            );
+          }
+          return {
+            qrUrl: row.short_code
+              ? `${baseUrl}/cf/${row.short_code}?surface=cascade_confirm`
+              : `${baseUrl}/confirm/${row.token}`,
+            qrDestination: 'cascade_confirm',
+            token: row.token,
+            tokenExpiresAt: row.expires_at,
+          };
         }
         case 'claim': {
           if (campaign.customer_id) {
@@ -573,10 +619,36 @@ class PostalMailerService {
     };
   }
 
+  /**
+   * Wrap a gallery target in the cascade tagged short link. Falls back to the
+   * original URL when the token has no short code (the QR still works, it just
+   * loses per-prospect scan attribution).
+   */
+  private async withCascadeTag(
+    target: Omit<PostalMailerQrTarget, 'ctaLabel'>,
+    baseUrl: string,
+    surface: 'cascade_gallery',
+  ): Promise<Omit<PostalMailerQrTarget, 'ctaLabel'>> {
+    if (!target.token) return target;
+    const row = await prisma.mkt_deliverable_preview_tokens.findFirst({
+      where: { token: target.token },
+      select: { short_code: true },
+    });
+    if (!row?.short_code) return target;
+    return {
+      ...target,
+      qrUrl: `${baseUrl}/cf/${row.short_code}?surface=${surface}`,
+      qrDestination: surface,
+    };
+  }
+
   private ctaLabelForDestination(destination: PostalMailerPayload['qrDestination']): string {
     switch (destination) {
       case 'diagnostic_gallery':
+      case 'cascade_gallery':
         return 'Scan to see your free diagnostic';
+      case 'cascade_confirm':
+        return 'Scan to confirm your listing';
       case 'claim':
         return 'Scan to claim your account';
       case 'portal':

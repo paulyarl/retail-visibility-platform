@@ -19,6 +19,8 @@ import type {
 export const MAILER_DESTINATION_OPTIONS: { value: MailerQrDestination; label: string }[] = [
   { value: 'auto', label: 'Auto (best available)' },
   { value: 'diagnostic_gallery', label: 'Diagnostic gallery link' },
+  { value: 'cascade_gallery', label: 'Tagged gallery link (cascade)' },
+  { value: 'cascade_confirm', label: 'Confirm page (cascade)' },
   { value: 'claim', label: 'Claim link' },
   { value: 'portal', label: 'Customer portal' },
   { value: 'site', label: 'Website homepage' },
@@ -56,7 +58,12 @@ export function resolveMailerDestinations({
   return MAILER_DESTINATION_OPTIONS.filter((opt) => {
     switch (opt.value) {
       case 'diagnostic_gallery':
+      case 'cascade_gallery':
         return canMintGalleryLink(eligibility) || liveGalleryTokens.length > 0;
+      case 'cascade_confirm':
+        // Offered always; the resolver 400s with a clear message until a live
+        // confirm_page token exists (the MailerPanel's confirm card mints one).
+        return true;
       case 'claim':
         // Mirrors the auto-path precondition — issueClaimToken only mints for
         // a paid, unclaimed campaign email.

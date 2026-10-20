@@ -157,6 +157,7 @@ import MarketingScorecardService from '../services/MarketingScorecardService';
 import MarketingDailyDigestService from '../services/MarketingDailyDigestService';
 import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
+import ConfirmPageService from '../services/ConfirmPageService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import { buildProjectPhasePlanForKey } from '../services/triage/project-phase-resolution';
 import { setControllingAuditForProspect } from '../services/triage/controlling-audit';
@@ -2174,6 +2175,42 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+const confirmPageMintSchema = z.object({
+  fact: z.object({
+    field: z.string().max(80).optional(),
+    label: z.string().max(300).optional(),
+    expected: z.string().max(500).optional(),
+    actual: z.string().max(500).optional(),
+    sources: z.array(z.string().max(500)).max(10).optional(),
+  }),
+});
+
+/**
+ * POST /campaigns/:campaignId/confirm-page-token
+ *
+ * Mint the Four-Act dual-role confirm page token with the desk-picked fact in
+ * its metadata. Supersedes prior unconverted confirm tokens for the campaign.
+ */
+router.post('/campaigns/:campaignId/confirm-page-token', async (req: any, res: Response) => {
+  try {
+    const parsed = confirmPageMintSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const result = await ConfirmPageService.mintForCampaign(
+      req.params.campaignId,
+      parsed.data.fact,
+      {
+        actorId: (req as any).user?.userId || (req as any).user?.id,
+        actorType: 'user',
+      },
+    );
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

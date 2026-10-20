@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Upload, Link2, Copy, RefreshCw, Check, Clock, AlertCircle, ImageIcon, Trash2, ExternalLink, Download } from 'lucide-react';
+import ImageLightbox from '@/components/ui/ImageLightbox';
 import marketingOpsService, {
   CampaignDetail,
   DiagnosticScreenshot,
@@ -23,6 +24,7 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
   const [eligibility, setEligibility] = useState<GalleryEligibility | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
@@ -257,6 +259,15 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
           </div>
         ) : (
           <div className="space-y-2">
+            {lightboxIndex !== null && (
+              <ImageLightbox
+                photos={screenshots.map((s) => ({ url: fileRenderUrl(s.id), alt: s.file_name }))}
+                index={lightboxIndex}
+                onIndexChange={setLightboxIndex}
+                onClose={() => setLightboxIndex(null)}
+                fallbackAlt="Diagnostic screenshot"
+              />
+            )}
             {screenshots.map((s, idx) => (
               <div
                 key={s.id}
@@ -264,10 +275,9 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xs font-mono text-gray-400">#{idx + 1}</span>
-                  <a
-                    href={fileRenderUrl(s.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(idx)}
                     className="flex-shrink-0"
                     title="View full size"
                   >
@@ -276,7 +286,7 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
                       alt={s.file_name}
                       className="h-12 w-12 rounded object-cover border border-gray-200 dark:border-neutral-600"
                     />
-                  </a>
+                  </button>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{s.file_name}</p>
                     <p className="text-xs text-gray-500">
@@ -289,15 +299,14 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
                   <span className="text-xs text-gray-400">
                     {s.uploaded_at ? new Date(s.uploaded_at).toLocaleDateString() : '—'}
                   </span>
-                  <a
-                    href={fileRenderUrl(s.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(idx)}
                     className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"
                     title="View"
                   >
                     <ExternalLink className="h-4 w-4 text-gray-500" />
-                  </a>
+                  </button>
                   <a
                     href={fileRenderUrl(s.id, true)}
                     className="p-1.5 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded"

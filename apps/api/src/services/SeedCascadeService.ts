@@ -244,7 +244,7 @@ export class SeedCascadeService extends BaseService {
 
     const hasChannel =
       !!(seed.owner_phone || seed.owner_email || seed.listing_phone || seed.listing_email) ||
-      touches.some((t) => ['call', 'email', 'sms', 'mail'].includes(t.channel) && !!t.outcome);
+      touches.some((t) => ['call', 'email', 'sms', 'mail', 'form'].includes(t.channel) && !!t.outcome);
 
     const hasPain = !!(latestPainTouch || latestPainLog);
 

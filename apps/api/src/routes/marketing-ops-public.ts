@@ -29,6 +29,7 @@ import { MarketingReceiptEmailService } from '../services/marketing/MarketingRec
 import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { CustomerAuthService, CustomerAuthResult } from '../services/CustomerAuthService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
+import ConfirmPageService from '../services/ConfirmPageService';
 
 const router = express.Router();
 
@@ -1237,6 +1238,63 @@ router.post('/public/marketing/claim/:token/complete', async (req, res) => {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error('[marketing-ops-public] POST /claim/:token/complete error', undefined, { error: msg });
     return res.status(500).json({ success: false, error: 'Failed to complete claim' });
+  }
+});
+
+const confirmSubmitSchema = z.object({
+  operational: z.boolean().optional(),
+  painOutcome: z.enum(['confirmed', 'disputed', 'not_asked']).optional(),
+  followUpPermission: z.enum(['yes', 'no', 'not_asked']).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+/**
+ * GET /api/public/marketing/confirm/:token
+ *
+ * Four-Act dual-role confirm page data. Token-gated; the token is the trust
+ * boundary. Returns the desk-picked fact, the gallery/claim links, and the
+ * disputed flag (a fact the owner already rejected is suppressed).
+ */
+router.get('/public/marketing/confirm/:token', async (req, res) => {
+  try {
+    const data = await ConfirmPageService.resolve(req.params.token);
+    if (!data) return res.status(404).json({ success: false, error: 'not_found' });
+    return res.json({ success: true, ...data });
+  } catch (error: any) {
+    logger.error('[marketing-ops-public] GET /confirm/:token error', undefined, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return res.status(500).json({ success: false, error: 'Failed to resolve confirm page' });
+  }
+});
+
+/**
+ * POST /api/public/marketing/confirm/:token
+ *
+ * Confirm-page form submit. Records the structured C1/C3/C4 capture on the
+ * seed touch ledger (or the campaign outreach log) and a cascade_confirm scan.
+ */
+router.post('/public/marketing/confirm/:token', async (req, res) => {
+  try {
+    const parsed = confirmSubmitSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const result = await ConfirmPageService.submit(req.params.token, parsed.data, {
+      actorId: 'confirm_page',
+      actorType: 'customer',
+      ip: req.ip,
+      userAgent: req.get('user-agent') ?? undefined,
+    });
+    if (!result) return res.status(404).json({ success: false, error: 'not_found' });
+    return res.json(result);
+  } catch (error: any) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.toLowerCase().includes('expired')) {
+      return res.status(410).json({ success: false, error: 'expired', message: msg });
+    }
+    logger.error('[marketing-ops-public] POST /confirm/:token error', undefined, { error: msg });
+    return res.status(500).json({ success: false, error: 'Failed to submit confirm page' });
   }
 });
 

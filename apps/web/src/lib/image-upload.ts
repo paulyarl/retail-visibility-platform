@@ -23,6 +23,7 @@ export type CompressionLevel = 'low' | 'medium' | 'high';
 export interface ImageUploadOptions {
   maxWidth?: number;           // Max width for compression (default: 1200)
   quality?: number;             // JPEG quality 0-1 (default: 0.85)
+  flatten?: boolean;            // Composite onto white and encode JPEG (drops transparency, smaller files)
   compressionLevel?: CompressionLevel; // Preset compression level
   maxSizeMB?: number;          // Max file size in MB (default: 5)
   aspectRatio?: {              // Optional aspect ratio validation
@@ -301,8 +302,11 @@ async function compressImage(
           return;
         }
         
-        // Preserve transparency for PNG and ICO
-        if (imageType === 'png' || imageType === 'ico') {
+        // Preserve transparency for PNG and ICO, unless flattening onto white
+        if (options.flatten) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+        } else if (imageType === 'png' || imageType === 'ico') {
           ctx.clearRect(0, 0, width, height);
         }
         
@@ -310,14 +314,16 @@ async function compressImage(
         
         // Determine output format
         // ICO files are treated as PNG to preserve transparency
-        const outputFormat = (imageType === 'png' || imageType === 'ico') 
+        const outputFormat = options.flatten
+          ? 'image/jpeg'
+          : (imageType === 'png' || imageType === 'ico') 
           ? 'image/png' 
           : imageType === 'webp'
           ? 'image/webp'
           : 'image/jpeg';
         
         // PNG and WebP don't use quality parameter the same way
-        const outputQuality = (imageType === 'png' || imageType === 'ico') 
+        const outputQuality = outputFormat === 'image/png' 
           ? 1 
           : options.quality || 0.85;
         
@@ -487,9 +493,11 @@ export const ImageUploadPresets = {
     allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
   },
 
-  /** Flyer hero artwork - MEDIUM compression (few images per tenant, showcase quality) */
+  /** Flyer hero artwork - posters are often tall, so keep near-native resolution (no crop, high-quality encode) */
   flyer: {
-    compressionLevel: 'medium' as CompressionLevel,
+    maxWidth: 2400,
+    quality: 0.92,
+    flatten: true,
     maxSizeMB: 8,
     allowedTypes: ['png', 'jpeg', 'webp'] as ImageType[],
   },

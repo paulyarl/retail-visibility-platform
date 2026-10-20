@@ -427,7 +427,7 @@ export default function FlyerSettingsClient({ tenantId }: Props) {
                 <div className="mt-1 flex items-start gap-3">
                   {heroImageUrl && (
                     <div className="relative shrink-0">
-                      <img src={heroImageUrl} alt="Flyer artwork preview" className="h-20 w-32 rounded-lg border border-neutral-200 dark:border-neutral-700 object-cover" />
+                      <img src={heroImageUrl} alt="Flyer artwork preview" className="h-20 max-w-[12rem] rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 object-contain" />
                       <button
                         type="button" onClick={() => setHeroImageUrl('')} aria-label="Remove image"
                         className="absolute -top-1.5 -right-1.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 p-0.5"

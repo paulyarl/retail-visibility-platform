@@ -7,6 +7,7 @@ import { publicFlyerService, type PublicFlyerPayload } from '@/services/PublicFl
 import FlyerReportButton from './FlyerReportButton';
 import { formatPrice } from '@/lib/pricing';
 import { clientLogger } from '@/lib/client-logger';
+import ZoomableImageCarousel from '@/components/directory/ZoomableImageCarousel';
 
 // Never prerender — flyer content is live/window-scoped.
 export const dynamic = 'force-dynamic';
@@ -129,8 +130,8 @@ export default async function FlyerPage({ params, searchParams }: PageProps) {
         {payload.flyers?.map((flyer) => (
           <article key={flyer.id}>
             {flyer.heroImageUrl && (
-              <div className="relative w-full aspect-[16/7] rounded-2xl overflow-hidden mb-6 bg-neutral-100 dark:bg-neutral-800">
-                <Image src={flyer.heroImageUrl} alt={flyer.title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" priority />
+              <div className="mb-6">
+                <ZoomableImageCarousel photos={[{ id: flyer.id, url: flyer.heroImageUrl, position: 1, alt: flyer.title }]} fallbackAlt={flyer.title} fit="natural" />
               </div>
             )}
             <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{flyer.title}</h1>

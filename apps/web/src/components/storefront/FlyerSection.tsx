@@ -19,6 +19,7 @@ import { publicFlyerService, type PublicFlyerPayload, type PublicFlyer, type Pub
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { formatPrice } from '@/lib/pricing';
 import { clientLogger } from '@/lib/client-logger';
+import ZoomableImageCarousel from '@/components/directory/ZoomableImageCarousel';
 
 interface FlyerSectionProps {
   tenantId: string;
@@ -107,8 +108,8 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
             </div>
 
             {flyer.heroImageUrl && (
-              <div className="relative w-full aspect-[16/6] rounded-2xl overflow-hidden mb-6 bg-neutral-100 dark:bg-neutral-800">
-                <Image src={flyer.heroImageUrl} alt={flyer.title} fill className="object-cover" sizes="(max-width: 1280px) 100vw, 1280px" />
+              <div className="mb-6">
+                <ZoomableImageCarousel photos={[{ id: flyer.id, url: flyer.heroImageUrl, position: 1, alt: flyer.title }]} fallbackAlt={flyer.title} fit="natural" />
               </div>
             )}
 

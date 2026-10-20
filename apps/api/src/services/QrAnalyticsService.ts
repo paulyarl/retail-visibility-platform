@@ -19,7 +19,7 @@ import { generateQrAnalyticsId, generateQrScanEventId } from '../lib/id-generato
 // TYPES
 // ====================
 
-export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner' | 'report_claimed' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call' | 'prospect_report_phone' | 'prospect_report_email' | 'prospect_report_social' | 'prospect_report_in_person' | 'prospect_report_text' | 'prospect_report_banner';
+export type QrSurfaceType = 'storefront' | 'product' | 'directory' | 'qr_landing' | 'promo' | 'private_grant' | 'general' | 'claim_invite' | 'claim_invite_walkin' | 'claim_invite_social' | 'claim_invite_email' | 'report_delivery_phone' | 'report_delivery_email' | 'report_delivery_social' | 'report_delivery_in_person' | 'report_delivery_text' | 'report_banner' | 'report_claimed' | 'intake_link_sms' | 'intake_link_email' | 'intake_link_qr' | 'intake_link_call' | 'prospect_report_phone' | 'prospect_report_email' | 'prospect_report_social' | 'prospect_report_in_person' | 'prospect_report_text' | 'prospect_report_banner' | 'cascade_postcard' | 'cascade_confirm' | 'cascade_gallery';
 export type QrConsumerType = 'merchant' | 'admin';
 export type PeriodType = 'day' | 'week' | 'month';
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
@@ -172,6 +172,13 @@ const SURFACE_LABELS: Record<QrSurfaceType, string> = {
   // banner clicks stay outside the delivered-funnel surfaces (same discipline
   // as report_banner).
   prospect_report_banner: 'Prospect Report (Banner)',
+  // Four-Act cascade — tagged campaign-prospect surfaces. `product_id` carries
+  // the business_prospect_id (or campaign id) so a cohort scan is attributable
+  // per prospect; `cascade_confirm` is act-2 delivery, `cascade_gallery` is the
+  // act-3 gate input.
+  cascade_postcard: 'Cascade Postcard',
+  cascade_confirm: 'Cascade Confirm Page',
+  cascade_gallery: 'Cascade Gallery',
 };
 
 function getSurfaceLabel(surface: string): string {

@@ -64,6 +64,39 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
   const [mailerLoading, setMailerLoading] = useState(false);
   const [mailerError, setMailerError] = useState<string | null>(null);
 
+  // Four-Act confirm page (act 2) — the desk-picked fact is stored on the
+  // token metadata so the printed postcard and the page cannot drift.
+  const [confirmFact, setConfirmFact] = useState('');
+  const [confirmMintBusy, setConfirmMintBusy] = useState(false);
+  const [confirmMintResult, setConfirmMintResult] = useState<{
+    token: string;
+    shortCode: string | null;
+    url: string;
+    qrUrl: string;
+  } | null>(null);
+  const [confirmMintError, setConfirmMintError] = useState<string | null>(null);
+
+  const handleMintConfirmPage = async () => {
+    if (!confirmFact.trim()) {
+      setConfirmMintError('Enter the fact the page should confirm.');
+      return;
+    }
+    setConfirmMintBusy(true);
+    setConfirmMintError(null);
+    setConfirmMintResult(null);
+    try {
+      const result = await marketingOpsService.mintConfirmPage(campaignId, {
+        field: 'desk_fact',
+        label: confirmFact.trim(),
+      });
+      setConfirmMintResult(result);
+    } catch (err) {
+      setConfirmMintError(err instanceof Error ? err.message : 'Failed to mint the confirm page');
+    } finally {
+      setConfirmMintBusy(false);
+    }
+  };
+
   // Gallery eligibility + existing links for the destination picker (degrade
   // silently — the server validates hard at resolve/generate time anyway).
   useEffect(() => {
@@ -80,6 +113,8 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
 
   const galleryMintEligible = canMintGalleryLink(eligibility);
   const liveGalleryTokens = useMemo(() => filterLiveGalleryTokens(galleryTokens), [galleryTokens]);
+  const isGalleryDestination =
+    qrDestination === 'diagnostic_gallery' || qrDestination === 'cascade_gallery';
 
   // Live links first; a pinned link that has since expired stays selectable so
   // the picker never renders blank on a value the operator already chose.
@@ -111,7 +146,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
         campaignId,
         qrDestination,
         qrDestination === 'custom' ? customUrl.trim() : undefined,
-        qrDestination === 'diagnostic_gallery' && galleryTokenId ? galleryTokenId : undefined,
+        isGalleryDestination && galleryTokenId ? galleryTokenId : undefined,
       );
       setResolvedTarget(target);
       return target;
@@ -167,7 +202,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
         qrDestination,
         customUrl: qrDestination === 'custom' ? customUrl.trim() : undefined,
         galleryTokenId:
-          qrDestination === 'diagnostic_gallery' && galleryTokenId ? galleryTokenId : undefined,
+          isGalleryDestination && galleryTokenId ? galleryTokenId : undefined,
         qrDataUrl: styledQrDataUrl ?? undefined,
       });
       if (!result.success || !result.pdfUrl) {
@@ -202,10 +237,12 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
     [eligibility, liveGalleryTokens, campaign.email, campaign.customer_id, campaign.date_paid],
   );
 
-  const galleryOptionAvailable = availableDestinations.some((o) => o.value === 'diagnostic_gallery');
+  const galleryOptionAvailable = availableDestinations.some(
+    (o) => o.value === 'diagnostic_gallery' || o.value === 'cascade_gallery',
+  );
   // Gallery picked on a campaign that can't mint and with nothing pinned —
   // resolve would 400, so the resolve/generate buttons stay disabled.
-  const galleryNeedsToken = qrDestination === 'diagnostic_gallery' && !galleryMintEligible && !galleryTokenId;
+  const galleryNeedsToken = isGalleryDestination && !galleryMintEligible && !galleryTokenId;
   const qrActionDisabled =
     resolvingQr || (qrDestination === 'custom' && !customUrl.trim()) || galleryNeedsToken;
 
@@ -218,7 +255,7 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
       changeDestination('auto');
       return;
     }
-    if (qrDestination === 'diagnostic_gallery' && !galleryMintEligible && !galleryTokenId) {
+    if (isGalleryDestination && !galleryMintEligible && !galleryTokenId) {
       setGalleryTokenId(defaultGalleryTokenId(eligibility, liveGalleryTokens));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,7 +269,13 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
     const expiresAt = new Date(resolvedTarget.tokenExpiresAt);
     const daysLeft = (expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
     if (daysLeft >= 7) return null;
-    return `The ${resolvedTarget.qrDestination === 'claim' ? 'claim' : 'gallery'} link expires ${expiresAt.toLocaleDateString()} — tight for a mailed card. Regenerate a longer-lived link first, or proceed anyway.`;
+    const label =
+      resolvedTarget.qrDestination === 'claim'
+        ? 'claim'
+        : resolvedTarget.qrDestination === 'cascade_confirm'
+          ? 'confirm page'
+          : 'gallery';
+    return `The ${label} link expires ${expiresAt.toLocaleDateString()} — tight for a mailed card. Regenerate a longer-lived link first, or proceed anyway.`;
   })();
 
   return (
@@ -270,18 +313,18 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
                 </option>
               ))}
             </select>
-            {qrDestination === 'diagnostic_gallery' && galleryMintEligible && galleryOptionHint && (
+            {isGalleryDestination && galleryMintEligible && galleryOptionHint && (
               <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                 {galleryOptionHint}
               </p>
             )}
-            {qrDestination === 'diagnostic_gallery' && !galleryMintEligible && (
+            {isGalleryDestination && !galleryMintEligible && (
               <p className="mt-1 text-[11px] text-amber-600">
                 A new gallery link can't be minted for this campaign — the postcard will encode the
                 existing link you pick.
               </p>
             )}
-            {qrDestination === 'diagnostic_gallery' && galleryTokenChoices.length > 0 && (
+            {isGalleryDestination && galleryTokenChoices.length > 0 && (
               <select
                 value={galleryTokenId}
                 onChange={(e) => {
@@ -480,6 +523,61 @@ export default function MailerPanel({ campaignId, campaign }: MailerPanelProps) 
           {mailerError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{mailerError}</p>}
         </div>
       )}
+
+      <div className="mt-5 rounded-lg border border-gray-200 dark:border-neutral-700 p-4">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Confirm page (act 2)</h4>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Names the desk-picked fact and leads onward to the gallery. The token is the
+          destination for the act-2 postcard QR; the fact is stored on the token so the
+          printed card and the page cannot drift.
+        </p>
+        <input
+          type="text"
+          value={confirmFact}
+          onChange={(e) => setConfirmFact(e.target.value)}
+          placeholder="e.g. Your Google listing shows a different phone than your Yelp page."
+          className="mt-3 w-full rounded-lg border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+        />
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleMintConfirmPage}
+            disabled={confirmMintBusy}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {confirmMintBusy ? 'Minting…' : 'Mint confirm page'}
+          </button>
+          {confirmMintError && (
+            <span className="text-xs text-red-600 dark:text-red-400">{confirmMintError}</span>
+          )}
+        </div>
+        {confirmMintResult && (
+          <div className="mt-3 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+            <p>
+              Confirm page:{' '}
+              <a
+                href={confirmMintResult.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {confirmMintResult.url}
+              </a>
+            </p>
+            <p>
+              Tagged QR target:{' '}
+              <a
+                href={confirmMintResult.qrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {confirmMintResult.qrUrl}
+              </a>
+            </p>
+          </div>
+        )}
+      </div>
 
       <MailerQrDesignerModal
         open={designerOpen}

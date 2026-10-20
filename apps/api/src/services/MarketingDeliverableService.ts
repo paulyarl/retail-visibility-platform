@@ -776,7 +776,7 @@ export class MarketingDeliverableService extends BaseService {
    */
   async generateCampaignToken(
     campaignId: string,
-    tokenType: 'deliverable' | 'demo_storefront' | 'diagnostic_gallery' | 'multi_diagnostic_gallery',
+    tokenType: 'deliverable' | 'demo_storefront' | 'diagnostic_gallery' | 'multi_diagnostic_gallery' | 'confirm_page',
     deliverableId?: string,
     expiryDays: number = 30,
     ctx?: RequestCtx,
@@ -790,11 +790,15 @@ export class MarketingDeliverableService extends BaseService {
     }
   ): Promise<any> {
     try {
-      // Mint a unique short_code (6-char) for SMS-friendly /g/{shortCode} URLs.
-      // Retry on the vanishingly-rare unique-index collision (32^6 ≈ 1B space).
+      // Mint a unique short_code (6-char) for SMS-friendly short URLs. Gallery
+      // tokens use /g/{code}; confirm_page uses /cf/{code}?surface=cascade_confirm
+      // so the scan is attributable per prospect.
       let shortCode: string | undefined;
-      const isGalleryToken = tokenType === 'diagnostic_gallery' || tokenType === 'multi_diagnostic_gallery';
-      if (isGalleryToken) {
+      const isShortCodeToken =
+        tokenType === 'diagnostic_gallery' ||
+        tokenType === 'multi_diagnostic_gallery' ||
+        tokenType === 'confirm_page';
+      if (isShortCodeToken) {
         for (let attempt = 0; attempt < 3; attempt++) {
           const candidate = generateGalleryShortCode();
           const existing = await this.prisma.mkt_deliverable_preview_tokens.findFirst({
@@ -805,11 +809,11 @@ export class MarketingDeliverableService extends BaseService {
             shortCode = candidate;
             break;
           }
-          logger.warn('Gallery short code collision, retrying', ctx, { candidate, attempt });
+          logger.warn('Short code collision, retrying', ctx, { candidate, attempt });
         }
         if (!shortCode) {
           // Exhausted retries — fall back to no short code; long URL still works.
-          logger.error('Gallery short code generation exhausted retries', ctx, { campaignId, tokenType });
+          logger.error('Short code generation exhausted retries', ctx, { campaignId, tokenType });
         }
       }
 
