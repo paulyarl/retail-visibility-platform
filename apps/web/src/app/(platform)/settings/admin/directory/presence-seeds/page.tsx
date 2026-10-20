@@ -291,6 +291,13 @@ function PresenceSeedsContent() {
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <Link
+              href="/settings/admin/directory/presence-seeds/announce-queue"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            >
+              <Clock className="w-4 h-4" />
+              Announce queue
+            </Link>
+            <Link
               href="/settings/admin/directory/presence-seeds/new"
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >

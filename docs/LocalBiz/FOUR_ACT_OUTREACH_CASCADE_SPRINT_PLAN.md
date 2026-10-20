@@ -50,7 +50,7 @@ These block phases or run on external clocks; start them all on day 1.
 | Q22 aging threshold | Flag value | `SEED_OUTREACH_NO_RESPONSE_DAYS` (14d) as a UI flag only; queue membership is marker-based, so the job no longer removes seeds. |
 | Q2 inline image | Does the operator's sending tool render an inline PNG? | Test before act 2. Fallback: hosted PNG link + tracked `/qe/` text link. |
 | Q11 counsel | Cold email/call basis, consent-flag relabel, future text | Start now; **pilot gate is written sign-off**, not "engaged." |
-| Q14 consent relabel | `owner_contact_consent` false is not "do not contact" | Relabel to "owner-initiated opt-in only"; one-line UI copy change in Phase 2. |
+| Q14 consent relabel | `owner_contact_consent` false is not "do not contact" | **Implemented:** seed detail reads "owner-initiated opt-in on record" / "cold-contact basis governed separately." |
 | Q4 script review | Team review + counsel note on DNC screening | Approve §2.1.1 before the first call. |
 | Q17 identification | Branding writer, staffed contacts, snapshot, sign-off | Build a `PlatformBrandingService` returning socials + dated fallback; record values used; block announce on a missing required surface. |
 | B5 settings auth | Secure the platform branding writer | `authenticateToken` + `requirePlatformAdmin` on POST; GET stays public. |
@@ -76,7 +76,7 @@ These block phases or run on external clocks; start them all on day 1.
 ### Phase 2 — Cascade-aware panel + announce queue (`apps/web` + thin api)
 
 - **Announce queue endpoint** — `GET /api/admin/directory/presence-seeds/announce-queue`: `status IN ('published','invited')`, `announce_scheduled` present, `announce_delivered` absent, `dps.published_at` age, oldest-first. Do not compose this client-side from the existing single-value `outreachState` filter.
-- **Announce queue view** — a tab/section on `settings/admin/directory/presence-seeds` (decided placement; the PG cockpit is per-PG and the communications page is read-only). Rows show age, channel, last touch, and the claim/place links.
+- **Announce queue view** — implemented as a sibling route (`settings/admin/directory/presence-seeds/announce-queue`, `AnnounceQueueTable`) linked from the seeds page header. Rows show age, channel, claim/listing links, and a **Mark announced** action that writes the `announce_delivered` marker. The remaining row-action work is the modal adapter for Resolve/Log touch/Log contact on seed-only rows.
 - **Row actions** — lifecycle-mapped chips, but adapted for seeds: `ResolveVerificationModal` needs a seed-shaped `VerificationEntryLike` and a seed-scoped submit; `ProspectTouchLogModal` needs a seed/queue adapter; `LogContactModal` is campaign-only. For campaign-less seeds use the seed touch route with the C3/C4 fields. `resolveProspectChannels` needs a seed/listing adapter (owner phone/email + listing phone/email).
 - **Per-prospect cascade view** — use `ProspectCommunicationService.getProspectTimeline` for the merged seed-touch + campaign-log timeline, plus `qr_scan_events` and `mkt_gallery_events`. Derive act position: act 1 = verification fields/state, act 2 = mail/email touch after announce, act 3 = `gallery_opened`, act 4 = `visit` touch.
 - **C3/C4 UI** — add the cascade fields to `LogContactModal` (campaign) and `ProspectTouchLogModal` (seed); the API already accepts the shape after Phase 1. Relabel `owner_contact_consent` per Q14.

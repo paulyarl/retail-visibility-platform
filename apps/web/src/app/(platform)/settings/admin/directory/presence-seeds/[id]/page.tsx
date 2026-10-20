@@ -3583,7 +3583,7 @@ function PresenceSeedDetailClient() {
                 Contact Consent
               </label>
               <p className={`text-sm ${seed.owner_contact_consent ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                {seed.owner_contact_consent ? 'Yes — OK to contact owner' : 'Not given — do not contact'}
+                {seed.owner_contact_consent ? 'Yes — owner-initiated opt-in on record' : 'No owner-initiated opt-in (cold-contact basis is governed separately)'}
               </p>
             </div>
           )}
