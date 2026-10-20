@@ -98,4 +98,11 @@ describe('CampaignCascadeService', () => {
     const result = await campaignCascadeService.getForCampaign('camp-1');
     expect(result.announce.inQueue).toBe(false);
   });
+
+  it('batches campaign cascades for the PG VAST board', async () => {
+    const result = await campaignCascadeService.getForCampaigns(['camp-1', 'camp-2']);
+    expect(Object.keys(result).sort()).toEqual(['camp-1', 'camp-2']);
+    expect(result['camp-1'].seedId).toBe('seed-1');
+    expect(result['camp-2'].seedId).toBe('seed-1');
+  });
 });

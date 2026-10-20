@@ -5555,6 +5555,24 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /** GET /campaigns/cascade-batch?campaignIds=… — PG VAST campaign-linked seeds. */
+  async getCampaignCascadeBatch(
+    campaignIds: string[],
+  ): Promise<Record<string, CampaignCascadeResponse>> {
+    const ids = [...new Set(campaignIds.filter(Boolean))];
+    if (ids.length === 0) return {};
+    const params = new URLSearchParams({ campaignIds: ids.join(',') });
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/campaigns/cascade-batch?${params.toString()}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return {};
+    const data = result.data?.data ?? result.data;
+    return (data?.cascades ?? data ?? {}) as Record<string, CampaignCascadeResponse>;
+  }
+
   /**
    * operator override for which business_analysis audit feeds the project
    * plan's signal resolution (migration 333). Plan-scoped only.

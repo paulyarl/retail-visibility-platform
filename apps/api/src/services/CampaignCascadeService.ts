@@ -46,6 +46,25 @@ export class CampaignCascadeService extends BaseService {
     return CampaignCascadeService.instance;
   }
 
+  /**
+   * Batch form for the PG VAST board — campaign-linked prospects whose queue
+   * row has no direct `seed_id`.
+   */
+  async getForCampaigns(
+    campaignIds: string[],
+  ): Promise<Record<string, CampaignCascadeResponse>> {
+    const ids = [...new Set(campaignIds.filter(Boolean))];
+    const out: Record<string, CampaignCascadeResponse> = {};
+    for (let i = 0; i < ids.length; i += 5) {
+      await Promise.all(
+        ids.slice(i, i + 5).map(async (id) => {
+          out[id] = await this.getForCampaign(id);
+        }),
+      );
+    }
+    return out;
+  }
+
   async getForCampaign(campaignId: string): Promise<CampaignCascadeResponse> {
     const links = await prisma.$queryRaw<any[]>`
       SELECT seed_id

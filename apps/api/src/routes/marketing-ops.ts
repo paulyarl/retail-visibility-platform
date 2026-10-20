@@ -2181,6 +2181,28 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
 });
 
 /**
+ * GET /campaigns/cascade-batch?campaignIds=a,b,c
+ *
+ * Batch campaign cascades for the PG VAST board — resolves campaign-linked
+ * seeds whose queue row has no direct `seed_id`.
+ */
+router.get('/campaigns/cascade-batch', async (req: any, res: Response) => {
+  try {
+    const campaignIds = (req.query.campaignIds as string | undefined)
+      ?.split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (!campaignIds || campaignIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'campaign_ids_required' });
+    }
+    const cascades = await CampaignCascadeService.getForCampaigns(campaignIds);
+    res.json({ success: true, cascades });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
  * GET /campaigns/:id/cascade
  *
  * Campaign-scoped Four-Act execution view for the Project Plan tab's

@@ -15,7 +15,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { ProspectQueueEntry } from '@/services/MarketingOpsService';
+import marketingOpsService, {
+  type ProspectQueueEntry,
+} from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, {
   type CascadeActStatus,
   type SeedCascadeSummary,
@@ -26,6 +28,7 @@ import { ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 export interface VastRow {
   entryId: string;
   seedId: string | null;
+  campaignId: string | null;
   businessName: string | null;
   status: string;
   seedStatus: string | null;
@@ -48,6 +51,7 @@ export interface VastCounts {
 export function buildVastRow(
   entry: ProspectQueueEntry,
   summary: SeedCascadeSummary | null,
+  campaignId: string | null = entry.processed_campaign_id ?? null,
 ): VastRow {
   const seedId = entry.seed_id ?? null;
   const acts = summary?.acts ?? [];
@@ -66,6 +70,7 @@ export function buildVastRow(
   return {
     entryId: entry.id,
     seedId,
+    campaignId,
     businessName: entry.business_name ?? entry.title ?? null,
     status: entry.status,
     seedStatus: summary?.seedStatus ?? null,
@@ -134,6 +139,13 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
 
   return (
     <div className="space-y-4">
+      {counts.seeded === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+          No prospects have been promoted to listings yet. VAST starts after a prospect is
+          seeded and published — use <span className="font-semibold">Promote to listings</span> first.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { letter: 'V', label: 'Verification', value: counts.v },
@@ -150,7 +162,11 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
             </p>
             <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
               {card.value}
-              <span className="ml-1 text-xs font-normal text-gray-400">/ {counts.seeded} seeded</span>
+            </p>
+            <p className="mt-0.5 text-[11px] text-gray-400">
+              {counts.seeded > 0
+                ? `of ${counts.seeded} seeded`
+                : `of ${counts.total} prospects — none seeded yet`}
             </p>
           </div>
         ))}
@@ -180,7 +196,11 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{row.status}</p>
                 </td>
                 <td className="px-3 py-3 text-xs text-gray-600 dark:text-gray-300">
-                  {row.seedId ? (row.seedStatus || 'seeded') : 'Not seeded'}
+                  {row.seedId
+                    ? row.seedStatus || 'seeded'
+                    : row.campaignId
+                      ? 'No seed (campaign)'
+                      : 'Not seeded'}
                 </td>
                 <td className="px-3 py-3 text-center"><ActChip letter="V" status={row.v} /></td>
                 <td className="px-3 py-3 text-center"><ActChip letter="A" status={row.a} /></td>
@@ -197,6 +217,15 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                     >
                       Log announce
                     </button>
+                    {row.campaignId && (
+                      <Link
+                        href={`/settings/admin/marketing-ops/campaigns/${row.campaignId}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        Campaign
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    )}
                     {row.seedId && (
                       <>
                         <Link
@@ -239,7 +268,10 @@ export default function VastPanel({
   const [logEntry, setLogEntry] = useState<ProspectQueueEntry | null>(null);
 
   const seedKey = useMemo(
-    () => entries.map((e) => `${e.id}:${e.seed_id ?? ''}`).join('|'),
+    () =>
+      entries
+        .map((e) => `${e.id}:${e.seed_id ?? ''}:${e.processed_campaign_id ?? ''}`)
+        .join('|'),
     [entries],
   );
 
@@ -248,11 +280,30 @@ export default function VastPanel({
       setLoading(true);
       setError(null);
       const seedIds = entries.map((e) => e.seed_id).filter(Boolean) as string[];
-      const summaries = await directoryPresenceAdminService.getSeedCascadeBatch(seedIds);
+      // campaign_created rows may have their seed linked through the campaign
+      // (directory_seed_campaign_links) rather than stamped on the queue row.
+      const campaignIds = entries
+        .filter((e) => !e.seed_id && !!e.processed_campaign_id)
+        .map((e) => e.processed_campaign_id as string);
+      const [seedSummaries, campaignCascades] = await Promise.all([
+        directoryPresenceAdminService.getSeedCascadeBatch(seedIds),
+        marketingOpsService.getCampaignCascadeBatch(campaignIds),
+      ]);
       setRows(
-        entries.map((entry) =>
-          buildVastRow(entry, entry.seed_id ? summaries[entry.seed_id] ?? null : null),
-        ),
+        entries.map((entry) => {
+          const campaign = !entry.seed_id && entry.processed_campaign_id
+            ? campaignCascades[entry.processed_campaign_id] ?? null
+            : null;
+          const resolvedSeedId = entry.seed_id ?? campaign?.seedId ?? null;
+          const summary = entry.seed_id
+            ? seedSummaries[entry.seed_id] ?? null
+            : campaign?.cascade ?? null;
+          return buildVastRow(
+            { ...entry, seed_id: resolvedSeedId },
+            summary,
+            entry.processed_campaign_id ?? null,
+          );
+        }),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load the VAST board');
@@ -302,7 +353,7 @@ export default function VastPanel({
         rows={rows}
         onLogAnnounce={(row) => {
           const entry = entries.find((e) => e.id === row.entryId) ?? null;
-          setLogEntry(entry);
+          setLogEntry(entry ? { ...entry, seed_id: row.seedId } : null);
         }}
       />
 

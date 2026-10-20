@@ -52,7 +52,15 @@ const summary = (acts: Array<'done' | 'in_progress' | 'not_started' | 'blocked'>
 
 const rows: VastRow[] = [
   buildVastRow(entry(), summary(['done', 'in_progress', 'not_started', 'blocked'])),
-  buildVastRow(entry({ id: 'queue-2', business_name: 'Second Market', seed_id: null }), null),
+  buildVastRow(
+    entry({
+      id: 'queue-2',
+      business_name: 'Second Market',
+      seed_id: null,
+      processed_campaign_id: 'camp-1',
+    }),
+    null,
+  ),
 ];
 
 describe('buildVastRow', () => {
@@ -108,9 +116,19 @@ describe('VastBoard', () => {
     expect(html).toContain('Tell');
     expect(html).toContain('Maria’s Market');
     expect(html).toContain('Second Market');
+    expect(html).toContain('No seed (campaign)');
     expect(html).toContain('Promote to listings');
     expect(html).toContain('Log announce');
-    expect(html).toContain('/ 1 seeded');
+    expect(html).toContain('Campaign');
+    expect(html).toContain('of 1 seeded');
+  });
+
+  it('explains the no-seeded state', () => {
+    const html = renderToStaticMarkup(
+      createElement(VastBoard, { rows: [rows[1]], onLogAnnounce: () => {} }),
+    );
+    expect(html).toContain('No prospects have been promoted to listings yet.');
+    expect(html).toContain('none seeded yet');
   });
 
   it('renders the empty state', () => {
