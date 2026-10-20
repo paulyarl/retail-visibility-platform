@@ -49,7 +49,7 @@ export default function ZoomableImageCarousel({ photos, fallbackAlt, fit = "fram
             alt={currentPhoto.alt || fallbackAlt}
             className={
               natural
-                ? "block w-auto h-auto max-w-full max-h-[80vh] transition-all duration-500 group-hover:scale-105"
+                ? "block w-auto h-auto max-w-full max-h-[28rem] transition-all duration-500 group-hover:scale-105"
                 : "object-contain w-full h-full transition-all duration-500 group-hover:scale-105"
             }
           />

@@ -161,9 +161,8 @@ export default function FlyerSection({ tenantId, tenantSlug, tenantName, tenantL
           </div>
   );
 
-  // ≤2 live flyers keep the flat vertical stack; 3+ (flyer_live_* expansion
-  // or flyer_flexible) switch to a snap carousel — one flyer per slide.
-  const useCarousel = payload.flyers.length > 2;
+  // Any live flyers beyond one switch to a snap carousel — one flyer per slide.
+  const useCarousel = payload.flyers.length > 1;
 
   const scrollTrack = (dir: number) => {
     const track = trackRef.current;
