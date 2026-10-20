@@ -8,6 +8,7 @@ import directoryPresenceAdminService, {
   type DirectoryAnnounceQueueRow,
 } from '@/services/DirectoryPresenceAdminService';
 import AnnounceQueueTable from './AnnounceQueueTable';
+import ProspectTouchLogModal from '@/components/marketing-ops/ProspectTouchLogModal';
 import { ArrowLeft, Clock, List, RefreshCw } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ function AnnounceQueueContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busySeedId, setBusySeedId] = useState<string | null>(null);
+  const [logRow, setLogRow] = useState<DirectoryAnnounceQueueRow | null>(null);
 
   const fetchQueue = useCallback(async () => {
     try {
@@ -115,6 +117,29 @@ function AnnounceQueueContent() {
           rows={rows}
           busySeedId={busySeedId}
           onMarkAnnounced={handleMarkAnnounced}
+          onLogAnnounce={(row) => setLogRow(row)}
+        />
+      )}
+
+      {logRow && (
+        <ProspectTouchLogModal
+          entry={{
+            id: logRow.seedId,
+            business_name: logRow.businessName,
+            title: null,
+            business_snapshot: {
+              verified_nap: {
+                phone: logRow.ownerPhone || logRow.listingPhone,
+                email: logRow.ownerEmail || logRow.listingEmail,
+              },
+            },
+          }}
+          seedId={logRow.seedId}
+          onClose={() => setLogRow(null)}
+          onLogged={async () => {
+            setLogRow(null);
+            await fetchQueue();
+          }}
         />
       )}
     </div>

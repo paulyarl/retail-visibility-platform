@@ -28,12 +28,14 @@ export interface AnnounceQueueTableProps {
   rows: DirectoryAnnounceQueueRow[];
   busySeedId?: string | null;
   onMarkAnnounced: (row: DirectoryAnnounceQueueRow) => void;
+  onLogAnnounce: (row: DirectoryAnnounceQueueRow) => void;
 }
 
 export default function AnnounceQueueTable({
   rows,
   busySeedId,
   onMarkAnnounced,
+  onLogAnnounce,
 }: AnnounceQueueTableProps) {
   if (rows.length === 0) {
     return (
@@ -108,14 +110,23 @@ export default function AnnounceQueueTable({
                 </div>
               </td>
               <td className="px-4 py-3 text-right">
-                <button
-                  type="button"
-                  disabled={busySeedId === row.seedId}
-                  onClick={() => onMarkAnnounced(row)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busySeedId === row.seedId ? 'Saving…' : 'Mark announced'}
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onLogAnnounce(row)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-gray-200 dark:hover:bg-neutral-700"
+                  >
+                    Log announce
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busySeedId === row.seedId}
+                    onClick={() => onMarkAnnounced(row)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busySeedId === row.seedId ? 'Saving…' : 'Mark announced'}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Phone, Mail, Globe, Share2, PhoneCall, Loader2 } from 'lucide-react';
 import { marketingOpsService } from '@/services/MarketingOpsService';
+import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import { resolveProspectChannels, type ProspectChannelSource } from '@/lib/prospect-channels';
 
 /**
@@ -42,9 +43,12 @@ interface ProspectTouchLogModalProps {
   entry: ProspectTouchEntry;
   onClose: () => void;
   onLogged: () => void | Promise<void>;
+  /** Seed-scoped mode: log against the seed touch ledger instead of the
+   *  queue entry. Used by the announce queue for campaign-less seeds. */
+  seedId?: string;
 }
 
-export default function ProspectTouchLogModal({ entry, onClose, onLogged }: ProspectTouchLogModalProps) {
+export default function ProspectTouchLogModal({ entry, onClose, onLogged, seedId }: ProspectTouchLogModalProps) {
   const ladder = entry.channel_sequence ?? [];
   const [channel, setChannel] = useState<TouchChannel>(
     () => ladder[entry.current_channel_index ?? 0]?.channel ?? 'call',
@@ -53,6 +57,7 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
   const [notes, setNotes] = useState('');
   const [painOutcome, setPainOutcome] = useState<'not_asked' | 'confirmed' | 'disputed'>('not_asked');
   const [followUpPermission, setFollowUpPermission] = useState<'not_asked' | 'yes' | 'no'>('not_asked');
+  const [announceDelivered, setAnnounceDelivered] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState('');
   const [recordingDuration, setRecordingDuration] = useState('');
   const [busy, setBusy] = useState(false);
@@ -73,16 +78,36 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
         verificationResults.push({ type: 'other', field: 'follow_up_permission', value: 'no' });
       }
 
-      await marketingOpsService.logProspectTouch(entry.id, {
-        channel,
-        outcome: (outcome || undefined) as any,
-        notes: notes || undefined,
-        recording_url: recordingUrl.trim() || undefined,
-        recording_duration_seconds: recordingDuration.trim()
-          ? Number(recordingDuration.trim())
-          : undefined,
-        verification_results: verificationResults.length > 0 ? verificationResults : undefined,
-      });
+      if (seedId) {
+        // Seed-scoped mode — campaign-less announce queue rows. The canonical
+        // seed touch ledger is the anchor; the delivered marker is separate.
+        await directoryPresenceAdminService.addOutreachTouch(seedId, {
+          channel,
+          outcome: (outcome || undefined) as any,
+          notes: notes || undefined,
+          verification_results: verificationResults.length > 0 ? verificationResults : undefined,
+        });
+        if (announceDelivered) {
+          const announceChannel =
+            channel === 'call' ? 'call' : channel === 'email' ? 'email' : 'other';
+          await directoryPresenceAdminService.markAnnounceDelivered(seedId, {
+            channel: announceChannel,
+            notes: notes || undefined,
+            verification_results: verificationResults.length > 0 ? verificationResults : undefined,
+          });
+        }
+      } else {
+        await marketingOpsService.logProspectTouch(entry.id, {
+          channel,
+          outcome: (outcome || undefined) as any,
+          notes: notes || undefined,
+          recording_url: recordingUrl.trim() || undefined,
+          recording_duration_seconds: recordingDuration.trim()
+            ? Number(recordingDuration.trim())
+            : undefined,
+          verification_results: verificationResults.length > 0 ? verificationResults : undefined,
+        });
+      }
       await onLogged();
     } catch (err: any) {
       setError(err.message || 'Failed to log touch');
@@ -261,6 +286,15 @@ export default function ProspectTouchLogModal({ entry, onClose, onLogged }: Pros
               </select>
             </label>
           </div>
+          <label className="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={announceDelivered}
+              onChange={(e) => setAnnounceDelivered(e.target.checked)}
+              className="rounded"
+            />
+            Announce delivered (C2)
+          </label>
         </div>
 
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

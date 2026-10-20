@@ -34,7 +34,11 @@ const row = (overrides: Partial<DirectoryAnnounceQueueRow> = {}): DirectoryAnnou
 
 const render = (rows: DirectoryAnnounceQueueRow[]) =>
   renderToStaticMarkup(
-    createElement(AnnounceQueueTable, { rows, onMarkAnnounced: () => {} }),
+    createElement(AnnounceQueueTable, {
+      rows,
+      onMarkAnnounced: () => {},
+      onLogAnnounce: () => {},
+    }),
   );
 
 describe('AnnounceQueueTable', () => {
@@ -48,6 +52,7 @@ describe('AnnounceQueueTable', () => {
     expect(html).toContain('call');
     expect(html).toContain('href="https://example.com/place/claim/TOKEN"');
     expect(html).toContain('href="https://example.com/place/marias-market"');
+    expect(html).toContain('Log announce');
     expect(html).toContain('Mark announced');
   });
 
