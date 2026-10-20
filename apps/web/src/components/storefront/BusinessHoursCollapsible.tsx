@@ -7,6 +7,8 @@ import { getTodaySpecialHours } from '@/lib/hours-utils';
 interface BusinessHoursCollapsibleProps {
   businessHours?: any;
   isRetailStore?: boolean;
+  /** Tighter rows with single-line times — for narrow sidebar columns. */
+  compact?: boolean;
 }
 
 function formatTime(time24: string): string {
@@ -33,7 +35,8 @@ function getTimezoneLabel(timezone?: string): string {
 
 export default function BusinessHoursCollapsible({
   businessHours,
-  isRetailStore = true
+  isRetailStore = true,
+  compact = false
 }: BusinessHoursCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Changed to true for open by default
   const tz = businessHours?.timezone;
@@ -42,7 +45,7 @@ export default function BusinessHoursCollapsible({
   if (!businessHours) return null;
 
   return (
-    <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden mb-5">
+    <div className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden ${compact ? '' : 'mb-5'}`}>
       {/* Collapsible Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -65,9 +68,9 @@ export default function BusinessHoursCollapsible({
 
       {/* Collapsible Content */}
       {isExpanded && isRetailStore && (
-        <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
-            <div className="grid grid-cols-1 gap-3">
+        <div className={`border-t border-neutral-200 dark:border-neutral-700 ${compact ? 'px-3 pb-3' : 'px-4 pb-4'}`}>
+          <div className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 ${compact ? 'p-3' : 'p-6'}`}>
+            <div className={`grid grid-cols-1 ${compact ? 'gap-2' : 'gap-3'}`}>
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                 const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
                 const dayAbbr = day.slice(0, 3);
@@ -103,7 +106,7 @@ export default function BusinessHoursCollapsible({
                 return (
                   <div
                     key={day}
-                    className={`flex items-start justify-between p-4 rounded-lg border gap-4 ${
+                    className={`flex items-start justify-between rounded-lg border gap-4 ${compact ? 'p-2.5' : 'p-4'} ${
                       isToday
                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                         : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
@@ -120,7 +123,16 @@ export default function BusinessHoursCollapsible({
                         ? 'text-blue-700 dark:text-blue-300'
                         : hasHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
                     }`}>
-                      {hasHours ? (
+                      {hasHours && compact ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          {timeSlots.map((slot, idx) => (
+                            <span key={idx} className="whitespace-nowrap">{slot.open} – {slot.close}</span>
+                          ))}
+                          {tzLabel && (
+                            <span className="text-xs text-neutral-500 dark:text-neutral-400">{tzLabel}</span>
+                          )}
+                        </div>
+                      ) : hasHours ? (
                         <div className="flex flex-col gap-1">
                           {timeSlots.map((slot, idx) => (
                             <div key={idx} className="flex flex-col items-end">

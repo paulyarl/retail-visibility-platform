@@ -998,6 +998,39 @@ The seek edge resolves with no seed, because that edge is about the audit. Per
     prospects. **VAST** (Verification, Awareness, Show, Tell) is the operator
     shorthand for the act strip. The review-pipeline **Cascade** tab is a
     different feature and is untouched.
+26. **Dismissal propagation policy.** `MarketingProspectQueueService.dismiss`
+    is queue-local: it writes the dismissal and syncs the linked public
+    suggestion, nothing downstream. An operator can dismiss `bad_fit` while a
+    published+invited seed and live campaign exist for the same business and
+    never be told — verified live 2026-10-20: `pque-fzou7k14` (Garaya African
+    Market) was dismissed `bad_fit` on 9/16, five days after its seed
+    `dps-5CQK-rrxi9fjm` published and went `invited`; the queue row's
+    `processed_campaign_id` is null because the campaign was created outside
+    queue graduation. The seed stayed public with a live claim token.
+    The reason enum (`already_customer | bad_fit | duplicate |
+    unverified_closed | other`) implies different blast radii:
+    `unverified_closed` is a data-quality defect that argues for suppressing
+    the published listing; `bad_fit` argues only for ending the controlled
+    path (the organic listing may still earn shelf value, but the live claim
+    token is spend the platform opted out of). Decide: warn-on-dismiss with a
+    live-children listing (seeds/campaigns resolved via
+    `directory_seed_campaign_links` + `seed_batch`), auto-suppress only on
+    `unverified_closed`, or some hybrid.
+27. **Dismissed-history guard.** `bad_fit` is a per-row verdict, not a
+    business verdict: the queue dedup covers only `status='queued'`, so a
+    dismissed business is re-queued by the very next intelligence scan; and
+    `Spawn Campaign` / queue graduation do not read dismissal history either —
+    verified live 2026-10-20 when a fresh `seek` campaign (`mcamp-s97mviop`)
+    was spawned for the business dismissed in Q26 with no surface flag.
+    Decide whether prior dismissals surface as context (a badge on the
+    prospect/campaign/seed, recommended — one intake's `bad_fit` should not
+    hard-veto another) or as a re-queue cool-down window. Related: the
+    prospect-queue entry never learned that a campaign existed for the same
+    business (`processed_campaign_id` stayed null) — queue rows and
+    out-of-band campaigns share no reconciliation path, so verdicts split-brain.
+    `seed_batch` is a fossil string stamped at creation and is not validated
+    against `directory_seed_campaign_links`; the announce queue (Q19) must
+    not trust the batch label as evidence of a live campaign anchor.
 
 ## 10. Verification Record (2026-10-19)
 

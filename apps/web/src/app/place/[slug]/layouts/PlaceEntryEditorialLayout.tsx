@@ -297,7 +297,7 @@ export default function PlaceEntryEditorialLayout({
               {showsHours && businessHours && (
                 <div className="bg-neutral-50 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Hours</h3>
-                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
+                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} compact />
                 </div>
               )}
             </div>
