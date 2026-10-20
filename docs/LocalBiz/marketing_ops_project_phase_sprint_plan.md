@@ -123,6 +123,8 @@ Emission funnels through three choke points; gating fidelity there covers nearly
 | 7.5 | **Public-surfaces assembly + strip.** The endpoint wrapper gathers each sibling's linked seeds via `DirectorySeedCampaignLinkService` (status, `placeUrl`, `seed_fidelity` when known) and the demo storefront URL from `demo_tenant_id` (`{tenant-slug}.visibleshelf.com`); the panel renders the `publicSurfaces` strip — `suppressed` seeds show as retired history, not live surfaces. | route/service wrapper + `PlanCockpitPanel.tsx` | Read-only links out to the public surface or its admin — no new state. |
 | 7.6 | Render tests via the `renderToStaticMarkup` pattern (`.test.ts`, `MantineProvider`, `initialTab`-style props for collapsed panels). | `PlanCockpitPanel.test.ts` (new) | Assert board row order, badge presence, collapsed-region counts, family-strip membership (non-contributing siblings included), surfaces-strip entries (seed + demo links, suppressed-as-history). |
 
+**Implementation note (2026-10-19):** the `#execution` slot reserved by 7.3 is now the Four-Act outreach cascade (`CampaignExecutionPanel`, `GET /campaigns/:id/cascade`). It is campaign-scoped through the primary seed and sits beside the prospect-keyed Plan cockpit; the review-pipeline **Cascade** tab is a separate feature and is untouched.
+
 **Deferred:** the dedicated prospect route (`/settings/admin/marketing-ops/prospects/[id]`, mirroring `proving-grounds/[id]`) — the endpoint is already prospect-keyed, so promoting the cockpit to a standalone dossier page is a UI placement change, not a contract change. Track it when the surface outgrows a panel.
 
 ## Phase 8 — Gallery project view (spec §9/§13)

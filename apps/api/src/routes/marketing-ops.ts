@@ -158,6 +158,7 @@ import MarketingDailyDigestService from '../services/MarketingDailyDigestService
 import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
 import ConfirmPageService from '../services/ConfirmPageService';
+import CampaignCascadeService from '../services/CampaignCascadeService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import { buildProjectPhasePlanForKey } from '../services/triage/project-phase-resolution';
 import { setControllingAuditForProspect } from '../services/triage/controlling-audit';
@@ -2175,6 +2176,22 @@ router.post('/:id/outreach', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * GET /campaigns/:id/cascade
+ *
+ * Campaign-scoped Four-Act execution view for the Project Plan tab's
+ * `#execution` surface. Resolves the campaign's primary seed and returns the
+ * same per-prospect summary the seed page uses, plus announce queue state.
+ */
+router.get('/campaigns/:id/cascade', async (req: any, res: Response) => {
+  try {
+    const data = await CampaignCascadeService.getForCampaign(req.params.id);
+    res.json({ success: true, data });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

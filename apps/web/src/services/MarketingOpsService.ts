@@ -12,6 +12,7 @@ import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { ResponseType } from '../providers/base/FlexibleApiSingleton';
 import { clientLogger } from '../lib/client-logger';
 import { uploadImage, ImageUploadPresets } from '../lib/image-upload';
+import type { SeedCascadeSummary } from './DirectoryPresenceAdminService';
 
 // ====================
 // TYPES
@@ -5536,8 +5537,25 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /** GET /campaigns/:id/cascade — the Project Plan `#execution` surface. */
+  async getCampaignCascade(campaignId: string): Promise<CampaignCascadeResponse> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/campaigns/${encodeURIComponent(campaignId)}/cascade`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message || 'Failed to get the campaign cascade',
+      );
+    }
+    return result.data?.data ?? result.data;
+  }
+
   /**
-   * Set (or clear, auditId=null) the prospect's controlling audit — the
    * operator override for which business_analysis audit feeds the project
    * plan's signal resolution (migration 333). Plan-scoped only.
    */
@@ -8624,4 +8642,22 @@ export interface ProjectPhaseGateResult {
 export interface ProjectPhasePlanResponse {
   plan: ProjectPhasePlan;
   gate: ProjectPhaseGateResult;
+}
+
+/** Campaign-scoped Four-Act execution view (Project Plan `#execution`). */
+export interface CampaignCascadeResponse {
+  seedId: string | null;
+  seed: {
+    seedBatch: string | null;
+    status: string;
+    publishedAt: string | null;
+  } | null;
+  cascade: SeedCascadeSummary | null;
+  announce: {
+    scheduledAt: string | null;
+    deliveredAt: string | null;
+    channel: string | null;
+    inQueue: boolean;
+  };
+  reason?: 'no_primary_seed';
 }

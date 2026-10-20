@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react';
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { ProjectPhasePlanResponse } from '@/services/MarketingOpsService';
 import PlanCockpitPanel, { type PlanSiblingSummary } from './PlanCockpitPanel';
+import CampaignExecutionPanel from './CampaignExecutionPanel';
 import { Loader2 } from 'lucide-react';
 
 type PlanSurface = 'plan' | 'proposal' | 'execution';
@@ -27,7 +28,9 @@ type PlanSurface = 'plan' | 'proposal' | 'execution';
 const PLAN_SURFACES: { key: PlanSurface; label: string; live: boolean }[] = [
   { key: 'plan', label: 'Plan', live: true },
   { key: 'proposal', label: 'Proposal', live: false },
-  { key: 'execution', label: 'Execution', live: false },
+  // Four-Act outreach execution — the campaign's primary seed, announce
+  // status, act position, and walk-in gate (FOUR_ACT_OUTREACH_CASCADE_SPEC §7).
+  { key: 'execution', label: 'Execution', live: true },
 ];
 
 export default function ProjectPlanTab({ campaign }: { campaign: any }) {
@@ -116,6 +119,11 @@ export default function ProjectPlanTab({ campaign }: { campaign: any }) {
         ) : data ? (
           <PlanCockpitPanel plan={data.plan} gate={data.gate} siblings={siblings} />
         ) : null
+      ) : surface === 'execution' ? (
+        <CampaignExecutionPanel
+          campaignId={campaign.id}
+          businessName={campaign.business_name ?? null}
+        />
       ) : (
         <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
           The {surface} surface lands in a later sprint — the plan is already loaded beside this slot.
