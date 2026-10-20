@@ -1665,8 +1665,35 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
+      // A prospect derived from a discovery scan keeps its candidate's suggested
+      // categories on the parent's discovery audit, not on this row. Merge them
+      // into the response only (read-only; the stored discovery_context is unchanged).
+      let discoveryContext = rest.discovery_context ?? null;
+      if (rest.parent_campaign_id && !discoveryContext?.suggested_categories) {
+        try {
+          const parentScan = await this.prisma.mkt_audits_list.findFirst({
+            where: { campaign_id: rest.parent_campaign_id, platform: 'intelligence_discovery' },
+            orderBy: { created_at: 'desc' },
+            select: { audit_data: true },
+          });
+          const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
+          const match = ((parentScan?.audit_data as any)?.discovered_businesses ?? []).find(
+            (b: any) => norm(b.business_name) === norm(rest.business_name) && norm(b.city) === norm(rest.city),
+          );
+          if (Array.isArray(match?.suggested_categories)) {
+            discoveryContext = { ...(discoveryContext ?? {}), suggested_categories: match.suggested_categories };
+          }
+        } catch (scanError) {
+          logger.warn('Parent discovery suggestion merge failed', ctx, {
+            error: (scanError as Error).message,
+            campaignId: rest.id,
+          });
+        }
+      }
+
       return {
         ...rest,
+        discovery_context: discoveryContext,
         audits,
         files: mkt_files_list ?? [],
         stage_history: mkt_stage_history_list ?? [],
