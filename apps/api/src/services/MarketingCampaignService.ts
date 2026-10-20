@@ -1506,7 +1506,7 @@ export class MarketingCampaignService extends BaseService {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id },
         include: {
-          mkt_audits_list: true,
+          mkt_audits_list: { orderBy: { created_at: 'desc' } },
           mkt_files_list: { orderBy: { uploaded_at: 'desc' } },
           mkt_stage_history_list: { orderBy: { changed_at: 'desc' }, take: 20 },
           parent: { select: { id: true, business_name: true, category: true, city: true, scope: true, stage: true } },
