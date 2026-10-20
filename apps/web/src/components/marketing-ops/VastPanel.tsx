@@ -121,6 +121,60 @@ function ActChip({ letter, status }: { letter: string; status: CascadeActStatus 
   );
 }
 
+function VastActions({
+  row,
+  onLogAnnounce,
+  align = 'end',
+}: {
+  row: VastRow;
+  onLogAnnounce: (row: VastRow) => void;
+  align?: 'start' | 'end';
+}) {
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-2 ${
+        align === 'end' ? 'justify-end' : 'justify-start'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onLogAnnounce(row)}
+        disabled={!row.seedId}
+        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-600 dark:bg-neutral-800 dark:text-gray-200 dark:hover:bg-neutral-700"
+      >
+        Log announce
+      </button>
+      {row.campaignId && (
+        <Link
+          href={`/settings/admin/marketing-ops/campaigns/${row.campaignId}`}
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+        >
+          Campaign
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+      {row.seedId && (
+        <>
+          <Link
+            href={`/settings/admin/directory/presence-seeds/${row.seedId}`}
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Seed
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+          <Link
+            href={`/settings/admin/directory/presence-seeds/${row.seedId}/cascade`}
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Cascade
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </>
+      )}
+    </div>
+  );
+}
+
 export interface VastBoardProps {
   rows: VastRow[];
   onLogAnnounce: (row: VastRow) => void;
@@ -172,7 +226,46 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-neutral-700 dark:bg-neutral-800">
+      {/* Small screens: card layout. The table needs ~8 columns; below md it
+          clipped the actions and forced horizontal scrolling. */}
+      <div className="space-y-2 md:hidden">
+        {rows.map((row) => (
+          <div
+            key={row.entryId}
+            className="rounded-lg border border-gray-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-gray-900 dark:text-white">
+                  {row.businessName || 'Untitled prospect'}
+                </p>
+                <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                  {row.status} ·{' '}
+                  {row.seedId
+                    ? row.seedStatus || 'seeded'
+                    : row.campaignId
+                      ? 'No seed (campaign)'
+                      : 'Not seeded'}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <ActChip letter="V" status={row.v} />
+                <ActChip letter="A" status={row.a} />
+                <ActChip letter="S" status={row.s} />
+                <ActChip letter="T" status={row.t} />
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
+              Next: {row.nextAction}
+            </p>
+            <div className="mt-2">
+              <VastActions row={row} onLogAnnounce={onLogAnnounce} align="start" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white md:block dark:border-neutral-700 dark:bg-neutral-800">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-neutral-900 dark:text-gray-400">
             <tr>
@@ -208,43 +301,7 @@ export function VastBoard({ rows, onLogAnnounce }: VastBoardProps) {
                 <td className="px-3 py-3 text-center"><ActChip letter="T" status={row.t} /></td>
                 <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-300">{row.nextAction}</td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onLogAnnounce(row)}
-                      disabled={!row.seedId}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-600 dark:bg-neutral-800 dark:text-gray-200 dark:hover:bg-neutral-700"
-                    >
-                      Log announce
-                    </button>
-                    {row.campaignId && (
-                      <Link
-                        href={`/settings/admin/marketing-ops/campaigns/${row.campaignId}`}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        Campaign
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    )}
-                    {row.seedId && (
-                      <>
-                        <Link
-                          href={`/settings/admin/directory/presence-seeds/${row.seedId}`}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          Seed
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                        <Link
-                          href={`/settings/admin/directory/presence-seeds/${row.seedId}/cascade`}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          Cascade
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      </>
-                    )}
-                  </div>
+                  <VastActions row={row} onLogAnnounce={onLogAnnounce} />
                 </td>
               </tr>
             ))}

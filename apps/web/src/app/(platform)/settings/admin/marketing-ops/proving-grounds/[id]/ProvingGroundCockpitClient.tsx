@@ -1744,7 +1744,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                           </span>
                         )}
                       </label>
-                      <span className="text-[10px] text-gray-400 flex-shrink-0 flex items-center gap-1.5 ml-auto">
+                      <span className="text-[10px] text-gray-400 flex flex-wrap items-center gap-1.5 w-full sm:w-auto sm:ml-auto">
                         {dismissId === e.id ? (
                           <>
                             <select

@@ -140,4 +140,4 @@ Phases 3 and 4 are parallelizable; Phase 2 is the panel that makes Phases 1/3 vi
 
 ## 6. Spec bookkeeping
 
-On phase completion, mark the resolved §9 items in `FOUR_ACT_OUTREACH_CASCADE_SPEC.md` (Q3/Q20 reversed; Q6, Q18–Q24 by phase) and append new findings to §10. The spec is the contract; the plan executes it.
+On phase completion, mark the resolved §9 items in `FOUR_ACT_OUTREACH_CASCADE_SPEC.md` (Q3/Q20 reversed; Q6, Q18–Q25 by phase) and append new findings to §10. The spec is the contract; the plan executes it.

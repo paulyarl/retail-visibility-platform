@@ -1,6 +1,6 @@
 # Four-Act Outreach Cascade Spec
 
-Status: DRAFT (revised 2026-10-19: source verification §10; operator decisions logged §9; gap-fix decisions §11)
+Status: DRAFT (revised 2026-10-19: source verification §10; operator decisions logged §9; gap-fix decisions §11; execution surfaces + VAST add-on §11.6)
 Date: 2026-10-19
 Scope: Operator outreach to directory-presence seed prospects and marketing-ops campaign prospects — multi-channel cascade design, gating rules, and platform touchpoints. This is a strategy/ops spec, not an implementation spec; §7 maps each act to existing machinery and names the routing change needed for channel attribution, without prescribing new schema.
 
@@ -71,6 +71,12 @@ context accrues instead of resetting per send.
 | 3 | Show | Email + gallery link | Show the pain — their actual diagnostic | Gallery event fired (or tagged QR scan, once §7 tagging lands) |
 | 4 | Tell | Walk-in | Consultation + live claim demo | — |
 | — | Residual | Text / phone / DM | Nudges for engaged-but-unclaimed | — |
+
+**Operator shorthand — VAST.** The four acts are surfaced to the operator as
+**VAST**: **V**erification → **A**wareness → **S**how → **T**ell. VAST is a
+presentation/placement name for the act strip and cards; it does not change the
+act definitions, gates, or sequencing. The execution surfaces are in §7 and
+§11.6.
 
 ### Required inputs — the decisiveness triad
 
@@ -676,6 +682,12 @@ the same half-day blind on all twenty.
 All numbers are hypotheses to measure, not results. The 12→7 step in particular
 is an assumption about gallery engagement that the first cohort should test.
 
+**VAST ↔ funnel.** The operator shorthand maps directly to the measured
+stages: **V** = verified (act-1 gate), **A** = aware (act-2 artifact), **S** =
+gate-cleared (act-3), **T** = walk-in scheduled/done (act-4). The cohort report
+(`SeedCascadeCohortService`) reports these stages directly, so the VAST board
+and the funnel cannot drift.
+
 ## 7. Platform Touchpoints
 
 | Act | Existing machinery (verified in source) |
@@ -719,6 +731,21 @@ carries `seed_id` + `seed_outreach='true'` on trigger rows; operator-logged
 campaign rows are campaign-anchored, so a seed-only prospect's ledger is the
 touch table, not the campaign log.
 
+**Execution surfaces (implemented 2026-10-19).** VAST is the operator-facing
+name for the four acts. The same act derivation is surfaced in three places,
+each scoped to where the operator is working:
+
+| Surface | Scope | Where | Behavior |
+|---|---|---|---|
+| **Campaign → Project Plan → Execution** | Campaign-backed prospect | Campaign detail (`#execution`) | `CampaignExecutionPanel`: announce status + Log announce / Mark announced, VAST cards, walk-in gate, recent activity. Resolves the campaign's primary seed via `GET /campaigns/:id/cascade`. |
+| **PG cockpit → VAST** | PG-scope queued prospects | Proving Ground cockpit (`#vast`) | `VastPanel`: PG-level act counts, per-prospect V/A/S/T chips, next action, Log announce / Seed / Cascade. Resolves `seed_id` first, then the campaign's primary seed via `GET /campaigns/cascade-batch`; campaign-linked unseeded rows show “No seed (campaign)”; unseeded rows show “Promote to listings.” |
+| **Seeds admin → Announce queue / Cohort** | Cross-prospect and seed-only | Seeds admin | The announce queue is the delivery worklist (age, channel, Log announce / Mark announced); the cohort page reports the VAST stages as the funnel. |
+
+The existing review-pipeline **Cascade** tab is a different feature
+(`ReviewCascadeService`, `cascade_enabled`). The Four-Act surface is deliberately
+named **Execution/VAST** to avoid that collision. The “enriched” chip on the PG
+Promote tab is shelf-market enrichment, not seed status.
+
 ## 8. Guardrails & Failure Modes
 
 - **Published precondition (act 1).** No call goes out for a seed that is not
@@ -741,6 +768,14 @@ touch table, not the campaign log.
   replies. Overrides are recorded.
 - **Standalone demo, gated visit.** The demo content does not depend on
   upstream acts. The visit itself is scheduled on signal.
+- **VAST is a view, not a gate.** The VAST board and the campaign Execution tab
+  derive position from the same seed-touch / campaign-log / gallery ledger.
+  They add no new gate and no separate state store; the act gates remain §2.1
+  and §2.3.
+- **Campaign-linked seed resolution.** For a PG row without a queue-row
+  `seed_id`, the campaign's primary seed link is authoritative. Never infer a
+  seed from a business name, and never present an unseeded prospect as
+  cascade-ready — show “Promote to listings.”
 - **Cold text is out.** Announce contact is cold by design. Marketing texts to
   wireless numbers require prior express written consent, which cold contact
   cannot obtain. Text is used only after an owner opt-in through a documented
@@ -918,6 +953,18 @@ touch table, not the campaign log.
     an `announce_scheduled` marker to `directory_seed_outreach_touches`.
     Campaign-linked seeds also keep the `mkt_outreach_log` row; campaign-less
     seeds use the seed touch ledger. Batch-publish remains operator-composed.
+25. **Execution surface placement / VAST.** Where does the operator actually
+    run the four acts? The seed admin page was the first home, but it is a
+    seed-management surface and gets crowded; the campaign detail page already
+    holds the audit/archetype/briefing triad, and the PG cockpit holds the
+    pre-campaign queue.
+    **Decided 2026-10-19 (addendum §11.6):** campaign-backed execution lives in
+    **Campaign → Project Plan → Execution** (`#execution`); PG-scope execution
+    lives in the **PG cockpit → VAST** tab; the seeds admin **Announce queue**
+    remains the cross-prospect worklist and the only home for seed-only
+    prospects. **VAST** (Verification, Awareness, Show, Tell) is the operator
+    shorthand for the act strip. The review-pipeline **Cascade** tab is a
+    different feature and is untouched.
 
 ## 10. Verification Record (2026-10-19)
 
@@ -1111,3 +1158,41 @@ modals.
 `requirePlatformAdmin`; `GET` stays public. The announce branding reader
 returns social handles and records the values used. A required field with no
 active surface blocks the announce.
+
+### B6 — Execution surfaces and the VAST add-on (2026-10-19)
+
+**VAST** = **V**erification → **A**wareness → **S**how → **T**ell. It is the
+operator-facing name for the four-act strip; the act definitions, gates, and
+sequencing are unchanged.
+
+Placement:
+
+- **Campaign-backed prospects** run the acts on the campaign detail page's
+  **Project Plan → Execution** tab (`#execution`, `CampaignExecutionPanel`).
+  The campaign already holds the audit, archetype, briefing, and siblings; the
+  panel resolves the campaign's primary seed via `GET /campaigns/:id/cascade`
+  and shows announce status/actions, VAST cards, the walk-in gate, and recent
+  activity.
+- **PG-scope queued prospects** run the acts on the PG cockpit's **VAST** tab
+  (`VastPanel`). It resolves a queue row's `seed_id` first, then the campaign's
+  primary seed via `GET /campaigns/cascade-batch` (campaign_created rows often
+  carry the link on the campaign, not the queue row). Campaign-linked unseeded
+  rows show “No seed (campaign)” and a Campaign link; genuinely unseeded rows
+  show “Promote to listings.” The “enriched” chip on the Promote tab is
+  shelf-market enrichment, not seed status.
+- **Seeds admin** keeps the **Announce queue** (cross-prospect delivery
+  worklist, seed-only prospects) and the **Cohort** page (the same VAST stages
+  as the measured funnel).
+- The existing review-pipeline **Cascade** tab (`ReviewCascadeService`,
+  `cascade_enabled`) is a different feature. The Four-Act surface is named
+  **Execution/VAST** to avoid the collision.
+
+Data path: `SeedCascadeService.getSummary` is the single derivation;
+`getSummaries(seedIds)` and `CampaignCascadeService.getForCampaigns(campaignIds)`
+batch it for the PG. The cohort report (`SeedCascadeCohortService`) maps
+V/A/S/T to verified/aware/gate-cleared/walk-in, so the board and the funnel
+cannot drift.
+
+This add-on changes presentation and placement only; it does not change the
+announce marker contract (§11 B1/B3), the mint policy (§11 B2), or the act-1
+capture (§11 B4).
