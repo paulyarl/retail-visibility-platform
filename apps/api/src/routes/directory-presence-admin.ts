@@ -55,6 +55,7 @@ import {
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import SeedAnnounceService from '../services/SeedAnnounceService';
+import SeedCascadeService from '../services/SeedCascadeService';
 import {
   generateClaimInvitePng,
   generateClaimInvitePostcard,
@@ -925,6 +926,25 @@ router.post('/presence-seeds/:id/announce-delivered', requirePlatformStaff, asyn
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error('[POST /api/admin/directory/presence-seeds/:id/announce-delivered] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/admin/directory/presence-seeds/:id/cascade
+ *
+ * Per-prospect four-act position + act-3 gate summary. Reads the seed touch
+ * ledger, linked campaign outreach logs, gallery events, and tagged scans.
+ */
+router.get('/presence-seeds/:id/cascade', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const summary = await SeedCascadeService.getSummary(req.params.id);
+    if (!summary) return res.status(404).json({ error: 'seed_not_found' });
+    res.json({ success: true, cascade: summary });
+  } catch (error) {
+    logger.error('[GET /api/admin/directory/presence-seeds/:id/cascade] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

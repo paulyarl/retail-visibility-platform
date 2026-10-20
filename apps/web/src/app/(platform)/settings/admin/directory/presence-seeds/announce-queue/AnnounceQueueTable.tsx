@@ -107,6 +107,12 @@ export default function AnnounceQueueTable({
                       Listing
                     </a>
                   ) : null}
+                  <Link
+                    href={`/settings/admin/directory/presence-seeds/${row.seedId}/cascade`}
+                    className="text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Cascade
+                  </Link>
                 </div>
               </td>
               <td className="px-4 py-3 text-right">

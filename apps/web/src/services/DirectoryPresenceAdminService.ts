@@ -27,6 +27,57 @@ export interface DirectoryListingPhoto {
   caption?: string | null;
 }
 
+/** Four-Act cascade per-prospect summary (seed detail / queue drill-down). */
+export type CascadeActStatus = 'not_started' | 'in_progress' | 'done' | 'blocked';
+
+export interface CascadeAct {
+  act: 1 | 2 | 3 | 4;
+  name: string;
+  status: CascadeActStatus;
+  detail: string;
+  lastEventAt: string | null;
+}
+
+export interface CascadeTimelineEvent {
+  id: string;
+  source: 'seed_touch' | 'campaign_log' | 'gallery_event' | 'qr_scan';
+  at: string;
+  channel: string | null;
+  outcome: string | null;
+  label: string;
+  notes: string | null;
+}
+
+export interface SeedCascadeSummary {
+  seedId: string;
+  businessName: string | null;
+  seedStatus: string;
+  outreachState: string;
+  publishedAt: string | null;
+  announceScheduledAt: string | null;
+  announceDeliveredAt: string | null;
+  announceChannel: string | null;
+  acts: CascadeAct[];
+  gate: {
+    act1Cleared: boolean;
+    act3Cleared: boolean;
+    gateCleared: boolean;
+    reason: string;
+    galleryOpenedAt: string | null;
+    galleryTaggedScanAt: string | null;
+    confirmScanAt: string | null;
+    missing: string[];
+  };
+  linkedCampaigns: Array<{
+    id: string;
+    displayId: string | null;
+    businessName: string | null;
+    stage: string | null;
+    linkRole: string;
+  }>;
+  timeline: CascadeTimelineEvent[];
+}
+
 /** Four-Act cascade announce queue row (migration 348). */
 export interface DirectoryAnnounceQueueRow {
   seedId: string;
@@ -1273,6 +1324,20 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       );
     }
     return (result.data?.data ?? result.data) as { delivered: boolean; reason?: string; channel?: string };
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/:id/cascade
+   *  Per-prospect four-act position + act-3 gate summary. */
+  async getSeedCascade(id: string): Promise<SeedCascadeSummary | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/cascade`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data?.cascade ?? data ?? null) as SeedCascadeSummary | null;
   }
 
   // ─── Seed listing photos (walk-in capture) ─────────────────────────────

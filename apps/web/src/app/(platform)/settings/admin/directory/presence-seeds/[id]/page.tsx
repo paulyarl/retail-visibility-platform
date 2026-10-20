@@ -1660,6 +1660,15 @@ function PresenceSeedDetailClient() {
             {status}
           </span>
         }
+        actions={
+          <Link
+            href={`/settings/admin/directory/presence-seeds/${seed.id}/cascade`}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+          >
+            <Clock className="w-4 h-4" />
+            Cascade
+          </Link>
+        }
       />
 
       {actionError && (
