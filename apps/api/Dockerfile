@@ -17,7 +17,12 @@ RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # Build
 WORKDIR /app/apps/api
-RUN pnpm build
+# Prisma client must exist even when dist/ was pre-built locally (install runs --ignore-scripts)
+RUN npx prisma generate
+# If the build context already contains a locally-compiled dist (Fly standby deploys),
+# skip the remote compile — the tsc type graph OOMs on small build machines.
+# On Railway (git context, dist is gitignored) this falls through to the normal build.
+RUN [ -f dist/index.js ] || pnpm build
 
 EXPOSE 8080
 

@@ -62,6 +62,9 @@ apps/api/src/tests
 node_modules
 **/node_modules
 **/dist
+# Fly standby deploys ship a locally-built dist (remote builders OOM on the tsc type graph)
+!apps/api/dist
+!apps/api/dist/**
 **/.next
 **/coverage
 **/*.tsbuildinfo

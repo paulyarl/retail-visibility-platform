@@ -21,6 +21,8 @@ apps/*/.env
 apps/*/.env.*
 !/apps/web/.env.example
 !/apps/api/.env.example
+**/fly-secrets.env
+**/*fly-secrets*.env
 
 # Prisma / SQLite (local dev only)
 apps/api/prisma/dev.db
