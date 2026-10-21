@@ -20,8 +20,10 @@ export const TIER_FEATURES = {
     'storefront_retail',
     'directory_visibility_snap_ebt',
   ],
-  // V3.1 Entry Presence — directory mode (display: "Starter")
+  // Entry Presence triad — commerce surface (display: "Storefront+", $39).
   // Clean key `presence` — does NOT inherit google_only or legacy starter feature bag.
+  // Deposit commerce + payment_gateway_stripe live in its tier_features_list
+  // bag (DB leg) — see ENTRY_PRESENCE_TRIAD_REDESIGN_SPEC.
   presence: [
     'directory_entry_enabled',
     'directory_entry_layout_classic',
@@ -232,9 +234,9 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
 export const TIER_DISPLAY_NAMES: Record<string, string> = {
   google_only: 'Google-Only',
   directory_presence: 'Directory Presence',
-  presence: 'Starter',
+  presence: 'Storefront+',
   starter: 'Starter',
-  discovery: 'Discovery',
+  discovery: 'SWIS',
   storefront: 'Storefront',
   commitment: 'Commitment',
   ecommerce: 'E-commerce',
@@ -382,7 +384,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
 export const TIER_PRICING: Record<string, number> = {
   google_only: 29,
   directory_presence: 0,
-  presence: 19,
+  presence: 39,
   discovery: 29,
   storefront: 59,
   commitment: 79,  // V2 pricing

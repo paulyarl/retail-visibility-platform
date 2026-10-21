@@ -377,6 +377,16 @@ async function checkCapabilityEngagement(
   });
 
   if (tierFeaturesInCapType.length === 0) {
+    // Deny-by-veto (triad redesign): a module with ZERO enabled tier rows is
+    // silent — off but open — for non-gateway tiers. The gate is the veto,
+    // not presence of engagement: a module is closed only when the tier
+    // carries `{cap}_disabled` (handled by capabilitySaleAllowed below).
+    // directory_presence stays constrained — claimed seeds buy only modules
+    // seeded by an active grant/purchase (SEED_CLAIM funnel decision).
+    const isOpenMarketTier = tierKeys.some(k => k !== 'directory_presence');
+    if (isOpenMarketTier) {
+      return { eligible: true, reason: null, capabilityKey };
+    }
     // A live purchase or granted override in the same capability type counts
     // as engagement — a complimentary grant (e.g. the seed-claim promo) is a
     // deliberate taste that must leave the à-la-carte upsell path open.
@@ -498,6 +508,9 @@ interface TierEvalContext {
   /** Capability types where the tenant holds a live purchase or granted
    *  override — mirrors hasGrantEngagement for the batch evaluators. */
   engagedCapTypeIds: Set<string>;
+  /** Deny-by-veto (triad redesign): at least one resolved tier is non-gateway,
+   *  so silent modules (zero enabled tier rows) are open à-la-carte. */
+  isOpenMarketTier: boolean;
   merchantGates: Map<string, boolean | null>;
 }
 
@@ -643,6 +656,7 @@ async function loadTierEvalContext(tenantId: string): Promise<TierEvalContext> {
     purchasesByKey: new Map(purchases.map(p => [p.feature_key, p])),
     overrideExpiryByKey: new Map(overrides.map(o => [o.feature, o.expires_at])),
     engagedCapTypeIds,
+    isOpenMarketTier: tierKeys.some(k => k !== 'directory_presence'),
     merchantGates,
   };
 }
@@ -723,6 +737,12 @@ function evalCapabilityEngagement(
   const tierFeaturesInCapType = ctx.tierFeatureKeysByCapType.get(capabilityTypeId) ?? [];
   const domainLabel = capabilityKey.replace(/_options$/, '').replace(/_/g, ' ');
   if (tierFeaturesInCapType.length === 0) {
+    // Deny-by-veto — same contract as checkCapabilityEngagement: a silent
+    // module is open à-la-carte for non-gateway tiers; the veto below is the
+    // only close. Gateway tier keeps the positive-engagement requirement.
+    if (ctx.isOpenMarketTier) {
+      return { eligible: true, reason: null, capabilityKey };
+    }
     // Same grant-engagement fallback as checkCapabilityEngagement — a live
     // purchase/grant in this cap type keeps the à-la-carte path open.
     if (!ctx.engagedCapTypeIds.has(capabilityTypeId)) {

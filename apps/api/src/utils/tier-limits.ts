@@ -77,12 +77,12 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     maxSkus: 250,
   },
   presence: {
-    name: 'Starter',
-    maxSkus: 0, // V3.1: directory-mode only, no catalog
+    name: 'Storefront+',
+    maxSkus: 200, // Triad redesign: commerce surface, SKU parity across the triad
   },
   discovery: {
-    name: 'Discovery',
-    maxSkus: 75,  // V2: Lower limit for discovery tier
+    name: 'SWIS',
+    maxSkus: 200, // Triad redesign: SWIS mode, SKU parity across the triad
   },
   storefront: {
     name: 'Storefront',

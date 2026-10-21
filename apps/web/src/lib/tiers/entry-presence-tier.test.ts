@@ -89,12 +89,12 @@ describe('V3.1 Entry Presence tier feature maps', () => {
   });
 
   describe('presence tier display and pricing', () => {
-    it('has display name "Starter"', () => {
-      expect(TIER_DISPLAY_NAMES.presence).toBe('Starter');
+    it('has display name "Storefront+"', () => {
+      expect(TIER_DISPLAY_NAMES.presence).toBe('Storefront+');
     });
 
-    it('is priced at $19/month', () => {
-      expect(TIER_PRICING.presence).toBe(19);
+    it('is priced at $39/month', () => {
+      expect(TIER_PRICING.presence).toBe(39);
     });
   });
 

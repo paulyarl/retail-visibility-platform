@@ -105,9 +105,10 @@ export const TIER_BADGE_CLASSES: Record<string, string> = {
 // the canonical TIER_DISPLAY_NAMES — where a key is present its value MUST
 // agree with the fixture's display_names. Missing keys fall back to a
 // title-cased key in formatTierDisplay (known gap: directory_presence,
-// presence, starter, google_only, chain_enterprise render as raw keys).
+// starter, google_only, chain_enterprise render as raw keys).
 export const TENANT_TIER_DISPLAY_NAMES: Record<string, string> = {
-  discovery: 'Discovery',
+  presence: 'Storefront+',
+  discovery: 'SWIS',
   storefront: 'Storefront',
   commitment: 'Commitment',
   ecommerce: 'E-commerce',

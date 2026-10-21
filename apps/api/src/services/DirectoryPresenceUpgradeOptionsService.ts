@@ -21,9 +21,9 @@ import { prisma } from '../prisma';
  * instead of a linear tier ladder.
  */
 const ENTRY_PRESENCE_MODES: Record<string, { mode: string; surface: string; tagline: string; primary: boolean }> = {
-  presence:   { mode: 'directory', surface: 'Platform in-house directory',   tagline: 'Own your directory listing', primary: true  },
-  discovery:  { mode: 'google',    surface: 'Third-party (Google)',          tagline: 'Get found on Google',       primary: false },
-  storefront: { mode: 'platform',  surface: 'Platform in-house marketplace', tagline: 'Open your platform store',  primary: false },
+  presence:   { mode: 'commerce', surface: 'Platform storefront + checkout',   tagline: 'Sell with deposit checkout',    primary: true  },
+  discovery:  { mode: 'google',   surface: 'Third-party (Google)',             tagline: 'Put your products on Google', primary: false },
+  storefront: { mode: 'platform', surface: 'Platform in-house marketplace',    tagline: 'Showcase your full catalog',  primary: false },
 };
 
 export interface UpgradeTierOptionDto {

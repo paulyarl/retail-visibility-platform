@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-17T19:21:33.761Z",
+  "generated_at": "2026-10-21T15:49:24.799Z",
   "env": "unknown",
   "tiers": [
     {
@@ -58,17 +58,17 @@
     },
     {
       "tier_key": "presence",
-      "display_name": "Starter",
-      "name": "Starter",
-      "price_monthly": 19,
+      "display_name": "Storefront+",
+      "name": "Storefront+",
+      "price_monthly": 39,
       "is_active": true,
       "sort_order": 10,
       "tier_type": "individual"
     },
     {
       "tier_key": "discovery",
-      "display_name": "Discovery",
-      "name": "discovery",
+      "display_name": "SWIS",
+      "name": "SWIS",
       "price_monthly": 29,
       "is_active": true,
       "sort_order": 20,
@@ -6598,60 +6598,12 @@
         "is_enabled": true
       },
       {
-        "feature_key": "chatbot_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_kb_static_faq",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_static_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_static_lookup",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_static_on",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_widget_embed",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_widget_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_widget_on",
+        "feature_key": "chatbot_disabled",
         "is_enabled": true
       },
       {
         "feature_key": "clover_sync",
         "is_enabled": true
-      },
-      {
-        "feature_key": "commerce_deposit_only",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "commerce_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "commerce_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "commerce_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "commerce_full_payment",
-        "is_enabled": false
       },
       {
         "feature_key": "coupon_disabled",
@@ -6770,10 +6722,6 @@
         "is_enabled": false
       },
       {
-        "feature_key": "directory_entry_disabled",
-        "is_enabled": true
-      },
-      {
         "feature_key": "directory_entry_enabled",
         "is_enabled": false
       },
@@ -6859,30 +6807,6 @@
       },
       {
         "feature_key": "directory_entry_social_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "directory_promotion_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_basic",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_featured",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_premium",
         "is_enabled": false
       },
       {
@@ -7074,43 +6998,15 @@
         "is_enabled": false
       },
       {
-        "feature_key": "fulfillment_delivery",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "fulfillment_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_pickup",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_service",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_shipping",
-        "is_enabled": false
-      },
-      {
         "feature_key": "funnel_options_disabled",
         "is_enabled": true
       },
       {
-        "feature_key": "funnel_options_enabled",
-        "is_enabled": false
+        "feature_key": "integration_enabled",
+        "is_enabled": true
       },
       {
-        "feature_key": "integration_enabled",
+        "feature_key": "integration_gmc_sync",
         "is_enabled": true
       },
       {
@@ -7138,63 +7034,11 @@
         "is_enabled": true
       },
       {
-        "feature_key": "marketing_ops_batch_execution",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "marketing_ops_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "marketing_ops_enabled",
+        "feature_key": "org_disabled",
         "is_enabled": true
-      },
-      {
-        "feature_key": "marketing_ops_filter_review",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "marketing_ops_prompt_execution",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "marketing_ops_revenue_tracking",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "payment_gateway_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "payment_gateway_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_paypal",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_square",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_stripe",
-        "is_enabled": false
       },
       {
         "feature_key": "performance_analytics",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "platform_services_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "platform_services_enabled",
         "is_enabled": true
       },
       {
@@ -7366,356 +7210,28 @@
         "is_enabled": false
       },
       {
-        "feature_key": "social_commerce_abandoned_cart",
-        "is_enabled": false
-      },
-      {
         "feature_key": "social_commerce_disabled",
         "is_enabled": true
-      },
-      {
-        "feature_key": "social_commerce_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_catalog",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_pixel",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_shop",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_share_buttons",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_social_proof",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_catalog",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_pixel",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_shop",
-        "is_enabled": false
       },
       {
         "feature_key": "square_sync",
         "is_enabled": true
       },
       {
-        "feature_key": "storefront",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_domains_custom_domain",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_domains_disabled",
-        "is_enabled": false
-      },
-      {
         "feature_key": "storefront_domains_enabled",
         "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_domains_flexible",
-        "is_enabled": false
       },
       {
         "feature_key": "storefront_domains_platform_subdomain",
         "is_enabled": true
       },
       {
-        "feature_key": "storefront_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_gallery_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_hours_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_layouts_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_maps_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_online",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_advanced_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_advanced_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_category_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_category_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_category_product",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_category_store",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "storefront_opt_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_enhanced_seo",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_gallery",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_gallery_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_gallery_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_hours_animated",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_hours_display",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_hours_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_hours_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_hours_status",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_image_gallery_10",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_image_gallery_15",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_image_gallery_5",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_info",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_info_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_info_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_interactive_maps",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_layout",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_layout_classic",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_layout_editorial",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_layout_immersive",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_location_display",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_map_display",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_codes_1024",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_codes_2048",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_codes_512",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_content",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_directory",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_logo",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_product",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_resolution",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_qr_store",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_recently_viewed",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_recommend_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_recommend_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_recommend_products",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_recommend_store",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_storefront_actions",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_storefront_contact",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_opt_storefront_social_media",
-        "is_enabled": false
-      },
-      {
         "feature_key": "storefront_policies",
         "is_enabled": true
       },
       {
-        "feature_key": "storefront_qr_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_retail",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_service",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_social",
-        "is_enabled": false
-      },
-      {
         "feature_key": "wholesale_matching_disabled",
-        "is_enabled": false
+        "is_enabled": true
       },
       {
         "feature_key": "wholesale_matching_enabled",
@@ -14036,32 +13552,20 @@
     ],
     "presence": [
       {
-        "feature_key": "barcode_camera",
+        "feature_key": "chatbot_disabled",
         "is_enabled": true
       },
       {
-        "feature_key": "barcode_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "barcode_enabled",
+        "feature_key": "commerce_deposit_only",
         "is_enabled": true
       },
       {
-        "feature_key": "barcode_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "barcode_manual",
+        "feature_key": "commerce_enabled",
         "is_enabled": true
       },
       {
-        "feature_key": "barcode_scan",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "barcode_usb",
-        "is_enabled": false
+        "feature_key": "coupon_disabled",
+        "is_enabled": true
       },
       {
         "feature_key": "directory_entry_about_on",
@@ -14074,10 +13578,6 @@
       {
         "feature_key": "directory_entry_contact_on",
         "is_enabled": true
-      },
-      {
-        "feature_key": "directory_entry_disabled",
-        "is_enabled": false
       },
       {
         "feature_key": "directory_entry_enabled",
@@ -14180,30 +13680,6 @@
         "is_enabled": true
       },
       {
-        "feature_key": "directory_promotion_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "directory_promotion_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_basic",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "directory_promotion_level_featured",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_premium",
-        "is_enabled": false
-      },
-      {
         "feature_key": "directory_visibility_attributes",
         "is_enabled": true
       },
@@ -14212,284 +13688,72 @@
         "is_enabled": true
       },
       {
-        "feature_key": "faq_chatbot_knowledge_base",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_display_bot_handoff",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_display_enabled",
+        "feature_key": "funnel_options_disabled",
         "is_enabled": true
       },
       {
-        "feature_key": "faq_display_feedback",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_display_on",
+        "feature_key": "integration_enabled",
         "is_enabled": true
       },
       {
-        "feature_key": "faq_display_product_accordion",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_display_storefront_accordion",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_enabled",
+        "feature_key": "integration_gbp",
         "is_enabled": true
       },
       {
-        "feature_key": "faq_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_kb_auto_sync",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_kb_coverage_metrics",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_kb_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_kb_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_bulk_actions",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_hub",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_import",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_reorder",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_management_search",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_preview_bot",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_preview_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_preview_gap_report",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_preview_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_product_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_product_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_storefront_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_storefront_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_templates_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "faq_templates_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_gallery",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_off",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_supplier_catalog",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_variants",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_creation_video",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_enabled",
+        "feature_key": "integration_propagation_gbp",
         "is_enabled": true
       },
       {
-        "feature_key": "product_options_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_layout_classic",
+        "feature_key": "integration_square",
         "is_enabled": true
       },
       {
-        "feature_key": "product_options_layout_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_layout_editorial",
+        "feature_key": "org_disabled",
         "is_enabled": true
       },
       {
-        "feature_key": "product_options_layout_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_layout_immersive",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_layout_off",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_layout_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_categories",
+        "feature_key": "payment_gateway_enabled",
         "is_enabled": true
       },
       {
-        "feature_key": "product_options_sections_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_enhanced_seo",
+        "feature_key": "payment_gateway_stripe",
         "is_enabled": true
       },
       {
-        "feature_key": "product_options_sections_fulfillment",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_hours_display",
+        "feature_key": "social_commerce_disabled",
         "is_enabled": true
       },
       {
-        "feature_key": "product_options_sections_location_availability",
+        "feature_key": "storefront",
         "is_enabled": true
-      },
-      {
-        "feature_key": "product_options_sections_location_display",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "product_options_sections_map_display",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "product_options_sections_off",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_qr_codes",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "product_options_sections_qr_logo",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "product_options_sections_recently_viewed",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "product_options_sections_recommended",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "product_options_sections_reviews",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_domains_custom_domain",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_domains_disabled",
-        "is_enabled": false
       },
       {
         "feature_key": "storefront_domains_enabled",
         "is_enabled": true
       },
       {
-        "feature_key": "storefront_domains_flexible",
-        "is_enabled": false
+        "feature_key": "storefront_domains_platform_subdomain",
+        "is_enabled": true
       },
       {
-        "feature_key": "storefront_domains_platform_subdomain",
-        "is_enabled": false
+        "feature_key": "storefront_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "storefront_online",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "storefront_retail",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "storefront_service",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "wholesale_matching_disabled",
+        "is_enabled": true
       }
     ],
     "professional": [
@@ -16536,104 +15800,12 @@
         "is_enabled": true
       },
       {
-        "feature_key": "chatbot_dynamic_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_dynamic_on",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_kb_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_kb_on",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_kb_product_scoped",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_kb_rag_retrieval",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_kb_static_faq",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_shared_dynamic",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_skill_product_search",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_skill_store_hours",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_skills_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_skills_on",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_static_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_static_lookup",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_static_on",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_widget_embed",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_widget_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "chatbot_widget_on",
+        "feature_key": "chatbot_disabled",
         "is_enabled": true
       },
       {
         "feature_key": "clover_sync",
         "is_enabled": true
-      },
-      {
-        "feature_key": "commerce_deposit_only",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "commerce_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "commerce_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "commerce_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "commerce_full_payment",
-        "is_enabled": false
       },
       {
         "feature_key": "coupon_disabled",
@@ -16837,30 +16009,6 @@
       },
       {
         "feature_key": "directory_entry_social_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "directory_promotion_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_basic",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "directory_promotion_level_featured",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "directory_promotion_level_premium",
         "is_enabled": false
       },
       {
@@ -17076,55 +16224,7 @@
         "is_enabled": true
       },
       {
-        "feature_key": "fulfillment_delivery",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_disabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "fulfillment_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_pickup",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_service",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "fulfillment_shipping",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "funnel_options_builder_on",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "funnel_options_builder_order_bump",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "funnel_options_builder_upsell",
-        "is_enabled": true
-      },
-      {
         "feature_key": "funnel_options_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "funnel_options_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "google_sync",
         "is_enabled": true
       },
       {
@@ -17132,11 +16232,23 @@
         "is_enabled": true
       },
       {
-        "feature_key": "integration_google_merchant_center",
+        "feature_key": "integration_clover",
         "is_enabled": true
       },
       {
-        "feature_key": "integration_google_shopping",
+        "feature_key": "integration_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "integration_pos_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "integration_pos_on",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "integration_square",
         "is_enabled": true
       },
       {
@@ -17148,67 +16260,15 @@
         "is_enabled": true
       },
       {
-        "feature_key": "marketing_ops_batch_execution",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "marketing_ops_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "marketing_ops_enabled",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "marketing_ops_filter_review",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "marketing_ops_prompt_execution",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "marketing_ops_revenue_tracking",
-        "is_enabled": true
-      },
-      {
         "feature_key": "mobile_responsive",
         "is_enabled": true
       },
       {
-        "feature_key": "payment_gateway_disabled",
+        "feature_key": "org_disabled",
         "is_enabled": true
-      },
-      {
-        "feature_key": "payment_gateway_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_paypal",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_square",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "payment_gateway_stripe",
-        "is_enabled": false
       },
       {
         "feature_key": "performance_analytics",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "platform_services_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "platform_services_enabled",
         "is_enabled": true
       },
       {
@@ -17384,68 +16444,8 @@
         "is_enabled": false
       },
       {
-        "feature_key": "social_commerce_abandoned_cart",
-        "is_enabled": false
-      },
-      {
         "feature_key": "social_commerce_disabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_enabled",
         "is_enabled": true
-      },
-      {
-        "feature_key": "social_commerce_flexible",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_catalog",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_meta_pixel",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "social_commerce_meta_shop",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_share_buttons",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "social_commerce_social_proof",
-        "is_enabled": true
-      },
-      {
-        "feature_key": "social_commerce_tiktok_catalog",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_on",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_pixel",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "social_commerce_tiktok_shop",
-        "is_enabled": false
       },
       {
         "feature_key": "square_sync",
@@ -17456,20 +16456,8 @@
         "is_enabled": true
       },
       {
-        "feature_key": "storefront_domains_custom_domain",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_domains_disabled",
-        "is_enabled": false
-      },
-      {
         "feature_key": "storefront_domains_enabled",
-        "is_enabled": false
-      },
-      {
-        "feature_key": "storefront_domains_flexible",
-        "is_enabled": false
+        "is_enabled": true
       },
       {
         "feature_key": "storefront_domains_platform_subdomain",
@@ -17829,7 +16817,7 @@
       },
       {
         "feature_key": "wholesale_matching_disabled",
-        "is_enabled": false
+        "is_enabled": true
       },
       {
         "feature_key": "wholesale_matching_enabled",

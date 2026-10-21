@@ -69,14 +69,17 @@ const KNOWN_PRICE_DIVERGENCES: Record<string, { db: number; fixture: number }> =
  */
 const TIER_VETO_BASELINE: Record<string, string[]> = {
   directory_presence: ['storefront_opt_disabled'],
+  // Triad redesign (migration 352): all three Entry Presence modes carry the
+  // same six upgrade-gated vetoes — every other module is silent (off but
+  // open à-la-carte), commerce/gateway/integration are open market.
   discovery: [
-    'commerce_disabled', 'coupon_disabled', 'directory_entry_disabled',
-    'directory_promotion_disabled', 'fulfillment_disabled', 'funnel_options_disabled',
-    'payment_gateway_disabled', 'social_commerce_disabled', 'storefront_disabled',
-    'storefront_gallery_disabled', 'storefront_hours_disabled', 'storefront_layouts_disabled',
-    'storefront_maps_disabled', 'storefront_opt_disabled',
+    'chatbot_disabled', 'coupon_disabled', 'funnel_options_disabled',
+    'org_disabled', 'social_commerce_disabled', 'wholesale_matching_disabled',
   ],
-  storefront: ['commerce_disabled', 'coupon_disabled', 'fulfillment_disabled', 'payment_gateway_disabled'],
+  storefront: [
+    'chatbot_disabled', 'coupon_disabled', 'funnel_options_disabled',
+    'org_disabled', 'social_commerce_disabled', 'wholesale_matching_disabled',
+  ],
   commitment: ['coupon_disabled'],
   chain_starter: ['coupon_disabled'],
   chain_professional: ['wholesale_matching_disabled'],
@@ -84,9 +87,12 @@ const TIER_VETO_BASELINE: Record<string, string[]> = {
   enterprise: ['wholesale_matching_disabled'],
   seed_preview: ['payment_gateway_disabled'],
   expired_trial: [],
-  // NOTE: `presence` has 9 `*_disabled` ROWS but all is_enabled=false —
-  // dormant vetoes, not live ones. Baseline tracks ENABLED vetoes only.
-  presence: [],
+  // Triad redesign: presence is now the deposit-commerce mode — its old
+  // dormant veto rows were deleted and it carries the same six gates.
+  presence: [
+    'chatbot_disabled', 'coupon_disabled', 'funnel_options_disabled',
+    'org_disabled', 'social_commerce_disabled', 'wholesale_matching_disabled',
+  ],
   // Trial-tier rows carry vetoes too — but the bags are DEAD DATA on resolve
   // paths (both MV and resolver proxy trial→base first). Pinned regardless —
   // a raw-key read path would observe them.

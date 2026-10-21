@@ -67,7 +67,7 @@
   "pricing": {
     "$comment": "0.4 is unresolved: the doc table lacks the `chain_*` / `google_only` / `trial` / `starter` rows that exist in code, and Phase 5.1's doc generation is gated on that decision. Only the documented active-tier prices are pinned here; the dormant rows are deliberately absent until 0.4 rules.",
     "directory_presence": 0,
-    "presence": 19,
+    "presence": 39,
     "discovery": 29,
     "storefront": 59,
     "commitment": 79,
@@ -78,12 +78,12 @@
     "enterprise": 499
   },
   "display_names": {
-    "$comment": "Canonical TIER_DISPLAY_NAMES (web tier-features.ts is the reference copy). `custom` is absent by rule — the assigned tier has no catalog-facing name. `presence` and `starter` BOTH render 'Starter' — an intentional V3.1 quirk (presence took the display name; legacy starter keeps it), not a bug to dedupe.",
+    "$comment": "Canonical TIER_DISPLAY_NAMES (web tier-features.ts is the reference copy). `custom` is absent by rule — the assigned tier has no catalog-facing name. Triad redesign (ENTRY_PRESENCE_TRIAD_REDESIGN_SPEC): `presence` renders 'Storefront+' (deposit-commerce surface — the 'Starter' collision with legacy `starter` is retired), `discovery` renders 'SWIS' (Google surface). `starter` keeps 'Starter' as the legacy-only holder.",
     "google_only": "Google-Only",
     "directory_presence": "Directory Presence",
-    "presence": "Starter",
+    "presence": "Storefront+",
     "starter": "Starter",
-    "discovery": "Discovery",
+    "discovery": "SWIS",
     "storefront": "Storefront",
     "commitment": "Commitment",
     "ecommerce": "E-commerce",
@@ -307,10 +307,9 @@
         ]
       },
       "no_checkout_below_commitment": {
-        "$comment": "2.3 — commerce starts at commitment/ecommerce. Prefix-level ban since commerce grants live in tier_features_list, not the static bags: nobody below commitment may carry commerce_*/checkout_* keys.",
+        "$comment": "2.3 — commerce starts at commitment/ecommerce. Prefix-level ban since commerce grants live in tier_features_list, not the static bags: nobody below commitment may carry commerce_*/checkout_* keys. Triad redesign (ENTRY_PRESENCE_TRIAD_REDESIGN_SPEC): `presence` is removed from the banned set — it is the deposit-commerce surface and legitimately carries commerce_enabled/commerce_deposit_only + payment_gateway_stripe in its DB bag. Full-payment commerce still opens at commitment/ecommerce or via commerce_flexible purchase.",
         "tiers": [
           "directory_presence",
-          "presence",
           "google_only",
           "discovery",
           "storefront"
@@ -510,7 +509,7 @@
     }
   },
   "capability_modules": {
-    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=unknown, generated_at=2026-10-17T19:21:33.761Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
+    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=unknown, generated_at=2026-10-21T15:47:27.862Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
     "barcode_scan_options": [
       "barcode_camera",
       "barcode_disabled",

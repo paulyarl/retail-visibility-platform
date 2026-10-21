@@ -1066,29 +1066,29 @@ export default function DirectoryClaimClient() {
 const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
   {
     tierKey: 'presence',
-    name: 'Starter',
-    displayName: 'Starter',
+    name: 'Storefront+',
+    displayName: 'Storefront+',
     description: null,
-    priceMonthly: 19,
-    priceAnnual: 228,
+    priceMonthly: 39,
+    priceAnnual: 468,
     sortOrder: 10,
     billingType: 'subscription',
-    mode: 'directory',
-    tagline: 'Own your directory listing',
+    mode: 'commerce',
+    tagline: 'Sell with deposit checkout',
     isPrimary: true,
     newFeatures: [],
   },
   {
     tierKey: 'discovery',
-    name: 'Discovery',
-    displayName: 'Discovery',
+    name: 'SWIS',
+    displayName: 'SWIS',
     description: null,
     priceMonthly: 29,
     priceAnnual: 348,
     sortOrder: 20,
     billingType: 'subscription',
     mode: 'google',
-    tagline: 'Get found on Google',
+    tagline: 'Put your products on Google',
     isPrimary: false,
     newFeatures: [],
   },
@@ -1102,22 +1102,23 @@ const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
     sortOrder: 30,
     billingType: 'subscription',
     mode: 'platform',
-    tagline: 'Open your platform store',
+    tagline: 'Showcase your full catalog',
     isPrimary: false,
     newFeatures: [],
   },
 ];
 
 // Curated per-mode unlock copy — must stay within each tier's actual feature
-// set (spec copy accuracy rules: no premium layout, no featured products, no
-// cart/checkout language; hours/map/contact/QR/SNAP are already free).
+// set (spec copy accuracy rules: no premium layout, no featured products;
+// hours/map/contact/QR/SNAP are already free). presence is the one mode with
+// native checkout — deposit-only, Stripe.
 const MODE_UNLOCK_COPY: Record<string, string> = {
   presence:
-    'Business logo, about/bio, photo gallery, social links, and richer directory layouts (classic / editorial / immersive).',
+    'Full directory chrome plus a hosted storefront with deposit checkout (Stripe). Upgrade to full payment and more gateways anytime as add-ons.',
   discovery:
-    'Google Shopping / Search / Maps visibility for your products and store, plus thin directory chrome.',
+    'Your products on Google — Merchant Center feed, Shopping and local inventory visibility, hosted on your platform subdomain.',
   storefront:
-    'A full, branded /shops/{slug} browse experience with product catalog and Google inherit — browsing only; checkout arrives with Commerce tiers.',
+    'A full, branded storefront browse experience with product catalog on your subdomain — add checkout anytime as an à-la-carte add-on.',
 };
 
 function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
@@ -1168,10 +1169,11 @@ function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
         ))}
       </Grid>
       <Text size="xs" c="dimmed" ta="center">
-        Start with a Presence Mode. Later, add checkout with <strong>Commitment</strong>,{' '}
-        <strong>E-commerce</strong>, or <strong>Omnichannel</strong>, then scale with{' '}
-        <strong>Professional</strong>, <strong>Organization</strong>, or <strong>Enterprise</strong>{' '}
-        tools. You can also buy individual features à la carte from the Feature Store at any time.
+        Start with a surface — every mode can add the others&apos; capabilities as
+        à-la-carte add-ons without switching plans. Scale to <strong>Commitment</strong>,{' '}
+        <strong>E-commerce</strong>, or <strong>Omnichannel</strong> for coupons, funnels, and
+        social selling, then <strong>Professional</strong>, <strong>Organization</strong>, or{' '}
+        <strong>Enterprise</strong> tools.
       </Text>
     </Stack>
   );
