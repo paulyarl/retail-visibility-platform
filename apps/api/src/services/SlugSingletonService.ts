@@ -568,11 +568,12 @@ class SlugSingletonService extends UniversalSingleton {
   async checkPlaceSlugAvailability(
     slug: string,
     excludeTenantId?: string
-  ): Promise<{ available: boolean; code?: string }> {
+  ): Promise<{ available: boolean; code?: string; ownedByCurrentUser?: boolean }> {
     const ownership = await this.getPlaceSlugOwnership(slug, excludeTenantId);
     return {
       available: ownership.isAvailable,
       code: ownership.isAvailable ? undefined : ownership.unavailableReason,
+      ownedByCurrentUser: ownership.isOwnSlug,
     };
   }
 

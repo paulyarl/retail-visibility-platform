@@ -230,7 +230,7 @@ describe('SlugSingletonService.getAllSlugPatterns — place namespace', () => {
 
     const result = await slugSingletonService.checkPlaceSlugAvailability('ivoire-african-market', TENANT);
 
-    expect(result).toEqual({ available: false, code: 'place_slug_taken' });
+    expect(result).toEqual({ available: false, code: 'place_slug_taken', ownedByCurrentUser: false });
   });
 
   it('flags reserved /place static-route slugs before any DB read', async () => {
@@ -271,7 +271,7 @@ describe('SlugSingletonService.checkPlaceSlugAvailability', () => {
   it('reports a reserved /place slug as unavailable without a DB read', async () => {
     const result = await slugSingletonService.checkPlaceSlugAvailability('claim', TENANT);
 
-    expect(result).toEqual({ available: false, code: 'reserved_place_slug' });
+    expect(result).toEqual({ available: false, code: 'reserved_place_slug', ownedByCurrentUser: false });
     expect(placeRowsMock).not.toHaveBeenCalled();
   });
 

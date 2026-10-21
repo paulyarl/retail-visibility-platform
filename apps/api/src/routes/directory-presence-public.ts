@@ -26,6 +26,7 @@ import DirectoryClaimService from '../services/DirectoryClaimService';
 import DirectorySuggestionService, { suggestionInputSchema } from '../services/DirectorySuggestionService';
 import DirectoryOwnerSubmissionService, { ownerSubmissionInputSchema } from '../services/DirectoryOwnerSubmissionService';
 import DirectoryPresenceSeedService from '../services/DirectoryPresenceSeedService';
+import slugSingletonService from '../services/SlugSingletonService';
 import GrowthEngineAnalyticsService from '../services/GrowthEngineAnalyticsService';
 import { slugify } from '../utils/slug';
 import { prisma } from '../prisma';
@@ -1721,26 +1722,38 @@ router.put('/claim/:token/listing', optionalAuth, optionalCustomerAuth, async (r
     if (data.slug !== undefined) fields.slug = data.slug;
 
     if (data.slug) {
-      const takenInSettings = await prisma.directory_settings_list.findFirst({
-        where: { slug: data.slug, NOT: { tenant_id: summary.tenantId } },
-      });
-      const takenInListings = await prisma.directory_listings_list.findFirst({
-        where: { slug: data.slug, NOT: { tenant_id: summary.tenantId } },
-      });
-      if (takenInSettings || takenInListings) {
-        return res.status(409).json({ error: 'slug_taken' });
-      }
+      // Normalize exactly as ensureUniqueSlug does, then require the value to
+      // be free across the shared slug namespace (listings + settings +
+      // tenants) and not a reserved /place/ name — the owner explicitly chose
+      // this slug, so silently suffixing it would be the wrong contract.
+      const normalizedSlug = data.slug
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 80);
+      if (!normalizedSlug) {
+        delete fields.slug;
+      } else {
+        const availability = await slugSingletonService.checkPlaceSlugAvailability(
+          normalizedSlug,
+          summary.tenantId
+        );
+        if (!availability.available) {
+          return res.status(409).json({ error: 'slug_taken' });
+        }
+        fields.slug = normalizedSlug;
 
-      await prisma.directory_settings_list.upsert({
-        where: { tenant_id: summary.tenantId },
-        update: { slug: data.slug, updated_at: new Date() },
-        create: {
-          id: `${summary.tenantId}_settings`,
-          tenant_id: summary.tenantId,
-          slug: data.slug,
-          updated_at: new Date(),
-        },
-      });
+        await prisma.directory_settings_list.upsert({
+          where: { tenant_id: summary.tenantId },
+          update: { slug: normalizedSlug, updated_at: new Date() },
+          create: {
+            id: `${summary.tenantId}_settings`,
+            tenant_id: summary.tenantId,
+            slug: normalizedSlug,
+            updated_at: new Date(),
+          },
+        });
+      }
     }
 
     await DirectoryPresenceSeedService.updateFields(summary.seedId, fields, [], {
@@ -1849,76 +1862,61 @@ router.get('/claim/:token/slug-patterns', async (req: Request, res: Response) =>
     if (summary.isExpired) return res.status(410).json({ error: 'token_expired' });
     if (summary.isConsumed) return res.status(409).json({ error: 'already_claimed' });
 
-    const baseSlug = slugify(summary.businessName);
-    const citySlug = summary.city ? slugify(summary.city) : '';
-    const stateSlug = summary.state ? summary.state.toLowerCase() : '';
+    // The shared 'place' oracle — the same patterns + availability ruleset the
+    // operator's seed-edit picker uses: candidates across the shared slug
+    // namespace (directory_listings_list + directory_settings_list +
+    // tenants.slug), reserved /place/ names refused, the seed's own slug
+    // reading isOwnSlug, and the canonical 4-char tenant key as the unique-ID
+    // pattern instead of a raw ID tail.
+    const patterns = await slugSingletonService.getAllSlugPatterns(
+      summary.businessName,
+      {
+        city: summary.city || undefined,
+        state: summary.state || undefined,
+      },
+      summary.tenantId,
+      'place'
+    );
 
-    const rawPatterns: { pattern: string; slug: string; description: string }[] = [
-      { pattern: 'business_name', slug: baseSlug, description: 'Business name only (shortest, most memorable)' },
-    ];
-
-    if (citySlug) {
-      rawPatterns.push({
-        pattern: 'business_name_city',
-        slug: `${baseSlug}-${citySlug}`,
-        description: `${summary.businessName} in ${summary.city}`,
-      });
-    }
-    if (stateSlug) {
-      rawPatterns.push({
-        pattern: 'business_name_state',
-        slug: `${baseSlug}-${stateSlug}`,
-        description: `${summary.businessName} in ${summary.state}`,
-      });
-    }
-    if (citySlug && stateSlug) {
-      rawPatterns.push({
-        pattern: 'business_name_city_state',
-        slug: `${baseSlug}-${citySlug}-${stateSlug}`,
-        description: `${summary.businessName} in ${summary.city}, ${summary.state}`,
-      });
-    }
-
-    // Always add a unique-id pattern as a guaranteed-available fallback
-    const shortId = summary.tenantId.slice(-6).toLowerCase();
-    rawPatterns.push({
-      pattern: 'business_name_autoid',
-      slug: `${baseSlug}-${shortId}`,
-      description: `${summary.businessName} (unique ID)`,
-    });
-
-    const slugs = rawPatterns.map((p) => p.slug);
-    const [settingsRows, listingRows] = await Promise.all([
-      prisma.directory_settings_list.findMany({
-        where: { slug: { in: slugs }, NOT: { tenant_id: summary.tenantId } },
-        select: { slug: true, tenant_id: true },
-      }),
-      prisma.directory_listings_list.findMany({
-        where: { slug: { in: slugs }, NOT: { tenant_id: summary.tenantId } },
-        select: { slug: true, tenant_id: true },
-      }),
-    ]);
-    const takenSlugs = new Set([
-      ...settingsRows.map((r) => r.slug),
-      ...listingRows.map((r) => r.slug),
-    ]);
-
-    const currentListingSlug = await prisma.directory_listings_list.findFirst({
-      where: { tenant_id: summary.tenantId },
-      select: { slug: true },
-    });
-    const ownSlug = currentListingSlug?.slug ?? undefined;
-
-    res.json({
-      success: true,
-      patterns: rawPatterns.map((p) => ({
-        ...p,
-        isAvailable: !takenSlugs.has(p.slug),
-        isOwnSlug: p.slug === ownSlug,
-      })),
-    });
+    res.json({ success: true, patterns });
   } catch (error: any) {
     logger.error('[GET /api/public/directory/claim/:token/slug-patterns] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/public/directory/claim/:token/slug-check — token-gated free-text
+ *  availability for the picker's "type your own" entry. Same oracle the
+ *  generated patterns use (shared slug namespace + reserved /place/ names);
+ *  normalizes like ensureUniqueSlug so the value checked is the value the
+ *  listing PUT writes. */
+router.get('/claim/:token/slug-check', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const summary = await DirectoryClaimService.getTokenSummary(token);
+    if (!summary) return res.status(404).json({ error: 'token_not_found' });
+    if (summary.isExpired) return res.status(410).json({ error: 'token_expired' });
+    if (summary.isConsumed) return res.status(409).json({ error: 'already_claimed' });
+
+    const slug = String(req.query.slug || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 80);
+    if (!slug) return res.status(400).json({ error: 'invalid_slug' });
+
+    const result = await slugSingletonService.checkPlaceSlugAvailability(slug, summary.tenantId);
+    res.json({
+      success: true,
+      slug,
+      isAvailable: result.available,
+      isOwnSlug: result.ownedByCurrentUser ?? false,
+      code: result.code,
+    });
+  } catch (error: any) {
+    logger.error('[GET /api/public/directory/claim/:token/slug-check] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

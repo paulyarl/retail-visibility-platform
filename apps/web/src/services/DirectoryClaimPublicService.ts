@@ -245,6 +245,28 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
     }
   }
 
+  /** GET /api/public/directory/claim/:token/slug-check — token-gated free-text
+   *  availability for the picker's "type your own" entry. */
+  async checkSlugAvailability(
+    token: string,
+    slug: string
+  ): Promise<{ available: boolean; own: boolean; code?: string } | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/claim/${encodeURIComponent(token)}/slug-check?slug=${encodeURIComponent(slug)}`,
+        { method: 'GET' },
+        undefined,
+        0,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      if (!data) return null;
+      return { available: !!data.isAvailable, own: !!data.isOwnSlug, code: data.code };
+    } catch {
+      return null;
+    }
+  }
+
   /** GET /api/public/directory/claim/:token/slug-patterns — available slugs */
   async getSlugPatterns(token: string): Promise<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }[]> {
     try {
