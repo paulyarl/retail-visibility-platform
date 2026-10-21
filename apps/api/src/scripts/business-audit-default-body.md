@@ -424,7 +424,10 @@ Classify website status using one of:
 * broken
 * none_found
 * social_media_only
+* hijacked
 * unable_to_verify
+
+`hijacked` means the URL resolves to live content that is NOT the business's — expired-domain takeover, foreign-language spam, gambling/casino/pharma/SEO-doorway pages, or a page for a different entity. The site loads, so it is not `broken`; it is not the business's site, so it is not `working`. Set `website.status` to `hijacked` on content-verified foreign content and emit `WC_DOMAIN_HIJACKED`.
 
 Evaluate:
 
@@ -678,6 +681,7 @@ Emit the codes above ONLY from observed evidence — a rendered notice, a visibl
 * `WC_THIRD_PARTY_DOMAIN`: the "website" is a social / messaging / profile platform page (facebook.com, instagram.com, wa.me, api.whatsapp.com, x.com/twitter.com, tiktok.com, linktr.ee, yelp.com, nextdoor.com, t.me, m.me, threads.net, snapchat.com) OR the site status is `social_media_only` — the website field is a social page, not an owned site. Emit on sight.
 * `WC_BUILDER_SUBDOMAIN`: the site is a free builder subdomain (*.wixsite.com, *.wordpress.com, *.godaddysites.com, *.weebly.com, *.square.site, *.business.site, *.blogspot.com, *.tripod.com, *.angelfire.com, *.homestead.com, *.webs.com, *.jimdo.com, *.site123.me, *.strikingly.com, *.webnode.com, *.myshopify.com, *.bigcartel.com) — a live page, but no owned domain. Emit on sight.
 * `WC_PARKED_DOMAIN`: the domain resolves to a parked / for-sale / registrar placeholder page. Emit on sight.
+* `WC_DOMAIN_HIJACKED`: the domain resolves to live content unrelated to the business — foreign-language spam, gambling/casino/pharma/SEO-doorway pages, or content for a different entity. Expired-domain takeover or site compromise; the domain is unusable even though it loads. Set `website.status` to `hijacked`. Emit on sight.
 * `WC_UNFINISHED_SITE`: a "coming soon" / under-construction / template-default page that was never finished. Emit on sight.
 * `WC_UNSECURED_WEBSITE`: the owned site serves plain HTTP or has an untrusted certificate. Emit on sight (only for an owned site — not for third-party/builder hosts where TLS is the platform's).
 * `WC_LEGACY_BUILDER_SITE`: owned domain fingerprinted as a legacy / low-cost builder (Wix assets, wp-content, GoDaddy generator meta, visible builder branding, table-layout-era markup). Requires content-verified.

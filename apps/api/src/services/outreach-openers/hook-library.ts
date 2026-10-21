@@ -43,6 +43,10 @@ export type HookAngle =
   | 'website_foundation'
   | 'website_repair'
   | 'third_party_presence'
+  // Hijacked-domain angle (WC_DOMAIN_HIJACKED) — the website URL resolves to
+  // live foreign content (gambling/spam/doorway pages). The pitch is rescue:
+  // replace the poisoned destination, don't repair it.
+  | 'domain_hijacked'
   // Website OFFERING angles (platform product-led, not gap-led) — the pitch
   // sells the platform's website capabilities: package tiers, ecommerce,
   // scaling, visibility. Spec: WEBSITE_GAP_AUDIT_PLAYBOOK_SPEC (angles).
@@ -303,6 +307,37 @@ Want me to sketch out what that could look like, no obligation?
       soft_cta: 'Want me to sketch out what that could look like, no obligation?',
     },
     phone_hook: 'I went looking for your website and what I found was a social page standing in for one — nothing a customer can land on that actually looks like your business. Totally normal for a lot of great local shops. But when someone searches for {{category}} in {{city}} and the only thing that comes up is a social page, a chunk of them just keep scrolling to the next result. I do simple storefront websites for shops like yours — nothing fancy, just something that shows up under your own name, loads fast, shows off what you carry, and gets people in. Want me to sketch out what that could look like, no obligation?',
+  },
+
+  // 4c-bis. domain_hijacked — the URL resolves to foreign content (expired-
+  //     domain takeover / compromise). NOT a build pitch — a reputation
+  //     rescue: the business's reviews and name are actively lending trust
+  //     to someone else's page. One-time repair offer; urgency is honest.
+  {
+    angle: 'domain_hijacked',
+    label: 'Website domain hijacked / foreign content',
+    archetypes: ['A7'],
+    signals: ['WC_DOMAIN_HIJACKED'],
+    subject: 'your website link is sending people somewhere it shouldn\u2019t',
+    body: `{{salutation}} I clicked the Website button on your Google profile today and it didn't open your business — it loads a page for something completely unrelated. It looks like the domain was taken over.
+
+This happens more than you'd think — domains expire or get compromised, and the old link keeps quietly sending your customers somewhere else.
+
+The part that's worth acting on: your reviews and reputation are doing the work. People click that button trusting {{business}} — and land on a page that isn't yours.
+
+I can put a real storefront up under a fresh address, switch your Google profile to point at it, and the bad link is done — usually same day. It's a one-time fix, not a subscription.
+
+Want me to send over what I captured?
+
+-- {{sender_name}}`,
+    shape: {
+      score_hook: 'The Website button on your Google profile opens a page that isn\u2019t yours',
+      reassurance: 'Happens more than you\u2019d think — domains expire or get compromised quietly.',
+      quantified_upside: 'Your reviews and reputation are sending customers to someone else\u2019s page',
+      audit_offer: 'New storefront on a fresh address + Google profile repoint — one-time fix, same day',
+      soft_cta: 'Want me to send over what I captured?',
+    },
+    phone_hook: 'I clicked the Website button on your Google profile today and it didn\u2019t open your business — it loads a page for something completely unrelated, looks like the domain was taken over. Happens more than people think — the link keeps sending your customers somewhere else. I can put a real storefront up under a fresh address, repoint your Google profile, and the bad link is done, usually same day. One-time fix, not a subscription. Want me to send over what I captured?',
   },
 
   // 4d. website_tiers — platform OFFERING angle: package tiers, start simple

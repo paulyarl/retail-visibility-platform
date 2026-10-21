@@ -331,6 +331,7 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
       websiteStatus === 'none_found' ||
       websiteStatus === 'social_media_only' ||
       websiteStatus === 'broken' ||
+      websiteStatus === 'hijacked' ||
       isSocialPlatformHost(website?.url) ||
       isBuilderSubdomainHost(website?.url);
     if (noOwnedUsableSite) {
@@ -340,7 +341,9 @@ export function selectArchetype(auditData: BusinessAnalysisAuditData): Archetype
           ? 'website is on a free builder subdomain'
           : websiteStatus === 'broken'
             ? 'website URL is dead'
-            : 'no website found';
+            : websiteStatus === 'hijacked'
+              ? 'website domain shows foreign content (hijacked)'
+              : 'no website found';
       return {
         archetype: 'A7',
         reason: `website gap: ${detail}`,

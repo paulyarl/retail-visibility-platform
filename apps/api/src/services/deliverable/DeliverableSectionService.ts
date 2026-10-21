@@ -196,6 +196,8 @@ export class DeliverableSectionService extends BaseService {
     if (w?.url && status !== 'none_found') {
       if (status === 'social_media_only') presenceState = `A social page is standing in for the website (${w.url})`;
       else if (status === 'broken') presenceState = `The website link is dead (${w.url})`;
+      else if (status === 'hijacked' || detected.includes('WC_DOMAIN_HIJACKED'))
+        presenceState = `The domain shows content that is not the business's — hijacked (${w.url})`;
       else if (detected.includes('WC_PARKED_DOMAIN')) presenceState = 'The domain is parked / not a live site';
       else if (detected.includes('WC_UNFINISHED_SITE')) presenceState = 'The site is unfinished (coming-soon page)';
       else if (detected.includes('WC_BUILDER_SUBDOMAIN')) presenceState = `The site is on a free builder subdomain (${w.url})`;

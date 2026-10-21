@@ -79,6 +79,9 @@ const DEFAULT_SEVERITY: Record<string, SignalSeverity> = {
   RA_BBB_GRADE_SUPPRESSION: 'crisis',
   RA_UNANSWERED_COMPLAINTS: 'crisis',
   WC_BROKEN_WEBSITE: 'crisis',
+  // The domain itself spends the business's reputation on foreign content —
+  // active harm, worse than absence (WC_MISSING_WEBSITE is also crisis).
+  WC_DOMAIN_HIJACKED: 'crisis',
   WC_MISSING_WEBSITE: 'crisis',
   DS_BROKEN_PROFILE_LINK: 'crisis',
   DS_MISSING_PROFILE: 'crisis',
@@ -533,7 +536,7 @@ export function computePrimarySignalSeverity(
       const w = auditData.website;
       if (!w?.url) return 'crisis';
       const status = w.status?.toLowerCase();
-      if (status === 'broken' || status === 'none_found' || status === 'social_media_only') {
+      if (status === 'broken' || status === 'none_found' || status === 'social_media_only' || status === 'hijacked') {
         return 'crisis';
       }
       return 'material';
@@ -552,6 +555,12 @@ export function computePrimarySignalSeverity(
       // Parked / unfinished are model-emitted only (no raw field) — read them
       // off detected_signals when present.
       const detected = (auditData as any)?.detected_signals;
+      // Hijacked: the URL resolves but to foreign content — reputation spent
+      // on someone else's page is a harder pain than absence.
+      if (status === 'hijacked' ||
+        (Array.isArray(detected) && detected.includes('WC_DOMAIN_HIJACKED'))) {
+        return 'crisis';
+      }
       if (Array.isArray(detected) &&
         (detected.includes('WC_PARKED_DOMAIN') || detected.includes('WC_UNFINISHED_SITE'))) {
         return 'material';
