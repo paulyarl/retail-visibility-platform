@@ -38,6 +38,9 @@ interface RepairAuditOutput {
     // Optional — absent on executions produced before the outreach_problems
     // contract landed (Triage & Repair Outreach Problems spec §5.1).
     outreach_problems?: OutreachProblem[];
+    // Optional — absent on executions produced before the Operator Benefits
+    // directive landed. The upside counterpart to outreach_problems.
+    benefits?: string[];
   };
 }
 
@@ -236,6 +239,20 @@ export default function RepairBriefingCard({ execution, campaignId, collapsible 
                 return { warnings: Array.isArray(issues) && issues.length > 0 ? issues : undefined };
               }}
             />
+          </div>
+        )}
+
+        {/* Benefits — the upside counterpart to the outreach ammunition;
+            owner-speakable benefit lines for the briefing. */}
+        {briefing.benefits && briefing.benefits.length > 0 && (
+          <div className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
+            <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
+              <Sparkles className="w-3.5 h-3.5" />
+              Benefits
+            </div>
+            <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-5">
+              {briefing.benefits.map((b, i) => <li key={i}>{b}</li>)}
+            </ul>
           </div>
         )}
 

@@ -345,6 +345,26 @@ export default function ProspectReportView({ report }: { report: ProspectReport 
         </section>
       )}
 
+      {/* Benefits annex (§2) — the upside counterpart to the problems
+          annex: the audit/briefing's owner-speakable benefit lines for
+          the recommended work, closing the pitch on what the owner gets
+          back. */}
+      {report.benefits.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            What the fix gets you
+          </h2>
+          <ul className="space-y-1.5">
+            {report.benefits.map((b, i) => (
+              <li key={i} className="text-sm text-gray-700 dark:text-gray-300 flex gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* How this report was made — the honesty footer (§6.5) */}
       {(report.data_quality.verified.length > 0 ||
         report.data_quality.couldnt_check.length > 0 ||

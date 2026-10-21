@@ -393,6 +393,17 @@ export class ProfileRepairPromptService extends BaseService {
       lines.push('');
     }
 
+    // 11b. Audit-derived benefits — the upside counterpart the briefing's
+    // own `benefits` list aligns with rather than reinvents.
+    const auditBenefits = auditData.benefits;
+    if (Array.isArray(auditBenefits) && auditBenefits.length > 0) {
+      lines.push('## Audit Benefits (pre-computed by the audit)');
+      for (const b of auditBenefits) {
+        if (typeof b === 'string' && b.trim()) lines.push(`- ${b}`);
+      }
+      lines.push('');
+    }
+
     // 12. Competitive benchmarks (compact — positioning input)
     const benchmarks = auditData.competitive_benchmarks;
     if (Array.isArray(benchmarks) && benchmarks.length > 0) {

@@ -153,6 +153,9 @@ export interface TriageRecommendation {
   // Operator outreach ammunition — 1–3 problem → solution pairs (§5).
   // Optional: absent on briefings persisted before the contract landed.
   outreach_problems?: OutreachProblem[];
+  // Operator benefits — 2–5 owner-speakable benefit statements, the upside
+  // counterpart to outreach_problems (same level in the briefing).
+  benefits?: string[];
   // Provenance metadata (persisted alongside the briefing)
   _execution_id?: string;
   _validated?: boolean;
@@ -861,6 +864,11 @@ export interface AssembledCallScript {
    * audit (outreach_problems contract). Empty when no audit carries it.
    */
   ammunition: OutreachProblem[];
+  /**
+   * The audit's `benefits` lines — the upside counterpart to ammunition.
+   * Operator reference only. Empty when no audit carries it.
+   */
+  benefits: string[];
 }
 
 export interface CampaignOutreachAnchor {

@@ -390,3 +390,35 @@ describe('outreach_problems — optional shared-schema field (Triage & Repair Ou
     expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
   });
 });
+
+describe('benefits — optional shared-schema field (Operator Benefits directive)', () => {
+  it('accepts audit without benefits (absent — shared schema)', () => {
+    expect(businessAnalysisSchema.safeParse(baseAudit()).success).toBe(true);
+  });
+
+  it('accepts audit with 2-5 benefit lines', () => {
+    const a2 = baseAudit();
+    (a2 as any).benefits = ['b1', 'b2'];
+    expect(businessAnalysisSchema.safeParse(a2).success).toBe(true);
+
+    const a5 = baseAudit();
+    (a5 as any).benefits = ['b1', 'b2', 'b3', 'b4', 'b5'];
+    expect(businessAnalysisSchema.safeParse(a5).success).toBe(true);
+  });
+
+  it('accepts 6 benefit lines (the <=5 cap is prompt-level, not validator-level)', () => {
+    const audit = baseAudit();
+    (audit as any).benefits = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'];
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(true);
+  });
+
+  it('rejects an empty or one-line benefits array (.min(2) when present)', () => {
+    const empty = baseAudit();
+    (empty as any).benefits = [];
+    expect(businessAnalysisSchema.safeParse(empty).success).toBe(false);
+
+    const one = baseAudit();
+    (one as any).benefits = ['b1'];
+    expect(businessAnalysisSchema.safeParse(one).success).toBe(false);
+  });
+});

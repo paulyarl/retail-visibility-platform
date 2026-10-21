@@ -275,6 +275,7 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
 
   const { stages, hookOptions, objections, callContext, anchor } = script;
   const ammunition = script.ammunition ?? [];
+  const benefits = script.benefits ?? [];
   const platformPriorities = callContext?.platform_priorities ?? [];
   const platformPremise = callContext?.platform_premise ?? null;
 
@@ -511,6 +512,27 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
       {ammunition.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <OutreachProblemsSection problems={ammunition} title="Audit ammunition — from the business audit" />
+        </div>
+      )}
+
+      {/* Audit benefits — the upside counterpart to the ammunition: what to
+          say when the owner asks what the work buys them. */}
+      {benefits.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Benefits — what the owner gets back
+          </h3>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            From the business audit — the upside lines for &quot;what&apos;s in it for me?&quot;
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {benefits.map((b, i) => (
+              <li key={i} className="text-sm text-gray-700 dark:text-gray-300 flex gap-1.5">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

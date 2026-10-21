@@ -236,6 +236,17 @@ export default function WebsitePositioningAuditCard({ audit, campaignId }: Websi
         </Section>
       )}
 
+      {/* Benefits — the upside counterpart to the outreach ammunition;
+          owner-speakable benefit lines from the audit's Operator Benefits
+          directive. Same level as Outreach Ammunition in the briefing. */}
+      {Array.isArray(d.benefits) && d.benefits.length > 0 && (
+        <Section title="Benefits">
+          <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside space-y-0.5">
+            {d.benefits.map((b: string, i: number) => <li key={i}>{b}</li>)}
+          </ul>
+        </Section>
+      )}
+
       {/* Data quality */}
       {(d.data_quality?.verified_fields?.length || d.data_quality?.unavailable_fields?.length || d.data_quality?.limitations?.length) && (
         <Section title="Data Quality">

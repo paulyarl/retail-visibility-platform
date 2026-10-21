@@ -172,6 +172,33 @@ describe('profileRepairTriageSchema', () => {
     (v.profile_repair_triage as any).outreach_problems = [{ problem: 'p', regular: 'r' }];
     expect(() => profileRepairTriageSchema.parse(v)).toThrow();
   });
+
+  // benefits boundary tests — optional, .min(2) when present, no .max()
+  // (the ≤5 cap is a prompt-level rule, not a validator rule).
+  it('accepts a triage briefing with no benefits field (optional)', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [entry()];
+    expect(() => profileRepairTriageSchema.parse(v)).not.toThrow();
+  });
+
+  it('rejects a triage briefing with fewer than 2 benefit lines (.min(2))', () => {
+    const v = triageBase();
+    (v.profile_repair_triage as any).outreach_problems = [entry()];
+    (v.profile_repair_triage as any).benefits = ['b1'];
+    expect(() => profileRepairTriageSchema.parse(v)).toThrow();
+  });
+
+  it('accepts a triage briefing with 2 and 6 benefit lines', () => {
+    const two = triageBase();
+    (two.profile_repair_triage as any).outreach_problems = [entry()];
+    (two.profile_repair_triage as any).benefits = ['b1', 'b2'];
+    expect(() => profileRepairTriageSchema.parse(two)).not.toThrow();
+
+    const six = triageBase();
+    (six.profile_repair_triage as any).outreach_problems = [entry()];
+    (six.profile_repair_triage as any).benefits = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'];
+    expect(() => profileRepairTriageSchema.parse(six)).not.toThrow();
+  });
 });
 
 describe('profileRepairAuditSchema', () => {
@@ -276,6 +303,32 @@ describe('profileRepairAuditSchema', () => {
     const four = auditBase();
     (four.profile_repair_audit as any).outreach_problems = [entry(), entry(), entry(), entry()];
     expect(() => profileRepairAuditSchema.parse(four)).not.toThrow();
+  });
+
+  // benefits boundary tests — optional, .min(2) when present, no .max().
+  it('accepts a per-issue briefing with no benefits field (optional)', () => {
+    const v = auditBase();
+    (v.profile_repair_audit as any).outreach_problems = [entry()];
+    expect(() => profileRepairAuditSchema.parse(v)).not.toThrow();
+  });
+
+  it('rejects a per-issue briefing with fewer than 2 benefit lines (.min(2))', () => {
+    const v = auditBase();
+    (v.profile_repair_audit as any).outreach_problems = [entry()];
+    (v.profile_repair_audit as any).benefits = ['b1'];
+    expect(() => profileRepairAuditSchema.parse(v)).toThrow();
+  });
+
+  it('accepts a per-issue briefing with 2 and 6 benefit lines', () => {
+    const two = auditBase();
+    (two.profile_repair_audit as any).outreach_problems = [entry()];
+    (two.profile_repair_audit as any).benefits = ['b1', 'b2'];
+    expect(() => profileRepairAuditSchema.parse(two)).not.toThrow();
+
+    const six = auditBase();
+    (six.profile_repair_audit as any).outreach_problems = [entry()];
+    (six.profile_repair_audit as any).benefits = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'];
+    expect(() => profileRepairAuditSchema.parse(six)).not.toThrow();
   });
 });
 

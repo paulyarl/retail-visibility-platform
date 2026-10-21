@@ -685,21 +685,53 @@ function mapOutreachProblems(raw: unknown): ReportProblemDto[] {
 // A bare-object fallback keeps the parse tolerant; malformed/unfinished
 // outputs simply yield no pairs and the audit fallback applies.
 function briefingProblemsFromRaw(rawOutput: unknown): ReportProblemDto[] {
-  if (typeof rawOutput !== 'string' || !rawOutput.trim()) return [];
+  const parsed = parseBriefingRawOutput(rawOutput);
+  if (!parsed) return [];
+  return mapOutreachProblems(
+    parsed?.profile_repair_audit?.outreach_problems ??
+      parsed?.profile_repair_triage?.outreach_problems ??
+      parsed?.outreach_problems,
+  );
+}
+
+// ─── §2 annex — benefits (the upside counterpart to problems) ───────────
+//
+// `benefits` is a plain string array (no pairs, no internal fields) and is
+// owner-speakable by directive — analyst-voice, no internal vocab, pricing,
+// or feature names — so the lines cross the DTO boundary verbatim. Same
+// precedence as problems: briefing executions win, the chapter audit is the
+// fallback; visible chapters only.
+
+function ownerFacingBenefits(auditData: unknown): string[] {
+  return mapBenefitLines((auditData as any)?.benefits);
+}
+
+function mapBenefitLines(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((b): b is string => typeof b === 'string' && !!b.trim());
+}
+
+function parseBriefingRawOutput(rawOutput: unknown): any {
+  if (typeof rawOutput !== 'string' || !rawOutput.trim()) return null;
   try {
     const cleaned = rawOutput
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/i, '')
       .trim();
-    const parsed = JSON.parse(cleaned);
-    return mapOutreachProblems(
-      parsed?.profile_repair_audit?.outreach_problems ??
-        parsed?.profile_repair_triage?.outreach_problems ??
-        parsed?.outreach_problems,
-    );
+    return JSON.parse(cleaned);
   } catch {
-    return [];
+    return null;
   }
+}
+
+function briefingBenefitsFromRaw(rawOutput: unknown): string[] {
+  const parsed = parseBriefingRawOutput(rawOutput);
+  if (!parsed) return [];
+  return mapBenefitLines(
+    parsed?.profile_repair_audit?.benefits ??
+      parsed?.profile_repair_triage?.benefits ??
+      parsed?.benefits,
+  );
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────
@@ -2200,10 +2232,11 @@ class ProspectReportService extends BaseService {
     // sharpest framing leads regardless of chapter order. Deduping still
     // matters — every BA-sourced chapter shares the one business_analysis
     // audit — and withheld chapters contribute nothing (tier clamp first).
-    const briefingProblems = await this.loadBriefingProblems(
+    const briefingAnnex = await this.loadBriefingAnnex(
       [...new Set(visible.map((b) => b.ownerCampaignId))],
       ctx,
     );
+    const briefingProblems = briefingAnnex.problems;
     const seenProblems = new Set<string>();
     const problems: ReportProblemDto[] = [];
     const pushProblems = (pairs: ReportProblemDto[]) => {
@@ -2221,6 +2254,32 @@ class ProspectReportService extends BaseService {
     for (const b of visible) {
       if (!briefingProblems.has(b.ownerCampaignId)) {
         pushProblems(ownerFacingProblems(b.auditData));
+      }
+    }
+
+    // §2 annex — benefits, the upside counterpart to problems. Same source
+    // precedence (briefing executions win, chapter audit is the fallback),
+    // same tier clamp (visible chapters only), deduped on the line text.
+    // Capped at 5 — the audits' own 2–5 bound keeps a multi-chapter union
+    // from turning into a laundry list.
+    const briefingBenefits = briefingAnnex.benefits;
+    const seenBenefits = new Set<string>();
+    const benefits: string[] = [];
+    const pushBenefits = (lines: string[]) => {
+      for (const line of lines) {
+        if (benefits.length >= 5) return;
+        const key = line.trim().toLowerCase();
+        if (!key || seenBenefits.has(key)) continue;
+        seenBenefits.add(key);
+        benefits.push(line.trim());
+      }
+    };
+    for (const b of visible) {
+      pushBenefits(briefingBenefits.get(b.ownerCampaignId) ?? []);
+    }
+    for (const b of visible) {
+      if (!briefingBenefits.has(b.ownerCampaignId)) {
+        pushBenefits(ownerFacingBenefits(b.auditData));
       }
     }
 
@@ -2242,6 +2301,7 @@ class ProspectReportService extends BaseService {
       chapters: visible.map((b) => b.chapter),
       locked_chapters: lockedChapters,
       problems,
+      benefits,
       data_quality: dataQuality,
       cta,
     };
@@ -2273,12 +2333,16 @@ class ProspectReportService extends BaseService {
    * can contribute pairs from each of its issue briefings + triage.
    * Failures degrade to an empty map — the audit fallback still applies.
    */
-  private async loadBriefingProblems(
+  private async loadBriefingAnnex(
     campaignIds: string[],
     ctx?: RequestCtx,
-  ): Promise<Map<string, ReportProblemDto[]>> {
-    const byCampaign = new Map<string, ReportProblemDto[]>();
-    if (campaignIds.length === 0) return byCampaign;
+  ): Promise<{
+    problems: Map<string, ReportProblemDto[]>;
+    benefits: Map<string, string[]>;
+  }> {
+    const problems = new Map<string, ReportProblemDto[]>();
+    const benefits = new Map<string, string[]>();
+    if (campaignIds.length === 0) return { problems, benefits };
     try {
       const execs = (await this.prisma.mkt_prompt_executions_list.findMany({
         where: { campaign_id: { in: campaignIds } },
@@ -2301,7 +2365,7 @@ class ProspectReportService extends BaseService {
         const key = `${exec.campaign_id}:${exec.template_id ?? ''}`;
         if (!latestPerTemplate.has(key)) latestPerTemplate.set(key, exec);
       }
-      if (latestPerTemplate.size === 0) return byCampaign;
+      if (latestPerTemplate.size === 0) return { problems, benefits };
 
       const rows = (await this.prisma.mkt_prompt_executions_list.findMany({
         where: { id: { in: [...latestPerTemplate.values()].map((e) => e.id) } },
@@ -2311,16 +2375,22 @@ class ProspectReportService extends BaseService {
 
       for (const row of rows) {
         const pairs = briefingProblemsFromRaw(row.raw_output);
-        if (pairs.length === 0) continue;
-        const list = byCampaign.get(row.campaign_id) ?? [];
-        byCampaign.set(row.campaign_id, list.concat(pairs));
+        if (pairs.length > 0) {
+          const list = problems.get(row.campaign_id) ?? [];
+          problems.set(row.campaign_id, list.concat(pairs));
+        }
+        const lines = briefingBenefitsFromRaw(row.raw_output);
+        if (lines.length > 0) {
+          const list = benefits.get(row.campaign_id) ?? [];
+          benefits.set(row.campaign_id, list.concat(lines));
+        }
       }
     } catch (error) {
-      logger.warn('Prospect report briefing problems resolution failed', ctx, {
+      logger.warn('Prospect report briefing annex resolution failed', ctx, {
         error: (error as Error).message,
       });
     }
-    return byCampaign;
+    return { problems, benefits };
   }
 
   /**

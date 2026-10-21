@@ -728,6 +728,28 @@ Rules:
 * Emit \`null\` when no outreach angle exists — a balanced/healthy audit with no painful verified gap produces \`null\`, not a manufactured pitch.
 `;
 
+// ─── Directive: Operator Benefits — the upside counterpart to the
+//     outreach-problems directive (same level in the briefings). The analyst
+//     lists 2–5 benefit statements this business gains from the fix this
+//     playbook delivers, grounded in the audit, the category intelligence,
+//     and the city/category market context — an owner-speakable benefit list
+//     the operator reads alongside the ammunition. Has a heading so
+//     removeSection manages re-runs; inserted AFTER the Primary Outreach
+//     Hook directive (anchored on its final line) in each transform.
+const BENEFITS_DIRECTIVE = `
+### Operator Benefits — REQUIRED
+
+Produce \`benefits\` — an array of TWO to FIVE (2–5) benefit statements this business gains from the fix this playbook delivers, written for the operator's briefings. Each entry is one sentence the operator can repeat to the owner — the upside counterpart to \`outreach_problems\`' pain: where a problem pair names what the business is losing, a benefit names what the owner gets back.
+
+Rules:
+* 2–5 entries — never fewer than two, never more than five. Every benefit must be grounded in THIS audit's findings (\`gap_analysis\`, \`detected_signals\`, \`website\`, \`platforms\`), the category intelligence block, and the city/category market context blocks when present — never a generic benefit any business in any category could claim.
+* Frame benefits as owner outcomes ("shoppers nearby can see your shelves before they leave the house"), never as product features, platform mechanics, or technical labels ("rich snippets", "NAP sync").
+* A benefit is the upside of the fix, not a restatement of the problem — write what the owner gains, not what they currently lack ("customers reach the right number every time", not "your phone is wrong on Yelp").
+* Playbook alignment — benefits belong to the same deliverable the outreach pairs pitch (repair packages, claim service, listing cleanup, website/visibility work); never promise an outcome the operator cannot deliver.
+* Category- and market-aware — what a benefit is worth differs by category and city; use the category intelligence and market context blocks to make each line land for THIS business.
+* Voice — a helpful, knowledgeable analyst speaking to the store owner: plain, concrete, and direct ("once your listings all say the same thing, customers stop landing at the wrong store"). No jargon, no hype — the benefits are the briefings' upside inventory, written so the operator can read them to the owner word for word.
+`;
+
 // ─── Prompt 2 (Signal-Aligned) missing CI instruction sections ───────────
 
 const STORE_FORMAT_SECTION_MD = `
@@ -1128,6 +1150,10 @@ function transformCategoryIntegrated(body: string): string {
   //      (seed version bump). Re-inserted at 4j3, after Outreach Problems.
   out = removeSection(out, '### Primary Outreach Hook');
 
+  // 4c5. Remove any prior version of the Operator Benefits directive (seed
+  //      version bump). Re-inserted at 4j4, after the Primary Outreach Hook.
+  out = removeSection(out, '### Operator Benefits');
+
   // 4d. Website Accessibility Verification directive — insert at the end of
   //     the Website Assessment section (after the intrusive-testing line).
   //     Idempotent via fingerprint. Fallback anchors cover variant bodies
@@ -1310,6 +1336,14 @@ function transformCategoryIntegrated(body: string): string {
     OPENER_HOOK_DIRECTIVE,
   );
 
+  // 4j4. Operator Benefits directive — anchored on the Primary Outreach Hook
+  //      directive's final line (guaranteed present by step 4j3).
+  out = insertAfter(
+    out,
+    'a balanced/healthy audit with no painful verified gap produces `null`, not a manufactured pitch.',
+    BENEFITS_DIRECTIVE,
+  );
+
   // 4k. Align the binding text with the blocks the runtime actually injects —
   //     position claims, the phantom city_profile field, undocumented category
   //     fields, and the category_signals name collision. Idempotent.
@@ -1361,6 +1395,11 @@ function transformSignalAligned(body: string): string {
   //     (seed version bump). Re-inserted at step 19i, after Outreach
   //     Problems.
   out = removeSection(out, '### Primary Outreach Hook');
+
+  // 0c4. Remove any prior version of the Operator Benefits directive (seed
+  //     version bump). Re-inserted at step 19j, after the Primary Outreach
+  //     Hook.
+  out = removeSection(out, '### Operator Benefits');
 
   // 1. Insert the binding sections after the business identity block's
   //    last line (the "do not treat blank as a negative signal" note).
@@ -1758,6 +1797,14 @@ function transformSignalAligned(body: string): string {
     OPENER_HOOK_DIRECTIVE,
   );
 
+  // 19j. Operator Benefits directive — anchored on the Primary Outreach Hook
+  //      directive's final line (guaranteed present by step 19i).
+  out = insertAfter(
+    out,
+    'a balanced/healthy audit with no painful verified gap produces `null`, not a manufactured pitch.',
+    BENEFITS_DIRECTIVE,
+  );
+
   // 20. Append seed version marker for idempotency tracking.
   if (!out.includes(SEED_VERSION_MARKER)) {
     out = out + '\n' + SEED_VERSION_MARKER;
@@ -1790,6 +1837,7 @@ function transformBusinessAuditV1(body: string): string {
   //     removeSection calls so each run self-heals.
   out = removeSection(out, '### Market Intelligence Output Fields');
   out = removeSection(out, '### Operator Outreach Problems');
+  out = removeSection(out, '### Operator Benefits');
 
   // 0a. Insert Market Context binding after the business identity block.
   //     V1 has no CI/GS bindings, but the market context binding is
@@ -1829,6 +1877,15 @@ function transformBusinessAuditV1(body: string): string {
     out,
     'Omit the field entirely when no category context was provided.',
     OUTREACH_PROBLEMS_DIRECTIVE,
+  );
+
+  // 0a4. Operator Benefits directive — after the Outreach Problems
+  //      directive's final line (guaranteed present by step 0a3). Same
+  //      optional-field rationale as outreach_problems.
+  out = insertAfter(
+    out,
+    'Never dry, never dull.',
+    BENEFITS_DIRECTIVE,
   );
 
   // 0b. Add Origin row to existing identity blocks (idempotent — no-op if
@@ -1903,12 +1960,12 @@ function transformBusinessAuditV1(body: string): string {
 //   - ### Observed Assets (observed_assets — verified strengths roll-up with
 //     also_seen_on corroboration and internal-only underexposed/confidence)
 //   - a clean, deduplicated embedded schema carrying every contract field the
-//     V2 skeletons omit (outreach_problems, recommended_attributes,
+//     V2 skeletons omit (outreach_problems, benefits, recommended_attributes,
 //     business_type, product-visibility fields, platform attributes arrays,
 //     canonical_city/state/zip)
 // The .md asset is the source of truth — edit it and bump
 // DEFAULT_AUDIT_MARKER when the canonical body changes.
-const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-15-split-identity-4 -->';
+const DEFAULT_AUDIT_MARKER = '<!-- seed-version: business-audit-default-2026-10-20-benefits-1 -->';
 
 function transformSeedBusinessAudit(): string {
   const body = readFileSync(

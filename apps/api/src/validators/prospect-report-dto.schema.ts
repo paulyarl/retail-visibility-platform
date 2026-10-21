@@ -19,7 +19,9 @@
  * appear anywhere in this DTO. `outreach_problems` surfaces only as the
  * `problems` annex — the owner-addressed framing (the `hook`/`regular` spoken
  * line + `problem`/`solution`/`evidence`); `outreach_use` and the unchosen
- * spoken line stay internal (§2 annex exception).
+ * spoken line stay internal (§2 annex exception). `benefits` surfaces as the
+ * `benefits` annex — the audit/briefing's owner-speakable upside lines cross
+ * verbatim (the directive already bars internal vocab, pricing, and features).
  * `data_quality` is the honesty footer — what was verified, what couldn't be
  * checked, and the audit's own limitations.
  */
@@ -202,6 +204,11 @@ export const prospectReportSchema = z.object({
   /** §2 annex — the audit's outreach problems in owner-facing framing,
       unioned across visible chapters, deduped by problem text. */
   problems: z.array(reportProblemSchema),
+
+  /** §2 annex — the upside counterpart to `problems`: the audit/briefing's
+      `benefits` lines (owner-speakable by directive), unioned across
+      visible chapters, deduped verbatim, capped at 5. */
+  benefits: z.array(z.string()),
 
   /** §6.5 "How this report was made" — unioned across included chapters. */
   data_quality: z.object({

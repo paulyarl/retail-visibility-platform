@@ -841,6 +841,12 @@ export const businessAnalysisSchema = z.object({
   // (prompt-level contract: only templates carrying the directive emit it).
   // When present, .min(1) — never an empty array.
   outreach_problems: z.array(outreachProblemEntrySchema).min(1).optional(),
+  // Operator Benefits — 2–5 owner-speakable benefit statements (the upside
+  // counterpart to outreach_problems, same level in the briefings). Optional
+  // like outreach_problems: only templates carrying the directive emit it.
+  // When present, .min(2) — never a one-line or empty array; the ≤5 cap is
+  // prompt-level.
+  benefits: z.array(z.string()).min(2).optional(),
 }).passthrough();
 
 export type BusinessAnalysisOutput = z.infer<typeof businessAnalysisSchema>;
@@ -1181,7 +1187,8 @@ Return your response as JSON matching this exact schema:
       "solution": "<high-level summary of the fix — what gets done, not a named package>",
       "evidence": "<the audit-data observation that grounds this problem: platform + observed fact>",
       "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>" }
-  ]
+  ],
+  "benefits": ["<one-sentence benefit the owner gains from the fix — helpful analyst voice, grounded in this audit>", ...]
 }
 
 GOLD STANDARD FIELDS (assess when a GOLD STANDARD BENCHMARK section is present in the prompt):
@@ -1196,6 +1203,9 @@ MARKET INTEL OUTPUT FIELDS:
 
 OUTREACH PROBLEMS FIELD (conditional — populate ONLY when the prompt body contains an Operator Outreach Problems & Solutions directive):
 - outreach_problems: 1–3 problem → solution pairs the operator can use directly in outreach to the prospect — the most painful problems, ranked by severity. Each entry: { "problem": the problem as the prospect experiences it (business consequence, not a technical label), "regular": the plain professional line that raises it, "hook": the alternative line — same fact, pattern-interrupt delivery, "solution": high-level summary of the fix (not a named package), "evidence": the audit-data observation grounding the problem (platform + observed fact), "outreach_use": how the operator deploys the pair (cold-call opener, email hook, objection response) }. Omit the field entirely when the prompt body carries no such directive — do not emit an empty array.
+
+BENEFITS FIELD (conditional — populate ONLY when the prompt body contains an Operator Benefits directive):
+- benefits: 2–5 one-sentence benefit statements the owner gains from the fix this playbook delivers — the upside counterpart to outreach_problems, written in the voice of a helpful, knowledgeable analyst speaking to the store owner. Grounded in this audit's findings plus the category intelligence and market context blocks. Omit the field entirely when the prompt body carries no such directive — do not emit an empty array.
 
 PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/inventory types; evidence scope is ANY verified public surface — owned site, social profile or post, marketplace, directory chip):
 - website.has_product_browsing: <boolean|null> — can customers browse products or categories on any verified public surface? (null when no rendered surface addresses it; false ONLY on an explicit negative statement)

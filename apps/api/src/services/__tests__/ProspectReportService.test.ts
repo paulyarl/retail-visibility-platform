@@ -144,6 +144,10 @@ const RAJA_AUDIT = {
       outreach_use: 'cold-call opener',
     },
   ],
+  benefits: [
+    'Shoppers nearby can see your shelves before they leave the house.',
+    'Your delivery offer reaches customers who never follow your Instagram.',
+  ],
   data_quality: {
     verified_fields: [
       'EVIDENCE COVERAGE is FULL — website reached directly',
@@ -287,6 +291,10 @@ const RAJA_BA_AUDIT = {
       outreach_use: 'cold-call opener',
     },
   ],
+  benefits: [
+    'Every bad review gets a human reply the next customer can see.',
+    'Your Yelp listing starts working for you instead of sitting unclaimed.',
+  ],
   data_quality: {
     confidence: 'high',
     verified_fields: [
@@ -414,6 +422,7 @@ describe('buildWebsiteChapter', () => {
       chapters: [ch],
       locked_chapters: [],
       problems: [],
+      benefits: [],
       data_quality: prospectReportService.buildChapterDataQuality(RAJA_AUDIT),
       cta: { kind: 'claim', label: 'Claim your listing', url: '/claim/abc' },
     };
@@ -560,6 +569,7 @@ describe('buildRepairChapter (business_analysis → repair chapter)', () => {
       chapters: [ch],
       locked_chapters: [],
       problems: [],
+      benefits: [],
       data_quality: prospectReportService.buildChapterDataQuality(RAJA_BA_AUDIT, 'repair'),
       cta: { kind: 'contact', label: 'Talk to us', url: null },
     };
@@ -1365,6 +1375,161 @@ describe('problems annex — briefing precedence over the audit set', () => {
     // briefing is never even consulted for the annex.
     expect(report!.problems).toHaveLength(1);
     expect(JSON.stringify(report)).not.toContain('LOCKED-ONLY');
+  });
+});
+
+describe('benefits annex (§2 — the upside counterpart to problems)', () => {
+  const THREE_SIBLINGS = [
+    ...SIBLINGS,
+    { id: 'cmp-pb01', business_name: 'Raja Bazaar', website_url: 'https://rajabazaar.com', category: 'Middle Eastern Grocery Store' },
+  ];
+  const A3_TRIAGE = [
+    { campaign_id: 'cmp-pb01', is_operator_accepted: true, playbook: { archetype: 'A3' }, overridden_playbook: null },
+  ];
+  const stageBriefings = (listRows: any[], rawRows: any[]) =>
+    mockExecFindMany.mockImplementation((args: any) =>
+      Promise.resolve(args?.select?.raw_output ? rawRows : listRows),
+    );
+  const briefingExec = (id: string, campaignId: string, templateId: string, schemaName: string) => ({
+    id,
+    campaign_id: campaignId,
+    template_id: templateId,
+    mkt_prompt_templates_list: { output_schema: { name: schemaName } },
+  });
+
+  it('surfaces the audit benefits verbatim', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website'], 'free');
+    expect(report!.benefits).toEqual([
+      'Shoppers nearby can see your shelves before they leave the house.',
+      'Your delivery offer reaches customers who never follow your Instagram.',
+    ]);
+    expect(prospectReportSchema.safeParse(report).success).toBe(true);
+  });
+
+  it('dedupes identical benefits across BA-sourced chapters sharing one audit', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue([
+      { campaign_id: 'cmp-repair', is_operator_accepted: true, playbook: { archetype: 'A5' }, overridden_playbook: null },
+      { campaign_id: 'cmp-pb01', is_operator_accepted: true, playbook: { archetype: 'A3' }, overridden_playbook: null },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift', 'repair'], 'full');
+    expect(report!.chapters).toHaveLength(2);
+    // Same audit, same list — emitted once, not once per chapter.
+    expect(report!.benefits).toHaveLength(2);
+    expect(report!.benefits[0]).toContain('Every bad review');
+  });
+
+  it('withheld chapters contribute no benefits on tier=free', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([AUDIT_ROW, BA_AUDIT_ROW]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website', 'repair'], 'free');
+    expect(report!.locked_chapters).toHaveLength(1);
+    // Only the website chapter is visible — the BA benefits stay locked away.
+    expect(report!.benefits).toEqual([
+      'Shoppers nearby can see your shelves before they leave the house.',
+      'Your delivery offer reaches customers who never follow your Instagram.',
+    ]);
+    expect(JSON.stringify(report)).not.toContain('Every bad review');
+  });
+
+  it('caps a multi-source union at five lines', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([
+      {
+        ...AUDIT_ROW,
+        audit_data: {
+          ...RAJA_AUDIT,
+          benefits: ['b1', 'b2', 'b3'],
+        },
+      },
+      {
+        ...BA_AUDIT_ROW,
+        audit_data: {
+          ...RAJA_BA_AUDIT,
+          benefits: ['b4', 'b5', 'b6', 'b7'],
+        },
+      },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website', 'repair'], 'full');
+    expect(report!.benefits).toEqual(['b1', 'b2', 'b3', 'b4', 'b5']);
+  });
+
+  it('emits an empty annex when no audit carries benefits', async () => {
+    mockCampaignFindMany.mockResolvedValue(SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([
+      {
+        ...AUDIT_ROW,
+        audit_data: { ...RAJA_AUDIT, benefits: undefined },
+      },
+    ]);
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['website'], 'free');
+    expect(report!.benefits).toEqual([]);
+    expect(prospectReportSchema.safeParse(report).success).toBe(true);
+  });
+
+  it('prefers the owning sibling\u2019s briefing benefits over the audit set', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(A3_TRIAGE);
+    stageBriefings(
+      [briefingExec('ex-brief', 'cmp-pb01', 'mpt-archetype-briefing-a3', 'profile_repair_audit')],
+      [{
+        campaign_id: 'cmp-pb01',
+        raw_output: JSON.stringify({
+          profile_repair_audit: {
+            benefits: [
+              'Customers stop landing on a competitor\u2019s page when they look you up.',
+            ],
+          },
+        }),
+      }],
+    );
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift'], 'full');
+    expect(report!.benefits).toEqual([
+      'Customers stop landing on a competitor\u2019s page when they look you up.',
+    ]);
+    // The audit's own list is displaced — the briefing is the fresher copy.
+    expect(JSON.stringify(report)).not.toContain('Every bad review');
+  });
+
+  it('falls back to the audit benefits when the briefing carries none', async () => {
+    mockCampaignFindMany.mockResolvedValue(THREE_SIBLINGS);
+    mockAuditFindMany.mockResolvedValue([BA_AUDIT_ROW]);
+    mockTriageFindMany.mockResolvedValue(A3_TRIAGE);
+    stageBriefings(
+      [briefingExec('ex-brief', 'cmp-pb01', 'mpt-archetype-briefing-a3', 'profile_repair_audit')],
+      [{
+        campaign_id: 'cmp-pb01',
+        raw_output: JSON.stringify({
+          profile_repair_audit: {
+            outreach_problems: [{
+              problem: 'Drift-scoped problem',
+              regular: 'x', hook: 'x', solution: 'x', evidence: 'x', outreach_use: 'x',
+            }],
+          },
+        }),
+      }],
+    );
+    mockQueryRaw.mockResolvedValue([]);
+
+    const report = await prospectReportService.assembleReport('bp_raja', ['drift'], 'full');
+    expect(report!.benefits).toHaveLength(2);
+    expect(report!.benefits[0]).toContain('Every bad review');
   });
 });
 

@@ -22,7 +22,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
-const BRIEFING_MARKER = 'ISSUE-SPECIFIC REPAIR BRIEFING — PRIMARY OUTPUT\n<!-- issue-briefing-v3: signal-weight-priority -->';
+const BRIEFING_MARKER = 'ISSUE-SPECIFIC REPAIR BRIEFING — PRIMARY OUTPUT\n<!-- issue-briefing-v4: benefits -->';
 
 /**
  * §6. Operator Outreach Problems & Solutions — shared directive appended to
@@ -56,6 +56,28 @@ Rules:
 * Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion).
 * \`outreach_use\` must be concrete enough to act on without rework.
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
+
+`;
+}
+
+/**
+ * §7. Operator Benefits — the upside counterpart to the outreach ammunition
+ * (same level in the briefing). The analyst lists 2–5 benefits the owner
+ * gains from the fix this briefing's issue type pitches, grounded in the
+ * audit data. `playbookBinding` applies the same on-issue alignment bar as
+ * the outreach pairs.
+ */
+function benefitsSection(playbookBinding: string): string {
+  return `### 7. Operator Benefits
+
+Produce \`benefits\` — an array of TWO to FIVE (2–5) benefit statements the owner gains from the fix this briefing's issue type pitches, written for the operator's use. Each entry is one sentence — the upside counterpart to \`outreach_problems\`' pain: where a problem pair names what the business is losing, a benefit names what the owner gets back.
+
+Rules:
+* 2–5 entries — never fewer than two, never more than five. Every benefit must be grounded in the audit data above — never a generic benefit any business in any category could claim.
+* Frame benefits as owner outcomes ("once your listings all say the same thing, customers stop landing at the wrong store"), never as features, platform mechanics, or technical labels.
+* A benefit is the upside of the fix, not a restatement of the problem — write what the owner gains, not what they currently lack.
+* Issue alignment — ${playbookBinding}
+* Voice — a helpful, knowledgeable analyst speaking to the store owner: plain, concrete, and direct. No jargon, no hype — the benefits are the briefings' upside inventory, written so the operator can read them to the owner word for word.
 
 `;
 }
@@ -130,6 +152,7 @@ List anything that makes this repair harder than it looks:
 - **issueType**: "nap_drift"
 
 ${outreachProblemsSection('every entry must be a NAP drift pair (name/address/phone consistency) — even when the audit data contains a more painful off-issue signal.')}
+${benefitsSection('every benefit must be an identity-consistency outcome (one correct name/address/phone everywhere) — even when the audit data suggests a more valuable off-issue upside.')}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
   {
@@ -195,6 +218,7 @@ List anything that makes this repair harder than it looks:
 - **issueType**: "unclaimed_profile"
 
 ${outreachProblemsSection('every entry must be a claim-state pair (unclaimed/unmanaged profile consequences) — even when the audit data contains a more painful off-issue signal.')}
+${benefitsSection('every benefit must be a claim-state outcome (owner control of the profile — posts, replies, hours, insights) — even when the audit data suggests a more valuable off-issue upside.')}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
   {
@@ -260,6 +284,7 @@ List anything that makes this repair harder than it looks:
 - **issueType**: "platform_gap"
 
 ${outreachProblemsSection('every entry must be a coverage-gap pair (missing platform presence) — even when the audit data contains a more painful off-issue signal.')}
+${benefitsSection('every benefit must be a coverage outcome (findable on every platform customers check) — even when the audit data suggests a more valuable off-issue upside.')}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`,
   },
 ];

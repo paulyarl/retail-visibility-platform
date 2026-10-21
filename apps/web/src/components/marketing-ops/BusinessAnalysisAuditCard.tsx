@@ -887,6 +887,17 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced,
           </Section>
         )}
 
+        {/* 12c. Benefits — the upside counterpart to the outreach ammunition;
+             owner-speakable benefit lines from the audit's Operator Benefits
+             directive. Same level as Outreach Ammunition in the briefing. */}
+        {Array.isArray(d.benefits) && d.benefits.length > 0 && (
+          <Section title="Benefits">
+            <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside space-y-0.5">
+              {d.benefits.map((b: string, i: number) => <li key={i}>{b}</li>)}
+            </ul>
+          </Section>
+        )}
+
         {/* 13. Data quality */}
         <Section title="Data Quality">
           <div className="flex items-center gap-2 mb-2">

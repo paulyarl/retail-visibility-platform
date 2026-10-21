@@ -73,6 +73,12 @@ export const profileRepairTriageSchema = z.object({
       outreach_use: z.string(),
     })).min(1),
 
+    // Operator benefits — 2–5 owner-speakable benefit statements, the upside
+    // counterpart to outreach_problems (same level in the briefing). Optional:
+    // only templates carrying the Operator Benefits directive emit it. When
+    // present, .min(2); the ≤5 cap is prompt-level.
+    benefits: z.array(z.string()).min(2).optional(),
+
     // Backward-compat fields (still rendered in stage history + signal chips)
     rationale: z.string(),
     escalation_signals: z.array(z.string()).optional().default([]),
@@ -117,6 +123,7 @@ Return valid JSON only matching this shape:
         "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>"
       }
     ],
+    "benefits": ["<one-sentence benefit the owner gains from the fix — helpful analyst voice, grounded in the audit data>", ...],
     "rationale": "<overall reasoning for the track recommendation>",
     "escalation_signals": ["<signal>", ...],
     "standard_signals": ["<signal>", ...]
@@ -183,6 +190,12 @@ export const profileRepairAuditSchema = z.object({
       outreach_use: z.string(),
     })).min(1),
 
+    // Operator benefits — 2–5 owner-speakable benefit statements, the upside
+    // counterpart to outreach_problems (same level in the briefing). Optional:
+    // only templates carrying the Operator Benefits directive emit it. When
+    // present, .min(2); the ≤5 cap is prompt-level.
+    benefits: z.array(z.string()).min(2).optional(),
+
     // Data quality — what this briefing verified, what it could not check, and
     // how the evidence was gathered. Same shape as `website_positioning`, which
     // has carried the block since its sprint — and is why the website audit is
@@ -237,6 +250,7 @@ Return valid JSON only matching this shape:
         "outreach_use": "<how the operator deploys this pair — cold-call opener, email hook, objection response>"
       }
     ],
+    "benefits": ["<one-sentence benefit the owner gains from the fix — helpful analyst voice, grounded in the audit data>", ...],
     "data_quality": {
       "verified_fields": ["<what you actually observed, and how>", ...],
       "unavailable_fields": ["<what you could not check>", ...],

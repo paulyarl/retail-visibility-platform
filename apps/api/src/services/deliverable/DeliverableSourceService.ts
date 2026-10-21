@@ -407,7 +407,7 @@ export class DeliverableSourceService extends BaseService {
 
     const eligibility = await this.resolveEligibleTypes(campaignId, ctx);
     const intake = await this.getReviewIntake(campaignId, ctx);
-    const priorOutreach = await this.buildPriorOutreach(campaignId);
+    const priorOutreach = await this.buildPriorOutreach(campaignId, auditData);
     const businessAttributes = this.formatBusinessAttributes(campaign);
     const discoveryAttribution = MarketingExecutionService.getInstance()
       .renderProspectOriginBlock(await this.campaignWithResolvedAttribution(campaign, ctx));
@@ -643,7 +643,7 @@ export class DeliverableSourceService extends BaseService {
     const qualityGate = content
       ? runDeliverableQualityGate(type, content, sourceText)
       : { passed: true, issues: [] };
-    const priorOutreach = await this.buildPriorOutreach(campaignId);
+    const priorOutreach = await this.buildPriorOutreach(campaignId, auditData);
     const repetitionGate = content
       ? runRepetitionGate(content, priorOutreach)
       : { passed: true, issues: [] };
@@ -1007,8 +1007,21 @@ export class DeliverableSourceService extends BaseService {
     }
   }
 
-  /** Assemble the campaign's already-emitted outreach lines (spec §7.2). */
-  private async buildPriorOutreach(campaignId: string): Promise<string> {    const lines: string[] = [];
+  /** Assemble the campaign's already-emitted outreach lines (spec §7.2) —
+      plus the benefit lines the audit/briefing promised, so the deliverable
+      proves the upside claim the outreach made. */
+  private async buildPriorOutreach(campaignId: string, auditData?: any): Promise<string> {    const lines: string[] = [];
+    const seenBenefits = new Set<string>();
+    const pushBenefits = (raw: unknown, source: string) => {
+      if (!Array.isArray(raw)) return;
+      for (const b of raw) {
+        if (typeof b !== 'string' || !b.trim()) continue;
+        const key = b.trim().toLowerCase();
+        if (seenBenefits.has(key)) continue;
+        seenBenefits.add(key);
+        lines.push(`${source} benefit: ${b.trim()}`);
+      }
+    };
     try {
       const opener = await this.prisma.mkt_outreach_openers_list.findFirst({
         where: { campaign_id: campaignId },
@@ -1027,6 +1040,8 @@ export class DeliverableSourceService extends BaseService {
           if (p?.hook) lines.push(`Problem hook: ${p.hook}`);
         }
       }
+      pushBenefits(briefing?.benefits, 'Promised');
+      pushBenefits(auditData?.benefits, 'Audit');
     } catch (e) {
       logger.warn('Failed to assemble prior outreach', undefined, { error: (e as Error).message, campaignId });
     }

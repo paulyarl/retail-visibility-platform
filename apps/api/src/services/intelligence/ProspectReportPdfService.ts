@@ -289,6 +289,16 @@ export async function generateProspectReportPdf(
   }
 
   // ════════════════════════════════════════════════════════════════════════
+  // BENEFITS ANNEX (§2 — the upside counterpart to the problems annex)
+  // ════════════════════════════════════════════════════════════════════════
+
+  if (report.benefits.length > 0) {
+    sectionHeading('What the fix gets you');
+    for (const b of report.benefits) bullet(b, 3);
+    yPos += 2;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // HOW THIS REPORT WAS MADE (§6.5)
   // ════════════════════════════════════════════════════════════════════════
 

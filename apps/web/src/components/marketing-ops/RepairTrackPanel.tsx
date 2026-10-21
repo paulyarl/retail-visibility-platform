@@ -649,6 +649,21 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                   </div>
                 )}
 
+                {/* Benefits — the upside counterpart to the outreach
+                    ammunition; owner-speakable benefit lines for the
+                    briefing. */}
+                {recommendation.benefits && recommendation.benefits.length > 0 && (
+                  <div className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
+                      <Lightbulb className="w-3.5 h-3.5" />
+                      Benefits
+                    </div>
+                    <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-5">
+                      {recommendation.benefits.map((b, i) => <li key={i}>{b}</li>)}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Confirmed issue + rationale */}
                 <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300 pt-1 border-t border-purple-200/40 dark:border-purple-800/30">
                   <p>

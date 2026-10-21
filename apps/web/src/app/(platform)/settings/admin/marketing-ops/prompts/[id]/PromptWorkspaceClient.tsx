@@ -73,7 +73,7 @@ digital_opportunity_score, high_attention, high_attention_reasons,
 recommended_tier, tier_rationale, estimated_monthly_service_fee,
 recommended_services, recommended_attributes, data_quality, sources,
 gap_analysis, quality_gate_results, market_opportunities, signal_checklist,
-render_controls, outreach_problems.
+render_controls, outreach_problems, benefits.
 
 When a GOLD STANDARD BENCHMARK section is present in the prompt, also
 populate gap_analysis (per-field gaps vs. expected values),
@@ -82,7 +82,7 @@ quality_gate_results (per-gate pass/fail), and render_controls
 platforms.{platform}.profile_url for each platform.
 
 When Market Context blocks are present, also populate market_opportunities
-and signal_checklist. Conditional fields (outreach_problems,
+and signal_checklist. Conditional fields (outreach_problems, benefits,
 recommended_attributes, platforms.{platform}.attributes) are emitted only
 when their governing directive applies — never as empty arrays.
 

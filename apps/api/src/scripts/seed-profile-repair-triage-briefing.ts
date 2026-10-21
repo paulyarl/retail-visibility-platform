@@ -23,7 +23,7 @@ import { logger } from '../logger';
 
 const TEMPLATE_ID = 'mpt-profile-repair-triage-default';
 
-const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v8: stub-partial-lane -->';
+const BRIEFING_MARKER = 'OPERATOR BRIEFING — PRIMARY OUTPUT\n<!-- triage-briefing-v9: benefits -->';
 
 const NEW_BODY = `You are a local business profile repair analyst producing an operator briefing.
 
@@ -52,7 +52,7 @@ The Audit Results block opens with an Audit Coverage line. FULL means a complete
 
 ## Instructions
 
-Produce an operator briefing with six sections. Each section must be grounded in the audit data above — do not invent platform names, drift details, or missing assets that are not present in the audit results.
+Produce an operator briefing with seven sections. Each section must be grounded in the audit data above — do not invent platform names, drift details, or missing assets that are not present in the audit results.
 
 ### 1. Scope
 
@@ -132,6 +132,17 @@ Rules:
 * Frame every pair in the develop-value-first motion: the platform seeds the prospect's directory presence first and invites the owner to claim it — the pairs ease pains the owner can already see. Problems land as "we surfaced this on your listing," solutions as "claim your profile and we fix it" — never as "buy an audit." Do not assert a published listing exists unless the audit data shows one; the claim-and-fix framing works whether or not the seed is already live (the seed is created as part of the outreach motion).
 * \`outreach_use\` must be concrete enough to act on without rework.
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
+
+### 7. Operator Benefits
+
+Produce \`benefits\` — an array of TWO to FIVE (2–5) benefit statements the owner gains from the fix this briefing's confirmed issue pitches, written for the operator's use. Each entry is one sentence — the upside counterpart to \`outreach_problems\`' pain: where a problem pair names what the business is losing, a benefit names what the owner gets back.
+
+Rules:
+* 2–5 entries — never fewer than two, never more than five. Every benefit must be grounded in the audit data above — never a generic benefit any business in any category could claim.
+* Frame benefits as owner outcomes ("once your listings all say the same thing, customers stop landing at the wrong store"), never as features, platform mechanics, or technical labels.
+* A benefit is the upside of the fix, not a restatement of the problem — write what the owner gains, not what they currently lack.
+* Issue alignment — benefits must serve the confirmed issue (\`issue_type_confirmed\`) this briefing pitches, the same alignment bar as the outreach pairs.
+* Voice — a helpful, knowledgeable analyst speaking to the store owner: plain, concrete, and direct. No jargon, no hype — the benefits are the briefings' upside inventory, written so the operator can read them to the owner word for word.
 
 The output JSON shape is appended after the supplementary blocks (category intelligence, gold standard, platform signal weights, city/category market context, and — emerging-lane prospects only — prospect origin). Return ONLY the JSON object, no markdown fences, no commentary.`;
 

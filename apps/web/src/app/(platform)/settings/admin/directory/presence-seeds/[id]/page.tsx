@@ -3322,6 +3322,24 @@ function PresenceSeedDetailClient() {
               </div>
             )}
 
+            {/* Audit benefits — the upside counterpart to the ammunition:
+                what the owner gets back from the recommended work. */}
+            {(seedScript.benefits?.length ?? 0) > 0 && (
+              <div className="border border-gray-200 rounded-lg p-3">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  Benefits — linked campaign audit
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {seedScript.benefits!.map((b, i) => (
+                    <li key={i} className="text-sm text-gray-800 flex gap-1.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Seed-preview storefront — only on PB-08-eligible seeds (spec §4).
                 The generated /tenant/[slug] page is a sample catalog proof-of-work
                 for the audit's website-gap fix. */}

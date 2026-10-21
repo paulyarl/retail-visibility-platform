@@ -167,6 +167,12 @@ export interface AssembledCallScript {
    * audit (outreach_problems contract). Empty when no audit carries it.
    */
   ammunition: OutreachAmmunitionEntry[];
+  /**
+   * The audit's `benefits` lines — the upside counterpart to ammunition.
+   * Operator reference only: what to say when the owner asks what the work
+   * gets them. Empty when no audit carries it.
+   */
+  benefits: string[];
 }
 
 /**
@@ -208,6 +214,11 @@ export interface AssembledSeedCallScript {
    * Empty for unlinked or unaudited seeds.
    */
   ammunition: OutreachAmmunitionEntry[];
+  /**
+   * The same audit's `benefits` lines — the upside counterpart to
+   * ammunition. Empty for unlinked or unaudited seeds.
+   */
+  benefits: string[];
 }
 
 export interface CallConfirmationInput {
@@ -492,6 +503,7 @@ export class CallScriptService extends BaseService {
       // audit already loaded for signal severity. Operator reference only;
       // stage text is unchanged.
       ammunition: this.extractAmmunition(auditDataForSeverity),
+      benefits: this.extractBenefits(auditDataForSeverity),
       anchor: anchorBlock,
     };
   }
@@ -624,6 +636,7 @@ export class CallScriptService extends BaseService {
     //     Unlinked or unaudited seeds get an empty list — the script is
     //     unchanged.
     let ammunition: OutreachAmmunitionEntry[] = [];
+    let benefits: string[] = [];
     try {
       const link = await this.prisma.directory_seed_campaign_links.findFirst({
         where: { seed_id: seedId },
@@ -633,6 +646,7 @@ export class CallScriptService extends BaseService {
       if (link?.campaign_id) {
         const auditResult = await BusinessContextService.getLatestAuditData(link.campaign_id, ctx);
         ammunition = this.extractAmmunition(auditResult?.auditData);
+        benefits = this.extractBenefits(auditResult?.auditData);
       }
     } catch {
       // No linked campaign / audit lookup failed — ammunition stays empty
@@ -704,6 +718,7 @@ export class CallScriptService extends BaseService {
         qr_url_report_text: linkVars.qr_url_report_text ?? null,
       },
       ammunition,
+      benefits,
     };
   }
 
@@ -727,6 +742,16 @@ export class CallScriptService extends BaseService {
         evidence: asString(p.evidence),
         outreach_use: asString(p.outreach_use),
       }));
+  }
+
+  /**
+   * Extract the `benefits` lines from a business_analysis audit payload —
+   * the upside counterpart to extractAmmunition. Returns [] when absent.
+   */
+  private extractBenefits(auditData: any): string[] {
+    const raw = auditData?.benefits;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((b): b is string => typeof b === 'string' && !!b.trim());
   }
 
   /**

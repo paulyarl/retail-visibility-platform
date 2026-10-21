@@ -72,6 +72,27 @@ Rules:
 }
 
 /**
+ * Shared operator-benefits section — the upside counterpart to the outreach
+ * ammunition (same level in the briefing). The analyst lists 2–5 benefits the
+ * owner gains from the fix this briefing's archetype pitches, grounded in the
+ * archetype extract and audit data.
+ */
+function benefitsSection(): string {
+  return `### 7. Operator Benefits
+
+Produce \`benefits\` — an array of TWO to FIVE (2–5) benefit statements the owner gains from the fix this briefing's archetype pitches, written for the operator's use. Each entry is one sentence — the upside counterpart to \`outreach_problems\`' pain: where a problem pair names what the business is losing, a benefit names what the owner gets back.
+
+Rules:
+* 2–5 entries — never fewer than two, never more than five. Every benefit must be grounded in the ARCHETYPE EXTRACT and audit data above — never a generic benefit any business in any category could claim.
+* Frame benefits as owner outcomes ("once your hours are right everywhere, customers stop showing up to a locked door"), never as features, platform mechanics, or technical labels.
+* A benefit is the upside of the fix, not a restatement of the problem — write what the owner gains, not what they currently lack.
+* Archetype alignment — benefits must serve the {{archetype_label}} fix this briefing pitches, the same alignment bar as the outreach pairs.
+* REPORT CONSISTENCY — nothing in \`benefits\` may contradict the extract: never promise an outcome for something the extract shows already working.
+* Voice — a helpful, knowledgeable analyst speaking to the store owner: plain, concrete, and direct. No jargon, no hype — the benefits are the briefings' upside inventory, written so the operator can read them to the owner word for word.
+`;
+}
+
+/**
  * Shared data-quality directive — the briefing must state what it verified,
  * what it could not check, and how the evidence was gathered.
  *
@@ -86,7 +107,7 @@ Rules:
  * before saying it out loud.
  */
 function dataQualitySection(): string {
-  return `### 7. Data Quality (REQUIRED — state your own limits)
+  return `### 8. Data Quality (REQUIRED — state your own limits)
 
 Produce \`data_quality\` — an honest account of the evidence behind this briefing. The operator reads these pitch lines to a real owner, so an unqualified figure that turns out wrong costs the call. Shape:
 
@@ -405,6 +426,7 @@ Produce an operator briefing for the {{archetype_label}} archetype grounded in t
 ${t.instructions}
 
 ${outreachProblemsSection(t.archetypeBinding)}
+${benefitsSection()}
 ${dataQualitySection()}
 The output JSON shape is appended after the category intelligence block. Return ONLY the JSON object, no markdown fences, no commentary.`;
 }

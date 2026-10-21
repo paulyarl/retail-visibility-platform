@@ -118,6 +118,11 @@ export const websitePositioningAuditSchema = z.object({
    *  problem/regular/hook/solution voice contract). */
   outreach_problems: z.array(outreachProblemEntrySchema).min(1).optional(),
 
+  /** Operator benefits — 2–5 owner-speakable benefit statements (the upside
+   *  counterpart to outreach_problems). .min(2) when present — emit the
+   *  field or omit it entirely; the ≤5 cap is prompt-level. */
+  benefits: z.array(z.string()).min(2).optional(),
+
   data_quality: z.object({
     verified_fields: z.array(z.string()).optional(),
     unavailable_fields: z.array(z.string()).optional(),
@@ -151,6 +156,7 @@ Return your response as JSON matching this exact schema:
   "outreach_problems": [
     { "problem": "<the web gap as the owner experiences it — the business consequence>", "regular": "<the plain professional line that raises it>", "hook": "<the alternative line — same fact, earns attention>", "solution": "<high-level summary of the fix — what gets built, not a named package>", "evidence": "<the observed fact grounding the pair: the URL/host/state you verified>", "outreach_use": "<cold-call opener | email hook | objection response>" }
   ],
+  "benefits": ["<one-sentence benefit the owner gains from the fix — helpful analyst voice, grounded in this audit>", ...],
   "data_quality": { "verified_fields": ["<string>"], "unavailable_fields": ["<string>"], "limitations": ["<string>"] }
 }
 

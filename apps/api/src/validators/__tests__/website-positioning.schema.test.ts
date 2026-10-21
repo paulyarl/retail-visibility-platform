@@ -86,6 +86,28 @@ describe('websitePositioningAuditSchema', () => {
     expect(parsed.success).toBe(false);
   });
 
+  // benefits boundary tests — optional, .min(2) when present, no .max()
+  // (the ≤5 cap is a prompt-level rule, not a validator rule).
+  it('omits benefits entirely without error', () => {
+    const parsed = websitePositioningAuditSchema.safeParse(validPayload());
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a one-line benefits array (.min(2) when present)', () => {
+    const parsed = websitePositioningAuditSchema.safeParse(
+      validPayload({ benefits: ['shoppers see your shelves before they leave home'] }),
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts 2 and 6 benefit lines (min 2, no validator-level max)', () => {
+    const two = validPayload({ benefits: ['b1', 'b2'] });
+    expect(websitePositioningAuditSchema.safeParse(two).success).toBe(true);
+
+    const six = validPayload({ benefits: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'] });
+    expect(websitePositioningAuditSchema.safeParse(six).success).toBe(true);
+  });
+
   it('is registered in OUTPUT_SCHEMA_REGISTRY with auditPlatform website_positioning', () => {
     const entry = resolveOutputSchema(WEBSITE_POSITIONING_SCHEMA_NAME);
     expect(entry).not.toBeNull();

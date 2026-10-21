@@ -1062,6 +1062,11 @@ export interface AssembledSeedCallScript {
    * Empty for unlinked or unaudited seeds.
    */
   ammunition: OutreachProblem[];
+  /**
+   * The same audit's `benefits` lines — the upside counterpart to
+   * ammunition. Empty for unlinked or unaudited seeds.
+   */
+  benefits: string[];
 }
 
 export interface DemoWindow {

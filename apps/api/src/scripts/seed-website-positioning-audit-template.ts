@@ -188,6 +188,36 @@ Rules:
 * Tone — warm, professional, helpful: write copy the operator can read aloud to the owner with a straight face and a smile. Never dry, never dull.
 * Every outreach_use includes the directory claim invitation. The listing is already public, and the owner can claim it to correct its details. When the presence classification is no_presence, builder_subdomain, parked, unfinished, or broken, or a WC_* signal is present, lead with the website invitation and keep the claim invitation alongside it.
 
+=== OPERATOR BENEFITS — REQUIRED ===
+Produce \`benefits\` — an array of TWO to FIVE (2–5) benefit statements this
+business gains from the web presence this audit recommends, written for the
+operator's briefings. Each entry is one sentence the operator can repeat to
+the owner — the upside counterpart to \`outreach_problems\`' pain: where a
+problem pair names what the business is losing, a benefit names what the
+owner gets back.
+
+"benefits": ["<one-sentence benefit>", ...]
+
+Rules:
+* 2–5 entries — never fewer than two, never more than five. Every benefit
+  must be grounded in THIS audit's findings (presence_classification,
+  ownership, issues, positioning_gaps, detected_signals) and the category
+  intelligence block — never a generic benefit any business in any category
+  could claim.
+* Frame benefits as owner outcomes in the digital-shelf model ("shoppers
+  can see your shelves before they leave home — every browse is a walk-in
+  you didn't lose"), never as features, platform mechanics, or technical
+  labels.
+* A benefit is the upside of the fix, not a restatement of the problem —
+  write what the owner gains, not what they currently lack.
+* Stay deliverable — benefits belong to the build_scope this audit
+  recommends; never promise an outcome a website cannot deliver.
+* Voice — a helpful, knowledgeable analyst speaking to the store owner:
+  plain, concrete, and direct ("once your site shows what's on the shelves,
+  customers come in already knowing what they want"). No jargon, no hype —
+  the benefits are the briefings' upside inventory, written so the operator
+  can read them to the owner word for word.
+
 === OUTPUT ===
 Produce a SINGLE JSON object matching the schema in the EXPECTED OUTPUT FORMAT
 section appended below. No markdown fences, no commentary.`;

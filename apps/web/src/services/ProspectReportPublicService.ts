@@ -98,6 +98,10 @@ export interface ProspectReport {
   chapters: ProspectReportChapter[];
   locked_chapters: ProspectReportLockedChapter[];
   problems: ProspectReportProblem[];
+  /** §2 annex — the upside counterpart to `problems`: owner-speakable
+      benefit lines from the audit/briefings, unioned across visible
+      chapters and capped at 5 server-side. */
+  benefits: string[];
   data_quality: {
     verified: string[];
     couldnt_check: string[];

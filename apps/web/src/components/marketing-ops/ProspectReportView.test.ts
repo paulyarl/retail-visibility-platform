@@ -77,6 +77,10 @@ const report: ProspectReport = {
       evidence: 'rajabazaar.com delivery banner: "£30 minimum"',
     },
   ],
+  benefits: [
+    'Shoppers nearby can see your shelves before they leave the house.',
+    'Your free-delivery offer reaches customers who never follow your Instagram.',
+  ],
   data_quality: {
     verified: ['Site reachable over HTTPS'],
     couldnt_check: [`${TRAP} internal-only field`],
@@ -146,6 +150,20 @@ describe('ProspectReportView', () => {
     bare.problems = [];
     const html = render(bare);
     expect(html).not.toContain('What this means for you');
+  });
+
+  it('renders the benefits annex — the upside counterpart to problems (§2)', () => {
+    const html = render();
+    expect(html).toContain('What the fix gets you');
+    expect(html).toContain('Shoppers nearby can see your shelves');
+    expect(html).toContain('free-delivery offer reaches customers');
+  });
+
+  it('omits the benefits annex when no benefits are on file', () => {
+    const bare = structuredClone(report);
+    bare.benefits = [];
+    const html = render(bare);
+    expect(html).not.toContain('What the fix gets you');
   });
 
   it('renders locked chapters as teasers with the claim CTA, no content', () => {

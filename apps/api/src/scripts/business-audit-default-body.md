@@ -148,6 +148,17 @@ Rules:
 * Plain spoken language — no jargon ("NAP", "citations", "SEO audit"), no tier or package names, no dollar amounts or pricing, no invented statistics. The downstream outreach quality gate rejects these on promotion.
 * Ground every claim in the audit data — never fabricate observed evidence. When the audit is too thin for a specific hook, write the most concrete honest sentence the evidence supports rather than generic filler ("baseline audit", "improve online presence").
 * Emit `null` when no outreach angle exists — a balanced/healthy audit with no painful verified gap produces `null`, not a manufactured pitch.
+### Operator Benefits — REQUIRED
+
+Produce `benefits` — an array of TWO to FIVE (2–5) benefit statements this business gains from the fix this playbook delivers, written for the operator's briefings. Each entry is one sentence the operator can repeat to the owner — the upside counterpart to `outreach_problems`' pain: where a problem pair names what the business is losing, a benefit names what the owner gets back.
+
+Rules:
+* 2–5 entries — never fewer than two, never more than five. Every benefit must be grounded in THIS audit's findings (`gap_analysis`, `detected_signals`, `website`, `platforms`), the category intelligence block, and the city/category market context blocks when present — never a generic benefit any business in any category could claim.
+* Frame benefits as owner outcomes ("shoppers nearby can see your shelves before they leave the house"), never as product features, platform mechanics, or technical labels ("rich snippets", "NAP sync").
+* A benefit is the upside of the fix, not a restatement of the problem — write what the owner gains, not what they currently lack ("customers reach the right number every time", not "your phone is wrong on Yelp").
+* Playbook alignment — benefits belong to the same deliverable the outreach pairs pitch (repair packages, claim service, listing cleanup, website/visibility work); never promise an outcome the operator cannot deliver.
+* Category- and market-aware — what a benefit is worth differs by category and city; use the category intelligence and market context blocks to make each line land for THIS business.
+* Voice — a helpful, knowledgeable analyst speaking to the store owner: plain, concrete, and direct ("once your listings all say the same thing, customers stop landing at the wrong store"). No jargon, no hype — the benefits are the briefings' upside inventory, written so the operator can read them to the owner word for word.
 
 
 ---
@@ -1025,7 +1036,7 @@ Preserve the specified enum values exactly.
 
 Every element of a JSON array MUST be a bare JSON object or bare value separated by a comma — never prefix an array element with a label, key, or identifier ("source_2: { ... }" is invalid).
 
-Omit a conditional field entirely when its governing directive says to omit it (outreach_problems, market_opportunities, signal_checklist, render_controls, gap_analysis, quality_gate_results, recommended_attributes, platforms.{platform}.attributes) — never emit an empty array for a conditional field.
+Omit a conditional field entirely when its governing directive says to omit it (outreach_problems, benefits, market_opportunities, signal_checklist, render_controls, gap_analysis, quality_gate_results, recommended_attributes, platforms.{platform}.attributes) — never emit an empty array for a conditional field.
 
 `channels_scanned` and `observed_assets` are NOT conditional — always emit them; an empty array is a valid answer.
 
@@ -1410,8 +1421,11 @@ Omit a conditional field entirely when its governing directive says to omit it (
       "evidence": "",
       "outreach_use": ""
     }
+  ],
+  "benefits": [
+    "<one-sentence benefit the owner gains from the fix — analyst voice, grounded in this audit>"
   ]
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-15-split-identity-4 -->
+<!-- seed-version: business-audit-default-2026-10-20-benefits-1 -->

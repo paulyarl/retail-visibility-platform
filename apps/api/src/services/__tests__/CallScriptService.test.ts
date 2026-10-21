@@ -661,6 +661,46 @@ describe('CallScriptService.assembleForCampaign', () => {
     expect(result.ammunition).toEqual([]);
   });
 
+  it('surfaces the audit benefits list alongside ammunition', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        outreach_problems: [
+          {
+            problem: 'Filed as a plain convenience store',
+            regular: '"I was looking at your Google listing…"',
+            hook: '"Try this on your phone: search…"',
+            solution: 'Re-file under the right primary category.',
+            evidence: 'GBP primary category is Convenience store.',
+            outreach_use: 'Cold-call opener',
+          },
+        ],
+        benefits: [
+          'Customers searching for African staples find your store, not the chain across town.',
+          '  ',
+          42,
+        ],
+      },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+
+    // The upside counterpart to ammunition — verbatim, blanks/non-strings dropped.
+    expect(result.benefits).toEqual([
+      'Customers searching for African staples find your store, not the chain across town.',
+    ]);
+  });
+
+  it('returns empty benefits when the audit carries none', async () => {
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: { gap_analysis: [] },
+      auditId: 'audit-001',
+    });
+
+    const result = await CallScriptService.assembleForCampaign('camp-001');
+    expect(result.benefits).toEqual([]);
+  });
+
   it('drops malformed outreach_problems entries and coerces missing fields', async () => {
     mockGetLatestAuditData.mockResolvedValue({
       auditData: {
@@ -1109,7 +1149,26 @@ describe('CallScriptService.assembleForSeed', () => {
   it('returns empty ammunition for an unlinked seed', async () => {
     const result = await CallScriptService.assembleForSeed('seed-1');
     expect(result.ammunition).toEqual([]);
+    expect(result.benefits).toEqual([]);
     expect(mockGetLatestAuditData).not.toHaveBeenCalled();
+  });
+
+  it('resolves benefits through the primary-linked campaign audit', async () => {
+    mockSeedLinksFindFirst.mockResolvedValue({ campaign_id: 'camp-9' });
+    mockGetLatestAuditData.mockResolvedValue({
+      auditData: {
+        benefits: [
+          'Shoppers nearby can see your shelves before they leave the house.',
+          'Your delivery offer reaches customers who never follow your Instagram.',
+        ],
+      },
+      auditId: 'audit-9',
+    });
+
+    const result = await CallScriptService.assembleForSeed('seed-1');
+
+    expect(result.benefits).toHaveLength(2);
+    expect(result.benefits[0]).toContain('see your shelves');
   });
 });
 
