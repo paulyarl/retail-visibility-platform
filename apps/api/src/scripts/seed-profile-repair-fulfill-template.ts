@@ -18,6 +18,8 @@
  *   {{delivery_mode}}     — diy | dfy with framing guidance
  *   {{repair_platforms}}  — derived scope: purchased platforms ∩ diagnosed
  *                           affected_platforms (operator may narrow per run)
+ *   {{campaign_categories}} — the campaign's category set (primary +
+ *                           secondaries) for platform category selection
  *
  * Gold standard context is delivered via the existing fulfill_target
  * injection in MarketingExecutionService — DO NOT re-declare it in this
@@ -162,6 +164,7 @@ async function main() {
         'repair_tier',
         'delivery_mode',
         'repair_platforms',
+        'campaign_categories',
       ],
       output_schema: {
         name: 'citation_repair_package',
