@@ -181,6 +181,40 @@ export const del = async (key: string): Promise<void> => {
 };
 
 /**
+ * Try to acquire a distributed lock via Redis SET NX PX.
+ * Returns a release function on success, or null when the lock is held
+ * elsewhere. When Redis is unavailable the caller proceeds UNLOCKED
+ * (release is a no-op) — matches this module's graceful-degradation style.
+ * TTL bounds lock lifetime if the holder dies before releasing.
+ */
+export const tryLock = async (name: string, ttlMs: number): Promise<(() => Promise<void>) | null> => {
+  const unlocked = () => Promise.resolve();
+  if (!isRedisConnected) {
+    await initRedis();
+  }
+  if (!redisClient) return unlocked;
+
+  const key = `lock:${name}`;
+  const token = `${process.pid}-${Date.now()}-${Math.random()}`;
+  try {
+    const acquired = await redisClient.set(key, token, { NX: true, PX: ttlMs });
+    if (acquired !== 'OK') return null;
+    return async () => {
+      try {
+        await redisClient!.eval(
+          "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+          { keys: [key], arguments: [token] }
+        );
+      } catch {
+        // Best-effort release — the PX TTL is the backstop
+      }
+    };
+  } catch {
+    return unlocked;
+  }
+};
+
+/**
  * Clear cache by pattern
  * @param pattern - Pattern to match (supports wildcards)
  */

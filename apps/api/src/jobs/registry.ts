@@ -28,6 +28,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { nextCronRun, isValidCron } from './cronSpec';
+import { tryLock } from '../lib/cache-service';
 
 export type JobTrigger = 'schedule' | 'manual' | 'api';
 
@@ -74,6 +75,10 @@ type RunStatus = 'running' | 'success' | 'failed' | 'skipped';
 
 const jobs = new Map<string, RegisteredJob>();
 const HOSTNAME = `${os.hostname()}:${process.pid}`;
+
+/** Cross-instance job lock (Redis SET NX PX). Bounds a dead holder's lease;
+ *  jobs exceeding this could double-run, so it should outlive the longest run. */
+const JOB_LOCK_TTL_MS = 30 * 60 * 1000;
 
 // ── Per-run console capture (AsyncLocalStorage so lines attribute to the
 //    run that produced them even when jobs overlap) ────────────────────────
@@ -335,6 +340,31 @@ async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ sk
     return { skipped: job.envDisabled ? 'disabled_by_env' : 'disabled_by_admin' };
   }
 
+  // Cross-instance guard (multi-machine deployments): only one host may run
+  // a job at a time. tryLock degrades to unlocked when Redis is unavailable —
+  // same behavior as the single-instance era. Losers skip silently on
+  // 'schedule' triggers (every replica's timer fires each cycle); manual/api
+  // triggers record the skip so the operator sees it.
+  const releaseLock = await tryLock(`job:${job.name}`, JOB_LOCK_TTL_MS);
+  if (!releaseLock) {
+    if (trigger !== 'schedule') {
+      await withJobDb(() =>
+        prisma.scheduled_job_runs.create({
+          data: {
+            job_name: job.name,
+            status: 'skipped' as RunStatus,
+            trigger_source: trigger,
+            finished_at: new Date(),
+            duration_ms: 0,
+            error: 'lock_held_remote',
+            hostname: HOSTNAME,
+          },
+        })
+      );
+    }
+    return { skipped: 'lock_held' };
+  }
+
   job.running = true;
   const startedAt = new Date();
 
@@ -367,6 +397,7 @@ async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ sk
     errorText = error?.stack || error?.message || String(error);
   } finally {
     job.running = false;
+    await releaseLock();
   }
 
   const finishedAt = new Date();
