@@ -64,6 +64,7 @@ import {
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
+import { Modal } from '@/components/ui/Modal';
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import ReportQrDesignerModal from './ReportQrDesignerModal';
@@ -1824,23 +1825,6 @@ function PresenceSeedDetailClient() {
           >
             <Pencil className="w-4 h-4" /> Edit Fields
           </button>
-        )}
-        {editing && (
-          <>
-            <button
-              onClick={handleSaveFields}
-              disabled={savingFields}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" /> {savingFields ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              onClick={cancelEditing}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-            >
-              <X className="w-4 h-4" /> Cancel
-            </button>
-          </>
         )}
         {canDelete && !editing && (
           <button
@@ -3799,15 +3783,16 @@ function PresenceSeedDetailClient() {
         autoSyncCampaignId={syncCampaignId}
       />
 
-      {/* Edit panel */}
-      {editing && (
-        <section className="bg-white border border-blue-200 rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Edit Sourced Fields</h2>
-          <p className="text-xs text-gray-500">
-            Updates write to the listing and upsert provenance rows. Once a seed
-            is claimed, the owner manages these fields.
-          </p>
-
+      {/* Edit panel — a modal: the full form is too tall to render inline
+          below the page's sections. */}
+      <Modal
+        isOpen={editing}
+        onClose={cancelEditing}
+        title="Edit Sourced Fields"
+        description="Updates write to the listing and upsert provenance rows. Once a seed is claimed, the owner manages these fields."
+        size="xl"
+      >
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <SlugPatternSelector
@@ -4409,8 +4394,26 @@ function PresenceSeedDetailClient() {
               )}
             </div>
           </div>
-        </section>
-      )}
+
+          {/* Sticky save bar — pinned to the modal scrollport's bottom edge so
+              the action stays reachable anywhere in the tall form. */}
+          <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex items-center justify-end gap-3 border-t border-neutral-200 bg-white px-6 py-4">
+            <button
+              onClick={cancelEditing}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            >
+              <X className="w-4 h-4" /> Cancel
+            </button>
+            <button
+              onClick={handleSaveFields}
+              disabled={savingFields}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> {savingFields ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {!editing && (
         <div className="text-sm text-gray-500">
