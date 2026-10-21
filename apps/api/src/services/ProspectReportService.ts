@@ -412,6 +412,13 @@ const VERDICT_GLOSSES: Record<string, string> = {
   'parked:none':
     'Your website address shows a parked page — no business content is on it.',
 
+  'hijacked:owned_domain':
+    'Your domain resolves to content that has nothing to do with your business — the domain appears to have been taken over.',
+  'hijacked:platform_hosted':
+    'Your website address resolves to content that isn\u2019t yours — the domain appears to have been taken over.',
+  'hijacked:none':
+    'Your website address resolves to content that isn\u2019t yours — the domain appears to have been taken over.',
+
   'unfinished:owned_domain':
     'You own a domain, but the website on it was never finished — visitors land on a half-built page.',
   'unfinished:platform_hosted':
@@ -968,6 +975,16 @@ class ProspectReportService extends BaseService {
         cost: 'Customers looking for hours, products, or ordering hit a page that was never built for that.',
         evidence: audit.website.url ?? null,
         tier: 'worth_fixing',
+      });
+    } else if (
+      audit.website?.status === 'hijacked' ||
+      ((audit as any).detected_signals ?? []).includes('WC_DOMAIN_HIJACKED')
+    ) {
+      costing.push({
+        headline: 'Your website link sends visitors to content that isn\u2019t yours',
+        cost: 'Customers and reviewers trust your name — the link spends that trust on a page that isn\u2019t yours. The domain appears to have been taken over.',
+        evidence: audit.website.url ?? null,
+        tier: 'now',
       });
     }
     if ((metrics?.observable_unanswered_negative_reviews ?? 0) > 0) {

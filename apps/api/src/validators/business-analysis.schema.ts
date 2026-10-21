@@ -126,6 +126,11 @@ const websiteStatusEnum = z.enum([
   'broken',
   'none_found',
   'social_media_only',
+  // 'hijacked' — the URL resolves to content that is not the business's:
+  // expired-domain takeover, foreign-language spam, gambling/pharma/SEO
+  // doorway pages. The site loads, so it is not 'broken'; it is not the
+  // business's site, so it is not 'working'. Emitted with WC_DOMAIN_HIJACKED.
+  'hijacked',
   'unable_to_verify',
 ]);
 const mobileFriendlyEnum = z.enum(['yes', 'likely', 'no', 'unable_to_verify']);
@@ -1072,7 +1077,7 @@ Return your response as JSON matching this exact schema:
   },
   "website": {
     "url": "<string|null>",
-    "status": "working|broken|none_found|social_media_only|unable_to_verify",
+    "status": "working|broken|none_found|social_media_only|hijacked|unable_to_verify",
     "mobile_friendly": "yes|likely|no|unable_to_verify" (use "yes" when confirmed mobile-friendly; do NOT use "verified"),
     "https": <boolean|null> (null when unable to verify),
     "contact_information_visible": <boolean|null> (null when unable to verify),

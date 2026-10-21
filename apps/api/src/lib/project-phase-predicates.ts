@@ -89,6 +89,7 @@ export const PROJECT_PHASE_PREDICATES_V1: readonly ProjectPhasePredicateSeed[] =
       'WC_THIRD_PARTY_DOMAIN',
       'WC_BUILDER_SUBDOMAIN',
       'WC_PARKED_DOMAIN',
+      'WC_DOMAIN_HIJACKED',
       'WC_UNFINISHED_SITE',
       'WC_BROKEN_WEBSITE',
       'WC_URL_MISMATCH',

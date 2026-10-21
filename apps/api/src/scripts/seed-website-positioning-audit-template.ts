@@ -134,6 +134,10 @@ emit on sight:
     certificate.
   - WC_PARKED_DOMAIN: the domain resolves to a parked / for-sale / registrar
     placeholder page.
+  - WC_DOMAIN_HIJACKED: the domain resolves to live content unrelated to the
+    business — foreign-language spam, gambling/casino/pharma/SEO-doorway
+    pages, or content for a different entity. Expired-domain takeover or
+    compromise; the domain is unusable even though it loads.
   - WC_UNFINISHED_SITE: a "coming soon" / under-construction / template-default
     page that was never finished.
 Quality judgments (require content-verified):

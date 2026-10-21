@@ -455,7 +455,10 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       !!website.url ||
       status === 'working' ||
       status === 'broken' ||
-      status === 'social_media_only';
+      status === 'social_media_only' ||
+      // 'hijacked' — the URL resolves (content loads) so a site exists; it
+      // just isn't the business's.
+      status === 'hijacked';
     // Explicit absence determination by the analyst. This is authoritative
     // and overrides a stale campaign.has_website='yes' that may have been
     // ingested from a directory listing which the audit later could not
@@ -469,7 +472,10 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
     // determination; the host sets catch it even when status wasn't set.
     const thirdParty = status === 'social_media_only' || isSocialPlatformHost(website.url);
     const builderSubdomain = !thirdParty && isBuilderSubdomainHost(website.url);
-    const frictionSuppressed = thirdParty || builderSubdomain;
+    // A hijacked domain is not the business's site either — conversion-
+    // friction codes on foreign content are noise, same suppression lane.
+    const hijacked = status === 'hijacked';
+    const frictionSuppressed = thirdParty || builderSubdomain || hijacked;
 
     // WC_MISSING_WEBSITE — no website detected
     if (!signals.has('WC_MISSING_WEBSITE')) {
@@ -504,6 +510,13 @@ function deriveSignals(input: SignalExtractorInput, signals: Set<SignalCode>): v
       }
       if (builderSubdomain && !signals.has('WC_BUILDER_SUBDOMAIN')) {
         signals.add('WC_BUILDER_SUBDOMAIN');
+      }
+      // WC_DOMAIN_HIJACKED — the URL resolves to foreign content
+      // (expired-domain takeover or compromise). Absence-class like parked:
+      // the business owns no usable site; the fix is a new site on a new
+      // URL (PB-08), not content repair.
+      if (hijacked && !signals.has('WC_DOMAIN_HIJACKED')) {
+        signals.add('WC_DOMAIN_HIJACKED');
       }
 
       // §5 — WC_UNSECURED_WEBSITE: a real owned site served over plain HTTP

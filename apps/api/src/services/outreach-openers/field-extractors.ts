@@ -217,6 +217,7 @@ export type WebsitePresenceClass =
   | 'parked'
   | 'unfinished'
   | 'broken'
+  | 'hijacked'
   | 'present';
 
 /**
@@ -515,6 +516,8 @@ export function extractA7Fields(
   else if (thirdParty) presenceClass = 'third_party_only';
   else if (builder) presenceClass = 'builder_subdomain';
   else if (status === 'broken' || isDeadUrl(website)) presenceClass = 'broken';
+  else if (status === 'hijacked' || detected.includes('WC_DOMAIN_HIJACKED'))
+    presenceClass = 'hijacked';
   else if (detected.includes('WC_PARKED_DOMAIN')) presenceClass = 'parked';
   else if (detected.includes('WC_UNFINISHED_SITE')) presenceClass = 'unfinished';
   else presenceClass = 'present';

@@ -76,6 +76,11 @@ export const KNOWN_SIGNAL_CODES = [
   'WC_BUILDER_SUBDOMAIN',
   'WC_PARKED_DOMAIN',
   'WC_UNFINISHED_SITE',
+  // The domain resolves to live content that is not the business's —
+  // expired-domain takeover or compromise. Absence-class: the business owns
+  // no usable site, and the fix is a new site on a new URL (PB-08), not
+  // content repair. Pairs with website.status='hijacked'.
+  'WC_DOMAIN_HIJACKED',
   // Website gap / positioning (PB-08 / A7) — defect-class (repair semantics)
   'WC_UNSECURED_WEBSITE',
   'WC_LEGACY_BUILDER_SITE',
@@ -324,6 +329,7 @@ export const SIGNAL_LABELS: Record<string, string> = {
   WC_THIRD_PARTY_DOMAIN: 'Website Is a Third-Party/Social Page',
   WC_BUILDER_SUBDOMAIN: 'Website on a Free Builder Subdomain',
   WC_PARKED_DOMAIN: 'Parked / For-Sale Domain',
+  WC_DOMAIN_HIJACKED: 'Hijacked / Foreign-Content Domain',
   WC_UNFINISHED_SITE: 'Unfinished "Coming Soon" Site',
   WC_UNSECURED_WEBSITE: 'Unsecured Website (HTTP / bad certificate)',
   WC_LEGACY_BUILDER_SITE: 'Legacy / Low-Cost Builder Site',
