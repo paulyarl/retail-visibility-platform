@@ -377,11 +377,17 @@ async function checkCapabilityEngagement(
   });
 
   if (tierFeaturesInCapType.length === 0) {
-    return {
-      eligible: false,
-      reason: `Your current plan doesn't include any features in the ${capabilityKey.replace(/_options$/, '').replace(/_/g, ' ')} category. Upgrade your plan to unlock this feature.`,
-      capabilityKey,
-    };
+    // A live purchase or granted override in the same capability type counts
+    // as engagement — a complimentary grant (e.g. the seed-claim promo) is a
+    // deliberate taste that must leave the à-la-carte upsell path open.
+    if (!(await hasGrantEngagement(tenantId, capabilityTypeId))) {
+      return {
+        eligible: false,
+        reason: `Your current plan doesn't include any features in the ${capabilityKey.replace(/_options$/, '').replace(/_/g, ' ')} category. Upgrade your plan to unlock this feature.`,
+        capabilityKey,
+      };
+    }
+    return { eligible: true, reason: null, capabilityKey };
   }
 
   // 4. D7 veto — `{capability_key}_disabled` is an ABSOLUTE veto: it wins even
@@ -398,6 +404,55 @@ async function checkCapabilityEngagement(
   }
 
   return { eligible: true, reason: null, capabilityKey };
+}
+
+/**
+ * Grant engagement — does the tenant hold a live purchase or granted override
+ * for any feature in this capability type? Complimentary grants (seed-claim
+ * promo, admin grant, redeemed grant token) are funnel tastes: they keep the
+ * à-la-carte path open for modules the tier doesn't carry. Mirrors the
+ * resolver's merge semantics (active/past_due/trial, non-expired).
+ */
+async function hasGrantEngagement(tenantId: string, capabilityTypeId: string): Promise<boolean> {
+  const [purchases, overrides] = await Promise.all([
+    prisma.tenant_feature_purchases.findMany({
+      where: {
+        tenant_id: tenantId,
+        status: { in: ['active', 'past_due', 'trial'] },
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+      },
+      select: { feature_key: true },
+    }),
+    prisma.tenant_feature_overrides_list.findMany({
+      where: {
+        tenant_id: tenantId,
+        granted: true,
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+      },
+      select: { feature: true },
+    }),
+  ]);
+
+  // Negative-gate keys are vetoes, not engagement (same isNegativeGate rule
+  // the merge applies to flexible expansion).
+  const grantKeys = [...purchases.map(p => p.feature_key), ...overrides.map(o => o.feature)]
+    .filter(k => !k.endsWith('_disabled') && !k.endsWith('_off'));
+  if (grantKeys.length === 0) return false;
+
+  const grantFeatures = await prisma.features_list.findMany({
+    where: { key: { in: grantKeys } },
+    select: { id: true },
+  });
+  if (grantFeatures.length === 0) return false;
+
+  const link = await prisma.capability_features_list.findFirst({
+    where: {
+      feature_id: { in: grantFeatures.map(f => f.id) },
+      capability_type_id: capabilityTypeId,
+    },
+    select: { feature_id: true },
+  });
+  return !!link;
 }
 
 /**
@@ -440,6 +495,9 @@ interface TierEvalContext {
   tierFeatureKeysByCapType: Map<string, string[]>;
   purchasesByKey: Map<string, { id: string; feature_key: string; status: string; expires_at: Date | null; source: string }>;
   overrideExpiryByKey: Map<string, Date | null>;
+  /** Capability types where the tenant holds a live purchase or granted
+   *  override — mirrors hasGrantEngagement for the batch evaluators. */
+  engagedCapTypeIds: Set<string>;
   merchantGates: Map<string, boolean | null>;
 }
 
@@ -537,6 +595,28 @@ async function loadTierEvalContext(tenantId: string): Promise<TierEvalContext> {
     }
   }
 
+  // Grant engagement — capability types where the tenant holds a live
+  // purchase or granted override (mirrors hasGrantEngagement). Note
+  // featureIdToCap keeps the FIRST link per feature; a grant linked to
+  // multiple cap types only marks the first — matching findFirst semantics.
+  const ctxNow = new Date();
+  const isNegativeGateKey = (k: string) => k.endsWith('_disabled') || k.endsWith('_off');
+  const engagedCapTypeIds = new Set<string>();
+  for (const p of purchases) {
+    const live = ['active', 'past_due', 'trial'].includes(p.status)
+      && (p.expires_at === null || p.expires_at > ctxNow);
+    if (!live || isNegativeGateKey(p.feature_key)) continue;
+    const fid = featureKeyToId.get(p.feature_key);
+    const cap = fid ? featureIdToCap.get(fid) : undefined;
+    if (cap) engagedCapTypeIds.add(cap.capabilityTypeId);
+  }
+  for (const o of overrides) {
+    if ((o.expires_at !== null && o.expires_at <= ctxNow) || isNegativeGateKey(o.feature)) continue;
+    const fid = featureKeyToId.get(o.feature);
+    const cap = fid ? featureIdToCap.get(fid) : undefined;
+    if (cap) engagedCapTypeIds.add(cap.capabilityTypeId);
+  }
+
   const merchantGates = new Map<string, boolean | null>();
   await Promise.all(Object.entries(MERCHANT_GATE_MAP).map(async ([capKey, gateInfo]) => {
     try {
@@ -553,7 +633,7 @@ async function loadTierEvalContext(tenantId: string): Promise<TierEvalContext> {
   return {
     hasTenant: !!tenant,
     hasTierKeys: tierKeys.length > 0,
-    now: new Date(),
+    now: ctxNow,
     featureKeyToId,
     featureIdToCap,
     featureIdToActiveCap,
@@ -562,6 +642,7 @@ async function loadTierEvalContext(tenantId: string): Promise<TierEvalContext> {
     tierFeatureKeysByCapType,
     purchasesByKey: new Map(purchases.map(p => [p.feature_key, p])),
     overrideExpiryByKey: new Map(overrides.map(o => [o.feature, o.expires_at])),
+    engagedCapTypeIds,
     merchantGates,
   };
 }
@@ -642,11 +723,16 @@ function evalCapabilityEngagement(
   const tierFeaturesInCapType = ctx.tierFeatureKeysByCapType.get(capabilityTypeId) ?? [];
   const domainLabel = capabilityKey.replace(/_options$/, '').replace(/_/g, ' ');
   if (tierFeaturesInCapType.length === 0) {
-    return {
-      eligible: false,
-      reason: `Your current plan doesn't include any features in the ${domainLabel} category. Upgrade your plan to unlock this feature.`,
-      capabilityKey,
-    };
+    // Same grant-engagement fallback as checkCapabilityEngagement — a live
+    // purchase/grant in this cap type keeps the à-la-carte path open.
+    if (!ctx.engagedCapTypeIds.has(capabilityTypeId)) {
+      return {
+        eligible: false,
+        reason: `Your current plan doesn't include any features in the ${domainLabel} category. Upgrade your plan to unlock this feature.`,
+        capabilityKey,
+      };
+    }
+    return { eligible: true, reason: null, capabilityKey };
   }
 
   // D7 veto — same contract as checkCapabilityEngagement

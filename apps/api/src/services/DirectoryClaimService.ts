@@ -8,7 +8,9 @@
  * Claim converts org_standing_mode from 'directory_seed' to 'independent'
  * and listing_origin from 'directory_seed' to 'claimed' so the public URL
  * moves from /place/{slug} to /directory/{slug}. The tenant keeps its
- * directory_presence tier until the owner upgrades.
+ * directory_presence tier until the owner upgrades; claimed-only
+ * capabilities arrive as seed_claim promo grants (tenant_feature_purchases),
+ * never as tier keys — see applySeedClaimGrants.
  */
 
 import { prisma } from '../prisma';
@@ -24,7 +26,36 @@ import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
 import { buildTenantUpgradeOptions, UpgradeOptionsPayload } from './DirectoryPresenceUpgradeOptionsService';
 import { MarketIntelAccessService } from './MarketIntelAccessService';
+import { invalidateEffectiveCapabilities } from './EffectiveCapabilityResolver';
 import { slugifyAttributeKey, type DirectoryListingAttribute } from './directory/listingAttributes';
+
+/**
+ * Seed-claim promo grants — capability features unlocked by the claim event
+ * itself (not by tier, so they never reach unclaimed `directory_presence`
+ * seeds). Written as `tenant_feature_purchases` rows (source `seed_claim`)
+ * so the effective-capability merge treats them exactly like a manual
+ * complimentary grant. Extend this list to add future claim promos.
+ */
+const SEED_CLAIM_PROMO_GRANTS: readonly string[] = [
+  // Flyer — directory + place surfaces only; flyer_flexible is the upsell.
+  'flyer_on',
+  'flyer_directory_on',
+  'flyer_place_on',
+  'flyer_items_5',
+  // Storefront QR — classic renderer, directory-entry target, 512px only.
+  // Deliberately NOT storefront_qr_on (it sweeps every content type +
+  // resolution): storefront_qr_flexible is the upsell for styled renderer,
+  // logo, custom colors/gradients, hi-res, analytics.
+  'storefront_qr_classic_on',
+  'storefront_qr_directory',
+  'storefront_qr_resolution_512',
+];
+
+/** Claim promo duration — one year from claim. */
+const SEED_CLAIM_PROMO_DAYS = 365;
+
+/** Sources that represent money attached — a claim promo never overwrites them. */
+const PAID_PURCHASE_SOURCES = ['bsaas', 'bsaas_bundle', 'addon', 'tier_overage'];
 
 /** Audit context for claim operations */
 interface ClaimAuditCtx {
@@ -142,6 +173,8 @@ export interface ClaimResult {
   currentTier?: UpgradeOptionsPayload['currentTier'];
   isGatewayUpgrade?: boolean;
   upgradeOptions?: UpgradeOptionsPayload['upgradeOptions'];
+  /** Feature keys unlocked by the claim promo grant (source 'seed_claim'). */
+  claimGrants?: string[];
 }
 
 export interface InitiateClaimResult {
@@ -1064,6 +1097,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
 
     await this.promoteListingToClaimed(r.tenant_id);
     await this.retireSeedPreviewStorefronts(r.tenant_id);
+    const claimGrants = await this.applySeedClaimGrants(r.tenant_id, r.seed_id);
 
     // --- Customer-to-user promotion bridge ---
     let platformUserId: string | undefined;
@@ -1149,6 +1183,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         isGatewayUpgrade: upgradePreview.isGatewayUpgrade,
         upgradeOptions: upgradePreview.upgradeOptions,
       } : {}),
+      ...(claimGrants.length ? { claimGrants } : {}),
     };
   }
 
@@ -1445,6 +1480,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
 
     await this.promoteListingToClaimed(r.tenant_id);
     await this.retireSeedPreviewStorefronts(r.tenant_id);
+    const claimGrants = await this.applySeedClaimGrants(r.tenant_id, r.seed_id);
 
     // Update request status
     await prisma.$executeRaw`
@@ -1512,6 +1548,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       userTokens,
       requiresPasswordSetup,
       platformUserId,
+      ...(claimGrants.length ? { claimGrants } : {}),
     };
   }
 
@@ -1785,6 +1822,75 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       tenantId,
       slug: listing.slug,
     });
+  }
+
+  /**
+   * Seed-claim promo grants — write the claim-time capability grants as
+   * `tenant_feature_purchases` rows (source 'seed_claim'), the same shape a
+   * manual complimentary grant or redeemed grant token produces, so the
+   * effective-capability merge resolves them without any tier change. A
+   * live paid-source row is never demoted. Returns the granted feature
+   * keys; non-fatal — a failure logs and returns [] so it never blocks
+   * the claim.
+   */
+  private async applySeedClaimGrants(tenantId: string, seedId: string): Promise<string[]> {
+    try {
+      const expiresAt = new Date(Date.now() + SEED_CLAIM_PROMO_DAYS * 24 * 60 * 60 * 1000);
+      const granted: string[] = [];
+
+      for (const featureKey of SEED_CLAIM_PROMO_GRANTS) {
+        const existing = await prisma.tenant_feature_purchases.findUnique({
+          where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+          select: { source: true, status: true },
+        });
+
+        // Never demote money — a live paid purchase keeps its source/attribution.
+        if (existing && PAID_PURCHASE_SOURCES.includes(existing.source ?? '') &&
+            ['active', 'past_due', 'trial'].includes(existing.status ?? '')) {
+          continue;
+        }
+
+        const metadata = {
+          trigger: 'seed_claim',
+          seed_id: seedId,
+          complimentary: true,
+          granted_by: 'system:seed_claim',
+          granted_at: new Date().toISOString(),
+          reason: 'Seed claim promo — module taste granted at claim for one year (see SEED_CLAIM_PROMO_GRANTS)',
+        };
+
+        await prisma.tenant_feature_purchases.upsert({
+          where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+          update: { source: 'seed_claim', status: 'active', expires_at: expiresAt, metadata, updated_at: new Date() },
+          create: {
+            tenant_id: tenantId,
+            feature_key: featureKey,
+            source: 'seed_claim',
+            status: 'active',
+            expires_at: expiresAt,
+            metadata,
+          },
+        });
+        granted.push(featureKey);
+      }
+
+      if (granted.length > 0) {
+        invalidateEffectiveCapabilities(tenantId);
+        logger.info('DirectoryClaimService — seed-claim promo grants applied', undefined, {
+          seedId,
+          tenantId,
+          grants: granted,
+        });
+      }
+      return granted;
+    } catch (err: any) {
+      logger.warn('DirectoryClaimService — seed-claim promo grant failed', undefined, {
+        seedId,
+        tenantId,
+        error: { name: err?.name || 'Error', message: err?.message || String(err) },
+      });
+      return [];
+    }
   }
 
   /**
