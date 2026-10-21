@@ -35,6 +35,7 @@ import { basePrisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { checkSubdomainAvailability, isReservedSubdomain, isValidSubdomainFormat } from '../lib/subdomain';
 import { isReservedPlaceSlug } from '../utils/slug';
+import { generateTenantKey } from '../lib/id-generator';
 import {
   generateUniqueDirectorySlug,
   getTenantLocation,
@@ -589,31 +590,15 @@ class SlugSingletonService extends UniversalSingleton {
   }
 
   /**
-   * Generate deterministic autoId from tenantId
-   * Matches backend logic in TenantSingletonService
+   * Deterministic autoId from tenantId — the canonical 4-char key
+   * generateTenantKey derives from the id-generator's tenant ID (the same
+   * key SKUs/order/correlation IDs embed). Lowercased for slug use.
+   *
+   * Replaces the old tid-(\d+) extraction: modern IDs are tid-<8-char
+   * base36>, so a tid like tid-9xxxx yielded a single-digit suffix.
    */
   private generateAutoId(tenantId: string): string {
-    // Extract the numeric part from tenantId (tid-12345 -> 12345)
-    const match = tenantId.match(/tid-(\d+)/);
-    if (match && match[1]) {
-      return match[1];
-    }
-    
-    // Fallback: use hash of tenantId
-    return this.simpleHash(tenantId);
-  }
-
-  /**
-   * Simple hash function for autoId generation
-   */
-  private simpleHash(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36).substring(0, 6).toUpperCase();
+    return generateTenantKey(tenantId).toLowerCase();
   }
 
   /**
