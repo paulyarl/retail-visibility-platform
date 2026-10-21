@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { tenantSlugService } from '@/services/TenantSlugService';
 import { clientLogger } from '@/lib/client-logger';
 
-interface SlugPattern {
+export interface SlugPattern {
   pattern: string;
   slug: string;
   isAvailable: boolean;
@@ -18,7 +18,7 @@ interface SlugPattern {
   unavailableReason?: string;
 }
 
-interface SlugPatternSelectorProps {
+export interface SlugPatternSelectorProps {
   businessName: string;
   location?: {
     city?: string;
@@ -32,9 +32,12 @@ interface SlugPatternSelectorProps {
   /**
    * 'subdomain' runs candidates through the platform subdomain ruleset
    * (format, reserved names, cross-namespace uniqueness) — use it for pickers
-   * that feed PUT /api/tenants/:id/subdomain. Default 'directory'.
+   * that feed PUT /api/tenants/:id/subdomain. 'place' runs the /place/{slug}
+   * ruleset (reserved static routes + directory_listings_list uniqueness,
+   * ownership by listing tenant) — use it for directory-presence seed
+   * listings. Default 'directory'.
    */
-  namespace?: 'directory' | 'subdomain';
+  namespace?: 'directory' | 'subdomain' | 'place';
   /** Heading copy. Defaults to the shop-URL wording. */
   label?: string;
   /** Preview line label. Defaults to "Your shop URL:". */
@@ -46,6 +49,27 @@ interface SlugPatternSelectorProps {
    * the tenant writes a slug (e.g. PUT /tenants/:id/subdomain renames it).
    */
   refreshKey?: string | number;
+}
+
+/**
+ * Decide whether the picker should auto-(re)select after patterns load.
+ * - No selection → the first available pattern.
+ * - Selection matches a pattern the platform marked unavailable → the first
+ *   available replacement.
+ * - Selection is NOT among the generated patterns (a seed's current suffixed
+ *   slug like "name-2", or a previously typed custom slug) → null. Never
+ *   silently rewrite a slug the picker didn't evaluate.
+ */
+export function resolveSlugAutoSelect(
+  patterns: SlugPattern[],
+  selectedSlug: string
+): string | null {
+  if (!patterns || patterns.length === 0) return null;
+  if (selectedSlug) {
+    const current = patterns.find((p) => p.slug === selectedSlug);
+    if (!current || current.isAvailable) return null;
+  }
+  return patterns.find((p) => p.isAvailable)?.slug ?? null;
 }
 
 export default function SlugPatternSelector({
@@ -100,21 +124,9 @@ export default function SlugPatternSelector({
 
         setPatterns(patterns);
 
-        // Auto-select first available pattern if none selected
-        if (!selectedSlugRef.current && patterns && patterns.length > 0) {
-          const firstAvailable = patterns.find((p: SlugPattern) => p.isAvailable);
-          if (firstAvailable) {
-            onSlugSelectRef.current(firstAvailable.slug);
-          }
-        } else if (selectedSlugRef.current && patterns) {
-          // If current selection is no longer available (taken by another), select first available
-          const currentPattern = patterns.find((p: SlugPattern) => p.slug === selectedSlugRef.current);
-          if (!currentPattern?.isAvailable) {
-            const firstAvailable = patterns.find((p: SlugPattern) => p.isAvailable);
-            if (firstAvailable) {
-              onSlugSelectRef.current(firstAvailable.slug);
-            }
-          }
+        const autoSelect = resolveSlugAutoSelect(patterns, selectedSlugRef.current);
+        if (autoSelect) {
+          onSlugSelectRef.current(autoSelect);
         }
       } catch (err) {
         clientLogger.error('Error fetching slug patterns:', { detail: err });
@@ -163,7 +175,7 @@ export default function SlugPatternSelector({
     return (
       <div className={className}>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Shop URL Slug
+          {label}
         </label>
         <p className="text-sm text-gray-500">
           Enter a business name to see available URL options
@@ -176,7 +188,7 @@ export default function SlugPatternSelector({
     return (
       <div className={className}>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Shop URL Slug
+          {label}
         </label>
         <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
           <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
@@ -190,7 +202,7 @@ export default function SlugPatternSelector({
     return (
       <div className={className}>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Shop URL Slug
+          {label}
         </label>
         <Alert variant="error">
           <AlertCircle className="h-4 w-4" />
@@ -277,7 +289,8 @@ export default function SlugPatternSelector({
                           <AlertCircle className="h-3 w-3 mr-1" />
                           {pattern.unavailableReason === 'invalid_subdomain'
                             ? 'Too long'
-                            : pattern.unavailableReason === 'reserved_subdomain'
+                            : pattern.unavailableReason === 'reserved_subdomain' ||
+                                pattern.unavailableReason === 'reserved_place_slug'
                               ? 'Reserved'
                               : 'Taken'}
                         </Badge>
@@ -340,7 +353,8 @@ export default function SlugPatternSelector({
                     <AlertCircle className="h-3 w-3 mr-1" />
                     {customStatus.reason === 'invalid_subdomain'
                       ? 'Invalid'
-                      : customStatus.reason === 'reserved_subdomain'
+                      : customStatus.reason === 'reserved_subdomain' ||
+                          customStatus.reason === 'reserved_place_slug'
                         ? 'Reserved'
                         : 'Taken'}
                   </Badge>

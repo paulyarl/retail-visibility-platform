@@ -63,6 +63,7 @@ import {
   Palette,
 } from 'lucide-react';
 import DirectoryCategorySelectorAdapter from '@/components/directory/DirectoryCategorySelectorAdapter';
+import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 import LinkedCampaignsPanel from './LinkedCampaignsPanel';
 import ClaimQrDesignerModal from './ClaimQrDesignerModal';
 import ReportQrDesignerModal from './ReportQrDesignerModal';
@@ -3809,16 +3810,24 @@ function PresenceSeedDetailClient() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Public Slug</label>
-              <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                value={editSlug}
-                onChange={(e) => setEditSlug(e.target.value)}
-                maxLength={80}
-                placeholder="your-business-slug"
+              <SlugPatternSelector
+                businessName={listing?.business_name ?? ''}
+                location={{
+                  city: editCity || listing?.city || undefined,
+                  state: editState || listing?.state || undefined,
+                }}
+                tenantId={seed?.tenant_id}
+                namespace="place"
+                selectedSlug={editSlug}
+                onSlugSelect={setEditSlug}
+                label="Public Slug"
+                urlLabel="Public URL:"
+                urlTemplate={(slug) => `/place/${slug}`}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Used in the public URL (/place/your-slug). Left empty, the current slug is kept.
+                The /place/&#123;slug&#125; entry URL. Availability is checked against live
+                listings and reserved /place routes; on save the value is normalized
+                and de-duped if the candidate was claimed in the meantime.
               </p>
             </div>
             <div>

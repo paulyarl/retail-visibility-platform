@@ -19,6 +19,7 @@ vi.mock('../../prisma', () => ({
   basePrisma: {
     tenants: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     directory_settings_list: { findFirst: vi.fn(), findUnique: vi.fn() },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -28,6 +29,8 @@ import slugSingletonService from '../SlugSingletonService';
 const tenantsMock = prisma.tenants as any;
 const settingsReadMock = (prisma as any).directory_settings_list as any;
 const ownershipMock = (basePrisma as any).directory_settings_list as any;
+// Shared-namespace union read used by the 'place' slug oracle.
+const placeRowsMock = (basePrisma as any).$queryRaw as any;
 
 const BUSINESS = 'Ivoire African Market';
 const LOCATION = { city: 'East Pittsburgh', state: 'Pennsylvania', country: 'United States' };
@@ -179,5 +182,103 @@ describe('SlugSingletonService.getAllSlugPatterns', () => {
     const patterns = await slugSingletonService.getAllSlugPatterns(BUSINESS, LOCATION, TENANT, 'subdomain');
 
     expect(patterns.some((p) => p.pattern.endsWith('_shortened'))).toBe(false);
+  });
+});
+
+describe('SlugSingletonService.getAllSlugPatterns — place namespace', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    placeRowsMock.mockResolvedValue([]);
+  });
+
+  // The $queryRaw union returns { owner } rows across listings + settings +
+  // tenants; the mock filters on the bound slug parameter (first value arg).
+  const holdSlug = (slug: string, owner: string) =>
+    placeRowsMock.mockImplementation(async (_q: any, value: string) =>
+      value === slug ? [{ owner }] : []
+    );
+
+  it('checks availability against the shared slug namespace, not settings alone', async () => {
+    // Another tenant holds the base slug in one of the three mirrors —
+    // unavailable even though directory_settings_list's findUnique oracle
+    // (the 'directory' namespace) knows nothing about it.
+    holdSlug('ivoire-african-market', 'tid-other');
+
+    const patterns = await slugSingletonService.getAllSlugPatterns(BUSINESS, LOCATION, TENANT, 'place');
+    const base = patterns.find((p) => p.pattern === 'business_name');
+
+    expect(base?.isAvailable).toBe(false);
+    expect(base?.isOwnSlug).toBe(false);
+    expect(base?.unavailableReason).toBe('place_slug_taken');
+    expect(ownershipMock.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('marks the slug owned by this tenant as available and "Yours"', async () => {
+    holdSlug('ivoire-african-market', TENANT);
+
+    const patterns = await slugSingletonService.getAllSlugPatterns(BUSINESS, LOCATION, TENANT, 'place');
+    const base = patterns.find((p) => p.pattern === 'business_name');
+
+    expect(base?.isAvailable).toBe(true);
+    expect(base?.isOwnSlug).toBe(true);
+  });
+
+  it('treats a slug held in tenants.slug without a listing row as taken', async () => {
+    // The union read surfaces owners from any mirror — a tenants.slug value
+    // orphaned by a deleted listing still blocks the candidate.
+    holdSlug('ivoire-african-market', 'tid-orphaned');
+
+    const result = await slugSingletonService.checkPlaceSlugAvailability('ivoire-african-market', TENANT);
+
+    expect(result).toEqual({ available: false, code: 'place_slug_taken' });
+  });
+
+  it('flags reserved /place static-route slugs before any DB read', async () => {
+    const patterns = await slugSingletonService.getAllSlugPatterns('About Us', {}, TENANT, 'place');
+    const base = patterns.find((p) => p.pattern === 'business_name');
+
+    expect(base?.slug).toBe('about-us');
+    // 'about-us' is not reserved — only exact static-route names are.
+    expect(base?.isAvailable).toBe(true);
+
+    const reserved = await slugSingletonService.getAllSlugPatterns('Search', {}, TENANT, 'place');
+    const reservedBase = reserved.find((p) => p.pattern === 'business_name');
+
+    expect(reservedBase?.slug).toBe('search');
+    expect(reservedBase?.isAvailable).toBe(false);
+    expect(reservedBase?.unavailableReason).toBe('reserved_place_slug');
+  });
+
+  it('evaluates the autoId pattern against the shared namespace too', async () => {
+    // AutoID pattern slug happens to be held by another tenant — the place
+    // namespace must not assume uniqueness the way 'directory' does.
+    const patterns = await slugSingletonService.getAllSlugPatterns(BUSINESS, {}, TENANT, 'place');
+    const auto = patterns.find((p) => p.pattern === 'business_name_autoid');
+    expect(auto).toBeDefined();
+
+    holdSlug(auto!.slug, 'tid-other');
+    const again = await slugSingletonService.getAllSlugPatterns(BUSINESS, {}, TENANT, 'place');
+    expect(again.find((p) => p.pattern === 'business_name_autoid')?.isAvailable).toBe(false);
+  });
+});
+
+describe('SlugSingletonService.checkPlaceSlugAvailability', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    placeRowsMock.mockResolvedValue([]);
+  });
+
+  it('reports a reserved /place slug as unavailable without a DB read', async () => {
+    const result = await slugSingletonService.checkPlaceSlugAvailability('claim', TENANT);
+
+    expect(result).toEqual({ available: false, code: 'reserved_place_slug' });
+    expect(placeRowsMock).not.toHaveBeenCalled();
+  });
+
+  it('excludes the seed tenant\'s own slug', async () => {
+    placeRowsMock.mockResolvedValue([{ owner: TENANT }, { owner: TENANT }]);
+
+    const result = await slugSingletonService.checkPlaceSlugAvailability('dreamcast-african-market-2', TENANT);
+    expect(result.available).toBe(true);
   });
 });

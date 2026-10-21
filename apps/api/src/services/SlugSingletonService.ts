@@ -34,10 +34,11 @@ import { logger } from '../logger';
 import { basePrisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { checkSubdomainAvailability, isReservedSubdomain, isValidSubdomainFormat } from '../lib/subdomain';
-import { 
-  generateUniqueDirectorySlug, 
-  getTenantLocation, 
-  slugify 
+import { isReservedPlaceSlug } from '../utils/slug';
+import {
+  generateUniqueDirectorySlug,
+  getTenantLocation,
+  slugify
 } from '../utils/slug-generator';
 
 // Slug Information Interface
@@ -61,9 +62,12 @@ export interface LocationInfo {
  * `directory` keeps the historical directory_settings_list-only check;
  * `subdomain` runs the full platform subdomain ruleset (format, reserved
  * names, cross-namespace uniqueness) so the picker never offers a candidate
- * that PUT /api/tenants/:id/subdomain would reject.
+ * that PUT /api/tenants/:id/subdomain would reject;
+ * `place` evaluates against directory_listings_list.slug — the write target
+ * for directory-presence seed listings (/place/{slug}) — plus the reserved
+ * /place/ static-route names, with ownership by the listing's tenant_id.
  */
-export type SlugNamespace = 'directory' | 'subdomain';
+export type SlugNamespace = 'directory' | 'subdomain' | 'place';
 
 /** Hard limit enforced by the platform subdomain ruleset (SUBDOMAIN_REGEX). */
 const SUBDOMAIN_MAX_LENGTH = 30;
@@ -515,6 +519,63 @@ class SlugSingletonService extends UniversalSingleton {
   }
 
   /**
+   * Evaluate a /place/{slug} candidate. The platform treats slug as one
+   * shared namespace — updateSlug writes directory_listings_list,
+   * directory_settings_list, and tenants.slug together — so a candidate is
+   * taken when ANY of the three mirrors holds it for a different tenant
+   * (a settings/tenants value with no listing row would still collide on
+   * /tenant/{slug} resolution). Reserved /place/ static-route names are
+   * unavailable outright. Ownership is by tenant_id — seed tenants keep
+   * tenants.slug NULL, so "Yours" resolves through the listing/settings row.
+   */
+  private async getPlaceSlugOwnership(
+    slug: string,
+    tenantId?: string
+  ): Promise<{ isAvailable: boolean; isOwnSlug: boolean; unavailableReason?: string }> {
+    if (isReservedPlaceSlug(slug)) {
+      return { isAvailable: false, isOwnSlug: false, unavailableReason: 'reserved_place_slug' };
+    }
+
+    try {
+      const rows = await basePrisma.$queryRaw<{ owner: string }[]>`
+        SELECT tenant_id AS owner FROM directory_listings_list WHERE slug = ${slug}
+        UNION ALL
+        SELECT tenant_id AS owner FROM directory_settings_list WHERE slug = ${slug}
+        UNION ALL
+        SELECT id AS owner FROM tenants WHERE slug = ${slug}
+      `;
+
+      if (rows.length === 0) {
+        return { isAvailable: true, isOwnSlug: false };
+      }
+      if (rows.some((r) => r.owner !== tenantId)) {
+        return { isAvailable: false, isOwnSlug: false, unavailableReason: 'place_slug_taken' };
+      }
+      return { isAvailable: true, isOwnSlug: true };
+    } catch (error: unknown) {
+      logger.error('[SlugSingletonService] Failed to check place slug ownership:', undefined, { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Check a single candidate against the /place/ namespace (reserved
+   * static-route names + directory_listings_list.slug). Returns the
+   * same shape the subdomain availability check produces so the picker
+   * can render a reason-specific badge.
+   */
+  async checkPlaceSlugAvailability(
+    slug: string,
+    excludeTenantId?: string
+  ): Promise<{ available: boolean; code?: string }> {
+    const ownership = await this.getPlaceSlugOwnership(slug, excludeTenantId);
+    return {
+      available: ownership.isAvailable,
+      code: ownership.isAvailable ? undefined : ownership.unavailableReason,
+    };
+  }
+
+  /**
    * Invalidate slug cache for a tenant
    * 
    * @param tenantId - The tenant ID
@@ -678,11 +739,13 @@ class SlugSingletonService extends UniversalSingleton {
     if (tenantId) {
       const autoId = this.generateAutoId(tenantId);
       const pattern6 = `${baseSlug}-${autoId.toLowerCase()}`;
-      const evaluation6 = namespace === 'subdomain'
-        // The subdomain write path enforces format — an autoId suffix on a long
-        // base can still exceed the limit, so evaluate it honestly.
-        ? await this.evaluateSlugCandidate(pattern6, tenantId, namespace)
-        : { isAvailable: true, isOwnSlug: false };
+      const evaluation6 = namespace === 'directory'
+        // Historical directory behavior: the autoId suffix is assumed unique.
+        // 'subdomain'/'place' evaluate honestly — a suffixed candidate can
+        // still violate the write namespace's rules (length cap, /place/
+        // reserved names, an existing listing collision).
+        ? { isAvailable: true, isOwnSlug: false }
+        : await this.evaluateSlugCandidate(pattern6, tenantId, namespace);
       patterns.push({
         pattern: 'business_name_autoid',
         slug: pattern6,
@@ -758,15 +821,20 @@ class SlugSingletonService extends UniversalSingleton {
    * Evaluate one picker candidate. 'directory' keeps the historical
    * directory_settings_list-only availability check; 'subdomain' delegates to
    * the shared subdomain helper (format + reserved + cross-namespace) so the
-   * picker can never offer a candidate PUT /tenants/:id/subdomain rejects.
-   * `isOwnSlug` always comes from the directory check — that is the table the
-   * badge has historically described.
+   * picker can never offer a candidate PUT /tenants/:id/subdomain rejects;
+   * 'place' evaluates against directory_listings_list.slug — the write target
+   * for seed listings under /place/{slug} — with ownership by the listing's
+   * tenant_id. For 'directory'/'subdomain', `isOwnSlug` always comes from the
+   * directory check — that is the table the badge has historically described.
    */
   private async evaluateSlugCandidate(
     slug: string,
     tenantId: string | undefined,
     namespace: SlugNamespace
   ): Promise<{ isAvailable: boolean; isOwnSlug: boolean; unavailableReason?: string }> {
+    if (namespace === 'place') {
+      return this.getPlaceSlugOwnership(slug, tenantId);
+    }
     const ownership = await this.getSlugOwnership(slug, tenantId);
     if (namespace === 'directory') {
       return {

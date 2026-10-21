@@ -435,7 +435,11 @@ class DirectoryPresenceSeedService {
    * Reserved /place/ slugs (about, claim, search, category, city) are suffixed
    * to avoid collision with static Next.js routes.
    */
-  private async ensureUniqueSlug(rawSlug: string, excludeListingId?: string): Promise<string> {
+  private async ensureUniqueSlug(
+    rawSlug: string,
+    excludeListingId?: string,
+    excludeTenantId?: string
+  ): Promise<string> {
     let base = rawSlug
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -448,16 +452,26 @@ class DirectoryPresenceSeedService {
       base = `${base}-listing`;
     }
 
+    // Uniqueness across the shared slug namespace — updateSlug keeps
+    // directory_listings_list, directory_settings_list, and tenants.slug
+    // mirrored, so a candidate must be free in all three or it collides on
+    // another public surface (/tenant/{slug}, /directory/{slug}).
     let candidate = base;
     let counter = 2;
     while (true) {
-      const existing = await prisma.$queryRaw<any[]>`
-        SELECT id FROM directory_listings_list WHERE slug = ${candidate}
+      const existing = await prisma.$queryRaw<{ row_id: string; owner: string; src: string }[]>`
+        SELECT id AS row_id, tenant_id AS owner, 'listing' AS src FROM directory_listings_list WHERE slug = ${candidate}
+        UNION ALL
+        SELECT tenant_id AS row_id, tenant_id AS owner, 'settings' AS src FROM directory_settings_list WHERE slug = ${candidate}
+        UNION ALL
+        SELECT id AS row_id, id AS owner, 'tenant' AS src FROM tenants WHERE slug = ${candidate}
       `;
-      if (
-        existing.length === 0 ||
-        (excludeListingId && existing.length === 1 && existing[0].id === excludeListingId)
-      ) {
+      const blocking = existing.filter(
+        (r) =>
+          !(excludeTenantId && r.owner === excludeTenantId) &&
+          !(excludeListingId && r.src === 'listing' && r.row_id === excludeListingId)
+      );
+      if (blocking.length === 0) {
         return candidate;
       }
       candidate = `${base}-${counter++}`;
@@ -494,7 +508,7 @@ class DirectoryPresenceSeedService {
     `;
 
     // Create the directory listing
-    const slug = await this.ensureUniqueSlug(input.slug || input.businessName);
+    const slug = await this.ensureUniqueSlug(input.slug || input.businessName, undefined, tenantId);
 
     await prisma.$executeRaw`
       INSERT INTO directory_listings_list (
@@ -1478,10 +1492,11 @@ class DirectoryPresenceSeedService {
       setClauses.push('longitude = $' + (params.length + 1));
       params.push(fields.longitude);
     }
+    let renamedSlug: string | null = null;
     if (fields.slug !== undefined) {
-      const uniqueSlug = await this.ensureUniqueSlug(fields.slug, listingId);
+      renamedSlug = await this.ensureUniqueSlug(fields.slug, listingId, tenantId);
       setClauses.push('slug = $' + (params.length + 1));
-      params.push(uniqueSlug);
+      params.push(renamedSlug);
     }
 
     params.push(listingId);
@@ -1489,6 +1504,28 @@ class DirectoryPresenceSeedService {
       `UPDATE directory_listings_list SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       ...params
     );
+
+    // Mirror the rename into directory_settings_list — the tenant-side slug
+    // oracle (SlugSingletonService availability + the owner's directory
+    // settings) reads that table, and seed creation writes the same slug to
+    // both stores. Only write when the new value is free there or already
+    // this tenant's — never overwrite another tenant's settings slug.
+    if (renamedSlug) {
+      const settingsHolder = await prisma.directory_settings_list.findFirst({
+        where: { slug: renamedSlug },
+        select: { tenant_id: true },
+      });
+      if (!settingsHolder || settingsHolder.tenant_id === tenantId) {
+        await prisma.directory_settings_list.updateMany({
+          where: { tenant_id: tenantId },
+          data: { slug: renamedSlug, updated_at: new Date() },
+        });
+      } else {
+        logger.warn(
+          `[DirectoryPresenceSeedService] Slug rename diverged from settings table (seed=${seedId} tenant=${tenantId} listing=${listingId} slug=${renamedSlug})`
+        );
+      }
+    }
 
     // Owner-correction capture: when a CLAIMED seed's NAP fields change,
     // persist the diff and flag the seed. The claim itself stamped

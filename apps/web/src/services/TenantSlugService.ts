@@ -29,15 +29,17 @@ export interface SlugPatternParams {
   /**
    * 'subdomain' applies the platform subdomain ruleset (the same check
    * PUT /api/tenants/:id/subdomain runs) so pickers that feed that route
-   * never offer an unassignable candidate. Default 'directory'.
+   * never offer an unassignable candidate. 'place' applies the /place/{slug}
+   * ruleset (reserved static routes + directory_listings_list uniqueness)
+   * for directory-presence seed listings. Default 'directory'.
    */
-  namespace?: 'directory' | 'subdomain';
+  namespace?: 'directory' | 'subdomain' | 'place';
 }
 
 export interface SlugAvailabilityResult {
   available: boolean;
   valid?: boolean;
-  /** 'invalid_subdomain' | 'reserved_subdomain' | 'subdomain_taken' when not available. */
+  /** 'invalid_subdomain' | 'reserved_subdomain' | 'subdomain_taken' | 'reserved_place_slug' | 'place_slug_taken' when not available. */
   code?: string;
   ownedByCurrentUser?: boolean;
 }
@@ -150,12 +152,14 @@ class TenantSlugService extends TenantApiSingleton {
    * Check a free-text slug for availability. Uncached — availability is
    * inherently time-sensitive and both backing endpoints are rate-limited.
    * 'subdomain' hits GET /api/tenants/check-subdomain (full subdomain
-   * ruleset); 'directory' hits POST /api/slugs/check-availability.
+   * ruleset); 'directory'/'place' hit POST /api/slugs/check-availability
+   * ('place' evaluates the /place/{slug} namespace — reserved static routes
+   * + directory_listings_list uniqueness).
    */
   async checkSlugAvailability(
     slug: string,
     tenantId?: string,
-    namespace: 'directory' | 'subdomain' = 'directory'
+    namespace: 'directory' | 'subdomain' | 'place' = 'directory'
   ): Promise<SlugAvailabilityResult> {
     if (namespace === 'subdomain') {
       const response = await this.makeDefaultRequest<any>(
@@ -172,10 +176,10 @@ class TenantSlugService extends TenantApiSingleton {
 
     const response = await this.makeDefaultRequest<any>('/api/slugs/check-availability', {
       method: 'POST',
-      body: JSON.stringify({ slug, excludeTenantId: tenantId }),
+      body: JSON.stringify({ slug, excludeTenantId: tenantId, namespace }),
     });
     const d = response?.data ?? response;
-    return { available: !!d?.isAvailable };
+    return { available: !!d?.isAvailable, code: d?.code };
   }
 
   /**

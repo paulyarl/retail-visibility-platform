@@ -41,6 +41,7 @@ const generateSlugSchema = z.object({
 const checkAvailabilitySchema = z.object({
   slug: z.string().min(1).max(200),
   excludeTenantId: z.string().optional(),
+  namespace: z.enum(['directory', 'subdomain', 'place']).optional(),
 });
 
 /**
@@ -264,7 +265,15 @@ router.post('/check-availability', searchRateLimit, authenticateToken, async (re
       });
     }
 
-    const { slug, excludeTenantId } = parsed.data;
+    const { slug, excludeTenantId, namespace } = parsed.data;
+
+    // 'place' candidates must satisfy the /place/{slug} write ruleset —
+    // reserved static-route names + directory_listings_list uniqueness —
+    // which the directory_settings_list check cannot answer.
+    if (namespace === 'place') {
+      const result = await slugSingletonService.checkPlaceSlugAvailability(slug, excludeTenantId);
+      return res.json({ slug, isAvailable: result.available, code: result.code });
+    }
 
     const isAvailable = await slugSingletonService.isSlugAvailable(slug, excludeTenantId);
 
@@ -324,9 +333,12 @@ router.post('/slugify', deprecate({ ...RETIREMENT, replacement: '/api/slugs/patt
  *   "businessName": "Coffee Shop",
  *   "location": { "city": "Seattle", "state": "Washington", "country": "United States" },
  *   "tenantId": "tid-12345",
- *   "namespace": "subdomain"   // optional — enforces the platform subdomain
- *                            // ruleset (format/reserved/cross-namespace) so
- *                            // subdomain pickers only offer assignable values
+ *   "namespace": "subdomain"   // optional — "subdomain" enforces the platform
+ *                            // subdomain ruleset (format/reserved/cross-
+ *                            // namespace); "place" enforces the /place/{slug}
+ *                            // ruleset (reserved static routes +
+ *                            // directory_listings_list uniqueness) so pickers
+ *                            // only offer assignable values
  * }
  * 
  * Response:
@@ -351,7 +363,7 @@ router.post('/patterns', searchRateLimit, authenticateToken, async (req: Request
       businessName,
       location || {},
       tenantId,
-      namespace === 'subdomain' ? 'subdomain' : 'directory'
+      namespace === 'subdomain' || namespace === 'place' ? namespace : 'directory'
     );
 
     return res.json({ patterns });
