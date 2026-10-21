@@ -29,6 +29,7 @@ import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { useDirectoryPresenceTracking } from '@/hooks/useDirectoryPresenceTracking';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
+import type { ReferrerShelf, SecondaryShelf } from '@/lib/place-shelves';
 
 /**
  * PlaceEntryEditorialLayout — editorial-style layout adapted for directory
@@ -75,6 +76,14 @@ export interface PlaceEntryEditorialLayoutProps {
   publicNarrative?: string | null;
   /** Server-rendered market-intel teaser — feeds the sponsored slot under Contact. */
   marketIntelTeaser?: MarketIntelTeaserSummary | null;
+  /** Resolved `?shelf=` referrer — the shelf the shopper clicked through from.
+   *  When set, the back link returns to it and a place-category referrer's
+   *  label leads the hero subtitle (the card showed the shelf name, so the
+   *  entry keeps that context; the primary remains a browse link). */
+  referrerShelf?: ReferrerShelf | null;
+  /** Secondary categories resolved to live shelves — rendered as "Also on"
+   *  chips so the page shows every shelf the seed is filed on. */
+  secondaryShelves?: SecondaryShelf[];
 }
 
 export default function PlaceEntryEditorialLayout({
@@ -99,6 +108,8 @@ export default function PlaceEntryEditorialLayout({
   publicDisclaimer,
   publicNarrative,
   marketIntelTeaser,
+  referrerShelf,
+  secondaryShelves,
 }: PlaceEntryEditorialLayoutProps) {
   useQrScanTracking(tenantId, 'directory');
 
@@ -120,6 +131,11 @@ export default function PlaceEntryEditorialLayout({
       : '#claim-inquiry';
   const disclaimer = publicDisclaimer ||
     `${listing.businessName} is listed from public information (address and phone). This is not a claimed profile and may be incomplete.`;
+
+  // Shelf-context display: the referring shelf label leads the subtitle when
+  // the shopper arrived from a place-category shelf (the card they clicked
+  // showed that shelf name); the primary category is the fallback.
+  const displayCategory = referrerShelf?.categoryLabel || listing.primaryCategory;
 
   return (
     <>
@@ -149,8 +165,11 @@ export default function PlaceEntryEditorialLayout({
             <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-neutral-900" />
           </div>
           <div className="relative max-w-5xl mx-auto px-6 py-16 sm:py-24">
-            <Link href="/directory" className="inline-flex items-center text-sm text-neutral-300 hover:text-white mb-8 transition-colors">
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Directory
+            <Link
+              href={referrerShelf?.href || '/directory'}
+              className="inline-flex items-center text-sm text-neutral-300 hover:text-white mb-8 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to {referrerShelf?.label || 'Directory'}
             </Link>
             {listing.primaryCategory && (
               <div className="-mt-4 mb-2">
@@ -176,6 +195,29 @@ export default function PlaceEntryEditorialLayout({
                 </Link>
               </div>
             )}
+            {(secondaryShelves?.length ?? 0) > 0 && (
+              <div className="-mt-2 mb-6 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-neutral-400">Also on:</span>
+                {secondaryShelves!.map((shelf) =>
+                  shelf.href ? (
+                    <Link
+                      key={shelf.label}
+                      href={shelf.href}
+                      className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-neutral-200 hover:text-white transition-colors"
+                    >
+                      {shelf.label}
+                    </Link>
+                  ) : (
+                    <span
+                      key={shelf.label}
+                      className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 text-neutral-400"
+                    >
+                      {shelf.label}
+                    </span>
+                  ),
+                )}
+              </div>
+            )}
             <div className="space-y-6">
               <div className="flex items-center gap-4">
                 {listing.logoUrl && showsSeedAuthoredSurface(listing, dirEntryOpts?.canShowLogo) && (
@@ -183,8 +225,8 @@ export default function PlaceEntryEditorialLayout({
                 )}
                 <div>
                   <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">{listing.businessName}</h1>
-                  {listing.primaryCategory && (
-                    <p className="text-neutral-300 mt-2 text-lg">{listing.primaryCategory}</p>
+                  {displayCategory && (
+                    <p className="text-neutral-300 mt-2 text-lg">{displayCategory}</p>
                   )}
                   {!listing.isClaimed && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 mt-3 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-sm font-medium text-yellow-300">
@@ -478,6 +520,20 @@ export default function PlaceEntryEditorialLayout({
                     {listing.primaryCategory}
                     <span aria-hidden="true">→</span>
                   </Link>
+                )}
+                {secondaryShelves?.map(
+                  (shelf) =>
+                    shelf.href && (
+                      <Link
+                        key={shelf.label}
+                        href={shelf.href}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-full text-sm font-medium text-neutral-700 transition-colors"
+                      >
+                        <Tag className="w-4 h-4" />
+                        {shelf.label}
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    ),
                 )}
                 {listing.city && listing.state && (
                   <Link

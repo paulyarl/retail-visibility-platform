@@ -4,6 +4,7 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { showsListingPhotoGallery } from '@/lib/place-photo-gallery';
 import type { DirectoryEntryOptionsState } from '@/services/CapabilityResolutionService';
 import type { MarketIntelTeaserSummary } from '@/services/MarketIntelPublicService';
+import type { ReferrerShelf, SecondaryShelf } from '@/lib/place-shelves';
 
 import PlaceEntryEditorialLayout from './layouts/PlaceEntryEditorialLayout';
 import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
@@ -20,6 +21,10 @@ interface PlacePageClientProps {
   slugForRelated: string;
   /** Server-rendered teaser (§11.5 — crawlable DOM content). */
   marketIntelTeaser?: MarketIntelTeaserSummary | null;
+  /** Resolved `?shelf=` referrer — which shelf the shopper came from. */
+  referrerShelf?: ReferrerShelf | null;
+  /** The seed's secondary categories resolved to live shelves. */
+  secondaryShelves?: SecondaryShelf[];
 }
 
 export default function PlacePageClient({
@@ -30,6 +35,8 @@ export default function PlacePageClient({
   dirEntryOpts,
   slugForRelated,
   marketIntelTeaser,
+  referrerShelf,
+  secondaryShelves,
 }: PlacePageClientProps) {
   const tenantId = listing?.tenantId || '';
   const { status: hoursStatus } = useStoreStatus(tenantId, true);
@@ -81,6 +88,8 @@ export default function PlacePageClient({
         publicDisclaimer={listing.publicDisclaimer}
         publicNarrative={marketIntelTeaser?.publicNarrative ?? null}
         marketIntelTeaser={marketIntelTeaser}
+        referrerShelf={referrerShelf}
+        secondaryShelves={secondaryShelves}
       />
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <GbpReviewsSection slug={slug} />
