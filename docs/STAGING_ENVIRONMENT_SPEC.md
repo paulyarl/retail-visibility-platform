@@ -66,8 +66,9 @@ until services are formally retired.
   `main` (`deploy-production.yml` → `flyctl deploy`), or `pnpm deployapi`.
   `pnpm deployapi:promote` remains the manual full-pipeline path
   (stg → pause → merge → prod).
-- CI auth: repo secret `FLY_API_TOKEN` (org deploy token; regenerate with
-  `fly tokens create deploy`).
+- CI auth: repo secrets `FLY_API_TOKEN` (prod) + `FLY_API_TOKEN_STG`
+  (staging) — app-scoped deploy tokens (`fly tokens create deploy -a
+  <app>`), so a leaked token can't deploy across environments.
 
 ### Web — Vercel Preview scope (already exists)
 
