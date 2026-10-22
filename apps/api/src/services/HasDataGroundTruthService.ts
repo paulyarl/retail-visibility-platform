@@ -130,17 +130,7 @@ export class HasDataGroundTruthService extends BaseService {
     const cached = await this.readFreshPacket(campaignId, level);
     if (cached) return cached.packet as GroundTruthPacket;
 
-    // 2. Load campaign identity for the resolve query
-    const campaign = await this.prisma.mkt_campaigns_list.findUnique({
-      where: { id: campaignId },
-      select: { business_name: true, address_line1: true, address_city: true, address_state: true, city: true, state: true, phone: true, website: true },
-    });
-    if (!campaign?.business_name) {
-      logger.warn('Ground-truth fetch skipped — campaign has no business_name', ctx, { campaignId });
-      return null;
-    }
-
-    // 3. Resolve the place — reuse a persisted place_id/data_id from any
+    // 2. Resolve the place — reuse a persisted place_id/data_id from any
     //    prior packet row to skip the paid search call.
     const prior = await this.readAnyPacket(campaignId);
     let placeId: string | null = prior?.place_id ?? null;
@@ -148,13 +138,28 @@ export class HasDataGroundTruthService extends BaseService {
     let credits = 0;
 
     try {
+      // Campaign identity for the resolve query — inside the try so a
+      // transient DB error degrades to unavailable instead of throwing.
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { business_name: true, address_line1: true, address_city: true, address_state: true, city: true, state: true, phone: true, website_url: true },
+      });
+      if (!campaign?.business_name) {
+        logger.warn('Ground-truth fetch skipped — campaign has no business_name', ctx, { campaignId });
+        return null;
+      }
+
       if (!placeId && !dataId) {
         const q = [campaign.business_name, campaign.address_city ?? campaign.city, campaign.address_state ?? campaign.state]
           .filter(Boolean)
           .join(', ');
         const search = await this.hasdata(apiKey, '/search', { q });
         credits += CREDITS_PER_CALL;
-        const hit = (search?.localResults?.[0] ?? search?.local_results?.[0] ?? search?.results?.[0]) as any;
+        // placeResults is the hit object for a single-result query (array
+        // when ambiguous) — verified against the live REST contract.
+        const pr = search?.placeResults;
+        const hit = (Array.isArray(pr) ? pr[0] : (pr?.placeId || pr?.dataId ? pr : null))
+          ?? search?.localResults?.[0] ?? search?.local_results?.[0] ?? search?.results?.[0];
         placeId = hit?.placeId ?? hit?.place_id ?? null;
         dataId = hit?.dataId ?? hit?.data_id ?? null;
         if (!placeId && !dataId) {
@@ -164,7 +169,7 @@ export class HasDataGroundTruthService extends BaseService {
       }
 
       const idParam: Record<string, string> = placeId ? { placeId } : { dataId: dataId! };
-      const details = await this.hasdata(apiKey, '/details', idParam);
+      const details = await this.hasdata(apiKey, '/place', idParam);
       credits += CREDITS_PER_CALL;
       const reviews = await this.hasdata(apiKey, '/reviews', { ...idParam, sort: 'newestFirst' });
       credits += CREDITS_PER_CALL;
@@ -208,7 +213,7 @@ export class HasDataGroundTruthService extends BaseService {
         FROM mkt_ground_truth_packets
         WHERE campaign_id = ${campaignId}
           AND level = ${level}
-          AND fetched_at > now() - make_interval(days => ${PACKET_TTL_DAYS})
+          AND fetched_at > now() - make_interval(days => ${PACKET_TTL_DAYS}::int)
         ORDER BY fetched_at DESC
         LIMIT 1
       `;
@@ -243,30 +248,35 @@ export class HasDataGroundTruthService extends BaseService {
     photos: any,
     meta: { placeId: string | null; dataId: string | null; level: GroundTruthLevel; credits: number },
   ): GroundTruthPacket {
+    // Live contract (verified): /place → { placeResults: {title, rating,
+    // reviews, type, types[], address, phone, website, ...} }; /reviews →
+    // { topics: [{keyword, mentions}], reviews: [{rating, isoDate, date,
+    // snippet, response?: {snippet}}] }.
+    const d = details?.placeResults ?? details;
     const reviewRows = ((reviews?.reviews ?? reviews?.userReviews?.reviews ?? []) as any[])
       .slice(0, 20)
       .map((r) => ({
         rating: typeof r?.rating === 'number' ? r.rating : null,
-        date: r?.date ?? r?.datetime ?? r?.reviewDate ?? null,
+        date: r?.isoDate ?? r?.date ?? r?.datetime ?? r?.reviewDate ?? null,
         text: r?.snippet ?? r?.text ?? r?.description ?? null,
-        owner_responded: !!(r?.responseFromOwnerText ?? r?.response_from_owner ?? r?.ownerResponse),
+        owner_responded: !!(r?.response?.snippet ?? r?.response ?? r?.responseFromOwnerText ?? r?.response_from_owner ?? r?.ownerResponse),
       }));
     const responded = reviewRows.filter((r) => r.owner_responded).length;
-    const topics = ((details?.userReviews?.topics ?? details?.topics ?? []) as any[])
+    const topics = ((reviews?.topics ?? details?.userReviews?.topics ?? d?.topics ?? []) as any[])
       .map((t) => (typeof t === 'string' ? t : t?.keyword ?? t?.name))
       .filter((t): t is string => typeof t === 'string' && !!t);
     const postsArr = posts?.posts ?? posts;
     const photosArr = photos?.photos ?? photos;
 
     return {
-      business_name: details?.name ?? null,
-      address: details?.address ?? details?.fullAddress ?? null,
-      phone: details?.phone ?? details?.phoneNumber ?? null,
-      website: details?.website ?? details?.websiteUrl ?? null,
-      rating: typeof details?.rating === 'number' ? details.rating : null,
-      review_count: typeof details?.reviewCount === 'number' ? details.reviewCount : (details?.reviews ?? null),
-      primary_type: details?.type ?? null,
-      types: Array.isArray(details?.types) ? details.types : [],
+      business_name: d?.title ?? d?.name ?? null,
+      address: d?.address ?? d?.fullAddress ?? null,
+      phone: d?.phone ?? d?.phoneNumber ?? null,
+      website: d?.website ?? d?.websiteUrl ?? null,
+      rating: typeof d?.rating === 'number' ? d.rating : null,
+      review_count: typeof d?.reviews === 'number' ? d.reviews : (typeof d?.reviewCount === 'number' ? d.reviewCount : null),
+      primary_type: d?.type ?? null,
+      types: Array.isArray(d?.types) ? d.types : [],
       place_id: meta.placeId,
       data_id: meta.dataId,
       reviews: reviewRows,
