@@ -262,6 +262,11 @@ export class HasDataGroundTruthService extends BaseService {
         owner_responded: !!(r?.response?.snippet ?? r?.response ?? r?.responseFromOwnerText ?? r?.response_from_owner ?? r?.ownerResponse),
       }));
     const responded = reviewRows.filter((r) => r.owner_responded).length;
+    // HasData row order isn't chronological — take the max parsed date.
+    const reviewTimes = reviewRows
+      .map((r) => (r.date ? Date.parse(r.date) : NaN))
+      .filter((t) => Number.isFinite(t));
+    const latestReviewAt = reviewTimes.length > 0 ? new Date(Math.max(...reviewTimes)).toISOString() : null;
     const topics = ((reviews?.topics ?? details?.userReviews?.topics ?? d?.topics ?? []) as any[])
       .map((t) => (typeof t === 'string' ? t : t?.keyword ?? t?.name))
       .filter((t): t is string => typeof t === 'string' && !!t);
@@ -285,7 +290,7 @@ export class HasDataGroundTruthService extends BaseService {
       photos_count: Array.isArray(photosArr) ? photosArr.length : (typeof photosArr?.photosCount === 'number' ? photosArr.photosCount : null),
       owner_response_rate_observable: reviewRows.length > 0 ? responded / reviewRows.length : null,
       review_corpus_size: reviewRows.length,
-      latest_review_at: reviewRows[0]?.date ?? null,
+      latest_review_at: latestReviewAt,
       fetched_at: new Date().toISOString(),
       level: meta.level,
       credits_spent: meta.credits,
