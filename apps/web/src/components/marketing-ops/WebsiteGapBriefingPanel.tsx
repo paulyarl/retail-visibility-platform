@@ -6,6 +6,7 @@ import marketingOpsService, { Audit, CampaignDetail } from '@/services/Marketing
 import { isWebsiteGapCampaign } from './repairCampaignGate';
 import WebsitePositioningAuditCard from './WebsitePositioningAuditCard';
 import CollapsiblePanel from './CollapsiblePanel';
+import GroundTruthKnob, { type GroundTruthLevel } from './GroundTruthKnob';
 
 interface WebsiteGapBriefingPanelProps {
   campaign: CampaignDetail;
@@ -60,6 +61,10 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
   const [importResult, setImportResult] = useState<{ passed: boolean; errors?: string[] } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Google Maps ground-truth knob (TOUCH LADDER §14.1a) — applies to
+  // whichever lane runs (AI Run or External render).
+  const [groundTruthOn, setGroundTruthOn] = useState(false);
+  const [groundTruthLevel, setGroundTruthLevel] = useState<GroundTruthLevel>('latest');
 
   // Build-scope decision state (the PB-08 analog of track confirmation)
   const [showScopeForm, setShowScopeForm] = useState(false);
@@ -118,6 +123,7 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
       await marketingOpsService.createExecution({
         campaign_id: campaign.id,
         template_id: WEBSITE_POSITIONING_TEMPLATE_ID,
+        variables_used: groundTruthOn ? { google_maps_ground_truth: groundTruthLevel } : undefined,
       });
       onRefresh();
     } catch (err: any) {
@@ -131,7 +137,11 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
     setRendering(true);
     setError(null);
     try {
-      const text = await marketingOpsService.renderPrompt(WEBSITE_POSITIONING_TEMPLATE_ID, campaign.id);
+      const text = await marketingOpsService.renderPrompt(
+        WEBSITE_POSITIONING_TEMPLATE_ID,
+        campaign.id,
+        groundTruthOn ? { google_maps_ground_truth: groundTruthLevel } : undefined,
+      );
       setRenderedPrompt(text);
     } catch (err: any) {
       setError(err.message || 'Failed to render positioning prompt');
@@ -246,6 +256,17 @@ export default function WebsiteGapBriefingPanel({ campaign, onRefresh }: Website
             </button>
           </div>
         </div>
+
+        {/* Google Maps ground-truth knob (§14.1a) — explicit opt-in spend;
+            injects the live listing packet + review corpus into whichever
+            lane runs. */}
+        <GroundTruthKnob
+          campaignId={campaign.id}
+          enabled={groundTruthOn}
+          level={groundTruthLevel}
+          onChange={({ enabled, level }) => { setGroundTruthOn(enabled); setGroundTruthLevel(level); }}
+          tone="sky"
+        />
 
         {/* AI Run mode — synchronous execution via the generic prompt runner */}
         {runMode === 'ai' && (

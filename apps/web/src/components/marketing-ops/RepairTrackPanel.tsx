@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRightLeft, CheckCircle, Loader2, Sparkles, ShieldAl
 import marketingOpsService, { Campaign, RepairTrack, TriageRecommendation } from '@/services/MarketingOpsService';
 import OutreachProblemsSection from './OutreachProblemsSection';
 import CollapsiblePanel from './CollapsiblePanel';
+import GroundTruthKnob, { type GroundTruthLevel } from './GroundTruthKnob';
 import { isWebsiteGapCampaign } from './repairCampaignGate';
 
 interface RepairTrackPanelProps {
@@ -38,6 +39,10 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ passed: boolean; errors?: string[] } | null>(null);
   const [copied, setCopied] = useState(false);
+  // Google Maps ground-truth knob (TOUCH LADDER §14.1a) — explicit opt-in
+  // spend; applies to whichever triage mode runs (AI Run or External render).
+  const [groundTruthOn, setGroundTruthOn] = useState(false);
+  const [groundTruthLevel, setGroundTruthLevel] = useState<GroundTruthLevel>('latest');
   // Collapsed by default — controlled so the header Switch Track action can
   // force the panel open when it summons the inline switch dialog.
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -80,7 +85,11 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
       // given — after track confirmation that field is set (e.g. nap_drift),
       // so a bare call would silently run the per-issue seek instead and
       // return recommendation: null.
-      const result = await marketingOpsService.runRepairTriage(campaign.id, TRIAGE_TEMPLATE_ID);
+      const result = await marketingOpsService.runRepairTriage(
+        campaign.id,
+        TRIAGE_TEMPLATE_ID,
+        groundTruthOn ? groundTruthLevel : undefined,
+      );
       if (result.recommendation) {
         setRecommendation(result.recommendation);
       } else {
@@ -98,7 +107,11 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
     setRendering(true);
     setError(null);
     try {
-      const result = await marketingOpsService.renderRepairTriage(campaign.id, TRIAGE_TEMPLATE_ID);
+      const result = await marketingOpsService.renderRepairTriage(
+        campaign.id,
+        TRIAGE_TEMPLATE_ID,
+        groundTruthOn ? groundTruthLevel : undefined,
+      );
       setRenderedPrompt(result.renderedPrompt);
     } catch (err: any) {
       setError(err.message || 'Failed to render triage prompt');
@@ -305,6 +318,17 @@ export default function RepairTrackPanel({ campaign, onRefresh }: RepairTrackPan
                 </button>
               </div>
             </div>
+
+            {/* Google Maps ground-truth knob (§14.1a) — explicit opt-in
+                spend; injects the live listing packet + review corpus into
+                the triage prompt. Applies to whichever mode runs. */}
+            <GroundTruthKnob
+              campaignId={campaign.id}
+              enabled={groundTruthOn}
+              level={groundTruthLevel}
+              onChange={({ enabled, level }) => { setGroundTruthOn(enabled); setGroundTruthLevel(level); }}
+              tone="amber"
+            />
 
             {/* AI Run mode — synchronous OpenAI execution */}
             {triageMode === 'ai' && (

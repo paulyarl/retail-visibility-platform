@@ -9543,6 +9543,9 @@ router.get('/intelligence-runs/:id', async (req, res) => {
 
 const repairTriageInputSchema = z.object({
   templateId: z.string().optional(),
+  // TOUCH LADDER §14.1a — explicit opt-in knob; 'latest'|'deep' spends
+  // HasData credits (cache-first). Absent/null → byte-identical render.
+  google_maps_ground_truth: z.enum(['latest', 'deep']).nullable().optional(),
 });
 
 const repairTriageImportSchema = z.object({
@@ -9563,6 +9566,9 @@ const handleRepairTriage = async (req: any, res: Response) => {
       campaignId,
       parsed.templateId,
       getCtx(req),
+      parsed.google_maps_ground_truth
+        ? { google_maps_ground_truth: parsed.google_maps_ground_truth }
+        : undefined,
     );
     res.json({ success: true, data: result });
   } catch (error) {
@@ -9580,10 +9586,14 @@ const handleRepairTriageRender = async (req: any, res: Response) => {
   try {
     const campaignId = req.params.id || req.params.campaignId;
     const templateId = req.body?.templateId || req.query?.templateId || PROFILE_REPAIR_TRIAGE_TEMPLATE_ID;
+    const parsed = repairTriageInputSchema.parse(req.body || {});
     const result = await ProfileRepairPromptService.renderPromptText(
       campaignId,
       templateId,
       getCtx(req),
+      parsed.google_maps_ground_truth
+        ? { google_maps_ground_truth: parsed.google_maps_ground_truth }
+        : undefined,
     );
     res.json({ success: true, data: result });
   } catch (error) {

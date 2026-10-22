@@ -899,6 +899,7 @@ export class ProfileRepairPromptService extends BaseService {
     campaignId: string,
     templateId?: string,
     ctx?: RequestCtx,
+    extras?: { google_maps_ground_truth?: 'latest' | 'deep' },
   ): Promise<{
     executionId: string;
     recommendation: ProfileRepairTriageOutput['profile_repair_triage'] | null;
@@ -927,7 +928,7 @@ export class ProfileRepairPromptService extends BaseService {
       const platformSignalWeights = await IntelligenceProfileService.getInstance()
         .resolveSignalWeightMapForCampaign(campaign, latestAudit?.audit_data, ctx);
       const targetTemplateId = templateId || this.resolveSeekTemplateId(campaign.repair_issue_type);
-      const seekVars = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
+      const seekVars = { ...this.buildSeekVariables(campaign, latestAudit, platformSignalWeights), ...extras };
 
       const execution = await MarketingExecutionService.getInstance().executeSingle(
         {
@@ -1251,6 +1252,7 @@ export class ProfileRepairPromptService extends BaseService {
     campaignId: string,
     templateId: string,
     ctx?: RequestCtx,
+    extras?: { google_maps_ground_truth?: 'latest' | 'deep' },
   ): Promise<{
     renderedPrompt: string;
     templateId: string;
@@ -1294,6 +1296,7 @@ export class ProfileRepairPromptService extends BaseService {
       } else {
         variablesUsed = this.buildSeekVariables(campaign, latestAudit, platformSignalWeights);
       }
+      if (extras) variablesUsed = { ...variablesUsed, ...extras };
 
       const executionService = MarketingExecutionService.getInstance();
       const { renderedPrompt } = await executionService.resolvePrompt(

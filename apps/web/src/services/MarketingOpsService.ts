@@ -2930,7 +2930,7 @@ class MarketingOpsService extends AdminApiSingleton {
   }
 
   // ─── Profile Repair Prompts & Triage (§4.5, §4.6) ──────────────────────────
-  async runRepairTriage(id: string, templateId?: string): Promise<{
+  async runRepairTriage(id: string, templateId?: string, googleMapsGroundTruth?: 'latest' | 'deep'): Promise<{
     executionId: string;
     recommendation: {
       severity_score: number;
@@ -2960,7 +2960,7 @@ class MarketingOpsService extends AdminApiSingleton {
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${id}/repair-triage`,
-      { method: 'POST', body: JSON.stringify({ templateId }) },
+      { method: 'POST', body: JSON.stringify({ templateId, google_maps_ground_truth: googleMapsGroundTruth }) },
       `mkt-ops-campaign-repair-triage-${id}`,
       0,
     );
@@ -2971,14 +2971,14 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async renderRepairTriage(id: string, templateId?: string): Promise<{
+  async renderRepairTriage(id: string, templateId?: string, googleMapsGroundTruth?: 'latest' | 'deep'): Promise<{
     renderedPrompt: string;
     templateId: string;
     variablesUsed: Record<string, any>;
   }> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${id}/repair-triage/render`,
-      { method: 'POST', body: JSON.stringify({ templateId }) },
+      { method: 'POST', body: JSON.stringify({ templateId, google_maps_ground_truth: googleMapsGroundTruth }) },
       `mkt-ops-campaign-repair-triage-render-${id}`,
       0,
     );

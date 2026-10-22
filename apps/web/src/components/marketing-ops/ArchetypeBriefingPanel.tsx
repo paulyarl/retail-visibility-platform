@@ -38,6 +38,7 @@ import marketingOpsService, {
 } from '@/services/MarketingOpsService';
 import RepairBriefingCard from './RepairBriefingCard';
 import CollapsiblePanel from './CollapsiblePanel';
+import GroundTruthKnob, { type GroundTruthLevel } from './GroundTruthKnob';
 
 /** Declared archetype → briefing seek template (seeded by seed-archetype-briefing-templates). */
 const ARCHETYPE_TEMPLATES: Record<string, { templateId: string; label: string }> = {
@@ -63,6 +64,10 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<string[] | null>(null);
+  // Google Maps ground-truth knob (TOUCH LADDER §14.1a) — applies to
+  // whichever lane runs (AI Run or External render).
+  const [groundTruthOn, setGroundTruthOn] = useState(false);
+  const [groundTruthLevel, setGroundTruthLevel] = useState<GroundTruthLevel>('latest');
 
   const archetype = (campaign as any).archetype as string | null | undefined;
   const target = archetype ? ARCHETYPE_TEMPLATES[archetype] : undefined;
@@ -99,6 +104,7 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
       await marketingOpsService.createExecution({
         campaign_id: campaign.id,
         template_id: target.templateId,
+        variables_used: groundTruthOn ? { google_maps_ground_truth: groundTruthLevel } : undefined,
       });
       await loadLatest();
       onRefresh?.();
@@ -113,7 +119,11 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
     setBusy('render');
     setError(null);
     try {
-      const text = await marketingOpsService.renderPrompt(target.templateId, campaign.id);
+      const text = await marketingOpsService.renderPrompt(
+        target.templateId,
+        campaign.id,
+        groundTruthOn ? { google_maps_ground_truth: groundTruthLevel } : undefined,
+      );
       setRenderedPrompt(text);
     } catch (err: any) {
       setError(err.message || 'Failed to render briefing prompt');
@@ -189,6 +199,16 @@ export default function ArchetypeBriefingPanel({ campaign, onRefresh }: Props) {
       }
     >
       <div className="space-y-3">
+        {/* Google Maps ground-truth knob (§14.1a) — explicit opt-in spend;
+            applies to whichever lane runs. */}
+        <GroundTruthKnob
+          campaignId={campaign.id}
+          enabled={groundTruthOn}
+          level={groundTruthLevel}
+          onChange={({ enabled, level }) => { setGroundTruthOn(enabled); setGroundTruthLevel(level); }}
+          tone="indigo"
+        />
+
         {runMode === 'ai' ? (
           <button
             onClick={handleRun}
