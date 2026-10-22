@@ -26,6 +26,7 @@ import { IntelligenceProfileService, type IntelligenceProfile, type PromptResolu
 import { PromptComposerService, type IntelligenceFocus } from './intelligence/PromptComposerService';
 import { buildInteractiveVerificationPreamble, INTERACTIVE_VERIFICATION_DIRECTIVE_VERSION } from './interactive-verification-directive';
 import { buildOperatorProfileEvidencePreamble, OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION } from './operator-profile-evidence-directive';
+import { buildGroundTruthPreamble, resolveGroundTruthLevel } from './hasdata-ground-truth-directive';
 import { BronzeReasonCatalogService } from './intelligence/BronzeReasonCatalogService';
 import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
@@ -987,7 +988,27 @@ export class MarketingExecutionService extends BaseService {
         operatorProfileEvidenceDirectiveVersion: OPERATOR_PROFILE_EVIDENCE_DIRECTIVE_VERSION,
       });
     }
-    const runPreamble = interactivePreamble + profileEvidencePreamble;
+    // Google Maps ground truth (TOUCH LADDER §14) — caller-supplied opt-in
+    // via the `google_maps_ground_truth` variable ('latest'|'deep'). Async:
+    // fetch-or-cache through HasDataGroundTruthService (credits are a
+    // managed spend — cache-first, TTL-gated). Off/failed → '' or an
+    // explicit unavailable line; never blocks the render.
+    let groundTruthPreamble = '';
+    if (resolveGroundTruthLevel(effectiveVariables)) {
+      try {
+        groundTruthPreamble = await buildGroundTruthPreamble(
+          input.campaign.id,
+          effectiveVariables,
+          ctx,
+        );
+      } catch (err) {
+        logger.warn('Ground-truth preamble failed (non-fatal)', ctx, {
+          campaignId: input.campaign.id,
+          error: (err as Error).message,
+        });
+      }
+    }
+    const runPreamble = interactivePreamble + profileEvidencePreamble + groundTruthPreamble;
     // National establishment (sprint: national layer) — a '__all__'
     // establishment campaign renders the national template variant: a
     // city-agnostic §10 body (no geography grid, national-scope signal

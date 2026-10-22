@@ -24,6 +24,7 @@ import directoryPresenceAdminService, {
   SeedPreviewStatus,
 } from '@/services/DirectoryPresenceAdminService';
 import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
+import type { AssembledReconScript } from '@/services/MarketingOpsService';
 import { clientLogger } from '@/lib/client-logger';
 import { generateQrDataUrl, type PersistedQrStyle, type QrEngineOptions, type QrTemplateName } from '@/lib/qr-engine';
 import { bannerQrOptions } from '@/components/place/MarketIntelBanner';
@@ -383,6 +384,11 @@ function PresenceSeedDetailClient() {
   const [scriptAnchorId, setScriptAnchorId] = useState<string>('');
   const [seedScript, setSeedScript] = useState<AssembledSeedCallScript | null>(null);
   const [scriptLoading, setScriptLoading] = useState(false);
+  // TOUCH LADDER §3/§7.5 — Pitch|Recon switcher for the script card.
+  // Recon is the pre-pitch authority-mapping call; intel is carried on
+  // touch metadata.recon_* (no campaign worksheet exists yet).
+  const [scriptKind, setScriptKind] = useState<'pitch' | 'recon'>('pitch');
+  const [seedReconScript, setSeedReconScript] = useState<AssembledReconScript | null>(null);
   const [reportQrDownloading, setReportQrDownloading] = useState<string | null>(null);
   const [reportQrDesignerChannel, setReportQrDesignerChannel] = useState<
     'in_person' | 'text' | 'email' | 'social' | 'phone' | 'banner' | null
@@ -394,6 +400,12 @@ function PresenceSeedDetailClient() {
   const [touchOutcome, setTouchOutcome] = useState('');
   const [touchNotes, setTouchNotes] = useState('');
   const [loggingTouch, setLoggingTouch] = useState(false);
+  // TOUCH LADDER §7.5 — recon intel captured on call/visit touches; rides
+  // metadata.recon_* (no campaign worksheet exists for seeds).
+  const [touchReconRole, setTouchReconRole] = useState('');
+  const [touchReconGk, setTouchReconGk] = useState('');
+  const [touchReconTiming, setTouchReconTiming] = useState('');
+  const [touchReconHint, setTouchReconHint] = useState('');
   const [decidingProposal, setDecidingProposal] = useState<string | null>(null);
 
   // Edit mode state
@@ -727,6 +739,26 @@ function PresenceSeedDetailClient() {
     return () => { cancelled = true; };
   }, [seedId, scriptAnchorId]);
 
+  // Load the recon variant when the switcher flips (§13.1 — recon is the
+  // natural seed-side call: authority mapping before any reveal).
+  useEffect(() => {
+    if (scriptKind !== 'recon' || seedReconScript) return;
+    let cancelled = false;
+    setScriptLoading(true);
+    directoryPresenceAdminService
+      .getSeedReconScript(seedId)
+      .then((script) => {
+        if (!cancelled) setSeedReconScript(script);
+      })
+      .catch((err) => {
+        if (!cancelled) clientLogger.error('Failed to load seed recon script:', { detail: err });
+      })
+      .finally(() => {
+        if (!cancelled) setScriptLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [seedId, scriptKind, seedReconScript]);
+
   useEffect(() => {
     if (seedId) loadComposed();
   }, [seedId, loadComposed]);
@@ -928,15 +960,29 @@ function PresenceSeedDetailClient() {
     setActionSuccess(null);
     try {
       setLoggingTouch(true);
+      const recon =
+        touchReconRole || touchReconGk || touchReconTiming || touchReconHint
+          ? {
+              contact_reached_role: (touchReconRole || null) as any,
+              gatekeeper_name: touchReconGk || null,
+              owner_presence_timing: touchReconTiming || null,
+              owner_contact_hint: touchReconHint || null,
+            }
+          : undefined;
       const result = await directoryPresenceAdminService.addOutreachTouch(seedId, {
         channel: touchChannel,
         outcome: (touchOutcome || undefined) as any,
         notes: touchNotes.trim() || undefined,
+        recon,
       });
       if (!result) throw new Error('Failed to log touch');
       setActionSuccess(`Touch logged (${touchChannel.replace(/_/g, ' ')}).`);
       setTouchNotes('');
       setTouchOutcome('');
+      setTouchReconRole('');
+      setTouchReconGk('');
+      setTouchReconTiming('');
+      setTouchReconHint('');
       loadTouches();
     } catch (err) {
       setActionError(
@@ -3236,18 +3282,128 @@ function PresenceSeedDetailClient() {
               verification question, pain probe, and transition stages.
             </p>
           </div>
-          {seedScript?.callContext.phone && (
-            <a
-              href={`tel:${seedScript.callContext.phone}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              {seedScript.callContext.phone}
-            </a>
-          )}
+          <div className="flex items-center gap-3">
+            {/* TOUCH LADDER §13.1 — Pitch | Recon */}
+            <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
+              {(['pitch', 'recon'] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setScriptKind(k)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                    scriptKind === k ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {k === 'pitch' ? 'Verification' : 'Recon'}
+                </button>
+              ))}
+            </div>
+            {(scriptKind === 'pitch' ? seedScript : seedReconScript)?.callContext.phone && (
+              <a
+                href={`tel:${(scriptKind === 'pitch' ? seedScript : seedReconScript)!.callContext.phone!}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                {(scriptKind === 'pitch' ? seedScript : seedReconScript)!.callContext.phone}
+              </a>
+            )}
+          </div>
         </div>
 
-        {/* Anchor picker */}
+        {/* Recon script — four-stage authority-mapping call (§3). */}
+        {scriptKind === 'recon' && (
+          <div className="space-y-3">
+            {scriptLoading && <span className="text-xs text-gray-400">Loading…</span>}
+            {seedReconScript && (
+              <>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                  <span>Owner on file: <span className="font-medium text-gray-800">{seedReconScript.callContext.owner_name ?? 'Unknown'}</span></span>
+                  {seedReconScript.callContext.authority_reached ? (
+                    <span className="rounded bg-green-100 px-1.5 py-0.5 font-medium text-green-700">Owner reached</span>
+                  ) : (
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-500">Owner unreachable</span>
+                  )}
+                  {seedReconScript.callContext.recon_completed_at && (
+                    <span>Last recon {new Date(seedReconScript.callContext.recon_completed_at).toLocaleDateString()}</span>
+                  )}
+                </div>
+                {(
+                  [
+                    ['1. Open (verification cover)', seedReconScript.stages.open],
+                    ['2. Authority probe', seedReconScript.stages.authority_probe],
+                  ] as Array<[string, string | null]>
+                ).map(([label, text]) =>
+                  text ? (
+                    <div key={label} className="border border-gray-100 rounded-lg p-3">
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+                      <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{text}</p>
+                      {label.startsWith('2.') && (
+                        <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                          {seedReconScript.stages.authority_branches.map((b, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                              <span className="shrink-0 font-medium text-gray-700">{b.answer}</span>
+                              <span className="text-gray-400">→</span>
+                              <span className="text-gray-500">{b.path}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null,
+                )}
+                <div className="border border-gray-100 rounded-lg p-3">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                    3. Intel asks (pick at most 3 — unknown fields first)
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {seedReconScript.stages.intel_asks.map((a, i) => (
+                      <div key={i} className={a.known ? 'opacity-50' : ''}>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-medium uppercase ${a.known ? 'text-gray-400' : 'text-blue-600'}`}>
+                            {a.known ? 'obtained — skip' : 'unknown — ask this'}
+                          </span>
+                          <span className="text-[10px] text-gray-400">{a.note}</span>
+                        </div>
+                        <p className="text-sm text-gray-800 mt-0.5">{a.ask}</p>
+                        {a.known && a.current_value && (
+                          <p className="text-xs text-gray-500">On file: {a.current_value}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="border border-gray-100 rounded-lg p-3">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">4. Close</p>
+                  <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{seedReconScript.stages.close}</p>
+                </div>
+                <div className="border border-amber-200 bg-amber-50 rounded-lg p-3">
+                  <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide">
+                    If they say &quot;I&apos;m the owner&quot; — escalation bridge (§3.3)
+                  </p>
+                  <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{seedReconScript.stages.owner_bridge}</p>
+                </div>
+                {seedReconScript.objections?.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Objection responses</p>
+                    <div className="space-y-2">
+                      {seedReconScript.objections.map((o, i) => (
+                        <div key={i} className="text-xs">
+                          <p className="font-medium text-gray-800">{o.objection}</p>
+                          <p className="text-gray-500 mt-0.5">{o.response}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400">
+                  Log the call under Outreach touches — recon_* intel rides the touch metadata.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Anchor picker — pitch script only */}
+        {scriptKind === 'pitch' && (
         <div className="flex items-center gap-3">
           <label className="text-xs font-medium text-gray-700 whitespace-nowrap">Outreach anchor</label>
           <select
@@ -3266,8 +3422,9 @@ function PresenceSeedDetailClient() {
           </select>
           {scriptLoading && <span className="text-xs text-gray-400">Loading…</span>}
         </div>
+        )}
 
-        {seedScript && (
+        {scriptKind === 'pitch' && seedScript && (
           <div className="space-y-3">
             {seedScript.anchor && (
               <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
@@ -3717,6 +3874,48 @@ function PresenceSeedDetailClient() {
               {loggingTouch ? 'Logging…' : 'Log touch'}
             </button>
           </div>
+          {/* Recon intel (§7.5/§13.2) — shown for call/visit touches. Rides
+              touch metadata.recon_* so the recon script's gap labels and the
+              pre-campaign authority map fill before any worksheet exists. */}
+          {(touchChannel === 'call' || touchChannel === 'visit') && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Recon intel</span>
+              <select
+                value={touchReconRole}
+                onChange={(e) => setTouchReconRole(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700"
+                title="Who answered"
+              >
+                <option value="">who answered…</option>
+                <option value="owner">owner</option>
+                <option value="manager">manager</option>
+                <option value="staffer">staffer</option>
+                <option value="answering_service">answering svc</option>
+                <option value="none">no one</option>
+              </select>
+              <input
+                type="text"
+                value={touchReconGk}
+                onChange={(e) => setTouchReconGk(e.target.value)}
+                placeholder="Gatekeeper name"
+                className="w-28 border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700"
+              />
+              <input
+                type="text"
+                value={touchReconTiming}
+                onChange={(e) => setTouchReconTiming(e.target.value)}
+                placeholder="Owner usually in"
+                className="w-32 border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700"
+              />
+              <input
+                type="text"
+                value={touchReconHint}
+                onChange={(e) => setTouchReconHint(e.target.value)}
+                placeholder="Owner contact hint"
+                className="w-36 border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700"
+              />
+            </div>
+          )}
           {touches.length > 0 && (
             <div className="space-y-1">
               {touches.slice(0, 5).map((t) => (

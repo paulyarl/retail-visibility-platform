@@ -106,6 +106,36 @@ const TEAM_SIGNAL_OPTIONS = [
   { value: 'unknown', label: 'Unknown' },
 ];
 
+// TOUCH LADDER §7 — recon intel chip vocabularies. Values match the
+// worksheet payload enums written by CallScriptService.applyCallConfirmations.
+const RECON_REACHED_ROLE_OPTIONS = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'staffer', label: 'Staffer' },
+  { value: 'answering_service', label: 'Answering svc' },
+  { value: 'none', label: 'No one' },
+];
+
+const RECON_PHONE_REACH_OPTIONS = [
+  { value: 'answered_live', label: 'Live' },
+  { value: 'voicemail', label: 'Voicemail' },
+  { value: 'dead_air', label: 'Dead air' },
+  { value: 'wrong_number', label: 'Wrong #', },
+  { value: 'disconnected', label: 'Disconnected' },
+];
+
+const RECON_GATEKEEPER_OPTIONS = [
+  { value: 'ally', label: 'Ally' },
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'blocker', label: 'Blocker' },
+];
+
+const RECON_LITERACY_OPTIONS = [
+  { value: 'low', label: 'Low' },
+  { value: 'moderate', label: 'Moderate' },
+  { value: 'high', label: 'High' },
+];
+
 function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
@@ -118,6 +148,9 @@ interface LogContactModalProps {
   // Script tab passes the operator's selected hook angle so it's recorded
   // on the outreach log without retyping.
   initialAngleUsed?: string;
+  /** TOUCH LADDER §13.2 — which script the touch ran. 'recon'/'visit'
+   *  surfaces the Recon intel block and stamps call_details.script_kind. */
+  initialScriptKind?: 'pitch' | 'recon' | 'visit';
   // Optional tab to open on. Radix TabsContent unmounts inactive panels, so
   // the write-back panel (and its prefilled fields) is not in the markup
   // unless it is the active tab — same test hook as ResolveVerificationModal's
@@ -135,7 +168,7 @@ interface LogContactModalProps {
 // auto-derived from the channel's result picker inside it.
 type LogContactTab = 'details' | 'writeback' | 'notes';
 
-export default function LogContactModal({ campaign, onClose, onLogged, initialAngleUsed, initialTab, initialWorksheet }: LogContactModalProps) {
+export default function LogContactModal({ campaign, onClose, onLogged, initialAngleUsed, initialScriptKind, initialTab, initialWorksheet }: LogContactModalProps) {
   // Pre-fill channel selector with channels the campaign actually has.
   const availableChannels: ContactChannel[] = [];
   if (campaign.phone) availableChannels.push('phone');
@@ -207,11 +240,52 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
   const isOtherChannel = channel === 'other';
   const isConnected = isPhoneMode && callResult === 'connected';
   const isDeadNumber = isPhoneMode && (callResult === 'wrong_number' || callResult === 'disconnected_number');
-  const hasWriteBackFields = isConnected && (
+
+  // ─── Touch Ladder recon intel (§7/§13.2) ─────────────────────────────
+  // Stamped by the surface that launched the debrief; visits (in_person)
+  // always get the block — contact_reached_role/can_act_at_floor are often
+  // best captured on foot (§7.3).
+  const [scriptKind] = useState<'pitch' | 'recon' | 'visit'>(initialScriptKind ?? 'pitch');
+  const [reconReachedRole, setReconReachedRole] = useState<string>('');
+  const [reconPhoneReachability, setReconPhoneReachability] = useState<string>('');
+  const [reconCanAct, setReconCanAct] = useState<'' | 'yes' | 'no'>('');
+  const [reconGatekeeperRelationship, setReconGatekeeperRelationship] = useState<string>('');
+  const [reconDigitalLiteracy, setReconDigitalLiteracy] = useState<string>('');
+  const [reconOwnerTiming, setReconOwnerTiming] = useState('');
+  const [reconContactHint, setReconContactHint] = useState('');
+  const [reconGatekeeperName, setReconGatekeeperName] = useState('');
+  const showReconIntel = scriptKind === 'recon' || scriptKind === 'visit' || channel === 'in_person';
+  // Phone reachability auto-derives from the call result for phone recon
+  // (§13.2 pre-fill); an explicit chip choice wins.
+  const derivedPhoneReachability =
+    reconPhoneReachability ||
+    (isPhoneMode
+      ? callResult === 'connected'
+        ? 'answered_live'
+        : callResult === 'voicemail'
+          ? 'voicemail'
+          : callResult === 'no_answer'
+            ? 'dead_air'
+            : callResult === 'wrong_number'
+              ? 'wrong_number'
+              : 'disconnected'
+      : '');
+  const hasReconFields =
+    reconReachedRole !== '' ||
+    derivedPhoneReachability !== '' ||
+    reconCanAct !== '' ||
+    reconGatekeeperRelationship !== '' ||
+    reconDigitalLiteracy !== '' ||
+    reconOwnerTiming.trim() !== '' ||
+    reconContactHint.trim() !== '' ||
+    reconGatekeeperName.trim() !== '';
+
+  const hasWriteBackFields = (isConnected || showReconIntel) && (
     ownerNameConfirmed.trim() ||
     teamSignalConfirmed ||
     preferredChannelConfirmed.trim() ||
-    (emailObtained && emailValue.trim())
+    (emailObtained && emailValue.trim()) ||
+    (showReconIntel && hasReconFields)
   );
 
   // Fetch the worksheet when the caller didn't supply one, and prefill the
@@ -303,6 +377,7 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
         // Phone mode — send call_details via the phone-aware log endpoint
         const callDetails: CallDetails = {
           call_result: callResult,
+          script_kind: scriptKind,
           identity_verified: isConnected ? identityVerified : null,
           operating_status_confirmed: isConnected ? operatingConfirmed : null,
           angle_used: angleUsed || null,
@@ -315,6 +390,14 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
           team_signal_confirmed: isConnected && teamSignalConfirmed ? (teamSignalConfirmed as any) : null,
           preferred_channel_confirmed: isConnected && preferredChannelConfirmed.trim() ? preferredChannelConfirmed.trim() : null,
           announce_delivered: isConnected ? announceDelivered : null,
+          recon_contact_reached_role: showReconIntel && reconReachedRole ? (reconReachedRole as any) : null,
+          recon_phone_reachability: showReconIntel && derivedPhoneReachability ? (derivedPhoneReachability as any) : null,
+          recon_can_act_at_floor: showReconIntel && reconCanAct !== '' ? reconCanAct === 'yes' : null,
+          recon_gatekeeper_relationship: showReconIntel && reconGatekeeperRelationship ? (reconGatekeeperRelationship as any) : null,
+          recon_contact_digital_literacy: showReconIntel && reconDigitalLiteracy ? (reconDigitalLiteracy as any) : null,
+          recon_owner_presence_timing: showReconIntel && reconOwnerTiming.trim() ? reconOwnerTiming.trim() : null,
+          recon_owner_contact_hint: showReconIntel && reconContactHint.trim() ? reconContactHint.trim() : null,
+          recon_gatekeeper_name: showReconIntel && reconGatekeeperName.trim() ? reconGatekeeperName.trim() : null,
         };
         await marketingOpsService.logCallContact(campaign.id, {
           contact_channel: 'phone',
@@ -338,7 +421,16 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
           call_details: {
             contact_result: contactResult,
             other_subtype: isOtherChannel ? otherSubtype : null,
+            script_kind: channel === 'in_person' ? 'visit' : scriptKind,
+            recon_contact_reached_role: showReconIntel && reconReachedRole ? (reconReachedRole as any) : null,
+            recon_can_act_at_floor: showReconIntel && reconCanAct !== '' ? reconCanAct === 'yes' : null,
+            recon_gatekeeper_relationship: showReconIntel && reconGatekeeperRelationship ? (reconGatekeeperRelationship as any) : null,
+            recon_contact_digital_literacy: showReconIntel && reconDigitalLiteracy ? (reconDigitalLiteracy as any) : null,
+            recon_owner_presence_timing: showReconIntel && reconOwnerTiming.trim() ? reconOwnerTiming.trim() : null,
+            recon_owner_contact_hint: showReconIntel && reconContactHint.trim() ? reconContactHint.trim() : null,
+            recon_gatekeeper_name: showReconIntel && reconGatekeeperName.trim() ? reconGatekeeperName.trim() : null,
           },
+          update_worksheet: hasReconFields ? updateWorksheet : undefined,
           verification_results: verificationResults.length > 0 ? verificationResults : undefined,
         });
       }
@@ -593,6 +685,144 @@ export default function LogContactModal({ campaign, onClose, onLogged, initialAn
                   </label>
                 </div>
               </div>
+
+              {/* ─── Recon intel (TOUCH LADDER §13.2) ──────────────────
+                  Rides the same call_details write-back as the confirmed-
+                  fields trio. Single-tap chips for every enum — the whole
+                  debrief must stay completable in ~15 seconds standing in
+                  a parking lot. Identity fields (owner/gatekeeper name,
+                  contact hint) are null-only writes on the worksheet. */}
+              {showReconIntel && (
+                <div className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Recon intel <span className="font-normal text-gray-400">— who can act (§7)</span>
+                  </p>
+
+                  <div>
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Who answered</span>
+                    <div className="flex flex-wrap gap-1">
+                      {RECON_REACHED_ROLE_OPTIONS.map((o) => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => setReconReachedRole(reconReachedRole === o.value ? '' : o.value)}
+                          className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                            reconReachedRole === o.value
+                              ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                              : 'border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:text-gray-400'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {isPhoneMode && (
+                    <div>
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Phone reachability</span>
+                      <div className="flex flex-wrap gap-1">
+                        {RECON_PHONE_REACH_OPTIONS.map((o) => (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => setReconPhoneReachability(reconPhoneReachability === o.value ? '' : o.value)}
+                            className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                              derivedPhoneReachability === o.value
+                                ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:text-gray-400'
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Floor can act</span>
+                    <div className="flex gap-1">
+                      {([['yes', 'Can act'], ['no', 'Cannot act']] as const).map(([v, label]) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setReconCanAct(reconCanAct === v ? '' : v)}
+                          className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                            reconCanAct === v
+                              ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                              : 'border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:text-gray-400'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Gatekeeper</span>
+                      <div className="flex flex-wrap gap-1">
+                        {RECON_GATEKEEPER_OPTIONS.map((o) => (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => setReconGatekeeperRelationship(reconGatekeeperRelationship === o.value ? '' : o.value)}
+                            className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                              reconGatekeeperRelationship === o.value
+                                ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:text-gray-400'
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Digital literacy</span>
+                      <div className="flex flex-wrap gap-1">
+                        {RECON_LITERACY_OPTIONS.map((o) => (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => setReconDigitalLiteracy(reconDigitalLiteracy === o.value ? '' : o.value)}
+                            className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                              reconDigitalLiteracy === o.value
+                                ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:text-gray-400'
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Gatekeeper name</span>
+                      <input type="text" value={reconGatekeeperName} onChange={(e) => setReconGatekeeperName(e.target.value)} placeholder="The ally (§3.2)" className={inputClass} />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Owner usually in</span>
+                      <input type="text" value={reconOwnerTiming} onChange={(e) => setReconOwnerTiming(e.target.value)} placeholder="e.g. weekday mornings" className={inputClass} />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Owner contact hint</span>
+                    <input type="text" value={reconContactHint} onChange={(e) => setReconContactHint(e.target.value)} placeholder="Channel or handle the owner prefers" className={inputClass} />
+                  </label>
+
+                  {hasReconFields && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Writes to the worksheet — observation fields stamp latest; names/hint fill null-only.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {channel === 'email' && (
                 <label className="block">

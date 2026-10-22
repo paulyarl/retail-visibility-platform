@@ -96,6 +96,20 @@ export interface CallDetails {
    *  published (phone spoken, email sent, mail/DM sent). Drives the
    *  announce_delivered marker; voicemail/no-answer do not count. */
   announce_delivered?: boolean | null;
+  // ─── Touch Ladder (OUTREACH_TOUCH_LADDER_SPEC §7) ──────────────────────
+  /** Which script the touch ran — stamped by the surface that launched the
+   *  debrief. Drives the recon write-back + checklist auto-complete. */
+  script_kind?: 'pitch' | 'recon' | 'visit' | null;
+  // Recon intel — captured by recon calls and visits (in_person). Identity
+  // fields fill null-only on the worksheet; observation fields restamp.
+  recon_contact_reached_role?: 'owner' | 'manager' | 'staffer' | 'answering_service' | 'none' | null;
+  recon_phone_reachability?: 'answered_live' | 'voicemail' | 'dead_air' | 'wrong_number' | 'disconnected' | null;
+  recon_owner_presence_timing?: string | null;
+  recon_can_act_at_floor?: boolean | null;
+  recon_owner_contact_hint?: string | null;
+  recon_gatekeeper_relationship?: 'ally' | 'neutral' | 'blocker' | 'unknown' | null;
+  recon_gatekeeper_name?: string | null;
+  recon_contact_digital_literacy?: 'low' | 'moderate' | 'high' | 'unknown' | null;
 }
 
 export interface LogContactInput {
@@ -261,6 +275,53 @@ export class MarketingOutreachService extends BaseService {
             campaignId: input.campaignId,
           });
         });
+
+      // Recon intel write-back (TOUCH LADDER §7) — any populated recon_*
+      // field lands on the worksheet's payload.recon block. Channel-
+      // agnostic: recon calls (call_result 'connected') and visits
+      // (in_person results) write identically (§7.3). Fire-and-forget —
+      // the log row is already persisted.
+      const reconFields = input.callDetails
+        ? {
+            contactReachedRole: input.callDetails.recon_contact_reached_role ?? null,
+            phoneReachability: input.callDetails.recon_phone_reachability ?? null,
+            ownerPresenceTiming: input.callDetails.recon_owner_presence_timing ?? null,
+            canActAtFloor: input.callDetails.recon_can_act_at_floor ?? null,
+            ownerContactHint: input.callDetails.recon_owner_contact_hint ?? null,
+            gatekeeperRelationship: input.callDetails.recon_gatekeeper_relationship ?? null,
+            gatekeeperName: input.callDetails.recon_gatekeeper_name ?? null,
+            contactDigitalLiteracy: input.callDetails.recon_contact_digital_literacy ?? null,
+          }
+        : null;
+      const hasReconIntel =
+        !!reconFields && Object.values(reconFields).some((v) => v !== null && v !== undefined && v !== '');
+      if (input.updateWorksheet && hasReconIntel && reconFields) {
+        import('./CallScriptService')
+          .then(({ default: callScriptService }) =>
+            callScriptService.applyReconConfirmations({
+              campaignId: input.campaignId,
+              callLogId: log.id,
+              callDate: input.contactDate,
+              contactedBy: input.contactedBy ?? null,
+              ...reconFields,
+            }, ctx),
+          )
+          .then((result) => {
+            logger.info('Recon write-back applied', ctx, {
+              campaignId: input.campaignId,
+              logId: log.id,
+              written: result.written,
+              authorityReached: result.authorityReached,
+            });
+          })
+          .catch((err) => {
+            logger.warn('Recon write-back failed (swallowed)', ctx, {
+              error: (err as Error).message,
+              campaignId: input.campaignId,
+              logId: log.id,
+            });
+          });
+      }
 
       // Cold-call worksheet write-back (§5.4). When updateWorksheet is true
       // and the call carries confirmation fields, apply them to the

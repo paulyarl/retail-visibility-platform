@@ -26,9 +26,12 @@ import { resolveCampaignArchetype } from './OutreachOpenerService';
 import CampaignTriageService from './CampaignTriageService';
 import OutreachIntelligenceService, {
   resolveSalutation,
+  foldSeedReconTouches,
   type SourceConfidence,
   type TeamSignalValue,
   type SourcedField,
+  type TeamSignalField,
+  type ReconPayload,
   type OutreachIntelligenceResult,
 } from './OutreachIntelligenceService';
 import MarketingDeliverableService from './MarketingDeliverableService';
@@ -45,6 +48,14 @@ import {
   CALL_SCRIPT_OBJECTIONS,
   WEBSITE_CALL_SCRIPT_OBJECTIONS,
   REPAIR_CALL_SCRIPT_OBJECTIONS,
+  RECON_SCRIPT_OPEN,
+  RECON_SCRIPT_AUTHORITY,
+  RECON_SCRIPT_CLOSE,
+  RECON_SCRIPT_OWNER_BRIDGE,
+  RECON_AUTHORITY_BRANCHES,
+  RECON_INTEL_ASKS,
+  RECON_OBJECTIONS,
+  type ReconIntelAsk,
   type HookAngle,
   type HookTemplate,
   type ObjectionRow,
@@ -141,6 +152,13 @@ export interface OutreachAmmunitionEntry {
 }
 
 export interface AssembledCallScript {
+  /**
+   * Script kind (spec §3.2 / OUTREACH_TOUCH_LADDER_SPEC §10) — the pitch
+   * script is 'pitch'; 'recon' and 'visit' return their own payload shapes
+   * (AssembledReconScript). Stamped so the debrief modal can infer which
+   * intel block to render.
+   */
+  script_kind: 'pitch';
   stages: {
     verify: string;
     hook: { angle: HookAngle; label: string; line: string };
@@ -239,6 +257,81 @@ export interface CallConfirmationResult {
   written: string[];
   conflicts: Array<{ field: string; existingValue: string; newValue: string }>;
   campaignEmailFilled: boolean;
+}
+
+// ─── Recon script (OUTREACH_TOUCH_LADDER_SPEC §3) ───────────────────────
+//
+// The recon call maps authority before the reveal is spent. Four stages:
+// open → authority probe (branching) → intel asks (pick ≤3, gap-driven)
+// → close. The owner-answers escalation bridge is the only branch allowed
+// to pitch. script_kind distinguishes the payload for the debrief modal
+// ('pitch' | 'recon' | 'visit').
+
+export type ScriptKind = 'pitch' | 'recon' | 'visit';
+
+export type ContactReachedRole = 'owner' | 'manager' | 'staffer' | 'answering_service' | 'none';
+export type PhoneReachability = 'answered_live' | 'voicemail' | 'dead_air' | 'wrong_number' | 'disconnected';
+export type GatekeeperRelationship = 'ally' | 'neutral' | 'blocker' | 'unknown';
+export type ContactDigitalLiteracy = 'low' | 'moderate' | 'high' | 'unknown';
+
+/** An intel ask annotated with the worksheet's current state — the panel
+ *  renders "unknown — ask this" vs "obtained — skip" (§13.1). */
+export interface ResolvedReconIntelAsk extends ReconIntelAsk {
+  known: boolean;
+  current_value: string | null;
+}
+
+export interface ReconCallContext {
+  phone: string | null;
+  business_name: string | null;
+  owner_name: string | null;
+  /** Derived — true once contact_reached_role === 'owner' or an owner
+   *  contact hint is on file (§7). Latches; never regresses. */
+  authority_reached: boolean;
+  recon_completed_at: string | null;
+  gallery_short_url: string | null;
+  linked_seed_id: string | null;
+}
+
+export interface AssembledReconScript {
+  script_kind: 'recon';
+  stages: {
+    open: string;
+    authority_probe: string;
+    /** The four answer-paths rendered inline on the card (§3.2). */
+    authority_branches: typeof RECON_AUTHORITY_BRANCHES;
+    intel_asks: ResolvedReconIntelAsk[];
+    close: string;
+    /** §3.3 — only permitted pitch branch, for "I'm the owner". */
+    owner_bridge: string;
+  };
+  objections: ObjectionRow[];
+  callContext: ReconCallContext;
+}
+
+export interface ReconConfirmationInput {
+  campaignId: string;
+  callLogId: string;
+  callDate: string; // YYYY-MM-DD
+  contactedBy: string | null;
+  // Observation fields — latest observation wins, restamped (§7.2)
+  contactReachedRole?: ContactReachedRole | null;
+  phoneReachability?: PhoneReachability | null;
+  ownerPresenceTiming?: string | null;
+  canActAtFloor?: boolean | null;
+  gatekeeperRelationship?: GatekeeperRelationship | null;
+  contactDigitalLiteracy?: ContactDigitalLiteracy | null;
+  // Identity fields — null-only fill, conflicts surfaced (§7.2)
+  ownerContactHint?: string | null;
+  gatekeeperName?: string | null;
+}
+
+export interface ReconConfirmationResult {
+  writeTargetCampaignId: string;
+  worksheetId: string | null;
+  written: string[];
+  conflicts: Array<{ field: string; existingValue: string; newValue: string }>;
+  authorityReached: boolean;
 }
 
 // ─── Service ────────────────────────────────────────────────────────────
@@ -457,6 +550,7 @@ export class CallScriptService extends BaseService {
     }
 
     return {
+      script_kind: 'pitch',
       stages: {
         verify: verifyStage,
         hook: {
@@ -722,6 +816,359 @@ export class CallScriptService extends BaseService {
     };
   }
 
+  // ─── Recon assembly (OUTREACH_TOUCH_LADDER_SPEC §3) ───────────────────
+
+  /**
+   * Assemble the four-stage recon call script for a campaign.
+   *
+   * Carries no finding — the reveal is a resource spent only on authority.
+   * Intel asks are gap-driven: each ask is labeled with the worksheet's
+   * current state so "pick ≤3" becomes "fill what's unknown" (§3.2/§13.1).
+   *
+   * Requires campaign.phone — a recon call without a reachable number
+   * is itself the finding (phone_reachability: dead, §7.4).
+   */
+  async assembleReconForCampaign(
+    campaignId: string,
+    ctx?: RequestCtx,
+  ): Promise<AssembledReconScript> {
+    const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
+    if (!campaign) {
+      throw new NotFoundError(`Campaign ${campaignId} not found`);
+    }
+    if (!campaign.phone) {
+      throw new ValidationError('phone_required');
+    }
+
+    const operatorName = await this.resolveOperatorName(campaign, ctx);
+    const merge: Record<string, string | null> = {
+      business: campaign.business_name ?? null,
+      address: this.formatAddress(campaign),
+      category: (campaign.service_category ?? campaign.category ?? null)?.toLowerCase() ?? null,
+      city: campaign.city ?? null,
+      operator_name: operatorName,
+    };
+    const mergeText = (t: string) =>
+      t.replace(/\{\{(\w+)\}\}/g, (m, k) => merge[k] ?? m);
+
+    // Worksheet recon state drives the intel-ask gap labels + derived badge.
+    let worksheet: OutreachIntelligenceResult | null = null;
+    try {
+      worksheet = await OutreachIntelligenceService.getForCampaign(campaignId, ctx);
+    } catch {
+      // Worksheet lookup failed — all asks render as unknown
+    }
+    const recon = worksheet?.payload?.recon;
+    const intelAsks = this.resolveIntelAsks(recon, worksheet);
+
+    const seedId = await resolveCampaignSeedId(campaignId);
+    const galleryShortUrl = await this.resolveGalleryShortUrl(campaignId, ctx);
+
+    return {
+      script_kind: 'recon',
+      stages: {
+        open: mergeText(RECON_SCRIPT_OPEN),
+        authority_probe: mergeText(RECON_SCRIPT_AUTHORITY),
+        authority_branches: RECON_AUTHORITY_BRANCHES,
+        intel_asks: intelAsks,
+        close: mergeText(RECON_SCRIPT_CLOSE),
+        owner_bridge: mergeText(RECON_SCRIPT_OWNER_BRIDGE),
+      },
+      objections: RECON_OBJECTIONS,
+      callContext: {
+        phone: campaign.phone,
+        business_name: campaign.business_name ?? null,
+        owner_name: worksheet?.owner_name ?? null,
+        authority_reached: recon?.authority_reached === true,
+        recon_completed_at: recon?.recon_completed_at ?? null,
+        gallery_short_url: galleryShortUrl,
+        linked_seed_id: seedId,
+      },
+    };
+  }
+
+  /**
+   * Seed-scoped recon (§7.5) — pre-campaign prospects have no worksheet;
+   * gap state comes from the seed's touch metadata (`recon_*` keys written
+   * by the log-touch path, latest non-null observation per field).
+   */
+  async assembleReconForSeed(
+    seedId: string,
+    ctx?: RequestCtx,
+  ): Promise<AssembledReconScript> {
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        dl.business_name,
+        dl.address,
+        dl.city,
+        dl.state,
+        dl.phone
+      FROM directory_presence_seeds dps
+      LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+    const seed = rows[0];
+    if (!seed) {
+      throw new NotFoundError(`Seed ${seedId} not found`);
+    }
+
+    const operatorName = await this.resolveOperatorNameFromCtx(ctx);
+    const merge: Record<string, string | null> = {
+      business: seed.business_name ?? null,
+      address: [seed.address, seed.city, seed.state].filter(Boolean).join(', ') || null,
+      category: null,
+      city: seed.city ?? null,
+      operator_name: operatorName,
+    };
+    const mergeText = (t: string) =>
+      t.replace(/\{\{(\w+)\}\}/g, (m, k) => merge[k] ?? m);
+
+    // Latest recon_* observations from touch metadata — same gap labels as
+    // the campaign path, sourced pre-worksheet (§7.5).
+    const seedRecon = await this.latestReconFromSeedTouches(seedId);
+    const intelAsks = this.resolveIntelAsks(seedRecon, null);
+
+    return {
+      script_kind: 'recon',
+      stages: {
+        open: mergeText(RECON_SCRIPT_OPEN),
+        authority_probe: mergeText(RECON_SCRIPT_AUTHORITY),
+        authority_branches: RECON_AUTHORITY_BRANCHES,
+        intel_asks: intelAsks,
+        close: mergeText(RECON_SCRIPT_CLOSE),
+        owner_bridge: mergeText(RECON_SCRIPT_OWNER_BRIDGE),
+      },
+      objections: RECON_OBJECTIONS,
+      callContext: {
+        phone: seed.phone ?? null,
+        business_name: seed.business_name ?? null,
+        owner_name: null,
+        authority_reached: seedRecon?.authority_reached === true,
+        recon_completed_at: seedRecon?.recon_completed_at ?? null,
+        gallery_short_url: null,
+        linked_seed_id: seedId,
+      },
+    };
+  }
+
+  /**
+   * Annotate each intel ask with the prospect's current state. `recon` is
+   * the worksheet payload's recon block (or the seed-touch aggregation —
+   * same shape); worksheet-level fields (preferred channel, team signal)
+   * fall back to the denormalized worksheet columns when supplied.
+   */
+  private resolveIntelAsks(
+    recon: ReconPayload | null | undefined,
+    worksheet: OutreachIntelligenceResult | null,
+  ): ResolvedReconIntelAsk[] {
+    const state = (fills: ReconIntelAsk['fills']): { known: boolean; current_value: string | null } => {
+      switch (fills) {
+        case 'owner_presence_timing':
+          return { known: !!recon?.owner_presence_timing?.value, current_value: recon?.owner_presence_timing?.value ?? null };
+        case 'owner_contact_hint':
+          return { known: !!recon?.owner_contact_hint?.value, current_value: recon?.owner_contact_hint?.value ?? null };
+        case 'can_act_at_floor':
+          return { known: !!recon?.can_act_at_floor?.value, current_value: recon?.can_act_at_floor?.value ?? null };
+        case 'preferred_contact_channel': {
+          const v = worksheet?.preferred_contact_channel ?? recon?.preferred_contact_channel?.value ?? null;
+          return { known: !!v, current_value: v };
+        }
+        case 'team_signal': {
+          const v = worksheet?.team_signal && worksheet.team_signal !== 'unknown' ? worksheet.team_signal : null;
+          return { known: !!v, current_value: v };
+        }
+      }
+    };
+    return RECON_INTEL_ASKS.map((ask) => ({ ...ask, ...state(ask.fills) }));
+  }
+
+  /**
+   * Aggregate the latest `metadata.recon_*` observations across a seed's
+   * touch history into the worksheet-recon shape (§7.5). The fold itself
+   * lives in OutreachIntelligenceService (the worksheet's owner) — ONE
+   * key list shared with the upsert-time seed→worksheet fold.
+   */
+  private async latestReconFromSeedTouches(seedId: string): Promise<ReconPayload | null> {
+    const touches = await this.prisma.$queryRaw<any[]>`
+      SELECT metadata, occurred_at
+      FROM directory_seed_outreach_touches
+      WHERE seed_id = ${seedId}
+        AND metadata IS NOT NULL
+        AND metadata ?| array[
+          'recon_contact_reached_role', 'recon_phone_reachability',
+          'recon_owner_presence_timing', 'recon_can_act_at_floor',
+          'recon_owner_contact_hint', 'recon_gatekeeper_relationship',
+          'recon_gatekeeper_name', 'recon_contact_digital_literacy'
+        ]
+      ORDER BY occurred_at DESC
+      LIMIT 50
+    `;
+    return foldSeedReconTouches(touches);
+  }
+
+  /**
+   * Recon confirmation write-back (§7.1/§7.2) — recon_* call_details land
+   * on the worksheet's `payload.recon` block (the payload is the worksheet's
+   * source of truth; no denormalized columns):
+   *
+   * - Identity fields (owner_contact_hint, gatekeeper_name): null-only
+   *   fill, differing non-null existing value → conflict surfaced.
+   * - Observation fields (role, reachability, timing, can-act, gatekeeper
+   *   relationship, literacy): latest observation wins, restamped — they
+   *   describe current-state reality, not identity facts.
+   * - Derived: authority_reached latches true on owner contact /
+   *   contact hint; recon_completed_at set on first recon write-back.
+   */
+  async applyReconConfirmations(
+    input: ReconConfirmationInput,
+    ctx?: RequestCtx,
+  ): Promise<ReconConfirmationResult> {
+    const writeTargetCampaignId = await this.resolveWriteTarget(input.campaignId, ctx);
+    const existing = await this.prisma.mkt_outreach_intelligence.findUnique({
+      where: { campaign_id: writeTargetCampaignId },
+    });
+
+    const sourceString = input.contactedBy
+      ? `${input.contactedBy} — recon ${input.callDate}`
+      : `Recon ${input.callDate}`;
+    const written: string[] = [];
+    const conflicts: Array<{ field: string; existingValue: string; newValue: string }> = [];
+
+    const recon: ReconPayload = { ...((existing?.payload as any)?.recon ?? {}) };
+    const sourced = (value: string): SourcedField => ({
+      value,
+      source: sourceString,
+      source_confidence: 'confirmed',
+    });
+
+    // Identity fields — null-only fill, conflicts surfaced
+    const identityFill = (
+      key: 'owner_contact_hint' | 'gatekeeper_name',
+      raw: string | null | undefined,
+    ) => {
+      const value = raw?.trim();
+      if (!value) return;
+      const existingValue = (recon[key] as SourcedField | undefined)?.value ?? null;
+      if (!existingValue) {
+        (recon as any)[key] = sourced(value);
+        written.push(key);
+      } else if (existingValue !== value) {
+        conflicts.push({ field: key, existingValue, newValue: value });
+      }
+    };
+    identityFill('owner_contact_hint', input.ownerContactHint);
+    identityFill('gatekeeper_name', input.gatekeeperName);
+
+    // Observation fields — latest observation wins with a fresh stamp
+    const observe = (
+      key: 'contact_reached_role' | 'phone_reachability' | 'owner_presence_timing'
+        | 'can_act_at_floor' | 'gatekeeper_relationship' | 'contact_digital_literacy',
+      raw: string | boolean | null | undefined,
+    ) => {
+      if (raw === undefined || raw === null || raw === '') return;
+      const value = typeof raw === 'boolean' ? String(raw) : String(raw).trim();
+      if (!value) return;
+      if ((recon[key] as SourcedField | undefined)?.value === value) return; // idempotent
+      (recon as any)[key] = sourced(value);
+      written.push(key);
+    };
+    observe('contact_reached_role', input.contactReachedRole);
+    observe('phone_reachability', input.phoneReachability);
+    observe('owner_presence_timing', input.ownerPresenceTiming);
+    observe('can_act_at_floor', input.canActAtFloor);
+    observe('gatekeeper_relationship', input.gatekeeperRelationship);
+    observe('contact_digital_literacy', input.contactDigitalLiteracy);
+
+    // Derived fields (§7): authority latches; completion stamps once
+    if (recon.contact_reached_role?.value === 'owner' || recon.owner_contact_hint?.value) {
+      recon.authority_reached = true;
+    }
+    if (written.length > 0 && !recon.recon_completed_at) {
+      recon.recon_completed_at = new Date().toISOString();
+    }
+
+    // Persist — merge recon into the worksheet payload
+    let worksheetId: string | null = null;
+    if (existing) {
+      const payload = { ...(existing.payload as any), recon };
+      await this.prisma.mkt_outreach_intelligence.update({
+        where: { campaign_id: writeTargetCampaignId },
+        data: { payload: payload as any, updated_at: new Date() },
+      });
+      worksheetId = existing.id;
+    } else {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: writeTargetCampaignId },
+        select: { business_name: true },
+      });
+      const id = await this.generateId();
+      const created = await this.prisma.mkt_outreach_intelligence.create({
+        data: {
+          id,
+          campaign_id: writeTargetCampaignId,
+          owner_name: null,
+          business_email: null,
+          team_signal: 'unknown',
+          preferred_contact_channel: null,
+          recommended_salutation: campaign?.business_name
+            ? resolveSalutation({ owner_name: { value: null, source: null, source_confidence: 'unavailable' } }, campaign.business_name)
+            : 'Hi there,',
+          prepared_by: input.contactedBy ?? 'recon',
+          research_date: new Date(`${input.callDate}T00:00:00.000Z`),
+          payload: {
+            business_name: campaign?.business_name ?? '',
+            address: null,
+            linked_audit_reference: null,
+            prepared_by: input.contactedBy ?? 'recon',
+            research_date: input.callDate,
+            researcher_notes: `Created from ${sourceString}`,
+            recon,
+          } as any,
+        },
+      });
+      worksheetId = created.id;
+    }
+
+    try {
+      await audit({
+        actor: ctx?.userId ?? null,
+        actorType: 'user',
+        action: 'update',
+        payload: {
+          entity_type: 'other',
+          id: writeTargetCampaignId,
+          campaign_id: writeTargetCampaignId,
+          call_log_id: input.callLogId,
+          call_date: input.callDate,
+          script_kind: 'recon',
+          written,
+          conflicts: conflicts.map((c) => c.field),
+          authority_reached: recon.authority_reached === true,
+          worksheet_id: worksheetId,
+        },
+      });
+    } catch (e) {
+      // audit failures must not block
+    }
+
+    logger.info('Recon confirmations applied', ctx, {
+      campaignId: writeTargetCampaignId,
+      callLogId: input.callLogId,
+      written,
+      conflicts: conflicts.length,
+      authorityReached: recon.authority_reached === true,
+    });
+
+    return {
+      writeTargetCampaignId,
+      worksheetId,
+      written,
+      conflicts,
+      authorityReached: recon.authority_reached === true,
+    };
+  }
+
   /**
    * Extract the outreach_problems contract from a business_analysis audit
    * payload — the analyst-authored problem → hook → fix pairs rendered as
@@ -811,8 +1258,15 @@ export class CallScriptService extends BaseService {
     const written: string[] = [];
     const conflicts: Array<{ field: string; existingValue: string; newValue: string }> = [];
 
-    // 3. Build the update payload (fill-and-confirm)
+    // 3. Build the update payload (fill-and-confirm).
+    //
+    // Provenance lives in the `payload` JSONB's SourcedField records — the
+    // worksheet's source of truth (migration 188 denormalizes only the
+    // merge/query columns). The `_source` siblings of the denormalized
+    // columns were never created, so sources are written here, not as
+    // top-level columns.
     const updateData: any = {};
+    const payloadUpdates: Record<string, SourcedField | TeamSignalField | undefined> = {};
     const createData: any = {
       id: await this.generateId(),
       campaign_id: writeTargetCampaignId,
@@ -824,6 +1278,11 @@ export class CallScriptService extends BaseService {
         linked_audit_reference: null,
         prepared_by: input.contactedBy ?? 'phone_call',
         research_date: input.callDate,
+        owner_name: null,
+        business_email: null,
+        team_signal: null,
+        preferred_contact_channel: null,
+        recommended_salutation: '',
         researcher_notes: `Created from ${sourceString}`,
       },
     };
@@ -834,11 +1293,14 @@ export class CallScriptService extends BaseService {
       const existingConfidence = existing?.owner_name_confidence ?? 'unavailable';
       if (!existingValue || existingConfidence === 'unavailable') {
         updateData.owner_name = input.ownerNameConfirmed.trim();
-        updateData.owner_name_source = sourceString;
         updateData.owner_name_confidence = 'confirmed';
         createData.owner_name = input.ownerNameConfirmed.trim();
-        createData.owner_name_source = sourceString;
         createData.owner_name_confidence = 'confirmed';
+        payloadUpdates.owner_name = {
+          value: input.ownerNameConfirmed.trim(),
+          source: sourceString,
+          source_confidence: 'confirmed',
+        };
         written.push('owner_name');
       } else if (existingValue === input.ownerNameConfirmed.trim()) {
         // Idempotent — same value, no-op
@@ -856,11 +1318,14 @@ export class CallScriptService extends BaseService {
       const existingValue = existing?.team_signal ?? 'unknown';
       if (existingValue === 'unknown') {
         updateData.team_signal = input.teamSignalConfirmed;
-        updateData.team_signal_source = sourceString;
-        updateData.team_signal_confidence = 'confirmed';
         createData.team_signal = input.teamSignalConfirmed;
-        createData.team_signal_source = sourceString;
-        createData.team_signal_confidence = 'confirmed';
+        payloadUpdates.team_signal = {
+          value: input.teamSignalConfirmed,
+          // Preserve an existing operator-authored description if present
+          quoted_description: (existing?.payload as any)?.team_signal?.quoted_description ?? null,
+          source: sourceString,
+          source_confidence: 'confirmed',
+        };
         written.push('team_signal');
       } else if (existingValue === input.teamSignalConfirmed) {
         // Idempotent
@@ -878,11 +1343,12 @@ export class CallScriptService extends BaseService {
       const existingValue = existing?.preferred_contact_channel ?? null;
       if (!existingValue) {
         updateData.preferred_contact_channel = input.preferredChannelConfirmed.trim();
-        updateData.preferred_contact_channel_source = sourceString;
-        updateData.preferred_contact_channel_confidence = 'confirmed';
         createData.preferred_contact_channel = input.preferredChannelConfirmed.trim();
-        createData.preferred_contact_channel_source = sourceString;
-        createData.preferred_contact_channel_confidence = 'confirmed';
+        payloadUpdates.preferred_contact_channel = {
+          value: input.preferredChannelConfirmed.trim(),
+          source: sourceString,
+          source_confidence: 'confirmed',
+        };
         written.push('preferred_contact_channel');
       } else if (existingValue === input.preferredChannelConfirmed.trim()) {
         // Idempotent
@@ -901,11 +1367,14 @@ export class CallScriptService extends BaseService {
       const existingEmail = existing?.business_email ?? null;
       if (!existingEmail) {
         updateData.business_email = input.emailValue.trim();
-        updateData.business_email_source = sourceString;
         updateData.business_email_confidence = 'confirmed';
         createData.business_email = input.emailValue.trim();
-        createData.business_email_source = sourceString;
         createData.business_email_confidence = 'confirmed';
+        payloadUpdates.business_email = {
+          value: input.emailValue.trim(),
+          source: sourceString,
+          source_confidence: 'confirmed',
+        };
         written.push('business_email');
       } else if (existingEmail === input.emailValue.trim()) {
         // Idempotent
@@ -935,6 +1404,9 @@ export class CallScriptService extends BaseService {
     let worksheetId: string | null = null;
     if (existing) {
       if (written.length > 0) {
+        // Merge the confirmed sourced fields into the payload JSONB —
+        // provenance lives there, not on phantom *_source columns.
+        updateData.payload = { ...(existing.payload as any), ...payloadUpdates };
         // Recompute salutation if owner_name changed
         if (written.includes('owner_name')) {
           const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -961,10 +1433,24 @@ export class CallScriptService extends BaseService {
         where: { id: writeTargetCampaignId },
         select: { business_name: true },
       });
-      createData.recommended_salutation = resolveSalutation(
+      const salutation = resolveSalutation(
         { owner_name: { value: createData.owner_name ?? null, source: sourceString, source_confidence: 'confirmed' } },
         campaign?.business_name ?? null,
       );
+      createData.recommended_salutation = salutation;
+      // Payload sourced fields — empty SourcedField for unconfirmed fields,
+      // matching the upsert path's payload shape.
+      const empty = { value: null, source: null, source_confidence: 'unavailable' };
+      createData.payload.owner_name = payloadUpdates.owner_name ?? { ...empty };
+      createData.payload.business_email = payloadUpdates.business_email ?? { ...empty };
+      createData.payload.team_signal = payloadUpdates.team_signal ?? {
+        value: 'unknown',
+        quoted_description: null,
+        source: null,
+        source_confidence: 'unavailable',
+      };
+      createData.payload.preferred_contact_channel = payloadUpdates.preferred_contact_channel ?? { ...empty };
+      createData.payload.recommended_salutation = salutation;
       // Fill defaults for fields not confirmed
       if (!createData.owner_name) createData.owner_name = null;
       if (!createData.business_email) createData.business_email = null;

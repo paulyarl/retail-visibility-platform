@@ -24,6 +24,7 @@ import { generateOutreachIntelligenceId } from '../lib/id-generator';
 import { formatCampaignAddress } from '../lib/canonical-nap';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
+import { resolveCampaignSeedId } from './outreach-openers/outreach-link-vars';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -55,6 +56,44 @@ export interface OutreachIntelligencePayload {
   preferred_contact_channel: SourcedField;
   recommended_salutation: string;
   researcher_notes: string;
+  /**
+   * Recon intel block (OUTREACH_TOUCH_LADDER_SPEC §7) — authority-map
+   * fields captured by recon calls and visits. The payload is the source
+   * of truth for these fields; no denormalized columns. Optional — absent
+   * on worksheets created before the ladder or with no recon touches.
+   */
+  recon?: ReconPayload;
+}
+
+/**
+ * Recon intel captured pre-pitch (spec §7). Each field is a SourcedField —
+ * value + provenance + confidence — matching the worksheet contract.
+ *
+ * Field classes (§7.2):
+ * - Identity (null-only fill, conflicts surfaced): owner_contact_hint,
+ *   gatekeeper_name.
+ * - Observation (latest restamps): contact_reached_role,
+ *   phone_reachability, owner_presence_timing, can_act_at_floor,
+ *   gatekeeper_relationship, contact_digital_literacy,
+ *   preferred_contact_channel.
+ * - Derived: authority_reached (latches true on owner contact or contact
+ *   hint), recon_completed_at (first successful recon write-back).
+ *
+ * can_act_at_floor stores 'true'|'false' as a string value (SourcedField
+ * is string-typed); readers compare against the string literal.
+ */
+export interface ReconPayload {
+  contact_reached_role?: SourcedField;
+  phone_reachability?: SourcedField;
+  owner_presence_timing?: SourcedField;
+  can_act_at_floor?: SourcedField;
+  owner_contact_hint?: SourcedField;
+  gatekeeper_relationship?: SourcedField;
+  gatekeeper_name?: SourcedField;
+  contact_digital_literacy?: SourcedField;
+  preferred_contact_channel?: SourcedField;
+  authority_reached?: boolean;
+  recon_completed_at?: string | null;
 }
 
 export interface OutreachIntelligenceRow {
@@ -77,6 +116,62 @@ export interface OutreachIntelligenceRow {
 export interface OutreachIntelligenceResult extends OutreachIntelligenceRow {
   inherited?: boolean;
   sourceCampaignId?: string;
+}
+
+// ─── Seed-touch recon fold (TOUCH LADDER §7.5) ──────────────────────────
+//
+// Pre-campaign recon intel rides directory_seed_outreach_touches.metadata as
+// recon_* keys (no worksheet exists yet). When the campaign's worksheet is
+// first created — and when the seed recon script assembles — this fold
+// produces the worksheet's payload.recon block. ONE key list for both paths:
+// CallScriptService delegates to this same function.
+
+/** recon field key → metadata key on the touch row. */
+export const SEED_RECON_TOUCH_KEYS: ReadonlyArray<readonly [keyof ReconPayload & string, string]> = [
+  ['contact_reached_role', 'recon_contact_reached_role'],
+  ['phone_reachability', 'recon_phone_reachability'],
+  ['owner_presence_timing', 'recon_owner_presence_timing'],
+  ['can_act_at_floor', 'recon_can_act_at_floor'],
+  ['owner_contact_hint', 'recon_owner_contact_hint'],
+  ['gatekeeper_relationship', 'recon_gatekeeper_relationship'],
+  ['gatekeeper_name', 'recon_gatekeeper_name'],
+  ['contact_digital_literacy', 'recon_contact_digital_literacy'],
+  ['preferred_contact_channel', 'recon_preferred_contact_channel'],
+];
+
+/**
+ * Fold seed-touch rows (newest-first `metadata` + `occurred_at`) into the
+ * worksheet recon shape: latest non-null observation per field wins,
+ * stamped with the touch date; authority_reached + recon_completed_at
+ * derive identically to the write-back path.
+ */
+export function foldSeedReconTouches(
+  touches: Array<{ metadata: any; occurred_at: any }>,
+): ReconPayload | null {
+  if (!touches || touches.length === 0) return null;
+  const recon: ReconPayload = {};
+  const seen = new Set<string>();
+  for (const t of touches) {
+    const md = t.metadata;
+    if (!md) continue;
+    for (const [field, key] of SEED_RECON_TOUCH_KEYS) {
+      if (seen.has(field)) continue;
+      const v = md[key];
+      if (v === undefined || v === null || v === '') continue;
+      seen.add(field);
+      (recon as any)[field] = {
+        value: typeof v === 'boolean' ? String(v) : String(v),
+        source: `Touch ${new Date(t.occurred_at).toISOString().slice(0, 10)}`,
+        source_confidence: 'confirmed',
+      };
+    }
+  }
+  recon.authority_reached =
+    recon.contact_reached_role?.value === 'owner' || !!recon.owner_contact_hint?.value;
+  recon.recon_completed_at = touches[0]?.occurred_at
+    ? new Date(touches[0].occurred_at).toISOString()
+    : null;
+  return recon;
 }
 
 export interface UpsertInput {
@@ -468,6 +563,20 @@ export class OutreachIntelligenceService extends BaseService {
       where: { campaign_id: campaignId },
     });
 
+    // Recon intel (TOUCH LADDER §7.5): caller-supplied recon wins; on update,
+    // preserve the write-back-captured block (a manual save must not clobber
+    // intel the log-call path wrote); on create, fold the linked seed's
+    // metadata.recon_* aggregation into the new worksheet.
+    let recon = input.payload.recon ?? (existing?.payload as any)?.recon ?? null;
+    if (!recon && !existing) {
+      try {
+        recon = await this.latestReconForLinkedCampaign(campaignId);
+      } catch {
+        // Best-effort — the worksheet saves without a recon block.
+      }
+    }
+    if (recon) fullPayload.recon = recon;
+
     let row: any;
     if (existing) {
       row = await this.prisma.mkt_outreach_intelligence.update({
@@ -628,6 +737,37 @@ export class OutreachIntelligenceService extends BaseService {
       } as any,
     });
     return count > 0;
+  }
+
+  /**
+   * Fold the campaign's linked seed recon into worksheet shape (§7.5) —
+   * pre-campaign recon intel (metadata.recon_* on the seed's touches)
+   * carries into the worksheet created when the campaign comes alive.
+   * Best-effort: returns null when no seed is linked or no touches carry
+   * recon metadata.
+   */
+  private async latestReconForLinkedCampaign(campaignId: string): Promise<ReconPayload | null> {
+    try {
+      const seedId = await resolveCampaignSeedId(campaignId);
+      if (!seedId) return null;
+      const touches = await this.prisma.$queryRaw<any[]>`
+        SELECT metadata, occurred_at
+        FROM directory_seed_outreach_touches
+        WHERE seed_id = ${seedId}
+          AND metadata IS NOT NULL
+          AND metadata ?| array[
+            'recon_contact_reached_role', 'recon_phone_reachability',
+            'recon_owner_presence_timing', 'recon_can_act_at_floor',
+            'recon_owner_contact_hint', 'recon_gatekeeper_relationship',
+            'recon_gatekeeper_name', 'recon_contact_digital_literacy'
+          ]
+        ORDER BY occurred_at DESC
+        LIMIT 50
+      `;
+      return foldSeedReconTouches(touches);
+    } catch {
+      return null;
+    }
   }
 
   /**

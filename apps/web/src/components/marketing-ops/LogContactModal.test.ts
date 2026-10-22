@@ -173,3 +173,46 @@ describe('LogContactModal cascade capture', () => {
     expect(html).toContain('Announce delivered (C2 spoken)');
   });
 });
+
+// ─── Recon intel block (TOUCH LADDER §13.2) ─────────────────────────────
+// initialScriptKind 'recon'/'visit' surfaces the authority-map capture
+// block: enum chips + identity fields, ~15-second parking-lot debrief.
+
+const renderWithKind = (c: Campaign, kind: 'pitch' | 'recon' | 'visit') =>
+  renderToStaticMarkup(
+    createElement(LogContactModal, {
+      campaign: c,
+      onClose: () => {},
+      onLogged: () => {},
+      initialScriptKind: kind,
+    }),
+  );
+
+describe('LogContactModal recon intel', () => {
+  it('renders the recon capture block for script_kind=recon', () => {
+    const html = renderWithKind(campaign(), 'recon');
+
+    expect(html).toContain('Recon intel');
+    expect(html).toContain('Who answered');
+    expect(html).toContain('Phone reachability');
+    expect(html).toContain('Floor can act');
+    expect(html).toContain('Gatekeeper');
+    expect(html).toContain('Digital literacy');
+    expect(html).toContain('Gatekeeper name');
+    expect(html).toContain('Owner usually in');
+    expect(html).toContain('Owner contact hint');
+  });
+
+  it('renders the recon capture block for script_kind=visit', () => {
+    const html = renderWithKind(campaign(), 'visit');
+
+    expect(html).toContain('Recon intel');
+    expect(html).toContain('Who answered');
+  });
+
+  it('hides the recon block for a plain pitch call on the phone channel', () => {
+    const html = renderWithKind(campaign(), 'pitch');
+
+    expect(html).not.toContain('Recon intel');
+  });
+});

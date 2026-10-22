@@ -285,6 +285,75 @@ export default function OutreachIntelligenceTab({ campaignId, campaignName, camp
         </div>
       )}
 
+      {/* Who can act — the authority map (TOUCH LADDER §13.3). Read-only:
+          values are captured by recon/visit debriefs via the call_details
+          write-back, not edited here. Renders only when recon data exists. */}
+      {data?.payload?.recon && (() => {
+        const r = data.payload.recon;
+        const val = (f?: { value: string | null }) => (f?.value ? f.value : null);
+        const reached = val(r.contact_reached_role);
+        const timing = val(r.owner_presence_timing);
+        const canAct = val(r.can_act_at_floor);
+        const gkRel = val(r.gatekeeper_relationship);
+        const gkName = val(r.gatekeeper_name);
+        const hint = val(r.owner_contact_hint);
+        const literacy = val(r.contact_digital_literacy);
+        const reach = val(r.phone_reachability);
+        // §8 routing derivation — one line, the action the map points at.
+        const next =
+          r.authority_reached || canAct === 'true'
+            ? 'Pitch path — authority reachable: pitch call or Tell visit.'
+            : hint
+              ? `Remote lane — send the gallery link via ${hint}.`
+              : gkRel === 'blocker'
+                ? 'Mail-only sweep — call/visit rungs suppressed (blocker gatekeeper).'
+                : reach === 'disconnected' || reach === 'wrong_number'
+                  ? 'Dead phone — mail rung; the dead number is itself a finding.'
+                  : timing && gkRel === 'ally'
+                    ? `Owner-window visit — ${gkName ? `${gkName} relays; ` : ''}owner in ${timing}.`
+                    : timing
+                      ? `Visit during owner window — ${timing}.`
+                      : 'Recon call — authority map still unknown.';
+        const rows: [string, string | null][] = [
+          ['Reached', reached],
+          ['Can act at floor', canAct === 'true' ? 'yes' : canAct === 'false' ? 'no' : null],
+          ['Owner usually in', timing],
+          ['Gatekeeper', gkRel ? `${gkName ? `${gkName} — ` : ''}${gkRel}` : gkName],
+          ['Owner contact hint', hint],
+          ['Digital literacy', literacy],
+          ['Phone reachability', reach],
+        ];
+        return (
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Who can act</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Recon intel — captured by call/visit debriefs.
+                  {r.recon_completed_at && ` Last recon ${new Date(r.recon_completed_at).toLocaleDateString()}.`}
+                </p>
+              </div>
+              {r.authority_reached && (
+                <span className="rounded bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-300">
+                  Authority reached
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+              {rows.filter(([, v]) => v).map(([k, v]) => (
+                <div key={k} className="text-xs">
+                  <span className="block text-gray-400 dark:text-gray-500">{k}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{v}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs border-t border-gray-100 dark:border-neutral-700 pt-2 text-gray-600 dark:text-gray-300">
+              <span className="font-semibold">▸ Next:</span> {next}
+            </p>
+          </div>
+        );
+      })()}
+
       {/* Salutation preview */}
       {data?.recommended_salutation && (
         <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4">

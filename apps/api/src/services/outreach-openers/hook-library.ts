@@ -1007,3 +1007,144 @@ export const REPAIR_CALL_SCRIPT_OBJECTIONS: ObjectionRow[] = [
     response: 'Fair — the second one earned its keep. But two listings means two half-profiles: they split your reviews, they split your categories, and neither ranks like one strong one would. You pay that every day, whether or not anything ever happens. And a duplicate is reportable — a competitor can file any time, and it\'s usually the newer listing that goes, with whatever it collected. If you don\'t control that second listing, anyone can claim or edit it. Consolidating on your terms beats losing it on theirs, and you pick which name survives. Want me to show you what each looks like merged?',
   },
 ];
+
+// ─── Recon call script (R1) ─────────────────────────────────────────────
+//
+// The recon call maps authority BEFORE the reveal is spent — doctrine:
+// "the reveal is a resource — spend it only on authority, or bank it for a
+// channel that reaches authority." It carries no finding: a hijacked-site
+// claim on a cold phone line is indistinguishable from scam telemarketing.
+// The stated purpose — verifying public listing details — is honest cover:
+// that is literally what the platform is doing.
+//
+// Spec: docs/LocalBiz/OUTREACH_TOUCH_LADDER_SPEC.md §3
+//
+// Merge placeholders (same phone set as CALL_SCRIPT_*):
+//   {{business}}       — business name (required for Stage 1)
+//   {{operator_name}}  — operator display name
+//   {{city}}           — market city (used in intel asks)
+
+export const RECON_SCRIPT_OPEN = `Hi, is this {{business}}? … Great — I'm verifying some public listing details for {{business}} to make sure customers can actually reach you. Do you have a quick second?`;
+
+export const RECON_SCRIPT_AUTHORITY = `Who's usually the best person to talk to about the store's online presence — would that be you, a manager, or the owner?`;
+
+export const RECON_SCRIPT_CLOSE = `That's really helpful, thank you. I'll make sure the listing details get verified — have a good one.`;
+
+/**
+ * Softened escalation used ONLY when Stage 2 returns "I'm the owner" — the
+ * recon call accidentally reached authority (§3.3). Converges on the
+ * rundown ask, never recites the finding on a cold line.
+ */
+export const RECON_SCRIPT_OWNER_BRIDGE = `Since I've got you — the reason I called is that the verification turned up something specific on {{business}}'s public listing you'd want to see. I put together a short rundown — where's the best place to send it?`;
+
+/**
+ * Authority-probe branch table — rendered inline on the recon script card
+ * so the operator sees the answer-paths as they hear them (§3.2).
+ */
+export interface ReconBranchRow {
+  answer: string;
+  path: string;
+}
+
+export const RECON_AUTHORITY_BRANCHES: ReconBranchRow[] = [
+  {
+    answer: '"I\'m the owner"',
+    path: 'Owner-answers escalation — switch to the softened bridge (§3.3). The only branch that may pitch.',
+  },
+  {
+    answer: '"Manager handles that" / "the owner"',
+    path: 'Continue to the intel asks.',
+  },
+  {
+    answer: '"I just work here" / "not sure"',
+    path: 'Continue to the intel asks — log can_act_at_floor: false.',
+  },
+  {
+    answer: 'Refusal / "take us off your list"',
+    path: 'Close politely + log gatekeeper_relationship: blocker — suppresses call/visit rungs.',
+  },
+];
+
+/**
+ * Intel asks — the operator picks at most three, prioritizing worksheet
+ * gaps (§3.2 Stage 3). Each entry names the worksheet field it fills so
+ * the assembler can label it known/unknown and the panel can render
+ * "unknown — ask this" vs "obtained — skip".
+ */
+export interface ReconIntelAsk {
+  ask: string;
+  /** Worksheet/field key the answer fills. */
+  fills:
+    | 'owner_presence_timing'
+    | 'owner_contact_hint'
+    | 'can_act_at_floor'
+    | 'preferred_contact_channel'
+    | 'team_signal';
+  note: string;
+}
+
+export const RECON_INTEL_ASKS: ReconIntelAsk[] = [
+  {
+    ask: `When does the owner usually come in — is there a good time to catch them?`,
+    fills: 'owner_presence_timing',
+    note: 'Drives visit scheduling',
+  },
+  {
+    ask: `Is there a direct way to reach the owner — an email or number that's theirs?`,
+    fills: 'owner_contact_hint',
+    note: 'Free text; may seed preferred channel on confirm',
+  },
+  {
+    ask: `Does anyone at the store handle the website or Google listing, or does that all go through the owner?`,
+    fills: 'can_act_at_floor',
+    note: 'Authority map: can the floor act on digital?',
+  },
+  {
+    ask: `If I put together a one-page summary of what I found in your listing, what's the best email or number to send it to?`,
+    fills: 'preferred_contact_channel',
+    note: 'The evidence-summary ask — also captures business_email',
+  },
+  {
+    ask: `Is it mostly family running the store, or a bigger team?`,
+    fills: 'team_signal',
+    note: 'Only if the authority probe did not already answer it',
+  },
+];
+
+/** Recon objections — answered honestly and briefly; recon never pitches
+ *  on a non-owner line and never deceives (§3.2 / §11). */
+export const RECON_OBJECTIONS: ObjectionRow[] = [
+  {
+    objection: 'Who is this / who do you work for?',
+    response: 'Name + platform, plainly — "I run a local retail directory; we verify the listings we publish" — then return to the benign ask.',
+  },
+  {
+    objection: 'Are you selling something?',
+    response: '"Not on this call — I\'m verifying listing details. If anything looks off I\'ll flag it properly." True, and honors the no-finding rule.',
+  },
+  {
+    objection: 'Take us off your list',
+    response: 'Close politely + log gatekeeper_relationship: blocker — suppresses call and visit rungs for the prospect.',
+  },
+];
+
+// ─── Visit script (R2-walkin) ───────────────────────────────────────────
+//
+// The in-person variant for targets that justify the drive. Stage 0 is
+// field-mandated rapport: name exchange + one genuine compliment BEFORE
+// any verification question — a cold pain-probe reads as salesy in person
+// the same way it reads as spammy on the phone (§4).
+//
+// Spec: docs/LocalBiz/OUTREACH_TOUCH_LADDER_SPEC.md §4
+
+export const VISIT_SCRIPT_RAPPORT = `Introduce yourself by name; learn theirs. One genuine compliment first — selection, products from the home country, the culture the store carries, how loved it clearly is. Professional, knowledgeable, friendly.`;
+
+export const VISIT_SCRIPT_OPEN = `Hi — I'm {{operator_name}}. Quick question: is the owner or manager around today?`;
+
+export const VISIT_SCRIPT_VERIFY = `Same authority question as recon — establish who can act BEFORE anything is revealed.`;
+
+export const VISIT_SCRIPT_REVEAL = `Evidence-led: pull the finding up on the operator's or the staff's phone ("pull up your site"). Show, don't tell.`;
+
+export const VISIT_SCRIPT_ASK = `Authority-targeted: owner present → offer the walkthrough / claim link. Not present → relay artifact + "who should I send this to?"`;
+
+export const VISIT_SCRIPT_CLOSE = `Leave the relay artifact, thank them, exit. Log the touch.`;

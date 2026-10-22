@@ -59,8 +59,16 @@ until services are formally retired.
 - Health: `https://visibleshelf-api-staging.fly.dev/api/health` → 200.
 - Secrets: `doppler secrets download --config stg --format env-no-quotes
   --no-file | fly secrets import -a visibleshelf-api-staging`.
-- Deploys: `fly deploy --config fly.staging.toml -a visibleshelf-api-staging`.
-  Optional later: GitHub Action on push to `staging` for auto-deploy.
+- Deploys: auto via GitHub Actions on push to `staging`
+  (`.github/workflows/deploy-staging.yml` → `flyctl deploy --config
+  fly.staging.toml`), or manually: `pnpm deployapi:stg` /
+  `fly deploy --config fly.staging.toml`. Prod deploys likewise on push to
+  `main` (`deploy-production.yml` → `flyctl deploy`), or `pnpm deployapi`.
+  `pnpm deployapi:promote` remains the manual full-pipeline path
+  (stg → pause → merge → prod).
+- CI auth: repo secrets `FLY_API_TOKEN` (prod) + `FLY_API_TOKEN_STG`
+  (staging) — app-scoped deploy tokens (`fly tokens create deploy -a
+  <app>`), so a leaked token can't deploy across environments.
 
 ### Web — Vercel Preview scope (already exists)
 

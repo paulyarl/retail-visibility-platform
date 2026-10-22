@@ -110,6 +110,7 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
   // call outcome" button. The selected hook angle is captured so the
   // modal's "Angle used" field is pre-filled for attribution.
   const [logContactAngle, setLogContactAngle] = useState<string | null>(null);
+  const [logContactScriptKind, setLogContactScriptKind] = useState<'pitch' | 'recon' | null>(null);
   const [showLogContactModal, setShowLogContactModal] = useState(false);
 
   // Toast shown after a call/email outcome is logged — gives the operator
@@ -839,8 +840,9 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
         <CallScriptPanel
           campaignId={selectedCampaignId}
           campaignPhone={selectedCampaign?.phone ?? null}
-          onLogCall={(angle) => {
+          onLogCall={(angle, scriptKind) => {
             setLogContactAngle(angle);
+            setLogContactScriptKind(scriptKind ?? 'pitch');
             setShowLogContactModal(true);
           }}
         />
@@ -879,13 +881,16 @@ export default function OpenerWorkspaceClient({ initialCampaignId, initialTab }:
         <LogContactModal
           campaign={selectedCampaign}
           initialAngleUsed={logContactAngle ?? undefined}
+          initialScriptKind={logContactScriptKind ?? undefined}
           onClose={() => {
             setShowLogContactModal(false);
             setLogContactAngle(null);
+            setLogContactScriptKind(null);
           }}
           onLogged={() => {
             setShowLogContactModal(false);
             setLogContactAngle(null);
+            setLogContactScriptKind(null);
             setLogToast('Contact logged — see "Recent outreach" on the Call Script tab');
             setTimeout(() => setLogToast(null), 4000);
           }}

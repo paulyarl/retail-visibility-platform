@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Phone, Mail, Globe, Share2, MapPin, Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, ArrowRight, ListChecks, Rocket } from 'lucide-react';
 import Link from 'next/link';
-import { marketingOpsService, type AssembledCallScript, type CampaignOutreachAnchor, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
+import { marketingOpsService, type AssembledCallScript, type AssembledReconScript, type CampaignOutreachAnchor, type HookAngle, type OutreachLogEntry, type ContactChannel, type ContactOutcome } from '@/services/MarketingOpsService';
 import directoryPresenceAdminService, { type SeedPreviewStatus } from '@/services/DirectoryPresenceAdminService';
 import OutreachProblemsSection from '@/components/marketing-ops/OutreachProblemsSection';
 
@@ -49,7 +49,9 @@ const OUTCOME_COLORS: Record<ContactOutcome, string> = {
 interface CallScriptPanelProps {
   campaignId: string;
   campaignPhone: string | null;
-  onLogCall?: (angle: HookAngle) => void;
+  /** angle is null for recon (no hook picker); scriptKind stamps
+   *  call_details.script_kind on the debrief (TOUCH LADDER §13.2). */
+  onLogCall?: (angle: HookAngle | null, scriptKind?: 'pitch' | 'recon') => void;
 }
 
 export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }: CallScriptPanelProps) {
@@ -65,6 +67,12 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const [showFullLog, setShowFullLog] = useState(false);
   const [campaignAnchors, setCampaignAnchors] = useState<CampaignOutreachAnchor[]>([]);
   const [selectedAnchorId, setSelectedAnchorId] = useState<string>('');
+  // Script-kind switcher (TOUCH LADDER §13.1) — Pitch is the five-stage
+  // cold call; Recon is the four-stage authority-mapping call.
+  const [scriptKind, setScriptKind] = useState<'pitch' | 'recon'>('pitch');
+  const [reconScript, setReconScript] = useState<AssembledReconScript | null>(null);
+  const [reconLoading, setReconLoading] = useState(false);
+  const [reconError, setReconError] = useState<string | null>(null);
   const [previewStatus, setPreviewStatus] = useState<SeedPreviewStatus | null>(null);
   const [previewBusy, setPreviewBusy] = useState<string | null>(null);
   const [previewCopied, setPreviewCopied] = useState(false);
@@ -83,6 +91,25 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
       setLoading(false);
     }
   }, [campaignId]);
+
+  const fetchRecon = useCallback(async () => {
+    setReconLoading(true);
+    setReconError(null);
+    try {
+      const result = await marketingOpsService.getReconScript(campaignId);
+      setReconScript(result);
+    } catch (err) {
+      setReconError(err instanceof Error ? err.message : 'Failed to load recon script');
+    } finally {
+      setReconLoading(false);
+    }
+  }, [campaignId]);
+
+  const handleKindChange = (kind: 'pitch' | 'recon') => {
+    setScriptKind(kind);
+    if (kind === 'recon' && !reconScript) fetchRecon();
+    if (kind === 'pitch' && !script) fetchScript();
+  };
 
   const fetchAnchors = useCallback(async () => {
     try {
@@ -247,6 +274,240 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
     );
   }
 
+  const kindSwitcher = (
+    <div className="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700 dark:bg-gray-900">
+      {(['pitch', 'recon'] as const).map((k) => (
+        <button
+          key={k}
+          onClick={() => handleKindChange(k)}
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+            scriptKind === k
+              ? 'bg-blue-600 text-white dark:bg-blue-500'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          {k === 'pitch' ? 'Pitch call' : 'Recon call'}
+        </button>
+      ))}
+    </div>
+  );
+
+  // ─── Recon view (TOUCH LADDER §3) ────────────────────────────────────
+  // Authority mapping before the reveal — carries no finding. The
+  // authority-probe card renders its answer-branches inline; intel asks
+  // are labeled by worksheet gap state.
+  if (scriptKind === 'recon') {
+    if (reconLoading) {
+      return (
+        <div className="space-y-3">
+          {kindSwitcher}
+          <div className="h-8 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-32 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-32 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+        </div>
+      );
+    }
+    if (reconError) {
+      return (
+        <div className="space-y-3">
+          {kindSwitcher}
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+            <p className="text-sm text-red-700 dark:text-red-400">{reconError}</p>
+            <button onClick={fetchRecon} className="mt-2 text-xs font-medium text-red-700 underline dark:text-red-400">
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (!reconScript) return kindSwitcher;
+
+    const { stages: rs, callContext: rc } = reconScript;
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          {kindSwitcher}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Recon maps authority — the reveal is spent only on the owner (§3.1).
+          </p>
+        </div>
+
+        {/* Call context — number, who to ask for, authority state */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Number to dial</span>
+              <button
+                onClick={() => rc.phone && handleCopy(rc.phone, 'phone')}
+                className="font-mono text-lg font-semibold text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                title="Click to copy"
+              >
+                {rc.phone ?? '—'}
+              </button>
+              {copiedStage === 'phone' && <span className="text-xs text-green-600">Copied!</span>}
+              {rc.authority_reached ? (
+                <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                  Owner reached
+                </span>
+              ) : (
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                  Owner unreachable
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Owner on file: </span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {rc.owner_name ?? 'Unknown'}
+                </span>
+              </div>
+              {rc.recon_completed_at && (
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Recon last run: </span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {new Date(rc.recon_completed_at).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
+            {rc.gallery_short_url && (
+              <div className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Gallery link: </span>
+                <span className="font-mono text-blue-600 dark:text-blue-400">{rc.gallery_short_url}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stage 1 — Open */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Stage 1 — Open (verification cover)</h4>
+            <button onClick={() => handleCopy(rs.open, 'open')} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+              {copiedStage === 'open' ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{rs.open}</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            No finding, no pitch — the stated purpose is listing verification, which is true.
+          </p>
+        </div>
+
+        {/* Stage 2 — Authority probe + branch table */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Stage 2 — Authority probe</h4>
+            <button onClick={() => handleCopy(rs.authority_probe, 'probe')} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+              {copiedStage === 'probe' ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{rs.authority_probe}</p>
+          <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800">
+            {rs.authority_branches.map((b, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs">
+                <span className="shrink-0 font-medium text-gray-700 dark:text-gray-300">{b.answer}</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-gray-500 dark:text-gray-400">{b.path}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Stage 3 — Intel asks, gap-labeled */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Stage 3 — Intel asks (pick at most 3)</h4>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Prioritize unknown fields — obtained intel is labeled so nothing gets re-asked.
+          </p>
+          <div className="mt-3 space-y-2">
+            {rs.intel_asks.map((a, i) => (
+              <div
+                key={i}
+                className={`rounded-md border p-3 ${
+                  a.known
+                    ? 'border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50'
+                    : 'border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-[10px] font-medium uppercase tracking-wide ${
+                    a.known ? 'text-gray-400' : 'text-blue-600 dark:text-blue-400'
+                  }`}>
+                    {a.known ? 'obtained — skip' : 'unknown — ask this'}
+                  </span>
+                  <span className="text-[10px] text-gray-400">{a.note}</span>
+                </div>
+                <p className={`mt-1 text-sm ${a.known ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                  {a.ask}
+                </p>
+                {a.known && a.current_value && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">On file: {a.current_value}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Stage 4 — Close */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Stage 4 — Close</h4>
+            <button onClick={() => handleCopy(rs.close, 'close')} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+              {copiedStage === 'close' ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{rs.close}</p>
+        </div>
+
+        {/* Owner-answers bridge — the only pitch-permitted branch */}
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            If they say &quot;I&apos;m the owner&quot; — escalation bridge (§3.3)
+          </h4>
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            The only branch that may pitch — converges on the rundown ask; the finding itself is never recited on a cold line.
+          </p>
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{rs.owner_bridge}</p>
+        </div>
+
+        {/* Objection Accordion — recon objections */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Objection responses</h3>
+          <div className="space-y-2">
+            {reconScript.objections.map((obj, idx) => (
+              <div key={idx} className="border-b border-gray-100 last:border-b-0 dark:border-gray-800">
+                <button
+                  onClick={() => setExpandedObjection(expandedObjection === idx ? null : idx)}
+                  className="flex w-full items-center justify-between py-2 text-left"
+                >
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{obj.objection}</span>
+                  <span className="text-gray-400">{expandedObjection === idx ? '−' : '+'}</span>
+                </button>
+                {expandedObjection === idx && (
+                  <p className="pb-3 text-sm text-gray-600 dark:text-gray-400">{obj.response}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Log call outcome — stamps script_kind: 'recon' on the debrief */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => {
+              onLogCall?.(null, 'recon');
+              setTimeout(() => fetchRecentLog(), 1500);
+            }}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+          >
+            Log recon call
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -281,6 +542,8 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
 
   return (
     <div className="space-y-6">
+      {kindSwitcher}
+
       {/* Outreach Anchor picker — operator-selected verification thesis (spec §11).
           Only shown when the campaign has anchors. Selecting one reloads the
           script with the anchor's questions attached. */}

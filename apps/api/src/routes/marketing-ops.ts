@@ -529,6 +529,17 @@ const callDetailsSchema = z.object({
   })).nullable().default(null),
   // Four-Act cascade C2 — the announce was actually delivered (not voicemail).
   announce_delivered: z.boolean().nullable().default(null),
+  // TOUCH LADDER §3/§7 — which script the touch ran + recon intel fields.
+  // Without these the schema silently strips the authority-map debrief.
+  script_kind: z.enum(['pitch', 'recon', 'visit']).nullable().default(null),
+  recon_contact_reached_role: z.enum(['owner', 'manager', 'staffer', 'answering_service', 'none']).nullable().default(null),
+  recon_phone_reachability: z.enum(['answered_live', 'voicemail', 'dead_air', 'wrong_number', 'disconnected']).nullable().default(null),
+  recon_owner_presence_timing: z.string().max(255).nullable().default(null),
+  recon_can_act_at_floor: z.boolean().nullable().default(null),
+  recon_owner_contact_hint: z.string().max(255).nullable().default(null),
+  recon_gatekeeper_relationship: z.enum(['ally', 'neutral', 'blocker', 'unknown']).nullable().default(null),
+  recon_gatekeeper_name: z.string().max(255).nullable().default(null),
+  recon_contact_digital_literacy: z.enum(['low', 'moderate', 'high', 'unknown']).nullable().default(null),
 });
 
 // Structured verification result for manual outreach anchors (§11.6, §13.4)
@@ -3294,11 +3305,21 @@ router.get('/:campaignId/hook-suggestions', async (req: any, res: Response) => {
 // Two-segment /:campaignId/call-script — safe from the GET /:id
 // catch-all (Express only matches /:id against a single segment).
 
-// GET /:campaignId/call-script?angle=&anchorId= — assembled five-stage script.
+// GET /:campaignId/call-script?angle=&anchorId=&kind= — assembled script.
 // anchorId is optional — when present, the anchor's verification question
 // and recommended transition are included in the script output (spec §11).
+// kind='recon' returns the four-stage recon script (TOUCH LADDER §3) —
+// authority mapping before the reveal; default ('pitch') is the
+// five-stage cold-call script.
 router.get('/:campaignId/call-script', async (req: any, res: Response) => {
   try {
+    if (req.query.kind === 'recon') {
+      const recon = await CallScriptService.assembleReconForCampaign(
+        req.params.campaignId,
+        getCtx(req),
+      );
+      return res.json({ success: true, data: recon });
+    }
     const result = await CallScriptService.assembleForCampaign(
       req.params.campaignId,
       req.query.angle as string | undefined,
@@ -3306,6 +3327,20 @@ router.get('/:campaignId/call-script', async (req: any, res: Response) => {
       req.query.anchorId as string | undefined,
     );
     res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /:campaignId/ground-truth-status?level= — cache state + estimated
+// credit cost for the `google_maps_ground_truth` workspace knob
+// (TOUCH LADDER §14.1a). The spend decision is made looking at this number.
+router.get('/:campaignId/ground-truth-status', async (req: any, res: Response) => {
+  try {
+    const { default: HasDataGroundTruthService } = await import('../services/HasDataGroundTruthService.js');
+    const level = req.query.level === 'deep' ? 'deep' : 'latest';
+    const status = await HasDataGroundTruthService.getPacketStatus(req.params.campaignId, level);
+    res.json({ success: true, data: status });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

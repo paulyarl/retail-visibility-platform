@@ -838,6 +838,9 @@ export interface ObjectionRow {
 }
 
 export interface AssembledCallScript {
+  /** TOUCH LADDER §10 — the pitch script is 'pitch'; 'recon' returns
+   *  AssembledReconScript from ?kind=recon. */
+  script_kind: 'pitch';
   stages: {
     verify: string;
     hook: { angle: HookAngle; label: string; line: string };
@@ -869,6 +872,62 @@ export interface AssembledCallScript {
    * Operator reference only. Empty when no audit carries it.
    */
   benefits: string[];
+}
+
+// ─── Recon call script (OUTREACH_TOUCH_LADDER_SPEC §3) ──────────────────
+
+export interface ReconBranchRow {
+  answer: string;
+  path: string;
+}
+
+/** An intel ask labeled with the worksheet's current state — the panel
+ *  renders "unknown — ask this" vs "obtained — skip" (§13.1). */
+export interface ReconIntelAsk {
+  ask: string;
+  fills:
+    | 'owner_presence_timing'
+    | 'owner_contact_hint'
+    | 'can_act_at_floor'
+    | 'preferred_contact_channel'
+    | 'team_signal';
+  note: string;
+  known: boolean;
+  current_value: string | null;
+}
+
+export interface ReconCallContext {
+  phone: string | null;
+  business_name: string | null;
+  owner_name: string | null;
+  authority_reached: boolean;
+  recon_completed_at: string | null;
+  gallery_short_url: string | null;
+  linked_seed_id: string | null;
+}
+
+export interface AssembledReconScript {
+  script_kind: 'recon';
+  stages: {
+    open: string;
+    authority_probe: string;
+    authority_branches: ReconBranchRow[];
+    intel_asks: ReconIntelAsk[];
+    close: string;
+    owner_bridge: string;
+  };
+  objections: ObjectionRow[];
+  callContext: ReconCallContext;
+}
+
+/** Cache state + cost estimate for the `google_maps_ground_truth`
+ *  workspace knob (TOUCH LADDER §14.1a). */
+export interface GroundTruthStatus {
+  cached: boolean;
+  level: 'latest' | 'deep' | null;
+  fetched_at: string | null;
+  est_credits: number;
+  configured: boolean;
 }
 
 export interface CampaignOutreachAnchor {
@@ -1029,6 +1088,20 @@ export interface CallDetails {
   profile_quality_findings?: Array<{ signal: string; severity: string; label: string }> | null;
   /** Four-Act cascade C2 — the announce was actually delivered. */
   announce_delivered?: boolean | null;
+  // ─── Touch Ladder (OUTREACH_TOUCH_LADDER_SPEC §7) ──────────────────────
+  /** Which script the touch ran — stamped by the surface that launched the
+   *  debrief. Drives recon write-back + checklist auto-complete. */
+  script_kind?: 'pitch' | 'recon' | 'visit' | null;
+  // Recon intel — captured by recon calls and visits (in_person). Identity
+  // fields fill null-only on the worksheet; observation fields restamp.
+  recon_contact_reached_role?: 'owner' | 'manager' | 'staffer' | 'answering_service' | 'none' | null;
+  recon_phone_reachability?: 'answered_live' | 'voicemail' | 'dead_air' | 'wrong_number' | 'disconnected' | null;
+  recon_owner_presence_timing?: string | null;
+  recon_can_act_at_floor?: boolean | null;
+  recon_owner_contact_hint?: string | null;
+  recon_gatekeeper_relationship?: 'ally' | 'neutral' | 'blocker' | 'unknown' | null;
+  recon_gatekeeper_name?: string | null;
+  recon_contact_digital_literacy?: 'low' | 'moderate' | 'high' | 'unknown' | null;
 }
 
 // ─── Outreach Follow-Up Types ───────────────────────────────────────────
@@ -6713,6 +6786,38 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /**
+   * GET /:campaignId/call-script?kind=recon — the four-stage recon call
+   * script (TOUCH LADDER §3): authority mapping before the reveal. Intel
+   * asks arrive gap-labeled from the worksheet.
+   */
+  async getReconScript(campaignId: string): Promise<AssembledReconScript> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/call-script?kind=recon`,
+      { method: 'GET' },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch recon script');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  /**
+   * GET /:campaignId/ground-truth-status?level= — cache state + estimated
+   * credit cost for the google_maps_ground_truth workspace knob (§14.1a).
+   */
+  async getGroundTruthStatus(
+    campaignId: string,
+    level: 'latest' | 'deep',
+  ): Promise<GroundTruthStatus | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/ground-truth-status?level=${level}`,
+      { method: 'GET' },
+    );
+    if (!result.success) return null;
+    return result.data?.data ?? result.data ?? null;
+  }
+
   // ─── Outreach Anchors — campaign-scoped (spec §11, §12.4) ────────────
 
   async listCampaignAnchors(campaignId: string): Promise<CampaignOutreachAnchor[]> {
@@ -8571,10 +8676,30 @@ export interface WorksheetPrefill {
   available_channels: Array<'email' | 'phone'>;
 }
 
+/**
+ * Recon intel block (TOUCH LADDER §7) — authority-map fields captured by
+ * recon calls and visits, stored inside the worksheet payload (no
+ * denormalized columns). can_act_at_floor stores 'true'|'false' strings.
+ */
+export interface ReconWorksheetPayload {
+  contact_reached_role?: SourcedField;
+  phone_reachability?: SourcedField;
+  owner_presence_timing?: SourcedField;
+  can_act_at_floor?: SourcedField;
+  owner_contact_hint?: SourcedField;
+  gatekeeper_relationship?: SourcedField;
+  gatekeeper_name?: SourcedField;
+  contact_digital_literacy?: SourcedField;
+  preferred_contact_channel?: SourcedField;
+  authority_reached?: boolean;
+  recon_completed_at?: string | null;
+}
+
 export interface OutreachIntelligencePayload extends OutreachIntelligenceInput {
   business_name: string;
   address: string | null;
   recommended_salutation: string;
+  recon?: ReconWorksheetPayload;
 }
 
 export interface OutreachIntelligenceResult {
