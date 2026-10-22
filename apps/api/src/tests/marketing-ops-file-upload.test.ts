@@ -12,14 +12,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-const { mockCampaignsList, mockCreateFile, mockStorageUpload } = vi.hoisted(() => ({
-  mockCampaignsList: { findUnique: vi.fn() },
-  mockCreateFile: vi.fn(),
-  mockStorageUpload: vi.fn(),
-}));
+const { mockCampaignsList, mockAuditsList, mockFilesList, mockCreateFile, mockSetBriefingTopic, mockStorageUpload } =
+  vi.hoisted(() => ({
+    mockCampaignsList: { findUnique: vi.fn() },
+    mockAuditsList: { findUnique: vi.fn() },
+    mockFilesList: { findFirst: vi.fn() },
+    mockCreateFile: vi.fn(),
+    mockSetBriefingTopic: vi.fn(),
+    mockStorageUpload: vi.fn(),
+  }));
 
 vi.mock('../prisma', () => ({
-  prisma: { mkt_campaigns_list: mockCampaignsList },
+  prisma: {
+    mkt_campaigns_list: mockCampaignsList,
+    mkt_audits_list: mockAuditsList,
+    mkt_files_list: mockFilesList,
+  },
 }));
 
 vi.mock('../logger', () => ({
@@ -43,7 +51,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 vi.mock('../services/MarketingFileService', () => ({
-  default: { createFile: mockCreateFile },
+  default: { createFile: mockCreateFile, setBriefingTopic: mockSetBriefingTopic },
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -71,9 +79,11 @@ const MISLABELED_DATA_URL = `data:image/png;base64,${Buffer.from([0xff, 0xd8, 0x
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockCampaignsList.findUnique.mockResolvedValue({ id: CAMPAIGN_ID });
+  mockCampaignsList.findUnique.mockResolvedValue({ id: CAMPAIGN_ID, business_prospect_id: null });
   mockStorageUpload.mockResolvedValue({ error: null });
   mockCreateFile.mockResolvedValue({ id: 'mfile-1', file_name: 'shot.png' });
+  mockFilesList.findFirst.mockResolvedValue({ id: 'mfile-1' });
+  mockSetBriefingTopic.mockResolvedValue({ id: 'mfile-1' });
 });
 
 describe('POST /:campaignId/files/upload — JSON dataUrl', () => {
@@ -159,5 +169,163 @@ describe('POST /:campaignId/files/upload — multipart (legacy shape)', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('no_file');
+  });
+});
+
+describe('POST /:campaignId/files/upload — briefing topic tag', () => {
+  const AUDIT = {
+    id: 'maud-1',
+    campaign_id: CAMPAIGN_ID,
+    platform: 'business_analysis',
+    audit_data: {
+      outreach_problems: [
+        { problem: 'Invisible on Maps', hook: 'h', solution: 'Fix the profile' },
+      ],
+      benefits: ['Show up first'],
+    },
+  };
+
+  it('resolves {auditId, kind, index} into a persisted snapshot', async () => {
+    mockAuditsList.findUnique.mockResolvedValue(AUDIT);
+
+    const res = await request(app)
+      .post(UPLOAD_URL)
+      .send({
+        dataUrl: PNG_DATA_URL,
+        fileName: 'shot.png',
+        briefingTopic: { auditId: 'maud-1', kind: 'ammunition', index: 0 },
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockCreateFile.mock.calls[0][0].briefingTopic).toEqual({
+      auditId: 'maud-1',
+      auditPlatform: 'business_analysis',
+      kind: 'ammunition',
+      index: 0,
+      label: 'Invisible on Maps',
+      detail: { problem: 'Invisible on Maps', hook: 'h', solution: 'Fix the profile' },
+    });
+  });
+
+  it('400s on an unknown kind before touching storage', async () => {
+    mockAuditsList.findUnique.mockResolvedValue(AUDIT);
+
+    const res = await request(app)
+      .post(UPLOAD_URL)
+      .send({
+        dataUrl: PNG_DATA_URL,
+        briefingTopic: { auditId: 'maud-1', kind: 'widget', index: 0 },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_briefing_topic');
+    expect(mockStorageUpload).not.toHaveBeenCalled();
+  });
+
+  it('400s when the index does not resolve inside the audit briefing', async () => {
+    mockAuditsList.findUnique.mockResolvedValue(AUDIT);
+
+    const res = await request(app)
+      .post(UPLOAD_URL)
+      .send({
+        dataUrl: PNG_DATA_URL,
+        briefingTopic: { auditId: 'maud-1', kind: 'issue', index: 0 },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_briefing_topic');
+    expect(mockStorageUpload).not.toHaveBeenCalled();
+  });
+
+  it('rejects an audit outside the campaign/prospect group', async () => {
+    mockAuditsList.findUnique.mockResolvedValue({ ...AUDIT, campaign_id: 'camp-other' });
+    // Keyed mock, not a Once chain — the audit-owner lookup only runs when the
+    // campaign has a prospect id, so queued values can leak between tests.
+    mockCampaignsList.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve(
+        where.id === 'camp-other'
+          ? { id: 'camp-other', business_prospect_id: 'prospect-9' }
+          : { id: CAMPAIGN_ID, business_prospect_id: 'prospect-7' },
+      ),
+    );
+
+    const res = await request(app)
+      .post(UPLOAD_URL)
+      .send({
+        dataUrl: PNG_DATA_URL,
+        briefingTopic: { auditId: 'maud-1', kind: 'benefit', index: 0 },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_briefing_topic');
+  });
+
+  it('accepts a sibling audit from the same prospect group (inherited briefing)', async () => {
+    mockAuditsList.findUnique.mockResolvedValue({ ...AUDIT, campaign_id: 'camp-primary' });
+    mockCampaignsList.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve({ id: where.id, business_prospect_id: 'prospect-7' }),
+    );
+
+    const res = await request(app)
+      .post(UPLOAD_URL)
+      .send({
+        dataUrl: PNG_DATA_URL,
+        briefingTopic: { auditId: 'maud-1', kind: 'benefit', index: 0 },
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockCreateFile.mock.calls[0][0].briefingTopic.label).toBe('Show up first');
+  });
+});
+
+describe('PATCH /:campaignId/files/:fileId/topic', () => {
+  const TOPIC_URL = `/api/admin/marketing-ops/${CAMPAIGN_ID}/files/mfile-1/topic`;
+
+  it('persists a resolved topic snapshot', async () => {
+    mockAuditsList.findUnique.mockResolvedValue({
+      id: 'maud-1',
+      campaign_id: CAMPAIGN_ID,
+      platform: 'website_positioning',
+      audit_data: { issues: [{ issue: 'No CTA', conversion_implication: 'Lost calls' }] },
+    });
+
+    const res = await request(app)
+      .patch(TOPIC_URL)
+      .send({ briefingTopic: { auditId: 'maud-1', kind: 'issue', index: 0 } });
+
+    expect(res.status).toBe(200);
+    expect(mockSetBriefingTopic).toHaveBeenCalledWith(
+      'mfile-1',
+      expect.objectContaining({ kind: 'issue', label: 'No CTA' }),
+      expect.anything(),
+    );
+  });
+
+  it('clears the tag on briefingTopic: null', async () => {
+    const res = await request(app).patch(TOPIC_URL).send({ briefingTopic: null });
+
+    expect(res.status).toBe(200);
+    expect(mockSetBriefingTopic).toHaveBeenCalledWith('mfile-1', null, expect.anything());
+    expect(mockAuditsList.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('400s on an unresolvable ref', async () => {
+    mockAuditsList.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch(TOPIC_URL)
+      .send({ briefingTopic: { auditId: 'maud-gone', kind: 'issue', index: 0 } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_briefing_topic');
+    expect(mockSetBriefingTopic).not.toHaveBeenCalled();
+  });
+
+  it('404s when the file is not a diagnostic screenshot on this campaign', async () => {
+    mockFilesList.findFirst.mockResolvedValue(null);
+
+    const res = await request(app).patch(TOPIC_URL).send({ briefingTopic: null });
+
+    expect(res.status).toBe(404);
   });
 });

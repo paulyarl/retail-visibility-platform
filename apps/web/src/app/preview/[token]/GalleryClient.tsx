@@ -35,6 +35,7 @@ import Link from 'next/link';
 import diagnosticGalleryPublicService, {
   type GalleryData,
 } from '@/services/DiagnosticGalleryPublicService';
+import { briefingTopicTagline } from '@/lib/briefing-topics';
 import { useGalleryTracking } from './useGalleryTracking';
 import { resolveGalleryToken } from './galleryToken';
 
@@ -110,6 +111,10 @@ export default function GalleryClient() {
   const isActive = !!(data && !data.expired && data.gallery);
   const screenshots = data?.screenshots ?? [];
   const totalScreenshots = screenshots.length;
+  // Briefing-topic tag on the visible slide — the finding the screen proves,
+  // with the topic's own cost/fix/benefit line underneath.
+  const currentTopic = screenshots[currentSlide]?.briefingTopic ?? null;
+  const currentTagline = currentTopic ? briefingTopicTagline(currentTopic) : null;
 
   const tracking = useGalleryTracking({
     token,
@@ -337,6 +342,24 @@ export default function GalleryClient() {
                 </Box>
               )}
             </Box>
+          </Card>
+        )}
+
+        {/* Briefing-topic caption — the finding this screen evidences, in
+            the briefing's own words (cost, gap, fix, or benefit). */}
+        {currentTopic && (
+          <Card withBorder p="md" radius="md" bg="gray.0">
+            <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={2}>
+              What this shows
+            </Text>
+            <Text size="sm" fw={600}>
+              {currentTopic.label}
+            </Text>
+            {currentTagline && (
+              <Text size="sm" c="dimmed">
+                {currentTagline}
+              </Text>
+            )}
           </Card>
         )}
 

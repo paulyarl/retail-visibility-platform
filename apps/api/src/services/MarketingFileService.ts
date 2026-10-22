@@ -13,6 +13,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateMarketingFileId } from '../lib/id-generator';
+import type { BriefingTopicSnapshot } from '../lib/briefing-topics';
 
 export interface FileInput {
   campaignId: string;
@@ -22,6 +23,9 @@ export interface FileInput {
   fileSize?: number;
   mimeType?: string;
   uploadedBy?: string;
+  /** Resolved briefing-topic snapshot (lib/briefing-topics) — NULL leaves the
+   *  screenshot untagged ("General"). */
+  briefingTopic?: BriefingTopicSnapshot | null;
 }
 
 export class MarketingFileService extends BaseService {
@@ -51,6 +55,7 @@ export class MarketingFileService extends BaseService {
           file_size: input.fileSize || null,
           mime_type: input.mimeType || null,
           uploaded_by: input.uploadedBy || null,
+          briefing_topic: (input.briefingTopic ?? null) as any,
         },
       });
       logger.info('Marketing file created', ctx, { fileId: id, campaignId: input.campaignId, fileType: input.fileType });
@@ -69,6 +74,29 @@ export class MarketingFileService extends BaseService {
       });
     } catch (error) {
       logger.error('Failed to list files', ctx, { error: (error as Error).message, campaignId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Re-tag (or clear, topic = null) a screenshot's briefing-topic link.
+   * The caller resolves the {auditId, kind, index} ref into a snapshot —
+   * this method only persists.
+   */
+  async setBriefingTopic(
+    id: string,
+    topic: BriefingTopicSnapshot | null,
+    ctx?: RequestCtx,
+  ): Promise<any> {
+    try {
+      const file = await this.prisma.mkt_files_list.update({
+        where: { id },
+        data: { briefing_topic: topic as any },
+      });
+      logger.info('Marketing file briefing topic updated', ctx, { fileId: id, tagged: topic != null });
+      return file;
+    } catch (error) {
+      logger.error('Failed to update file briefing topic', ctx, { error: (error as Error).message, fileId: id });
       throw this.handleError(error, ctx);
     }
   }

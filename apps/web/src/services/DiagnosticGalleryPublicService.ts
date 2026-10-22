@@ -19,6 +19,15 @@ export interface GalleryScreenshot {
   mimeType: string | null;
   fileSize: number | null;
   uploadedAt: string | null;
+  /** Briefing-topic tag (prospect-facing projection — kind + label + the
+   *  topic's hook/fix/benefit copy). Null when the screenshot is untagged. */
+  briefingTopic?: GalleryBriefingTopic | null;
+}
+
+export interface GalleryBriefingTopic {
+  kind: 'issue' | 'gap' | 'ammunition' | 'benefit';
+  label: string;
+  detail?: Record<string, string | number | boolean>;
 }
 
 export interface GalleryData {

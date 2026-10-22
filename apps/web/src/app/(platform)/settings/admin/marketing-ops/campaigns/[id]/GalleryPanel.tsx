@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { Upload, Link2, Copy, RefreshCw, Check, Clock, AlertCircle, ImageIcon, Trash2, ExternalLink, Download } from 'lucide-react';
 import ImageLightbox from '@/components/ui/ImageLightbox';
@@ -11,6 +11,7 @@ import marketingOpsService, {
   GalleryToken,
   GalleryTokenParams,
 } from '@/services/MarketingOpsService';
+import { flattenBriefingTopics, briefingTopicKey, BRIEFING_TOPIC_KIND_LABELS } from '@/lib/briefing-topics';
 
 interface GalleryPanelProps {
   campaignId: string;
@@ -31,6 +32,20 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
   const [useShortUrl, setUseShortUrl] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Briefing-topic tagging — the sibling's archetype briefing (newest audit
+  // per platform, inherited primary-sibling audits included) flattens into
+  // the topics an uploaded screen can be anchored to. '' = General/untagged.
+  const [pendingTopicKey, setPendingTopicKey] = useState('');
+  const [retaggingId, setRetaggingId] = useState<string | null>(null);
+  const topicOptions = useMemo(
+    () => flattenBriefingTopics(campaign.audits ?? []),
+    [campaign.audits],
+  );
+  const topicByKey = useMemo(
+    () => new Map(topicOptions.map((t) => [t.key, t])),
+    [topicOptions],
+  );
 
   // Platform-fronted render URL — streams through the same-origin route
   // handler so the browser never sees the raw Supabase signed URL, and the
@@ -67,6 +82,7 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
               mime_type: f.mime_type,
               file_size: f.file_size,
               uploaded_at: f.uploaded_at,
+              briefing_topic: f.briefing_topic ?? null,
             }));
         }),
         marketingOpsService.listGalleryTokens(campaignId),
@@ -94,13 +110,33 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
     setUploading(true);
     setError(null);
     try {
-      await marketingOpsService.uploadDiagnosticScreenshot(campaignId, file);
+      const ref = pendingTopicKey ? topicByKey.get(pendingTopicKey)?.ref : undefined;
+      await marketingOpsService.uploadDiagnosticScreenshot(campaignId, file, ref);
+      setPendingTopicKey(''); // next screenshot is usually a different finding
       await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Re-tag (or clear to General) an existing screenshot — same ref resolution
+  // as upload, then refetch so the gallery payload reflects the new tag.
+  const handleRetag = async (shot: DiagnosticScreenshot, key: string) => {
+    const current = shot.briefing_topic ? briefingTopicKey(shot.briefing_topic) : '';
+    if (key === current) return;
+    setRetaggingId(shot.id);
+    setError(null);
+    try {
+      const ref = key ? topicByKey.get(key)?.ref ?? null : null;
+      await marketingOpsService.updateFileBriefingTopic(campaignId, shot.id, ref);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Retag failed');
+    } finally {
+      setRetaggingId(null);
     }
   };
 
@@ -251,6 +287,30 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
           </div>
         </div>
 
+        {topicOptions.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg bg-blue-50/60 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 px-3 py-2">
+            <label htmlFor="upload-topic" className="text-xs font-medium text-blue-900 dark:text-blue-200">
+              Link to briefing topic:
+            </label>
+            <select
+              id="upload-topic"
+              value={pendingTopicKey}
+              onChange={(e) => setPendingTopicKey(e.target.value)}
+              className="min-w-0 flex-1 max-w-xl rounded-md border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-xs text-gray-700 dark:text-gray-200"
+            >
+              <option value="">General — not tied to a finding</option>
+              {topicOptions.map((t) => (
+                <option key={t.key} value={t.key}>
+                  [{t.kindLabel}] {t.label}
+                </option>
+              ))}
+            </select>
+            <p className="w-full text-[11px] text-blue-800/70 dark:text-blue-300/60">
+              Tag the screen to the finding it proves — the gallery caption picks up that topic&apos;s hook, fix, and benefit.
+            </p>
+          </div>
+        )}
+
         {screenshots.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -293,6 +353,32 @@ export default function GalleryPanel({ campaignId, campaign }: GalleryPanelProps
                       {s.file_size ? `${(s.file_size / 1024).toFixed(1)} KB` : '—'}
                       {s.mime_type ? ` · ${s.mime_type}` : ''}
                     </p>
+                    {(topicOptions.length > 0 || s.briefing_topic) && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        {retaggingId === s.id && (
+                          <RefreshCw className="h-3 w-3 animate-spin text-gray-400 flex-shrink-0" />
+                        )}
+                        <select
+                          value={s.briefing_topic ? briefingTopicKey(s.briefing_topic) : ''}
+                          disabled={retaggingId === s.id}
+                          onChange={(e) => handleRetag(s, e.target.value)}
+                          className="min-w-0 max-w-full rounded border border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-0.5 text-[11px] text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                          title="Briefing topic this screenshot evidences"
+                        >
+                          <option value="">General — not tied to a finding</option>
+                          {s.briefing_topic && !topicByKey.has(briefingTopicKey(s.briefing_topic)) && (
+                            <option value={briefingTopicKey(s.briefing_topic)} disabled>
+                              [{(BRIEFING_TOPIC_KIND_LABELS as any)[s.briefing_topic.kind] ?? s.briefing_topic.kind}] {s.briefing_topic.label} (saved)
+                            </option>
+                          )}
+                          {topicOptions.map((t) => (
+                            <option key={t.key} value={t.key}>
+                              [{t.kindLabel}] {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

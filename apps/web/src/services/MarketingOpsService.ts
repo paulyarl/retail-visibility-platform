@@ -1944,6 +1944,31 @@ export interface MarketingFile {
   mime_type: string | null;
   uploaded_by: string | null;
   uploaded_at: string;
+  briefing_topic?: BriefingTopic | null;
+}
+
+/**
+ * Briefing-topic linkage for diagnostic screenshots (Migration 355).
+ *
+ * A screenshot can be anchored to ONE topic in the campaign's archetype
+ * briefing — an issue, positioning gap, outreach-ammunition entry, or
+ * benefit. The client sends a REF ({auditId, kind, index}); the API resolves
+ * it against the audit row and persists the SNAPSHOT (kind + label + detail
+ * copy) on mkt_files_list.briefing_topic, so audit re-runs can't re-mean a
+ * stored tag. NULL = untagged ("General").
+ */
+export type BriefingTopicKind = 'issue' | 'gap' | 'ammunition' | 'benefit';
+
+export interface BriefingTopicRef {
+  auditId: string;
+  kind: BriefingTopicKind;
+  index: number;
+}
+
+export interface BriefingTopic extends BriefingTopicRef {
+  auditPlatform: string;
+  label: string;
+  detail: Record<string, any>;
 }
 
 /**
@@ -1959,6 +1984,7 @@ export interface DiagnosticScreenshot {
   mime_type: string | null;
   file_size: number | null;
   uploaded_at: string | null;
+  briefing_topic?: BriefingTopic | null;
 }
 
 export interface PromptTemplate {
@@ -7545,8 +7571,17 @@ interface MarketingOpsService {
   listGalleryTokens(campaignId: string): Promise<GalleryToken[]>;
   getGalleryAnalytics(campaignId: string): Promise<GalleryAnalytics>;
   getGalleryDashboard(daysBack?: number): Promise<GalleryDashboard>;
-  uploadDiagnosticScreenshot(campaignId: string, file: File): Promise<MarketingFile>;
+  uploadDiagnosticScreenshot(
+    campaignId: string,
+    file: File,
+    briefingTopic?: BriefingTopicRef | null,
+  ): Promise<MarketingFile>;
   listDiagnosticScreenshots(campaignId: string): Promise<DiagnosticScreenshot[]>;
+  updateFileBriefingTopic(
+    campaignId: string,
+    fileId: string,
+    briefingTopic: BriefingTopicRef | null,
+  ): Promise<MarketingFile>;
   // Intelligence Profile + Run methods (Sprint 2 — Seek Intelligence Scope)
   listIntelligenceProfiles(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
   listIntelligenceProfileDrafts(focus?: IntelligenceFocus): Promise<IntelligenceProfile[]>;
@@ -7819,6 +7854,7 @@ MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
   this: MarketingOpsService,
   campaignId: string,
   file: File,
+  briefingTopic?: BriefingTopicRef | null,
 ): Promise<MarketingFile> {
   const payload = await encodeScreenshotPayload(file);
 
@@ -7826,13 +7862,36 @@ MarketingOpsService.prototype.uploadDiagnosticScreenshot = async function (
     `${BASE_URL}/${campaignId}/files/upload`,
     {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(briefingTopic ? { ...payload, briefingTopic } : payload),
     },
     undefined,
     0,
   );
   if (!result.success) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Failed to upload screenshot');
+  }
+  await this.invalidateCachePattern(`mkt-ops-files-${campaignId}`);
+  await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+  return result.data?.data ?? result.data;
+};
+
+MarketingOpsService.prototype.updateFileBriefingTopic = async function (
+  this: MarketingOpsService,
+  campaignId: string,
+  fileId: string,
+  briefingTopic: BriefingTopicRef | null,
+): Promise<MarketingFile> {
+  const result = await this.makeDefaultRequest<any>(
+    `${BASE_URL}/${campaignId}/files/${fileId}/topic`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ briefingTopic }),
+    },
+    undefined,
+    0,
+  );
+  if (!result.success) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update screenshot topic');
   }
   await this.invalidateCachePattern(`mkt-ops-files-${campaignId}`);
   await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);

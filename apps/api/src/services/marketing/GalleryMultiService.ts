@@ -37,6 +37,7 @@ import {
 import { buildProjectPhasePlanForKey } from '../triage/project-phase-resolution';
 import { runProjectPhaseGate } from '../outreach-openers/project-phase-gate';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { publicBriefingTopic, type PublicBriefingTopic } from '../../lib/briefing-topics';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -64,6 +65,9 @@ export interface MultiGalleryScreenshot {
   mimeType: string | null;
   fileSize: number | null;
   uploadedAt: Date;
+  /** Briefing-topic tag (lib/briefing-topics, prospect-facing projection) —
+   *  null when the screenshot is untagged ("General"). */
+  briefingTopic?: PublicBriefingTopic | null;
 }
 
 /**
@@ -309,6 +313,7 @@ export class GalleryMultiService extends BaseService {
         mime_type: true,
         file_size: true,
         uploaded_at: true,
+        briefing_topic: true,
       },
     });
 
@@ -424,6 +429,7 @@ export class GalleryMultiService extends BaseService {
             mimeType: s.mime_type,
             fileSize: s.file_size,
             uploadedAt: s.uploaded_at,
+            briefingTopic: publicBriefingTopic(s.briefing_topic),
           };
         }),
       );
@@ -436,6 +442,7 @@ export class GalleryMultiService extends BaseService {
         mimeType: s.mime_type,
         fileSize: s.file_size,
         uploadedAt: s.uploaded_at,
+        briefingTopic: publicBriefingTopic(s.briefing_topic),
       }));
     }
   }

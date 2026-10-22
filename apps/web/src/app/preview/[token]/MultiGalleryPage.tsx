@@ -39,6 +39,7 @@ import diagnosticGalleryPublicService, {
   type CompletedSiblingSection,
   type MultiGalleryProjectPlan,
 } from '@/services/DiagnosticGalleryPublicService';
+import { briefingTopicTagline } from '@/lib/briefing-topics';
 import { resolveGalleryToken } from './galleryToken';
 
 const ARCHETYPE_COLORS: Record<string, string> = {
@@ -281,6 +282,10 @@ function SiblingSectionContent({
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const screenshots = section.screenshots ?? [];
+  // Briefing-topic tag on the visible slide — the finding the screen proves,
+  // with the topic's own cost/fix/benefit line underneath.
+  const currentTopic = screenshots[currentSlide]?.briefingTopic ?? null;
+  const currentTagline = currentTopic ? briefingTopicTagline(currentTopic) : null;
 
   const nextSlide = useCallback(() => {
     if (screenshots.length === 0) return;
@@ -363,6 +368,23 @@ function SiblingSectionContent({
               fit="contain"
               mah={400}
             />
+          )}
+          {/* Briefing-topic caption — the finding this screen evidences, in
+              the briefing's own words (cost, gap, fix, or benefit). */}
+          {currentTopic && (
+            <Paper p="sm" withBorder radius="sm" bg="var(--mantine-color-gray-0)" mt="sm">
+              <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={2}>
+                What this shows
+              </Text>
+              <Text size="sm" fw={600}>
+                {currentTopic.label}
+              </Text>
+              {currentTagline && (
+                <Text size="sm" c="dimmed">
+                  {currentTagline}
+                </Text>
+              )}
+            </Paper>
           )}
         </Box>
       )}

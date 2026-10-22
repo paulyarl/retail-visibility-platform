@@ -30,6 +30,7 @@ import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { CustomerAuthService, CustomerAuthResult } from '../services/CustomerAuthService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 import ConfirmPageService from '../services/ConfirmPageService';
+import { publicBriefingTopic } from '../lib/briefing-topics';
 
 const router = express.Router();
 
@@ -166,6 +167,7 @@ router.get('/public/marketing/gallery/:token', async (req, res) => {
         mime_type: true,
         file_size: true,
         uploaded_at: true,
+        briefing_topic: true,
       },
     });
 
@@ -198,6 +200,7 @@ router.get('/public/marketing/gallery/:token', async (req, res) => {
           mimeType: s.mime_type,
           fileSize: s.file_size,
           uploadedAt: s.uploaded_at,
+          briefingTopic: publicBriefingTopic(s.briefing_topic),
         };
       })
     );

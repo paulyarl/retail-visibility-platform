@@ -223,6 +223,10 @@ import { generatePostcardPdf } from '../services/marketing/PostalMailerPdfServic
 import GalleryEligibilityService, { type GalleryEligibility } from '../services/marketing/GalleryEligibilityService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
+import {
+  resolveBriefingTopicSnapshot,
+  type BriefingTopicSnapshot,
+} from '../lib/briefing-topics';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { normalizeRepairIssueType } from '../lib/repair-issue-type';
@@ -3646,6 +3650,58 @@ function decodeImageDataUrl(dataUrl: string): { buffer: Buffer; mime: string } |
 }
 
 /**
+ * Parse + resolve the optional briefing-topic ref carried with a screenshot
+ * upload or retag. The client sends a REF — { auditId, kind, index } (an
+ * object on the JSON path, a JSON string on multipart) — and the API resolves
+ * it into a snapshot so the stored tag survives audit re-runs.
+ *
+ * Returns:
+ *   undefined — no tag supplied (an untagged "General" screenshot)
+ *   null      — a tag was supplied but is malformed or unresolvable → 400
+ *   snapshot  — resolved briefing-topic snapshot to persist
+ *
+ * The referenced audit must belong to this campaign OR to a sibling in the
+ * same business prospect group — non-primary siblings inherit the primary's
+ * briefing, and the UI offers those inherited topics too.
+ */
+async function resolveBriefingTopicParam(
+  campaignId: string,
+  campaignProspectId: string | null | undefined,
+  raw: unknown,
+): Promise<BriefingTopicSnapshot | null | undefined> {
+  if (raw == null) return undefined;
+  let ref: any = raw;
+  if (typeof raw === 'string') {
+    try {
+      ref = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const auditId = ref?.auditId;
+  if (typeof auditId !== 'string' || !auditId) return null;
+
+  const audit = await prisma.mkt_audits_list.findUnique({
+    where: { id: auditId },
+    select: { id: true, campaign_id: true, platform: true, audit_data: true },
+  });
+  if (!audit) return null;
+
+  if (audit.campaign_id !== campaignId) {
+    if (!campaignProspectId) return null;
+    const owner = await prisma.mkt_campaigns_list.findUnique({
+      where: { id: audit.campaign_id },
+      select: { business_prospect_id: true },
+    });
+    if (!owner?.business_prospect_id || owner.business_prospect_id !== campaignProspectId) {
+      return null;
+    }
+  }
+
+  return resolveBriefingTopicSnapshot(audit, ref);
+}
+
+/**
  * POST /:campaignId/files/upload
  *
  * One-step upload for diagnostic screenshots. Accepts either shape:
@@ -3655,6 +3711,11 @@ function decodeImageDataUrl(dataUrl: string): { buffer: Buffer; mime: string } |
  *     before the bytes leave the browser
  * Uploads to the Supabase disputes bucket and creates an mkt_files_list record
  * with file_type='diagnostic_screenshot'.
+ *
+ * Optional `briefingTopic` ({auditId, kind, index} | JSON string) anchors the
+ * screenshot to one briefing topic — an issue, positioning gap, outreach
+ * ammunition entry, or benefit — so the tag can surface on the admin panel
+ * and the prospect gallery. Omit for an untagged "General" screenshot.
  *
  * Mirrors the DisputeIntakeService upload pattern (line 588).
  */
@@ -3714,10 +3775,25 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
     // Verify campaign exists
     const campaign = await prisma.mkt_campaigns_list.findUnique({
       where: { id: campaignId },
-      select: { id: true },
+      select: { id: true, business_prospect_id: true },
     });
     if (!campaign) {
       return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    // Resolve the optional briefing-topic tag BEFORE uploading — a tag that
+    // doesn't resolve fails fast, no orphaned storage object.
+    const briefingTopic = await resolveBriefingTopicParam(
+      campaignId,
+      campaign.business_prospect_id,
+      req.body?.briefingTopic,
+    );
+    if (briefingTopic === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_briefing_topic',
+        message: 'briefingTopic must be { auditId, kind, index } resolving to a briefing topic on this campaign\'s audits (or its prospect group\'s).',
+      });
     }
 
     // Upload to Supabase disputes bucket
@@ -3764,9 +3840,10 @@ router.post('/:campaignId/files/upload', diagnosticScreenshotUpload.single('file
       fileSize: buffer.length,
       mimeType: effectiveMime,
       uploadedBy: req.user?.id,
+      briefingTopic: briefingTopic ?? null,
     }, getCtx(req));
 
-    logger.info('Diagnostic screenshot uploaded', getCtx(req), { campaignId, fileId: fileRecord.id, fileName });
+    logger.info('Diagnostic screenshot uploaded', getCtx(req), { campaignId, fileId: fileRecord.id, fileName, briefingTopicKind: briefingTopic?.kind ?? null });
 
     return res.status(201).json({ success: true, data: fileRecord });
   } catch (error) {
@@ -3797,6 +3874,7 @@ router.get('/:campaignId/files/diagnostic-screenshots', async (req: any, res: Re
         mime_type: true,
         file_size: true,
         uploaded_at: true,
+        briefing_topic: true,
       },
     });
 
@@ -3827,6 +3905,7 @@ router.get('/:campaignId/files/diagnostic-screenshots', async (req: any, res: Re
           mime_type: f.mime_type,
           file_size: f.file_size,
           uploaded_at: f.uploaded_at,
+          briefing_topic: f.briefing_topic ?? null,
         };
       })
     );
@@ -3885,6 +3964,52 @@ router.get('/:campaignId/files/:fileId/render', async (req: any, res: Response) 
     res.setHeader('Content-Length', buffer.length);
     res.setHeader('Cache-Control', 'private, max-age=300');
     return res.send(buffer);
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * PATCH /:campaignId/files/:fileId/topic
+ *
+ * Re-tag (or clear) a diagnostic screenshot's briefing-topic link. Body:
+ *   { briefingTopic: { auditId, kind, index } }  — tag to a briefing topic
+ *   { briefingTopic: null }                      — clear back to "General"
+ * The ref resolves the same way the upload path does (audit on this campaign
+ * or its prospect group), and the resolved snapshot replaces the stored tag.
+ */
+router.patch('/:campaignId/files/:fileId/topic', async (req: any, res: Response) => {
+  try {
+    const { campaignId, fileId } = req.params;
+    const raw = req.body?.briefingTopic;
+
+    const file = await prisma.mkt_files_list.findFirst({
+      where: { id: fileId, campaign_id: campaignId, file_type: 'diagnostic_screenshot' },
+      select: { id: true },
+    });
+    if (!file) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'File not found' });
+    }
+
+    let topic: BriefingTopicSnapshot | null = null;
+    if (raw != null) {
+      const campaign = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { business_prospect_id: true },
+      });
+      const resolved = await resolveBriefingTopicParam(campaignId, campaign?.business_prospect_id, raw);
+      if (resolved == null) {
+        return res.status(400).json({
+          success: false,
+          error: 'invalid_briefing_topic',
+          message: 'briefingTopic must be { auditId, kind, index } resolving to a briefing topic on this campaign\'s audits (or its prospect group\'s).',
+        });
+      }
+      topic = resolved;
+    }
+
+    const updated = await MarketingFileService.setBriefingTopic(fileId, topic, getCtx(req));
+    res.json({ success: true, data: updated });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
