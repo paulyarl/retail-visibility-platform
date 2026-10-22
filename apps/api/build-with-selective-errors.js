@@ -109,6 +109,10 @@ function main() {
       stdio: 'pipe'
     });
     
+    if (!fs.existsSync('dist/index.js')) {
+      console.error('\n❌ dist/index.js missing after successful tsc — build FAILED');
+      process.exit(1);
+    }
     console.log('✅ Build completed successfully!');
     process.exit(0);
     
@@ -146,6 +150,14 @@ function main() {
       console.log(`\n✅ SAFE ERRORS IGNORED: ${analysis.safeErrors.length} property access errors (handled by middleware)`);
     }
     
+    // A tsc crash (OOM/signal) produces no 'error TS' lines at all — that is
+    // a build failure, not a safe-error pass. Same for a run that emits no
+    // dist: never let a broken artifact look like success.
+    if (analysis.totalErrors === 0 || !fs.existsSync('dist/index.js')) {
+      console.error('\n❌ tsc produced no dist output (OOM/crash/signal) — build FAILED');
+      process.exit(1);
+    }
+
     console.log('\n🌟 Build completed with warnings - middleware will handle runtime transforms');
     process.exit(0);
   }
