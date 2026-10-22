@@ -300,7 +300,20 @@ export class ProfileRepairPromptService extends BaseService {
       ].filter(Boolean);
       lines.push(`- ${parts.join(' · ')}`);
       if (Array.isArray(auditData.negative_review_themes) && auditData.negative_review_themes.length > 0) {
-        lines.push(`- Negative themes: ${auditData.negative_review_themes.join(', ')}`);
+        const themes = auditData.negative_review_themes
+          .map((t: any) => {
+            if (typeof t === 'string') return t;
+            if (!t || typeof t !== 'object') return null;
+            const detail = [
+              t.observed_frequency,
+              t.supporting_review_count != null ? `${t.supporting_review_count} review(s)` : null,
+            ].filter(Boolean).join(', ');
+            return `${t.theme ?? 'unclassified'}${detail ? ` (${detail})` : ''}${t.summary ? ` — ${t.summary}` : ''}`;
+          })
+          .filter(Boolean);
+        if (themes.length > 0) {
+          lines.push(`- Negative themes: ${themes.join('; ')}`);
+        }
       }
       lines.push('');
     }
