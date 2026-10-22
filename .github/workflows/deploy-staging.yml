@@ -1,4 +1,4 @@
-name: Deploy Staging to Vercel
+name: Deploy Staging
 
 on:
   push:
@@ -7,18 +7,25 @@ on:
   workflow_dispatch: # Manual trigger
 
 jobs:
-  deploy:
+  web:
     runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel Deployment
+        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_STAGING }}"
+
+  api:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: fly-deploy-staging
+      cancel-in-progress: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Trigger Vercel Deployment
-        run: |
-          echo "🚀 Triggering Vercel deployment for staging branch"
-          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_STAGING }}"
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Deployment triggered
-        run: |
-          echo "✅ Vercel deployment triggered successfully"
-          echo "Check deployment status at: https://vercel.com/dashboard"
+      - name: Deploy to Fly staging
+        run: flyctl deploy --config fly.staging.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
