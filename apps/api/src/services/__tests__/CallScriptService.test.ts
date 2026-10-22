@@ -115,6 +115,44 @@ vi.mock('../OutreachIntelligenceService', () => ({
     }
     return 'Hi there,';
   },
+  // Mirror of the real fold (§7.5) — the mocked module can't export it.
+  foldSeedReconTouches: (touches: Array<{ metadata: any; occurred_at: any }>) => {
+    const KEYS: Array<[string, string]> = [
+      ['contact_reached_role', 'recon_contact_reached_role'],
+      ['phone_reachability', 'recon_phone_reachability'],
+      ['owner_presence_timing', 'recon_owner_presence_timing'],
+      ['can_act_at_floor', 'recon_can_act_at_floor'],
+      ['owner_contact_hint', 'recon_owner_contact_hint'],
+      ['gatekeeper_relationship', 'recon_gatekeeper_relationship'],
+      ['gatekeeper_name', 'recon_gatekeeper_name'],
+      ['contact_digital_literacy', 'recon_contact_digital_literacy'],
+      ['preferred_contact_channel', 'recon_preferred_contact_channel'],
+    ];
+    if (!touches || touches.length === 0) return null;
+    const recon: any = {};
+    const seen = new Set<string>();
+    for (const t of touches) {
+      const md = t.metadata;
+      if (!md) continue;
+      for (const [field, key] of KEYS) {
+        if (seen.has(field)) continue;
+        const v = md[key];
+        if (v === undefined || v === null || v === '') continue;
+        seen.add(field);
+        recon[field] = {
+          value: typeof v === 'boolean' ? String(v) : String(v),
+          source: `Touch ${new Date(t.occurred_at).toISOString().slice(0, 10)}`,
+          source_confidence: 'confirmed',
+        };
+      }
+    }
+    recon.authority_reached =
+      recon.contact_reached_role?.value === 'owner' || !!recon.owner_contact_hint?.value;
+    recon.recon_completed_at = touches[0]?.occurred_at
+      ? new Date(touches[0].occurred_at).toISOString()
+      : null;
+    return recon;
+  },
 }));
 
 vi.mock('../MarketingDeliverableService', () => ({
@@ -250,8 +288,8 @@ describe('CallScriptService.assembleForCampaign', () => {
   it('returns every ranked hook option', async () => {
     const result = await CallScriptService.assembleForCampaign('camp-001');
 
-    expect(result.hookOptions).toHaveLength(24);
-    for (let i = 0; i < 24; i++) {
+    expect(result.hookOptions).toHaveLength(25);
+    for (let i = 0; i < 25; i++) {
       expect(result.hookOptions[i].rank).toBe(i + 1);
     }
   });
@@ -1228,5 +1266,221 @@ describe('Platform-weighted phone-hook ranking', () => {
     expect(result.callContext.platform_priorities).toEqual([]);
     // Legacy catalog order inside the same severity tier: gbp_verification first.
     expect(angles.indexOf('gbp_verification')).toBeLessThan(angles.indexOf('hours_sync'));
+  });
+});
+
+// ─── Recon scripts + recon write-back (TOUCH LADDER §3/§7) ──────────────
+
+describe('CallScriptService.assembleReconForCampaign', () => {
+  it('assembles the four recon stages with merge fields resolved', async () => {
+    const result = await CallScriptService.assembleReconForCampaign('camp-001');
+
+    expect(result.script_kind).toBe('recon');
+    expect(result.stages.open).toContain('Tetees Market');
+    expect(result.stages.authority_probe).toBeTruthy();
+    expect(result.stages.authority_branches.length).toBeGreaterThan(0);
+    expect(result.stages.intel_asks.length).toBeGreaterThan(0);
+    expect(result.stages.close).toBeTruthy();
+    expect(result.stages.owner_bridge).toBeTruthy();
+    expect(result.objections.length).toBeGreaterThan(0);
+    expect(result.callContext.phone).toBe('317-555-0100');
+  });
+
+  it('throws phone_required when the campaign has no phone', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign({ phone: null }));
+    await expect(CallScriptService.assembleReconForCampaign('camp-001')).rejects.toThrow();
+  });
+
+  it('labels every intel ask as unknown when no worksheet exists', async () => {
+    mockGetForCampaign.mockResolvedValue(null);
+    const result = await CallScriptService.assembleReconForCampaign('camp-001');
+
+    expect(result.stages.intel_asks.every((a) => a.known === false)).toBe(true);
+    expect(result.callContext.authority_reached).toBe(false);
+  });
+
+  it('labels obtained asks from the worksheet recon block', async () => {
+    mockGetForCampaign.mockResolvedValue({
+      id: 'moi-1',
+      owner_name: 'Maria',
+      preferred_contact_channel: 'text',
+      team_signal: 'family_team',
+      payload: {
+        recon: {
+          owner_presence_timing: { value: 'weekday mornings', source: 'Recon 2026-10-20', source_confidence: 'confirmed' },
+          owner_contact_hint: { value: 'WhatsApp 317-555-9999', source: 'Recon 2026-10-20', source_confidence: 'confirmed' },
+          authority_reached: true,
+          recon_completed_at: '2026-10-20T14:00:00Z',
+        },
+      },
+    });
+
+    const result = await CallScriptService.assembleReconForCampaign('camp-001');
+    const byFills = Object.fromEntries(result.stages.intel_asks.map((a) => [a.fills, a]));
+
+    expect(byFills['owner_presence_timing'].known).toBe(true);
+    expect(byFills['owner_presence_timing'].current_value).toBe('weekday mornings');
+    expect(byFills['owner_contact_hint'].known).toBe(true);
+    expect(byFills['preferred_contact_channel'].known).toBe(true);
+    expect(byFills['team_signal'].known).toBe(true);
+    expect(byFills['can_act_at_floor'].known).toBe(false);
+    expect(result.callContext.authority_reached).toBe(true);
+    expect(result.callContext.recon_completed_at).toBe('2026-10-20T14:00:00Z');
+    expect(result.callContext.owner_name).toBe('Maria');
+  });
+});
+
+describe('CallScriptService.assembleReconForSeed', () => {
+  it('throws NotFoundError for a missing seed', async () => {
+    mockQueryRaw.mockResolvedValueOnce([]);
+    await expect(CallScriptService.assembleReconForSeed('seed-404')).rejects.toThrow();
+  });
+
+  it('assembles stages from the seed row with all asks unknown when no touches carry recon metadata', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([{ business_name: 'Dreamcast African Market', address: '4201 N College Ave', city: 'Indianapolis', state: 'IN', phone: '317-555-0100' }])
+      .mockResolvedValueOnce([]); // touch metadata query
+
+    const result = await CallScriptService.assembleReconForSeed('seed-001');
+
+    expect(result.script_kind).toBe('recon');
+    expect(result.stages.open).toContain('Dreamcast African Market');
+    expect(result.callContext.linked_seed_id).toBe('seed-001');
+    expect(result.callContext.authority_reached).toBe(false);
+    expect(result.stages.intel_asks.every((a) => !a.known)).toBe(true);
+  });
+
+  it('aggregates latest recon_* observations from touch metadata into gap labels', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([{ business_name: 'Dreamcast', address: '1 Main St', city: 'Indianapolis', state: 'IN', phone: '317-555-0100' }])
+      .mockResolvedValueOnce([
+        { metadata: { recon_contact_reached_role: 'owner', recon_gatekeeper_name: 'Maria' }, occurred_at: '2026-10-21T15:00:00Z' },
+        { metadata: { recon_contact_reached_role: 'staffer', recon_owner_presence_timing: 'mornings' }, occurred_at: '2026-10-20T15:00:00Z' },
+      ]);
+
+    const result = await CallScriptService.assembleReconForSeed('seed-001');
+
+    // Latest non-null observation wins — 'owner' (10-21) beats 'staffer' (10-20)
+    expect(result.callContext.authority_reached).toBe(true);
+    expect(result.callContext.recon_completed_at).toBe('2026-10-21T15:00:00.000Z');
+    const byFills = Object.fromEntries(result.stages.intel_asks.map((a) => [a.fills, a]));
+    expect(byFills['owner_presence_timing'].known).toBe(true);
+    expect(byFills['owner_presence_timing'].current_value).toBe('mornings');
+  });
+});
+
+describe('CallScriptService.applyReconConfirmations', () => {
+  const reconInput = {
+    campaignId: 'camp-001',
+    callLogId: 'log-009',
+    callDate: '2026-10-21',
+    contactedBy: 'operator-1',
+  };
+
+  it('creates a worksheet with payload.recon when none exists', async () => {
+    mockOiFindUnique.mockResolvedValue(null);
+    mockCampaignsFindUnique.mockResolvedValue({ business_name: 'Tetees Market' });
+
+    const result = await CallScriptService.applyReconConfirmations({
+      ...reconInput,
+      contactReachedRole: 'manager',
+      ownerPresenceTiming: 'weekday mornings',
+      gatekeeperName: 'Maria',
+      gatekeeperRelationship: 'ally',
+      canActAtFloor: false,
+    });
+
+    expect(mockOiCreate).toHaveBeenCalled();
+    const createdPayload = mockOiCreate.mock.calls[0][0].data.payload;
+    expect(createdPayload.recon.contact_reached_role.value).toBe('manager');
+    expect(createdPayload.recon.owner_presence_timing.value).toBe('weekday mornings');
+    expect(createdPayload.recon.gatekeeper_name.value).toBe('Maria');
+    expect(createdPayload.recon.can_act_at_floor.value).toBe('false');
+    expect(createdPayload.recon.recon_completed_at).toBeTruthy();
+    expect(result.written).toEqual(
+      expect.arrayContaining(['gatekeeper_name', 'contact_reached_role', 'owner_presence_timing', 'can_act_at_floor', 'gatekeeper_relationship']),
+    );
+    expect(result.authorityReached).toBe(false);
+  });
+
+  it('latches authority_reached when the contact reached is the owner', async () => {
+    mockOiFindUnique.mockResolvedValue(null);
+    mockCampaignsFindUnique.mockResolvedValue({ business_name: 'Tetees Market' });
+
+    const result = await CallScriptService.applyReconConfirmations({
+      ...reconInput,
+      contactReachedRole: 'owner',
+    });
+
+    expect(result.authorityReached).toBe(true);
+    const createdPayload = mockOiCreate.mock.calls[0][0].data.payload;
+    expect(createdPayload.recon.authority_reached).toBe(true);
+  });
+
+  it('merges recon into an existing payload without clobbering other keys', async () => {
+    mockOiFindUnique.mockResolvedValue({
+      id: 'moi-existing',
+      payload: { business_name: 'Tetees Market', researcher_notes: 'keep me' },
+    });
+
+    await CallScriptService.applyReconConfirmations({
+      ...reconInput,
+      contactReachedRole: 'staffer',
+    });
+
+    expect(mockOiUpdate).toHaveBeenCalled();
+    const updatedPayload = mockOiUpdate.mock.calls[0][0].data.payload;
+    expect(updatedPayload.researcher_notes).toBe('keep me');
+    expect(updatedPayload.recon.contact_reached_role.value).toBe('staffer');
+  });
+
+  it('identity fields fill null-only and surface conflicts on differing values', async () => {
+    mockOiFindUnique.mockResolvedValue({
+      id: 'moi-existing',
+      payload: {
+        recon: {
+          gatekeeper_name: { value: 'Maria', source: 'Recon 2026-10-20', source_confidence: 'confirmed' },
+          owner_contact_hint: null,
+        },
+      },
+    });
+
+    const result = await CallScriptService.applyReconConfirmations({
+      ...reconInput,
+      gatekeeperName: 'Rosa',           // conflict — Maria already on file
+      ownerContactHint: 'WhatsApp',     // null → fills
+    });
+
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].field).toBe('gatekeeper_name');
+    expect(result.conflicts[0].existingValue).toBe('Maria');
+    expect(result.written).toContain('owner_contact_hint');
+    const updatedPayload = mockOiUpdate.mock.calls[0][0].data.payload;
+    expect(updatedPayload.recon.gatekeeper_name.value).toBe('Maria'); // unchanged
+    expect(updatedPayload.recon.owner_contact_hint.value).toBe('WhatsApp');
+  });
+
+  it('observation fields restamp on differing values (latest wins)', async () => {
+    mockOiFindUnique.mockResolvedValue({
+      id: 'moi-existing',
+      payload: {
+        recon: {
+          contact_reached_role: { value: 'staffer', source: 'Recon 2026-10-19', source_confidence: 'confirmed' },
+          gatekeeper_relationship: { value: 'neutral', source: 'Recon 2026-10-19', source_confidence: 'confirmed' },
+        },
+      },
+    });
+
+    const result = await CallScriptService.applyReconConfirmations({
+      ...reconInput,
+      contactReachedRole: 'manager',
+      gatekeeperRelationship: 'neutral', // idempotent — no write
+    });
+
+    expect(result.written).toContain('contact_reached_role');
+    expect(result.written).not.toContain('gatekeeper_relationship');
+    const updatedPayload = mockOiUpdate.mock.calls[0][0].data.payload;
+    expect(updatedPayload.recon.contact_reached_role.value).toBe('manager');
+    expect(updatedPayload.recon.contact_reached_role.source).toContain('2026-10-21');
   });
 });

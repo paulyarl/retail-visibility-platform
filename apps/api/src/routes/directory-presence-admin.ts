@@ -494,6 +494,19 @@ const touchSchema = z.object({
   recordingProvider: z.string().max(40).optional(),
   // Four-Act cascade — C3 pain / C4 permission (stored on touch metadata).
   verification_results: z.array(z.record(z.string(), z.any())).optional(),
+  // TOUCH LADDER §7.5 — pre-campaign recon intel rides touch metadata as
+  // recon_* keys (no campaign worksheet exists for seeds).
+  recon: z.object({
+    contact_reached_role: z.enum(['owner', 'manager', 'staffer', 'answering_service', 'none']).nullable().optional(),
+    phone_reachability: z.enum(['answered_live', 'voicemail', 'dead_air', 'wrong_number', 'disconnected']).nullable().optional(),
+    owner_presence_timing: z.string().max(255).nullable().optional(),
+    can_act_at_floor: z.boolean().nullable().optional(),
+    owner_contact_hint: z.string().max(255).nullable().optional(),
+    gatekeeper_relationship: z.enum(['ally', 'neutral', 'blocker', 'unknown']).nullable().optional(),
+    gatekeeper_name: z.string().max(255).nullable().optional(),
+    contact_digital_literacy: z.enum(['low', 'moderate', 'high', 'unknown']).nullable().optional(),
+    preferred_contact_channel: z.string().max(50).nullable().optional(),
+  }).optional(),
 });
 
 router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Request, res: Response) => {
@@ -506,6 +519,31 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
       actorId: (req as any).user?.id,
       actorType: 'user' as const,
     };
+    // §7.5 — flatten recon intel onto metadata.recon_* keys (the key set
+    // CallScriptService.latestReconFromSeedTouches aggregates).
+    const recon = parsed.data.recon;
+    const reconMeta = recon
+      ? Object.fromEntries(
+          Object.entries({
+            recon_contact_reached_role: recon.contact_reached_role,
+            recon_phone_reachability: recon.phone_reachability,
+            recon_owner_presence_timing: recon.owner_presence_timing,
+            recon_can_act_at_floor: recon.can_act_at_floor,
+            recon_owner_contact_hint: recon.owner_contact_hint,
+            recon_gatekeeper_relationship: recon.gatekeeper_relationship,
+            recon_gatekeeper_name: recon.gatekeeper_name,
+            recon_contact_digital_literacy: recon.contact_digital_literacy,
+            recon_preferred_contact_channel: recon.preferred_contact_channel,
+          }).filter(([, v]) => v !== undefined && v !== null),
+        )
+      : {};
+    const metadata =
+      parsed.data.verification_results || Object.keys(reconMeta).length > 0
+        ? {
+            ...(parsed.data.verification_results ? { verification_results: parsed.data.verification_results } : {}),
+            ...reconMeta,
+          }
+        : undefined;
     const result = await DirectoryPresenceSeedService.addOutreachTouch(
       req.params.id,
       {
@@ -516,9 +554,7 @@ router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Req
         recordingUrl: parsed.data.recordingUrl,
         recordingDurationSeconds: parsed.data.recordingDurationSeconds,
         recordingProvider: parsed.data.recordingProvider,
-        metadata: parsed.data.verification_results
-          ? { verification_results: parsed.data.verification_results }
-          : undefined,
+        metadata,
       },
       ctx,
     );
@@ -3386,19 +3422,24 @@ router.post('/outreach-anchors/:anchorId/contact', requirePlatformStaff, async (
 });
 
 /**
- * GET /api/admin/directory-presence/presence-seeds/:id/call-script?anchorId=
+ * GET /api/admin/directory-presence/presence-seeds/:id/call-script?anchorId=&kind=
  * Assemble the seed-side verification call script (spec §13.3 seed path).
  * anchorId is optional — the selected anchor's verification question, pain
  * probe, and recommended transition drive the middle stages.
+ * kind='recon' returns the pre-campaign recon script (TOUCH LADDER §3/§7.5)
+ * — gap state aggregated from the seed's touch metadata.
  */
 router.get('/presence-seeds/:id/call-script', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const { default: callScriptService } = await import('../services/CallScriptService.js');
-    const script = await callScriptService.assembleForSeed(
-      req.params.id,
-      req.query.anchorId as string | undefined,
-      { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' },
-    );
+    const ctx = { userId: (req as any).user?.id, ip: req.ip, region: 'us-east-1' };
+    const script = req.query.kind === 'recon'
+      ? await callScriptService.assembleReconForSeed(req.params.id, ctx as any)
+      : await callScriptService.assembleForSeed(
+          req.params.id,
+          req.query.anchorId as string | undefined,
+          ctx as any,
+        );
     res.json({ success: true, data: script });
   } catch (error: any) {
     if (error?.name === 'NotFoundError') {

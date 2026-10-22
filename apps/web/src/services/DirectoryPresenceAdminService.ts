@@ -15,7 +15,7 @@
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
-import type { OutreachProblem } from '@/services/MarketingOpsService';
+import type { OutreachProblem, AssembledReconScript } from '@/services/MarketingOpsService';
 import type { PersistedQrStyle } from '@/lib/qr-engine';
 
 /** A row from directory_photos, as served by /api/directory/:id/photos. */
@@ -1677,6 +1677,19 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       recordingDurationSeconds?: number;
       recordingProvider?: string;
       verification_results?: Array<Record<string, any>>;
+      /** TOUCH LADDER §7.5 — recon intel captured on the touch; the API
+       *  persists it as metadata.recon_* keys. */
+      recon?: {
+        contact_reached_role?: 'owner' | 'manager' | 'staffer' | 'answering_service' | 'none' | null;
+        phone_reachability?: 'answered_live' | 'voicemail' | 'dead_air' | 'wrong_number' | 'disconnected' | null;
+        owner_presence_timing?: string | null;
+        can_act_at_floor?: boolean | null;
+        owner_contact_hint?: string | null;
+        gatekeeper_relationship?: 'ally' | 'neutral' | 'blocker' | 'unknown' | null;
+        gatekeeper_name?: string | null;
+        contact_digital_literacy?: 'low' | 'moderate' | 'high' | 'unknown' | null;
+        preferred_contact_channel?: string | null;
+      };
     },
   ): Promise<{ touchId: string } | null> {
     const result = await this.makeDefaultRequest<any>(
@@ -2256,6 +2269,22 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const qs = anchorId ? `?anchorId=${encodeURIComponent(anchorId)}` : '';
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/call-script${qs}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    return (result.data?.data ?? result.data) ?? null;
+  }
+
+  /**
+   * Assemble the seed-side recon call script (TOUCH LADDER §3/§7.5) —
+   * pre-campaign authority mapping; gap state aggregated from the seed's
+   * touch metadata (recon_* keys).
+   */
+  async getSeedReconScript(seedId: string): Promise<AssembledReconScript | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/call-script?kind=recon`,
       { method: 'GET' },
       undefined,
       0,

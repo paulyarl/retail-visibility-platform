@@ -515,6 +515,34 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     return v !== '' && !['off', 'false', '0', 'no', 'none', 'disabled'].includes(v);
   }, [variables.interactive_verification]);
 
+  // Google Maps ground truth opt-in (TOUCH LADDER §14/§14.1a) — caller-
+  // supplied variable; '' is the normal path, 'latest'/'deep' trigger a
+  // HasData packet lookup (cache-first) at the server render seam. The
+  // status fetch reports cache state + approximate credit cost so the
+  // operator sees the price before spending.
+  const groundTruthLevel = useMemo(() => {
+    const v = (variables.google_maps_ground_truth ?? '').trim().toLowerCase();
+    return v === 'deep' ? 'deep' : v === 'latest' ? 'latest' : null;
+  }, [variables.google_maps_ground_truth]);
+  const [groundTruthStatus, setGroundTruthStatus] = useState<{
+    cached: boolean;
+    fetched_at: string | null;
+    est_credits: number;
+    configured: boolean;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!groundTruthLevel || !selectedCampaign?.id) {
+      setGroundTruthStatus(null);
+      return;
+    }
+    marketingOpsService
+      .getGroundTruthStatus(selectedCampaign.id, groundTruthLevel)
+      .then((s) => { if (!cancelled) setGroundTruthStatus(s); })
+      .catch(() => { if (!cancelled) setGroundTruthStatus(null); });
+    return () => { cancelled = true; };
+  }, [groundTruthLevel, selectedCampaign?.id]);
+
   useEffect(() => {
     if (!selectedCampaign) return;
     setVariables((prev) => ({
@@ -533,6 +561,9 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       // Prospect-scoped evidence must not leak across campaigns — a stale
       // path would point the analyst at the previous prospect's file.
       operator_profile_evidence_file: '',
+      // A stale ground-truth level would silently spend HasData credits on
+      // the newly selected prospect (§14.1 — never implicit).
+      google_maps_ground_truth: '',
     }));
     setServerRendered(null);
   }, [selectedCampaign]);
@@ -903,6 +934,70 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                 hunting profiles live; a profile the operator can see is public, one they can't reach
                 logged-out is a visibility finding. Applies on the server render; blank is a normal run.
               </p>
+            </div>
+            {/* Google Maps ground truth (TOUCH LADDER §14/§14.1a) —
+                caller-supplied opt-in that can spend HasData credits. Sends
+                google_maps_ground_truth ('latest'|'deep') in the render
+                payload; never a body placeholder. Blank = normal run. */}
+            <div className="mt-4 rounded-lg border border-gray-200 dark:border-neutral-700 p-3">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={groundTruthLevel !== null}
+                  onChange={(e) =>
+                    setVariables((prev) => ({
+                      ...prev,
+                      google_maps_ground_truth: e.target.checked ? 'latest' : '',
+                    }))
+                  }
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-xs font-medium text-gray-600 dark:text-gray-300">
+                    Google Maps ground truth — live HasData packet
+                  </span>
+                  <span className="block text-xs text-gray-400 dark:text-gray-500">
+                    Injects a verified GBP packet (rating, reviews, posts, photos) as
+                    {' '}<code className="font-mono">=== GOOGLE MAPS GROUND TRUTH ===</code> context —
+                    ammunition for attributable pains. Optional: consumes HasData credits.
+                  </span>
+                </span>
+              </label>
+              {groundTruthLevel !== null && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Depth</label>
+                    <select
+                      value={groundTruthLevel}
+                      onChange={(e) =>
+                        setVariables((prev) => ({ ...prev, google_maps_ground_truth: e.target.value }))
+                      }
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="latest">Latest — place + recent reviews (~35 credits)</option>
+                      <option value="deep">Deep — reviews + photos + posts (~50 credits)</option>
+                    </select>
+                  </div>
+                  {groundTruthStatus ? (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {groundTruthStatus.cached ? (
+                        <>
+                          Cached packet{groundTruthStatus.fetched_at ? ` fetched ${new Date(groundTruthStatus.fetched_at).toLocaleDateString()}` : ''} — serves at ~0 credits.
+                          Est. fresh fetch: ~{groundTruthStatus.est_credits} credits.
+                        </>
+                      ) : groundTruthStatus.configured ? (
+                        <>No cached packet — this render fetches live: ~{groundTruthStatus.est_credits} credits.</>
+                      ) : (
+                        <>HasData key not configured — render continues with ground_truth: unavailable.</>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Cache state unknown — a fresh {groundTruthLevel} fetch costs ~{groundTruthLevel === 'deep' ? 50 : 35} credits.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

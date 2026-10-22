@@ -83,6 +83,19 @@ class UnifiedConfig {
     return this.env.GOOGLE_MAPS_API_KEY;
   }
 
+  // ─── HasData (Google Maps ground truth — TOUCH LADDER §14) ────────────
+
+  /**
+   * HasData REST API key — powers the optional `google_maps_ground_truth`
+   * audit directive (live Maps packet: rating, reviews, owner-response
+   * rate, posts). Missing → the directive degrades to
+   * `ground_truth: unavailable`; renders are never blocked. Never in
+   * source — Doppler local/prd.
+   */
+  get hasdataApiKey(): string | undefined {
+    return this.env.HASDATA_API_KEY;
+  }
+
   // ─── TikTok ───────────────────────────────────────────────────────────
 
   get tiktokAppSecret(): string {
