@@ -80,3 +80,6 @@ DATABASE_MIGRATION_PLAN.md
 # nested tracked HTML (apps/web/public/bot-widget/, apps/api/tests/reports/) is
 # unaffected.
 /*.html
+
+# Local scratch (env backups, temp exports) — never commit secrets
+tmp/
