@@ -1,0 +1,41 @@
+# Fly.io staging config for the RVP API — landing spot for all `staging`
+# branch commits per docs/STAGING_ENVIRONMENT_SPEC.md.
+# Build context is the repo root (same as apps/api/Dockerfile expects).
+# Secrets come from Doppler `stg` config → `fly secrets import`.
+
+app = "visibleshelf-api-staging"
+primary_region = "ord"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Staging: stop idle machines, start on request. Cold-start cost is
+  # acceptable in exchange for near-zero spend when unused.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "10s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/health"
+
+# Staging is a canary, not a mirror — one right-sized machine.
+[[vm]]
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 1
