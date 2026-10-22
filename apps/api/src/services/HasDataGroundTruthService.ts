@@ -11,9 +11,12 @@
  *
  * Credits are a managed spend (§14.2):
  * - Explicit directive only — never implicit per-render.
- * - Cache-first: `mkt_ground_truth_packets` (migration 354) keyed
- *   (campaign_id, level), TTL PACKET_TTL_DAYS. Resolved place_id/data_id
- *   persist on the row so refreshes skip the paid search call.
+ * - Cache-first: `mkt_ground_truth_packets` (migration 354) written per
+ *   (campaign_id, level) but READ at prospect scope — siblings sharing
+ *   business_prospect_id serve each other's freshest packet within
+ *   TTL PACKET_TTL_DAYS. Resolved place_id/data_id persist on the row so
+ *   refreshes skip the paid search call; writes stay per-campaign to
+ *   keep credit attribution honest.
  * - latest-N reviews by default; 'deep' adds posts/photos for forensics.
  * - Missing HASDATA_API_KEY → unavailable, never a hard failure.
  *
@@ -206,15 +209,29 @@ export class HasDataGroundTruthService extends BaseService {
     return res.json();
   }
 
+  /**
+   * Fresh packet within TTL, scoped to the PROSPECT — a sibling campaign's
+   * fresh packet (same business_prospect_id) serves this render too, so one
+   * fetch covers every campaign looking at the same listing.
+   */
   private async readFreshPacket(campaignId: string, level: GroundTruthLevel): Promise<any | null> {
     try {
       const rows = await this.prisma.$queryRaw<any[]>`
-        SELECT id, packet, place_id, data_id, fetched_at
-        FROM mkt_ground_truth_packets
-        WHERE campaign_id = ${campaignId}
-          AND level = ${level}
-          AND fetched_at > now() - make_interval(days => ${PACKET_TTL_DAYS}::int)
-        ORDER BY fetched_at DESC
+        SELECT p.id, p.packet, p.place_id, p.data_id, p.fetched_at
+        FROM mkt_ground_truth_packets p
+        JOIN mkt_campaigns_list c ON c.id = p.campaign_id
+        WHERE p.level = ${level}
+          AND p.fetched_at > now() - make_interval(days => ${PACKET_TTL_DAYS}::int)
+          AND (
+            p.campaign_id = ${campaignId}
+            OR (
+              c.business_prospect_id IS NOT NULL
+              AND c.business_prospect_id = (
+                SELECT business_prospect_id FROM mkt_campaigns_list WHERE id = ${campaignId}
+              )
+            )
+          )
+        ORDER BY p.fetched_at DESC
         LIMIT 1
       `;
       return rows[0] ?? null;
@@ -225,14 +242,24 @@ export class HasDataGroundTruthService extends BaseService {
     }
   }
 
-  /** Any prior packet regardless of level/freshness — used for place-id reuse. */
+  /**
+   * Any prior packet across the prospect regardless of level/freshness —
+   * used for place-id reuse so a sibling's resolve skips the paid /search.
+   */
   private async readAnyPacket(campaignId: string): Promise<any | null> {
     try {
       const rows = await this.prisma.$queryRaw<any[]>`
-        SELECT id, place_id, data_id, packet, fetched_at
-        FROM mkt_ground_truth_packets
-        WHERE campaign_id = ${campaignId}
-        ORDER BY fetched_at DESC
+        SELECT p.id, p.place_id, p.data_id, p.packet, p.fetched_at
+        FROM mkt_ground_truth_packets p
+        JOIN mkt_campaigns_list c ON c.id = p.campaign_id
+        WHERE p.campaign_id = ${campaignId}
+           OR (
+             c.business_prospect_id IS NOT NULL
+             AND c.business_prospect_id = (
+               SELECT business_prospect_id FROM mkt_campaigns_list WHERE id = ${campaignId}
+             )
+           )
+        ORDER BY p.fetched_at DESC
         LIMIT 1
       `;
       return rows[0] ?? null;
