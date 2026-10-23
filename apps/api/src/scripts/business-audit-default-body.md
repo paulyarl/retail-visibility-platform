@@ -457,7 +457,7 @@ Evaluate:
 * Category-specific content check: Evaluate whether the website surfaces category-relevant products, services, terminology, or ordering/pickup options as defined in the Category Intelligence block. Record findings in `website.category_specific_content_present` and `website.ordering_or_pickup_info_present`. Absence of category-specific content is recorded as "not_verified," not as a negative claim.
 
 
-Website absence rule: emit `WC_MISSING_WEBSITE` when at least three readable profiles (Google, Yelp, Facebook, BBB, or directory listings where the website field is visible) show no website, and a search for an owned domain or builder subdomain returns none. Record the unread profiles in `website.issues`. Absence on an unread profile is not a reason to suppress the signal; it is a reason to note the limit. Set `website.status` to `none_found` on this evidence.
+Website absence rule: emit `WC_MISSING_WEBSITE` when any reachable profile (Google, Yelp, Facebook, BBB, or a directory listing where the website field is visible) shows no website, and a search for an owned domain or builder subdomain returns none. ONE reachable profile clears the gate — the business's own primary profile is the authoritative surface for its website field, so a business that has a site will list it there, and unread profiles are never a reason to withhold the signal. Record the unread profiles in `website.issues`. Set `website.status` to `none_found` on this evidence.
 
 Do not perform intrusive testing, vulnerability scanning, or security exploitation.
 ### Website Accessibility Verification — REQUIRED
@@ -1446,4 +1446,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-23-hours-2 -->
+<!-- seed-version: business-audit-default-2026-10-23-website-absence-any-profile-1 -->
