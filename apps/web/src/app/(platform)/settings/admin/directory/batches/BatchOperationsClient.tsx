@@ -87,7 +87,13 @@ export default function BatchOperationsDashboard() {
       marketingOpsService
         .listIntelligenceProfiles()
         .then((result) => {
-          setProfiles(result || []);
+          // Seek batches launch prospect-emitting discovery scans — only
+          // 'emerging'/'competitive' profiles drive that output. gold_standards
+          // and bronze_standards are calibration artifacts injected into scans
+          // at render time, never selectable drivers.
+          setProfiles((result || []).filter(
+            (p) => p.intelligence_focus === 'emerging' || p.intelligence_focus === 'competitive',
+          ));
         })
         .catch(() => {
           setLauncherError('Failed to load intelligence profiles.');

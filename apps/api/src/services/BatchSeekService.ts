@@ -12,6 +12,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
+import { ValidationError } from '../middleware/errorHandler';
 import { generateSeekBatchId, generateSeekBatchSlug, generateSeekBatchEntryId } from '../lib/id-generator';
 
 interface BatchAuditCtx {
@@ -98,14 +99,81 @@ class BatchSeekService {
     const hasEntries = input.entries && input.entries.length > 0;
     const entries = hasEntries ? input.entries! : [];
 
+    // Validate every referenced profile before writing anything. A seek batch
+    // launches prospect-emitting discovery scans, so each profile must be an
+    // active driver ('emerging' | 'competitive') tightly coupled to the entry's
+    // category and scope — the same coupling the launcher UI enforces.
+    // gold_standards / bronze_standards profiles are calibration artifacts
+    // injected into scans at render time; letting one occupy the driver slot
+    // would mint campaigns whose scans emit benchmark evaluations instead of
+    // prospects — a quiet zero-yield failure.
+    const refs: Array<BatchEntryInput & { resolvedFocus?: string }> = hasEntries
+      ? entries.map((e) => ({ ...e }))
+      : (input.cities || []).map((city) => ({
+          profileId: input.profileId,
+          profileVersion: input.profileVersion,
+          nicheCategory: input.nicheCategory,
+          city,
+          state: input.state,
+          intelligenceFocus: input.intelligenceFocus,
+        }));
+
+    const profileIds = Array.from(new Set(refs.map((r) => r.profileId).filter(Boolean)));
+    const profileRows = profileIds.length
+      ? await prisma.mkt_intelligence_profiles.findMany({
+          where: { id: { in: profileIds }, status: 'active' },
+        })
+      : [];
+    const versionsById = new Map<string, typeof profileRows>();
+    for (const row of profileRows) {
+      const list = versionsById.get(row.id) || [];
+      list.push(row);
+      versionsById.set(row.id, list);
+    }
+
+    for (const ref of refs) {
+      const versions = (versionsById.get(ref.profileId) || []).sort((a, b) => b.version - a.version);
+      const profile = ref.profileVersion
+        ? versions.find((v) => v.version === ref.profileVersion)
+        : versions[0];
+      if (!profile) {
+        throw new ValidationError(`seek batch entry references unknown or inactive profile '${ref.profileId}'`);
+      }
+      const focus = profile.intelligence_focus;
+      if (focus !== 'emerging' && focus !== 'competitive') {
+        throw new ValidationError(`profile '${ref.profileId}' has intelligence_focus '${focus}' — only 'emerging'/'competitive' profiles can drive a seek batch (gold/bronze standards are scan calibration, not drivers)`);
+      }
+      if (ref.intelligenceFocus && ref.intelligenceFocus !== focus) {
+        throw new ValidationError(`entry declares intelligenceFocus '${ref.intelligenceFocus}' but profile '${ref.profileId}' is '${focus}'`);
+      }
+      if (profile.category_name !== ref.nicheCategory && profile.category_key !== ref.nicheCategory) {
+        throw new ValidationError(`profile '${ref.profileId}' is for category '${profile.category_name}' — entry declares '${ref.nicheCategory}'`);
+      }
+      // Scope coupling — mirrors the launcher rules: a city-scoped profile only
+      // drives its own city; a state-scoped profile can't drive another state's
+      // scope; a nationwide entry requires a nationwide profile.
+      const entryCity = (ref.city || '').toLowerCase();
+      const profileCity = (profile.reference_city || '').toLowerCase();
+      if (profileCity) {
+        if (entryCity !== profileCity) {
+          throw new ValidationError(`city-scoped profile '${ref.profileId}' (${profile.reference_city}) cannot drive entry '${ref.city || ref.state || 'nationwide'}'`);
+        }
+      } else if (!entryCity) {
+        if (profile.reference_state && profile.reference_state !== ref.state) {
+          throw new ValidationError(`state-scoped profile '${ref.profileId}' (${profile.reference_state}) cannot drive entry '${ref.state || 'nationwide'}'`);
+        }
+      } else if (ref.state && profile.reference_state && profile.reference_state !== ref.state) {
+        throw new ValidationError(`state-scoped profile '${ref.profileId}' (${profile.reference_state}) cannot drive city entry '${ref.city}' in ${ref.state}`);
+      }
+      ref.resolvedFocus = focus;
+    }
+
     const summaryProfileId = hasEntries ? entries[0].profileId : input.profileId;
     const summaryProfileVersion = hasEntries
       ? (entries[0].profileVersion || null)
       : (input.profileVersion || null);
     const summaryCategory = hasEntries ? entries[0].nicheCategory : input.nicheCategory;
-    const summaryFocus = hasEntries
-      ? (entries[0].intelligenceFocus || 'emerging')
-      : (input.intelligenceFocus || 'emerging');
+    const summaryFocus = refs[0]?.resolvedFocus || input.intelligenceFocus || 'emerging';
     const summaryCities = hasEntries
       ? Array.from(new Set(entries.map((e) => e.city)))
       : input.cities;
@@ -141,7 +209,7 @@ class BatchSeekService {
       for (let i = 0; i < entries.length; i++) {
         const e = entries[i];
         const entryId = generateSeekBatchEntryId();
-        const entryFocus = e.intelligenceFocus || 'emerging';
+        const entryFocus = refs[i].resolvedFocus || 'emerging';
         await prisma.$executeRaw`
           INSERT INTO mkt_seek_batch_entries (
             id, batch_id, profile_id, profile_version, niche_category,

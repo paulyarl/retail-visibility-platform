@@ -2195,6 +2195,9 @@ router.post('/seek-batches', requirePlatformAdmin, async (req: Request, res: Res
 
     res.json({ success: true, batch: result });
   } catch (error: any) {
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({ error: error.code, message: error.message });
+    }
     logger.error('[POST /api/admin/directory/seek-batches] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
