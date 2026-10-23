@@ -1810,7 +1810,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                                       className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
                                       title={!verificationClearsCampaign(e.verification?.outcome)
                                         ? 'Blocked — this prospect failed verification (closed/unreachable). Re-verify as operational first.'
-                                        : `Create a ${e.source_scope ?? 'business'}-scope campaign from this prospect`}
+                                        : 'Create a business-scope campaign from this prospect'}
                                     >
                                       {creatingId === e.id ? '…' : 'create →'}
                                     </button>
