@@ -17,7 +17,7 @@
 
 ---
 
-## 0. Pre-flight — do not open Search Console until all six pass
+## 0. Pre-flight — do not open Search Console until all seven pass
 
 Google caches a bad sitemap. Run these first; if any fail, stop and fix before submitting.
 
@@ -78,7 +78,35 @@ curl -sS "<paste that URL>robots.txt"
 
 Expect `200` with the **same** `Sitemap: https://visibleshelf.com/sitemap.xml` line. If this 404s, stop: the storefront and product URLs in the sitemap will be rejected as "URLs not allowed".
 
-### 0.6 Full sweep — every advertised URL returns 200
+### 0.6 One canonical host — apex and `www` must agree
+
+Google treats `visibleshelf.com` and `www.visibleshelf.com` as **different
+sites**. If both answer `200`, every page exists twice, and the sitemap can end
+up advertising one host while robots.txt lives on the other.
+
+```bash
+# Do both hosts serve, or does one redirect?
+for u in https://visibleshelf.com/ https://www.visibleshelf.com/; do
+  printf '%s -> ' "$u"; curl -sS -m 20 -o /dev/null -w '%{http_code} %{url_effective}\n' -L "$u"
+done
+
+# Do robots.txt and the sitemap agree on the host?
+curl -sS https://visibleshelf.com/robots.txt | grep '^Sitemap:'
+grep -o '<loc>https://[^/]*' /tmp/sm-all.xml | sort -u
+```
+
+**Pass condition:** the `Sitemap:` host matches the host used by the `<loc>`s,
+and the other host `301`s to it. **Fail condition:** both serve `200`, or the two
+hosts disagree.
+
+> **Known state (2026-10-23):** production serves **both** `visibleshelf.com` and
+> `www.visibleshelf.com` with `200`, and staging's `robots.txt` advertises the
+> apex sitemap while the sitemap's URLs are on `www.`. Fix before submitting:
+> 301 the non-canonical host at the edge (whichever `WEB_URL` names is the
+> canonical one), then re-run this check. Duplicate hosts split crawl budget and
+> muddy the "Discovered / Alternate page" numbers you are about to baseline.
+
+### 0.7 Full sweep — every advertised URL returns 200
 
 ```bash
 grep -o '<loc>[^<]*</loc>' /tmp/sm-all.xml | sed 's|<loc>||;s|</loc>||' > /tmp/urls.txt
@@ -222,6 +250,8 @@ Interpretation:
 | Symptom | Most likely cause | Check | Fix owner |
 |---|---|---|---|
 | `sitemap.xml` 404s | Rewrite removed or web deploy didn't ship | §0.2 | Engineering |
+| `robots.txt` sitemap host ≠ `<loc>` host | `WEB_URL` and the web env disagree, or no host redirect | §0.6 | Engineering (env / edge redirect) |
+| Both apex and `www` serve `200` | No canonical-host redirect at the edge | §0.6 | Engineering (edge config) |
 | `<loc>`s show `api.visibleshelf.com` | Producer fell back to the request host | §0.4 | Engineering |
 | "URLs not allowed" for storefront/product URLs | Tenant host `robots.txt` missing or not referencing the platform sitemap | §0.5 | Engineering |
 | Sitemap has far fewer URLs than expected | Gates too tight (demo/`location_status`) or the product table is empty | Compare §4 counts to the database | Engineering |
@@ -283,7 +313,8 @@ Copy this into the ticket and tick as you go.
 - [ ] §0.3 every child file 200
 - [ ] §0.4 zero `api.` occurrences
 - [ ] §0.5 tenant-host robots.txt 200
-- [ ] §0.6 full sweep = single `N 200`
+- [ ] §0.6 robots/sitemap host agree; `www` 301s to the canonical host
+- [ ] §0.7 full sweep = single `N 200`
 - [ ] Domain property verified (`visibleshelf.com`)
 - [ ] `sitemap.xml` submitted, status **Success**
 - [ ] 5–7 URLs inspected + indexing requested; canonicals checked
