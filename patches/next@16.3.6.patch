@@ -1,0 +1,28 @@
+diff --git a/dist/esm/lib/metadata/resolve-metadata.js b/dist/esm/lib/metadata/resolve-metadata.js
+index ca26627777b5c6f2879893ed39b29e0977ac75b6..99ee3e71ba04ad84a8805f05c1b9449f01af56b6 100644
+--- a/dist/esm/lib/metadata/resolve-metadata.js
++++ b/dist/esm/lib/metadata/resolve-metadata.js
+@@ -793,8 +793,8 @@ export async function accumulateViewport(viewportItems) {
+ }
+ // Exposed API for metadata component, that directly resolve the loader tree and related context as resolved metadata.
+ export async function resolveMetadata(tree, pathname, searchParams, errorConvention, interpolatedParams, metadataContext) {
+-    const metadataItems = await resolveMetadataItems(tree, searchParams, errorConvention, interpolatedParams);
+     const workStore = workAsyncStorage.getStore();
++    const metadataItems = await resolveMetadataItems(tree, searchParams, errorConvention, interpolatedParams);
+     if (!workStore) {
+         throw Object.defineProperty(new InvariantError('Expected workStore to be initialized'), "__NEXT_ERROR_CODE", {
+             value: "E1068",
+diff --git a/dist/lib/metadata/resolve-metadata.js b/dist/lib/metadata/resolve-metadata.js
+index b6c9182edd109bbf1778558836d6fcfd94086604..56b5f210bbc3a43106873b2d2bc8534d2af09b28 100644
+--- a/dist/lib/metadata/resolve-metadata.js
++++ b/dist/lib/metadata/resolve-metadata.js
+@@ -862,8 +862,8 @@ async function accumulateViewport(viewportItems) {
+     return resolvedViewport;
+ }
+ async function resolveMetadata(tree, pathname, searchParams, errorConvention, interpolatedParams, metadataContext) {
+-    const metadataItems = await resolveMetadataItems(tree, searchParams, errorConvention, interpolatedParams);
+     const workStore = _workasyncstorageexternal.workAsyncStorage.getStore();
++    const metadataItems = await resolveMetadataItems(tree, searchParams, errorConvention, interpolatedParams);
+     if (!workStore) {
+         throw Object.defineProperty(new _invarianterror.InvariantError('Expected workStore to be initialized'), "__NEXT_ERROR_CODE", {
+             value: "E1068",

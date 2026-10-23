@@ -63,6 +63,17 @@ const CRITICAL_ERROR_PATTERNS = [
   /This expression is not callable/,
 ];
 
+// tsc needs >4 GB on this codebase; Node's default heap OOMs with empty stdout
+// (see AGENTS.md). The Dockerfile sets NODE_OPTIONS to the same limit — merge
+// rather than clobber so a caller-provided heap is respected.
+const DEFAULT_MAX_OLD_SPACE_MB = 8192;
+
+function nodeOptionsWithHeap() {
+  const existing = process.env.NODE_OPTIONS || '';
+  if (/--max-old-space-size/.test(existing)) return existing;
+  return `${existing} --max-old-space-size=${DEFAULT_MAX_OLD_SPACE_MB}`.trim();
+}
+
 function isSafeError(errorLine) {
   // Check if this error matches any safe patterns
   return SAFE_ERROR_PATTERNS.some(pattern => pattern.test(errorLine));
@@ -106,7 +117,8 @@ function main() {
     console.log('🏗️  Compiling TypeScript...');
     const output = execSync('tsc -p tsconfig.build.json --skipLibCheck', { 
       encoding: 'utf8',
-      stdio: 'pipe'
+      stdio: 'pipe',
+      env: { ...process.env, NODE_OPTIONS: nodeOptionsWithHeap() }
     });
     
     if (!fs.existsSync('dist/index.js')) {

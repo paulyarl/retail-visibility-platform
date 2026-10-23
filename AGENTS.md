@@ -9,6 +9,12 @@
 - `doppler run --config local -- pnpm prisma generate` — Regenerate client with Doppler secrets
 - `cd apps/web && npx vitest run` — web unit tests (vitest, node environment, `src/**/*.test.ts`). Run a single file by path.
 - `pnpm test` — both app vitest suites (`pnpm -r test`); `pnpm test:watch` for watch mode
+- `pnpm build` — `pnpm -r build` (api → shared → web). Both app builds must exit 0 before a deploy.
+
+### `pnpm build` — the two failure modes it used to have (fixed 2026-10-23)
+
+- **API: `tsc` OOM, empty stdout.** `build-with-selective-errors.js` now runs `tsc` with `NODE_OPTIONS=--max-old-space-size=8192` (merged with any existing `NODE_OPTIONS`, so the Dockerfile's value still wins). Without it tsc dies at Node's ~4 GB default and the script reports `Total errors: 0` / `tsc produced no dist output` — that is the OOM, not a clean build.
+- **Web: `/_global-error` prerender dies with `InvariantError: Expected workStore to be initialized` (Next E1068).** Upstream bug: `resolveMetadata` reads `workAsyncStorage.getStore()` *after* `await resolveMetadataItems(...)`, so the ALS context is lost when segment modules are cold-loaded — intermittent, and it poisons `.next` so the next build fails too. Unfixed in next 16.3.6→16.3.8, 16.4.3 and canary 16.5.0-canary.25. Fixed here by `patches/next@16.3.6.patch` (moves the `getStore()` call above the await; applied to both `dist/esm` and `dist/lib`), wired through `patchedDependencies` in `pnpm-workspace.yaml`. **Drop the patch when Next ships the fix upstream** — it pins to the exact version, so a Next bump fails the install loudly until the patch is regenerated or deleted. Note `apps/web` builds with 16.3.6 while the repo root pins 16.3.7; only the app copy is patched, so `npx next build` from the root is not protected — use `pnpm build`.
 
 ### Tier/capability contract (`shared/tier-contract.json`)
 

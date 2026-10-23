@@ -23,3 +23,4 @@ allowBuilds:
 
 patchedDependencies:
   next-themes@0.4.6: patches/next-themes@0.4.6.patch
+  next@16.3.6: patches/next@16.3.6.patch
