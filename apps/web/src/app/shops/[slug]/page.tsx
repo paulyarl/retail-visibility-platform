@@ -70,10 +70,7 @@ export async function generateMetadata({ params }: ShopProfilePageProps): Promis
         title: `${businessName} — Shop Profile`,
         description,
         alternates: {
-          canonical: shopProfileCanonicalUrl(
-            canonicalLookup,
-            tenantInfo?.slug || slug,
-          ),
+          canonical: shopProfileCanonicalUrl(canonicalLookup, tenantId),
         },
       };
     }

@@ -2,11 +2,11 @@
 
 > Google has indexed the platform's marketing pages but none of its inventory.
 > `site:visibleshelf.com` returns the home page, `/terms`, and `/directory` — and
-> nothing else. The 70 `/place/{slug}` pages, 72 `/directory/{slug}` pages, every
-> tenant storefront (path, subdomain, or custom domain) and every public product
-> page that constitute the product are invisible to search, not because they are
-> low quality, but because the platform publishes no sitemap, no robots.txt, and
-> no crawlable link to any of them.
+> nothing else. The 70 `/place/{slug}` pages, the `/directory/{slug}` tenant
+> listings, every tenant storefront (path, subdomain, or custom domain) and every
+> public product page that constitute the product are invisible to search, not
+> because they are low quality, but because the platform publishes no sitemap, no
+> robots.txt, and no crawlable link to any of them.
 
 **Status:** Proposed — awaiting team review
 **Revision:** 2026-10-23 — extended to storefronts (`/tenant/{slug}`, `/shops/{slug}`, subdomains, custom domains) and products (`/products/{id}`); review findings folded in (sitemap index, canonical ladder, demo gating, SSR prefill contracts). All open decisions resolved and the pre-sprint plan added (§12).
@@ -56,7 +56,9 @@ The detail pages themselves are fine. `/place/dreamcast-african-market-indianapo
 | `GET /products/pid-ULCW-79au4s1v` (on `baraka-international-market.visibleshelf.com`) | `200` — same product, second URL, no canonical |
 | `GET {tenant}.visibleshelf.com/robots.txt` | `404` |
 
-Inventory at the time of writing: **70** seed listings (`/place/{slug}`), **72** published tenant listings (`/directory/{slug}`), **20** category shelves, **10** city markets. `/api/public/directory/places` reports `totalPlaces: 119` — that is *shelf memberships*, not unique listings (a place on three shelves counts three times). Do not use it as a page count.
+**Inventory, measured at launch (2026-10-23, from the live sitemap):** 275 URLs — **70** seed listings (`/place/{slug}`), **2** non-seed tenant listings (`/directory/{slug}`), **20** category shelves, **7** city markets, **5** storefront homes, **168** public products (35 on a tenant subdomain, 133 on platform-path storefronts).
+
+> **Do not use `/api/directory/search`'s `totalItems` as a tenant-listing count.** It reports **72**, but that total is 70 seeds + 2 tenants — it searches the whole published directory, seeds included. Likewise `/api/public/directory/places` reports `totalPlaces: 119`, which is *shelf memberships*, not unique listings (a place on three shelves counts three times). The sitemap's own `<loc>` counts are the only trustworthy page counts.
 
 Storefront/product counts are **not yet measured** (`SELECT count(*) FROM inventory_items WHERE item_status='active' AND visibility='public'`). This matters: the storefront + product inventory sets the sitemap architecture (§5.1) — a product catalog in the tens of thousands requires a `<sitemapindex>` from day one.
 
@@ -64,7 +66,7 @@ Storefront/product counts are **not yet measured** (`SELECT count(*) FROM invent
 
 - **The sitemap that exists is unusable.** The API already generates a complete 101-URL sitemap (`/api/public/directory/places-sitemap.xml`), but it stamps every `<loc>` with `https://api.visibleshelf.com`. Submitted to Search Console as-is, every URL is cross-domain and rejected.
 - **The sitemap the web app serves is a silent failure.** `/directory/sitemap.xml` reads `listings.items`, but `/api/directory/search` returns `{ listings, pagination }`. `items` is `undefined`, `.map()` throws, and the `catch` returns a minimal one-URL fallback. It has never emitted a listing and never logs an error to the operator.
-- **Orphaned pages don't get crawled on hope.** Googlebot renders JS, but rendering is budgeted. 142 listing pages with no static inbound link and no sitemap entry is not a "wait for the renderer" situation — it is an absence of discovery.
+- **Orphaned pages don't get crawled on hope.** Googlebot renders JS, but rendering is budgeted. 72 listing pages with no static inbound link and no sitemap entry is not a "wait for the renderer" situation — it is an absence of discovery.
 - **Every new seed ships orphaned.** The seed pipeline adds listings continuously; without a crawl path each new page inherits the same defect.
 - **Every tenant is three-to-four URLs and none of them declare a winner.** A tenant storefront is reachable at `/tenant/{slug}`, `/shops/{slug}`, `{tenant}.visibleshelf.com`, and (if entitled) a custom domain; each product is reachable at `/products/{id}` on the platform *and* on the tenant host. Only `/tenant/{slug}` emits a canonical today. Indexing the rest without fixing that trades "invisible" for "duplicated" — which is worse, because duplicates split the equity the storefront needs to rank.
 
@@ -114,7 +116,7 @@ Steps 1–4 are the indexing unblock. Steps 5–6 are what stop the new inventor
 | **RC1** | API sitemap derives `<loc>` from `req.protocol + '://' + req.get('host')` (`directory-presence-public.ts:1470`). Through the Next proxy the host is `api.visibleshelf.com`. | Every URL cross-domain → sitemap unusable. |
 | **RC2** | No `robots.txt` and no root `/sitemap.xml` at the web origin. | Nothing to submit; no discovery hint. |
 | **RC3** | `/directory/sitemap.xml` reads `listings.items` from a response shaped `{ listings, pagination }`; the throw is swallowed into a 1-URL fallback. | Zero listings emitted; failure is invisible. |
-| **RC4** | All listing grids fetch in `useEffect`. Server HTML carries no `<a href>` to any detail page. | 142 detail pages orphaned. |
+| **RC4** | All listing grids fetch in `useEffect`. Server HTML carries no `<a href>` to any detail page. | 72 detail pages orphaned. |
 | **RC5** | `/place/city/*` and `/place/category/*` emit no canonical; category URLs take `?city=&state=` query variants. | Once crawlable, variants compete as duplicates. |
 | **RC6** | Shelf slugs are derived from free-text category labels. The sitemap currently includes `international-supermarket-african-goods-store-per-directory-mixed-asian-mexican-and-african`. | Composite operator labels create junk URLs in the index. |
 | **RC7** | The sitemap producer only knows the seed tables. There is no storefront or product query, and no public "list all products" endpoint (`/api/public/products` is a featured-products wrapper; `/api/public/products/:id` is single-fetch). | Every tenant storefront and product page is unlisted. |
@@ -150,7 +152,7 @@ const baseUrl = unifiedConfig.webUrl.replace(/\/+$/, '');
 
 **Single producer:** the API route. It has the database, the status gates (`dps.status IN ('published','invited','claimed') AND dll.is_published = true`), and the city-slug tokenizer. Reimplementing this in `apps/web` would duplicate a SQL contract that already drifts (see RC3).
 
-**Extend the producer to claimed listings.** The current query is seed-only (`listing_origin = 'directory_seed'`), so the 72 tenant listings at `/directory/{slug}` are absent. Add a third query and emit them at their canonical path:
+**Extend the producer to claimed listings.** The current query is seed-only (`listing_origin = 'directory_seed'`), so the non-seed tenant listings at `/directory/{slug}` are absent (2 at launch — not 72; see §1.2). Add a third query and emit them at their canonical path:
 
 ```sql
 SELECT dll.slug, dll.updated_at
@@ -316,7 +318,7 @@ WHERE t.is_demo IS NOT TRUE
   AND (t.location_status IS NULL OR t.location_status = 'active')
 ```
 
-Emit `https://{custom_domain}/` when present, else `https://{subdomain}.visibleshelf.com/`, else `{baseUrl}/tenant/{slug}`. This is the **same ladder** as `canonicalStorefrontHome` — batch it in one query, do not call `/api/tenants/storefront-canonical/:id` per tenant. Table/column names are indicative; verify against the `resolveStorefrontCanonical` implementation before writing the query.
+Emit `https://{custom_domain}/` when present, else `https://{subdomain}.visibleshelf.com/`, else `{baseUrl}/tenant/{id}`. The path-form segment is the **tenant id** — `/tenant/{id}` is the canonical the storefront page itself emits; the slug is an alias that resolves but canonicalizes to the id, so advertising the slug would make every path-form `<loc>` a non-canonical alternate (caught in production 2026-10-23). This is the **same ladder** as `canonicalStorefrontHome` — batch it in one query, do not call `/api/tenants/storefront-canonical/:id` per tenant. Table/column names are indicative; verify against the `resolveStorefrontCanonical` implementation before writing the query.
 
 **Products.** Every publicly reachable product:
 
@@ -429,8 +431,8 @@ The token is public by design; `NEXT_PUBLIC_` is correct.
 | `places.xml` | Category shelves (post §4.6 filter) | ≤20 | `/place/category/{slug}` |
 | `places.xml` | City markets | 10 | `/place/city/{city}-{state}` |
 | `places.xml` | Seed listings | 70 | `/place/{slug}` |
-| `directory.xml` | Claimed/tenant listings | 72 | `/directory/{slug}` |
-| `storefronts.xml` | Tenant storefront homes | = live tenants | canonical ladder: custom → `{sub}.visibleshelf.com` → `/tenant/{slug}` |
+| `directory.xml` | Claimed/tenant listings | 2 (measured; not 72 — that total includes seeds) | `/directory/{slug}` |
+| `storefronts.xml` | Tenant storefront homes | = live tenants | canonical ladder: custom → `{sub}.visibleshelf.com` → `/tenant/{id}` |
 | `products-N.xml` | Public products | = active public items | `{owning tenant canonical origin}/products/{id}` |
 
 `/sitemap.xml` is a `<sitemapindex>` over those files (§4.8). Per-file limit 20,000 URLs for products (headroom under the 50,000 cap), 50,000 for the rest.
@@ -531,7 +533,7 @@ No new dependencies. No schema changes. No migrations.
 
 1. `GET https://visibleshelf.com/robots.txt` → `200`, `text/plain`, contains `Sitemap: https://visibleshelf.com/sitemap.xml`, and does **not** disallow `/place`, `/directory`, `/tenant`, `/shops`, `/products`, or `/_next/`.
 2. `GET https://visibleshelf.com/sitemap.xml` → `200`, `application/xml`, is a `<sitemapindex>`; every child file fetches `200`; zero `api.visibleshelf.com` occurrences in any `<loc>`.
-3. Sitemap inventory: ≥70 `/place/{slug}`, ≥72 `/directory/{slug}`, ≥1 storefront home per live tenant, ≥1 `/products/{id}` per active public item. `/shops/{slug}` appears **zero** times (canonicalized away).
+3. Sitemap inventory: ≥70 `/place/{slug}`, ≥ the non-seed published listing count at `/directory/{slug}` (**2 at launch — do not assert 72**, that total includes seeds), ≥1 storefront home per live tenant, ≥1 `/products/{id}` per active public item. `/shops/{slug}` appears **zero** times (canonicalized away).
 4. **Every** `<loc>` returns `200` — no `3xx`, no `404` — across **all hosts** (platform, `{tenant}.visibleshelf.com`, custom domains). Full sweep, not a sample; §8.
 5. `GET /directory/sitemap.xml` → `308` → `/sitemap.xml`.
 6. `/place` server HTML contains ≥1 `<a href="/place/{slug}">` and ≥1 `<a href="/place/city/...">` with JS disabled.
@@ -562,7 +564,7 @@ cat /tmp/sm/*.xml > /tmp/sm-all.xml
 grep -c '<loc>' /tmp/sm-all.xml                      # total inventory
 grep -c 'api.visibleshelf.com' /tmp/sm-all.xml       # expect 0
 grep -c '/place/[^/<]*</loc>' /tmp/sm-all.xml        # expect >= 70
-grep -c '/directory/[^/<]*</loc>' /tmp/sm-all.xml    # expect >= 72
+grep -c '/directory/[^/<]*</loc>' /tmp/sm-all.xml    # expect >= non-seed published count (2 at launch)
 grep -c '/products/[^/<]*</loc>' /tmp/sm-all.xml     # expect >= 1
 grep -c '/shops/[^/<]*</loc>' /tmp/sm-all.xml        # expect 0 (canonicalized away)
 
@@ -637,7 +639,7 @@ Code alone will not move the index. After deploy:
 5. **Watch *Page indexing → Crawled – currently not indexed*.** If it climbs, the problem has moved from discovery to content quality — different spec.
 6. **Custom domains are a separate property each.** They are outside `visibleshelf.com`'s domain property, so cross-host `<loc>`s for them rely solely on the tenant domain's `robots.txt` referencing our sitemap (§4.10). If a tenant cares about their own domain's index, they verify it in their own Search Console; we should not gate the launch on it.
 
-Realistic expectation: sitemap submission → first crawl within days; a meaningful share of the ~142 listing pages plus storefronts and products indexed in 2–4 weeks. New domains and thin pages index slower; the content here is not thin (description, address, phone, hours, JSON-LD), which helps — but product pages are only as strong as their catalog data, so expect uneven product coverage.
+Realistic expectation: sitemap submission → first crawl within days; a meaningful share of the 72 listing pages plus storefronts and products indexed in 2–4 weeks. New domains and thin pages index slower; the content here is not thin (description, address, phone, hours, JSON-LD), which helps — but product pages are only as strong as their catalog data, so expect uneven product coverage.
 
 ---
 
@@ -700,7 +702,7 @@ Each slice is independently shippable and independently verifiable. Only PR3 cha
 **PR1 — Producer correctness (no new surfaces).** `apps/api` only.
 §4.1 origin + 500 guard · §4.2 claimed query with demo exclusion · §4.6 slug filter + excluded-count log · extract the pure URL assembler · NULL-safe `lastmod` · contract tests for seed/claimed/ladder cases.
 *Why first:* gives a correct single sitemap immediately, and PR3 reuses the assembler.
-*Verify:* contract tests, `pnpm checkapi`, staging `curl` of the sitemap → all `<loc>`s on the web origin, ≥72 `/directory/` rows, zero `3xx` targets.
+*Verify:* contract tests, `pnpm checkapi`, staging `curl` of the sitemap → all `<loc>`s on the web origin, the expected `/directory/` rows (2 at launch), zero `3xx` targets.
 
 **PR2 — Canonicals and gating (render side; sitemap untouched).** `apps/web` only.
 §4.9 `/shops/{slug}` canonical + real title · `/products/{id}` canonical + ladder `offers[].url` + `noindex` for non-public/demo · `/tenant/{id}` demo `noindex` · RC11 un-gate `Product`/`Store` JSON-LD and delete both `metadata.other` JSON-LD paths.
@@ -743,7 +745,24 @@ Each slice is independently shippable and independently verifiable. Only PR3 cha
 
 All §7 criteria pass against production; §8 returns a single `N 200` line across all hosts; `pnpm build` is green; the sitemap is submitted and *Success* in Search Console; the pre-launch *Pages → Indexed* baseline is recorded (§9.4); the sitemap-log retention job is installed or the write is gone.
 
-**Delivered 2026-10-23:** PR1–PR5 implemented. Local gates green (`pnpm checkapi`, `pnpm checkweb`, `pnpm build`, 217 API lib tests, 704 web tests). The remaining work is operational: §8 probes against staging/prod, Search Console submission, and the §9 baseline.
+**Delivered 2026-10-23:** PR1–PR5 implemented. Local gates green (`pnpm checkapi`, `pnpm checkweb`, `pnpm build`, 217 API lib tests, 734 web tests).
+
+**Production pre-flight (2026-10-23, after the API + web deploy):**
+
+| Gate | Result |
+|---|---|
+| `robots.txt` | 200, platform-absolute `Sitemap:` line |
+| `sitemap.xml` | 200 `<sitemapindex>`; 5 child files all 200 |
+| `<loc>` origin | 0 `api.` occurrences; 240 on the apex, 35 on a tenant subdomain |
+| Inventory | 275 URLs — 70 place, 2 directory, 20 categories + 7 cities, 5 storefronts, 168 products |
+| Full sweep | **275/275 → 200** |
+| Tenant-host `robots.txt` | 200, references the platform sitemap |
+| Product canonical | platform form and subdomain form both canonicalize to `https://baraka-international-market.visibleshelf.com/products/{id}` |
+| `/shops/{slug}` | real title + canonical → storefront home, no `noindex` |
+| Legacy paths | `/directory/sitemap.xml` → 308; API `/places-sitemap.xml` → 301 |
+| **Host canonicalization** | ✅ prod: `www` → `301` apex (incl. `/robots.txt`, `/sitemap.xml`); wildcard `*.visibleshelf.com` **served** (a redirect there 301'd all tenant subdomains — observed and reverted same day); baraka subdomain + all 35 off-apex `<loc>`s re-verified `200`. ⚠️ staging still split — `visibleshelf.store` and `www.` both `200`, robots/sitemap hosts disagree (API `WEB_URL` vs web `NEXT_PUBLIC_WEB_URL`) |
+
+Remaining: fix staging host alignment (one canonical host + redirect), then Search Console submission and the §9 baseline.
 
 ---
 
@@ -757,6 +776,8 @@ GET https://visibleshelf.com/api/public/directory/places-sitemap.xml
                                                             200  application/xml  (101 <loc>, all api.visibleshelf.com)
 GET https://visibleshelf.com/api/directory/search?limit=1&published=true
                                                             200  {"listings":[...],"pagination":{...,"totalItems":72}}
+  NOTE (2026-10-23): 72 = 70 seeds + 2 tenant listings. This total searches the
+  whole published directory, seeds included — it is NOT a tenant-listing count.
 GET https://visibleshelf.com/api/public/directory/places    200  {"totalPlaces":119,"categories":[...20...]}
 
 SSR link census (raw HTML, no JS):

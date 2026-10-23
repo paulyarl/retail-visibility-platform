@@ -99,12 +99,29 @@ grep -o '<loc>https://[^/]*' /tmp/sm-all.xml | sort -u
 and the other host `301`s to it. **Fail condition:** both serve `200`, or the two
 hosts disagree.
 
-> **Known state (2026-10-23):** production serves **both** `visibleshelf.com` and
-> `www.visibleshelf.com` with `200`, and staging's `robots.txt` advertises the
-> apex sitemap while the sitemap's URLs are on `www.`. Fix before submitting:
-> 301 the non-canonical host at the edge (whichever `WEB_URL` names is the
-> canonical one), then re-run this check. Duplicate hosts split crawl budget and
-> muddy the "Discovered / Alternate page" numbers you are about to baseline.
+> **State (2026-10-23, prod):** `www.visibleshelf.com` → `301` apex, verified for
+> `/`, `/robots.txt`, and `/sitemap.xml`. Configured in Vercel → Project →
+> Domains with three entries:
+>
+> | Domain | Setting | Why |
+> |---|---|---|
+> | `visibleshelf.com` | **Production** | canonical host |
+> | `*.visibleshelf.com` | **Production** (served, NOT redirected) | tenant subdomains are canonical hosts — a wildcard redirect kills them |
+> | `www.visibleshelf.com` | **Redirect → `visibleshelf.com` (301)** | the specific entry wins over the wildcard for `www` |
+>
+> **Do not** set the wildcard to "Redirect": a `*.visibleshelf.com → 301`
+> redirect catches every tenant subdomain, so `{tenant}.visibleshelf.com/`
+> lands on the platform homepage and the sitemap's off-apex `<loc>`s all
+> become redirects. Observed live 2026-10-23 when the wildcard was briefly
+> set to redirect — `baraka-international-market.visibleshelf.com` 301'd
+> root, `robots.txt`, and product pages to the apex. Reverted to served the
+> same day; the subdomain and all 35 off-apex `<loc>`s re-verified `200`.
+>
+> **State (staging):** still split — both `visibleshelf.store` and
+> `www.visibleshelf.store` serve `200`; the sitemap's `<loc>`s are on `www`
+> (API `WEB_URL`) while `robots.txt`'s `Sitemap:` line is on the apex (web
+> `NEXT_PUBLIC_WEB_URL`). Pick one canonical host, align both env vars to it,
+> and redirect the other host the same way.
 
 ### 0.7 Full sweep — every advertised URL returns 200
 

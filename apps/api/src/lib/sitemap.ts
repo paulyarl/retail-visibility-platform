@@ -195,7 +195,7 @@ export function buildPlacesSitemap(input: PlacesSitemapInput): PlacesSitemapResu
 // ─── Storefronts and products (spec §4.7) ───────────────────────────────────
 
 export interface TenantHostRow {
-  slug: string | null;
+  tenantId: string | null;
   subdomain?: string | null;
   customDomain?: string | null;
 }
@@ -225,18 +225,21 @@ export function tenantCanonicalOrigin(input: {
 
 /**
  * Canonical HOME of a tenant storefront. The DNS-shaped levels end in `/` —
- * that is the URL `/tenant/{slug}` and `/shops/{slug}` already canonicalize to.
+ * that is the URL `/tenant/{id}` and `/shops/{slug}` already canonicalize to.
+ * The path form uses the tenant ID, not the slug: `/tenant/{id}` is the
+ * canonical emitted by the storefront page itself, so the sitemap must
+ * advertise the same URL rather than the slug alias that resolves to it.
  */
 export function tenantCanonicalHome(input: {
   baseUrl: string;
   apex: string;
-  slug: string | null;
+  tenantId: string | null;
   subdomain?: string | null;
   customDomain?: string | null;
 }): string | null {
   if (input.customDomain) return `https://${input.customDomain}/`;
   if (input.subdomain) return `https://${input.subdomain}.${input.apex}/`;
-  if (input.slug) return `${input.baseUrl}/tenant/${encodeURIComponent(input.slug)}`;
+  if (input.tenantId) return `${input.baseUrl}/tenant/${encodeURIComponent(input.tenantId)}`;
   return null;
 }
 
@@ -253,7 +256,7 @@ export function buildStorefrontEntries(input: {
     const loc = tenantCanonicalHome({
       baseUrl,
       apex,
-      slug: row.slug,
+      tenantId: row.tenantId,
       subdomain: row.subdomain,
       customDomain: row.customDomain,
     });

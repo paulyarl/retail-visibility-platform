@@ -1620,19 +1620,19 @@ async function loadDirectoryEntries(pool: any, baseUrl: string) {
 /** Tenant storefront homes, ladder-resolved (custom → subdomain → path). */
 async function loadStorefrontEntries(pool: any, baseUrl: string) {
   const result = await pool.query(
-    `SELECT t.slug, t.subdomain, cd.domain AS custom_domain
+    `SELECT t.id AS tenant_id, t.subdomain, cd.domain AS custom_domain
      FROM tenants t
      ${TENANT_LADDER_JOIN}
      WHERE t.is_demo IS NOT TRUE
        AND (t.location_status IS NULL OR t.location_status = 'active')
-     ORDER BY t.slug NULLS LAST`,
+     ORDER BY t.id`,
   );
 
   return buildStorefrontEntries({
     baseUrl,
     apex: platformApex(),
     tenants: result.rows.map((row: any) => ({
-      slug: row.slug,
+      tenantId: row.tenant_id,
       subdomain: row.subdomain,
       customDomain: row.custom_domain,
     })),

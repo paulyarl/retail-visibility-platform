@@ -219,7 +219,7 @@ describe('tenantCanonicalOrigin / tenantCanonicalHome (spec §4.7)', () => {
       tenantCanonicalOrigin({ baseUrl, apex, subdomain: 'baraka', customDomain: 'baraka.example.com' }),
     ).toBe('https://baraka.example.com');
     expect(
-      tenantCanonicalHome({ baseUrl, apex, slug: 'baraka', subdomain: 'baraka', customDomain: 'baraka.example.com' }),
+      tenantCanonicalHome({ baseUrl, apex, tenantId: 'tid-baraka', subdomain: 'baraka', customDomain: 'baraka.example.com' }),
     ).toBe('https://baraka.example.com/');
   });
 
@@ -227,20 +227,23 @@ describe('tenantCanonicalOrigin / tenantCanonicalHome (spec §4.7)', () => {
     expect(tenantCanonicalOrigin({ baseUrl, apex, subdomain: 'baraka' })).toBe(
       'https://baraka.visibleshelf.com',
     );
-    expect(tenantCanonicalHome({ baseUrl, apex, slug: 'baraka', subdomain: 'baraka' })).toBe(
+    expect(tenantCanonicalHome({ baseUrl, apex, tenantId: 'tid-baraka', subdomain: 'baraka' })).toBe(
       'https://baraka.visibleshelf.com/',
     );
   });
 
   it('falls back to the platform path form when the tenant has no host', () => {
+    // The path canonical is /tenant/{id} — the storefront page emits the
+    // tenant id, so the sitemap must advertise the same segment, not the
+    // slug alias that also resolves.
     expect(tenantCanonicalOrigin({ baseUrl, apex })).toBe(baseUrl);
-    expect(tenantCanonicalHome({ baseUrl, apex, slug: 'baraka-international-market' })).toBe(
-      'https://visibleshelf.com/tenant/baraka-international-market',
+    expect(tenantCanonicalHome({ baseUrl, apex, tenantId: 'tid-zcp9a56y' })).toBe(
+      'https://visibleshelf.com/tenant/tid-zcp9a56y',
     );
   });
 
-  it('returns null for a home with no slug and no host', () => {
-    expect(tenantCanonicalHome({ baseUrl, apex, slug: null })).toBeNull();
+  it('returns null for a home with no tenant id and no host', () => {
+    expect(tenantCanonicalHome({ baseUrl, apex, tenantId: null })).toBeNull();
   });
 });
 
@@ -253,16 +256,16 @@ describe('buildStorefrontEntries', () => {
       baseUrl,
       apex,
       tenants: [
-        { slug: 'baraka', subdomain: 'baraka' },
-        { slug: 'baraka-dup', subdomain: 'baraka' },
-        { slug: 'plain', subdomain: null },
-        { slug: null, subdomain: null },
+        { tenantId: 'tid-1', subdomain: 'baraka' },
+        { tenantId: 'tid-2', subdomain: 'baraka' },
+        { tenantId: 'tid-plain', subdomain: null },
+        { tenantId: null, subdomain: null },
       ],
     });
     const locs = entries.map((e) => e.loc);
     expect(locs).toEqual([
       'https://baraka.visibleshelf.com/',
-      'https://visibleshelf.com/tenant/plain',
+      'https://visibleshelf.com/tenant/tid-plain',
     ]);
   });
 });
