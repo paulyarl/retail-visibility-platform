@@ -852,6 +852,9 @@ export interface SeedBatchSummary {
   sourceCampaigns: Array<{ id: string; displayId: string | null }>;
   /** Seek batches these seeds' prospects came from (queue lineage). */
   seekBatches: Array<{ id: string; batchSlug: string | null; intelligenceFocus: string | null }>;
+  /** Lens(es) this cohort traces to — via seek batch, linked campaign, or
+   *  the campaign encoded in a convention label. */
+  focuses: string[];
 }
 
 export interface SeedBatchFilters {

@@ -862,6 +862,7 @@ class BatchSeekService {
     provingGrounds: Array<{ id: string; displayId: string | null }>;
     sourceCampaigns: Array<{ id: string; displayId: string | null }>;
     seekBatches: Array<{ id: string; batchSlug: string | null; intelligenceFocus: string | null }>;
+    focuses: string[];
   }>> {
     const limit = Math.min(filters?.limit || 50, 200);
 
@@ -889,19 +890,34 @@ class BatchSeekService {
       conditions.push(`dps.seek_batch_id = ${addParam(filters.seekBatch)}`);
     }
     if (filters?.focus) {
-      // Same "summary OR any entry" semantics as listBatches — a seed cohort
-      // from a mixed-lens batch surfaces under each lens it swept with.
+      // Lens lineage, three paths — a seed can trace its lens through its
+      // seek batch (summary OR any entry, same semantics as listBatches),
+      // through a linked campaign, or through the campaign id encoded in a
+      // convention label (from-campaign-*, pg-*). Legacy seeds almost always
+      // carry only the third.
       const p = addParam(filters.focus);
-      conditions.push(`EXISTS (
-        SELECT 1 FROM mkt_seek_batches sb
-        WHERE sb.id = dps.seek_batch_id
-          AND (
-            sb.intelligence_focus = ${p}
-            OR EXISTS (
-              SELECT 1 FROM mkt_seek_batch_entries e
-              WHERE e.batch_id = sb.id AND e.intelligence_focus = ${p}
+      conditions.push(`(
+        EXISTS (
+          SELECT 1 FROM mkt_seek_batches sb
+          WHERE sb.id = dps.seek_batch_id
+            AND (
+              sb.intelligence_focus = ${p}
+              OR EXISTS (
+                SELECT 1 FROM mkt_seek_batch_entries e
+                WHERE e.batch_id = sb.id AND e.intelligence_focus = ${p}
+              )
             )
-          )
+        )
+        OR EXISTS (
+          SELECT 1 FROM directory_seed_campaign_links dscl
+          JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+          WHERE dscl.seed_id = dps.id AND mc.intelligence_focus = ${p}
+        )
+        OR EXISTS (
+          SELECT 1 FROM mkt_campaigns_list mc2
+          WHERE mc2.id = substring(dps.seed_batch from '(mcamp-[a-z0-9]+)')
+            AND mc2.intelligence_focus = ${p}
+        )
       )`);
     }
 
@@ -972,6 +988,36 @@ class BatchSeekService {
       sbByBatch.set(r.seed_batch, list);
     }
 
+    // Lens resolution per seed batch — the same three lineage paths the focus
+    // filter uses, surfaced so the row can show which lens(es) it descends
+    // from. Legacy cohorts resolve through their source campaign's focus.
+    const focusRows = await prisma.$queryRaw<any[]>`
+      SELECT DISTINCT dps.seed_batch, f.intelligence_focus
+      FROM directory_presence_seeds dps
+      JOIN LATERAL (
+        SELECT sb.intelligence_focus FROM mkt_seek_batches sb
+        WHERE sb.id = dps.seek_batch_id AND sb.intelligence_focus IS NOT NULL
+        UNION
+        SELECT e.intelligence_focus FROM mkt_seek_batch_entries e
+        WHERE e.batch_id = dps.seek_batch_id AND e.intelligence_focus IS NOT NULL
+        UNION
+        SELECT mc.intelligence_focus FROM directory_seed_campaign_links dscl
+        JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+        WHERE dscl.seed_id = dps.id AND mc.intelligence_focus IS NOT NULL
+        UNION
+        SELECT mc2.intelligence_focus FROM mkt_campaigns_list mc2
+        WHERE mc2.id = substring(dps.seed_batch from '(mcamp-[a-z0-9]+)')
+          AND mc2.intelligence_focus IS NOT NULL
+      ) f ON true
+      WHERE dps.seed_batch IS NOT NULL
+    `;
+    const focusByBatch = new Map<string, string[]>();
+    for (const r of focusRows) {
+      const list = focusByBatch.get(r.seed_batch) || [];
+      list.push(r.intelligence_focus);
+      focusByBatch.set(r.seed_batch, list);
+    }
+
     return rows.map((r) => {
       const label = String(r.seed_batch);
       const m = label.match(/^(?:pg-(mcamp-[a-z0-9]+)-\d{8}|from-campaign-(mcamp-[a-z0-9]+))$/i);
@@ -999,6 +1045,7 @@ class BatchSeekService {
         provingGrounds,
         sourceCampaigns,
         seekBatches: sbByBatch.get(label) || [],
+        focuses: focusByBatch.get(label) || [],
       };
     });
   }

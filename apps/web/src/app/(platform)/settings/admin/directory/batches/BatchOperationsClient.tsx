@@ -1116,6 +1116,17 @@ export default function BatchOperationsDashboard() {
                             Seek · {sb.intelligenceFocus || sb.batchSlug || sb.id}
                           </Link>
                         ))}
+                        {(b.focuses || []).map((f: string) => (
+                          <span
+                            key={f}
+                            className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium align-middle ${
+                              f === 'competitive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                            }`}
+                            title="Lens traced via seek batch, linked campaign, or label-encoded source campaign"
+                          >
+                            {f}
+                          </span>
+                        ))}
                       </td>
                       <td className="py-3 px-4 text-gray-600 text-xs">
                         {b.createdAt ? new Date(b.createdAt).toLocaleDateString() : '—'}
