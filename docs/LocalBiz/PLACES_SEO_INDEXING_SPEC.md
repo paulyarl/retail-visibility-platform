@@ -670,7 +670,7 @@ Realistic expectation: sitemap submission → first crawl within days; a meaning
 - Adding `?city=` category variants to the sitemap (needs canonicalization from §4.5 to settle first).
 - Detail-page sibling links (§4.4.3) — phase 2.
 - **`/directory` A–Z crawl block.** Claimed listings ship sitemap-only in v1 (§12.3); add the server-rendered list if Search Console shows them underperforming `/place` pages.
-- **Per-tenant-host sitemaps.** Each tenant host could serve its own `sitemap.xml` (storefront + that tenant's products). Cleaner for custom domains, unnecessary while the platform sitemap + robots authorization works — revisit if custom-domain tenants become a meaningful share.
+- **Per-tenant-host sitemaps.** Each tenant host could serve its own `sitemap.xml` (storefront + that tenant's products). Cleaner for custom domains, unnecessary while the platform sitemap + robots authorization works — **now spec'd as the prerequisite for the paid service**: `docs/LocalBiz/DOMAIN_VISIBILITY_SERVICE_SPEC.md` §2.1 / PR A.
 - **Pretty product URLs.** `/products/{pid-…}` stays; a slug URL is a routing + redirect project, not an indexing one.
 - **`/retail/[slug]`** — token-gated client preview, correctly `noindex`/disallowed; not an inventory surface.
 - Google Business Profile integration, Merchant Center feeds.

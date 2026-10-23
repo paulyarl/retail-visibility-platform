@@ -272,6 +272,13 @@ property. Two consequences:
 - If a tenant wants their own domain's index, they verify it in their own Search
   Console. **Do not gate this launch on that.**
 
+> **Productizing this:** `docs/LocalBiz/DOMAIN_VISIBILITY_SERVICE_SPEC.md` specs the
+> paid per-domain service — per-host sitemap, guided verification, automated health
+> checks, monthly reporting. Two consequences for this guide once that ships:
+> a tenant host will advertise **its own** sitemap (not the platform one), and the
+> platform sitemap will stop listing custom-domain URLs (decision D4), so the
+> cross-host authorization in §0.5 applies to platform subdomains only.
+
 ---
 
 ## 8. Do not do these
