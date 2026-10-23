@@ -2401,10 +2401,15 @@ router.post('/:id/clear-deprioritized', async (req: any, res: Response) => {
   }
 });
 
-// Sprint 4: manually sync a business_analysis audit onto its campaign
+// Sprint 4: manually sync a business_analysis audit onto its campaign.
+// The write always targets the audit's owning campaign; :id must be that
+// campaign or a sibling inheriting the audit (then the primary is written
+// and the report flags syncedToPrimary).
 router.post('/:id/audits/:auditId/sync', async (req: any, res: Response) => {
   try {
-    const report = await hotProspectService.syncFromAudit(req.params.auditId, getCtx(req));
+    const report = await hotProspectService.syncFromAudit(req.params.auditId, getCtx(req), {
+      requestedCampaignId: req.params.id,
+    });
     res.json({ success: true, data: report });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

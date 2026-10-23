@@ -17,7 +17,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { NotFoundError } from '../middleware/errorHandler';
+import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { generateMarketingAuditId, generateCampaignId } from '../lib/id-generator';
 import { addressParser } from '../lib/address-parser';
@@ -186,6 +186,12 @@ export interface AuditSyncReport {
   identityStatus: string | null;
   skipped: boolean;
   skipReason?: string;
+  /** Campaign the sync was requested from, when it differs from `campaignId`
+   *  (a non-primary sibling syncing an audit inherited from its primary). */
+  requestedCampaignId?: string;
+  /** True when the write landed on the audit's owning primary sibling rather
+   *  than the requesting campaign. */
+  syncedToPrimary?: boolean;
 }
 
 // ─── Service ────────────────────────────────────────────────────────────
@@ -703,7 +709,11 @@ export class MarketingHotProspectService extends BaseService {
    * `ambiguous` identity, syncs normally but includes "identity ambiguous"
    * in the hot_prospect_reason.
    */
-  async syncFromAudit(auditId: string, ctx?: RequestCtx): Promise<AuditSyncReport> {
+  async syncFromAudit(
+    auditId: string,
+    ctx?: RequestCtx,
+    opts?: { requestedCampaignId?: string },
+  ): Promise<AuditSyncReport> {
     const report: AuditSyncReport = {
       campaignId: '',
       auditId,
@@ -737,6 +747,13 @@ export class MarketingHotProspectService extends BaseService {
       if (!campaign) throw new NotFoundError('Campaign not found for audit');
 
       report.campaignId = campaign.id;
+
+      const requestedCampaignId = opts?.requestedCampaignId;
+      if (requestedCampaignId && requestedCampaignId !== campaign.id) {
+        await this.assertInheritedAudit(campaign, requestedCampaignId, auditId);
+        report.requestedCampaignId = requestedCampaignId;
+        report.syncedToPrimary = true;
+      }
 
       const data = (audit.audit_data ?? {}) as any;
       const identityStatus = data.audit_metadata?.identity_status ?? null;
@@ -864,6 +881,28 @@ export class MarketingHotProspectService extends BaseService {
     } catch (error) {
       logger.error('syncFromAudit failed', ctx, { error: (error as Error).message, auditId });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * A non-primary sibling shows its primary's audits as `inherited`
+   * (MarketingCampaignService.getCampaign), and syncing one always writes to
+   * the audit's owner. Allow that only when the requesting campaign shares
+   * the owner's business prospect; any other campaign/audit pairing is a
+   * caller error, not a silent write to an unrelated campaign.
+   */
+  private async assertInheritedAudit(owner: any, requestedCampaignId: string, auditId: string): Promise<void> {
+    const requested = await this.prisma.mkt_campaigns_list.findUnique({
+      where: { id: requestedCampaignId },
+      select: { id: true, business_prospect_id: true },
+    });
+    if (!requested) throw new NotFoundError('Campaign not found');
+    const sameProspect =
+      !!owner.business_prospect_id && requested.business_prospect_id === owner.business_prospect_id;
+    if (!sameProspect) {
+      throw new ValidationError(
+        `Audit ${auditId} belongs to campaign ${owner.id}, not ${requestedCampaignId}`,
+      );
     }
   }
 

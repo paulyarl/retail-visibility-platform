@@ -1486,6 +1486,8 @@ export interface AuditSyncReport {
   identityStatus: string | null;
   skipped: boolean;
   skipReason?: string;
+  requestedCampaignId?: string;
+  syncedToPrimary?: boolean;
 }
 
 // ─── Sprint 5: Scan-to-Campaign Spawning ────────────────────────────────

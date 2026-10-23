@@ -612,3 +612,69 @@ describe('MarketingHotProspectService.syncFromAudit — business_hours sync', ()
     expect(hoursUpdate).toBeUndefined();
   });
 });
+
+describe('MarketingHotProspectService.syncFromAudit — requesting campaign', () => {
+  const PROSPECT_ID = 'bp-0nakrhpf';
+  const SIBLING_ID = 'mcamp-gf6c4445';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** Route the requested-campaign lookup to `other`; everything else to the owner mock. */
+  function withRequestedCampaign(other: any) {
+    const ownerImpl = mockCampaignsList.findUnique.getMockImplementation()!;
+    mockCampaignsList.findUnique.mockImplementation((args: any) =>
+      args?.where?.id === other.id ? Promise.resolve(other) : ownerImpl(args),
+    );
+  }
+
+  it('does not flag syncedToPrimary when requested from the owning campaign', async () => {
+    wireMocks(buildAuditData(), buildCampaign({ business_prospect_id: PROSPECT_ID, is_primary_sibling: true }));
+
+    const report = await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID, undefined, {
+      requestedCampaignId: CAMPAIGN_ID,
+    });
+
+    expect(report.campaignId).toBe(CAMPAIGN_ID);
+    expect(report.syncedToPrimary).toBeUndefined();
+    expect(report.requestedCampaignId).toBeUndefined();
+  });
+
+  it('syncs an inherited audit onto the primary and flags it when requested from a sibling', async () => {
+    const auditHours = {
+      monday: { open: '09:00', close: '20:30', closed: false },
+      timezone: 'America/Indianapolis',
+    };
+    const { updates } = wireMocks(
+      buildAuditData({ business_hours: auditHours }),
+      buildCampaign({ business_prospect_id: PROSPECT_ID, is_primary_sibling: true, business_hours: null }),
+    );
+    withRequestedCampaign({ id: SIBLING_ID, business_prospect_id: PROSPECT_ID });
+
+    const report = await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID, undefined, {
+      requestedCampaignId: SIBLING_ID,
+    });
+
+    expect(report.campaignId).toBe(CAMPAIGN_ID);
+    expect(report.requestedCampaignId).toBe(SIBLING_ID);
+    expect(report.syncedToPrimary).toBe(true);
+    expect(updates.every((u) => u.where.id === CAMPAIGN_ID)).toBe(true);
+    expect(updates.some((u) => u.data.business_hours === auditHours)).toBe(true);
+  });
+
+  it('rejects a campaign that does not share the audit owner\'s business prospect', async () => {
+    const { updates } = wireMocks(
+      buildAuditData(),
+      buildCampaign({ business_prospect_id: PROSPECT_ID, is_primary_sibling: true }),
+    );
+    withRequestedCampaign({ id: 'mcamp-unrelated', business_prospect_id: 'bp-other' });
+
+    await expect(
+      MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID, undefined, {
+        requestedCampaignId: 'mcamp-unrelated',
+      }),
+    ).rejects.toThrow(/belongs to campaign/);
+    expect(updates).toHaveLength(0);
+  });
+});

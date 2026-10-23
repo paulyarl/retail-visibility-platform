@@ -245,7 +245,8 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced,
         if (report.fieldsSynced.length) parts.push(`${report.fieldsSynced.length} fields`);
         if (report.contactsSynced.length) parts.push(`${report.contactsSynced.length} contacts`);
         if (report.hotProspectMarked) parts.push('hot prospect');
-        setSyncResult(`Synced: ${parts.join(', ') || 'no changes'}`);
+        const target = report.syncedToPrimary ? ` to primary sibling ${report.campaignId}` : '';
+        setSyncResult(`Synced${target}: ${parts.join(', ') || 'no changes'}`);
         onSynced?.();
       }
     } catch (e: any) {
@@ -308,8 +309,13 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced,
             <button onClick={handleCopySummary} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-neutral-700">
               <Copy className="h-3 w-3" /> {copied ? 'Copied!' : 'Copy summary'}
             </button>
-            <button onClick={handleSync} disabled={syncing} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50">
-              {syncing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Sync to campaign
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              title={audit.inherited ? `Inherited audit — syncs onto the primary sibling campaign (${audit.campaign_id}), not this one` : undefined}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50"
+            >
+              {syncing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} {audit.inherited ? 'Sync to primary' : 'Sync to campaign'}
             </button>
             <button
               onClick={handleAddToPlace}
