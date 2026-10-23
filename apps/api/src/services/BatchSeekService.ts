@@ -646,9 +646,23 @@ class BatchSeekService {
    * slugs, but attribution comes from the link — not the slug — so renamed
    * or hand-stamped batches still resolve). A batch can surface multiple
    * PGs if its seeds were linked to more than one.
+   *
+   * Slug fallback: seeds minted before link-stamping (or hand-labeled) carry
+   * no link rows — pg-{campaignId}-{yyyymmdd} and from-campaign-{id} labels
+   * embed the source campaign id, so unresolved batches parse the slug and
+   * attribute directly. Linked attribution wins; the slug only fills the gap.
+   *
+   * Seek-batch lineage: dps.seek_batch_id connects each seed cohort back to
+   * the seek batch that produced its prospects (queue → seed propagation).
    */
   async listSeedBatches(filters?: {
     seedBatch?: string;
+    city?: string;
+    category?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    focus?: string;
+    seekBatch?: string;
     limit?: number;
   }): Promise<Array<{
     seedBatch: string;
@@ -658,32 +672,57 @@ class BatchSeekService {
     invitedSeeds: number;
     cities: string[];
     categories: string[];
+    createdAt: string | null;
     provingGrounds: Array<{ id: string; displayId: string | null }>;
+    sourceCampaigns: Array<{ id: string; displayId: string | null }>;
+    seekBatches: Array<{ id: string; batchSlug: string | null; intelligenceFocus: string | null }>;
   }>> {
     const limit = Math.min(filters?.limit || 50, 200);
-    const seedBatchFilter = filters?.seedBatch;
 
-    let query = `
-      SELECT
-        seed_batch,
-        COUNT(*) AS total_seeds,
-        COUNT(*) FILTER (WHERE published_at IS NOT NULL) AS published_seeds,
-        COUNT(*) FILTER (WHERE claimed_at IS NOT NULL) AS claimed_seeds,
-        COUNT(*) FILTER (WHERE invited_at IS NOT NULL) AS invited_seeds,
-        ARRAY_AGG(DISTINCT city) AS cities,
-        ARRAY_AGG(DISTINCT category) AS categories
-      FROM directory_presence_seeds
-    `;
+    const conditions = ['dps.seed_batch IS NOT NULL'];
     const params: any[] = [];
-    const conditions = ['seed_batch IS NOT NULL'];
-    if (seedBatchFilter) {
-      conditions.push(`seed_batch = $1`);
-      params.push(seedBatchFilter);
+    const addParam = (v: any) => `$${params.push(v)}`;
+    if (filters?.seedBatch) {
+      conditions.push(`dps.seed_batch ILIKE ${addParam(`%${filters.seedBatch}%`)}`);
     }
-    query += ` WHERE ${conditions.join(' AND ')} GROUP BY seed_batch ORDER BY MIN(created_at) DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
+    if (filters?.city) {
+      conditions.push(`dps.city ILIKE ${addParam(`%${filters.city}%`)}`);
+    }
+    if (filters?.category) {
+      conditions.push(`dps.category ILIKE ${addParam(`%${filters.category}%`)}`);
+    }
+    if (filters?.dateFrom) {
+      conditions.push(`dps.created_at >= ${addParam(filters.dateFrom)}::timestamptz`);
+    }
+    if (filters?.dateTo) {
+      conditions.push(`dps.created_at < (${addParam(filters.dateTo)}::date + 1)`);
+    }
+    if (filters?.seekBatch) {
+      conditions.push(`dps.seek_batch_id = ${addParam(filters.seekBatch)}`);
+    }
+    if (filters?.focus) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM mkt_seek_batches sb
+        WHERE sb.id = dps.seek_batch_id AND sb.intelligence_focus = ${addParam(filters.focus)}
+      )`);
+    }
 
-    const rows = await prisma.$queryRawUnsafe<any[]>(query, ...params);
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        dps.seed_batch,
+        COUNT(*) AS total_seeds,
+        COUNT(*) FILTER (WHERE dps.published_at IS NOT NULL) AS published_seeds,
+        COUNT(*) FILTER (WHERE dps.claimed_at IS NOT NULL) AS claimed_seeds,
+        COUNT(*) FILTER (WHERE dps.invited_at IS NOT NULL) AS invited_seeds,
+        ARRAY_AGG(DISTINCT dps.city) AS cities,
+        ARRAY_AGG(DISTINCT dps.category) AS categories,
+        MIN(dps.created_at) AS created_at
+      FROM directory_presence_seeds dps
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY dps.seed_batch
+      ORDER BY MIN(dps.created_at) DESC
+      LIMIT ${addParam(limit)}
+    `, ...params);
 
     // Attribute each seed_batch to its proving-ground campaign(s) via the
     // seed ↔ campaign links.
@@ -702,16 +741,68 @@ class BatchSeekService {
       pgByBatch.set(r.seed_batch, list);
     }
 
-    return rows.map((r) => ({
-      seedBatch: r.seed_batch,
-      totalSeeds: parseInt(r.total_seeds) || 0,
-      publishedSeeds: parseInt(r.published_seeds) || 0,
-      claimedSeeds: parseInt(r.claimed_seeds) || 0,
-      invitedSeeds: parseInt(r.invited_seeds) || 0,
-      cities: r.cities || [],
-      categories: r.categories || [],
-      provingGrounds: pgByBatch.get(r.seed_batch) || [],
-    }));
+    // Slug-parse fallback for unlinked batches + source-campaign attribution
+    // for convention labels (pg-{campaignId}-{yyyymmdd}, from-campaign-{id}).
+    const slugCampaignIds = new Set<string>();
+    for (const r of rows) {
+      const m = String(r.seed_batch).match(/^(?:pg-(mcamp-[a-z0-9]+)-\d{8}|from-campaign-(mcamp-[a-z0-9]+))$/i);
+      const cid = m?.[1] || m?.[2];
+      if (cid) slugCampaignIds.add(cid);
+    }
+    const campaignById = new Map<string, { id: string; displayId: string | null; category: string | null }>();
+    if (slugCampaignIds.size) {
+      const camps = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, display_id, campaign_category FROM mkt_campaigns_list WHERE id = ANY($1::text[])`,
+        Array.from(slugCampaignIds),
+      );
+      for (const c of camps) {
+        campaignById.set(c.id, { id: c.id, displayId: c.display_id, category: c.campaign_category });
+      }
+    }
+
+    // Seek-batch lineage per seed batch.
+    const sbRows = await prisma.$queryRaw<any[]>`
+      SELECT DISTINCT dps.seed_batch, sb.id AS sb_id, sb.batch_slug, sb.intelligence_focus
+      FROM directory_presence_seeds dps
+      JOIN mkt_seek_batches sb ON sb.id = dps.seek_batch_id
+      WHERE dps.seed_batch IS NOT NULL
+    `;
+    const sbByBatch = new Map<string, Array<{ id: string; batchSlug: string | null; intelligenceFocus: string | null }>>();
+    for (const r of sbRows) {
+      const list = sbByBatch.get(r.seed_batch) || [];
+      list.push({ id: r.sb_id, batchSlug: r.batch_slug, intelligenceFocus: r.intelligence_focus });
+      sbByBatch.set(r.seed_batch, list);
+    }
+
+    return rows.map((r) => {
+      const label = String(r.seed_batch);
+      const m = label.match(/^(?:pg-(mcamp-[a-z0-9]+)-\d{8}|from-campaign-(mcamp-[a-z0-9]+))$/i);
+      const slugCampaign = m ? campaignById.get(m[1] || m[2] || '') : undefined;
+      const linkedPgs = pgByBatch.get(label) || [];
+      // Slug-attributed PG fills the gap only when links found none.
+      const slugPg = slugCampaign?.category === 'proving_ground'
+        ? [{ id: slugCampaign.id, displayId: slugCampaign.displayId }]
+        : [];
+      const provingGrounds = linkedPgs.length
+        ? linkedPgs
+        : slugPg;
+      const sourceCampaigns = slugCampaign && slugCampaign.category !== 'proving_ground'
+        ? [{ id: slugCampaign.id, displayId: slugCampaign.displayId }]
+        : [];
+      return {
+        seedBatch: label,
+        totalSeeds: parseInt(r.total_seeds) || 0,
+        publishedSeeds: parseInt(r.published_seeds) || 0,
+        claimedSeeds: parseInt(r.claimed_seeds) || 0,
+        invitedSeeds: parseInt(r.invited_seeds) || 0,
+        cities: r.cities || [],
+        categories: r.categories || [],
+        createdAt: r.created_at ?? null,
+        provingGrounds,
+        sourceCampaigns,
+        seekBatches: sbByBatch.get(label) || [],
+      };
+    });
   }
 }
 

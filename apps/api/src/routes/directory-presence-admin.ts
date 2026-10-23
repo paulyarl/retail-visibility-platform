@@ -2114,8 +2114,15 @@ router.post('/presence-seeds/batch-invite', requirePlatformAdmin, async (req: Re
 /** GET /api/admin/directory/seed-batches — list seed batches with metrics */
 router.get('/seed-batches', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
-    const seedBatch = req.query.seedBatch as string | undefined;
-    const result = await BatchSeekService.listSeedBatches({ seedBatch });
+    const result = await BatchSeekService.listSeedBatches({
+      seedBatch: req.query.seedBatch as string | undefined,
+      city: req.query.city as string | undefined,
+      category: req.query.category as string | undefined,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+      focus: req.query.focus as string | undefined,
+      seekBatch: req.query.seekBatch as string | undefined,
+    });
     res.json({ success: true, batches: result });
   } catch (error: any) {
     logger.error('[GET /api/admin/directory/seed-batches] Error:', undefined, {

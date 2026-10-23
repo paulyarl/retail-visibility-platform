@@ -844,8 +844,24 @@ export interface SeedBatchSummary {
   invitedSeeds: number;
   cities: string[];
   categories: string[];
+  /** MIN(created_at) across the batch's seeds — the cohort's birth date. */
+  createdAt: string | null;
   /** Proving grounds this batch's seeds are linked to (usually 0 or 1). */
   provingGrounds: Array<{ id: string; displayId: string | null }>;
+  /** Source campaign parsed from a convention label (from-campaign-{id}). */
+  sourceCampaigns: Array<{ id: string; displayId: string | null }>;
+  /** Seek batches these seeds' prospects came from (queue lineage). */
+  seekBatches: Array<{ id: string; batchSlug: string | null; intelligenceFocus: string | null }>;
+}
+
+export interface SeedBatchFilters {
+  seedBatch?: string;
+  city?: string;
+  category?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  focus?: string;
+  seekBatch?: string;
 }
 
 export interface CategoryRollup {
@@ -2620,9 +2636,16 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   }
 
   /** GET /api/admin/directory-presence/seed-batches */
-  async listSeedBatches(seedBatch?: string): Promise<SeedBatchSummary[]> {
+  async listSeedBatches(filters?: SeedBatchFilters): Promise<SeedBatchSummary[]> {
+    const params = new URLSearchParams();
+    if (filters) {
+      for (const [k, v] of Object.entries(filters)) {
+        if (v) params.set(k, v);
+      }
+    }
+    const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory-presence/seed-batches${seedBatch ? `?seedBatch=${encodeURIComponent(seedBatch)}` : ''}`,
+      `/api/admin/directory-presence/seed-batches${qs ? `?${qs}` : ''}`,
       { method: 'GET', cache: 'no-store' },
       undefined,
       0,

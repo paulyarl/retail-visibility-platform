@@ -18,6 +18,16 @@ export default function BatchOperationsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Seed-batch list filters — label substring, city, category, lens, window
+  const [seedFilter, setSeedFilter] = useState({
+    seedBatch: '', city: '', category: '', focus: '', dateFrom: '', dateTo: '',
+  });
+  const [debouncedSeedFilter, setDebouncedSeedFilter] = useState(seedFilter);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSeedFilter(seedFilter), 300);
+    return () => clearTimeout(t);
+  }, [seedFilter]);
+
   // Launcher form state
   const [showLauncher, setShowLauncher] = useState(false);
   const [profiles, setProfiles] = useState<IntelligenceProfile[]>([]);
@@ -52,12 +62,19 @@ export default function BatchOperationsDashboard() {
 
   const fetchSeedBatches = useCallback(async () => {
     try {
-      const result = await directoryPresenceAdminService.listSeedBatches();
+      const result = await directoryPresenceAdminService.listSeedBatches({
+        seedBatch: debouncedSeedFilter.seedBatch || undefined,
+        city: debouncedSeedFilter.city || undefined,
+        category: debouncedSeedFilter.category || undefined,
+        focus: debouncedSeedFilter.focus || undefined,
+        dateFrom: debouncedSeedFilter.dateFrom || undefined,
+        dateTo: debouncedSeedFilter.dateTo || undefined,
+      });
       setSeedBatches(result);
     } catch (err: any) {
       setError(err?.message || 'failed_to_load');
     }
-  }, []);
+  }, [debouncedSeedFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -774,11 +791,82 @@ export default function BatchOperationsDashboard() {
 
       {/* Seed Batches Tab */}
       {tab === 'seed' && !loading && (
+        <div>
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Batch label</label>
+              <input
+                type="text"
+                value={seedFilter.seedBatch}
+                onChange={(e) => setSeedFilter((f) => ({ ...f, seedBatch: e.target.value }))}
+                placeholder="pg-…, from-campaign-…"
+                className="w-44 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
+              <input
+                type="text"
+                value={seedFilter.city}
+                onChange={(e) => setSeedFilter((f) => ({ ...f, city: e.target.value }))}
+                className="w-32 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+              <input
+                type="text"
+                value={seedFilter.category}
+                onChange={(e) => setSeedFilter((f) => ({ ...f, category: e.target.value }))}
+                className="w-44 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Lens</label>
+              <select
+                value={seedFilter.focus}
+                onChange={(e) => setSeedFilter((f) => ({ ...f, focus: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All</option>
+                <option value="emerging">emerging</option>
+                <option value="competitive">competitive</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+              <input
+                type="date"
+                value={seedFilter.dateFrom}
+                onChange={(e) => setSeedFilter((f) => ({ ...f, dateFrom: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+              <input
+                type="date"
+                value={seedFilter.dateTo}
+                onChange={(e) => setSeedFilter((f) => ({ ...f, dateTo: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            {(seedFilter.seedBatch || seedFilter.city || seedFilter.category || seedFilter.focus || seedFilter.dateFrom || seedFilter.dateTo) && (
+              <button
+                type="button"
+                onClick={() => setSeedFilter({ seedBatch: '', city: '', category: '', focus: '', dateFrom: '', dateTo: '' })}
+                className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-gray-600 bg-gray-50">
                 <th className="py-3 px-4 font-medium">Seed Batch</th>
+                <th className="py-3 px-4 font-medium">Created</th>
                 <th className="py-3 px-4 font-medium">Cities</th>
                 <th className="py-3 px-4 font-medium">Categories</th>
                 <th className="py-3 px-4 font-medium">Total</th>
@@ -791,8 +879,8 @@ export default function BatchOperationsDashboard() {
             <tbody>
               {seedBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray-400">
-                    No seed batches yet. Seeds will appear here after batch creation.
+                  <td colSpan={9} className="py-8 text-center text-gray-400">
+                    No seed batches match. Seeds appear here after batch creation.
                   </td>
                 </tr>
               ) : (
@@ -813,6 +901,29 @@ export default function BatchOperationsDashboard() {
                             PG · {pg.displayId || pg.id}
                           </Link>
                         ))}
+                        {(b.sourceCampaigns || []).map((c: { id: string; displayId: string | null }) => (
+                          <Link
+                            key={c.id}
+                            href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                            className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 align-middle"
+                            title={`Source campaign: ${c.displayId || c.id}`}
+                          >
+                            Campaign · {c.displayId || c.id}
+                          </Link>
+                        ))}
+                        {(b.seekBatches || []).map((sb: { id: string; batchSlug: string | null; intelligenceFocus: string | null }) => (
+                          <Link
+                            key={sb.id}
+                            href={`/settings/admin/directory/batches/${sb.id}`}
+                            className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-sky-100 text-sky-700 hover:bg-sky-200 align-middle"
+                            title={`Seek batch: ${sb.batchSlug || sb.id}`}
+                          >
+                            Seek · {sb.intelligenceFocus || sb.batchSlug || sb.id}
+                          </Link>
+                        ))}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600 text-xs">
+                        {b.createdAt ? new Date(b.createdAt).toLocaleDateString() : '—'}
                       </td>
                       <td className="py-3 px-4 text-gray-600">{b.cities?.join(', ') || '—'}</td>
                       <td className="py-3 px-4 text-gray-600">{b.categories?.join(', ') || '—'}</td>
@@ -839,6 +950,7 @@ export default function BatchOperationsDashboard() {
               )}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>
