@@ -170,6 +170,9 @@ describe('HasDataGroundTruthService — prospect-scoped cache', () => {
 
     expect(status.cached).toBe(true);
     expect(status.est_credits).toBe(0);
+    // The knob still needs a refresh price — place_id is on file, so a
+    // forced refresh is details + reviews (2 calls), not 3.
+    expect(status.refresh_credits).toBe(20);
     expect(status.configured).toBe(true);
   });
 

@@ -930,6 +930,8 @@ export interface GroundTruthStatus {
   level: 'latest' | 'deep' | null;
   fetched_at: string | null;
   est_credits: number;
+  /** Cost of a forced refresh — est_credits is 0 while the row is fresh. */
+  refresh_credits?: number;
   configured: boolean;
 }
 

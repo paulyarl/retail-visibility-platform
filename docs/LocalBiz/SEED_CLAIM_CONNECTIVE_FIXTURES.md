@@ -42,6 +42,14 @@ conversion story breaks at that point.
   `directory_field_provenance` row (`show_on_public`). Hours omitted unless
   sourced. SNAP/EBT never inferred from category labels — sourced evidence
   only. The QC cost and the trust moat are the same constraint.
+- **Hours depth — two layers.** The seed carries the regular weekly grid
+  (`business_hours_list`, sourced at seed or owner-verified at claim).
+  `business_hours_special_list` adds per-date overrides — holiday closures,
+  seasonal dates, split-day windows the flat grid can't express — each with
+  `date`, `isClosed`, `open`/`close`, `note`. Owner-managed post-claim
+  (`PUT /tenant/:id/business-hours/special`), rendered publicly
+  (`GET /public/tenants/:id/business-hours/special`), and pushed to the
+  linked GBP `specialHours` by `GBPBusinessInfoSync.syncSpecialHours`.
 - SEO packet composed deterministically by `SeedSeoComposer` (meta title,
   description, keywords, `same_as`) — identical output on the automated
   `createFromCampaign` path and the manual form's seo-preview. Zero
@@ -190,6 +198,7 @@ the schema can't back.
 | B8 | **Proof of work, not a pitch** — "the work is done, come see it" | The seed pre-fixes findability before first contact (2.2) |
 | B9 | **Free forever** — not a trial, no clock | `subscription_status='active'`, never trial machinery (2.1) |
 | B10 | **Shoppers see what you carry before they visit** | 5-SKU browsable shelf + SWIS-shaped surface (2.5, 2.7) |
+| B11 | **Special hours, not just regular hours** — holidays, seasonal dates, split-day schedules the weekly grid can't express | `business_hours_special_list` per-date overrides + GBP `specialHours` push (2.1) |
 
 ### Hook archetypes — the audit knows which sale before first touch
 

@@ -78,7 +78,10 @@ export interface PacketStatus {
   cached: boolean;
   level: GroundTruthLevel | null;
   fetched_at: string | null;
+  /** Credits this render will spend — 0 while the cached row is fresh. */
   est_credits: number;
+  /** Credits a forced refresh would spend (what the knob's price is). */
+  refresh_credits: number;
   configured: boolean;
 }
 
@@ -124,11 +127,15 @@ export class HasDataGroundTruthService extends BaseService {
     // reviews (+posts/photos on deep) without the paid search resolve.
     const hasPlace = !!cached?.place_id || !!(await this.readAnyPacket(campaignId))?.place_id;
     const calls = hasPlace ? (level === 'deep' ? 4 : 2) : level === 'deep' ? 5 : 3;
+    const freshCredits = calls * CREDITS_PER_CALL;
     return {
       cached: !!cached,
       level: cached ? level : null,
       fetched_at: cached?.fetched_at ?? null,
-      est_credits: cached ? 0 : calls * CREDITS_PER_CALL,
+      est_credits: cached ? 0 : freshCredits,
+      // Cached renders spend 0, but the knob still needs the price of a
+      // forced refresh — reporting est_credits there would say "~0 credits".
+      refresh_credits: freshCredits,
       configured,
     };
   }

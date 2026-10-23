@@ -528,6 +528,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     cached: boolean;
     fetched_at: string | null;
     est_credits: number;
+    refresh_credits?: number;
     configured: boolean;
   } | null>(null);
   useEffect(() => {
@@ -983,7 +984,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                       {groundTruthStatus.cached ? (
                         <>
                           Cached packet{groundTruthStatus.fetched_at ? ` fetched ${new Date(groundTruthStatus.fetched_at).toLocaleDateString()}` : ''} — serves at ~0 credits.
-                          Est. fresh fetch: ~{groundTruthStatus.est_credits} credits.
+                          {' '}Refreshing would cost ~{groundTruthStatus.refresh_credits ?? (groundTruthLevel === 'deep' ? 50 : 30)} credits.
                         </>
                       ) : groundTruthStatus.configured ? (
                         <>No cached packet — this render fetches live: ~{groundTruthStatus.est_credits} credits.</>
