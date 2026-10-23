@@ -43,6 +43,108 @@ const CREDITS_PER_CALL = 10;
 
 export type GroundTruthLevel = 'latest' | 'deep';
 
+export const PACKET_DAYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+type PacketDay = (typeof PACKET_DAYS)[number];
+
+export interface GroundTruthDayHours {
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+/** Canonical day grid — the same shape the audit's business_hours contract emits. */
+export type GroundTruthHours = Partial<Record<PacketDay, GroundTruthDayHours>> & {
+  timezone?: string;
+};
+
+const MERIDIEM_RE = /(a\.?m\.?|p\.?m\.?)/i;
+
+function parseTimeToken(token: string, fallbackMeridiem?: 'am' | 'pm'): number | null {
+  const m = token.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  const mer = (m[3] ? m[3].replace(/\./g, '').toLowerCase() : fallbackMeridiem) as 'am' | 'pm' | undefined;
+  if (h > 24 || h === 0 || min > 59) return null;
+  if (!mer) {
+    // Bare hour with no meridiem anywhere — treat only unambiguous 24h
+    // tokens (>12) as times; a bare "8" can't be resolved honestly.
+    if (h <= 12) return null;
+    return h * 60 + min;
+  }
+  if (mer === 'am') h = h === 12 ? 0 : h;
+  else h = h === 12 ? 12 : h + 12;
+  return h * 60 + min;
+}
+
+const fmtMinutes = (mins: number) =>
+  `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+
+/**
+ * Converts HasData's `/place` `workingHours` payload —
+ * `{ timezone, days: [{ day: "Friday", time: "10 AM–8 PM" | "Closed" }] }` —
+ * into the canonical day grid. Returns null when nothing parses so the
+ * packet reads "not measured" rather than carrying a wrong schedule.
+ *
+ * Split-day ranges ("9 AM–12 PM, 4–8 PM") collapse to the day's outer
+ * span — the flat grid holds one open/close pair; intra-day breaks are
+ * the owner's special-hours surface post-claim. Overnight closes
+ * (10 AM–12 AM) render as 00:00.
+ */
+export function parseHasDataWorkingHours(wh: any): GroundTruthHours | null {
+  const days = wh?.days;
+  if (!Array.isArray(days) || days.length === 0) return null;
+  const out: GroundTruthHours = {};
+  if (typeof wh.timezone === 'string' && wh.timezone) out.timezone = wh.timezone;
+
+  for (const d of days) {
+    const key = String(d?.day ?? '').trim().toLowerCase() as PacketDay;
+    if (!(PACKET_DAYS as readonly string[]).includes(key)) continue;
+    const raw = String(d?.time ?? '').trim();
+    if (!raw || /^closed$/i.test(raw)) {
+      // Placeholder times mirror the EMPTY_HOURS closed-day convention.
+      out[key] = { open: '09:00', close: '18:00', closed: true };
+      continue;
+    }
+    if (/open\s*24\s*hours/i.test(raw)) {
+      out[key] = { open: '00:00', close: '23:59', closed: false };
+      continue;
+    }
+    const ranges = raw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+    const opens: number[] = [];
+    const closes: number[] = [];
+    let overnight = false;
+    for (const r of ranges) {
+      const parts = r.split(/\s*[–—−-]\s*/);
+      if (parts.length !== 2) continue;
+      const closeMer = MERIDIEM_RE.test(parts[1]) ? (parts[1].toLowerCase().includes('p') ? 'pm' : 'am') : undefined;
+      const openMer = MERIDIEM_RE.test(parts[0]) ? (parts[0].toLowerCase().includes('p') ? 'pm' : 'am') : undefined;
+      const closeM = parseTimeToken(parts[1], openMer);
+      const openM = parseTimeToken(parts[0], closeMer);
+      if (openM === null || closeM === null) continue;
+      opens.push(openM);
+      closes.push(closeM);
+      if (closeM <= openM) overnight = true;
+    }
+    if (!opens.length) continue;
+    out[key] = {
+      open: fmtMinutes(Math.min(...opens)),
+      close: overnight ? '00:00' : fmtMinutes(Math.max(...closes)),
+      closed: false,
+    };
+  }
+
+  return PACKET_DAYS.some((d) => out[d]) ? out : null;
+}
+
 export interface GroundTruthReview {
   rating: number | null;
   date: string | null;
@@ -67,6 +169,10 @@ export interface GroundTruthPacket {
   photos_count: number | null;
   /** Derived: share of observable reviews with an owner response. */
   owner_response_rate_observable: number | null;
+  /** Listing's live open-state string, e.g. "Closed · Opens 10 AM". */
+  open_state: string | null;
+  /** Measured weekly schedule in the canonical day-grid shape, null when the listing exposes none. */
+  hours: GroundTruthHours | null;
   review_corpus_size: number;
   latest_review_at: string | null;
   fetched_at: string;
@@ -400,6 +506,8 @@ export class HasDataGroundTruthService extends BaseService {
       posts_count: Array.isArray(postsArr) ? postsArr.length : null,
       photos_count: Array.isArray(photosArr) ? photosArr.length : (typeof photosArr?.photosCount === 'number' ? photosArr.photosCount : null),
       owner_response_rate_observable: reviewRows.length > 0 ? responded / reviewRows.length : null,
+      open_state: typeof d?.openState === 'string' ? d.openState : null,
+      hours: parseHasDataWorkingHours(d?.workingHours),
       review_corpus_size: reviewRows.length,
       latest_review_at: latestReviewAt,
       fetched_at: new Date().toISOString(),

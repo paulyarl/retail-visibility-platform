@@ -39,7 +39,7 @@ vi.mock('../../logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 
-import { HasDataGroundTruthService } from '../HasDataGroundTruthService';
+import { HasDataGroundTruthService, parseHasDataWorkingHours } from '../HasDataGroundTruthService';
 
 const CAMPAIGN = 'mcamp-s97mviop';
 
@@ -263,5 +263,93 @@ describe('HasDataGroundTruthService — prospect-scoped cache', () => {
     // Only the leader reports the spend; the joined call reports 0.
     expect(first.credits_spent).toBe(30);
     expect(second.credits_spent).toBe(0);
+  });
+
+  it('normalizes workingHours into the canonical day grid and carries open_state', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'moi-old', place_id: PACKET.place_id, data_id: PACKET.data_id }]);
+
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonRes({
+          placeResults: {
+            ...PLACE_RES.placeResults,
+            openState: 'Closed · Opens 10 AM',
+            workingHours: {
+              timezone: 'America/Indianapolis',
+              days: [
+                { day: 'Friday', time: '10 AM–8 PM' },
+                { day: 'Saturday', time: '10 AM–8 PM' },
+                { day: 'Sunday', time: 'Closed' },
+                { day: 'Monday', time: '10 AM–8 PM' },
+                { day: 'Tuesday', time: '10 AM–8 PM' },
+                { day: 'Wednesday', time: '10 AM–8 PM' },
+                { day: 'Thursday', time: '10 AM–8 PM' },
+              ],
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(jsonRes({ topics: [], reviews: [] }));
+
+    const packet = await HasDataGroundTruthService.getInstance().getPacket(CAMPAIGN, 'latest');
+
+    expect(packet?.open_state).toBe('Closed · Opens 10 AM');
+    expect(packet?.hours?.timezone).toBe('America/Indianapolis');
+    expect(packet?.hours?.monday).toEqual({ open: '10:00', close: '20:00', closed: false });
+    expect(packet?.hours?.saturday).toEqual({ open: '10:00', close: '20:00', closed: false });
+    expect(packet?.hours?.sunday?.closed).toBe(true);
+  });
+});
+
+describe('parseHasDataWorkingHours', () => {
+  it('returns null for missing or empty payloads', () => {
+    expect(parseHasDataWorkingHours(null)).toBeNull();
+    expect(parseHasDataWorkingHours({})).toBeNull();
+    expect(parseHasDataWorkingHours({ days: [] })).toBeNull();
+    expect(parseHasDataWorkingHours({ days: [{ day: 'Notaday', time: '9-5' }] })).toBeNull();
+  });
+
+  it('parses 12-hour ranges across dash styles and inherits meridiem', () => {
+    const h = parseHasDataWorkingHours({
+      days: [
+        { day: 'Monday', time: '9:30 AM–5:30 PM' },
+        { day: 'Tuesday', time: '8 AM—8 PM' },
+        { day: 'Wednesday', time: '5–9 PM' },
+      ],
+    });
+    expect(h?.monday).toEqual({ open: '09:30', close: '17:30', closed: false });
+    expect(h?.tuesday).toEqual({ open: '08:00', close: '20:00', closed: false });
+    expect(h?.wednesday).toEqual({ open: '17:00', close: '21:00', closed: false });
+  });
+
+  it('marks closed and 24-hour days without dropping them', () => {
+    const h = parseHasDataWorkingHours({
+      days: [
+        { day: 'Sunday', time: 'Closed' },
+        { day: 'Saturday', time: 'Open 24 hours' },
+      ],
+    });
+    expect(h?.sunday?.closed).toBe(true);
+    expect(h?.saturday).toEqual({ open: '00:00', close: '23:59', closed: false });
+  });
+
+  it('collapses split-day ranges to the outer span', () => {
+    const h = parseHasDataWorkingHours({
+      days: [{ day: 'Friday', time: '9 AM–12 PM, 4–8 PM' }],
+    });
+    expect(h?.friday).toEqual({ open: '09:00', close: '20:00', closed: false });
+  });
+
+  it('skips unparseable day rows but keeps parseable siblings', () => {
+    const h = parseHasDataWorkingHours({
+      days: [
+        { day: 'Monday', time: 'Hours may vary' },
+        { day: 'Tuesday', time: '10 AM–6 PM' },
+      ],
+    });
+    expect(h?.monday).toBeUndefined();
+    expect(h?.tuesday).toEqual({ open: '10:00', close: '18:00', closed: false });
   });
 });

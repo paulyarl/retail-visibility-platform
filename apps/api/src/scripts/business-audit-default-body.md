@@ -421,6 +421,7 @@ When a rendered public surface displays the business's opening hours — the GBP
 
 Rules:
 
+* Ground-truth precedence — when a `GOOGLE MAPS GROUND TRUTH` context block precedes this prompt and carries a measured-hours JSON grid, emit it verbatim into `business_hours`: it is already measured from the live listing surface in the canonical day-grid and needs no further source work. The ground-truth block is the citation. Only fall back to the source-survey rules below when the packet carries no hours grid.
 * Emit only what the surface displays — omit days the source does not list, and mark a day `"closed": true` only when the source lists that day closed.
 * Never infer or interpolate hours from the category, conventions, or a different location of a chain. "No hours observed" is the honest answer — emit `"business_hours": null`.
 * Conflicting hours across surfaces are a NAP-style conflict — record the most authoritative surface's values and note the disagreement in `data_quality.conflicts`.
@@ -1445,4 +1446,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-23-hours-1 -->
+<!-- seed-version: business-audit-default-2026-10-23-hours-2 -->

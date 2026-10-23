@@ -20,12 +20,13 @@
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import HasDataGroundTruthService, {
+  PACKET_DAYS,
   type GroundTruthLevel,
   type GroundTruthPacket,
 } from './HasDataGroundTruthService';
 import { unifiedConfig } from '../config/unifiedConfig';
 
-export const GOOGLE_MAPS_GROUND_TRUTH_DIRECTIVE_VERSION = 'gmaps_ground_truth_v1';
+export const GOOGLE_MAPS_GROUND_TRUTH_DIRECTIVE_VERSION = 'gmaps_ground_truth_v2';
 
 /** Caller-supplied variable carrying the opt-in level. */
 export const GROUND_TRUTH_VARIABLE = 'google_maps_ground_truth';
@@ -80,6 +81,21 @@ export async function buildGroundTruthPreamble(
 
 // ─── Blocks ─────────────────────────────────────────────────────────────
 
+/** One-line human summary of the measured weekly grid, canonical day order. */
+function formatPacketHours(p: GroundTruthPacket): string | null {
+  const h = p.hours;
+  if (!h) return null;
+  const parts: string[] = [];
+  for (const day of PACKET_DAYS) {
+    const v = h[day];
+    if (!v) continue;
+    const name = day[0].toUpperCase() + day.slice(1);
+    parts.push(v.closed ? `${name} Closed` : `${name} ${v.open}–${v.close}`);
+  }
+  if (!parts.length) return null;
+  return parts.join(' · ') + (h.timezone ? ` (timezone ${h.timezone})` : '');
+}
+
 function buildGroundTruthBlock(p: GroundTruthPacket): string {
   const lines: string[] = [
     `=== GOOGLE MAPS GROUND TRUTH (live listing data — HasData, ${p.level} level) ===`,
@@ -92,6 +108,17 @@ function buildGroundTruthBlock(p: GroundTruthPacket): string {
     `Phone: ${p.phone ?? 'n/a'} · Website: ${p.website ?? 'n/a'}`,
     `Address: ${p.address ?? 'n/a'}`,
   ];
+  const hoursLine = formatPacketHours(p);
+  if (hoursLine) {
+    lines.push(`Hours (live weekly schedule): ${hoursLine}`);
+    lines.push(
+      `Hours are measured from the listing itself — emit this grid VERBATIM into business_hours (already the canonical day-grid; no other source needed):`,
+      JSON.stringify(p.hours),
+    );
+  }
+  if (p.open_state) {
+    lines.push(`Open state at fetch: ${p.open_state}`);
+  }
   if (p.topics.length) {
     lines.push(`Topic clusters (Google's own review themes): ${p.topics.join(', ')}`);
   }
