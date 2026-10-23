@@ -624,6 +624,10 @@ Run 1–5 against production after deploy; 6 locally before merge.
 
 ## 9. Launch runbook (Search Console)
 
+> **Operator-facing version:** `docs/LocalBiz/SEARCH_CONSOLE_OPERATOR_GUIDE.md` — the
+> click-by-click checklist, pre-flight probes, status/troubleshooting matrix, and
+> the operator log. This section is the design-level summary.
+
 Code alone will not move the index. After deploy:
 
 1. **Verify the property.** Prefer the domain property (`visibleshelf.com`, DNS TXT) — it covers `www`, apex, every `*.visibleshelf.com` tenant subdomain, and both protocols in one property. That coverage is also what authorizes cross-host `<loc>`s for subdomains in the sitemap. If a URL-prefix property already exists, keep it and add the domain property rather than migrating.
