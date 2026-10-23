@@ -71,6 +71,7 @@ interface BusinessJson {
     canonical_state?: string | null;
     canonical_zip?: string | null;
   };
+  business_hours?: Record<string, any> | null;
   audit_metadata?: {
     matched_business?: {
       business_name?: string | null;
@@ -637,6 +638,24 @@ export class MarketingHotProspectService extends BaseService {
       }
     }
 
+    // ── business_hours ───────────────────────────────────────────────────
+    // Audit-measured weekly grid (canonical day-map; verify-record writes
+    // share this column). Same policy as contacts: a verified-fields mention
+    // of "hours" allows overwrite; otherwise fill-null only so an
+    // operator-verified grid from the call is never clobbered by scan data.
+    const auditHours = business.business_hours;
+    if (
+      auditHours
+      && typeof auditHours === 'object'
+      && !Array.isArray(auditHours)
+      && Object.keys(auditHours).length > 0
+    ) {
+      const canOverwrite = isVerified('hours');
+      if (canOverwrite || !campaign.business_hours) {
+        data.business_hours = auditHours;
+      }
+    }
+
     if (Object.keys(data).length > 0) {
       await this.prisma.mkt_campaigns_list.update({ where: { id: campaign.id }, data });
     }
@@ -756,6 +775,7 @@ export class MarketingHotProspectService extends BaseService {
         data_quality: data.data_quality,
         negative_review_themes: data.negative_review_themes,
         opportunities: data.opportunities,
+        business_hours: data.business_hours,
       };
 
       // Track which fields would be synced by inspecting the data object
@@ -794,6 +814,7 @@ export class MarketingHotProspectService extends BaseService {
           address_state: true,
           address_zip: true,
           address_country: true,
+          business_hours: true,
         },
       });
       if (afterContacts) {
@@ -808,6 +829,12 @@ export class MarketingHotProspectService extends BaseService {
         }
         if (afterContacts.address_line1 && afterContacts.address_line1 !== beforeContacts.address_line1) {
           report.contactsSynced.push('address');
+        }
+        if (
+          afterContacts.business_hours
+          && JSON.stringify(afterContacts.business_hours) !== JSON.stringify((campaign as any).business_hours)
+        ) {
+          report.contactsSynced.push('business_hours');
         }
       }
 

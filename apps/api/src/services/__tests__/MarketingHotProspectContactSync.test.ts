@@ -532,3 +532,83 @@ describe('MarketingHotProspectService.syncFromAudit — contact sync', () => {
     expect(contactUpdate).toBeUndefined();
   });
 });
+
+describe('MarketingHotProspectService.syncFromAudit — business_hours sync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const HOURS_GRID = {
+    monday: { open: '10:00', close: '20:00', closed: false },
+    tuesday: { open: '10:00', close: '20:00', closed: false },
+    wednesday: { open: '10:00', close: '20:00', closed: false },
+    thursday: { open: '10:00', close: '20:00', closed: false },
+    friday: { open: '10:00', close: '20:00', closed: false },
+    saturday: { open: '10:00', close: '20:00', closed: false },
+    sunday: { open: '09:00', close: '18:00', closed: true },
+    timezone: 'America/Indianapolis',
+  };
+
+  it('fills campaign.business_hours from the audit grid when the campaign has none', async () => {
+    const auditData = buildAuditData({ business_hours: HOURS_GRID });
+    const initial = buildCampaign({ business_hours: null });
+    const { updates } = wireMocks(auditData, initial);
+
+    const report = await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const hoursUpdate = updates.find((u) => u.data.business_hours);
+    expect(hoursUpdate).toBeDefined();
+    expect(hoursUpdate.data.business_hours).toEqual(HOURS_GRID);
+    expect(report.contactsSynced).toContain('business_hours');
+  });
+
+  it('overwrites campaign.business_hours when the audit lists hours in verified_fields', async () => {
+    const auditData = buildAuditData({
+      business_hours: HOURS_GRID,
+      data_quality: {
+        confidence: 'high',
+        verified_fields: ['Business name', 'Opening hours'],
+        unavailable_fields: [],
+      },
+    });
+    const staleGrid = { monday: { open: '09:00', close: '17:00', closed: false } };
+    const initial = buildCampaign({ business_hours: staleGrid });
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const hoursUpdate = updates.find((u) => u.data.business_hours);
+    expect(hoursUpdate).toBeDefined();
+    expect(hoursUpdate.data.business_hours).toEqual(HOURS_GRID);
+  });
+
+  it('does NOT overwrite operator-verified campaign.business_hours when hours are not in verified_fields', async () => {
+    const auditData = buildAuditData({
+      business_hours: HOURS_GRID,
+      data_quality: {
+        confidence: 'medium',
+        verified_fields: ['Business name'],
+        unavailable_fields: [],
+      },
+    });
+    const verifiedGrid = { monday: { open: '08:00', close: '21:00', closed: false } };
+    const initial = buildCampaign({ business_hours: verifiedGrid });
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const hoursUpdate = updates.find((u) => Object.prototype.hasOwnProperty.call(u.data, 'business_hours'));
+    expect(hoursUpdate).toBeUndefined();
+  });
+
+  it('writes nothing when the audit emits business_hours: null', async () => {
+    const auditData = buildAuditData({ business_hours: null });
+    const initial = buildCampaign({ business_hours: null });
+    const { updates } = wireMocks(auditData, initial);
+
+    await MarketingHotProspectService.getInstance().syncFromAudit(AUDIT_ID);
+
+    const hoursUpdate = updates.find((u) => Object.prototype.hasOwnProperty.call(u.data, 'business_hours'));
+    expect(hoursUpdate).toBeUndefined();
+  });
+});
