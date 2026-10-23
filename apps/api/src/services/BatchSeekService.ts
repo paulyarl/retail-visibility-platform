@@ -118,16 +118,19 @@ class BatchSeekService {
           intelligenceFocus: input.intelligenceFocus,
         }));
 
-    // One lens per market-vertical: entries dedup on (category, city, state) —
-    // focus/profile must not distinguish two entries for the same market, or the
-    // second would silently reuse the first's campaign at launch (reuseExisting
-    // is keyed on the same tuple). Mirrors the launcher's queue rule and also
-    // covers duplicate city values in the legacy cities[] path.
+    // Entries dedup on (category, city, state, declared focus) — the market
+    // is swept once per lens; the same market may legitimately queue both an
+    // emerging and a competitive scan (different candidate classes, each
+    // with its own campaign per the structural-duplicate signature).
+    // Declared focus is validated against the profile below, so a missing
+    // focus falls back to 'emerging' consistently for the key.
     const seenMarkets = new Set<string>();
     for (const ref of refs) {
-      const marketKey = `${(ref.nicheCategory || '').trim().toLowerCase()}|${(ref.city || '').trim().toLowerCase()}|${(ref.state || '').trim().toLowerCase()}`;
+      const marketKey = [
+        ref.nicheCategory, ref.city, ref.state, ref.intelligenceFocus || 'emerging',
+      ].map((p) => (p || '').trim().toLowerCase()).join('|');
       if (seenMarkets.has(marketKey)) {
-        throw new ValidationError(`duplicate batch entry for '${ref.nicheCategory}' in '${ref.city || ref.state || 'nationwide'}' — one lens per market (dedup key is category + city + state)`);
+        throw new ValidationError(`duplicate batch entry for '${ref.nicheCategory}' in '${ref.city || ref.state || 'nationwide'}' (${ref.intelligenceFocus || 'emerging'}) — same market + same lens already queued`);
       }
       seenMarkets.add(marketKey);
     }
@@ -327,21 +330,24 @@ class BatchSeekService {
       userAgent: ctx?.userAgent,
     };
 
-    // Reuse a campaign this batch already created for the same (category, city)
-    // — makes relaunch idempotent instead of minting duplicates.
-    const reuseExisting = async (category: string, city: string): Promise<string | null> => {
+    // Reuse a campaign this batch already created for the same
+    // (category, city, focus) — makes relaunch idempotent instead of
+    // minting duplicates. Focus is part of the key: the same market may
+    // carry both an emerging and a competitive scan as separate campaigns.
+    const reuseExisting = async (category: string, city: string, focus: string): Promise<string | null> => {
       const existing = await prisma.$queryRaw<any[]>`
         SELECT id FROM mkt_campaigns_list
         WHERE seek_batch_id = ${batchId}
           AND LOWER(category) = LOWER(${category})
           AND LOWER(city) = LOWER(${city})
+          AND LOWER(COALESCE(intelligence_focus, 'emerging')) = LOWER(${focus})
         LIMIT 1
       `;
       return existing[0]?.id || null;
     };
 
     const launchEntry = async (category: string, city: string, state: string | null, focus: string) => {
-      const reused = await reuseExisting(category, city);
+      const reused = await reuseExisting(category, city, focus);
       if (reused) {
         campaignIds.push(reused);
         return;
@@ -362,6 +368,17 @@ class BatchSeekService {
         // than failing the entry (carries existingCampaignId — Migration 271).
         const existingId = (err as any)?.existingCampaignId;
         if (existingId) {
+          // Backfill the batch tag so the adopted campaign's scan output
+          // propagates seek_batch_id onto its prospects — otherwise the batch
+          // counts campaign_ids (completion works) but never sees the yield
+          // (prospect/seed metrics key on seek_batch_id). IS NULL guard: a
+          // campaign already claimed by another batch keeps its attribution —
+          // queue rows can only carry one batch id, first claim wins.
+          await prisma.$executeRaw`
+            UPDATE mkt_campaigns_list
+            SET seek_batch_id = ${batchId}
+            WHERE id = ${existingId} AND seek_batch_id IS NULL
+          `;
           campaignIds.push(existingId);
           return;
         }

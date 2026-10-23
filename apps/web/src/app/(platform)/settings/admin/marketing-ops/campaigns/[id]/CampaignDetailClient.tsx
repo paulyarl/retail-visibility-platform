@@ -1176,6 +1176,20 @@ export default function CampaignDetailClient({
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
                     {campaign.scope}
                   </span>
+                  {campaign.scope === 'intelligence' && (campaign.intelligence_focus || campaign.intelligence_campaign_kind) && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                      {[campaign.intelligence_focus, campaign.intelligence_campaign_kind].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {campaign.seek_batch_id && (
+                    <Link
+                      href={`/settings/admin/directory/batches/${campaign.seek_batch_id}`}
+                      title={`Seek batch ${campaign.seek_batch_id}`}
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-900/50"
+                    >
+                      Batch
+                    </Link>
+                  )}
                   {campaign.archetype && (
                     <ArchetypeBadge archetype={campaign.archetype} showLabel />
                   )}

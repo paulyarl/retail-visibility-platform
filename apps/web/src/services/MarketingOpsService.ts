@@ -415,6 +415,9 @@ export interface Campaign {
   intelligence_campaign_kind?: 'discovery' | 'establishment' | null;
   // Migration 234 — platform focus for gold-standard campaigns
   intelligence_platform?: string | null;
+  // Migration 216 — the seek batch that minted this campaign (discovery
+  // scope), or the batch that adopted it on launch.
+  seek_batch_id?: string | null;
   // Migration 204 — diaspora / heritage-origin categorization
   business_origin_country?: string | null;
   business_origin_region?: string | null;

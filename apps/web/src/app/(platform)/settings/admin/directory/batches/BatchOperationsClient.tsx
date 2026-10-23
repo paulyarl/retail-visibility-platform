@@ -242,12 +242,15 @@ export default function BatchOperationsDashboard() {
   };
 
   // Check if current (category, scope, profile) is already in the queue.
-  // Duplicate = same category + same geographic scope (city + state).
+  // Duplicate = same category + same geographic scope + same lens — the
+  // same market may queue once per focus (emerging AND competitive are
+  // distinct sweeps with their own campaigns).
   const isDuplicateEntry = queue.some(
     (q) =>
       q.nicheCategory === nicheCategory
       && q.city === selectedScope.city
-      && (q.state || '') === (selectedScope.state || ''),
+      && (q.state || '') === (selectedScope.state || '')
+      && q.intelligenceFocus === (focus || ''),
   );
 
   const canAddToQueue = Boolean(
