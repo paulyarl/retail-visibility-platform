@@ -12,8 +12,12 @@
  *   - `prod` must run on main, clean, with staging already merged — staging
  *     always ships first.
  *   - `promote` pauses for manual verification between the two deploys.
+ *   - Every deploy recompiles apps/api/dist from HEAD first, so a stale local
+ *     build can never ship.
  */
 const { execSync, spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const readline = require('node:readline');
 
 const mode = process.argv[2];
@@ -39,13 +43,31 @@ function run(cmd, args) {
   if (r.status !== 0) fail(`command failed: ${cmd} ${args.join(' ')}`);
 }
 
+// The Dockerfile ships apps/api/dist as-is when it exists, so a leftover
+// local build would deploy stale code. Always wipe and recompile from the
+// current HEAD before deploying.
+const API_DIST = path.join(__dirname, '..', 'apps', 'api', 'dist');
+let builtHead = null;
+
+function buildApi() {
+  const head = git('rev-parse HEAD');
+  if (builtHead === head) return;
+  console.log(`\n==> Building API from ${head.slice(0, 9)} (fresh dist)`);
+  fs.rmSync(API_DIST, { recursive: true, force: true });
+  run('pnpm', ['-C', 'apps/api', 'build']);
+  if (!fs.existsSync(path.join(API_DIST, 'index.js'))) fail('build produced no apps/api/dist/index.js');
+  builtHead = head;
+}
+
 function deployStg() {
+  buildApi();
   console.log('\n==> Deploying staging (visibleshelf-api-staging)');
   run('fly', ['deploy', '--config', 'fly.staging.toml']);
   console.log(`    Verify: ${STG_VERIFY_URL}/api/health`);
 }
 
 function deployProd() {
+  buildApi();
   console.log('\n==> Deploying production (visibleshelf-api)');
   run('fly', ['deploy']);
   console.log(`    Verify: ${PRD_VERIFY_URL}/api/health`);
