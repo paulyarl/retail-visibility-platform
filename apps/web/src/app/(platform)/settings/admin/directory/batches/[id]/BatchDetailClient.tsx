@@ -25,6 +25,18 @@ interface BatchDetail {
   categories?: string[];
   cities: string[];
   campaignIds: string[];
+  campaigns?: Array<{
+    id: string;
+    displayId: string | null;
+    category: string | null;
+    city: string | null;
+    state: string | null;
+    intelligenceFocus: string | null;
+    campaignKind: string | null;
+    stage: string | null;
+    campaignCategory: string | null;
+    seekBatchId: string | null;
+  }>;
   status: string;
   createdAt: string;
   completedAt: string | null;
@@ -225,19 +237,58 @@ export default function BatchDetailClient() {
 
       {/* Campaigns */}
       {batch.campaignIds.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Campaigns ({batch.campaignIds.length})</h2>
-          <div className="space-y-1">
-            {batch.campaignIds.map((id) => (
-              <Link
-                key={id}
-                href={`/settings/admin/marketing-ops/campaigns/${id}`}
-                className="block font-mono text-xs text-blue-600 hover:underline"
-              >
-                {id}
-              </Link>
-            ))}
-          </div>
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <h2 className="text-lg font-semibold text-gray-900 p-4 border-b border-gray-200">
+            Campaigns ({batch.campaignIds.length})
+          </h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-600 bg-gray-50">
+                <th className="py-2 px-4 font-medium">Campaign</th>
+                <th className="py-2 px-4 font-medium">Category</th>
+                <th className="py-2 px-4 font-medium">Scope</th>
+                <th className="py-2 px-4 font-medium">Focus</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(batch.campaigns?.length
+                ? batch.campaigns
+                : batch.campaignIds.map((id) => ({ id, displayId: null, category: null, city: null, state: null, intelligenceFocus: null, campaignKind: null, stage: null, campaignCategory: null, seekBatchId: null }))
+              ).map((c) => (
+                <tr key={c.id} className="border-b border-gray-100">
+                  <td className="py-2 px-4">
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                      className="font-mono text-xs text-blue-600 hover:underline"
+                    >
+                      {c.displayId || c.id}
+                    </Link>
+                    {c.seekBatchId && c.seekBatchId !== batch.id && (
+                      <span
+                        className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 align-middle"
+                        title={`Adopted — attributed to ${c.seekBatchId} (first-claim-wins)`}
+                      >
+                        adopted
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 px-4 text-gray-700">{c.category || '—'}</td>
+                  <td className="py-2 px-4 text-gray-700">
+                    {c.city ? `${c.city}${c.state ? `, ${c.state}` : ''}` : c.state ? `${c.state} (statewide)` : '—'}
+                  </td>
+                  <td className="py-2 px-4">
+                    {c.intelligenceFocus ? (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        c.intelligenceFocus === 'competitive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {c.intelligenceFocus}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -74,6 +74,20 @@ export interface BatchSummary {
   /** Distinct entry focuses — a batch may sweep both lenses. Fallback:
    *  [intelligenceFocus]. */
   focuses?: string[];
+  /** Campaign descriptors (detail reads) — attributes plus seek_batch_id so
+   *  an adopted campaign still shows which batch actually owns its yield. */
+  campaigns?: Array<{
+    id: string;
+    displayId: string | null;
+    category: string | null;
+    city: string | null;
+    state: string | null;
+    intelligenceFocus: string | null;
+    campaignKind: string | null;
+    stage: string | null;
+    campaignCategory: string | null;
+    seekBatchId: string | null;
+  }>;
   entries?: BatchEntry[];
 }
 
@@ -536,6 +550,19 @@ class BatchSeekService {
         }))
       : undefined;
 
+    // Campaign descriptors — the raw ids alone don't say what was minted or
+    // adopted. seek_batch_id exposes ownership: an adopted campaign still
+    // belongs to its origin batch (first-claim-wins), so surface it.
+    const campaignIds: string[] = r.campaign_ids || [];
+    const campaigns = campaignIds.length > 0
+      ? await prisma.$queryRaw<any[]>`
+          SELECT id, display_id, category, city, state, intelligence_focus,
+                 intelligence_campaign_kind, stage, campaign_category, seek_batch_id
+          FROM mkt_campaigns_list
+          WHERE id = ANY(${campaignIds}::text[])
+        `
+      : [];
+
     return {
       id: r.id,
       batchSlug: r.batch_slug,
@@ -544,13 +571,25 @@ class BatchSeekService {
       nicheCategory: r.niche_category,
       intelligenceFocus: r.intelligence_focus || 'emerging',
       cities,
+      campaignIds,
+      campaigns: campaigns.map((c) => ({
+        id: c.id,
+        displayId: c.display_id,
+        category: c.category,
+        city: c.city,
+        state: c.state,
+        intelligenceFocus: c.intelligence_focus,
+        campaignKind: c.intelligence_campaign_kind,
+        stage: c.stage,
+        campaignCategory: c.campaign_category,
+        seekBatchId: c.seek_batch_id,
+      })),
       categories: entryRows.length
         ? Array.from(new Set(entryRows.map((e) => e.niche_category).filter(Boolean)))
         : (r.niche_category ? [r.niche_category] : []),
       focuses: entryRows.length
         ? Array.from(new Set(entryRows.map((e) => e.intelligence_focus || 'emerging')))
         : [r.intelligence_focus || 'emerging'],
-      campaignIds: r.campaign_ids || [],
       status: r.status,
       createdAt: new Date(r.created_at),
       completedAt: r.completed_at ? new Date(r.completed_at) : null,
