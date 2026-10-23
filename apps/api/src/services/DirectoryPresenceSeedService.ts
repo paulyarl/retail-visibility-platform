@@ -2142,10 +2142,11 @@ class DirectoryPresenceSeedService {
           `;
         }
 
-        // Update queue entry status
+        // Update queue entry status + seed stamp — the promote panel keys
+        // on seed_id; an unstamped seed leaves the prospect promotable.
         await prisma.$executeRaw`
           UPDATE mkt_prospect_queue
-          SET status = 'campaign_created', processed_at = now(), updated_at = now()
+          SET status = 'campaign_created', seed_id = ${result.id}, processed_at = now(), updated_at = now()
           WHERE id = ${entry.id}
         `;
 
@@ -2217,6 +2218,30 @@ class DirectoryPresenceSeedService {
         if (entry.seed_id) {
           skipped.push({ queueEntryId: entry.id, reason: 'already_seeded' });
           continue;
+        }
+
+        // Campaign-side births (createFromCampaign / linkCampaign) leave
+        // queue.seed_id unstamped — an entry whose processed campaign
+        // already links a live seed is already seeded regardless of the
+        // stamp. Heal the column so the promote panel stops offering it.
+        if (entry.processed_campaign_id) {
+          const linkedSeed = await prisma.$queryRaw<any[]>`
+            SELECT dscl.seed_id
+            FROM directory_seed_campaign_links dscl
+            JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+            WHERE dscl.campaign_id = ${entry.processed_campaign_id}
+              AND dps.status IS DISTINCT FROM 'suppressed'
+            LIMIT 1
+          `;
+          if (linkedSeed[0]) {
+            await prisma.$executeRaw`
+              UPDATE mkt_prospect_queue
+              SET seed_id = ${linkedSeed[0].seed_id}, updated_at = now()
+              WHERE id = ${entry.id}
+            `;
+            skipped.push({ queueEntryId: entry.id, reason: 'already_seeded' });
+            continue;
+          }
         }
 
         // Same-business duplicate guard (mirrors createSeedsFromBatch).

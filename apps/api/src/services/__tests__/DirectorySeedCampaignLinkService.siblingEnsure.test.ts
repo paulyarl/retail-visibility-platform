@@ -129,8 +129,12 @@ describe('ensureProspectSiblingLinks', () => {
     });
     const res = await DirectorySeedCampaignLinkService.ensureProspectSiblingLinks('seed-1');
     expect(res.linked.sort()).toEqual(['camp-b', 'camp-c']);
-    // One INSERT per newly attached sibling.
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
+    // One INSERT per newly attached sibling (each link also writes the
+    // mkt_prospect_queue.seed_id stamp via a second $executeRaw).
+    const inserts = mockExecuteRaw.mock.calls.filter((c) =>
+      sqlText(c[0]).includes('INSERT INTO directory_seed_campaign_links'),
+    );
+    expect(inserts).toHaveLength(2);
   });
 
   it('is a no-op when the whole family is already attached', async () => {
@@ -162,7 +166,10 @@ describe('ensureSeedLinksForProspect', () => {
     });
     const res = await DirectorySeedCampaignLinkService.ensureSeedLinksForProspect('bp-1');
     expect(res.linked).toEqual(['camp-new']);
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
+    const inserts = mockExecuteRaw.mock.calls.filter((c) =>
+      sqlText(c[0]).includes('INSERT INTO directory_seed_campaign_links'),
+    );
+    expect(inserts).toHaveLength(1);
   });
 
   it('does nothing when the prospect has no primary-linked seed', async () => {
@@ -181,7 +188,11 @@ describe('linkCampaign — family attach on primary link', () => {
       linked: ['camp-primary'],
     });
     await DirectorySeedCampaignLinkService.linkCampaign('seed-1', 'camp-primary', 'primary');
-    // The primary insert + the sibling attach = 2 writes.
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
+    // The primary insert + the sibling attach = 2 link writes (queue
+    // seed_id stamps ride alongside each).
+    const inserts = mockExecuteRaw.mock.calls.filter((c) =>
+      sqlText(c[0]).includes('INSERT INTO directory_seed_campaign_links'),
+    );
+    expect(inserts).toHaveLength(2);
   });
 });

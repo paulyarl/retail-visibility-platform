@@ -662,6 +662,13 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // FK column, not the join, so the flag reflects the row's own state.
       const auditDates = new Map<string, Date>();
       const checklistCounts = new Map<string, number>();
+      // Live seed per processed campaign — queue.seed_id is only stamped by
+      // the proving-ground promote path, so seeds born campaign-side
+      // (createFromCampaign / linkCampaign) leave the column null and the
+      // promote panel still offers the prospect a checkbox. Resolving the
+      // campaign's seed links at read time keeps the decoration truthful for
+      // rows stamped before the write-path heal existed.
+      const seedByCampaignId = new Map<string, string>();
       if (filters.includeCampaigns) {
         const campaignIds = entries
           .map((e: any) => e.processed_campaign_id)
@@ -701,6 +708,19 @@ class MarketingProspectQueueServiceClass extends BaseService {
           });
           for (const p of checklist) {
             checklistCounts.set(p.campaign_id, p._count.step_id);
+          }
+
+          const linkedSeeds = await this.prisma.$queryRaw<{ campaign_id: string; seed_id: string }[]>`
+            SELECT dscl.campaign_id, dscl.seed_id
+            FROM directory_seed_campaign_links dscl
+            JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
+            WHERE dscl.campaign_id = ANY(${campaignIds})
+              AND dps.status IS DISTINCT FROM 'suppressed'
+          `;
+          for (const r of linkedSeeds) {
+            if (r.seed_id && !seedByCampaignId.has(r.campaign_id)) {
+              seedByCampaignId.set(r.campaign_id, r.seed_id);
+            }
           }
         }
       }
@@ -810,6 +830,9 @@ class MarketingProspectQueueServiceClass extends BaseService {
             const { mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list, ...rest } = e;
             return {
               ...rest,
+              seed_id:
+                rest.seed_id ??
+                (e.processed_campaign_id ? seedByCampaignId.get(e.processed_campaign_id) ?? null : null),
               campaign_stage: camp?.stage ?? null,
               campaign_category: camp?.category ?? null,
               repair_track: camp?.repair_track ?? null,

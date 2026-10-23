@@ -337,6 +337,22 @@ class DirectorySeedCampaignLinkService {
         updated_at = now()
     `;
 
+    // Heal the prospect-queue stamp — the promote panel + worklist key on
+    // mkt_prospect_queue.seed_id, and seeds linked campaign-side otherwise
+    // leave the prospect promotable (second-seed risk). Non-fatal: the link
+    // itself already committed.
+    try {
+      await prisma.$executeRaw`
+        UPDATE mkt_prospect_queue
+        SET seed_id = ${seedId}, updated_at = now()
+        WHERE processed_campaign_id = ${campaignId} AND seed_id IS NULL
+      `;
+    } catch (err) {
+      logger.warn('DirectorySeedCampaignLinkService.linkCampaign — queue stamp failed (non-fatal)', undefined, {
+        seedId, campaignId, error: (err as Error).message,
+      });
+    }
+
     let autoProjected = false;
     if (napMatch.confidence === 'high') {
       try {
