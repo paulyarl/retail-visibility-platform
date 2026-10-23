@@ -2092,3 +2092,14 @@ Publish-first / clean-later surface at `/settings/admin/directory/presence-seeds
 - `POST /presence-seeds/backfill-enrichment` — `{seedIds[]}`: insert-only canonical provenance (`ON CONFLICT DO NOTHING` — human/owner rows outrank), queue-snapshot attributes via `normalizeAttributeEntry`, then per-seed `getComposedEnrichment` with fill-missing writes (`buildSeoEnrichmentJson` + prov rows). `POST /:id/reset` stays the overwrite path; backfill never clobbers. Queue-linked seeds cite `prospect_queue`, others `cleanup_backfill`.
 
 First-batch catch (pg-mcamp-mdjvk2bu-20261023, 58 seeds): 9 address + 5 phone duplicate groups (name variants beat the exact-`LOWER(business_name)` batch dedup guard) and all 58 thin on canonical provenance + SEO — both fixable from the panel.
+
+### Places sitemap producer — URL assembly is pure (added 2026-10-23)
+
+`GET /api/public/directory/places-sitemap.xml` (`apps/api/src/routes/directory-presence-public.ts`) owns the SQL; `apps/api/src/lib/sitemap.ts` owns every URL/XML rule and is unit-tested in `apps/api/src/lib/__tests__/sitemap.test.ts`. Spec: `docs/LocalBiz/PLACES_SEO_INDEXING_SPEC.md`.
+
+- **Origin comes from `unifiedConfig.webUrl`, never `req.get('host')`.** Through the Next proxy the host is `api.visibleshelf.com`, which stamped every `<loc>` cross-domain and made the sitemap unusable. `resolveSitemapBaseUrl` trims trailing slashes and returns null for empty/non-http(s)/`api.*` — the route then answers `500 sitemap_origin_unconfigured` rather than emitting a bad document.
+- **Seeds and claimed listings are disjoint surfaces.** Seeds (`dll.listing_origin = 'directory_seed'`) emit `/place/{slug}`; everything else emits `/directory/{slug}`. The layouts 308 the other way for each, so emitting either on the wrong surface puts a redirect in the sitemap. Demo tenants are excluded (`t.is_demo IS NOT TRUE`) — sample storefronts are not inventory.
+- **Composite shelf slugs are filtered, not rendered** (§4.6): >60 chars or containing `per-directory`. Dropped slugs are logged with a count so the operator can see the cost. `-unverified` variants are legitimate and kept.
+- **`<lastmod>` is optional and NULL-safe** — `formatLastmod` returns null for NULL/Invalid Date instead of throwing (a single throw 500s the whole document).
+- **Queries are `ORDER BY`-stable** so successive crawls fetch a byte-stable sitemap (diff noise otherwise).
+- PR3 of the spec splits this into a `<sitemapindex>` with per-surface files (`storefronts.xml`, `products-N.xml`) and emits the tenant canonical ladder for storefront/product locs; `apps/api/src/lib/storefront-url.ts` already holds that ladder.

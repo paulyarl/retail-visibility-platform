@@ -33,6 +33,7 @@ import { prisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { buildPlacesSitemap, renderUrlset, resolveSitemapBaseUrl } from '../lib/sitemap';
 import { validateAttachment } from '../validators/recovery-intake.schema';
 import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
 import CategoryMarketEnrichmentService from '../services/CategoryMarketEnrichmentService';
@@ -1467,7 +1468,16 @@ router.get('/places-map', async (req: Request, res: Response) => {
 router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
   try {
     const pool = getDirectPool();
-    const baseUrl = (req as any).protocol + '://' + req.get('host');
+    // Canonical origin comes from config, never the request host: through the
+    // Next proxy `req.get('host')` is api.visibleshelf.com, which stamped every
+    // <loc> cross-domain and made the sitemap unusable (spec RC1).
+    const baseUrl = resolveSitemapBaseUrl(unifiedConfig.webUrl);
+    if (!baseUrl) {
+      logger.error(
+        '[GET /api/public/directory/places-sitemap.xml] Refusing to emit sitemap: WEB_URL is missing or points at the API host',
+      );
+      return res.status(500).json({ error: 'sitemap_origin_unconfigured' });
+    }
 
     // Fetch all published presence listing slugs
     const listingsResult = await pool.query(
@@ -1475,7 +1485,8 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
-         AND dll.listing_origin = 'directory_seed'`,
+         AND dll.listing_origin = 'directory_seed'
+       ORDER BY dll.slug`,
     );
 
     // Fetch all shelf categories with published listings — primary AND
@@ -1499,7 +1510,8 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
            AND dll.listing_origin = 'directory_seed'
            AND NULLIF(TRIM(sec), '') IS NOT NULL
        ) shelf
-       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)`,
+       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)
+       ORDER BY shelf.category`,
     );
 
     // Fetch all markets (city+state pairs) with published listings — the
@@ -1510,68 +1522,64 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
-         AND dll.listing_origin = 'directory_seed'`,
+         AND dll.listing_origin = 'directory_seed'
+       ORDER BY city_slug, state_slug`,
     );
 
-    const urls: string[] = [];
+    // Claimed/tenant listings live at /directory/{slug}; seeds 308 there when
+    // their origin changes, so the two sets are disjoint and must not be
+    // emitted on each other's surface. Demo tenants are sample storefronts,
+    // not inventory (spec §4.7 gating parity).
+    const claimedResult = await pool.query(
+      `SELECT dll.slug, dll.updated_at
+       FROM directory_listings_list dll
+       LEFT JOIN tenants t ON t.id = dll.tenant_id
+       WHERE dll.is_published = true
+         AND dll.listing_origin IS DISTINCT FROM 'directory_seed'
+         AND t.is_demo IS NOT TRUE
+       ORDER BY dll.slug`,
+    );
 
-    // Index page
-    urls.push(`  <url>
-    <loc>${baseUrl}/place</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>`);
+    const categories = categoriesResult.rows.map((row: any) => ({
+      slug: row.category_slug || slugify(row.category),
+    }));
 
-    // Category pages
-    for (const row of categoriesResult.rows) {
-      const shelfSlug = row.category_slug || slugify(row.category);
-      urls.push(`  <url>
-    <loc>${baseUrl}/place/category/${encodeURIComponent(shelfSlug)}</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`);
-    }
-
-    // City pages
-    for (const row of citiesResult.rows) {
+    const cities = citiesResult.rows.map((row: any) => {
       const stateCode = row.state_slug
         ? CITY_SLUG_STATE_TOKENS[(row.state_slug as string).trim()] ?? null
         : null;
-      const citySlug = slugify(row.city_slug as string)
-        + (stateCode ? `-${stateCode}` : '');
-      urls.push(`  <url>
-    <loc>${baseUrl}/place/city/${encodeURIComponent(citySlug)}</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`);
-    }
+      return {
+        slug: slugify(row.city_slug as string) + (stateCode ? `-${stateCode}` : ''),
+      };
+    });
 
-    // Individual listing pages
-    for (const row of listingsResult.rows) {
-      const lastmod = new Date(row.updated_at).toISOString().split('T')[0];
-      urls.push(`  <url>
-    <loc>${baseUrl}/place/${encodeURIComponent(row.slug)}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>`);
+    const { entries, excludedCategorySlugs } = buildPlacesSitemap({
+      baseUrl,
+      categories,
+      cities,
+      seeds: listingsResult.rows.map((row: any) => ({ slug: row.slug, updatedAt: row.updated_at })),
+      claimed: claimedResult.rows.map((row: any) => ({ slug: row.slug, updatedAt: row.updated_at })),
+    });
+
+    // Free-text shelf labels cost index quality — surface what the §4.6 filter
+    // dropped so the operator can see it in the logs.
+    if (excludedCategorySlugs.length > 0) {
+      logger.info(
+        '[GET /api/public/directory/places-sitemap.xml] Excluded free-text shelf slugs',
+        undefined,
+        { count: excludedCategorySlugs.length, slugs: excludedCategorySlugs.slice(0, 20) },
+      );
     }
 
     // Log sitemap generation
-    const totalUrls = 1 + categoriesResult.rows.length + citiesResult.rows.length + listingsResult.rows.length;
     await pool.query(
       'INSERT INTO directory_places_sitemap_log (generated_at, url_count) VALUES (now(), $1)',
-      [totalUrls],
+      [entries.length],
     );
-
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.join('\n')}
-</urlset>`;
 
     res.set('Content-Type', 'application/xml');
     res.set('Cache-Control', 'public, max-age=3600');
-    res.send(xml);
+    res.send(renderUrlset(entries));
   } catch (error) {
     logger.error('[GET /api/public/directory/places-sitemap.xml] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
