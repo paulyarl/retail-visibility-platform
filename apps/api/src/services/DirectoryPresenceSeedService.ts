@@ -222,7 +222,7 @@ class DirectoryPresenceSeedService {
    * rows ({fieldKey, value, sourceName, ...}). Discovery sources aren't
    * listing fields, so they record under the synthetic 'discovery' key.
    */
-  private toSeedProvenance(discoveryProvenance: any[] | null | undefined): CreateSeedInput['provenance'] {
+  private toSeedProvenance(discoveryProvenance: any[] | null | undefined): NonNullable<CreateSeedInput['provenance']> {
     if (!Array.isArray(discoveryProvenance)) return [];
     return discoveryProvenance
       .filter((p) => p && (p.source || p.source_name))
@@ -240,6 +240,43 @@ class DirectoryPresenceSeedService {
           showOnPublic: false,
         };
       });
+  }
+
+  /**
+   * Field-level provenance for captured opening hours (queue/PG seed paths).
+   * Operator-verified hours (resolveVerification mirrors them into
+   * verified_nap.hours) cite the verification call; scan-captured hours cite
+   * the discovery_provenance source whose evidence_types includes 'hours'
+   * (the directive requires that citation) — falling back to a plain
+   * 'discovery_scan' marker when the emission predates the citation rule.
+   */
+  private toHoursProvenance(
+    businessHours: any,
+    snapshot: any,
+    discoveryProvenance: any[] | null | undefined,
+  ): NonNullable<CreateSeedInput['provenance']> {
+    if (!businessHours || typeof businessHours !== 'object' || Array.isArray(businessHours)) return [];
+    const value = JSON.stringify(businessHours);
+    if (snapshot?.verified_nap?.hours) {
+      return [{
+        fieldKey: 'hours',
+        value,
+        sourceName: 'verification_call',
+        confidence: 'high' as const,
+        showOnPublic: true,
+      }];
+    }
+    const cite = (Array.isArray(discoveryProvenance) ? discoveryProvenance : [])
+      .find((p) => p && Array.isArray(p.evidence_types) && p.evidence_types.includes('hours'));
+    return [{
+      fieldKey: 'hours',
+      value,
+      sourceName: String(cite?.source ?? cite?.source_name ?? 'discovery_scan').slice(0, 50),
+      sourceUrl: cite?.url ?? cite?.source_url ?? undefined,
+      accessedAt: cite?.accessed_at ? new Date(cite.accessed_at) : undefined,
+      confidence: 'medium' as const,
+      showOnPublic: true,
+    }];
   }
 
   /**
@@ -2106,6 +2143,10 @@ class DirectoryPresenceSeedService {
         }
 
         const snapshot = entry.business_snapshot || {};
+        // Migration 296 — opening hours captured on the verification call
+        // (snapshot.hours / verified_nap.hours) or observed on a cited
+        // discovery source (snapshot.hours emitted by the scan).
+        const seedBusinessHours = snapshot.hours || snapshot.verified_nap?.hours || undefined;
         const seedInput: CreateSeedInput = {
           businessName: entry.business_name || entry.title || 'Unknown Business',
           address: snapshot.address || 'Address not available',
@@ -2125,10 +2166,11 @@ class DirectoryPresenceSeedService {
           identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
           categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
           notes: entry.note || null,
-          // Migration 296 — opening hours captured on the verification call
-          // (snapshot.hours) or the verified_nap provenance block.
-          businessHours: snapshot.hours || snapshot.verified_nap?.hours || undefined,
-          provenance: this.toSeedProvenance(entry.discovery_provenance),
+          businessHours: seedBusinessHours,
+          provenance: [
+            ...this.toSeedProvenance(entry.discovery_provenance),
+            ...this.toHoursProvenance(seedBusinessHours, snapshot, entry.discovery_provenance),
+          ],
         };
 
         const result = await this.createSeed(seedInput, ctx);
@@ -2261,6 +2303,10 @@ class DirectoryPresenceSeedService {
         }
 
         const snapshot = entry.business_snapshot || {};
+        // Migration 296 — opening hours captured on the verification call
+        // (snapshot.hours / verified_nap.hours) or observed on a cited
+        // discovery source (snapshot.hours emitted by the scan).
+        const seedBusinessHours = snapshot.hours || snapshot.verified_nap?.hours || undefined;
         const seedInput: CreateSeedInput = {
           businessName: entry.business_name || entry.title || 'Unknown Business',
           address: snapshot.address || 'Address not available',
@@ -2280,10 +2326,11 @@ class DirectoryPresenceSeedService {
           identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
           categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
           notes: entry.note || null,
-          // Migration 296 — opening hours captured on the verification call
-          // (snapshot.hours) or the verified_nap provenance block.
-          businessHours: snapshot.hours || snapshot.verified_nap?.hours || undefined,
-          provenance: this.toSeedProvenance(entry.discovery_provenance),
+          businessHours: seedBusinessHours,
+          provenance: [
+            ...this.toSeedProvenance(entry.discovery_provenance),
+            ...this.toHoursProvenance(seedBusinessHours, snapshot, entry.discovery_provenance),
+          ],
         };
 
         const result = await this.createSeed(seedInput, ctx);
@@ -2964,6 +3011,12 @@ class DirectoryPresenceSeedService {
       .filter((c: string) => c.toLowerCase() !== campaignPrimaryLower)
       .slice(0, 9);
 
+    // Opening hours — the campaign record's capture (verification call or
+    // operator edit; migration 296) outranks the audit's observed hours
+    // (audit_data.business_hours). The provenance row names which lane the
+    // seed carries.
+    const seedBusinessHours = campaign.business_hours || d.business_hours || undefined;
+
     const seedInput: CreateSeedInput = {
       businessName,
       address,
@@ -2988,7 +3041,7 @@ class DirectoryPresenceSeedService {
       categoryFit,
       notes: ([d.summary, (catIdAudit?.auditData as any)?.business_summary]
         .find((s): s is string => typeof s === 'string' && s.trim().length > 0))?.substring(0, 1000),
-      businessHours: campaign.business_hours || d.business_hours || undefined,
+      businessHours: seedBusinessHours,
       description: seoPacket.description,
       keywords: seoPacket.keywords,
       sameAs: seoPacket.sameAs,
@@ -2998,6 +3051,7 @@ class DirectoryPresenceSeedService {
         { fieldKey: 'address', value: address, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'phone', value: phone || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!phone },
         { fieldKey: 'website', value: websiteUrl || undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!websiteUrl },
+        { fieldKey: 'hours', value: seedBusinessHours ? JSON.stringify(seedBusinessHours) : undefined, sourceName: campaign.business_hours ? 'campaign_record' : sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: !!seedBusinessHours },
         { fieldKey: 'primary_category', value: campaign.category, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'secondary_categories', value: campaignSecondary.length > 0 ? campaignSecondary.join(', ') : undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: campaignSecondary.length > 0 },
         // SEO provenance rows (spec §4.4.6)

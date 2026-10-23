@@ -17,6 +17,11 @@
  *   TTL PACKET_TTL_DAYS. Resolved place_id/data_id persist on the row so
  *   refreshes skip the paid search call; writes stay per-campaign to
  *   keep credit attribution honest.
+ * - In-flight dedupe: renders that land together for the same
+ *   prospect+level share one fetch, so a resolved-prompt preview and the
+ *   Execute that follows it cannot both pay for the same packet.
+ * - `fetchPacket` reports `cached` + the credits THIS call consumed;
+ *   `getPacket` is the packet-only wrapper for existing callers.
  * - latest-N reviews by default; 'deep' adds posts/photos for forensics.
  * - Missing HASDATA_API_KEY → unavailable, never a hard failure.
  *
@@ -77,10 +82,25 @@ export interface PacketStatus {
   configured: boolean;
 }
 
+/**
+ * Fetch-or-cache outcome. `credits_spent` is what THIS call actually
+ * consumed — 0 on a cache hit and 0 when the call joined a concurrent
+ * render's in-flight fetch, so a caller logging it reports real spend
+ * rather than the packet's historical `credits_spent`.
+ */
+export interface GroundTruthFetchResult {
+  packet: GroundTruthPacket | null;
+  cached: boolean;
+  credits_spent: number;
+}
+
 // ─── Service ────────────────────────────────────────────────────────────
 
 export class HasDataGroundTruthService extends BaseService {
   private static instance: HasDataGroundTruthService;
+
+  /** prospect|level → the fetch currently running, so concurrent renders share it. */
+  private inFlight = new Map<string, Promise<GroundTruthPacket | null>>();
 
   private constructor() {
     super();
@@ -95,7 +115,7 @@ export class HasDataGroundTruthService extends BaseService {
 
   /**
    * Cache status + cost estimate for the workspace knob (§14.1a): the
-   * checkbox shows "cached packet · 0 credits" vs "~35 credits".
+   * checkbox shows "cached packet · 0 credits" vs the live-fetch estimate.
    */
   async getPacketStatus(campaignId: string, level: GroundTruthLevel): Promise<PacketStatus> {
     const configured = !!unifiedConfig.hasdataApiKey;
@@ -123,35 +143,92 @@ export class HasDataGroundTruthService extends BaseService {
     level: GroundTruthLevel,
     ctx?: RequestCtx,
   ): Promise<GroundTruthPacket | null> {
+    return (await this.fetchPacket(campaignId, level, ctx)).packet;
+  }
+
+  /**
+   * Fetch-or-cache with provenance: `cached` distinguishes a 0-credit DB
+   * hit from a live fetch, and `credits_spent` reports what this call
+   * actually consumed. Concurrent renders for the same prospect+level
+   * share one fetch — the joined callers report 0 credits because the
+   * leader already paid.
+   */
+  async fetchPacket(
+    campaignId: string,
+    level: GroundTruthLevel,
+    ctx?: RequestCtx,
+  ): Promise<GroundTruthFetchResult> {
     const apiKey = unifiedConfig.hasdataApiKey;
     if (!apiKey) {
       logger.warn('HASDATA_API_KEY not configured; ground truth unavailable', ctx, { campaignId });
-      return null;
+      return { packet: null, cached: false, credits_spent: 0 };
     }
 
     // 1. Cache-first — fresh packet within TTL
     const cached = await this.readFreshPacket(campaignId, level);
-    if (cached) return cached.packet as GroundTruthPacket;
+    if (cached) return { packet: cached.packet as GroundTruthPacket, cached: true, credits_spent: 0 };
 
-    // 2. Resolve the place — reuse a persisted place_id/data_id from any
-    //    prior packet row to skip the paid search call.
+    // 2. Campaign identity — the resolve query needs it, and its
+    //    business_prospect_id keys the in-flight map so sibling campaigns
+    //    on one prospect share a single paid fetch.
+    let campaign: any = null;
+    try {
+      campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { business_name: true, address_line1: true, address_city: true, address_state: true, city: true, state: true, phone: true, website_url: true, business_prospect_id: true },
+      });
+    } catch (err) {
+      logger.warn('Ground-truth campaign lookup failed (non-fatal)', ctx, {
+        campaignId,
+        error: (err as Error).message,
+      });
+    }
+    if (!campaign?.business_name) {
+      logger.warn('Ground-truth fetch skipped — campaign has no business_name', ctx, { campaignId });
+      return { packet: null, cached: false, credits_spent: 0 };
+    }
+
+    // 3. In-flight dedupe — two renders landing together (a resolved-prompt
+    //    preview followed by Execute, or sibling campaigns on one prospect)
+    //    must not both pay for the same packet.
+    const key = campaign.business_prospect_id
+      ? `prospect:${campaign.business_prospect_id}:${level}`
+      : `campaign:${campaignId}:${level}`;
+    const joined = this.inFlight.get(key);
+    if (joined) {
+      logger.info('Ground-truth fetch joined an in-flight request', ctx, { campaignId, level, key });
+      return { packet: await joined, cached: false, credits_spent: 0 };
+    }
+
+    const task = this.fetchAndPersist(campaignId, level, apiKey, campaign, ctx);
+    this.inFlight.set(key, task);
+    try {
+      const packet = await task;
+      return { packet, cached: false, credits_spent: packet?.credits_spent ?? 0 };
+    } finally {
+      if (this.inFlight.get(key) === task) this.inFlight.delete(key);
+    }
+  }
+
+  /**
+   * Live fetch + persist. Separated so the in-flight map can hold the
+   * promise itself; never throws (callers get null on failure).
+   */
+  private async fetchAndPersist(
+    campaignId: string,
+    level: GroundTruthLevel,
+    apiKey: string,
+    campaign: any,
+    ctx?: RequestCtx,
+  ): Promise<GroundTruthPacket | null> {
+    // Resolve the place — reuse a persisted place_id/data_id from any
+    // prior packet row to skip the paid search call.
     const prior = await this.readAnyPacket(campaignId);
     let placeId: string | null = prior?.place_id ?? null;
     let dataId: string | null = prior?.data_id ?? null;
     let credits = 0;
 
     try {
-      // Campaign identity for the resolve query — inside the try so a
-      // transient DB error degrades to unavailable instead of throwing.
-      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
-        where: { id: campaignId },
-        select: { business_name: true, address_line1: true, address_city: true, address_state: true, city: true, state: true, phone: true, website_url: true },
-      });
-      if (!campaign?.business_name) {
-        logger.warn('Ground-truth fetch skipped — campaign has no business_name', ctx, { campaignId });
-        return null;
-      }
-
       if (!placeId && !dataId) {
         const q = [campaign.business_name, campaign.address_city ?? campaign.city, campaign.address_state ?? campaign.state]
           .filter(Boolean)

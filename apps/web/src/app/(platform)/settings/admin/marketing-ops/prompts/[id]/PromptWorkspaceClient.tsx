@@ -974,7 +974,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                       }
                       className="px-2 py-1 text-xs border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="latest">Latest — place + recent reviews (~35 credits)</option>
+                      <option value="latest">Latest — place + recent reviews (~30 credits)</option>
                       <option value="deep">Deep — reviews + photos + posts (~50 credits)</option>
                     </select>
                   </div>
@@ -993,7 +993,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                     </p>
                   ) : (
                     <p className="text-xs text-gray-400 dark:text-gray-500">
-                      Cache state unknown — a fresh {groundTruthLevel} fetch costs ~{groundTruthLevel === 'deep' ? 50 : 35} credits.
+                      Cache state unknown — a fresh {groundTruthLevel} fetch costs ~{groundTruthLevel === 'deep' ? 50 : 30} credits.
                     </p>
                   )}
                 </div>

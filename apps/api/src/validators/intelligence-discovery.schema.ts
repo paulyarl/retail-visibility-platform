@@ -57,6 +57,29 @@ export const discoveryProvenanceSchema = z.object({
   accessed_at: z.string().nullable().optional(),
 }).passthrough();
 
+// ─── Opening Hours ───────────────────────────────────────────────────────
+// Canonical day-grid shape shared with directory_listings_list.business_hours,
+// mkt_campaigns_list.business_hours, and the verify-record modal's hours editor
+// (apps/web/src/lib/business-hours.ts). Emit ONLY when a cited source displays
+// the business's hours — the value then rides business_snapshot.hours into the
+// seed listing, citing the source that showed them.
+const discoveryDayHoursSchema = z.object({
+  open: z.string(),
+  close: z.string(),
+  closed: z.boolean().optional(),
+}).passthrough();
+
+export const discoveryHoursSchema = z.object({
+  monday: discoveryDayHoursSchema.nullable().optional(),
+  tuesday: discoveryDayHoursSchema.nullable().optional(),
+  wednesday: discoveryDayHoursSchema.nullable().optional(),
+  thursday: discoveryDayHoursSchema.nullable().optional(),
+  friday: discoveryDayHoursSchema.nullable().optional(),
+  saturday: discoveryDayHoursSchema.nullable().optional(),
+  sunday: discoveryDayHoursSchema.nullable().optional(),
+  timezone: z.string().nullable().optional(),
+}).passthrough();
+
 // ─── Suggested Categories ────────────────────────────────────────────────
 // Directory entries need a category; Proving Ground needs one too. The item
 // shape mirrors category-identification's candidateCategorySchema so the same
@@ -83,6 +106,11 @@ const discoveredBusinessSchema = z.object({
   phone: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
   gbp_url: z.string().nullable().optional(),
+  // Opening hours observed on a cited source (canonical day grid —
+  // monday…sunday → { open "HH:MM", close "HH:MM", closed }, optional
+  // timezone). Emitted only when a discovery_provenance source displays
+  // them; that source's evidence_types then includes "hours".
+  hours: discoveryHoursSchema.nullable().optional(),
 
   // Geographic classification (§G2)
   location_status: locationStatusEnum,
@@ -944,6 +972,7 @@ Return a single JSON object with this structure:
       "phone": "<phone if known>",
       "website": "<url or null>",
       "gbp_url": "<gbp url or null>",
+      "hours": { "monday": { "open": "09:00", "close": "18:00", "closed": false }, "...": "<one entry per weekday the cited source lists, monday–sunday>", "timezone": "<IANA zone or null>" },
       "location_status": "inside_city" | "adjacent_city" | "metro_area" | "outside_market",
       "ownership_type": "independent" | "local_chain" | "franchise" | "national_chain" | "national_franchise" | "regional_chain" | "unknown",
       "category_fit": "verified" | "probable" | "insufficient",
@@ -1093,6 +1122,7 @@ Rules:
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
 - OBSERVED ATTRIBUTES: For each candidate, record the attribute chips its platform profiles actually display (payments accepted, accessibility, ownership, service options, certifications) in observed_attributes — one entry per attribute with the platform, a snake_case key, a display label, the profile URL where it was observed, and the date observed. Never infer attributes from the business's category, name, or neighborhood — record only what the profile itself shows. Omit the field entirely when no attribute chips are observed.
+- OPENING HOURS: emit "hours" ONLY when a source you cite in discovery_provenance displays the business's opening hours (GBP hours block, directory profile, the business's own site). Shape is the canonical day grid — lowercase full day keys monday…sunday, each { "open": "HH:MM", "close": "HH:MM", "closed": <boolean> } with 24-hour times — plus an optional "timezone" (IANA zone) only when the source names one. Mark a day "closed": true when the source lists it closed; omit days the source does not list. Never infer or interpolate hours from the category, typical conventions, or a different location of a chain. The source that displayed the hours MUST carry "hours" in its evidence_types with its url and accessed_at. Omit the field entirely (or null) when no cited source displays hours — absence is honest.
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
 - BRONZE REASON ATTRIBUTION: When a "=== BRONZE STANDARD — MARKET CALIBRATION ===" block is present in the prompt, attribute each candidate to the catalog reason(s) DIRECTLY RESPONSIBLE for the find — the reason whose expected_vectors surfaced the business, or whose signal vocabulary is what identifies it as category-qualified-but-invisible. Emit one bronze_attribution entry per responsible reason with its reason_key exactly as given in the block and a one-line basis naming the vector or signal that produced the find. Attribution is causal, not resemblance: a candidate mainstream discovery would have found anyway gets NO attribution, and a candidate that merely looks like a bronze exemplar but was not reached through the reason's vector gets none either. When NO bronze calibration block is present, or no reason was responsible for a candidate, OMIT bronze_attribution entirely.

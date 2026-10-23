@@ -413,6 +413,18 @@ On the Google Business Profile, record:
 * `platforms.google.photo_types` — the photo types observed on the profile, categorized from: storefront, exterior, interior, product, team, logo, signage. Emit the array of types observed.
 * `platforms.google.special_hours_present` — whether special or holiday hours are posted and current on the profile (true/false/null).
 
+### Displayed Opening Hours Capture — CONDITIONAL
+
+When a rendered public surface displays the business's opening hours — the GBP hours block, the business's own site, or a directory profile — record them in the top-level `business_hours` field using the canonical day grid. Lowercase full day keys `monday`–`sunday`, each `{ "open": "HH:MM", "close": "HH:MM", "closed": <boolean> }` with 24-hour times, plus an optional `"timezone"` (IANA zone) only when the source names one:
+
+{ "monday": { "open": "09:00", "close": "18:00", "closed": false }, ..., "sunday": { "open": "09:00", "close": "18:00", "closed": true } }
+
+Rules:
+
+* Emit only what the surface displays — omit days the source does not list, and mark a day `"closed": true` only when the source lists that day closed.
+* Never infer or interpolate hours from the category, conventions, or a different location of a chain. "No hours observed" is the honest answer — emit `"business_hours": null`.
+* Conflicting hours across surfaces are a NAP-style conflict — record the most authoritative surface's values and note the disagreement in `data_quality.conflicts`.
+
 
 ---
 
@@ -1259,6 +1271,7 @@ Omit a conditional field entirely when its governing directive says to omit it (
     "phone_variations": [],
     "material_issues": []
   },
+  "business_hours": null,
   "operational_status": {
     "status": "unable_to_verify",
     "last_activity_evidence": null,

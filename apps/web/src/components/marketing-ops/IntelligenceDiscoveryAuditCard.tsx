@@ -86,6 +86,14 @@ export interface DiscoveredBusiness {
   /** Optional benchmark marker — a leader observed as reference point, not
    *  a prospect (spec §3). Card-display only. */
   benchmark_only?: boolean | null;
+  /** Canonical day-grid opening hours observed on a cited source
+   *  (monday…sunday → { open "HH:MM", close "HH:MM", closed }, optional
+   *  timezone — the shape apps/web/src/lib/business-hours.ts parses).
+   *  Rides the queue snapshot into the seed listing with provenance. */
+  hours?: {
+    [day: string]: { open?: string; close?: string; closed?: boolean } | string | undefined;
+    timezone?: string;
+  } | null;
   notes?: string;
   [key: string]: any;
 }
@@ -401,6 +409,10 @@ export default function IntelligenceDiscoveryAuditCard({
           website: biz.website,
           gbp_url: biz.gbp_url,
           ownership_type: biz.ownership_type,
+          // Scan-captured opening hours (canonical day grid) — prefills the
+          // verify-record editor, carries onto campaign.business_hours at
+          // derive, and lands on the seed listing at promotion.
+          hours: biz.hours ?? undefined,
           // Sourced attributes ride the snapshot so queue → campaign → seed
           // carries the analyst-recorded evidence (migration 267).
           attributes: Array.isArray(biz.observed_attributes) ? biz.observed_attributes : [],

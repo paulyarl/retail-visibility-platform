@@ -92,6 +92,12 @@ const fetchUrls = () => mockFetch.mock.calls.map((c) => String(c[0]));
 describe('HasDataGroundTruthService — prospect-scoped cache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks leaves queued mockResolvedValueOnce values in place —
+    // reset so one test's leftover row can't satisfy the next test's read.
+    mockQueryRaw.mockReset();
+    mockExecuteRaw.mockReset();
+    mockFindCampaign.mockReset();
+    mockFetch.mockReset();
     mockConfig.hasdataApiKey = 'test-key';
     mockFindCampaign.mockResolvedValue(CAMPAIGN_ROW);
     mockExecuteRaw.mockResolvedValue(1);
@@ -198,5 +204,61 @@ describe('HasDataGroundTruthService — prospect-scoped cache', () => {
     expect(packet).toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockQueryRaw).not.toHaveBeenCalled();
+  });
+
+  it('reports cached · 0 credits on a fetchPacket cache hit', async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      { id: 'moi-1', packet: PACKET, place_id: PACKET.place_id, data_id: PACKET.data_id, fetched_at: PACKET.fetched_at },
+    ]);
+
+    const result = await HasDataGroundTruthService.getInstance().fetchPacket(CAMPAIGN, 'latest');
+
+    expect(result.cached).toBe(true);
+    // The packet's own credits_spent (30) is historical — this call spent 0.
+    expect(result.credits_spent).toBe(0);
+    expect(result.packet?.place_id).toBe(PACKET.place_id);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('reports the real spend on a fresh fetchPacket', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'moi-old', place_id: PACKET.place_id, data_id: PACKET.data_id }]);
+
+    mockFetch
+      .mockResolvedValueOnce(jsonRes(PLACE_RES))
+      .mockResolvedValueOnce(jsonRes({ topics: [], reviews: [] }));
+
+    const result = await HasDataGroundTruthService.getInstance().fetchPacket(CAMPAIGN, 'latest');
+
+    expect(result.cached).toBe(false);
+    // place + reviews only (place_id reused) = 2 calls.
+    expect(result.credits_spent).toBe(20);
+  });
+
+  it('collapses concurrent renders for one prospect into a single paid fetch', async () => {
+    // Every cache read misses, and the campaign carries no prospect id —
+    // both calls therefore key on campaign scope and must share one fetch.
+    mockQueryRaw.mockResolvedValue([]);
+
+    mockFetch
+      .mockResolvedValueOnce(jsonRes({ placeResults: { placeId: PACKET.place_id, dataId: PACKET.data_id } }))
+      .mockResolvedValueOnce(jsonRes(PLACE_RES))
+      .mockResolvedValueOnce(jsonRes({ topics: [], reviews: [] }));
+
+    const service = HasDataGroundTruthService.getInstance();
+    const [first, second] = await Promise.all([
+      service.fetchPacket(CAMPAIGN, 'latest'),
+      service.fetchPacket(CAMPAIGN, 'latest'),
+    ]);
+
+    // One search + place + reviews — not two of each.
+    expect(fetchUrls()).toHaveLength(3);
+    expect(mockExecuteRaw).toHaveBeenCalledOnce();
+    expect(first.packet?.place_id).toBe(PACKET.place_id);
+    expect(second.packet?.place_id).toBe(PACKET.place_id);
+    // Only the leader reports the spend; the joined call reports 0.
+    expect(first.credits_spent).toBe(30);
+    expect(second.credits_spent).toBe(0);
   });
 });

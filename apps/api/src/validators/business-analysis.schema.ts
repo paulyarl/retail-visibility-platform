@@ -464,6 +464,28 @@ const napConsistencySchema = z.object({
   material_issues: z.array(z.string()).optional(),
 }).passthrough();
 
+// Opening hours — canonical day-grid shape shared with
+// directory_listings_list.business_hours and mkt_campaigns_list.business_hours
+// (migration 296; apps/web/src/lib/business-hours.ts parses it). Emitted ONLY
+// when a rendered public surface displays the business's hours — flows onto
+// the seed listing via createFromCampaign (audit_data.business_hours).
+const auditDayHoursSchema = z.object({
+  open: z.string(),
+  close: z.string(),
+  closed: z.boolean().optional(),
+}).passthrough();
+
+const auditBusinessHoursSchema = z.object({
+  monday: auditDayHoursSchema.nullable().optional(),
+  tuesday: auditDayHoursSchema.nullable().optional(),
+  wednesday: auditDayHoursSchema.nullable().optional(),
+  thursday: auditDayHoursSchema.nullable().optional(),
+  friday: auditDayHoursSchema.nullable().optional(),
+  saturday: auditDayHoursSchema.nullable().optional(),
+  sunday: auditDayHoursSchema.nullable().optional(),
+  timezone: z.string().nullable().optional(),
+}).passthrough();
+
 const reviewExampleSchema = z.object({
   platform: z.string(),
   rating: coercedNumberNullable,
@@ -789,6 +811,11 @@ export const businessAnalysisSchema = z.object({
   alignment_scoring: alignmentScoringSchema.optional(),
   website: websiteSchema,
   nap_consistency: napConsistencySchema,
+  // Opening hours observed on a rendered public surface (GBP hours block,
+  // the business's own site, a directory profile). Canonical day grid —
+  // carried onto the seed listing at "Add to place listing" and shown
+  // publicly with field provenance. null when no surface displays hours.
+  business_hours: auditBusinessHoursSchema.nullable().optional(),
   operational_status: operationalStatusSchema.optional(),
   competitive_benchmarks: z.array(competitiveBenchmarkSchema).optional(),
   unanswered_negative_review_examples: z.array(reviewExampleSchema).optional(),
@@ -1100,6 +1127,12 @@ Return your response as JSON matching this exact schema:
     "phone_variations": ["<string>", ...],
     "material_issues": ["<string>", ...]
   },
+  "business_hours": {
+    "monday": { "open": "09:00", "close": "18:00", "closed": false },
+    "...": "<one entry per weekday the observed surface lists, monday–sunday>",
+    "sunday": { "open": "09:00", "close": "18:00", "closed": true },
+    "timezone": "<IANA zone or null — only when the source names it>"
+  },
   "operational_status": {
     "status": "active|likely_active|inactive|unable_to_verify",
     "last_activity_evidence": "<string|null>",
@@ -1224,6 +1257,7 @@ PRODUCT-VISIBILITY FIELDS (assess for all businesses, especially product/invento
 - platforms.google.photo_count: <number|null> — total number of photos on GBP
 - platforms.google.photo_types: ["storefront"|"exterior"|"interior"|"product"|"team"|"logo", ...] — categorize GBP photos by type
 - platforms.google.special_hours_present: <boolean|null> — are special/holiday hours present on GBP?
+- business_hours: <object|null> — the business's displayed opening hours in canonical day-grid form, emitted ONLY when a rendered platform profile or public surface shows them. Shape: lowercase full day keys monday…sunday → { "open": "HH:MM", "close": "HH:MM", "closed": <boolean> } with 24-hour times; mark a day closed:true when the source lists it closed; omit days the source does not list; include "timezone" only when the source names one. Never infer or interpolate hours from category, conventions, or a different chain location — emit null when no surface displays them.
 - platforms.{platform}.attributes: [{ "key": "<snake_case_key>", "label": "<display label>", "source_url": "<url|null>", "as_of": "<ISO date|null>" }, ...] — the attribute chips the profile actually displays (payments accepted, accessibility, ownership, service options, certifications). Record each attribute only when the profile itself displays it (attribute chips, amenity sections, payment badges); NEVER infer attributes from the business's category, name, or neighborhood. Omit the field entirely when the profile displays no attribute chips — do not fabricate an empty inventory.
 - recommended_attributes: [{ "key", "label", "platform", "basis", "rationale", "current_state" }, ...] — advisory attribute chips the owner could enable per platform, derived by comparing the Gold Standard expected attributes and Category Intelligence attribute lists against what each profile actually displays. Unlike sourced attributes, basis may legitimately be category/benchmark context. current_state: "not_observed" (profile rendered, chip absent), "unverifiable" (profile could not be fully rendered — gated/walled), "verify_with_owner" (owner-confirmable fact such as identity designation or program enrollment). Never recommend a chip already present in platforms.{platform}.attributes; never assert owner-designated identity attributes as fact — frame them as enableable slots. Omit when no recommendation is warranted.
 

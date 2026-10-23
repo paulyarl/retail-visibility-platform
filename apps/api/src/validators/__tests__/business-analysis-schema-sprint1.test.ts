@@ -422,3 +422,32 @@ describe('benefits — optional shared-schema field (Operator Benefits directive
     expect(businessAnalysisSchema.safeParse(one).success).toBe(false);
   });
 });
+
+describe('business_analysis schema — observed business_hours', () => {
+  it('accepts canonical day-grid business_hours', () => {
+    const audit = baseAudit();
+    audit.business_hours = {
+      monday: { open: '09:00', close: '18:00', closed: false },
+      sunday: { open: '09:00', close: '18:00', closed: true },
+      timezone: 'America/Indiana/Indianapolis',
+    };
+    const result = businessAnalysisSchema.safeParse(audit);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.business_hours?.monday?.open).toBe('09:00');
+    }
+  });
+
+  it('accepts null and omitted business_hours (nothing observed)', () => {
+    const nullAudit = baseAudit();
+    nullAudit.business_hours = null;
+    expect(businessAnalysisSchema.safeParse(nullAudit).success).toBe(true);
+    expect(businessAnalysisSchema.safeParse(baseAudit()).success).toBe(true);
+  });
+
+  it('rejects a day entry missing open/close', () => {
+    const audit = baseAudit();
+    (audit as any).business_hours = { monday: { open: '09:00' } };
+    expect(businessAnalysisSchema.safeParse(audit).success).toBe(false);
+  });
+});

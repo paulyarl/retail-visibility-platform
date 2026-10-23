@@ -134,3 +134,59 @@ describe('createSeedsForProvingGround — verified hours carry', () => {
     expect(input.businessHours).toBeUndefined();
   });
 });
+
+describe('createSeedsForProvingGround — hours provenance', () => {
+  const hoursRow = (input: any) =>
+    (input.provenance as any[]).find((p) => p.fieldKey === 'hours');
+
+  it('verification-captured hours cite the verification call at high confidence', async () => {
+    const input = await captureSeedInput(baseEntry({
+      business_snapshot: { address: '1 Main St', hours: HOURS, verified_nap: { hours: HOURS } },
+    }));
+    expect(hoursRow(input)).toMatchObject({
+      sourceName: 'verification_call',
+      confidence: 'high',
+      showOnPublic: true,
+    });
+    expect(JSON.parse(hoursRow(input).value)).toEqual(HOURS);
+  });
+
+  it('scan-captured hours cite the discovery source listing hours evidence', async () => {
+    const input = await captureSeedInput(baseEntry({
+      business_snapshot: { address: '1 Main St', hours: HOURS },
+      discovery_provenance: [
+        { source: 'Loc8NearMe', role: 'mainstream_directory', url: 'https://loc8.example/x', accessed_at: '2026-09-10', evidence_types: ['address', 'phone', 'hours'] },
+        { source: 'SOS registry', role: 'certification', evidence_types: ['entity'] },
+      ],
+    }));
+    expect(hoursRow(input)).toMatchObject({
+      sourceName: 'Loc8NearMe',
+      sourceUrl: 'https://loc8.example/x',
+      confidence: 'medium',
+      showOnPublic: true,
+    });
+    expect(hoursRow(input).accessedAt).toEqual(new Date('2026-09-10'));
+  });
+
+  it('scan-captured hours without an hours-cited source fall back to discovery_scan', async () => {
+    const input = await captureSeedInput(baseEntry({
+      business_snapshot: { address: '1 Main St', hours: HOURS },
+      discovery_provenance: [
+        { source: 'Google', role: 'directory', evidence_types: ['address'] },
+      ],
+    }));
+    expect(hoursRow(input)).toMatchObject({
+      sourceName: 'discovery_scan',
+      confidence: 'medium',
+      showOnPublic: true,
+    });
+  });
+
+  it('emits no hours provenance row when no hours were captured', async () => {
+    const input = await captureSeedInput(baseEntry({
+      business_snapshot: { address: '1 Main St' },
+      discovery_provenance: [{ source: 'Google', role: 'directory', evidence_types: ['hours'] }],
+    }));
+    expect(hoursRow(input)).toBeUndefined();
+  });
+});

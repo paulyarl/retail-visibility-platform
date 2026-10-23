@@ -56,16 +56,22 @@ export async function buildGroundTruthPreamble(
     return `=== GOOGLE MAPS GROUND TRUTH ===\n\nground_truth: unavailable (HASDATA_API_KEY not configured). Proceed without this signal — corpus fields (unanswered rate, topics) mark not_measured rather than fabricating.\n=== END GOOGLE MAPS GROUND TRUTH ===\n\n`;
   }
 
-  const packet = await HasDataGroundTruthService.getPacket(campaignId, level, ctx);
+  const result = await HasDataGroundTruthService.fetchPacket(campaignId, level, ctx);
+  const packet = result.packet;
   if (!packet) {
     return `=== GOOGLE MAPS GROUND TRUTH ===\n\nground_truth: unavailable (fetch failed or place unresolved — level: ${level}). Proceed without this signal — corpus fields mark not_measured rather than fabricating.\n=== END GOOGLE MAPS GROUND TRUTH ===\n\n`;
   }
 
+  // creditsSpent is what THIS render consumed — 0 on a cache hit or when a
+  // concurrent render's fetch was joined. The packet's own credits_spent
+  // records what the original fetch cost and must not be summed per render.
   logger.info('Google Maps ground truth emitted', ctx, {
     campaignId,
     level,
     directiveVersion: GOOGLE_MAPS_GROUND_TRUTH_DIRECTIVE_VERSION,
-    creditsSpent: packet.credits_spent,
+    cached: result.cached,
+    creditsSpent: result.credits_spent,
+    packetFetchedAt: packet.fetched_at,
     reviewCorpus: packet.review_corpus_size,
   });
 

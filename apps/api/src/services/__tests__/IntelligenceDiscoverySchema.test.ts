@@ -1077,3 +1077,62 @@ describe('intelligence_discovery schema — vocabulary suggestions', () => {
     expect(data.suggested_signals).toBeUndefined();
   });
 });
+
+// ─── Scan-captured opening hours (canonical day grid) ─────────────────────
+
+describe('intelligence_discovery schema — hours', () => {
+  const DAY_GRID = {
+    monday: { open: '09:00', close: '18:00', closed: false },
+    tuesday: { open: '09:00', close: '18:00', closed: false },
+    sunday: { open: '09:00', close: '18:00', closed: true },
+    timezone: 'America/Chicago',
+  };
+
+  it('accepts a candidate carrying canonical day-grid hours', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        hours: DAY_GRID,
+        discovery_provenance: [{
+          source: 'Loc8NearMe',
+          role: 'mainstream_directory',
+          evidence_types: ['address', 'phone', 'hours'],
+          url: 'https://example.com/loc8',
+          accessed_at: '2026-09-10',
+        }],
+      })],
+      qualifying_businesses: [validCandidate({ hours: DAY_GRID })],
+    });
+    const result = schema.safeParse(data);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.discovered_businesses[0].hours?.monday?.open).toBe('09:00');
+      expect(result.data.discovered_businesses[0].hours?.sunday?.closed).toBe(true);
+    }
+  });
+
+  it('accepts null and omitted hours (source displayed none)', () => {
+    const withNull = validDiscovery({
+      discovered_businesses: [validCandidate({ hours: null })],
+    });
+    expect(schema.safeParse(withNull).success).toBe(true);
+    expect(schema.safeParse(validDiscovery()).success).toBe(true);
+  });
+
+  it('rejects a day entry missing open/close', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        hours: { monday: { open: '09:00' } } as any,
+      })],
+    });
+    expect(schema.safeParse(data).success).toBe(false);
+  });
+
+  it('tolerates extra keys inside the hours object (passthrough)', () => {
+    const data = validDiscovery({
+      discovered_businesses: [validCandidate({
+        hours: { ...DAY_GRID, note: 'holiday hours differ' },
+      })],
+    });
+    expect(schema.safeParse(data).success).toBe(true);
+  });
+});
