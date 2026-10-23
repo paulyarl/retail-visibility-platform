@@ -1445,4 +1445,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-20-benefits-1 -->
+<!-- seed-version: business-audit-default-2026-10-23-hours-1 -->
