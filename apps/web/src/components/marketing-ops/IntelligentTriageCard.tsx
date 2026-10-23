@@ -4,7 +4,9 @@
  * IntelligentTriageCard — Sprint 5
  *
  * Inline triage decision panel placed above the tabs in CampaignDetailClient,
- * visible only for `seek`-stage campaigns. The triage decision is a
+ * visible for `seek`- and `seed`-stage campaigns (seed included because the
+ * proving-ground preflight graduation can auto-advance past seek before the
+ * operator decides). The triage decision is a
  * prerequisite gate, not a parallel view.
  *
  * Displays:

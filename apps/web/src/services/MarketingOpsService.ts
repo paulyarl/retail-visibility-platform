@@ -2366,6 +2366,12 @@ export interface BusinessAnalysisRequiredError {
   action?: string;
 }
 
+export interface TriageDecisionRequiredError {
+  code: 'triage_decision_required';
+  message: string;
+  action?: string;
+}
+
 export interface ContactReadiness {
   hasPhone: boolean;
   hasEmail: boolean;
@@ -2838,6 +2844,16 @@ class MarketingOpsService extends AdminApiSingleton {
           action: err.action,
         };
         throw auditErr;
+      }
+      // Hard gate: preview_built requires a decided triage (or a declared
+      // playbook lane) — an audit-fallback archetype alone is not enough.
+      if (err?.error === 'triage_decision_required') {
+        const triageErr: TriageDecisionRequiredError = {
+          code: 'triage_decision_required',
+          message: err.message || 'Triage must be decided before preview_built',
+          action: err.action,
+        };
+        throw triageErr;
       }
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
     }

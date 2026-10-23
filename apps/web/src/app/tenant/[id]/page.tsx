@@ -53,6 +53,7 @@ import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerCon
 // import ProductDataService from '@/services/ProductDataService';
 import { clientLogger } from '@/lib/client-logger';
 import { canonicalStorefrontHome } from '@/lib/storefront-routing';
+import { buildStorefrontSchema, storefrontTypeLabel } from '@/lib/storefront-seo';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -521,16 +522,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const showEnhancedSEO = storefrontOptionFlags?.showEnhancedSEO ?? false;
   const storefrontType = storefrontTypeSettings?.effectiveType || 'retail';
 
-  // Type-specific SEO labels
-  const typeLabels: Record<string, { title: string; desc: string; schemaType: string }> = {
-    retail:   { title: 'Store Catalog',       desc: 'Browse products',           schemaType: 'Store' },
-    online:   { title: 'Online Store',        desc: 'Shop online',               schemaType: 'OnlineStore' },
-    service:  { title: 'Services',            desc: 'Book professional services', schemaType: 'Service' },
-    social:   { title: 'Shop',                desc: 'Discover and shop',          schemaType: 'Store' },
-    flexible: { title: 'Store & Services',    desc: 'Browse products and services', schemaType: 'Store' },
-    none:     { title: 'Storefront',          desc: 'View store',                schemaType: 'Store' },
-  };
-  const typeLabel = typeLabels[storefrontType] || typeLabels.retail;
+  // Type-specific SEO labels (shared with the body's JSON-LD builder)
+  const typeLabel = storefrontTypeLabel(storefrontType);
   const customTitle = tenant.profileData?.seo_title?.trim() || null;
 
   // Canonical ladder (sprint plan 4.2): active custom domain → platform
@@ -540,11 +533,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const canonicalLookup = await tenantPublicService.getStorefrontCanonical(id).catch(() => null);
   const canonicalUrl = canonicalStorefrontHome(canonicalLookup, data.resolvedTenantId);
 
+  // Demo storefronts are sample pages, and a storefront that renders the
+  // "not available" gate (closed message, google_only tier) is not a storefront
+  // at all — neither belongs in the index (spec §4.9).
+  const storefrontUnavailable =
+    Boolean((tenant as any).storefrontMessage) || tenant.subscriptionTier === 'google_only';
+  const robots = tenant.isDemo || storefrontUnavailable
+    ? { index: false, follow: false }
+    : undefined;
+
   // Basic metadata — always emitted
   const basicMetadata: Metadata = {
     title: customTitle || `${businessName} - ${typeLabel.title}`,
     description: `${typeLabel.desc} from ${businessName}.`,
     alternates: { canonical: canonicalUrl },
+    ...(robots ? { robots } : {}),
   };
 
   if (!showEnhancedSEO) {
@@ -558,31 +561,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ? `${typeLabel.desc} from ${businessName}. ${businessDescription}`
     : `${typeLabel.desc} from ${businessName}.`;
 
-  const schema = {
-    '@context': 'https://schema.org',
-    '@type': typeLabel.schemaType,
-    name: businessName,
-    description: enhancedDescription,
-    image: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : undefined,
-    address: tenant.metadata?.address ? {
-      '@type': 'PostalAddress',
-      streetAddress: tenant.profileData?.address_line1,
-      addressLocality: tenant.profileData?.city,
-      addressRegion: tenant.profileData?.state,
-      postalCode: tenant.profileData?.postal_code,
-      addressCountry: tenant.profileData?.country_code,
-    } : undefined,
-    telephone: tenant.profileData?.phone_number,
-    email: tenant.profileData?.email,
-    url: tenant.website || tenant.metadata?.website,
-    keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
-  };
+  // Structured data is emitted once, in the page body, as a real
+  // <script type="application/ld+json"> — `metadata.other` renders a
+  // <meta name="application/ld+json"> that no crawler reads (spec RC11).
 
   return {
     title: customTitle || `${businessName} - ${typeLabel.title}`,
     description: enhancedDescription as string,
     keywords: Array.isArray(seoTags) ? seoTags.join(', ') : undefined,
     alternates: { canonical: canonicalUrl },
+    ...(robots ? { robots } : {}),
     openGraph: {
       title: customTitle || businessName,
       description: `${typeLabel.desc} from ${businessName}`,
@@ -594,9 +582,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: businessName,
       description: `${typeLabel.desc} from ${businessName}`,
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
-    },
-    other: {
-      'application/ld+json': JSON.stringify(schema),
     },
   };
 }
@@ -642,6 +627,32 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, storefrontLayoutState, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
+  // Storefront structured data — emitted for EVERY tenant (spec RC11: basic SEO
+  // is not a paid capability). `enhanced_seo` gates keywords and enriched copy.
+  const storefrontType = storefrontTypeSettings?.effectiveType || 'retail';
+  const storefrontTypeLabelResolved = storefrontTypeLabel(storefrontType);
+  const storefrontSchema = buildStorefrontSchema({
+    type: storefrontType,
+    businessName,
+    description: tenant.metadata?.business_description
+      ? `${storefrontTypeLabelResolved.desc} from ${businessName}. ${tenant.metadata.business_description}`
+      : `${storefrontTypeLabelResolved.desc} from ${businessName}.`,
+    imageUrl: tenant.metadata?.logo_url,
+    address: tenant.metadata?.address
+      ? {
+          streetAddress: tenant.profileData?.address_line1,
+          addressLocality: tenant.profileData?.city,
+          addressRegion: tenant.profileData?.state,
+          postalCode: tenant.profileData?.postal_code,
+          addressCountry: tenant.profileData?.country_code,
+        }
+      : null,
+    telephone: tenant.profileData?.phone_number,
+    email: tenant.profileData?.email,
+    website: tenant.website || tenant.metadata?.website,
+    keywords: tenant.profileData?.seo_tags || tenant.directoryData?.seo_keywords,
+  });
+
   if (category && currentCategory) {
     // Track category browse on storefront
     import('@/utils/behaviorTracking').then(({ trackCategoryBrowse }) => {
@@ -790,6 +801,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <ProductSingletonProvider>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(storefrontSchema) }}
+      />
       {tenant.isDemo && <DemoBanner expiresAt={tenant.demoExpiresAt} />}
       {/* B-3 page-view tracking for seed_preview demo storefronts — the
           tracker drops the event server-side when the slug isn't a live

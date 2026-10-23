@@ -3,11 +3,16 @@ import { describe, it, expect } from 'vitest';
 import {
   MAX_CATEGORY_SLUG_LENGTH,
   buildPlacesSitemap,
+  buildProductEntries,
+  buildStorefrontEntries,
   escapeXml,
   formatLastmod,
   isExcludedCategorySlug,
+  renderSitemapIndex,
   renderUrlset,
   resolveSitemapBaseUrl,
+  tenantCanonicalHome,
+  tenantCanonicalOrigin,
 } from '../sitemap';
 
 describe('resolveSitemapBaseUrl (spec RC1)', () => {
@@ -202,5 +207,135 @@ describe('buildPlacesSitemap', () => {
     const locs = entries.map((e) => e.loc);
     expect(locs).toContain(`${baseUrl}/place/city/coeur-d-alene-id`);
     expect(locs).toContain(`${baseUrl}/place/place%20with%20space`);
+  });
+});
+
+describe('tenantCanonicalOrigin / tenantCanonicalHome (spec §4.7)', () => {
+  const baseUrl = 'https://visibleshelf.com';
+  const apex = 'visibleshelf.com';
+
+  it('prefers an active custom domain', () => {
+    expect(
+      tenantCanonicalOrigin({ baseUrl, apex, subdomain: 'baraka', customDomain: 'baraka.example.com' }),
+    ).toBe('https://baraka.example.com');
+    expect(
+      tenantCanonicalHome({ baseUrl, apex, slug: 'baraka', subdomain: 'baraka', customDomain: 'baraka.example.com' }),
+    ).toBe('https://baraka.example.com/');
+  });
+
+  it('falls back to the platform subdomain', () => {
+    expect(tenantCanonicalOrigin({ baseUrl, apex, subdomain: 'baraka' })).toBe(
+      'https://baraka.visibleshelf.com',
+    );
+    expect(tenantCanonicalHome({ baseUrl, apex, slug: 'baraka', subdomain: 'baraka' })).toBe(
+      'https://baraka.visibleshelf.com/',
+    );
+  });
+
+  it('falls back to the platform path form when the tenant has no host', () => {
+    expect(tenantCanonicalOrigin({ baseUrl, apex })).toBe(baseUrl);
+    expect(tenantCanonicalHome({ baseUrl, apex, slug: 'baraka-international-market' })).toBe(
+      'https://visibleshelf.com/tenant/baraka-international-market',
+    );
+  });
+
+  it('returns null for a home with no slug and no host', () => {
+    expect(tenantCanonicalHome({ baseUrl, apex, slug: null })).toBeNull();
+  });
+});
+
+describe('buildStorefrontEntries', () => {
+  const baseUrl = 'https://visibleshelf.com';
+  const apex = 'visibleshelf.com';
+
+  it('emits one canonical home per tenant, deduped', () => {
+    const entries = buildStorefrontEntries({
+      baseUrl,
+      apex,
+      tenants: [
+        { slug: 'baraka', subdomain: 'baraka' },
+        { slug: 'baraka-dup', subdomain: 'baraka' },
+        { slug: 'plain', subdomain: null },
+        { slug: null, subdomain: null },
+      ],
+    });
+    const locs = entries.map((e) => e.loc);
+    expect(locs).toEqual([
+      'https://baraka.visibleshelf.com/',
+      'https://visibleshelf.com/tenant/plain',
+    ]);
+  });
+});
+
+describe('buildProductEntries', () => {
+  const baseUrl = 'https://visibleshelf.com';
+  const apex = 'visibleshelf.com';
+
+  it("inherits the owning tenant's canonical origin", () => {
+    const entries = buildProductEntries({
+      baseUrl,
+      apex,
+      products: [
+        { id: 'pid-1', subdomain: 'baraka' },
+        { id: 'pid-2', customDomain: 'baraka.example.com' },
+        { id: 'pid-3' },
+      ],
+    });
+    expect(entries.map((e) => e.loc)).toEqual([
+      'https://baraka.visibleshelf.com/products/pid-1',
+      'https://baraka.example.com/products/pid-2',
+      'https://visibleshelf.com/products/pid-3',
+    ]);
+  });
+
+  it('carries lastmod and tolerates a null timestamp', () => {
+    const entries = buildProductEntries({
+      baseUrl,
+      apex,
+      products: [
+        { id: 'pid-1', updatedAt: '2026-10-01T00:00:00Z' },
+        { id: 'pid-2', updatedAt: null },
+      ],
+    });
+    expect(entries[0].lastmod).toBe('2026-10-01');
+    expect(entries[1].lastmod).toBeNull();
+    expect(() => renderUrlset(entries)).not.toThrow();
+  });
+
+  it('dedupes and skips empty ids', () => {
+    const entries = buildProductEntries({
+      baseUrl,
+      apex,
+      products: [{ id: 'pid-1' }, { id: 'pid-1' }, { id: '' }],
+    });
+    expect(entries).toHaveLength(1);
+  });
+});
+
+describe('renderSitemapIndex', () => {
+  it('wraps child sitemaps in a <sitemapindex>', () => {
+    const xml = renderSitemapIndex([
+      { loc: 'https://visibleshelf.com/sitemaps/core.xml' },
+      { loc: 'https://visibleshelf.com/sitemaps/products-1.xml', lastmod: '2026-10-23' },
+    ]);
+    expect(xml).toContain('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    expect(xml).toContain('<loc>https://visibleshelf.com/sitemaps/core.xml</loc>');
+    expect(xml).toContain('<lastmod>2026-10-23</lastmod>');
+    expect(xml.match(/<sitemap>/g)).toHaveLength(2);
+    expect(xml.trimEnd().endsWith('</sitemapindex>')).toBe(true);
+  });
+});
+
+describe('buildPlacesSitemap — file split', () => {
+  it('omits the index pages when includeIndexPages is false', () => {
+    const { entries } = buildPlacesSitemap({
+      baseUrl: 'https://visibleshelf.com',
+      categories: [],
+      cities: [],
+      seeds: [{ slug: 'seed-one' }],
+      claimed: [],
+      includeIndexPages: false,
+    });
+    expect(entries.map((e) => e.loc)).toEqual(['https://visibleshelf.com/place/seed-one']);
   });
 });

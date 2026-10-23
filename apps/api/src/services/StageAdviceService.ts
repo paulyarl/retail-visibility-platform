@@ -9,6 +9,7 @@
  * transition route enforces, so the board and the route cannot drift:
  *
  *   - archetype resolvable      → the `preview_built` hard gate (409)
+ *   - triage declared           → the `preview_built` hard gate (409 `triage_decision_required`)
  *   - checklist required steps  → the soft gate (409 `checklist_incomplete`)
  *   - gallery eligibility       → `GALLERY_ELIGIBLE_STAGES` / screenshots
  *   - act 1 / act 3 gates       → `SeedCascadeService` derivation
@@ -77,6 +78,9 @@ export interface StageAdviceFacts {
   categoryIdentified: boolean;
   hasBusinessAnalysisAudit: boolean;
   hasAcceptedTriage: boolean;
+  /** Campaign `playbook_code` resolved the archetype (a declared lane —
+   *  sibling/playbook-created campaigns count as triage-decided). */
+  hasDeclaredPlaybook: boolean;
   archetypeResolved: boolean;
   hasContact: boolean;
   operationalVerified: boolean;
@@ -190,6 +194,7 @@ export function deriveStageAdvice(facts: StageAdviceFacts): StageAdvice {
       { key: 'seed_published', label: 'Seed published (or invited with a live token)', met: seedPublished, advisory: false },
       { key: 'act1_gate', label: 'Act 1 gate: operational + channel + pain', met: facts.act1Cleared, advisory: false },
       { key: 'archetype', label: 'Archetype resolvable', met: facts.archetypeResolved, advisory: false },
+      { key: 'triage_decided', label: 'Triage decided or playbook lane declared', met: facts.hasAcceptedTriage || facts.hasDeclaredPlaybook, advisory: false },
       { key: 'announce', label: 'Announce delivered (C2)', met: facts.announceDelivered, advisory: true },
     ];
 
@@ -217,6 +222,18 @@ export function deriveStageAdvice(facts: StageAdviceFacts): StageAdvice {
           'No archetype can be resolved. Preview Built has no back-edge, so this is the last safe moment — run the seek-stage business analysis.',
         hard: true,
         actionLabel: 'Run business analysis',
+      });
+    }
+    // Mirrors the transition route's triage_decision_required 409: an
+    // audit-fallback archetype is not enough — the lane must be
+    // operator-declared (triage accept/override or a declared playbook).
+    if (!facts.hasAcceptedTriage && !facts.hasDeclaredPlaybook) {
+      blockers.push({
+        code: 'triage_decision_required',
+        message:
+          'Triage is not decided — accept or override the recommendation so Preview Built locks in an operator-chosen lane.',
+        hard: true,
+        actionLabel: 'Decide triage',
       });
     }
 
@@ -397,6 +414,7 @@ export class StageAdviceService extends BaseService {
       categoryIdentified: categoryAuditCount > 0,
       hasBusinessAnalysisAudit: gallery?.hasBusinessAnalysisAudit ?? false,
       hasAcceptedTriage: gallery?.hasAcceptedTriage ?? false,
+      hasDeclaredPlaybook: gallery?.hasDeclaredPlaybook ?? false,
       archetypeResolved: !!gallery?.archetype,
       hasContact: !!(campaign.phone || campaign.website_url),
       operationalVerified: (campaign.notes ?? '').includes(OPERATIONAL_VERIFIED_MARKER),

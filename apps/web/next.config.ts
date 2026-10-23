@@ -147,6 +147,16 @@ const nextConfig: NextConfig = {
         source: '/api/admin/marketing-ops/:campaignId/files/:fileId/render',
         destination: '/api/admin/marketing-ops/:campaignId/files/:fileId/render', // Pass through to Next.js
       },
+      // Sitemap: one producer in the API, exposed at the web origin. The index
+      // lists per-surface files under /sitemaps/<name>.xml (spec §4.8).
+      {
+        source: '/sitemap.xml',
+        destination: `${apiBaseUrl}/api/public/directory/sitemap.xml`,
+      },
+      {
+        source: '/sitemaps/:file',
+        destination: `${apiBaseUrl}/api/public/directory/sitemap/:file`,
+      },
       // Prospect-facing gallery image URLs — /preview/<token>/img/<fileId>
       // streams through the public token-scoped render endpoint so raw
       // supabase.co signed URLs never appear in the page

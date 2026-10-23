@@ -32,6 +32,12 @@ export interface GalleryArchetypeSource {
   archetype: ArchetypeCode | null;
   hasBusinessAnalysisAudit: boolean;
   hasAcceptedTriage: boolean;
+  /**
+   * The campaign's own `playbook_code` resolved the archetype — a sibling or
+   * playbook-created campaign's declared lane. Counts as an operator-level
+   * decision for the preview_built triage gate alongside an accepted triage.
+   */
+  hasDeclaredPlaybook: boolean;
 }
 
 export interface GalleryEligibility {
@@ -41,6 +47,7 @@ export interface GalleryEligibility {
   screenshotCount: number;
   hasBusinessAnalysisAudit: boolean;
   hasAcceptedTriage: boolean;
+  hasDeclaredPlaybook: boolean;
   archetype: ArchetypeCode | null;
   reason: GalleryIneligibilityReason | null;
   action: string | null;
@@ -80,10 +87,14 @@ export class GalleryEligibilityService extends BaseService {
   async resolveArchetypeSource(campaignId: string, ctx?: RequestCtx): Promise<GalleryArchetypeSource> {
     let archetype: ArchetypeCode | null = null;
     let hasAcceptedTriage = false;
+    let hasDeclaredPlaybook = false;
+    let auditFallbackResolved = false;
     try {
       const resolved = await resolveCampaignArchetype(campaignId, ctx);
       archetype = resolved.archetype as ArchetypeCode;
       hasAcceptedTriage = resolved.source === 'triage';
+      hasDeclaredPlaybook = resolved.source === 'campaign';
+      auditFallbackResolved = resolved.source === 'fallback';
     } catch {
       // Neither an accepted triage nor an audit — leave archetype null.
     }
@@ -105,9 +116,9 @@ export class GalleryEligibilityService extends BaseService {
     }
 
     // A fallback resolution can only succeed when a real audit exists.
-    if (archetype && !hasAcceptedTriage) hasBusinessAnalysisAudit = true;
+    if (auditFallbackResolved) hasBusinessAnalysisAudit = true;
 
-    return { archetype, hasBusinessAnalysisAudit, hasAcceptedTriage };
+    return { archetype, hasBusinessAnalysisAudit, hasAcceptedTriage, hasDeclaredPlaybook };
   }
 
   /**
@@ -151,6 +162,7 @@ export class GalleryEligibilityService extends BaseService {
       screenshotCount,
       hasBusinessAnalysisAudit: source.hasBusinessAnalysisAudit,
       hasAcceptedTriage: source.hasAcceptedTriage,
+      hasDeclaredPlaybook: source.hasDeclaredPlaybook,
       archetype: source.archetype,
       reason,
       action: reason ? REASON_ACTIONS[reason] : null,

@@ -1572,6 +1572,27 @@ router.post('/:id/transition', async (req: any, res: Response) => {
           has_accepted_triage: source.hasAcceptedTriage,
         });
       }
+
+      // Hard gate: the archetype must come from an operator DECLARATION — an
+      // accepted/overridden triage or a declared playbook lane
+      // (playbook_code, e.g. a sibling created FOR a playbook). An
+      // audit-fallback archetype alone is not enough: the proving-ground
+      // preflight can auto-advance seek → seed seconds after creation, so a
+      // campaign reaches this edge with triage still pending — entering
+      // preview_built would lock in the default category and no FITD lane,
+      // with no back-edge to fix it.
+      if (!source.hasAcceptedTriage && !source.hasDeclaredPlaybook) {
+        return res.status(409).json({
+          success: false,
+          error: 'triage_decision_required',
+          message:
+            'Triage has not been decided: accept the recommendation or override it in the Intelligent Triage card ' +
+            'before entering preview_built. An audit-derived archetype alone does not choose the campaign lane.',
+          action: 'Accept or override the triage recommendation in the Intelligent Triage card.',
+          has_business_analysis_audit: source.hasBusinessAnalysisAudit,
+          has_accepted_triage: source.hasAcceptedTriage,
+        });
+      }
     }
 
     const campaign = await MarketingCampaignService.transitionStage({

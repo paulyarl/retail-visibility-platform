@@ -46,6 +46,7 @@ import ProductDigitalLayout from './ProductDigitalLayout';
 import { ProductFunnelPreview } from '@/components/products/ProductFunnelPreview';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { clientLogger } from '@/lib/client-logger';
+import { productCanonicalUrl } from '@/lib/seo-canonical';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -257,6 +258,26 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const optFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
   const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
+  // Canonical + indexability. The product surface is host-scoped: it inherits
+  // its OWNING tenant's canonical origin (custom → subdomain → platform path),
+  // never the request host — the same product renders on the platform apex and
+  // on every tenant host (spec §4.9). Demo tenants and non-public items are
+  // sample/private pages and must not be indexed.
+  const [canonicalLookup, tenantInfo] = await Promise.all([
+    tenantPublicService.getStorefrontCanonical(product.tenantId),
+    tenantPublicService.getPublicTenantInfo(product.tenantId),
+  ]);
+  const canonicalUrl = productCanonicalUrl(canonicalLookup, product.id);
+  const isPubliclyAccessible =
+    product.itemStatus === 'active' && product.visibility === 'public';
+  const robots = !isPubliclyAccessible || tenantInfo?.isDemo
+    ? { index: false, follow: false }
+    : undefined;
+  const indexability = {
+    alternates: { canonical: canonicalUrl },
+    ...(robots ? { robots } : {}),
+  };
+
   let storefrontType: string | undefined;
   try {
     const storefrontState = await publicUnifiedCapabilityService.getStorefrontState(product.tenantId);
@@ -277,6 +298,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   if (!showEnhancedSEO) {
     return {
+      ...indexability,
       title: basicTitle,
       description: basicDescription,
       openGraph: {
@@ -300,43 +322,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     ? `${basicDescription}. ${businessDescription}`
     : basicDescription;
 
-  // Create SEO schema
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    "name": product.title,
-    "description": enhancedDescription,
-    "brand": {
-      "@type": "Brand",
-      "name": product.brand || businessName
-    },
-    "offers": {
-      "@type": "Offer",
-      "price": product.price,
-      "priceCurrency": product.currency,
-      "availability": product.itemStatus === 'active' ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
-    },
-    "seller": {
-      "@type": "Organization",
-      "name": businessName,
-      "description": businessDescription,
-      "address": tenantProfile ? {
-        "@type": "PostalAddress",
-        "streetAddress": tenantProfile.address_line1,
-        "addressLocality": tenantProfile.city,
-        "addressRegion": tenantProfile.state,
-        "postalCode": tenantProfile.postal_code,
-        "addressCountry": tenantProfile.country_code
-      } : undefined,
-      "telephone": tenantProfile?.phone_number,
-      "email": tenantProfile?.email,
-      "website": tenantProfile?.website
-    },
-    "keywords": seoTags.join(", "),
-    "image": product.images?.map(img => img.url) || []
-  };
+  // Structured data is emitted once, in the page body, as a real
+  // <script type="application/ld+json"> — `metadata.other` renders a
+  // <meta name="application/ld+json"> that no crawler reads (spec RC11).
 
   return {
+    ...indexability,
     title: basicTitle,
     description: enhancedDescription,
     keywords: seoTags.join(", "),
@@ -350,9 +341,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title: product.title,
       description: enhancedDescription,
       images: product.images?.[0]?.url ? [product.images[0].url] : [],
-    },
-    other: {
-      "application/ld+json": JSON.stringify(schema),
     },
   };
 }
@@ -541,6 +529,14 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     : process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/products/${product.id}`;
 
+  // Canonical product URL (owning tenant's ladder). The JSON-LD `Offer.url`
+  // must agree with the <link rel="canonical"> — deriving it from the request
+  // host made the same product advertise a different identity per surface.
+  const canonicalUrl = productCanonicalUrl(
+    await tenantPublicService.getStorefrontCanonical(product.tenantId),
+    product.id,
+  );
+
   // Enhanced structured data with business profile and SEO tags
   const structuredData = {
     '@context': 'https://schema.org',
@@ -558,10 +554,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     // keywords: tenantProfile?.seo_tags?.join(", ") || "",
     offers: {
       '@type': 'Offer',
-      // Host-aware product URL (same value as the share/QR URL above) — was a
-      // hardcoded `NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'`, which
-      // shipped a stale non-platform origin to Google on every surface.
-      url: currentUrl,
+      // Canonical URL, not the request host — see the canonical above. (This
+      // was once a hardcoded `NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'`,
+      // which shipped a stale non-platform origin to Google on every surface.)
+      url: canonicalUrl,
       priceCurrency: product.currency,
       price: product.price,
       availability: `https://schema.org/${product.availability === 'in_stock' ? 'InStock' : 'OutOfStock'}`,
@@ -616,13 +612,12 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </>
         )}
 
-        {/* Structured Data — gated behind enhanced SEO capability */}
-        {optFlags?.showEnhancedSEO && (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-          />
-        )}
+        {/* Structured Data — always emitted. Basic SEO is not a paid capability
+            (spec RC11); `enhanced_seo` gates keywords and enriched copy only. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
 
         {/* Product View Tracking */}
         <ProductViewTracker

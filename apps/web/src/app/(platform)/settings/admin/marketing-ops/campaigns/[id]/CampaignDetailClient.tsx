@@ -323,20 +323,28 @@ export default function CampaignDetailClient({
     toStage: PipelineStage;
     incompleteSteps: { id: string; title: string; stage_tag?: string | null }[];
   } | null>(null);
-  // Hard gate for preview_built without a resolvable archetype (no
-  // business_analysis audit and no accepted triage) — the campaign would be
-  // stranded: openers, headers, gallery defaults and deliverable sections all
-  // derive from the archetype, and there is no back-edge to seed.
+  // Hard gates for preview_built: (a) no resolvable archetype (no
+  // business_analysis audit and no accepted triage), (b) archetype resolved
+  // only from the audit fallback while triage is still undecided and no
+  // playbook lane is declared. Both strand the campaign — openers, headers,
+  // gallery defaults and deliverable sections all derive from the declared
+  // lane, and there is no back-edge to seed.
   const [missingAuditDialog, setMissingAuditDialog] = useState<{
     toStage: PipelineStage;
     message: string;
     action?: string;
+    title?: string;
+    ctaLabel?: string;
+    ctaTarget?: 'prompts' | 'triage';
   } | null>(null);
   const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
   // Ref to the stage pipeline bar — used by the focusStage deep-link
   // (e.g. ?focus=preview_built from the openers workspace) to scroll the
   // pipeline into view and briefly highlight the target stage button.
   const pipelineRef = useRef<HTMLDivElement | null>(null);
+  // Ref to the triage card — the triage_decision_required dialog's CTA
+  // scrolls it into view so the operator lands on the decision panel.
+  const triageCardRef = useRef<HTMLDivElement | null>(null);
   const [focusedStage, setFocusedStage] = useState<PipelineStage | null>(null);
   // Sprint 5: latest city_analysis execution for SyncReportCard
   const [cityScanExecutionId, setCityScanExecutionId] = useState<string | null>(null);
@@ -847,6 +855,18 @@ export default function CampaignDetailClient({
         // back-edge (preview_built → seed is invalid) — so this is terminal
         // until the business analysis runs.
         setMissingAuditDialog({ toStage, message: err.message, action: err.action });
+      } else if (err?.code === 'triage_decision_required') {
+        // Hard gate: the audit fallback resolved an archetype but triage is
+        // still undecided and no playbook lane is declared — the operator must
+        // accept/override before Preview Built locks the lane in.
+        setMissingAuditDialog({
+          toStage,
+          message: err.message,
+          action: err.action,
+          title: 'Blocked: triage not decided',
+          ctaLabel: 'Decide triage',
+          ctaTarget: 'triage',
+        });
       } else {
         setError(err.message || 'Failed to transition stage');
       }
@@ -1134,7 +1154,7 @@ export default function CampaignDetailClient({
         {missingAuditDialog && (
           <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
             <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">
-              Blocked: no campaign archetype
+              {missingAuditDialog.title ?? 'Blocked: no campaign archetype'}
             </h3>
             <p className="mt-1 text-sm text-red-700 dark:text-red-400">{missingAuditDialog.message}</p>
             {missingAuditDialog.action && (
@@ -1146,10 +1166,17 @@ export default function CampaignDetailClient({
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => { setActiveTab('prompts'); setMissingAuditDialog(null); }}
+                onClick={() => {
+                  if (missingAuditDialog.ctaTarget === 'triage') {
+                    triageCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  } else {
+                    setActiveTab('prompts');
+                  }
+                  setMissingAuditDialog(null);
+                }}
                 className="rounded-md bg-white dark:bg-neutral-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-600"
               >
-                Go to Prompts
+                {missingAuditDialog.ctaLabel ?? 'Go to Prompts'}
               </button>
               <button
                 type="button"
@@ -1482,14 +1509,23 @@ export default function CampaignDetailClient({
               )}
             </div>
 
-            {/* Intelligent Triage Card — above the tabs, only for seek-stage
+            {/* Intelligent Triage Card — above the tabs, for seek/seed-stage
                 business-scope campaigns. Triage is a per-business funnel
                 (re-categorize + FITD fee + playbook); category/city-scope
                 campaigns are aggregate scans with no single business to
                 triage, so the card must not surface there. The backend
-                evaluate path enforces the same scope guard. */}
-            {campaign.stage === 'seek' && campaign.scope === 'business' && (
-              <IntelligentTriageCard campaign={campaign} onRefresh={fetchCampaign} />
+                evaluate path enforces the same scope guard.
+                `seed` is included because the proving-ground preflight queue
+                graduation can auto-advance seek → seed seconds after creation
+                — before the operator ever sees the card — leaving a pending
+                triage decision stranded (seed → seek is not a valid
+                transition). Triage may still be decided during the seed
+                wedge; once accepted/overridden the card shows the decided
+                state. */}
+            {(campaign.stage === 'seek' || campaign.stage === 'seed') && campaign.scope === 'business' && (
+              <div ref={triageCardRef} className="scroll-mt-4">
+                <IntelligentTriageCard campaign={campaign} onRefresh={fetchCampaign} />
+              </div>
             )}
 
             {/* Tabs — two groups: actionables first, read-onlys last (a

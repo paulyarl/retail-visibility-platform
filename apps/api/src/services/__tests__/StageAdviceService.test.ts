@@ -16,6 +16,7 @@ const facts = (overrides: Partial<StageAdviceFacts> = {}): StageAdviceFacts => (
   categoryIdentified: true,
   hasBusinessAnalysisAudit: true,
   hasAcceptedTriage: false,
+  hasDeclaredPlaybook: false,
   archetypeResolved: true,
   hasContact: true,
   operationalVerified: false,
@@ -73,6 +74,9 @@ describe('deriveStageAdvice — seed → preview_built', () => {
     seedStatus: 'published',
     act1Cleared: true,
     announceDelivered: true,
+    // The preview_built edge now requires a declared lane — the ready-path
+    // fixture carries an accepted triage so the lane is operator-chosen.
+    hasAcceptedTriage: true,
   });
 
   it('is ready when the seed is published, act 1 cleared, and an archetype resolves', () => {
@@ -80,6 +84,20 @@ describe('deriveStageAdvice — seed → preview_built', () => {
     expect(advice.nextStage).toBe('preview_built');
     expect(advice.readiness).toBe('ready');
     expect(advice.tip).toContain('before the postcard ships');
+  });
+
+  it('hard-blocks when triage is undecided and no playbook lane is declared', () => {
+    const advice = deriveStageAdvice({ ...seeded, hasAcceptedTriage: false, hasDeclaredPlaybook: false });
+    expect(advice.readiness).toBe('blocked');
+    const blocker = advice.blockers.find((b) => b.code === 'triage_decision_required');
+    expect(blocker?.hard).toBe(true);
+    expect(blocker?.message).toContain('Triage is not decided');
+  });
+
+  it('counts a declared playbook lane as triage-decided', () => {
+    const advice = deriveStageAdvice({ ...seeded, hasAcceptedTriage: false, hasDeclaredPlaybook: true });
+    expect(advice.readiness).toBe('ready');
+    expect(advice.blockers.find((b) => b.code === 'triage_decision_required')).toBeUndefined();
   });
 
   it('hard-blocks on an unresolvable archetype — the one edge with no back-edge', () => {

@@ -33,7 +33,16 @@ import { prisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 import { unifiedConfig } from '../config/unifiedConfig';
-import { buildPlacesSitemap, renderUrlset, resolveSitemapBaseUrl } from '../lib/sitemap';
+import {
+  buildPlacesSitemap,
+  buildProductEntries,
+  buildStorefrontEntries,
+  renderSitemapIndex,
+  renderUrlset,
+  resolveSitemapBaseUrl,
+  type SitemapEntry,
+} from '../lib/sitemap';
+import { platformApex } from '../lib/storefront-url';
 import { validateAttachment } from '../validators/recovery-intake.schema';
 import { optionalCustomerAuth, optionalAuth } from '../middleware/auth';
 import CategoryMarketEnrichmentService from '../services/CategoryMarketEnrichmentService';
@@ -1464,111 +1473,264 @@ router.get('/places-map', async (req: Request, res: Response) => {
   }
 });
 
-/** GET /api/public/directory/places-sitemap.xml — XML sitemap for all presence pages */
-router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
+// ─── Sitemaps (docs/LocalBiz/PLACES_SEO_INDEXING_SPEC.md §4.2, §4.7–4.8) ───
+//
+// One producer, split into a <sitemapindex> over per-surface files. Every URL is
+// the surface's CANONICAL URL: seeds at /place, claimed tenants at /directory,
+// storefronts and products on the owning tenant's ladder-resolved host. The
+// origin comes from config, never the request host (RC1).
+
+const SITEMAP_CACHE_CONTROL = 'public, max-age=3600';
+const PRODUCT_SITEMAP_CHUNK = 20000;
+/** Name of the ladder-resolved custom-domain join, aliased as `cd`. */
+const TENANT_LADDER_JOIN = `
+  LEFT JOIN LATERAL (
+    SELECT d.domain
+    FROM custom_domains d
+    WHERE d.tenant_id = t.id AND d.status = 'active'
+    ORDER BY d.is_primary DESC, d.created_at ASC
+    LIMIT 1
+  ) cd ON true`;
+
+function sendSitemap(res: Response, xml: string) {
+  res.set('Content-Type', 'application/xml');
+  res.set('Cache-Control', SITEMAP_CACHE_CONTROL);
+  res.send(xml);
+}
+
+function sitemapBaseUrlOrNull(res: Response, label: string): string | null {
+  const baseUrl = resolveSitemapBaseUrl(unifiedConfig.webUrl);
+  if (!baseUrl) {
+    logger.error(
+      `[${label}] Refusing to emit sitemap: WEB_URL is missing or points at the API host`,
+    );
+    res.status(500).json({ error: 'sitemap_origin_unconfigured' });
+    return null;
+  }
+  return baseUrl;
+}
+
+/** Product count under the same gates as loadProductEntries. */
+async function countPublicProducts(pool: any): Promise<number> {
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM inventory_items ii
+     JOIN tenants t ON t.id = ii.tenant_id
+     WHERE ii.item_status = 'active'
+       AND ii.visibility = 'public'
+       AND t.is_demo IS NOT TRUE
+       AND (t.location_status IS NULL OR t.location_status = 'active')`,
+  );
+  return Number(result.rows[0]?.total) || 0;
+}
+
+async function loadPlacesEntries(pool: any, baseUrl: string) {
+  const listingsResult = await pool.query(
+    `SELECT dll.slug, dll.updated_at
+     FROM directory_presence_seeds dps
+     JOIN directory_listings_list dll ON dll.id = dps.listing_id
+     WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
+       AND dll.listing_origin = 'directory_seed'
+     ORDER BY dll.slug`,
+  );
+
+  // Shelf categories — primary AND secondary, including vocab-registered
+  // labels with no platform_categories row (fallback: name-derived slug,
+  // matching the /places/:categorySlug resolution).
+  const categoriesResult = await pool.query(
+    `SELECT DISTINCT shelf.category, pc.slug AS category_slug
+     FROM (
+       SELECT dps.category AS category
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'
+       UNION
+       SELECT TRIM(sec)
+       FROM directory_presence_seeds dps
+       JOIN directory_listings_list dll ON dll.id = dps.listing_id
+       CROSS JOIN LATERAL unnest(dll.secondary_categories) sec
+       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
+         AND dll.listing_origin = 'directory_seed'
+         AND NULLIF(TRIM(sec), '') IS NOT NULL
+     ) shelf
+     LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)
+     ORDER BY shelf.category`,
+  );
+
+  // Markets — the canonical "/place/city/{city}-{state}" slug disambiguates
+  // same-name cities across states.
+  const citiesResult = await pool.query(
+    `SELECT DISTINCT LOWER(dps.city) AS city_slug, LOWER(dps.state) AS state_slug
+     FROM directory_presence_seeds dps
+     JOIN directory_listings_list dll ON dll.id = dps.listing_id
+     WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
+       AND dll.listing_origin = 'directory_seed'
+     ORDER BY city_slug, state_slug`,
+  );
+
+  const categories = categoriesResult.rows.map((row: any) => ({
+    slug: row.category_slug || slugify(row.category),
+  }));
+
+  const cities = citiesResult.rows.map((row: any) => {
+    const stateCode = row.state_slug
+      ? CITY_SLUG_STATE_TOKENS[(row.state_slug as string).trim()] ?? null
+      : null;
+    return {
+      slug: slugify(row.city_slug as string) + (stateCode ? `-${stateCode}` : ''),
+    };
+  });
+
+  return buildPlacesSitemap({
+    baseUrl,
+    categories,
+    cities,
+    seeds: listingsResult.rows.map((row: any) => ({ slug: row.slug, updatedAt: row.updated_at })),
+    // The claimed listings live in directory.xml; the places file is seeds only.
+    claimed: [],
+    includeIndexPages: false,
+  });
+}
+
+/** Claimed/tenant listings — the /directory/{slug} surface. */
+async function loadDirectoryEntries(pool: any, baseUrl: string) {
+  // Seeds 308 to /directory when their origin changes, so the two sets are
+  // disjoint. Demo tenants are sample storefronts, not inventory.
+  const result = await pool.query(
+    `SELECT dll.slug, dll.updated_at
+     FROM directory_listings_list dll
+     LEFT JOIN tenants t ON t.id = dll.tenant_id
+     WHERE dll.is_published = true
+       AND dll.listing_origin IS DISTINCT FROM 'directory_seed'
+       AND t.is_demo IS NOT TRUE
+     ORDER BY dll.slug`,
+  );
+
+  return buildPlacesSitemap({
+    baseUrl,
+    categories: [],
+    cities: [],
+    seeds: [],
+    claimed: result.rows.map((row: any) => ({ slug: row.slug, updatedAt: row.updated_at })),
+    includeIndexPages: false,
+  }).entries;
+}
+
+/** Tenant storefront homes, ladder-resolved (custom → subdomain → path). */
+async function loadStorefrontEntries(pool: any, baseUrl: string) {
+  const result = await pool.query(
+    `SELECT t.slug, t.subdomain, cd.domain AS custom_domain
+     FROM tenants t
+     ${TENANT_LADDER_JOIN}
+     WHERE t.is_demo IS NOT TRUE
+       AND (t.location_status IS NULL OR t.location_status = 'active')
+     ORDER BY t.slug NULLS LAST`,
+  );
+
+  return buildStorefrontEntries({
+    baseUrl,
+    apex: platformApex(),
+    tenants: result.rows.map((row: any) => ({
+      slug: row.slug,
+      subdomain: row.subdomain,
+      customDomain: row.custom_domain,
+    })),
+  });
+}
+
+/** One product chunk — deterministic order so successive crawls see stable files. */
+async function loadProductEntries(pool: any, baseUrl: string, page: number) {
+  const offset = (page - 1) * PRODUCT_SITEMAP_CHUNK;
+  const result = await pool.query(
+    `SELECT ii.id, ii.updated_at, t.subdomain, cd.domain AS custom_domain
+     FROM inventory_items ii
+     JOIN tenants t ON t.id = ii.tenant_id
+     ${TENANT_LADDER_JOIN}
+     WHERE ii.item_status = 'active'
+       AND ii.visibility = 'public'
+       AND t.is_demo IS NOT TRUE
+       AND (t.location_status IS NULL OR t.location_status = 'active')
+     ORDER BY ii.id
+     LIMIT $1 OFFSET $2`,
+    [PRODUCT_SITEMAP_CHUNK, offset],
+  );
+
+  return buildProductEntries({
+    baseUrl,
+    apex: platformApex(),
+    products: result.rows.map((row: any) => ({
+      id: row.id,
+      updatedAt: row.updated_at,
+      subdomain: row.subdomain,
+      customDomain: row.custom_domain,
+    })),
+  });
+}
+
+/** GET /api/public/directory/sitemap.xml — the <sitemapindex> (§4.8). */
+router.get('/sitemap.xml', async (_req: Request, res: Response) => {
+  const label = 'GET /api/public/directory/sitemap.xml';
   try {
+    const baseUrl = sitemapBaseUrlOrNull(res, label);
+    if (!baseUrl) return;
+
     const pool = getDirectPool();
-    // Canonical origin comes from config, never the request host: through the
-    // Next proxy `req.get('host')` is api.visibleshelf.com, which stamped every
-    // <loc> cross-domain and made the sitemap unusable (spec RC1).
-    const baseUrl = resolveSitemapBaseUrl(unifiedConfig.webUrl);
-    if (!baseUrl) {
-      logger.error(
-        '[GET /api/public/directory/places-sitemap.xml] Refusing to emit sitemap: WEB_URL is missing or points at the API host',
-      );
-      return res.status(500).json({ error: 'sitemap_origin_unconfigured' });
+    const productCount = await countPublicProducts(pool);
+    const productFiles = Math.ceil(productCount / PRODUCT_SITEMAP_CHUNK);
+
+    const files = ['core', 'places', 'directory', 'storefronts'].map(
+      (name) => `${baseUrl}/sitemaps/${name}.xml`,
+    );
+    for (let page = 1; page <= productFiles; page += 1) {
+      files.push(`${baseUrl}/sitemaps/products-${page}.xml`);
     }
 
-    // Fetch all published presence listing slugs
-    const listingsResult = await pool.query(
-      `SELECT dll.slug, dll.updated_at
-       FROM directory_presence_seeds dps
-       JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
-         AND dll.listing_origin = 'directory_seed'
-       ORDER BY dll.slug`,
-    );
-
-    // Fetch all shelf categories with published listings — primary AND
-    // secondary categories, including vocab-registered labels that have no
-    // platform_categories row (fallback: name-derived slug, matching the
-    // /places/:categorySlug resolution).
-    const categoriesResult = await pool.query(
-      `SELECT DISTINCT shelf.category, pc.slug AS category_slug
-       FROM (
-         SELECT dps.category AS category
-         FROM directory_presence_seeds dps
-         JOIN directory_listings_list dll ON dll.id = dps.listing_id
-         WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
-           AND dll.listing_origin = 'directory_seed'
-         UNION
-         SELECT TRIM(sec)
-         FROM directory_presence_seeds dps
-         JOIN directory_listings_list dll ON dll.id = dps.listing_id
-         CROSS JOIN LATERAL unnest(dll.secondary_categories) sec
-         WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
-           AND dll.listing_origin = 'directory_seed'
-           AND NULLIF(TRIM(sec), '') IS NOT NULL
-       ) shelf
-       LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)
-       ORDER BY shelf.category`,
-    );
-
-    // Fetch all markets (city+state pairs) with published listings — the
-    // canonical "/place/city/{city}-{state}" slug disambiguates same-name
-    // cities across states.
-    const citiesResult = await pool.query(
-      `SELECT DISTINCT LOWER(dps.city) AS city_slug, LOWER(dps.state) AS state_slug
-       FROM directory_presence_seeds dps
-       JOIN directory_listings_list dll ON dll.id = dps.listing_id
-       WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
-         AND dll.listing_origin = 'directory_seed'
-       ORDER BY city_slug, state_slug`,
-    );
-
-    // Claimed/tenant listings live at /directory/{slug}; seeds 308 there when
-    // their origin changes, so the two sets are disjoint and must not be
-    // emitted on each other's surface. Demo tenants are sample storefronts,
-    // not inventory (spec §4.7 gating parity).
-    const claimedResult = await pool.query(
-      `SELECT dll.slug, dll.updated_at
-       FROM directory_listings_list dll
-       LEFT JOIN tenants t ON t.id = dll.tenant_id
-       WHERE dll.is_published = true
-         AND dll.listing_origin IS DISTINCT FROM 'directory_seed'
-         AND t.is_demo IS NOT TRUE
-       ORDER BY dll.slug`,
-    );
-
-    const categories = categoriesResult.rows.map((row: any) => ({
-      slug: row.category_slug || slugify(row.category),
-    }));
-
-    const cities = citiesResult.rows.map((row: any) => {
-      const stateCode = row.state_slug
-        ? CITY_SLUG_STATE_TOKENS[(row.state_slug as string).trim()] ?? null
-        : null;
-      return {
-        slug: slugify(row.city_slug as string) + (stateCode ? `-${stateCode}` : ''),
-      };
+    sendSitemap(res, renderSitemapIndex(files.map((loc) => ({ loc }))));
+  } catch (error) {
+    logger.error(`[${label}] Error:`, undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
 
-    const { entries, excludedCategorySlugs } = buildPlacesSitemap({
-      baseUrl,
-      categories,
-      cities,
-      seeds: listingsResult.rows.map((row: any) => ({ slug: row.slug, updatedAt: row.updated_at })),
-      claimed: claimedResult.rows.map((row: any) => ({ slug: row.slug, updatedAt: row.updated_at })),
-    });
+/** GET /api/public/directory/sitemap/:file — one <urlset> per surface (§4.7–4.8). */
+router.get('/sitemap/:file', async (req: Request, res: Response) => {
+  const label = 'GET /api/public/directory/sitemap/:file';
+  try {
+    const baseUrl = sitemapBaseUrlOrNull(res, label);
+    if (!baseUrl) return;
 
-    // Free-text shelf labels cost index quality — surface what the §4.6 filter
-    // dropped so the operator can see it in the logs.
-    if (excludedCategorySlugs.length > 0) {
-      logger.info(
-        '[GET /api/public/directory/places-sitemap.xml] Excluded free-text shelf slugs',
-        undefined,
-        { count: excludedCategorySlugs.length, slugs: excludedCategorySlugs.slice(0, 20) },
-      );
+    const file = String(req.params.file || '').replace(/\.xml$/i, '');
+    const pool = getDirectPool();
+    let entries: SitemapEntry[] = [];
+
+    if (file === 'core') {
+      entries = [
+        { loc: `${baseUrl}/place`, changefreq: 'daily', priority: 1 },
+        { loc: `${baseUrl}/directory`, changefreq: 'daily', priority: 0.9 },
+        { loc: `${baseUrl}/shops`, changefreq: 'weekly', priority: 0.8 },
+      ];
+    } else if (file === 'places') {
+      const { entries: placeEntries, excludedCategorySlugs } = await loadPlacesEntries(pool, baseUrl);
+      entries = placeEntries;
+      // Free-text shelf labels cost index quality — surface what the §4.6
+      // filter dropped so the operator can see it in the logs.
+      if (excludedCategorySlugs.length > 0) {
+        logger.info(`[${label}] Excluded free-text shelf slugs`, undefined, {
+          count: excludedCategorySlugs.length,
+          slugs: excludedCategorySlugs.slice(0, 20),
+        });
+      }
+    } else if (file === 'directory') {
+      entries = await loadDirectoryEntries(pool, baseUrl);
+    } else if (file === 'storefronts') {
+      entries = await loadStorefrontEntries(pool, baseUrl);
+    } else {
+      const match = /^products-(\d+)$/.exec(file);
+      if (!match) return res.status(404).json({ error: 'sitemap_not_found' });
+      entries = await loadProductEntries(pool, baseUrl, parseInt(match[1], 10));
     }
 
     // Log sitemap generation
@@ -1577,15 +1739,22 @@ router.get('/places-sitemap.xml', async (req: Request, res: Response) => {
       [entries.length],
     );
 
-    res.set('Content-Type', 'application/xml');
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.send(renderUrlset(entries));
+    sendSitemap(res, renderUrlset(entries));
   } catch (error) {
-    logger.error('[GET /api/public/directory/places-sitemap.xml] Error:', undefined, {
+    logger.error(`[${label}] Error:`, undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
   }
+});
+
+/**
+ * GET /api/public/directory/places-sitemap.xml — deprecated single-file sitemap.
+ * Kept alive for a release so an existing Search Console submission or external
+ * reference lands somewhere valid; delete after the index is accepted.
+ */
+router.get('/places-sitemap.xml', (_req: Request, res: Response) => {
+  res.redirect(301, '/api/public/directory/sitemap.xml');
 });
 
 /** POST /api/public/directory/search-demand — log a search demand event (public, no auth) */

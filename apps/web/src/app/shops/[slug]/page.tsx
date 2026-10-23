@@ -22,6 +22,7 @@ import { SocialPixels } from '@/components/tracking/SocialPixels';
 import SeedPreviewTracker from '@/components/storefront/SeedPreviewTracker';
 import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerContact';
 import { clientLogger } from '@/lib/client-logger';
+import { shopProfileCanonicalUrl } from '@/lib/seo-canonical';
 
 interface ShopProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -34,6 +35,11 @@ interface ShopProfilePageProps {
   }>;
 }
 
+// The shop profile is the same storefront as /tenant/{slug} with a weaker SSR
+// payload, so it is suppressed from the index by canonicalizing to the
+// storefront home — NOT by noindex (noindex voids the canonical, and a robots
+// block stops the crawl before the canonical is read). It stays reachable and
+// linked; crawlers keep discovering it (spec §4.9).
 // Demo/seed-preview storefronts are sample pages for an unclaimed business —
 // they must never be indexed (spec B-11). Conditional so real tenants' shops
 // keep their normal crawling behavior.
@@ -42,13 +48,34 @@ export async function generateMetadata({ params }: ShopProfilePageProps): Promis
   try {
     const tenantId = await publicDirectoryService.resolveBySlug(slug);
     if (tenantId) {
-      const tenantInfo = await tenantPublicService.getPublicTenantInfo(tenantId);
+      const [tenantInfo, canonicalLookup] = await Promise.all([
+        tenantPublicService.getPublicTenantInfo(tenantId),
+        tenantPublicService.getStorefrontCanonical(tenantId),
+      ]);
+
       if (tenantInfo?.isDemo) {
         return {
           title: `${tenantInfo.name} — Sample Storefront Preview`,
           robots: { index: false, follow: false },
         };
       }
+
+      const businessName =
+        tenantInfo?.profileData?.business_name || tenantInfo?.name || slug;
+      const description =
+        tenantInfo?.profileData?.business_description ||
+        `Shop ${businessName} on VisibleShelf — browse products, hours, and contact information.`;
+
+      return {
+        title: `${businessName} — Shop Profile`,
+        description,
+        alternates: {
+          canonical: shopProfileCanonicalUrl(
+            canonicalLookup,
+            tenantInfo?.slug || slug,
+          ),
+        },
+      };
     }
   } catch {
     // Fall through to default metadata

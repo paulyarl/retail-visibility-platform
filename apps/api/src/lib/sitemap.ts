@@ -108,6 +108,8 @@ export interface PlacesSitemapInput {
   cities: CitySitemapRow[];
   seeds: SeedSitemapRow[];
   claimed: ClaimedSitemapRow[];
+  /** Index pages live in `core.xml`; the `places` file omits them (§4.8). */
+  includeIndexPages?: boolean;
 }
 
 export interface PlacesSitemapResult {
@@ -119,11 +121,13 @@ export interface PlacesSitemapResult {
 const segment = (value: string) => encodeURIComponent(value);
 
 export function buildPlacesSitemap(input: PlacesSitemapInput): PlacesSitemapResult {
-  const { baseUrl, categories, cities, seeds, claimed } = input;
+  const { baseUrl, categories, cities, seeds, claimed, includeIndexPages = true } = input;
   const entries: SitemapEntry[] = [];
 
-  entries.push({ loc: `${baseUrl}/place`, changefreq: 'daily', priority: 1 });
-  entries.push({ loc: `${baseUrl}/directory`, changefreq: 'daily', priority: 0.9 });
+  if (includeIndexPages) {
+    entries.push({ loc: `${baseUrl}/place`, changefreq: 'daily', priority: 1 });
+    entries.push({ loc: `${baseUrl}/directory`, changefreq: 'daily', priority: 0.9 });
+  }
 
   const excludedCategorySlugs: string[] = [];
   const seenCategories = new Set<string>();
@@ -186,4 +190,128 @@ export function buildPlacesSitemap(input: PlacesSitemapInput): PlacesSitemapResu
   }
 
   return { entries, excludedCategorySlugs };
+}
+
+// ─── Storefronts and products (spec §4.7) ───────────────────────────────────
+
+export interface TenantHostRow {
+  slug: string | null;
+  subdomain?: string | null;
+  customDomain?: string | null;
+}
+
+export interface ProductSitemapRow {
+  id: string;
+  updatedAt?: Date | string | null;
+  subdomain?: string | null;
+  customDomain?: string | null;
+}
+
+/**
+ * Canonical origin of a tenant's storefront — active custom domain → platform
+ * subdomain → platform path. Mirrors `lib/storefront-url.ts` /
+ * `apps/web/src/lib/storefront-routing.ts`; keep the three in step.
+ */
+export function tenantCanonicalOrigin(input: {
+  baseUrl: string;
+  apex: string;
+  subdomain?: string | null;
+  customDomain?: string | null;
+}): string {
+  if (input.customDomain) return `https://${input.customDomain}`;
+  if (input.subdomain) return `https://${input.subdomain}.${input.apex}`;
+  return input.baseUrl;
+}
+
+/**
+ * Canonical HOME of a tenant storefront. The DNS-shaped levels end in `/` —
+ * that is the URL `/tenant/{slug}` and `/shops/{slug}` already canonicalize to.
+ */
+export function tenantCanonicalHome(input: {
+  baseUrl: string;
+  apex: string;
+  slug: string | null;
+  subdomain?: string | null;
+  customDomain?: string | null;
+}): string | null {
+  if (input.customDomain) return `https://${input.customDomain}/`;
+  if (input.subdomain) return `https://${input.subdomain}.${input.apex}/`;
+  if (input.slug) return `${input.baseUrl}/tenant/${encodeURIComponent(input.slug)}`;
+  return null;
+}
+
+export function buildStorefrontEntries(input: {
+  baseUrl: string;
+  apex: string;
+  tenants: TenantHostRow[];
+}): SitemapEntry[] {
+  const { baseUrl, apex, tenants } = input;
+  const entries: SitemapEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const row of tenants) {
+    const loc = tenantCanonicalHome({
+      baseUrl,
+      apex,
+      slug: row.slug,
+      subdomain: row.subdomain,
+      customDomain: row.customDomain,
+    });
+    if (!loc || seen.has(loc)) continue;
+    seen.add(loc);
+    entries.push({ loc, changefreq: 'weekly', priority: 0.7 });
+  }
+
+  return entries;
+}
+
+/**
+ * Product pages inherit their OWNING tenant's canonical origin
+ * (`SURFACE_RULES.product.origin = 'canonical'`) — never the platform apex and
+ * never the request host.
+ */
+export function buildProductEntries(input: {
+  baseUrl: string;
+  apex: string;
+  products: ProductSitemapRow[];
+}): SitemapEntry[] {
+  const { baseUrl, apex, products } = input;
+  const entries: SitemapEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const row of products) {
+    const id = (row.id ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const origin = tenantCanonicalOrigin({
+      baseUrl,
+      apex,
+      subdomain: row.subdomain,
+      customDomain: row.customDomain,
+    });
+    entries.push({
+      loc: `${origin}/products/${encodeURIComponent(id)}`,
+      lastmod: formatLastmod(row.updatedAt),
+      changefreq: 'monthly',
+      priority: 0.5,
+    });
+  }
+
+  return entries;
+}
+
+/** `<sitemapindex>` over the per-surface files (§4.8). */
+export function renderSitemapIndex(files: { loc: string; lastmod?: string | null }[]): string {
+  const body = files.map((file) => {
+    const lines = [`    <loc>${escapeXml(file.loc)}</loc>`];
+    if (file.lastmod) lines.push(`    <lastmod>${escapeXml(file.lastmod)}</lastmod>`);
+    return `  <sitemap>\n${lines.join('\n')}\n  </sitemap>`;
+  });
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...body,
+    '</sitemapindex>',
+  ].join('\n');
 }

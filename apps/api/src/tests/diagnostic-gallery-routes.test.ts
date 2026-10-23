@@ -445,3 +445,54 @@ describe('POST /api/admin/marketing-ops/:id/transition — preview_built archety
     expect(res.body.error).toBe('business_analysis_required');
   });
 });
+
+// ── seed → preview_built triage-decision guard ──────────────────────────
+
+describe('POST /api/admin/marketing-ops/:id/transition — preview_built triage gate', () => {
+  beforeEach(() => {
+    // mockImplementationOnce entries survive vi.clearAllMocks() — earlier
+    // describes leave unconsumed mockRejectedValueOnce values in the queue
+    // that would fire before these tests' values. Reset drains the queue.
+    vi.mocked(resolveCampaignArchetype).mockReset();
+  });
+
+  it('returns 409 triage_decision_required when the archetype resolves only from the audit fallback', async () => {
+    vi.mocked(resolveCampaignArchetype).mockResolvedValueOnce({
+      archetype: 'A3',
+      source: 'fallback',
+      reason: 'audit-derived',
+    });
+    const res = await request(adminApp)
+      .post(`/api/admin/marketing-ops/${CAMPAIGN_ID}/transition`)
+      .send({ to_stage: 'preview_built', trigger_type: 'manual' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('triage_decision_required');
+    expect(res.body.action).toBeTruthy();
+  });
+
+  it('passes the triage gate when triage was accepted or overridden (source=triage)', async () => {
+    vi.mocked(resolveCampaignArchetype).mockResolvedValueOnce({
+      archetype: 'A3',
+      source: 'triage',
+      reason: 'accepted',
+    });
+    const res = await request(adminApp)
+      .post(`/api/admin/marketing-ops/${CAMPAIGN_ID}/transition`)
+      .send({ to_stage: 'preview_built', trigger_type: 'manual' });
+    // The request may still fail downstream inside transitionStage — it must
+    // not be stopped by THIS gate.
+    expect(res.body.error).not.toBe('triage_decision_required');
+  });
+
+  it('passes the triage gate on a declared playbook lane (source=campaign)', async () => {
+    vi.mocked(resolveCampaignArchetype).mockResolvedValueOnce({
+      archetype: 'A7',
+      source: 'campaign',
+      reason: 'declared playbook',
+    });
+    const res = await request(adminApp)
+      .post(`/api/admin/marketing-ops/${CAMPAIGN_ID}/transition`)
+      .send({ to_stage: 'preview_built', trigger_type: 'manual' });
+    expect(res.body.error).not.toBe('triage_decision_required');
+  });
+});

@@ -37,8 +37,25 @@ export const viewport: Viewport = {
   ],
 };
 
+// Absolute base for relative metadata URLs (OG images etc.). Without it Next
+// resolves them against the request origin, which is inconsistent across
+// visibleshelf.com, www., tenant hosts, and preview deployments.
+const metadataBaseUrl = (() => {
+  const raw =
+    process.env.NEXT_PUBLIC_WEB_URL ||
+    process.env.NEXT_PUBLIC_APP_ORIGIN ||
+    process.env.WEB_URL ||
+    'http://localhost:3000';
+  try {
+    return new URL(raw);
+  } catch {
+    return new URL('http://localhost:3000');
+  }
+})();
+
 // PWA Metadata configuration
 export const metadata: Metadata = {
+  metadataBase: metadataBaseUrl,
   title: {
     default: "VisibleShelf",
     template: "%s | VisibleShelf",
