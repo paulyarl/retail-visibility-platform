@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { Trash2 } from 'lucide-react';
 import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
@@ -27,6 +28,48 @@ export default function BatchOperationsDashboard() {
     const t = setTimeout(() => setDebouncedSeedFilter(seedFilter), 300);
     return () => clearTimeout(t);
   }, [seedFilter]);
+
+  // Dropdown option universe — derived from the UNFILTERED list so applying
+  // a filter can't collapse its own options.
+  const [seedBatchOptions, setSeedBatchOptions] = useState<{ cities: string[]; categories: string[] }>({
+    cities: [], categories: [],
+  });
+  const [seedOptionsLoaded, setSeedOptionsLoaded] = useState(false);
+
+  // Batch delete / unbatch confirmation
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: 'seek' | 'seed'; id: string; label: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'seek') {
+        await directoryPresenceAdminService.deleteSeekBatch(deleteTarget.id);
+        setSeekBatches((prev) => prev.filter((b) => b.id !== deleteTarget.id));
+      } else {
+        await directoryPresenceAdminService.unbatchSeeds(deleteTarget.id);
+        setSeedBatches((prev) => prev.filter((b) => b.seedBatch !== deleteTarget.id));
+      }
+      setDeleteTarget(null);
+    } catch (err: any) {
+      setError(err?.message || 'delete_failed');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const fetchSeedBatchOptions = useCallback(async () => {
+    try {
+      const all = await directoryPresenceAdminService.listSeedBatches();
+      const cities = Array.from(new Set(all.flatMap((b) => b.cities || []).filter(Boolean))).sort();
+      const categories = Array.from(new Set(all.flatMap((b) => b.categories || []).filter(Boolean))).sort();
+      setSeedBatchOptions({ cities, categories });
+      setSeedOptionsLoaded(true);
+    } catch {
+      // option load failure is non-fatal — the row fetch reports its own error
+    }
+  }, []);
 
   // Launcher form state
   const [showLauncher, setShowLauncher] = useState(false);
@@ -82,9 +125,10 @@ export default function BatchOperationsDashboard() {
     if (tab === 'seek') {
       fetchSeekBatches().finally(() => setLoading(false));
     } else {
+      if (!seedOptionsLoaded) fetchSeedBatchOptions();
       fetchSeedBatches().finally(() => setLoading(false));
     }
-  }, [tab, fetchSeekBatches, fetchSeedBatches]);
+  }, [tab, fetchSeekBatches, fetchSeedBatches, fetchSeedBatchOptions, seedOptionsLoaded]);
 
   // Open launcher automatically if query params are present (from Growth Engine "Launch Seek")
   useEffect(() => {
@@ -730,12 +774,13 @@ export default function BatchOperationsDashboard() {
                 <th className="py-3 px-4 font-medium">Invited</th>
                 <th className="py-3 px-4 font-medium">Claimed</th>
                 <th className="py-3 px-4 font-medium">Created</th>
+                <th className="py-3 px-4 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {seekBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-400">
+                  <td colSpan={12} className="py-8 text-center text-gray-400">
                     No seek batches yet. Click &quot;+ New Seek Batch&quot; to create one.
                   </td>
                 </tr>
@@ -781,6 +826,16 @@ export default function BatchOperationsDashboard() {
                     <td className="py-3 px-4 text-gray-500 text-xs">
                       {new Date(b.createdAt).toLocaleDateString()}
                     </td>
+                    <td className="py-3 px-4">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget({ kind: 'seek', id: b.id, label: b.batchSlug || b.id })}
+                        title="Delete batch (unlinks campaigns, prospects, seeds — artifacts are kept)"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -805,21 +860,29 @@ export default function BatchOperationsDashboard() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
-              <input
-                type="text"
+              <select
                 value={seedFilter.city}
                 onChange={(e) => setSeedFilter((f) => ({ ...f, city: e.target.value }))}
-                className="w-32 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
-              />
+                className="w-40 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All cities</option>
+                {seedBatchOptions.cities.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-              <input
-                type="text"
+              <select
                 value={seedFilter.category}
                 onChange={(e) => setSeedFilter((f) => ({ ...f, category: e.target.value }))}
-                className="w-44 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
-              />
+                className="w-52 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All categories</option>
+                {seedBatchOptions.categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Lens</label>
@@ -874,12 +937,13 @@ export default function BatchOperationsDashboard() {
                 <th className="py-3 px-4 font-medium">Invited</th>
                 <th className="py-3 px-4 font-medium">Claimed</th>
                 <th className="py-3 px-4 font-medium">Progress</th>
+                <th className="py-3 px-4 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {seedBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-400">
+                  <td colSpan={10} className="py-8 text-center text-gray-400">
                     No seed batches match. Seeds appear here after batch creation.
                   </td>
                 </tr>
@@ -944,6 +1008,16 @@ export default function BatchOperationsDashboard() {
                           </span>
                         </div>
                       </td>
+                      <td className="py-3 px-4">
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget({ kind: 'seed', id: b.seedBatch, label: b.seedBatch })}
+                          title="Dissolve cohort (clears the label — seeds are kept)"
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -951,6 +1025,49 @@ export default function BatchOperationsDashboard() {
             </tbody>
           </table>
         </div>
+        </div>
+      )}
+
+      {/* Delete / Unbatch confirmation */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">
+              {deleteTarget.kind === 'seek' ? 'Delete seek batch?' : 'Dissolve seed batch?'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {deleteTarget.kind === 'seek' ? (
+                <>
+                  Removes <span className="font-mono text-xs">{deleteTarget.label}</span> and its entries.
+                  Its campaigns, queue prospects, and seeds are <span className="font-medium">unlinked, not deleted</span> —
+                  they keep living, they just lose their batch attribution. This cannot be undone.
+                </>
+              ) : (
+                <>
+                  Clears the <span className="font-mono text-xs">{deleteTarget.label}</span> label from its seeds —
+                  the cohort dissolves, the seeds themselves are untouched.
+                  To delete the seeds, use the seeds list page.
+                </>
+              )}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Working…' : deleteTarget.kind === 'seek' ? 'Delete batch' : 'Dissolve batch'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

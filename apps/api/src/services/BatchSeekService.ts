@@ -189,13 +189,21 @@ class BatchSeekService {
     const summaryProfileVersion = hasEntries
       ? (entries[0].profileVersion || null)
       : (input.profileVersion || null);
-    const summaryCategory = hasEntries ? entries[0].nicheCategory : input.nicheCategory;
+    // Mixed-category batches: the summary niche reads "First Category +N more"
+    // and the slug drops the niche name entirely — a batch that sweeps two
+    // niches shouldn't label itself with only one of them.
+    const distinctCategories = hasEntries
+      ? Array.from(new Set(entries.map((e) => e.nicheCategory)))
+      : [input.nicheCategory];
+    const summaryCategory = distinctCategories.length > 1
+      ? `${distinctCategories[0]} +${distinctCategories.length - 1} more`
+      : distinctCategories[0];
     const summaryFocus = refs[0]?.resolvedFocus || input.intelligenceFocus || 'emerging';
     const summaryCities = hasEntries
       ? Array.from(new Set(entries.map((e) => e.city)))
       : input.cities;
 
-    const batchSlug = generateSeekBatchSlug(summaryCategory, summaryCities.length);
+    const batchSlug = generateSeekBatchSlug(distinctCategories[0], summaryCities.length, distinctCategories.length);
 
     // Summary state: prefer the first entry's state, else the batch-level state.
     const summaryState = hasEntries ? (entries[0].state || null) : (input.state || null);
@@ -639,6 +647,75 @@ class BatchSeekService {
   }
 
   /**
+   * Delete a seek batch: removes the coordination record and its entries, and
+   * unlinks downstream attribution — campaigns, queue prospects, and seeds
+   * keep living (the batch was bookkeeping, not an owner). The honest verb for
+   * discarding smoke-test or abandoned batches without touching the work they
+   * minted. Irreversible.
+   */
+  async deleteSeekBatch(
+    batchId: string,
+    ctx?: BatchAuditCtx,
+  ): Promise<{ deleted: boolean; unlinked: { campaigns: number; queueEntries: number; seeds: number } }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id FROM mkt_seek_batches WHERE id = ${batchId} LIMIT 1
+    `;
+    if (!rows[0]) {
+      return { deleted: false, unlinked: { campaigns: 0, queueEntries: 0, seeds: 0 } };
+    }
+
+    const unlinkedCampaigns = await prisma.$executeRaw`
+      UPDATE mkt_campaigns_list SET seek_batch_id = NULL WHERE seek_batch_id = ${batchId}
+    `;
+    const unlinkedQueue = await prisma.$executeRaw`
+      UPDATE mkt_prospect_queue SET seek_batch_id = NULL WHERE seek_batch_id = ${batchId}
+    `;
+    const unlinkedSeeds = await prisma.$executeRaw`
+      UPDATE directory_presence_seeds SET seek_batch_id = NULL, updated_at = now()
+      WHERE seek_batch_id = ${batchId}
+    `;
+    await prisma.$executeRaw`DELETE FROM mkt_seek_batch_entries WHERE batch_id = ${batchId}`;
+    await prisma.$executeRaw`DELETE FROM mkt_seek_batches WHERE id = ${batchId}`;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'seek_batch.delete',
+      payload: { batchId, unlinkedCampaigns, unlinkedQueue, unlinkedSeeds },
+    });
+    logger.info('BatchSeekService.deleteSeekBatch', undefined, { batchId, unlinkedCampaigns, unlinkedQueue, unlinkedSeeds });
+
+    return { deleted: true, unlinked: { campaigns: unlinkedCampaigns, queueEntries: unlinkedQueue, seeds: unlinkedSeeds } };
+  }
+
+  /**
+   * Dissolve a seed-batch cohort: clears the seed_batch label on every seed in
+   * the group. Seed batches are labels, not entities — "delete" here means the
+   * cohort view goes away; the seeds themselves are untouched (per-seed delete
+   * lives on the seeds list page where the cascade is explicit).
+   */
+  async unbatchSeeds(
+    seedBatch: string,
+    ctx?: BatchAuditCtx,
+  ): Promise<{ unbatched: number }> {
+    const unbatched = await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET seed_batch = NULL, updated_at = now()
+      WHERE seed_batch = ${seedBatch}
+    `;
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'seed_batch.unbatch',
+      payload: { seedBatch, unbatched },
+    });
+    logger.info('BatchSeekService.unbatchSeeds', undefined, { seedBatch, unbatched });
+
+    return { unbatched };
+  }
+
+  /**
    * List seed batches (grouped by seed_batch column) with metrics.
    *
    * PG awareness: each batch is attributed to proving-ground campaigns via
@@ -686,10 +763,12 @@ class BatchSeekService {
       conditions.push(`dps.seed_batch ILIKE ${addParam(`%${filters.seedBatch}%`)}`);
     }
     if (filters?.city) {
-      conditions.push(`dps.city ILIKE ${addParam(`%${filters.city}%`)}`);
+      // Exact (case-insensitive) — the UI supplies real city values from the
+      // batch rollup; substring here would leak (city 'St' matching 'Austin').
+      conditions.push(`dps.city ILIKE ${addParam(filters.city)}`);
     }
     if (filters?.category) {
-      conditions.push(`dps.category ILIKE ${addParam(`%${filters.category}%`)}`);
+      conditions.push(`dps.category ILIKE ${addParam(filters.category)}`);
     }
     if (filters?.dateFrom) {
       conditions.push(`dps.created_at >= ${addParam(filters.dateFrom)}::timestamptz`);

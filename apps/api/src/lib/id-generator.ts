@@ -1328,9 +1328,14 @@ export function generateSeekBatchId(): string {
  * Generate a human-readable seek batch slug.
  * Format: {category-slug}-{city-count}cities-{yyyymmdd}
  */
-export function generateSeekBatchSlug(category: string, cityCount: number): string {
-  const categorySlug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+export function generateSeekBatchSlug(category: string, cityCount: number, categoryCount = 1): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  // Mixed-category batches can't honestly wear a single niche's name —
+  // label the sweep for what it is rather than its first entry's category.
+  if (categoryCount > 1) {
+    return `multi-category-${categoryCount}niches-${cityCount}cities-${date}`;
+  }
+  const categorySlug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return `${categorySlug}-${cityCount}cities-${date}`;
 }
 

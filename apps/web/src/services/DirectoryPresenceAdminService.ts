@@ -2635,6 +2635,33 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data;
   }
 
+  /** DELETE /api/admin/directory-presence/seek-batches/:id */
+  async deleteSeekBatch(id: string): Promise<{
+    deleted: boolean;
+    unlinked: { campaigns: number; queueEntries: number; seeds: number };
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seek-batches/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
+  /** DELETE /api/admin/directory-presence/seed-batches/:label — dissolve cohort (clears the label; seeds untouched) */
+  async unbatchSeeds(seedBatch: string): Promise<{ unbatched: number }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/seed-batches/${encodeURIComponent(seedBatch)}`,
+      { method: 'DELETE' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data;
+  }
+
   /** GET /api/admin/directory-presence/seed-batches */
   async listSeedBatches(filters?: SeedBatchFilters): Promise<SeedBatchSummary[]> {
     const params = new URLSearchParams();

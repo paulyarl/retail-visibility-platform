@@ -2132,6 +2132,25 @@ router.get('/seed-batches', requirePlatformStaff, async (req: Request, res: Resp
   }
 });
 
+/** DELETE /api/admin/directory/seed-batches/:label — dissolve a seed-batch cohort
+ *  (clears the label on its seeds; the seeds themselves are untouched) */
+router.delete('/seed-batches/:label', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await BatchSeekService.unbatchSeeds(decodeURIComponent(req.params.label), {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[DELETE /api/admin/directory/seed-batches/:label] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/seek-batches — list seek batches with metrics */
 router.get('/seek-batches', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
@@ -2206,6 +2225,29 @@ router.post('/seek-batches', requirePlatformAdmin, async (req: Request, res: Res
       return res.status(error.statusCode).json({ error: error.code, message: error.message });
     }
     logger.error('[POST /api/admin/directory/seek-batches] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** DELETE /api/admin/directory/seek-batches/:id — delete a seek batch + its entries,
+ *  unlinking seek_batch_id from campaigns, queue prospects, and seeds (those
+ *  artifacts keep living; the batch record was coordination, not ownership) */
+router.delete('/seek-batches/:id', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await BatchSeekService.deleteSeekBatch(req.params.id, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    if (!result.deleted) {
+      return res.status(404).json({ error: 'batch_not_found' });
+    }
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[DELETE /api/admin/directory/seek-batches/:id] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
