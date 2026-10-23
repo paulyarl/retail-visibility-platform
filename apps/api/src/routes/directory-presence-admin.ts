@@ -2154,8 +2154,15 @@ router.delete('/seed-batches/:label', requirePlatformAdmin, async (req: Request,
 /** GET /api/admin/directory/seek-batches — list seek batches with metrics */
 router.get('/seek-batches', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
-    const status = req.query.status as string | undefined;
-    const result = await BatchSeekService.listBatches({ status });
+    const result = await BatchSeekService.listBatches({
+      status: req.query.status as string | undefined,
+      batch: req.query.batch as string | undefined,
+      city: req.query.city as string | undefined,
+      category: req.query.category as string | undefined,
+      focus: req.query.focus as string | undefined,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+    });
     res.json({ success: true, batches: result });
   } catch (error: any) {
     logger.error('[GET /api/admin/directory/seek-batches] Error:', undefined, {

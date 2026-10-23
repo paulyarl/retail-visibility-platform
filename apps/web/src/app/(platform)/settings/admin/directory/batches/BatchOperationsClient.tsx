@@ -29,12 +29,26 @@ export default function BatchOperationsDashboard() {
     return () => clearTimeout(t);
   }, [seedFilter]);
 
+  // Seek-batch list filters — slug substring, city, category, lens, status, window
+  const [seekFilter, setSeekFilter] = useState({
+    batch: '', city: '', category: '', focus: '', status: '', dateFrom: '', dateTo: '',
+  });
+  const [debouncedSeekFilter, setDebouncedSeekFilter] = useState(seekFilter);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSeekFilter(seekFilter), 300);
+    return () => clearTimeout(t);
+  }, [seekFilter]);
+
   // Dropdown option universe — derived from the UNFILTERED list so applying
   // a filter can't collapse its own options.
   const [seedBatchOptions, setSeedBatchOptions] = useState<{ cities: string[]; categories: string[] }>({
     cities: [], categories: [],
   });
   const [seedOptionsLoaded, setSeedOptionsLoaded] = useState(false);
+  const [seekBatchOptions, setSeekBatchOptions] = useState<{ cities: string[]; categories: string[] }>({
+    cities: [], categories: [],
+  });
+  const [seekOptionsLoaded, setSeekOptionsLoaded] = useState(false);
 
   // Batch delete / unbatch confirmation
   const [deleteTarget, setDeleteTarget] = useState<{ kind: 'seek' | 'seed'; id: string; label: string } | null>(null);
@@ -71,6 +85,20 @@ export default function BatchOperationsDashboard() {
     }
   }, []);
 
+  const fetchSeekBatchOptions = useCallback(async () => {
+    try {
+      const all = await directoryPresenceAdminService.listSeekBatches();
+      const cities = Array.from(new Set(all.flatMap((b) => b.cities || []).filter(Boolean))).sort();
+      const categories = Array.from(new Set(
+        all.flatMap((b) => (b.categories?.length ? b.categories : [b.nicheCategory])).filter(Boolean),
+      )).sort();
+      setSeekBatchOptions({ cities, categories });
+      setSeekOptionsLoaded(true);
+    } catch {
+      // option load failure is non-fatal — the row fetch reports its own error
+    }
+  }, []);
+
   // Launcher form state
   const [showLauncher, setShowLauncher] = useState(false);
   const [profiles, setProfiles] = useState<IntelligenceProfile[]>([]);
@@ -96,12 +124,20 @@ export default function BatchOperationsDashboard() {
 
   const fetchSeekBatches = useCallback(async () => {
     try {
-      const result = await directoryPresenceAdminService.listSeekBatches();
+      const result = await directoryPresenceAdminService.listSeekBatches({
+        batch: debouncedSeekFilter.batch || undefined,
+        city: debouncedSeekFilter.city || undefined,
+        category: debouncedSeekFilter.category || undefined,
+        focus: debouncedSeekFilter.focus || undefined,
+        status: debouncedSeekFilter.status || undefined,
+        dateFrom: debouncedSeekFilter.dateFrom || undefined,
+        dateTo: debouncedSeekFilter.dateTo || undefined,
+      });
       setSeekBatches(result);
     } catch (err: any) {
       setError(err?.message || 'failed_to_load');
     }
-  }, []);
+  }, [debouncedSeekFilter]);
 
   const fetchSeedBatches = useCallback(async () => {
     try {
@@ -123,12 +159,13 @@ export default function BatchOperationsDashboard() {
     setLoading(true);
     setError(null);
     if (tab === 'seek') {
+      if (!seekOptionsLoaded) fetchSeekBatchOptions();
       fetchSeekBatches().finally(() => setLoading(false));
     } else {
       if (!seedOptionsLoaded) fetchSeedBatchOptions();
       fetchSeedBatches().finally(() => setLoading(false));
     }
-  }, [tab, fetchSeekBatches, fetchSeedBatches, fetchSeedBatchOptions, seedOptionsLoaded]);
+  }, [tab, fetchSeekBatches, fetchSeedBatches, fetchSeekBatchOptions, fetchSeedBatchOptions, seekOptionsLoaded, seedOptionsLoaded]);
 
   // Open launcher automatically if query params are present (from Growth Engine "Launch Seek")
   useEffect(() => {
@@ -759,6 +796,97 @@ export default function BatchOperationsDashboard() {
 
       {/* Seek Batches Tab */}
       {tab === 'seek' && !loading && (
+        <div>
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Batch slug</label>
+              <input
+                type="text"
+                value={seekFilter.batch}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, batch: e.target.value }))}
+                placeholder="grocery-store-…"
+                className="w-44 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
+              <select
+                value={seekFilter.city}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, city: e.target.value }))}
+                className="w-40 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All cities</option>
+                {seekBatchOptions.cities.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+              <select
+                value={seekFilter.category}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, category: e.target.value }))}
+                className="w-52 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All categories</option>
+                {seekBatchOptions.categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Lens</label>
+              <select
+                value={seekFilter.focus}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, focus: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All</option>
+                <option value="emerging">emerging</option>
+                <option value="competitive">competitive</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+              <select
+                value={seekFilter.status}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, status: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All</option>
+                <option value="draft">draft</option>
+                <option value="running">running</option>
+                <option value="completed">completed</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+              <input
+                type="date"
+                value={seekFilter.dateFrom}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, dateFrom: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+              <input
+                type="date"
+                value={seekFilter.dateTo}
+                onChange={(e) => setSeekFilter((f) => ({ ...f, dateTo: e.target.value }))}
+                className="w-36 px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              />
+            </div>
+            {(seekFilter.batch || seekFilter.city || seekFilter.category || seekFilter.focus || seekFilter.status || seekFilter.dateFrom || seekFilter.dateTo) && (
+              <button
+                type="button"
+                onClick={() => setSeekFilter({ batch: '', city: '', category: '', focus: '', status: '', dateFrom: '', dateTo: '' })}
+                className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -797,13 +925,15 @@ export default function BatchOperationsDashboard() {
                     </td>
                     <td className="py-3 px-4 text-gray-900">{b.nicheCategory}</td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        b.intelligenceFocus === 'competitive'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {b.intelligenceFocus || 'emerging'}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {(b.focuses?.length ? b.focuses : [b.intelligenceFocus || 'emerging']).map((f: string) => (
+                          <span key={f} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            f === 'competitive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {f}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-gray-600">
                       {b.cities?.join(', ') || '—'}
@@ -841,6 +971,7 @@ export default function BatchOperationsDashboard() {
               )}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 

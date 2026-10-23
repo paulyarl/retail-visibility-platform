@@ -68,6 +68,12 @@ export interface BatchSummary {
   status: string;
   createdAt: Date;
   completedAt: Date | null;
+  /** Distinct entry categories — the honest set for mixed-category batches
+   *  (summary nicheCategory may read "X +N more"). Fallback: [nicheCategory]. */
+  categories?: string[];
+  /** Distinct entry focuses — a batch may sweep both lenses. Fallback:
+   *  [intelligenceFocus]. */
+  focuses?: string[];
   entries?: BatchEntry[];
 }
 
@@ -538,6 +544,12 @@ class BatchSeekService {
       nicheCategory: r.niche_category,
       intelligenceFocus: r.intelligence_focus || 'emerging',
       cities,
+      categories: entryRows.length
+        ? Array.from(new Set(entryRows.map((e) => e.niche_category).filter(Boolean)))
+        : (r.niche_category ? [r.niche_category] : []),
+      focuses: entryRows.length
+        ? Array.from(new Set(entryRows.map((e) => e.intelligence_focus || 'emerging')))
+        : [r.intelligence_focus || 'emerging'],
       campaignIds: r.campaign_ids || [],
       status: r.status,
       createdAt: new Date(r.created_at),
@@ -563,32 +575,85 @@ class BatchSeekService {
 
   /**
    * List seek batches with summary metrics.
+   *
+   * Filter semantics mirror listSeedBatches: `batch` is a slug substring
+   * search; `city` is exact case-insensitive against the batch's city set;
+   * `category`/`focus` match the summary column OR any entry row — a
+   * mixed-lens or mixed-category batch surfaces under each of its parts,
+   * not just its first entry.
    */
   async listBatches(filters?: {
     status?: string;
+    batch?: string;
+    city?: string;
+    category?: string;
+    focus?: string;
+    dateFrom?: string;
+    dateTo?: string;
     limit?: number;
   }): Promise<Array<BatchSummary & { metrics: BatchMetrics }>> {
     const limit = Math.min(filters?.limit || 50, 200);
-    const statusFilter = filters?.status;
 
-    let query = `
+    const conditions: string[] = [];
+    const params: any[] = [];
+    const addParam = (v: any) => `$${params.push(v)}`;
+
+    if (filters?.status) {
+      conditions.push(`b.status = ${addParam(filters.status)}`);
+    }
+    if (filters?.batch) {
+      conditions.push(`b.batch_slug ILIKE ${addParam(`%${filters.batch}%`)}`);
+    }
+    if (filters?.city) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM unnest(COALESCE(b.cities, '{}'::text[])) c
+        WHERE lower(c) = lower(${addParam(filters.city)})
+      )`);
+    }
+    if (filters?.category) {
+      const p = addParam(filters.category);
+      conditions.push(`(
+        lower(b.niche_category) = lower(${p})
+        OR EXISTS (
+          SELECT 1 FROM mkt_seek_batch_entries e
+          WHERE e.batch_id = b.id AND lower(e.niche_category) = lower(${p})
+        )
+      )`);
+    }
+    if (filters?.focus) {
+      const p = addParam(filters.focus);
+      conditions.push(`(
+        b.intelligence_focus = ${p}
+        OR EXISTS (
+          SELECT 1 FROM mkt_seek_batch_entries e
+          WHERE e.batch_id = b.id AND e.intelligence_focus = ${p}
+        )
+      )`);
+    }
+    if (filters?.dateFrom) {
+      conditions.push(`b.created_at >= ${addParam(filters.dateFrom)}::timestamptz`);
+    }
+    if (filters?.dateTo) {
+      conditions.push(`b.created_at < (${addParam(filters.dateTo)}::date + 1)`);
+    }
+
+    const query = `
       SELECT
         b.id, b.batch_slug, b.profile_id, b.profile_version, b.niche_category, b.intelligence_focus,
         b.cities, b.campaign_ids, b.status, b.created_at, b.completed_at,
+        (SELECT array_agg(DISTINCT e.niche_category)
+         FROM mkt_seek_batch_entries e WHERE e.batch_id = b.id) AS entry_categories,
+        (SELECT array_agg(DISTINCT e.intelligence_focus)
+         FROM mkt_seek_batch_entries e WHERE e.batch_id = b.id) AS entry_focuses,
         (SELECT COUNT(*) FROM mkt_prospect_queue pq WHERE pq.seek_batch_id = b.id) AS total_prospects,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id) AS total_seeds,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.published_at IS NOT NULL) AS published_seeds,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.invited_at IS NOT NULL) AS invited_seeds,
         (SELECT COUNT(*) FROM directory_presence_seeds dps WHERE dps.seek_batch_id = b.id AND dps.claimed_at IS NOT NULL) AS claimed_seeds
       FROM mkt_seek_batches b
+      ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
+      ORDER BY b.created_at DESC LIMIT ${addParam(limit)}
     `;
-    const params: any[] = [];
-    if (statusFilter) {
-      query += ` WHERE b.status = $1`;
-      params.push(statusFilter);
-    }
-    query += ` ORDER BY b.created_at DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
 
     const rows = await prisma.$queryRawUnsafe<any[]>(query, ...params);
 
@@ -617,6 +682,11 @@ class BatchSeekService {
       nicheCategory: r.niche_category,
       intelligenceFocus: r.intelligence_focus || 'emerging',
       cities: r.cities || [],
+      // Distinct categories across entries — the honest option universe for
+      // mixed-category batches (summary niche reads "X +N more"). Legacy
+      // batches have no entry rows, so fall back to the summary category.
+      categories: r.entry_categories?.length ? r.entry_categories : (r.niche_category ? [r.niche_category] : []),
+      focuses: r.entry_focuses?.length ? r.entry_focuses : [r.intelligence_focus || 'emerging'],
       campaignIds: r.campaign_ids || [],
       status: r.status,
       createdAt: new Date(r.created_at),
@@ -780,9 +850,19 @@ class BatchSeekService {
       conditions.push(`dps.seek_batch_id = ${addParam(filters.seekBatch)}`);
     }
     if (filters?.focus) {
+      // Same "summary OR any entry" semantics as listBatches — a seed cohort
+      // from a mixed-lens batch surfaces under each lens it swept with.
+      const p = addParam(filters.focus);
       conditions.push(`EXISTS (
         SELECT 1 FROM mkt_seek_batches sb
-        WHERE sb.id = dps.seek_batch_id AND sb.intelligence_focus = ${addParam(filters.focus)}
+        WHERE sb.id = dps.seek_batch_id
+          AND (
+            sb.intelligence_focus = ${p}
+            OR EXISTS (
+              SELECT 1 FROM mkt_seek_batch_entries e
+              WHERE e.batch_id = sb.id AND e.intelligence_focus = ${p}
+            )
+          )
       )`);
     }
 

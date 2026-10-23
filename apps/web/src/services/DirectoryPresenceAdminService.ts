@@ -864,6 +864,16 @@ export interface SeedBatchFilters {
   seekBatch?: string;
 }
 
+export interface SeekBatchFilters {
+  batch?: string;
+  city?: string;
+  category?: string;
+  focus?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export interface CategoryRollup {
   category: string;
   metrics: CohortFunnelMetrics;
@@ -2571,10 +2581,17 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   }
 
   /** GET /api/admin/directory-presence/seek-batches */
-  async listSeekBatches(status?: string): Promise<any[]> {
+  async listSeekBatches(filters?: SeekBatchFilters): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters) {
+      for (const [k, v] of Object.entries(filters)) {
+        if (v) params.set(k, v);
+      }
+    }
+    const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/directory-presence/seek-batches${status ? `?status=${encodeURIComponent(status)}` : ''}`,
-      { method: 'GET' },
+      `/api/admin/directory-presence/seek-batches${qs ? `?${qs}` : ''}`,
+      { method: 'GET', cache: 'no-store' },
       undefined,
       0,
     );

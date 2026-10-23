@@ -21,6 +21,8 @@ interface BatchDetail {
   batchSlug: string;
   nicheCategory: string;
   intelligenceFocus: string;
+  focuses?: string[];
+  categories?: string[];
   cities: string[];
   campaignIds: string[];
   status: string;
@@ -132,11 +134,13 @@ export default function BatchDetailClient() {
           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusColor}`}>
             {batch.status}
           </span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-            batch.intelligenceFocus === 'competitive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-          }`}>
-            {batch.intelligenceFocus || 'emerging'}
-          </span>
+          {(batch.focuses?.length ? batch.focuses : [batch.intelligenceFocus || 'emerging']).map((f) => (
+            <span key={f} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              f === 'competitive' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+            }`}>
+              {f}
+            </span>
+          ))}
           <span className="text-xs text-gray-500">
             Created {new Date(batch.createdAt).toLocaleDateString()}
             {batch.completedAt && ` · Completed ${new Date(batch.completedAt).toLocaleDateString()}`}
