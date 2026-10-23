@@ -118,6 +118,20 @@ class BatchSeekService {
           intelligenceFocus: input.intelligenceFocus,
         }));
 
+    // One lens per market-vertical: entries dedup on (category, city, state) —
+    // focus/profile must not distinguish two entries for the same market, or the
+    // second would silently reuse the first's campaign at launch (reuseExisting
+    // is keyed on the same tuple). Mirrors the launcher's queue rule and also
+    // covers duplicate city values in the legacy cities[] path.
+    const seenMarkets = new Set<string>();
+    for (const ref of refs) {
+      const marketKey = `${(ref.nicheCategory || '').trim().toLowerCase()}|${(ref.city || '').trim().toLowerCase()}|${(ref.state || '').trim().toLowerCase()}`;
+      if (seenMarkets.has(marketKey)) {
+        throw new ValidationError(`duplicate batch entry for '${ref.nicheCategory}' in '${ref.city || ref.state || 'nationwide'}' — one lens per market (dedup key is category + city + state)`);
+      }
+      seenMarkets.add(marketKey);
+    }
+
     const profileIds = Array.from(new Set(refs.map((r) => r.profileId).filter(Boolean)));
     const profileRows = profileIds.length
       ? await prisma.mkt_intelligence_profiles.findMany({
