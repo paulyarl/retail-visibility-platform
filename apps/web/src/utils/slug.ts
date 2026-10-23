@@ -177,6 +177,34 @@ export function parsePlaceCitySlug(slug: string): { city: string; state: string 
   return { city: parts.join(' '), state: null };
 }
 
+/** Full state names → postal codes, matching the API's CITY_SLUG_STATE_TOKENS. */
+const PLACE_CITY_STATE_NAMES: Record<string, string> = {
+  alabama: 'al', alaska: 'ak', arizona: 'az', arkansas: 'ar', california: 'ca',
+  colorado: 'co', connecticut: 'ct', delaware: 'de', 'district of columbia': 'dc',
+  florida: 'fl', georgia: 'ga', hawaii: 'hi', idaho: 'id', illinois: 'il',
+  indiana: 'in', iowa: 'ia', kansas: 'ks', kentucky: 'ky', louisiana: 'la',
+  maine: 'me', maryland: 'md', massachusetts: 'ma', michigan: 'mi', minnesota: 'mn',
+  mississippi: 'ms', missouri: 'mo', montana: 'mt', nebraska: 'ne', nevada: 'nv',
+  'new hampshire': 'nh', 'new jersey': 'nj', 'new mexico': 'nm', 'new york': 'ny',
+  'north carolina': 'nc', 'north dakota': 'nd', ohio: 'oh', oklahoma: 'ok',
+  oregon: 'or', pennsylvania: 'pa', 'rhode island': 'ri', 'south carolina': 'sc',
+  'south dakota': 'sd', tennessee: 'tn', texas: 'tx', utah: 'ut', vermont: 'vt',
+  virginia: 'va', washington: 'wa', 'west virginia': 'wv', wisconsin: 'wi',
+  wyoming: 'wy',
+};
+
+/**
+ * Normalize a stored state to its postal code. `dps.state` may hold either
+ * form, but the canonical shelf slug is always `{city}-{code}` (matching the
+ * API's sitemap tokenizer). Without this, a stored "Indiana" emits
+ * `/place/city/indianapolis-indiana`, which 308s to `…-in` — every city link
+ * would be a redirect.
+ */
+function placeCityStateCode(state: string): string {
+  const key = state.trim().toLowerCase();
+  return PLACE_CITY_STATE_NAMES[key] ?? key;
+}
+
 /**
  * Canonical URL for a /place seed city shelf — "{city}-{state}" when the
  * state is known ('/place/city/indianapolis-in'), which disambiguates
@@ -185,7 +213,9 @@ export function parsePlaceCitySlug(slug: string): { city: string; state: string 
  * gracefully instead of breaking the link.
  */
 export function getPlaceCityShelfUrl(city: string, state?: string | null): string {
-  return state ? getCityUrl(city, state, '/place/city') : `/place/city/${slugify(city)}`;
+  return state
+    ? getCityUrl(city, placeCityStateCode(state), '/place/city')
+    : `/place/city/${slugify(city)}`;
 }
 
 /**

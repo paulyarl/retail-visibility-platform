@@ -9,7 +9,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { slugify, unslugify, slugsMatch, getCategoryUrl, getStoreTypeUrl } from './slug';
+import {
+  slugify,
+  unslugify,
+  slugsMatch,
+  getCategoryUrl,
+  getStoreTypeUrl,
+  getPlaceCityShelfUrl,
+  parsePlaceCitySlug,
+} from './slug';
 
 describe('Frontend Slug Utilities', () => {
   describe('slugify', () => {
@@ -193,5 +201,33 @@ describe('Frontend Slug Utilities', () => {
       expect(slugify('A///B')).toBe('a-b');
       expect(slugify('A   B')).toBe('a-b');
     });
+  });
+});
+
+describe('getPlaceCityShelfUrl (spec §4.4.1)', () => {
+  it('normalizes full state names to postal codes so links match the sitemap', () => {
+    expect(getPlaceCityShelfUrl('Indianapolis', 'Indiana')).toBe('/place/city/indianapolis-in');
+    expect(getPlaceCityShelfUrl('Bluefield', 'West Virginia')).toBe('/place/city/bluefield-wv');
+    expect(getPlaceCityShelfUrl('New York', 'New York')).toBe('/place/city/new-york-ny');
+  });
+
+  it('passes postal codes through unchanged', () => {
+    expect(getPlaceCityShelfUrl('Indianapolis', 'IN')).toBe('/place/city/indianapolis-in');
+    expect(getPlaceCityShelfUrl('Indianapolis', 'in')).toBe('/place/city/indianapolis-in');
+  });
+
+  it('falls back to the legacy bare-city slug when the state is unknown', () => {
+    expect(getPlaceCityShelfUrl('Indianapolis')).toBe('/place/city/indianapolis');
+    expect(getPlaceCityShelfUrl('Indianapolis', null)).toBe('/place/city/indianapolis');
+  });
+});
+
+describe('parsePlaceCitySlug', () => {
+  it('splits the canonical {city}-{state} form', () => {
+    expect(parsePlaceCitySlug('indianapolis-in')).toEqual({ city: 'indianapolis', state: 'in' });
+  });
+
+  it('keeps multi-word cities intact when the tail is not a state code', () => {
+    expect(parsePlaceCitySlug('south-bend')).toEqual({ city: 'south bend', state: null });
   });
 });

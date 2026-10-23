@@ -489,7 +489,7 @@ Both return `[]`/`null` on failure. A browse page must never 500 because an SEO 
 | `/tenant/{slug}` canonical lookup | `tenantPublicService.getStorefrontCanonical` — already cached per tenant |
 | SSR prefills | existing 5-minute `PublicApiSingleton` TTL — no change |
 
-The producer writes a row to `directory_places_sitemap_log` per generation. At 1/hour that is ~8.7k rows/year — acceptable, but **add it to the retention job set** (`purge-*` pattern documented in AGENTS.md) or drop the write. Flagging rather than deciding.
+**Resolved 2026-10-23:** the `directory_places_sitemap_log` write is **dropped**. Nothing read the table, and the index now generates five-plus files per crawl (so the old ~8.7k rows/year became ~44k). Drop the table in a follow-up migration if nothing else adopts it.
 
 ---
 
@@ -646,7 +646,7 @@ Realistic expectation: sitemap submission → first crawl within days; a meaning
 | 3 | **Slug filter aggressiveness** (§4.6). Excluding >60 chars removes real pages from the index. | Ship the filter, log exclusions, revisit after Search Console shows which category pages earn impressions. |
 | 4 | **`totalPlaces` is misleading** (shelf memberships). Any sitemap count check using it will be wrong. | Use `<loc>` counts. Do not add a page-count assertion against `totalPlaces`. |
 | 5 | **Duplicate content across shelves.** A place with 3 secondary categories appears on 3 category pages with the same card. | Not a new problem, and each shelf page has distinct copy from its enrichment packet. Do not `noindex` shelf pages. |
-| 6 | **`directory_places_sitemap_log` growth.** Unbounded insert per generation. | Add to the retention job set or drop the write. Low urgency. |
+| 6 | **`directory_places_sitemap_log` growth.** Unbounded insert per generation. | **Resolved: write dropped.** No readers; the index multiplies generation events. Table can be dropped in a follow-up migration. |
 | 7 | **SSR prefill cost.** Three extra API calls per browse page render. | All are 5-minute cached and already fetched by the client on the same page view. Net: the client's duplicate fetch is removed. |
 | 8 | **Cross-host `<loc>`s** (subdomain + custom-domain storefronts/products) are legal only while each tenant host serves a `robots.txt` referencing the platform sitemap. The proxy's `.`-path passthrough is what makes that work — an unrelated routing change could silently break it. | Keep acceptance #11 and a comment in `proxy.ts` / `robots.ts`. If it breaks, fall back to emitting path-form URLs only (canonicals still consolidate). |
 | 9 | **`/shops/{slug}` consolidation** (§4.9) assumes the shop profile is not a deliberately distinct surface. | **Decided 2026-10-23: suppress, don't block.** Canonical to the storefront home; no `noindex`, no `Disallow`, not in the sitemap, keep it linked. Crawlers keep discovering it; equity lands on the storefront. If it later earns unique content, drop the canonical. |
@@ -737,6 +737,8 @@ Each slice is independently shippable and independently verifiable. Only PR3 cha
 ### 12.5 Definition of done
 
 All §7 criteria pass against production; §8 returns a single `N 200` line across all hosts; `pnpm build` is green; the sitemap is submitted and *Success* in Search Console; the pre-launch *Pages → Indexed* baseline is recorded (§9.4); the sitemap-log retention job is installed or the write is gone.
+
+**Delivered 2026-10-23:** PR1–PR5 implemented. Local gates green (`pnpm checkapi`, `pnpm checkweb`, `pnpm build`, 217 API lib tests, 704 web tests). The remaining work is operational: §8 probes against staging/prod, Search Console submission, and the §9 baseline.
 
 ---
 

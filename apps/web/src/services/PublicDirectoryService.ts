@@ -42,32 +42,6 @@ export interface DirectoryItem {
   updatedAt: string;
 }
 
-export interface DirectorySearchParams {
-  query?: string;
-  category?: string;
-  location?: string;
-  latitude?: number;
-  longitude?: number;
-  radius?: number; // in km
-  limit?: number;
-  offset?: number;
-  sortBy?: 'name' | 'rating' | 'distance' | 'newest' | 'featured';
-  featured?: boolean;
-  published?: boolean;
-}
-
-export interface DirectorySearchResponse {
-  items: DirectoryItem[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-  facets?: {
-    categories: Array<{ name: string; count: number }>;
-    locations: Array<{ name: string; count: number }>;
-  };
-}
-
 export interface SitemapEntry {
   url: string;
   lastmod: string;
@@ -108,50 +82,6 @@ class PublicDirectoryService extends PublicApiSingleton {
       PublicDirectoryService.instance = new PublicDirectoryService();
     }
     return PublicDirectoryService.instance;
-  }
-
-  /**
-   * Search directory listings
-   */
-  async searchDirectory(params: DirectorySearchParams): Promise<DirectorySearchResponse> {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      // Add all search parameters
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          queryParams.append(key, value.toString());
-        }
-      });
-
-      const result = await this.makeDefaultRequest<DirectorySearchResponse>(
-        `/api/directory/search?${queryParams.toString()}`,
-        {},
-        `directory-search-${queryParams.toString()}`,
-        10 * 60 * 1000 // 10 minutes cache for search results
-      );
-      
-      if (!result.success || !result.data) {
-        return {
-          items: [],
-          total: 0,
-          limit: params.limit || 20,
-          offset: params.offset || 0,
-          hasMore: false
-        };
-      }
-      
-      return result.data;
-    } catch (error) {
-      clientLogger.error('[PublicDirectoryService] Failed to search directory:', { detail: error });
-      return {
-        items: [],
-        total: 0,
-        limit: params.limit || 20,
-        offset: params.offset || 0,
-        hasMore: false
-      };
-    }
   }
 
   /**
@@ -439,25 +369,6 @@ class PublicDirectoryService extends PublicApiSingleton {
     }
   }
 
-  /**
-   * Get directory items by location slug
-   */
-  async getItemsByLocation(locationSlug: string, params?: Omit<DirectorySearchParams, 'location'>): Promise<DirectorySearchResponse> {
-    return this.searchDirectory({
-      ...params,
-      location: locationSlug
-    });
-  }
-
-  /**
-   * Get directory items by category slug
-   */
-  async getItemsByCategory(categorySlug: string, params?: Omit<DirectorySearchParams, 'category'>): Promise<DirectorySearchResponse> {
-    return this.searchDirectory({
-      ...params,
-      category: categorySlug
-    });
-  }
 }
 
 // Export the singleton instance

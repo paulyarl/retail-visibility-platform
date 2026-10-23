@@ -11,6 +11,7 @@ import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
 import { parsePlaceCitySlug } from '@/utils/slug';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 /** Slug-derived display name — the DB spelling wins whenever it's available.
  *  Strips the trailing state segment so 'indianapolis-in' reads 'Indianapolis'. */
@@ -38,6 +39,11 @@ export async function generateMetadata({ params }: { params: Promise<{ citySlug:
     title,
     description,
     keywords: effective?.keywords?.join(', '),
+    // Canonical uses the resolved slug so the legacy bare-city form (which
+    // 308s below) never competes with the "{city}-{state}" URL.
+    alternates: {
+      canonical: `${platformOrigin()}/place/city/${summary?.canonicalSlug ?? citySlug}`,
+    },
     openGraph: {
       title,
       description,
@@ -57,12 +63,16 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
   // Server-render the market intel teaser (§11.5) and the city shelf summary
   // (dominant state + location enrichment packet) for SEO — the packet copy
   // renders below the client-driven listings grid.
-  const [marketIntelTeaser, summary, shelfIndex] = await Promise.all([
+  const [marketIntelTeaser, summary, shelfIndex, initialCityData] = await Promise.all([
     marketIntelSurfaceService.getCityTeaser(citySlug).catch(() => null),
     placesBrowsePublicService.getCityShelfSummary(citySlug).catch(() => null),
     // Live shelf index — resolves packet top_categories / strong_categories
     // labels to hot shelf links (exact label + this market's count > 0).
     placesBrowsePublicService.getCategories().catch(() => null),
+    // First page of the shelf, in the shape the client renders — this is what
+    // turns the grid from client-only markup into real detail links in the
+    // first HTML response (spec §4.4.1).
+    placesBrowsePublicService.getCityPlaces(citySlug).catch(() => null),
   ]);
 
   // Legacy bare-city slugs (and full-name state tokens) 308 to the canonical
@@ -96,6 +106,7 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
           citySlug={citySlug}
           marketIntelTeaser={marketIntelTeaser}
           enrichment={summary?.enrichment ?? null}
+          initialData={initialCityData}
         />
       </Suspense>
       {summary?.enrichment && (

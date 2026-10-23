@@ -34,6 +34,8 @@ interface PlaceCategoryClientProps {
   city?: string;
   state?: string;
   marketIntelTeaser?: CategoryMarketIntelTeaser | null;
+  /** Server-rendered first page of the shelf — spec §4.4.1. */
+  initialPlaces?: PlaceListing[] | null;
 }
 
 function formatCategoryName(slug: string): string {
@@ -48,21 +50,28 @@ export default function PlaceCategoryClient({
   city,
   state,
   marketIntelTeaser,
+  initialPlaces,
 }: PlaceCategoryClientProps) {
-  const [places, setPlaces] = useState<PlaceListing[]>([]);
+  const [places, setPlaces] = useState<PlaceListing[]>(initialPlaces ?? []);
   const [enrichment, setEnrichment] = useState<CategoryEnrichmentResponse | null>(null);
   const [shelfIndex, setShelfIndex] = useState<PlaceCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialPlaces);
   const [error, setError] = useState<string | null>(null);
 
   const categoryName = enrichment?.market?.categoryName ?? formatCategoryName(categorySlug);
 
   useEffect(() => {
     const fetchData = async () => {
+      // The server prefilled the listings — still fetch enrichment + the shelf
+      // index (they drive the body copy, JSON-LD, and shelf chips), but skip
+      // the places call so the prefilled grid never flashes a spinner.
+      const needsPlaces = !initialPlaces;
       try {
-        setLoading(true);
+        if (needsPlaces) setLoading(true);
         const [placesData, enrichmentData, shelfData] = await Promise.all([
-          placesBrowsePublicService.getPlacesByCategory(categorySlug, city),
+          needsPlaces
+            ? placesBrowsePublicService.getPlacesByCategory(categorySlug, city)
+            : Promise.resolve(null),
           // No city → national category view; fetch the '__all__' packet.
           placesBrowsePublicService.getCategoryEnrichment(categorySlug, city ?? '__all__', state),
           // Live shelf index — resolves taxonomy labels to real shelves with
@@ -71,19 +80,19 @@ export default function PlaceCategoryClient({
         ]);
         if (placesData) {
           setPlaces(placesData.places);
-        } else {
+        } else if (needsPlaces) {
           setError('Failed to load places.');
         }
         setEnrichment(enrichmentData);
         setShelfIndex(shelfData?.categories ?? []);
       } catch {
-        setError('Failed to load places.');
+        if (needsPlaces) setError('Failed to load places.');
       } finally {
-        setLoading(false);
+        if (needsPlaces) setLoading(false);
       }
     };
     fetchData();
-  }, [categorySlug, city, state]);
+  }, [categorySlug, city, state, initialPlaces]);
 
   if (loading) {
     return (

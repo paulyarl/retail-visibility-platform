@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import PlaceCategoryClient from './PlaceCategoryClient';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +33,21 @@ export async function generateMetadata({
     ? await placesBrowsePublicService.getCategoryEnrichment(categorySlug, city, state)
     : await placesBrowsePublicService.getCategoryEnrichment(categorySlug, '__all__');
 
+  // The city filter changes content, so it stays in the canonical; the
+  // national view is the bare shelf URL. `?sort`/`?page` variants canonicalize
+  // here too (spec §4.5).
+  const canonical = `${platformOrigin()}/place/category/${categorySlug}${
+    city
+      ? `?city=${encodeURIComponent(city)}${state ? `&state=${encodeURIComponent(state)}` : ''}`
+      : ''
+  }`;
+
   if (enrichment?.market) {
     return {
       title: enrichment.effective.metaTitle,
       description: enrichment.effective.description,
       keywords: enrichment.effective.keywords,
+      alternates: { canonical },
       openGraph: {
         title: enrichment.effective.metaTitle,
         description: enrichment.effective.description,
@@ -51,6 +62,7 @@ export async function generateMetadata({
   return {
     title: `${categoryName} — Places Directory — VisibleShelf`,
     description: fallbackDescription,
+    alternates: { canonical },
     openGraph: {
       title: `${categoryName} — Places Directory — VisibleShelf`,
       description: `Browse ${categoryName} businesses listed on VisibleShelf.`,
@@ -66,16 +78,16 @@ export default async function PlaceCategoryPage({ params, searchParams }: PagePr
   // Server-render the market intel teaser for SEO (§11.5).
   const city = resolvedSearchParams.city ?? '__all__';
   const state = resolvedSearchParams.state ?? null;
-  let marketIntelTeaser = null;
-  try {
-    marketIntelTeaser = await marketIntelSurfaceService.getCategoryTeaser(
-      resolvedParams.categorySlug,
-      city,
-      state,
-    );
-  } catch {
-    // Degrade gracefully — sidebar just won't render.
-  }
+  const [marketIntelTeaser, placesResult] = await Promise.all([
+    marketIntelSurfaceService
+      .getCategoryTeaser(resolvedParams.categorySlug, city, state)
+      .catch(() => null),
+    // First page of the shelf — server-rendered detail links (spec §4.4.1).
+    placesBrowsePublicService
+      .getPlacesByCategory(resolvedParams.categorySlug, resolvedSearchParams.city)
+      .catch(() => null),
+  ]);
+  const initialPlaces = placesResult?.places ?? null;
 
   return (
     <Suspense
@@ -93,6 +105,7 @@ export default async function PlaceCategoryPage({ params, searchParams }: PagePr
         city={resolvedSearchParams.city}
         state={resolvedSearchParams.state}
         marketIntelTeaser={marketIntelTeaser}
+        initialPlaces={initialPlaces}
       />
     </Suspense>
   );

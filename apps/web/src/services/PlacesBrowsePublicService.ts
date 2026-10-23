@@ -55,6 +55,26 @@ export interface PlacesByCategoryResponse {
   count: number;
 }
 
+/**
+ * GET /api/public/directory/places/city/:citySlug — the shape
+ * `PlaceCityClient` renders: shelf-grouped `categories[]` (deduped by
+ * `buildShelfSections`) plus the flat `places[]` and pagination counters.
+ * NOT a flat `PlaceListing[]`.
+ */
+export interface CityShelfResponse {
+  city: string;
+  state: string | null;
+  citySlug: string;
+  canonicalSlug: string | null;
+  categories: Array<{ category: string; slug: string; iconEmoji: string | null; places: PlaceListing[] }>;
+  places: PlaceListing[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+  enrichment: LocationEnrichmentResponse | null;
+}
+
 export interface CategoryEnrichmentMarket {
   categoryName: string;
   city: string;
@@ -288,8 +308,11 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
     canonicalSlug: string | null;
   } | null> {
     try {
+      // perPage=24 matches the first page PlaceCityClient renders, so this
+      // response doubles as the SSR prefill (see getCityPlaces) — one API call
+      // per city render instead of two.
       const result = await this.makeDefaultRequest<any>(
-        `/api/public/directory/places/city/${encodeURIComponent(citySlug)}?perPage=1`,
+        `/api/public/directory/places/city/${encodeURIComponent(citySlug)}?page=1&perPage=24&sort=name`,
         { method: 'GET' },
         `places-city-summary-${citySlug}`,
         5 * 60 * 1000,
@@ -307,6 +330,75 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * GET /api/public/directory/places/city/:citySlug — the FIRST PAGE of the
+   * city shelf in the shape `PlaceCityClient` renders (grouped `categories[]`,
+   * `places[]`, pagination counters). Shares the summary's cache entry, so the
+   * page and its metadata cost one API call.
+   *
+   * Returns null on failure — a browse page must never 500 because an SEO
+   * prefill failed; the client falls back to its own fetch.
+   */
+  async getCityPlaces(citySlug: string): Promise<CityShelfResponse | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/places/city/${encodeURIComponent(citySlug)}?page=1&perPage=24&sort=name`,
+        { method: 'GET' },
+        `places-city-summary-${citySlug}`,
+        5 * 60 * 1000,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      if (!data || !data.city) return null;
+      return {
+        city: data.city,
+        state: data.state ?? null,
+        citySlug: data.citySlug ?? citySlug,
+        canonicalSlug: data.canonicalSlug ?? null,
+        categories: Array.isArray(data.categories) ? data.categories : [],
+        places: Array.isArray(data.places) ? data.places : [],
+        total: data.total ?? 0,
+        page: data.page ?? 1,
+        perPage: data.perPage ?? 24,
+        totalPages: data.totalPages ?? 1,
+        enrichment: data.enrichment ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * GET /api/public/directory/places/search — every published seed, A–Z.
+   * Pages at the API's 48 cap and hard-stops at `max` so a runaway dataset
+   * can't stall a server render. Feeds the `/place` crawl index (§4.4.2).
+   */
+  async getAllPlaces(max = 500): Promise<PlaceListing[]> {
+    const perPage = 48;
+    const pageCount = Math.max(1, Math.ceil(max / perPage));
+    const all: PlaceListing[] = [];
+
+    for (let page = 1; page <= pageCount; page += 1) {
+      try {
+        const result = await this.makeDefaultRequest<any>(
+          `/api/public/directory/places/search?page=${page}&perPage=${perPage}&sort=name`,
+          { method: 'GET' },
+          `places-search-all-${page}`,
+          5 * 60 * 1000,
+        );
+        if (!result.success) break;
+        const data = result.data?.data ?? result.data;
+        const places: PlaceListing[] = Array.isArray(data?.places) ? data.places : [];
+        all.push(...places);
+        if (places.length < perPage || all.length >= max) break;
+      } catch {
+        break;
+      }
+    }
+
+    return all.slice(0, max);
   }
 
   /** GET /api/public/directory/location-enrichment — effective location SEO for city pages */

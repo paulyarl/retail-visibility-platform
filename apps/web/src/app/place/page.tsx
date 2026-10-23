@@ -4,6 +4,8 @@ import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import PlacesIndexClient from './PlacesIndexClient';
 import PlacesIndexHero from './PlacesIndexHero';
 import PlaceNationalPanel from './PlaceNationalPanel';
+import PlacesIndexDirectory, { type PlacesIndexCityLink } from './PlacesIndexDirectory';
+import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,11 +38,31 @@ export default async function PlacesIndexPage() {
   // of national category packets (per-category framing for the cards below).
   // The category shelf is read here too — the header carries its counts and the
   // grid renders from it without waiting on a client fetch.
-  const [national, roster, categories] = await Promise.all([
+  const [national, roster, categories, allPlaces] = await Promise.all([
     placesBrowsePublicService.getLocationEnrichment('__all__', '__all__'),
     placesBrowsePublicService.getNationalCategoryRoster(),
     placesBrowsePublicService.getCategories(),
+    // Server-rendered A–Z crawl index (§4.4.2). [] on failure — the page
+    // degrades to the category grid rather than erroring.
+    placesBrowsePublicService.getAllPlaces(),
   ]);
+
+  // One link per market, deduped by href (a city appears under every shelf it
+  // has listings on). getPlaceCityShelfUrl normalizes full state names to
+  // postal codes so these match the canonical shelf slug — no redirects.
+  const cityLinks: PlacesIndexCityLink[] = [];
+  {
+    const seen = new Set<string>();
+    for (const category of categories?.categories ?? []) {
+      for (const city of category.cities ?? []) {
+        const href = getPlaceCityShelfUrl(city.city, city.state);
+        if (seen.has(href)) continue;
+        seen.add(href);
+        cityLinks.push({ label: `${city.city}, ${city.state}`, href });
+      }
+    }
+    cityLinks.sort((a, b) => a.label.localeCompare(b.label));
+  }
 
   return (
     <>
@@ -66,6 +88,9 @@ export default async function PlacesIndexPage() {
           initialCategories={categories?.categories ?? null}
         />
       </Suspense>
+      {/* Crawl index — server-rendered so every listing and city has an
+          inbound link in the first HTML response. */}
+      <PlacesIndexDirectory cities={cityLinks} places={allPlaces} />
     </>
   );
 }

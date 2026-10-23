@@ -19,7 +19,10 @@ import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import { reportShelfListingClick } from '@/services/DirectoryPresencePublicService';
 import type { CityMarketIntelTeaser } from '@/services/MarketIntelSurfaceService';
-import type { LocationEnrichmentResponse } from '@/services/PlacesBrowsePublicService';
+import type {
+  CityShelfResponse,
+  LocationEnrichmentResponse,
+} from '@/services/PlacesBrowsePublicService';
 
 interface PlaceResult {
   id: string;
@@ -86,9 +89,11 @@ interface PlaceCityClientProps {
   citySlug: string;
   marketIntelTeaser?: CityMarketIntelTeaser | null;
   enrichment?: LocationEnrichmentResponse | null;
+  /** Server-rendered first page (page 1, name sort) — spec §4.4.1. */
+  initialData?: CityShelfResponse | null;
 }
 
-export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTeaser, enrichment: enrichmentProp }: PlaceCityClientProps) {
+export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTeaser, enrichment: enrichmentProp, initialData }: PlaceCityClientProps) {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -97,8 +102,8 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
   const sort = searchParams.get('sort') || 'name';
   const page = parseInt(searchParams.get('page') || '1');
 
-  const [data, setData] = useState<CityResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<CityResponse | null>(initialData ?? null);
+  const [loading, setLoading] = useState(!initialData);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -107,7 +112,12 @@ export default function PlaceCityClient({ citySlug: citySlugProp, marketIntelTea
     setLoading(false);
   }, [citySlug, sort, page]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    // The server prefilled page 1 with the name sort — any other sort or page
+    // still needs the client fetch.
+    if (initialData && page === 1 && sort === 'name') return;
+    fetchData();
+  }, [fetchData, initialData, page, sort]);
 
   const updateParam = (key: string, value: string) => {
     const sp = new URLSearchParams(searchParams.toString());

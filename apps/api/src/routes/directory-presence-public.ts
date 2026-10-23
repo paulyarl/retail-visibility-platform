@@ -1733,12 +1733,6 @@ router.get('/sitemap/:file', async (req: Request, res: Response) => {
       entries = await loadProductEntries(pool, baseUrl, parseInt(match[1], 10));
     }
 
-    // Log sitemap generation
-    await pool.query(
-      'INSERT INTO directory_places_sitemap_log (generated_at, url_count) VALUES (now(), $1)',
-      [entries.length],
-    );
-
     sendSitemap(res, renderUrlset(entries));
   } catch (error) {
     logger.error(`[${label}] Error:`, undefined, {
