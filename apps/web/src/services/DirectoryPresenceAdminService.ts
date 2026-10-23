@@ -3186,6 +3186,72 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data?.result ?? data;
   }
 
+  /** GET /api/admin/directory-presence/presence-seeds/cleanup-report?seedBatch=…
+   *  Post-batch verification: duplicate groups (funnel-matched keys) +
+   *  per-seed completeness. Omit seedBatch to report across all seeds. */
+  async getCleanupReport(seedBatch?: string): Promise<SeedCleanupReport | null> {
+    const params = new URLSearchParams();
+    if (seedBatch) params.set('seedBatch', seedBatch);
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/cleanup-report${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return null;
+    const data = result.data?.data ?? result.data;
+    return (data ?? null) as SeedCleanupReport | null;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/resolve-duplicates
+   *  Keep one seed, suppress the losers, revoke their claim tokens, and
+   *  record the same_entity verdict (merge_into = keeper). */
+  async resolveDuplicateGroup(input: {
+    keepSeedId: string;
+    suppressSeedIds: string[];
+    matchKey: 'phone' | 'address_city';
+    rationale?: string;
+  }): Promise<ResolveDuplicateGroupResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/resolve-duplicates`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const payload = result.data?.data ?? result.data;
+      const claimed = (payload as any)?.claimedSeedIds as string[] | undefined;
+      const errorMessage =
+        typeof result.error === 'string' ? result.error : (result.error?.message ?? (payload as any)?.error);
+      const err = new Error(errorMessage || 'resolve_duplicates_failed') as Error & {
+        claimedSeedIds?: string[];
+      };
+      if (claimed?.length) err.claimedSeedIds = claimed;
+      throw err;
+    }
+    const data = result.data?.data ?? result.data;
+    return data as ResolveDuplicateGroupResult;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/backfill-enrichment
+   *  Fill-missing backfill: canonical provenance + queue-snapshot attributes
+   *  + composed SEO packet (description/keywords/same_as/seo_enrichment). */
+  async backfillSeedEnrichment(seedIds: string[]): Promise<BackfillEnrichmentResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/backfill-enrichment`,
+      { method: 'POST', body: JSON.stringify({ seedIds }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'backfill_enrichment_failed');
+    }
+    const data = result.data?.data ?? result.data;
+    return data as BackfillEnrichmentResult;
+  }
+
   /** POST /api/admin/directory-presence/presence-seeds/:id/reset */
   async resetSeedOverride(seedId: string): Promise<any> {
     const result = await this.makeDefaultRequest<any>(
@@ -3373,6 +3439,74 @@ export interface EnrichMarketResult {
   listingsEnriched: number;
   listingsSkipped: number;
   skipReasons: Record<string, number>;
+}
+
+export interface CleanupSeedRef {
+  seedId: string;
+  businessName: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  phone: string | null;
+  category: string | null;
+  status: string;
+  seedBatch: string | null;
+  isPgBatch: boolean;
+  slug: string | null;
+  isPublished: boolean;
+  hasActiveClaimToken: boolean;
+  primaryCampaignId: string | null;
+}
+
+export interface CleanupDuplicateGroup {
+  matchKey: 'phone' | 'address_city';
+  seedIds: string[];
+  seeds: CleanupSeedRef[];
+  verdict: {
+    verdict: string;
+    mergeInto: string | null;
+    resolvedBy: string | null;
+    resolvedAt: string | null;
+    rationale: string | null;
+  } | null;
+}
+
+export interface CleanupThinSeed {
+  seedId: string;
+  businessName: string | null;
+  seedBatch: string | null;
+  isPgBatch: boolean;
+  status: string;
+  missing: string[];
+}
+
+export interface SeedCleanupReport {
+  generatedAt: string;
+  seedBatch: string | null;
+  batches: Array<{ seedBatch: string; seedCount: number; isPgBatch: boolean }>;
+  duplicateGroups: CleanupDuplicateGroup[];
+  completeness: {
+    totalSeeds: number;
+    thinSeeds: CleanupThinSeed[];
+    summary: Record<string, number>;
+  };
+}
+
+export interface ResolveDuplicateGroupResult {
+  suppressed: string[];
+  alreadySuppressed: string[];
+  tokensRevoked: number;
+  verdictRecorded: boolean;
+}
+
+export interface BackfillEnrichmentResult {
+  results: Array<{
+    seedId: string;
+    skipped?: string;
+    provenanceWritten?: number;
+    attributesWritten?: number;
+    seoSharpened?: boolean;
+  }>;
 }
 
 const directoryPresenceAdminService = DirectoryPresenceAdminService.getInstance();

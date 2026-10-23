@@ -53,6 +53,7 @@ import {
   IDENTITY_SOURCE_TIERS,
 } from '../services/directory/identityScoring';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
+import DirectorySeedCleanupService from '../services/DirectorySeedCleanupService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import SeedAnnounceService from '../services/SeedAnnounceService';
 import SeedCascadeService from '../services/SeedCascadeService';
@@ -465,6 +466,116 @@ router.get('/presence-seeds/dedup-verdicts', requirePlatformStaff, async (_req: 
     res.json({ success: true, verdicts: rows });
   } catch (error: any) {
     logger.error('[GET /api/admin/directory/presence-seeds/dedup-verdicts] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ====================
+// CLEANUP PANEL — post-batch-publish verification
+// ====================
+
+/**
+ * GET /api/admin/directory/presence-seeds/cleanup-report?seedBatch=<batch>
+ *
+ * Post-batch verification surface: duplicate groups (same normalizers as
+ * the funnel detection — verdicts recorded here clear its gate) + per-seed
+ * completeness (canonical provenance, SEO enrichment, attributes, hours).
+ * Batch-scoped groups still compare against ALL live seeds. Declared
+ * before /presence-seeds/:id so 'cleanup-report' isn't swallowed as an id.
+ */
+router.get('/presence-seeds/cleanup-report', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const seedBatch = typeof req.query.seedBatch === 'string' && req.query.seedBatch.trim()
+      ? req.query.seedBatch.trim()
+      : undefined;
+    const report = await DirectorySeedCleanupService.getCleanupReport(seedBatch);
+    res.json({ success: true, ...report });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/cleanup-report] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/resolve-duplicates
+ *
+ * Atomic group resolve: keep one seed, suppress the losers, revoke their
+ * live claim tokens, and record the same_entity verdict (merge_into =
+ * keeper) so the identity ledger accumulates and the funnel gate clears.
+ * Claimed seeds may be the keeper but can never be suppressed here.
+ */
+const resolveDuplicatesSchema = z.object({
+  keepSeedId: z.string().min(1),
+  suppressSeedIds: z.array(z.string().min(1)).min(1),
+  matchKey: z.enum(['phone', 'address_city']),
+  rationale: z.string().max(2000).optional(),
+});
+
+router.post('/presence-seeds/resolve-duplicates', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = resolveDuplicatesSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+    const result = await DirectorySeedCleanupService.resolveDuplicates(validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    const msg = error?.message || '';
+    if (msg === 'keep_seed_not_found' || msg.startsWith('seeds_not_found:')) {
+      return res.status(404).json({ error: 'seed_not_found', details: msg });
+    }
+    if (msg === 'keep_seed_suppressed' || msg === 'nothing_to_suppress') {
+      return res.status(400).json({ error: msg });
+    }
+    if (msg.startsWith('claimed_seed_cannot_suppress:')) {
+      return res.status(409).json({
+        error: 'claimed_seed_cannot_suppress',
+        claimedSeedIds: msg.split(':')[1]?.split(',') ?? [],
+      });
+    }
+    logger.error('[POST /api/admin/directory/presence-seeds/resolve-duplicates] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/backfill-enrichment
+ *
+ * Bring thin seeds up to the createFromCampaign birth standard: canonical
+ * provenance (insert-only, never clobbers operator/owner rows), sourced
+ * attributes from the linked queue snapshot, then the shared resharpen
+ * lane for SEO per primary-linked campaign.
+ */
+const backfillEnrichmentSchema = z.object({
+  seedIds: z.array(z.string().min(1)).min(1).max(500),
+});
+
+router.post('/presence-seeds/backfill-enrichment', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = backfillEnrichmentSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+    const result = await DirectorySeedCleanupService.backfillEnrichment(validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/backfill-enrichment] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
