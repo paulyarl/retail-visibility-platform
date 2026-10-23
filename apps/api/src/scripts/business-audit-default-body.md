@@ -415,16 +415,20 @@ On the Google Business Profile, record:
 
 ### Displayed Opening Hours Capture — CONDITIONAL
 
-When a rendered public surface displays the business's opening hours — the GBP hours block, the business's own site, or a directory profile — record them in the top-level `business_hours` field using the canonical day grid. Lowercase full day keys `monday`–`sunday`, each `{ "open": "HH:MM", "close": "HH:MM", "closed": <boolean> }` with 24-hour times, plus an optional `"timezone"` (IANA zone) only when the source names one:
+**Purpose — this grid is what the business's public directory listing will display.** It flows onto the seed listing and is shown to customers deciding whether to walk in; an empty grid means the listing shows no hours at all. Capture a full weekly schedule whenever any surface publishes one with provenance you can name.
+
+When any rendered public surface displays the business's opening hours — the GBP hours block, the business's own site, Yelp, Facebook, Apple Maps, a directory or locator profile, or a verified record — record them in the top-level `business_hours` field using the canonical day grid. Any one such surface is sufficient: this is NOT a Google-only capture. Lowercase full day keys `monday`–`sunday`, each `{ "open": "HH:MM", "close": "HH:MM", "closed": <boolean> }` with 24-hour times, plus an optional `"timezone"` (IANA zone) only when the source names one:
 
 { "monday": { "open": "09:00", "close": "18:00", "closed": false }, ..., "sunday": { "open": "09:00", "close": "18:00", "closed": true } }
 
 Rules:
 
+* Provenance is required — name the surface the grid came from in `data_quality.verified_fields` (e.g. "weekly hours and timezone (Yelp business page)"). A schedule you cannot attribute to a named surface is not evidence: emit `"business_hours": null` rather than an unsourced grid.
 * Ground-truth precedence — when a `GOOGLE MAPS GROUND TRUTH` context block precedes this prompt and carries a measured-hours JSON grid, emit it verbatim into `business_hours`: it is already measured from the live listing surface in the canonical day-grid and needs no further source work. The ground-truth block is the citation. Only fall back to the source-survey rules below when the packet carries no hours grid.
+* Prefer the most complete published schedule — when one surface publishes all seven days and another publishes only weekdays, emit the fuller grid and name that source. A partial grid is still worth emitting when that is all any surface publishes: a listing showing Monday–Saturday beats a listing showing nothing.
 * Emit only what the surface displays — omit days the source does not list, and mark a day `"closed": true` only when the source lists that day closed.
 * Never infer or interpolate hours from the category, conventions, or a different location of a chain. "No hours observed" is the honest answer — emit `"business_hours": null`.
-* Conflicting hours across surfaces are a NAP-style conflict — record the most authoritative surface's values and note the disagreement in `data_quality.conflicts`.
+* Conflicting hours across surfaces are a NAP-style conflict — record the most authoritative surface's values (prefer the business's own listing or site over a third-party directory, and the fresher surface over a stale one) and note the disagreement in `data_quality.conflicts`.
 
 
 ---
@@ -1446,4 +1450,4 @@ Omit a conditional field entirely when its governing directive says to omit it (
 }
 ```
 
-<!-- seed-version: business-audit-default-2026-10-23-website-absence-any-profile-1 -->
+<!-- seed-version: business-audit-default-2026-10-23-hours-any-provenance-1 -->
