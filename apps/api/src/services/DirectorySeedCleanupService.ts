@@ -150,7 +150,7 @@ class DirectorySeedCleanupService {
              dps.category, dps.city AS seed_city, dps.state AS seed_state,
              dps.identity_confidence, dps.seo_enrichment,
              dps.owner_email, dps.owner_phone,
-             dl.business_name, dl.address, dl.city, dl.state, dl.phone,
+             dl.business_name, dl.address, dl.zip_code, dl.city, dl.state, dl.phone,
              dl.website, dl.slug, dl.is_published, dl.description,
              dl.keywords, dl.same_as, dl.secondary_categories,
              dl.business_hours, dl.attributes,
@@ -261,6 +261,8 @@ class DirectorySeedCleanupService {
           ? computeChainSignals(members.map((m) => ({
               id: m.id,
               business_name: m.business_name,
+              address: m.address,
+              zip_code: m.zip_code,
               city: m.city ?? m.seed_city,
               state: m.state ?? m.seed_state,
               phone: m.phone,

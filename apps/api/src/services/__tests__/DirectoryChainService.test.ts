@@ -10,6 +10,8 @@ import { computeChainSignals, type ChainMemberSignals } from '../DirectoryChainS
 const member = (over: Partial<ChainMemberSignals>): ChainMemberSignals => ({
   id: 'dps-1',
   business_name: null,
+  address: null,
+  zip_code: null,
   city: 'Indianapolis',
   state: 'IN',
   phone: '(317) 998-2510',
@@ -93,6 +95,33 @@ describe('computeChainSignals', () => {
     // halal overlaps (not a stopword) — so this IS a candidate; use a case
     // where the ONLY shared token is the city name.
     expect(r?.nameTokenOverlap).not.toContain('milwaukee');
+  });
+
+  it('returns null: identical street + zip is one storefront, not a chain (the Enerem case)', () => {
+    // Same name, phone, street, zip — only the city label differs
+    // (Fort Wayne vs Huntertown, same 46748 address). A city-label data
+    // issue, not a second location — distinct_address is required (§2.1).
+    const r = computeChainSignals([
+      member({ id: 'a', business_name: 'Enerem African Food Store', address: '17189 Delancey Court', zip_code: '46748', city: 'Fort Wayne' }),
+      member({ id: 'b', business_name: 'Enerem African Food Store', address: '17189 Delancey Court', zip_code: '46748', city: 'Huntertown' }),
+    ]);
+    expect(r).toBeNull();
+  });
+
+  it('same street, different zip still candidates (zip mismatch could be either)', () => {
+    const r = computeChainSignals([
+      member({ id: 'a', business_name: 'Victory Foods A', address: '100 Main St', zip_code: '46201' }),
+      member({ id: 'b', business_name: 'Victory Foods B', address: '100 Main St', zip_code: '46202' }),
+    ]);
+    expect(r?.confidence).toBe('chain_confirmed');
+  });
+
+  it('different streets with shared phone stay candidates', () => {
+    const r = computeChainSignals([
+      member({ id: 'a', business_name: 'Victory Super Store African Foods LLC', address: '7460 Rockville Rd', zip_code: '46214', city: 'Indianapolis' }),
+      member({ id: 'b', business_name: 'Victory International Market Plainfield', address: '1601 E Main St #12', zip_code: '46168', city: 'Plainfield' }),
+    ]);
+    expect(r?.confidence).toBe('chain_confirmed');
   });
 
   it('stopword-only names produce no brand tokens', () => {

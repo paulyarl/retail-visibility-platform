@@ -40,6 +40,8 @@ export type ChainConfidence = 'chain_confirmed' | 'chain_probable';
 export interface ChainMemberSignals {
   id: string;
   business_name: string | null;
+  address: string | null;
+  zip_code: string | null;
   city: string | null;
   state: string | null;
   phone: string | null;
@@ -82,6 +84,22 @@ const domainOf = (url: unknown): string | null => {
  */
 export function computeChainSignals(members: ChainMemberSignals[]): ChainSignalResult | null {
   if (members.length < 2) return null;
+
+  // distinct_address is REQUIRED for chain candidacy (spec §2.1): a chain
+  // is different storefronts, so an identical normalized street address
+  // means merge territory — a city-label data issue (e.g. "Fort Wayne" vs
+  // "Huntertown" on the same 46748 address), not a second location.
+  const normAddr = (v: string | null | undefined) =>
+    (v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normZip = (v: string | null | undefined) => digits(v).slice(0, 5);
+  const allSameAddress = members.every((m) => {
+    const a = normAddr(m.address);
+    return a && a === normAddr(members[0].address);
+  });
+  const zipSets = new Set(members.map((m) => normZip(m.zip_code)).filter(Boolean));
+  if (allSameAddress && (zipSets.size <= 1 || normZip(members[0].zip_code) === '')) {
+    return null;
+  }
 
   // same_phone — the group exists because of it, but verify anyway.
   const phones = new Set(members.map((m) => digits(m.phone)).filter((p) => p.length >= 7));
@@ -191,7 +209,8 @@ class DirectoryChainService {
   }> {
     const seedIds = [...new Set(input.seedIds)];
     const members = await prisma.$queryRaw<ChainMemberSignals[]>`
-      SELECT dps.id, dl.business_name, COALESCE(dl.city, dps.city) AS city,
+      SELECT dps.id, dl.business_name, dl.address, dl.zip_code,
+             COALESCE(dl.city, dps.city) AS city,
              COALESCE(dl.state, dps.state) AS state, dl.phone,
              dps.category, dl.same_as, dps.owner_email, dps.owner_phone
       FROM directory_presence_seeds dps
