@@ -532,6 +532,8 @@ function Home() {
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
                 <Link
                   href="/directory/add-business"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-full sm:w-auto"
                   onClick={() =>
                     trackBehaviorClient({
@@ -546,7 +548,7 @@ function Home() {
                     Claim your free listing →
                   </Button>
                 </Link>
-                <Link href={withUTM('/features')} className="w-full sm:w-auto">
+                <Link href={withUTM('/features')} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
                   <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     See features &amp; pricing
                   </Button>
@@ -974,7 +976,7 @@ function Home() {
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
-                    <a href={withUTM('/auth/signup')} className="block">
+                    <a href={withUTM('/auth/signup')} target="_blank" rel="noopener noreferrer" className="block">
                       <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -982,7 +984,7 @@ function Home() {
                         Create Free Account
                       </Button>
                     </a>
-                    <a href="/auth/login" className="block">
+                    <a href="/auth/login" target="_blank" rel="noopener noreferrer" className="block">
                       <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
@@ -1001,39 +1003,6 @@ function Home() {
               </AnimatedCard>
             </>
           )}
-        </div>
-
-        {/* Already listed — free. Contextual top-of-funnel CTA above the directory pillar. */}
-        <div className="mt-8 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-100 p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
-            <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="flex-1 text-center sm:text-left">
-            <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
-              Already listed — free
-            </h3>
-            <p className="text-sm text-neutral-600">
-              We seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming it takes about two minutes and costs nothing — then you own the listing and can fix your details.
-            </p>
-          </div>
-          <Link
-            href="/directory/add-business"
-            className="flex-shrink-0"
-            onClick={() =>
-              trackBehaviorClient({
-                entityType: 'platform',
-                entityId: 'home_already_listed_claim',
-                entityName: 'Claim your free listing (already-listed card)',
-                pageType: 'platform_home',
-              })
-            }
-          >
-            <Button variant="gradient" size="md" style={{ color: 'white' }}>
-              Claim your free listing →
-            </Button>
-          </Link>
         </div>
 
         {/* Browse Directory - Prominent Platform Pillar */}
@@ -1104,7 +1073,7 @@ function Home() {
                   </div>
 
                   {/* CTA Button */}
-                  <Link href="/directory">
+                  <Link href="/directory" target="_blank" rel="noopener noreferrer">
                     <Button
                       variant='gradient' style={{ color: 'white' }}
                       size="lg"
@@ -1126,9 +1095,88 @@ function Home() {
           </div>
         </AnimatedCard>
 
+        {/* Already listed — free. Claim CTA AFTER the directory pillar:
+            browse/demo first, claim second — same flow as the storefront
+            panel + post-demo CTA below it. */}
+        <div className="mt-8 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-100 p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+            <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
+              Already listed — free
+            </h3>
+            <p className="text-sm text-neutral-600">
+              We seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming it takes about two minutes and costs nothing — then you own the listing and can fix your details.
+            </p>
+          </div>
+          <Link
+            href="/directory/add-business"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0"
+            onClick={() =>
+              trackBehaviorClient({
+                entityType: 'platform',
+                entityId: 'home_already_listed_claim',
+                entityName: 'Claim your free listing (already-listed card)',
+                pageType: 'platform_home',
+              })
+            }
+          >
+            <Button variant="gradient" size="md" style={{ color: 'white' }}>
+              Claim your free listing →
+            </Button>
+          </Link>
+        </div>
+
         {/* Storefront demo — "one store, three doors" canonical-ladder
             triptych beside the directory pillar (PIONEER_RECRUITMENT_SPEC §3) */}
         <StorefrontDemoPanel />
+
+        {/* Post-demo CTA — the storefront answer to the directory claim
+            cards: demo proves the product, this closes with account
+            creation. Visitors only (mirrors "Get Started Today"). */}
+        {!isAuthenticated && !authLoading && (
+          <AnimatedCard delay={0.8} hover={false} className="mt-8">
+            <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
+                  Ready to open your storefront?
+                </h3>
+                <p className="text-sm text-neutral-600">
+                  You just saw what a store looks like on all three doors — same store, your choice of address. Create a free account and yours is next.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+                <a
+                  href={withUTM('/auth/signup')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    trackBehaviorClient({
+                      entityType: 'platform',
+                      entityId: 'home_postdemo_signup',
+                      entityName: 'Create Free Account (post-demo)',
+                      pageType: 'platform_home',
+                    })
+                  }
+                >
+                  <Button variant="gradient" size="md" style={{ color: 'white' }}>
+                    Create Free Account
+                  </Button>
+                </a>
+                <Link href="/auth/login" target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" size="md">
+                    Sign In
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </AnimatedCard>
+        )}
 
         {/* Value Showcase - Only show to authenticated users with products */}
         {isAuthenticated && !loading && stats.total > 0 && (

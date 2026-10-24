@@ -186,7 +186,7 @@ Return your response as JSON matching this exact schema:
   "business_type": "service" | "product" | "hybrid" | "unable_to_verify",
   "candidate_categories": [
     {
-      "category": "<category label>",
+      "category": "<clean public shelf label — plain category name, no qualifiers or markers>",
       "confidence": "high" | "medium" | "low",
       "is_known_category": true | false,
       "subcategory": "<string|null>",
@@ -196,7 +196,7 @@ Return your response as JSON matching this exact schema:
       ]
     }
   ],
-  "primary_category": "<best-fit category label>",
+  "primary_category": "<best-fit clean shelf label — plain category name, no qualifiers or markers>",
   "primary_category_confidence": "high" | "medium" | "low",
   "reasoning": "<overall justification for the primary category choice>",
   "business_summary": "<2-4 sentence operator-facing summary of the business's digital footprint across platforms>",
@@ -249,5 +249,7 @@ Return your response as JSON matching this exact schema:
     "overall_confidence": "high" | "medium" | "low"
   }
 }
+
+Category labels are public display text: every category value — candidate_categories[].category and primary_category — is a directory shelf name rendered verbatim on public shelf pages, store cards, and breadcrumbs. Emit the plain category name only — never a qualifier, verdict, or parenthetical marker such as "(unverified)", "(probable)", or "(candidate)". Confidence belongs ONLY in the confidence fields.
 
 Return ONLY the JSON object, no markdown fences, no commentary.`;

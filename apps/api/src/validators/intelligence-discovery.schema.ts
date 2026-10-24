@@ -974,7 +974,7 @@ Return a single JSON object with this structure:
   "discovered_businesses": [
     {
       "business_name": "<name>",
-      "category": "<category>",
+      "category": "<clean public shelf label — plain category name, no qualifiers or markers>",
       "city": "<city>",
       "state": "<state>",
       "address": "<address if known>",
@@ -992,7 +992,7 @@ Return a single JSON object with this structure:
         { "source": "<source name>", "role": "<role>", "evidence_types": ["..."], "url": "<url>", "accessed_at": "<date>" }
       ],
       "suggested_categories": [
-        { "category": "<directory label>", "confidence": "high" | "medium" | "low", "is_known_category": true | false, "subcategory": "<or null>", "basis": ["<evidence recorded for this business>"] }
+        { "category": "<clean shelf label — plain category name, no qualifiers or markers>", "confidence": "high" | "medium" | "low", "is_known_category": true | false, "subcategory": "<or null>", "basis": ["<evidence recorded for this business>"] }
       ],
       "business_seek_recommended": true | false,
       "business_seek_priority": "high" | "medium" | "low" | "hold",
@@ -1125,6 +1125,7 @@ Return a single JSON object with this structure:
 Rules:
 - discovered_businesses is the full set found; qualifying_businesses excludes outside_market, national_chain, national_franchise, and regional_chain.
 - qualifying_businesses MUST contain full duplicate records (every field), NOT references or summaries. Each entry must be a complete business object identical in shape to its discovered_businesses counterpart.
+- CATEGORY LABELS ARE PUBLIC DISPLAY TEXT: every "category" value — per-candidate and each suggested_categories[].category — is a directory shelf name rendered verbatim on public shelf pages, store cards, breadcrumbs, and page titles, and it files the listing under that shelf. Emit the plain category name only — never append a qualifier, verdict, or parenthetical marker such as "(unverified)", "(probable)", "(candidate)", or "(suspected)". A marked label creates a separate public shelf with the marker in its name. Fit and certainty belong ONLY in category_fit, confidence, and is_known_category.
 - discovery_signals MUST use INT_* codes only. Do NOT use RA/DS/WC/CP/VP signal codes. Use only codes from the registered discovery-signal vocabulary (the Category Signals block / established INT_* codes). When a candidate exhibits a recurring discovery-relevant pattern that NO registered code captures, do NOT emit an invented code inside discovery_signals — propose it once in the top-level suggested_signals array (code INT_<UPPER_SNAKE>, proposed_label, proposed_definition, exemplar_leads naming the businesses). A proposed signal never evaluates in triage until an operator registers it.
 - SUGGESTED SIGNAL TRIAGE ROUTING: each suggested_signals entry SHOULD name where the pattern belongs in triage once registered — primary_playbook is the playbook whose evidence pool it would join (the business this pattern describes is that playbook's pitch target), secondary_playbook is the fallback route when no playbook's rules match the business. Use ONLY playbook codes listed in the TRIAGE PLAYBOOK ROSTER block; omit both when none genuinely fits — never invent a code.
 - If identity_confidence is "low", business_seek_priority MUST be "hold".

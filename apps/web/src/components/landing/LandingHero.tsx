@@ -209,6 +209,8 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
           <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Link
               href="/directory/add-business"
+              target="_blank"
+              rel="noopener noreferrer"
               className="w-full sm:w-auto px-6 py-3 rounded-xl text-black font-semibold hover:bg-gray-100 transition-colors"
               style={{ background: "rgba(255,255,255,0.95)" }}
             >
@@ -216,6 +218,8 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
             </Link>
             <Link
               href="/directory/about"
+              target="_blank"
+              rel="noopener noreferrer"
               className="w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold border border-white/20 hover:border-white/40 transition-colors"
               style={{ background: "rgba(15,15,20,0.5)", backdropFilter: "blur(8px)" }}
             >
