@@ -34,6 +34,9 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `directory_presence_seeds` — operator-facing seed record per unclaimed listing
 - `directory_field_provenance` — per-field source evidence (name, address, phone, snap_ebt, hours)
 - `directory_claim_tokens` — single-use tokens for claiming a seed
+- `directory_claim_otps` — OTP codes for tokens bound to owner contact (`bound_email`/`bound_phone`)
+- `directory_claim_requests` — operator-review queue for unbound tokens (migration 246)
+- `directory_claim_request_verifications` — claimant proof-of-inbox: pending claims only file a request row after the emailed link is clicked (migration 358)
 
 ### ID Prefixes
 
@@ -59,6 +62,7 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `database/migrations/207_directory_visibility_snap_ebt.sql` — SNAP columns + feature
 - `database/migrations/208_directory_presence_seed.sql` — seed/provenance/claim-token tables
 - `database/migrations/209_indianapolis_african_grocery_seeds.sql` — initial 10 Indianapolis seeds
+- `database/migrations/358_claim_request_email_verification.sql` — claimant proof-of-inbox table
 
 ### Backend
 
@@ -100,8 +104,11 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 
 ### Public (no auth for GET, auth for POST)
 
-- `GET /api/public/directory/claim/:token` — public token summary
+- `GET /api/public/directory/claim/:token` — public token summary (includes `claimRequestStatus` for the pending/rejected revisit screens and `claimEmailVerificationPending` to restore the "check your email" screen)
+- `POST /api/public/directory/claim/:token/initiate` — initiate claim: sends the bound OTP (`verificationRequired`), files the operator-approval request, or emails a claimant-confirmation link (`claimantVerificationRequired`, migration 358)
 - `POST /api/public/directory/claim/:token/accept` — bind owner (requires customer auth). Response embeds the gateway upgrade preview (`currentTier`, `isGatewayUpgrade`, `upgradeOptions[]`) so the success screen can render Entry Presence mode cards without a platform (Auth0) session.
+- `POST /api/public/directory/claim-requests/verify` — confirm the claimant's email link and file the pending claim request (migration 358)
+- `/initiate`, `/accept`, and `/claim-requests/verify` are rate-limited per IP via `checkDirectoryPresenceRateLimit`
 
 ## Seed Statuses
 
@@ -158,12 +165,15 @@ Nothing is saved on load — the operator reviews/edits every prefilled field an
 
 1. Operator creates a seed (tenant + listing + provenance)
 2. Operator publishes the seed (listing `is_published = true`)
-3. Operator invites the owner (mints a claim token, shares `/directory/claim/:token`)
+3. Operator invites the owner (mints a claim token, shares `/directory/claim/:token`). `inviteSeed` binds the token to the seed's `owner_email`/`owner_phone` when present → `verification_required` (OTP); otherwise `operator_approval_required`.
 4. Owner visits the claim page, sees the listing summary
 5. Owner registers/logs in
-6. Owner accepts the claim
-7. Backend consumes the token, flips `org_standing_mode` to `independent`, sets `subscription_status = 'active'` (free-forever gateway), sets seed status to `claimed`, and embeds the gateway upgrade preview in the accept response
-8. Owner sees the claim success screen: free-state heading, three Entry Presence mode cards (live from the embedded options; static fallback with "from $X/mo" pricing), and a primary "Upgrade to Starter" CTA with session-aware hrefs (routes through `/auth/login?returnTo=` when no platform session exists — see `docs/LocalBiz/directory_presence_claim_handoff_spec.md`)
+6. Owner confirms categories + attributes (migration 274 consent gate) and initiates the claim
+7. Verification tier depends on the token binding:
+   - **Bound token** (owner contact captured on the seed): OTP emailed to the bound address/phone; `accept` requires the 6-digit code.
+   - **Unbound token**: operator approval required — and since migration 358, the claimant must first prove inbox access. If their email is not already verified (platform users and `email_verified=true` customers skip), `initiateClaim` emails a confirmation link (`directory_claim_request_verifications`, 24h expiry) and the pending `directory_claim_requests` row + CRM alert/ticket are only created when the link is clicked (`verifyClaimRequestEmail`). Verified claimants file the pending request immediately.
+8. Backend consumes the token (on `accept` for OTP tokens, or `approveClaimRequest` for operator-approved ones), flips `org_standing_mode` to `independent`, sets `subscription_status = 'active'` (free-forever gateway), sets seed status to `claimed`, and embeds the gateway upgrade preview in the accept response
+9. Owner sees the claim success screen: free-state heading, three Entry Presence mode cards (live from the embedded options; static fallback with "from $X/mo" pricing), and a primary "Upgrade to Starter" CTA with session-aware hrefs (routes through `/auth/login?returnTo=` when no platform session exists — see `docs/LocalBiz/directory_presence_claim_handoff_spec.md`)
 
 ## Post-Claim GBP Public Surfacing
 

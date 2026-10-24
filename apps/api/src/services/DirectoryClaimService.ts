@@ -282,15 +282,24 @@ class DirectoryClaimService {
 
     // Live claimant email verification (migration 358) — restores the
     // "check your email" screen for a claimant revisiting their link.
-    const verificationRows = await prisma.$queryRaw<any[]>`
-      SELECT claimant_email FROM directory_claim_request_verifications
-      WHERE token_id = ${r.token_id}
-        AND verified = FALSE
-        AND expires_at > now()
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    const pendingVerification = verificationRows[0] ?? null;
+    // Non-fatal: if migration 358 hasn't been applied in this env yet the
+    // summary still resolves (claim links must not 500 on a missing table).
+    let pendingVerification: { claimant_email: string } | null = null;
+    try {
+      const verificationRows = await prisma.$queryRaw<any[]>`
+        SELECT claimant_email FROM directory_claim_request_verifications
+        WHERE token_id = ${r.token_id}
+          AND verified = FALSE
+          AND expires_at > now()
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      pendingVerification = verificationRows[0] ?? null;
+    } catch (err) {
+      logger.warn('DirectoryClaimService.getTokenSummary — verification lookup failed (migration 358 pending?)', undefined, {
+        error: (err as Error).message,
+      });
+    }
 
     return {
       seedId: r.seed_id,
