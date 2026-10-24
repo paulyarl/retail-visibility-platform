@@ -130,9 +130,12 @@ router.get('/r/pr-scan/:code', async (req: Request, res: Response) => {
         SELECT COALESCE(dps.tenant_id, mc.tenant_id) AS tenant_id
         FROM mkt_campaigns_list mc
         LEFT JOIN directory_seed_campaign_links dscl
-          ON dscl.campaign_id = mc.id AND dscl.link_role = 'primary'
+          ON dscl.campaign_id = mc.id
         LEFT JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
         WHERE mc.id = ${link.campaignId}
+        ORDER BY
+          CASE dscl.link_role WHEN 'primary' THEN 0 WHEN 'sibling' THEN 1 ELSE 2 END,
+          dscl.created_at
         LIMIT 1
       `;
       if (rows[0]?.tenant_id) tenantId = rows[0].tenant_id;
@@ -220,9 +223,12 @@ router.get('/cascade/scan/:code', async (req: Request, res: Response) => {
         SELECT COALESCE(dps.tenant_id, mc.tenant_id) AS tenant_id
         FROM mkt_campaigns_list mc
         LEFT JOIN directory_seed_campaign_links dscl
-          ON dscl.campaign_id = mc.id AND dscl.link_role = 'primary'
+          ON dscl.campaign_id = mc.id
         LEFT JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
         WHERE mc.id = ${tokenRow.campaign_id}
+        ORDER BY
+          CASE dscl.link_role WHEN 'primary' THEN 0 WHEN 'sibling' THEN 1 ELSE 2 END,
+          dscl.created_at
         LIMIT 1
       `;
       if (rows[0]?.tenant_id) tenantId = rows[0].tenant_id;

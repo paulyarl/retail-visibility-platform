@@ -232,14 +232,8 @@ class IdentityEvidenceService {
 
     if (Array.isArray(row.corroborates) && row.corroborates.length > 0) {
       try {
-        const links = await prisma.$queryRaw<any[]>`
-          SELECT dps.id AS seed_id
-          FROM directory_seed_campaign_links dscl
-          JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
-          WHERE dscl.campaign_id = ${row.campaign_id} AND dscl.link_role = 'primary'
-          LIMIT 1
-        `;
-        const seedId = links[0]?.seed_id;
+        const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+        const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(row.campaign_id);
         if (seedId) {
           // Only rows this service wrote carry the marker — an upsert by another
           // writer changes source_name/notes and is therefore left alone.
@@ -286,13 +280,16 @@ class IdentityEvidenceService {
     },
   ): Promise<void> {
     try {
-      const links = await prisma.$queryRaw<any[]>`
-        SELECT dps.id AS seed_id, dps.tenant_id
-        FROM directory_seed_campaign_links dscl
-        JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
-        WHERE dscl.campaign_id = ${scope.campaignId} AND dscl.link_role = 'primary'
-        LIMIT 1
-      `;
+      const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+      const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(scope.campaignId);
+      const links = seedId
+        ? await prisma.$queryRaw<any[]>`
+            SELECT dps.id AS seed_id, dps.tenant_id
+            FROM directory_presence_seeds dps
+            WHERE dps.id = ${seedId}
+            LIMIT 1
+          `
+        : [];
       const link = links[0];
       if (!link) return;
 

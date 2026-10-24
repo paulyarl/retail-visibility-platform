@@ -146,6 +146,30 @@ A field must not render publicly without a provenance row with `show_on_public =
 - Renders as a chip row on the directory entry classic layout, next to category chips, gated by `attributesVisible`
 - Attribute picker (migration 268): `directory_attribute_definitions` table — predefined, category-aware chips (grouped payments / accessibility / ownership / service_options / certifications / other; `applies_to_categories` NULL = universal, otherwise lowercase category names or `platform_categories` slugs). Served by `GET /api/admin/directory-presence/attribute-definitions?category=<name>`; the seed detail edit drawer renders them as toggle chips with per-attribute evidence fields plus a custom-attribute escape hatch (replaces the old raw-JSON textarea)
 
+## Seed ↔ Campaign Link Roles
+
+`directory_seed_campaign_links.link_role` semantics:
+
+- **`primary`** — the *producing* campaign (scan/intelligence campaign that
+  discovered the prospect, or the campaign that birthed the seed via
+  `createFromCampaign`). One per seed; seed→campaign reads that want the
+  owner/producer key on it (funnel cohorts, publish-time courtesy trigger,
+  promote retire-and-replace, seed-fidelity canonical NAP).
+- **`sibling`** — associated campaigns: the proving-ground umbrella, the
+  promoted business campaign (`createCampaignFromQueue` heals the link at
+  promote time via `ensureCampaignSeedLink`), and chain-built sibling
+  campaigns (each owns its location's seed — `distinct_chain` prospect
+  builds).
+- **`recovery`** — recovery-pipeline associations.
+
+**Campaign→seed reads must not filter `link_role='primary'`** — use
+`DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId)`
+(primary-first, then sibling). The primary-only filter was the root of
+"seed exists but the campaign shows Push draft seed / no cascade / no
+verification back-fill". An existing link row must never be re-written
+with a different role — `linkCampaign`'s upsert would demote 'primary'
+to 'sibling'; check before inserting.
+
 ## Manual Seed Creation (Load from Prospect)
 
 The Create Seed form (`presence-seeds/new`) can prefill itself from an existing prospect instead of retyping — bridging audits → seeds without retyping NAP.

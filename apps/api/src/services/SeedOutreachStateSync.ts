@@ -96,20 +96,14 @@ export class SeedOutreachStateSync extends BaseService {
   }): Promise<void> {
     const { campaignId, outcome, callDetails, ctx } = input;
 
-    // Find the primary-linked seed for this campaign
-    const links = await prisma.$queryRaw<any[]>`
-      SELECT seed_id FROM directory_seed_campaign_links
-      WHERE campaign_id = ${campaignId}
-        AND link_role = 'primary'
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    if (!links[0]) {
+    // Find the campaign's working seed — 'primary' first, then 'sibling'
+    // (promoted/chain-built campaigns own their seed via 'sibling').
+    const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+    const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId);
+    if (!seedId) {
       // No linked seed — this is a non-seed campaign, no-op
       return;
     }
-
-    const seedId = links[0].seed_id;
     const newState = this.mapOutcomeToState(outcome, callDetails);
     if (!newState) {
       // Outcome doesn't warrant a state change (system-generated)

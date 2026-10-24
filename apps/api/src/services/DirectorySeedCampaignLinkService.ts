@@ -481,6 +481,27 @@ class DirectorySeedCampaignLinkService {
   }
 
   /**
+   * Resolve "the seed this campaign works" — the owning link, preferring
+   * 'primary' then 'sibling' then 'recovery'. PG/preflight seeds keep
+   * 'primary' on the producing scan campaign, so promoted business
+   * campaigns (and chain-built sibling campaigns) reach their seed via
+   * 'sibling'. Campaign-side surfaces must use this instead of a raw
+   * link_role='primary' read — the primary-only filter was the root of
+   * "seed exists but the campaign can't see it".
+   */
+  async resolveSeedIdForCampaign(campaignId: string): Promise<string | null> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT seed_id FROM directory_seed_campaign_links
+      WHERE campaign_id = ${campaignId}
+      ORDER BY
+        CASE link_role WHEN 'primary' THEN 0 WHEN 'sibling' THEN 1 ELSE 2 END,
+        created_at
+      LIMIT 1
+    `;
+    return rows[0]?.seed_id ?? null;
+  }
+
+  /**
    * List all campaigns linked to a seed, with campaign summary.
    */
   async listLinks(seedId: string): Promise<LinkRow[]> {

@@ -159,10 +159,13 @@ export class ConfirmPageService extends BaseService {
         dl.state AS listing_state
       FROM mkt_campaigns_list mc
       LEFT JOIN directory_seed_campaign_links dscl
-        ON dscl.campaign_id = mc.id AND dscl.link_role = 'primary'
+        ON dscl.campaign_id = mc.id
       LEFT JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
       LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE mc.id = ${campaignId}
+      ORDER BY
+        CASE dscl.link_role WHEN 'primary' THEN 0 WHEN 'sibling' THEN 1 ELSE 2 END,
+        dscl.created_at
       LIMIT 1
     `;
     const campaign = campaignRows[0] ?? null;
@@ -279,8 +282,9 @@ export class ConfirmPageService extends BaseService {
       FROM directory_seed_campaign_links dscl
       JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
       WHERE dscl.campaign_id = ${campaignId}
-        AND dscl.link_role = 'primary'
-      ORDER BY dscl.created_at DESC
+      ORDER BY
+        CASE dscl.link_role WHEN 'primary' THEN 0 WHEN 'sibling' THEN 1 ELSE 2 END,
+        dscl.created_at
       LIMIT 1
     `;
     const seed = rows[0] ?? null;

@@ -324,15 +324,11 @@ export class SeedAnnounceService extends BaseService {
     } = {},
     ctx?: SeedAnnounceCtx,
   ): Promise<MarkDeliveredResult> {
-    const rows = await prisma.$queryRaw<any[]>`
-      SELECT seed_id FROM directory_seed_campaign_links
-      WHERE campaign_id = ${campaignId}
-        AND link_role = 'primary'
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    if (!rows[0]) return { delivered: false, reason: 'no_primary_seed' };
-    return this.markDelivered(rows[0].seed_id, input, ctx);
+    // The campaign's working seed — 'primary' first, then 'sibling'.
+    const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+    const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId);
+    if (!seedId) return { delivered: false, reason: 'no_primary_seed' };
+    return this.markDelivered(seedId, input, ctx);
   }
 
   async isAnnounced(seedId: string): Promise<boolean> {

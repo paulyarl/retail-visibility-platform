@@ -2630,6 +2630,12 @@ export class MarketingExecutionService extends BaseService {
           if (verifiedBlock) {
             gsAmplified = gsAmplified + '\n' + verifiedBlock;
           }
+          // Chain context — the dedup surface resolved this storefront as one
+          // of a multi-location operator's linked locations.
+          const chainBlock = await this.renderChainContextBlock(input.campaign, ctx);
+          if (chainBlock) {
+            gsAmplified = gsAmplified + '\n' + chainBlock;
+          }
           // Market context injection (seed gains market awareness).
           const marketCtxBlock = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
           if (marketCtxBlock) {
@@ -2649,6 +2655,7 @@ export class MarketingExecutionService extends BaseService {
               intelligence_mode: 'profile',
               discovery_leads_injected: !!leadsBlock,
               verified_evidence_injected: !!verifiedBlock,
+              chain_context_injected: !!chainBlock,
             },
           };
         }
@@ -2664,6 +2671,11 @@ export class MarketingExecutionService extends BaseService {
       if (verifiedBlockNoProfile) {
         noProfileAmplified = noProfileAmplified + '\n' + verifiedBlockNoProfile;
       }
+      // Chain context — multi-location operator resolution.
+      const chainBlockNoProfile = await this.renderChainContextBlock(input.campaign, ctx);
+      if (chainBlockNoProfile) {
+        noProfileAmplified = noProfileAmplified + '\n' + chainBlockNoProfile;
+      }
       // Market context injection (seed gains market awareness).
       const marketCtxNoProfile = await this.buildMarketContextBlock(category, businessCity, businessState, ctx);
       if (marketCtxNoProfile) {
@@ -2677,6 +2689,7 @@ export class MarketingExecutionService extends BaseService {
           intelligence_mode: 'none',
           discovery_leads_injected: !!leadsBlockNoProfile,
           verified_evidence_injected: !!verifiedBlockNoProfile,
+          chain_context_injected: !!chainBlockNoProfile,
         },
       };
     }
@@ -2717,6 +2730,13 @@ export class MarketingExecutionService extends BaseService {
     const verifiedBlock = await this.renderVerifiedEvidenceBlock(input.campaign, ctx);
     if (verifiedBlock) {
       amplified = amplified + '\n' + verifiedBlock;
+    }
+
+    // Chain context — the dedup surface resolved this storefront as one of
+    // a multi-location operator's linked locations (spec §7.2 directive).
+    const chainBlock = await this.renderChainContextBlock(input.campaign, ctx);
+    if (chainBlock) {
+      amplified = amplified + '\n' + chainBlock;
     }
 
     // Market context injection (seed gains market awareness): category
@@ -3290,6 +3310,109 @@ export class MarketingExecutionService extends BaseService {
       // The ledger is additive context — a read failure must never break a
       // render that was valid without it.
       logger.warn('renderVerifiedEvidenceBlock: ledger read failed (non-fatal)', ctx, {
+        campaignId,
+        error: err?.message,
+      });
+      return '';
+    }
+  }
+
+  /**
+   * Render the "CHAIN CONTEXT" block for the audit path (CHAIN_PROSPECTING_
+   * FEED_SPEC §7.2). When the campaign's linked seed is a member of a
+   * non-dismissed chain group, the analyst needs to know: the discovery
+   * surface shows this business as an independent (distinct name, address,
+   * city) while the operator has already resolved it as ONE STOREFRONT of a
+   * multi-location brand. Without the block the audit re-derives
+   * independence from the footprint — misreading the shared phone as a NAP
+   * error and the sibling listings as duplicates.
+   *
+   * Resolves the seed via DirectorySeedCampaignLinkService.
+   * resolveSeedIdForCampaign (primary-first, sibling fallback) so chain-
+   * built business campaigns and queue-promoted PG campaigns both reach
+   * their seed. Returns '' on no membership or any read failure —
+   * byte-identical render for the overwhelming majority of campaigns.
+   */
+  private async renderChainContextBlock(campaign: any, ctx?: RequestCtx): Promise<string> {
+    const campaignId = campaign?.id;
+    if (!campaignId) return '';
+    try {
+      const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+      const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId);
+      if (!seedId) return '';
+
+      const rows = await this.prisma.$queryRaw<any[]>`
+        SELECT dcg.id AS chain_group_id, dcg.display_name, dcg.confidence,
+               dcg.source_signals,
+               sibdps.id AS sibling_seed_id,
+               sibdl.business_name, sibdl.city, sibdl.state,
+               sibdl.phone
+        FROM directory_chain_group_members self
+        JOIN directory_chain_groups dcg
+          ON dcg.id = self.chain_group_id AND dcg.status <> 'dismissed'
+        JOIN directory_chain_group_members sibm
+          ON sibm.chain_group_id = self.chain_group_id
+        JOIN directory_presence_seeds sibdps
+          ON sibdps.id = sibm.seed_id AND sibdps.status <> 'suppressed'
+        JOIN directory_listings_list sibdl ON sibdl.id = sibdps.listing_id
+        WHERE self.seed_id = ${seedId}
+        ORDER BY sibdl.business_name
+      `;
+      if (rows.length < 2) return '';
+
+      const group = rows[0];
+      const sourceSignals = (group.source_signals ?? {}) as Record<string, unknown>;
+      const signalCodes = Array.isArray(sourceSignals.signals)
+        ? (sourceSignals.signals as string[])
+        : [];
+      const confidence = group.confidence === 'chain_confirmed' ? 'confirmed' : 'probable';
+      const displayName =
+        (typeof group.display_name === 'string' && group.display_name.trim())
+          ? group.display_name.trim()
+          : 'shared operator';
+
+      const lines: string[] = [
+        '=== CHAIN CONTEXT — MULTI-LOCATION OPERATOR ===',
+        `Operator resolution (not a discovery finding): this business is one of`,
+        `${rows.length} linked locations of "${displayName}" — confidence ${confidence}.`,
+        'The locations look independent by digital footprint (distinct names,',
+        'addresses, cities) but share an operator. The link was made from the',
+        'signals below, NOT from public data the businesses publish:',
+        '',
+        'Linked locations:',
+      ];
+      for (const r of rows) {
+        const here = r.sibling_seed_id === seedId ? ' ← THIS BUSINESS' : '';
+        const phone = r.phone ? ` · ${r.phone}` : '';
+        lines.push(`- ${r.business_name ?? 'unnamed'} — ${r.city ?? '?'}, ${r.state ?? '?'}${phone}${here}`);
+      }
+      lines.push('');
+      if (signalCodes.length > 0) {
+        const sharedPhone = typeof sourceSignals.shared_phone === 'string' && sourceSignals.shared_phone
+          ? ` (${sourceSignals.shared_phone})`
+          : '';
+        const nameTokens = Array.isArray(sourceSignals.name_tokens) && (sourceSignals.name_tokens as string[]).length > 0
+          ? ` ("${(sourceSignals.name_tokens as string[]).join('", "')}")`
+          : '';
+        lines.push(`Link signals: ${signalCodes.join(', ')}${sharedPhone}${nameTokens}`);
+        lines.push('');
+      }
+      lines.push(
+        'DIRECTIVE — evaluate this business as ONE STOREFRONT of a multi-location',
+        'brand. The shared phone and any name-token overlap with the locations',
+        'above are expected — do not flag them as NAP inconsistencies, and do not',
+        'treat the sibling listings as duplicates. Assess THIS location\'s presence',
+        'independently (its own profiles, reviews, site). Where a gap is shared',
+        'across the brand — e.g. a dead website, missing profiles on several',
+        'locations — it is a brand-level opportunity: note it as affecting the',
+        'operator\'s whole footprint, not just this store.',
+        '',
+        '=== END CHAIN CONTEXT ===',
+      );
+      return lines.join('\n');
+    } catch (err: any) {
+      // Additive context — a read failure must never break the render.
+      logger.warn('renderChainContextBlock: chain lookup failed (non-fatal)', ctx, {
         campaignId,
         error: err?.message,
       });

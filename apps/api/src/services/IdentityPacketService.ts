@@ -702,18 +702,27 @@ class IdentityPacketService {
       });
     }
 
-    // Linked seed + provenance.
+    // Linked seed + provenance. Any link role resolves the seed — 'primary'
+    // first, then 'sibling' (see DirectorySeedCampaignLinkService.
+    // resolveSeedIdForCampaign). 'primary' stays with the producing scan
+    // campaign for PG/preflight seeds; the promoted business campaign (and
+    // chain-built sibling campaigns) carry 'sibling' links to the seed they
+    // own. Without the fallback the card offers "Push draft seed" against an
+    // already-live seed.
     let seed: IdentityPacket['seed'] = null;
     let provenance: AssembleInput['provenance'] = [];
     try {
-      const linkRows = await prisma.$queryRaw<any[]>`
-        SELECT dps.id, dps.status, dl.slug, dl.is_published
-        FROM directory_seed_campaign_links dscl
-        JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
-        JOIN directory_listings_list dl ON dl.id = dps.listing_id
-        WHERE dscl.campaign_id = ${campaignId} AND dscl.link_role = 'primary'
-        LIMIT 1
-      `;
+      const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+      const linkedSeedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId);
+      const linkRows = linkedSeedId
+        ? await prisma.$queryRaw<any[]>`
+            SELECT dps.id, dps.status, dl.slug, dl.is_published
+            FROM directory_presence_seeds dps
+            JOIN directory_listings_list dl ON dl.id = dps.listing_id
+            WHERE dps.id = ${linkedSeedId}
+            LIMIT 1
+          `
+        : [];
       const link = Array.isArray(linkRows) ? linkRows[0] : null;
       if (link) {
         seed = {

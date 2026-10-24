@@ -76,15 +76,11 @@ export class CampaignCascadeService extends BaseService {
   }
 
   async getForCampaign(campaignId: string, ctx?: RequestCtx): Promise<CampaignCascadeResponse> {
-    const links = await prisma.$queryRaw<any[]>`
-      SELECT seed_id
-      FROM directory_seed_campaign_links
-      WHERE campaign_id = ${campaignId}
-        AND link_role = 'primary'
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    const seedId = links[0]?.seed_id ?? null;
+    // The campaign's working seed — 'primary' first, then 'sibling'
+    // (promoted/chain-built business campaigns own their seed via
+    // 'sibling' since 'primary' stays with the producing scan campaign).
+    const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+    const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId);
     if (!seedId) {
       return {
         seedId: null,

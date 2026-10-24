@@ -235,6 +235,10 @@ export interface PromptResolution {
   // True only when a "Verified evidence — operator / owner" block (the
   // mkt_identity_evidence ledger) was appended to the rendered prompt.
   verified_evidence_injected?: boolean;
+  // True only when a "Chain context — multi-location operator" block (the
+  // campaign's linked seed is a member of a non-dismissed chain group) was
+  // appended to the rendered prompt.
+  chain_context_injected?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

@@ -2835,18 +2835,17 @@ export class MarketingCampaignService extends BaseService {
       }
     }
 
-    // 3. Seed back-fill — when a primary-linked seed exists, mirror the
-    //    verified facts into its NAP ledger + provenance so the seed report
-    //    reflects the same owner confirmation the campaign record just got.
-    //    Connected-contact gate (§20.4): 'unreachable' / 'wrong_business' can
-    //    produce no verified facts. Confirmed vs corrected is measured against
-    //    the seed's current provenance — same split as the anchor path.
+    // 3. Seed back-fill — when a linked seed exists (primary-preferred,
+    //    sibling fallback), mirror the verified facts into its NAP ledger +
+    //    provenance so the seed report reflects the same owner confirmation
+    //    the campaign record just got. Connected-contact gate (§20.4):
+    //    'unreachable' / 'wrong_business' can produce no verified facts.
+    //    Confirmed vs corrected is measured against the seed's current
+    //    provenance — same split as the anchor path.
     if (!['unreachable', 'wrong_business'].includes(input.outcome)) {
       try {
-        const links = await this.prisma.$queryRaw<{ seed_id: string }[]>`
-          SELECT seed_id FROM directory_seed_campaign_links
-          WHERE campaign_id = ${campaignId} AND link_role = 'primary' LIMIT 1`;
-        const seedId = links[0]?.seed_id;
+        const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+        const seedId = await DirectorySeedCampaignLinkService.resolveSeedIdForCampaign(campaignId);
         if (seedId) {
           const verified: Array<[string, string]> = (
             [

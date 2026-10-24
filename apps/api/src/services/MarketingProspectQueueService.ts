@@ -1139,6 +1139,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
           where: { id: entry.processed_campaign_id },
         });
         if (existingCampaign) {
+          // Heal the campaign→seed link for rows promoted before the
+          // preflight-seed link existed (chain builds also self-heal via
+          // their own link step, but a plain re-run should too).
+          if (entry.seed_id) {
+            await this.ensureCampaignSeedLink(existingCampaign.id, entry.seed_id, input.actingUserId, ctx);
+          }
           logger.info('createCampaignFromQueue: idempotent return', ctx, {
             queueEntryId: input.queueEntryId, campaignId: existingCampaign.id,
           });
@@ -1566,6 +1572,14 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }
       }
 
+      // Preflight seeds were born linked to the scan/PG campaigns; the
+      // promoted business campaign needs its own link row or every
+      // campaign-side surface (identity packet seed resolution, claim
+      // propagation, spawned-listings) misses the seed it owns.
+      if (entry.seed_id && result.campaign?.id) {
+        await this.ensureCampaignSeedLink(result.campaign.id, entry.seed_id, input.actingUserId, ctx);
+      }
+
       // PG retrofit (D2 — CAMPAIGN_SEED_STAGE_SPRINT_PLAN): a queue entry
       // carrying seed_id was preflight-seeded by its proving ground — the
       // seed wedge (listing created + published, claim token minted +
@@ -1630,6 +1644,44 @@ class MarketingProspectQueueServiceClass extends BaseService {
         queueEntryId: input.queueEntryId,
       });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Ensure the promoted campaign carries a 'sibling' link to its
+   * pre-seeded seed. PG preflight births link 'primary' to the producing
+   * scan campaign (and 'sibling' to the proving ground); the promoted
+   * business campaign gets 'sibling' — never 'primary', which would
+   * throw on the single-primary guard and on the non_primary_sibling
+   * rule. An existing link row is left alone: linkCampaign's upsert
+   * would demote a 'primary' role to 'sibling'. Non-fatal throughout —
+   * the campaign exists and is usable without the link.
+   */
+  private async ensureCampaignSeedLink(
+    campaignId: string,
+    seedId: string,
+    actingUserId: string | undefined,
+    ctx?: RequestCtx,
+  ): Promise<void> {
+    try {
+      const existing = await this.prisma.$queryRaw<any[]>`
+        SELECT link_role FROM directory_seed_campaign_links
+        WHERE seed_id = ${seedId} AND campaign_id = ${campaignId}
+        LIMIT 1
+      `;
+      if (existing[0]) return;
+      const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+      await DirectorySeedCampaignLinkService.linkCampaign(seedId, campaignId, 'sibling', {
+        actorType: 'user',
+        actorId: actingUserId,
+      });
+      logger.info('createCampaignFromQueue: campaign linked to preflight seed', ctx, {
+        campaignId, seedId,
+      });
+    } catch (err) {
+      logger.warn('createCampaignFromQueue: campaign seed-link failed (non-fatal)', ctx, {
+        campaignId, seedId, error: (err as Error).message,
+      });
     }
   }
 
