@@ -45,6 +45,7 @@ import { audit } from '../audit';
 import { generateDirectoryFieldProvenanceId } from '../lib/id-generator';
 import DirectoryPresenceSeedService from './DirectoryPresenceSeedService';
 import ProvingGroundDedupService from './ProvingGroundDedupService';
+import DirectoryChainService, { computeChainSignals } from './DirectoryChainService';
 import { normalizeAttributeEntry } from './directory/listingAttributes';
 import { buildSeoEnrichmentJson, type SeedSeoPacket } from './directory/SeedSeoComposer';
 
@@ -82,6 +83,14 @@ export interface CleanupDuplicateGroup {
     resolvedBy: string | null;
     resolvedAt: string | null;
     rationale: string | null;
+  } | null;
+  /** Chain candidacy — phone groups only (Migration 359, spec §4.1). */
+  chain: {
+    confidence: 'chain_confirmed' | 'chain_probable';
+    signals: string[];
+    sharedPhone: string | null;
+    nameTokenOverlap: string[];
+    existingChainGroupId: string | null;
   } | null;
 }
 
@@ -136,6 +145,7 @@ class DirectorySeedCleanupService {
       SELECT dps.id, dps.tenant_id, dps.listing_id, dps.status, dps.seed_batch,
              dps.category, dps.city AS seed_city, dps.state AS seed_state,
              dps.identity_confidence, dps.seo_enrichment,
+             dps.owner_email, dps.owner_phone,
              dl.business_name, dl.address, dl.city, dl.state, dl.phone,
              dl.website, dl.slug, dl.is_published, dl.description,
              dl.keywords, dl.same_as, dl.secondary_categories,
@@ -220,10 +230,35 @@ class DirectorySeedCleanupService {
       verdictRows.map((v) => [`${v.match_key}:${(v.seed_ids as string[]).join(',')}`, v]),
     );
 
+    // Chain candidacy — phone groups only (address_city groups are merge
+    // territory: same address = same storefront, not a chain). Memberships
+    // are fetched once so the card can show "already linked".
+    const phoneGroupSeedIds = [
+      ...new Set(
+        groupCandidates
+          .filter((c) => c.matchKey === 'phone')
+          .flatMap((c) => c.members.map((m) => m.id as string)),
+      ),
+    ];
+    const chainMemberships = await DirectoryChainService.membershipsForSeeds(phoneGroupSeedIds);
+
     const duplicateGroups: CleanupDuplicateGroup[] = groupCandidates
       .map(({ matchKey, members }) => {
         const seedIds = members.map((m) => m.id).sort();
         const verdict = verdictByKey.get(`${matchKey}:${seedIds.join(',')}`);
+        const signals = matchKey === 'phone'
+          ? computeChainSignals(members.map((m) => ({
+              id: m.id,
+              business_name: m.business_name,
+              city: m.city ?? m.seed_city,
+              state: m.state ?? m.seed_state,
+              phone: m.phone,
+              category: m.category,
+              same_as: m.same_as,
+              owner_email: m.owner_email,
+              owner_phone: m.owner_phone,
+            })))
+          : null;
         return {
           matchKey,
           seedIds,
@@ -231,6 +266,16 @@ class DirectorySeedCleanupService {
             .slice()
             .sort((a, b) => String(a.id).localeCompare(String(b.id)))
             .map(toRef),
+          chain: signals
+            ? {
+                confidence: signals.confidence,
+                signals: signals.signals,
+                sharedPhone: signals.sharedPhone,
+                nameTokenOverlap: signals.nameTokenOverlap,
+                existingChainGroupId:
+                  seedIds.map((id) => chainMemberships.get(id)).find(Boolean) ?? null,
+              }
+            : null,
           verdict: verdict
             ? {
                 verdict: verdict.verdict,
@@ -445,6 +490,17 @@ class DirectorySeedCleanupService {
           error: (err as Error).message,
         });
       }
+    }
+
+    // A same_entity verdict covering a chain group's full membership means
+    // the earlier chain read was wrong — dismiss it (the verdict still
+    // protects the funnel gate). Non-fatal.
+    try {
+      await DirectoryChainService.dismissForVerdict(groupMembers);
+    } catch (err) {
+      logger.error('DirectorySeedCleanupService.resolveDuplicates — chain dismiss failed', undefined, {
+        error: (err as Error).message,
+      });
     }
 
     audit({

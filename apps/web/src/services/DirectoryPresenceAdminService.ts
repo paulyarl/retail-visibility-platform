@@ -2553,11 +2553,12 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
 
   /** POST /api/admin/directory-presence/presence-seeds/dedup-verdicts
    *  (Migration 262, spec §4.9) — record a group verdict; same_entity merges
-   *  identity into mergeInto. */
+   *  identity into mergeInto; distinct_chain (Migration 359) links the group
+   *  into the chain prospecting feed. Returns { verdict, chainGroup }. */
   async recordDedupVerdict(input: {
     seedIds: string[];
     matchKey: 'phone' | 'address_city';
-    verdict: 'same_entity' | 'distinct';
+    verdict: 'same_entity' | 'distinct' | 'distinct_chain';
     mergeInto?: string;
     rationale?: string;
   }): Promise<any> {
@@ -2568,7 +2569,22 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
       0,
     );
     const data = result.data?.data ?? result.data;
-    return data?.verdict ?? data;
+    return data?.verdict
+      ? { verdict: data.verdict, chainGroup: data.chainGroup ?? null, chainError: data.chainError ?? null }
+      : data;
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/chain-groups —
+   *  the chain prospecting feed (Migration 359, spec §5.2). */
+  async listChainGroups(): Promise<any[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/chain-groups`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    const data = result.data?.data ?? result.data;
+    return data?.chainGroups ?? [];
   }
 
   /** GET /api/admin/directory-presence/presence-seeds/dedup-verdicts */
@@ -3474,6 +3490,38 @@ export interface CleanupDuplicateGroup {
     resolvedAt: string | null;
     rationale: string | null;
   } | null;
+  /** Chain candidacy — phone groups only (Migration 359, spec §4.1). */
+  chain: {
+    confidence: 'chain_confirmed' | 'chain_probable';
+    signals: string[];
+    sharedPhone: string | null;
+    nameTokenOverlap: string[];
+    existingChainGroupId: string | null;
+  } | null;
+}
+
+export interface ChainGroupFeedItem {
+  chainGroupId: string;
+  displayName: string;
+  status: string;
+  confidence: 'chain_confirmed' | 'chain_probable';
+  sourceSignals: Record<string, unknown>;
+  cities: string[];
+  contact: { phone: string | null; ownerEmail: string | null; ownerPhone: string | null };
+  members: Array<{
+    seedId: string;
+    businessName: string | null;
+    slug: string | null;
+    city: string | null;
+    state: string | null;
+    status: string;
+    isPublished: boolean;
+    listingOrigin: string | null;
+    hasActiveClaimToken: boolean;
+  }>;
+  claimProgress: { total: number; live: number; claimed: number; invited: number };
+  pitchHooks: string[];
+  createdAt: string | null;
 }
 
 export interface CleanupThinSeed {

@@ -47,6 +47,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       featuredProductsResult,
       storeTypesResult,
       categoryCountsResult,
+      chainLocationsResult,
       randomFeaturedProductsResult,
       recommendationsResult,
       lastViewedResult
@@ -172,6 +173,22 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
         []
       ),
 
+      // 4b. Chain sibling locations — "Also visit" strip (Migration 359).
+      // Separate settled query so a DB without the chain tables degrades to
+      // [] instead of failing the whole consolidated payload.
+      pool.query(
+        `SELECT sib.slug, sib.business_name, sib.city, sib.state, sib.listing_origin
+         FROM directory_presence_seeds self_dps
+         JOIN directory_listings_list self_dl ON self_dl.id = self_dps.listing_id AND self_dl.slug = $1
+         JOIN directory_chain_group_members self ON self.seed_id = self_dps.id
+         JOIN directory_chain_groups dcg ON dcg.id = self.chain_group_id AND dcg.status <> 'dismissed'
+         JOIN directory_chain_group_members sibm ON sibm.chain_group_id = self.chain_group_id AND sibm.seed_id <> self_dps.id
+         JOIN directory_presence_seeds sibdps ON sibdps.id = sibm.seed_id AND sibdps.status IN ('published','invited','claimed')
+         JOIN directory_listings_list sib ON sib.id = sibdps.listing_id AND sib.is_published = true
+         ORDER BY sib.business_name`,
+        [slug]
+      ),
+
       // 5. Random featured products
       pool.query(
         `SELECT DISTINCT ON (inventory_item_id)
@@ -251,6 +268,16 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
 
     const categoryCounts = categoryCountsResult.status === 'fulfilled' 
       ? categoryCountsResult.value.rows 
+      : [];
+
+    const chainLocations = chainLocationsResult.status === 'fulfilled'
+      ? chainLocationsResult.value.rows.map((row: any) => ({
+          slug: row.slug,
+          businessName: row.business_name,
+          city: row.city,
+          state: row.state,
+          listingOrigin: row.listing_origin,
+        }))
       : [];
 
     const randomFeaturedProducts = randomFeaturedProductsResult.status === 'fulfilled' 
@@ -405,6 +432,9 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       activeClaimToken: (listing as any).active_claim?.token || null,
       claimShortCode: (listing as any).active_claim?.short_code || null,
       isClaimed: (listing as any).seed_status === 'claimed',
+      // Sibling locations in the same linked chain (Migration 359) — the
+      // "Also visit" strip; empty unless an operator verdict-linked the group.
+      chainLocations,
       // On-page report-banner QR design — the seed tenant's storefront_qr
       // style row (operator-authored; seed-scoped surface only).
       qrStyle: (listing as any).seed_id && (listing as any).qr_dot_type ? {

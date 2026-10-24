@@ -54,6 +54,7 @@ import {
 } from '../services/directory/identityScoring';
 import ProvingGroundDedupService from '../services/ProvingGroundDedupService';
 import DirectorySeedCleanupService from '../services/DirectorySeedCleanupService';
+import DirectoryChainService from '../services/DirectoryChainService';
 import { SeedOutreachTriggerService } from '../services/SeedOutreachTriggerService';
 import SeedAnnounceService from '../services/SeedAnnounceService';
 import SeedCascadeService from '../services/SeedCascadeService';
@@ -425,11 +426,14 @@ router.get('/surface-engagement', requirePlatformStaff, async (req: Request, res
 // ====================
 
 /** POST /api/admin/directory/presence-seeds/dedup-verdicts — record a
- *  same_entity / distinct verdict on a surfaced duplicate group. */
+ *  same_entity / distinct / distinct_chain verdict on a surfaced duplicate
+ *  group. distinct_chain additionally links the group into the chain
+ *  prospecting feed (Migration 359); a non-chain verdict that covers a
+ *  chain group's full membership dismisses it. */
 const dedupVerdictSchema = z.object({
   seedIds: z.array(z.string().min(1)).min(2),
   matchKey: z.enum(['phone', 'address_city']),
-  verdict: z.enum(['same_entity', 'distinct']),
+  verdict: z.enum(['same_entity', 'distinct', 'distinct_chain']),
   mergeInto: z.string().min(1).optional(),
   rationale: z.string().max(2000).optional(),
 });
@@ -450,9 +454,44 @@ router.post('/presence-seeds/dedup-verdicts', requirePlatformAdmin, async (req: 
       userId: (req as any).user?.userId || (req as any).user?.id,
       actorType: 'user',
     } as any);
-    res.status(201).json({ success: true, verdict: row });
+    let chainGroup: any = null;
+    let chainError: string | null = null;
+    if (validation.data.verdict === 'distinct_chain') {
+      // The verdict already landed — a link failure must not 500 the
+      // request; report it so the operator can retry from the feed.
+      try {
+        chainGroup = await DirectoryChainService.linkFromVerdict({
+          seedIds: validation.data.seedIds,
+          resolvedBy: (req as any).user?.userId || (req as any).user?.id,
+        });
+      } catch (err: any) {
+        chainError = err?.message || 'chain_link_failed';
+        logger.error('[POST dedup-verdicts] chain link failed', undefined, {
+          error: { name: err?.name || 'Error', message: chainError },
+        });
+      }
+    } else {
+      // Non-chain verdict on a chain-linked group dismisses it.
+      await DirectoryChainService.dismissForVerdict(validation.data.seedIds).catch(() => []);
+    }
+    res.status(201).json({ success: true, verdict: row, chainGroup, chainError });
   } catch (error: any) {
     logger.error('[POST /api/admin/directory/presence-seeds/dedup-verdicts] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/** GET /api/admin/directory/presence-seeds/chain-groups — the chain
+ *  prospecting feed (Migration 359, spec §5.2): groups + members +
+ *  copy-ready pitch hooks. */
+router.get('/presence-seeds/chain-groups', requirePlatformStaff, async (_req: Request, res: Response) => {
+  try {
+    const groups = await DirectoryChainService.listFeed();
+    res.json({ success: true, chainGroups: groups });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/chain-groups] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

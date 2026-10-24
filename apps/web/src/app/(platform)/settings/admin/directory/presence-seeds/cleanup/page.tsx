@@ -5,6 +5,7 @@ import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
+  type ChainGroupFeedItem,
   type CleanupDuplicateGroup,
   type CleanupSeedRef,
   type SeedCleanupReport,
@@ -16,6 +17,7 @@ import {
   Copy,
   ExternalLink,
   GitMerge,
+  Link2,
   RefreshCw,
   ShieldAlert,
   Sparkles,
@@ -111,11 +113,13 @@ function DuplicateGroupCard({
   busy,
   onResolve,
   onMarkDistinct,
+  onLinkChain,
 }: {
   group: CleanupDuplicateGroup;
   busy: boolean;
   onResolve: (group: CleanupDuplicateGroup, keepSeedId: string) => void;
   onMarkDistinct: (group: CleanupDuplicateGroup) => void;
+  onLinkChain: (group: CleanupDuplicateGroup) => void;
 }) {
   const claimedIds = group.seeds.filter((s) => s.status === 'claimed').map((s) => s.seedId);
   const [keepId, setKeepId] = useState<string | null>(claimedIds[0] ?? null);
@@ -134,14 +138,33 @@ function DuplicateGroupCard({
         <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
           {group.matchKey === 'phone' ? 'same phone' : 'same address'}
         </span>
-        {group.matchKey === 'phone' && (
+        {group.chain && (
+          <span className={`rounded px-2 py-0.5 text-xs font-semibold ${
+            group.chain.confidence === 'chain_confirmed'
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+              : 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300'
+          }`}>
+            {group.chain.confidence === 'chain_confirmed' ? 'chain — confirmed' : 'chain — probable'}
+          </span>
+        )}
+        {group.chain?.nameTokenOverlap?.length ? (
+          <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+            shared brand token “{group.chain.nameTokenOverlap.join('”, “')}”
+          </span>
+        ) : null}
+        {group.chain?.existingChainGroupId && (
+          <span className="text-xs text-gray-500">already linked → {group.chain.existingChainGroupId}</span>
+        )}
+        {group.matchKey === 'phone' && !group.chain && (
           <span className="text-xs text-gray-500">phone matches can be chains — verify before merging</span>
         )}
         {group.verdict && (
           <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/40 dark:text-green-300">
             {group.verdict.verdict === 'same_entity'
               ? `resolved → kept ${group.verdict.mergeInto}`
-              : 'marked distinct'}
+              : group.verdict.verdict === 'distinct_chain'
+                ? 'linked as chain'
+                : 'marked distinct'}
           </span>
         )}
       </div>
@@ -178,6 +201,17 @@ function DuplicateGroupCard({
           >
             Not duplicates — mark distinct
           </button>
+          {group.chain && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onLinkChain(group)}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Same chain — link {group.seeds.length} location{group.seeds.length > 2 ? 's' : ''}
+            </button>
+          )}
           {claimedIds.length > 0 && (
             <span className="text-xs text-red-600">
               claimed seeds can be kept but never suppressed
@@ -189,8 +223,100 @@ function DuplicateGroupCard({
   );
 }
 
+function ChainFeedCard({ chain }: { chain: ChainGroupFeedItem }) {
+  const statusTone: Record<string, string> = {
+    candidate: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+    confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    claimed: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    org_linked: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  };
+  const memberStatusTone = (s: string) =>
+    s === 'claimed'
+      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+      : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300';
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/10">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          {chain.displayName}
+        </span>
+        <span className={`rounded px-2 py-0.5 text-xs font-semibold ${statusTone[chain.status] ?? 'bg-gray-100 text-gray-600'}`}>
+          {chain.status.replace(/_/g, ' ')}
+        </span>
+        <span className={`rounded px-2 py-0.5 text-xs font-medium ${
+          chain.confidence === 'chain_confirmed'
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+            : 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300'
+        }`}>
+          {chain.confidence === 'chain_confirmed' ? 'confirmed' : 'probable'}
+        </span>
+        <span className="text-xs text-gray-500">
+          {chain.claimProgress.claimed}/{chain.claimProgress.live} claimed
+          {chain.claimProgress.invited > 0 ? ` · ${chain.claimProgress.invited} invited` : ''}
+        </span>
+        {(chain.contact.ownerPhone || chain.contact.ownerEmail || chain.contact.phone) && (
+          <span className="ml-auto text-xs text-gray-500">
+            pitch → {chain.contact.ownerPhone || chain.contact.ownerEmail || chain.contact.phone}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {chain.members.map((m) => (
+          <div
+            key={m.seedId}
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+          >
+            <Link
+              href={`/settings/admin/directory/presence-seeds/${m.seedId}`}
+              className="font-medium text-blue-700 hover:underline dark:text-blue-400"
+            >
+              {m.businessName || m.seedId}
+            </Link>
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${memberStatusTone(m.status)}`}>
+              {m.status}
+            </span>
+            {m.hasActiveClaimToken && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                live token
+              </span>
+            )}
+            <span className="text-xs text-gray-500">
+              {[m.city, m.state].filter(Boolean).join(', ') || '—'}
+            </span>
+            {m.slug && (
+              <Link
+                href={m.listingOrigin === 'directory_seed' ? `/place/${m.slug}` : `/directory/${m.slug}`}
+                target="_blank"
+                className="ml-auto inline-flex items-center gap-0.5 text-xs text-gray-500 hover:text-blue-600"
+              >
+                <ExternalLink className="h-3 w-3" /> public
+              </Link>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {chain.pitchHooks.length > 0 && (
+        <div className="mt-3 rounded-lg border border-emerald-100 bg-white px-3 py-2 dark:border-emerald-900/40 dark:bg-neutral-900/60">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Pitch hooks
+          </div>
+          <ul className="list-disc space-y-0.5 pl-4 text-xs text-gray-600 dark:text-gray-300">
+            {chain.pitchHooks.map((h, i) => (
+              <li key={i}>{h}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CleanupContent() {
   const [report, setReport] = useState<SeedCleanupReport | null>(null);
+  const [chains, setChains] = useState<ChainGroupFeedItem[]>([]);
   const [seedBatch, setSeedBatch] = useState<string>('');
   const [batchTouched, setBatchTouched] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -202,8 +328,12 @@ function CleanupContent() {
     setLoading(true);
     setError(null);
     try {
-      const data = await directoryPresenceAdminService.getCleanupReport(batch || undefined);
+      const [data, chainGroups] = await Promise.all([
+        directoryPresenceAdminService.getCleanupReport(batch || undefined),
+        directoryPresenceAdminService.listChainGroups().catch(() => [] as ChainGroupFeedItem[]),
+      ]);
       setReport(data);
+      setChains(chainGroups);
       // Default the selector to the newest batch on first load.
       if (!batchTouched && data?.batches?.length) {
         setSeedBatch(data.batches[0].seedBatch);
@@ -266,6 +396,22 @@ function CleanupContent() {
         verdict: 'distinct',
       });
       return 'Group marked distinct — cleared from duplicate review.';
+    });
+
+  const handleLinkChain = (group: CleanupDuplicateGroup) =>
+    runAction(async () => {
+      const r = await directoryPresenceAdminService.recordDedupVerdict({
+        seedIds: group.seedIds,
+        matchKey: group.matchKey,
+        verdict: 'distinct_chain',
+      });
+      const cg = r?.chainGroup;
+      if (r?.chainError) {
+        return `Verdict recorded but chain link failed (${r.chainError}) — the group stays resolved; retry by re-linking.`;
+      }
+      return cg
+        ? `Linked as chain ${cg.chainGroupId} (${cg.confidence.replace('chain_', '')}) — ${cg.memberCount} location(s) in the prospecting feed.`
+        : 'Group linked as chain — added to the prospecting feed.';
     });
 
   const handleBackfillAll = () =>
@@ -364,6 +510,7 @@ function CleanupContent() {
             busy={busy}
             onResolve={handleResolve}
             onMarkDistinct={handleMarkDistinct}
+            onLinkChain={handleLinkChain}
           />
         ))}
         {resolvedGroups.length > 0 && (
@@ -379,11 +526,35 @@ function CleanupContent() {
                   busy={busy}
                   onResolve={handleResolve}
                   onMarkDistinct={handleMarkDistinct}
+                  onLinkChain={handleLinkChain}
                 />
               ))}
             </div>
           </details>
         )}
+      </section>
+
+      {/* Chain prospecting feed — resolved distinct_chain groups are the
+          leads: who owns multiple shelves and hasn't been pitched the org
+          story yet. (Migration 359, spec §5.2) */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-emerald-600" />
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            Chain prospecting feed
+          </h2>
+          <span className="text-xs text-gray-500">
+            {loading ? '…' : `${chains.filter((c) => c.status !== 'dismissed').length} chain${chains.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+        {!loading && chains.filter((c) => c.status !== 'dismissed').length === 0 && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-gray-400">
+            No chains yet — same-phone duplicate groups with chain signals get a "Same chain — link locations" action above.
+          </div>
+        )}
+        {chains.filter((c) => c.status !== 'dismissed').map((c) => (
+          <ChainFeedCard key={c.chainGroupId} chain={c} />
+        ))}
       </section>
 
       {/* Completeness */}

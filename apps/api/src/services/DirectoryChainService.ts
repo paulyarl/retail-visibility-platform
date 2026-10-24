@@ -206,7 +206,7 @@ class DirectoryChainService {
     const created = existing.length === 0;
     const chainGroupId = created ? generateDirectoryChainGroupId() : existing[0].chain_group_id;
     if (existing.length > 1) {
-      logger.warn('DirectoryChainService.linkFromVerdict — members span multiple groups', {
+      logger.warn('DirectoryChainService.linkFromVerdict — members span multiple groups', undefined, {
         seedIds, groups: existing.map((e) => e.chain_group_id),
       });
     }
@@ -225,6 +225,7 @@ class DirectoryChainService {
             ${chainGroupId}, ${displayName}, 'candidate', ${signals.confidence},
             ${JSON.stringify({
               match_keys: ['phone'],
+              signals: signals.signals,
               name_tokens: nameTokens,
               shared_phone: signals.sharedPhone,
               cities: signals.cities,
@@ -247,7 +248,7 @@ class DirectoryChainService {
     const memberCountRows = await prisma.$queryRaw<{ n: number }[]>`
       SELECT COUNT(*)::int AS n FROM directory_chain_group_members WHERE chain_group_id = ${chainGroupId}
     `;
-    logger.info('DirectoryChainService.linkFromVerdict', {
+    logger.info('DirectoryChainService.linkFromVerdict', undefined, {
       chainGroupId, seedIds, created, confidence: signals.confidence,
     });
     return {
@@ -335,12 +336,7 @@ class DirectoryChainService {
       const ms = byGroup.get(g.id) ?? [];
       const live = ms.filter((m) => m.seed_status !== 'suppressed');
       const sourceSignals = (g.source_signals ?? {}) as Record<string, unknown>;
-      const signalKeys = [
-        sourceSignals.shared_phone ? 'same_phone' : null,
-        (sourceSignals.name_tokens as string[] | undefined)?.length ? 'name_token_overlap' : null,
-        ...((sourceSignals.signals as string[] | undefined) ?? []),
-      ].filter(Boolean) as string[];
-      const uniqueSignals = [...new Set(signalKeys)];
+      const uniqueSignals = [...new Set((sourceSignals.signals as string[] | undefined) ?? [])];
       const cities = [...new Set(live.map((m) => m.city).filter(Boolean))] as string[];
       const names = live.map((m) => m.business_name).filter(Boolean) as string[];
       const contact = live.find((m) => m.owner_email || m.owner_phone) ?? null;

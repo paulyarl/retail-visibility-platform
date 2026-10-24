@@ -6,6 +6,7 @@ import { getCategoryUrl, getCityUrl, getPlaceCityShelfUrl } from '@/utils/slug';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
+import ChainLocationsStrip from '@/components/directory/ChainLocationsStrip';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import { showsSeedAuthoredSurface } from '@/lib/place-photo-gallery';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
@@ -550,6 +551,7 @@ export default function PlaceEntryEditorialLayout({
           </div>
         )}
 
+        <ChainLocationsStrip locations={listing.chainLocations ?? []} />
         <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Places" />
         <LastViewed />
         <div className="container mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">

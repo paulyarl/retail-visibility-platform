@@ -1629,24 +1629,25 @@ model directory_claim_requests {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model directory_claim_tokens {
-  id                         String                     @id @db.VarChar(60)
-  seed_id                    String                     @db.VarChar(60)
-  tenant_id                  String                     @db.VarChar(255)
-  token                      String                     @unique(map: "uq_dct_token") @db.VarChar(255)
-  expires_at                 DateTime                   @db.Timestamptz(6)
-  consumed_at                DateTime?                  @db.Timestamptz(6)
-  consumed_by                String?                    @db.VarChar(255)
-  single_use                 Boolean                    @default(true)
-  created_at                 DateTime                   @default(now()) @db.Timestamptz(6)
-  bound_email                String?                    @db.VarChar(255)
-  bound_phone                String?                    @db.VarChar(40)
-  verification_required      Boolean                    @default(true)
-  operator_approval_required Boolean                    @default(false)
-  short_code                 String?                    @db.VarChar(8)
-  directory_claim_otps       directory_claim_otps[]
-  directory_claim_requests   directory_claim_requests[]
-  directory_presence_seeds   directory_presence_seeds   @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_seed")
-  tenants                    tenants                    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_tenant")
+  id                                    String                                  @id @db.VarChar(60)
+  seed_id                               String                                  @db.VarChar(60)
+  tenant_id                             String                                  @db.VarChar(255)
+  token                                 String                                  @unique(map: "uq_dct_token") @db.VarChar(255)
+  expires_at                            DateTime                                @db.Timestamptz(6)
+  consumed_at                           DateTime?                               @db.Timestamptz(6)
+  consumed_by                           String?                                 @db.VarChar(255)
+  single_use                            Boolean                                 @default(true)
+  created_at                            DateTime                                @default(now()) @db.Timestamptz(6)
+  bound_email                           String?                                 @db.VarChar(255)
+  bound_phone                           String?                                 @db.VarChar(40)
+  verification_required                 Boolean                                 @default(true)
+  operator_approval_required            Boolean                                 @default(false)
+  short_code                            String?                                 @db.VarChar(8)
+  directory_claim_otps                  directory_claim_otps[]
+  directory_claim_request_verifications directory_claim_request_verifications[]
+  directory_claim_requests              directory_claim_requests[]
+  directory_presence_seeds              directory_presence_seeds                @relation(fields: [seed_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_seed")
+  tenants                               tenants                                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dct_tenant")
 
   @@index([expires_at], map: "idx_dct_expires")
   @@index([seed_id], map: "idx_dct_seed")
@@ -1882,6 +1883,7 @@ model directory_presence_seeds {
   observed_assets                   Json?
   report_qr_style                   Json?
   claim_qr_style                    Json?
+  directory_chain_group_members     directory_chain_group_members[]
   directory_claim_requests          directory_claim_requests[]
   directory_claim_tokens            directory_claim_tokens[]
   directory_enrichment_tokens       directory_enrichment_tokens[]
@@ -3456,6 +3458,7 @@ model mkt_campaigns_list {
   mkt_deliverables_list                                                           mkt_deliverables_list[]
   mkt_dispute_intake                                                              mkt_dispute_intake[]
   mkt_files_list                                                                  mkt_files_list[]
+  mkt_ground_truth_packets                                                        mkt_ground_truth_packets[]
   mkt_outreach_closers_list                                                       mkt_outreach_closers_list[]
   mkt_outreach_contacts_list                                                      mkt_outreach_contacts_list[]
   mkt_outreach_headers_list                                                       mkt_outreach_headers_list[]
@@ -3749,9 +3752,9 @@ model mkt_files_list {
   mime_type          String?            @db.VarChar(100)
   uploaded_by        String?
   uploaded_at        DateTime           @default(now()) @db.Timestamptz(6)
-  briefing_topic     Json?
   created_at         DateTime           @default(now()) @db.Timestamptz(6)
   updated_at         DateTime           @default(now()) @db.Timestamptz(6)
+  briefing_topic     Json?
   mkt_campaigns_list mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_files_campaign")
 
   @@index([campaign_id], map: "idx_mkt_files_campaign")
@@ -8432,6 +8435,71 @@ model tenant_flyer_events {
   @@index([flyer_id, created_at(sort: Desc)], map: "idx_tenant_flyer_events_flyer")
   @@index([tenant_id, src, created_at(sort: Desc)], map: "idx_tenant_flyer_events_src")
   @@index([tenant_id, created_at(sort: Desc)], map: "idx_tenant_flyer_events_tenant")
+}
+
+model directory_chain_group_members {
+  chain_group_id           String                   @db.VarChar(255)
+  seed_id                  String                   @db.VarChar(60)
+  tenant_id                String?                  @db.VarChar(255)
+  added_by                 String?                  @db.VarChar(255)
+  added_at                 DateTime                 @default(now()) @db.Timestamptz(6)
+  directory_chain_groups   directory_chain_groups   @relation(fields: [chain_group_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_dcgm_group")
+  directory_presence_seeds directory_presence_seeds @relation(fields: [seed_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_dcgm_seed")
+
+  @@id([chain_group_id, seed_id])
+  @@index([seed_id], map: "idx_dcgm_seed")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model directory_chain_groups {
+  id                            String                          @id @db.VarChar(255)
+  display_name                  String?                         @db.VarChar(255)
+  status                        String                          @default("candidate") @db.VarChar(20)
+  confidence                    String                          @db.VarChar(20)
+  source_signals                Json                            @default("{}")
+  created_at                    DateTime                        @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                        @default(now()) @db.Timestamptz(6)
+  directory_chain_group_members directory_chain_group_members[]
+
+  @@index([status], map: "idx_dcg_status")
+}
+
+model directory_claim_request_verifications {
+  id                     String                 @id @db.VarChar(60)
+  token                  String                 @unique @db.VarChar(128)
+  token_id               String                 @db.VarChar(60)
+  seed_id                String                 @db.VarChar(60)
+  tenant_id              String                 @db.VarChar(255)
+  claimant_email         String                 @db.VarChar(255)
+  payload                Json                   @default("{}")
+  verified               Boolean                @default(false)
+  verified_at            DateTime?              @db.Timestamptz(6)
+  expires_at             DateTime               @db.Timestamptz(6)
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  directory_claim_tokens directory_claim_tokens @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dcrv_token")
+
+  @@index([expires_at], map: "idx_dcrv_expires")
+  @@index([seed_id], map: "idx_dcrv_seed")
+  @@index([token_id], map: "idx_dcrv_token_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mkt_ground_truth_packets {
+  id                 String             @id @db.VarChar(255)
+  campaign_id        String             @db.VarChar(255)
+  place_id           String?            @db.VarChar(255)
+  data_id            String?            @db.VarChar(255)
+  level              String             @db.VarChar(10)
+  packet             Json
+  credits_spent      Int                @default(0)
+  fetched_at         DateTime           @default(now()) @db.Timestamptz(6)
+  fetched_by         String?            @db.VarChar(255)
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime           @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([campaign_id, level], map: "idx_ground_truth_packets_campaign_level")
 }
 
 enum action {

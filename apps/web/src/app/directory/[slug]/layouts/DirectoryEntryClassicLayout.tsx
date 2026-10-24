@@ -5,6 +5,7 @@ import { Globe, ArrowLeft } from 'lucide-react';
 
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
+import ChainLocationsStrip from '@/components/directory/ChainLocationsStrip';
 import DirectoryActions from '@/components/directory/DirectoryActions';
 import StoreRatingsSection from '@/components/directory/StoreRatingsSection';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
@@ -519,6 +520,9 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
           </div>
         </div>
       </div>
+
+      {/* Chain sibling locations — the "Also visit" strip (Migration 359) */}
+      {!showStatusPanel && <ChainLocationsStrip locations={listing.chainLocations ?? []} />}
 
       {/* Related Stores */}
       {!showStatusPanel && <RelatedStores currentSlug={slugForRelated} limit={3} title="Similar Stores" />}
