@@ -618,7 +618,7 @@ export class DigitalDownloadPageService {
     const template = {
       instructions: `Thank you for your purchase! Your digital files are ready for download below. If you have any issues accessing your files, please don't hesitate to contact our support team.`,
       thank_you_message: `Enjoy your digital purchase from ${tenant?.name || 'our store'}! We hope you love your new files.`,
-      support_email: 'support@example.com', // Should be configurable
+      support_email: 'support@visibleshelf.com', // Should be configurable
       require_authentication: true,
       require_purchase_verification: true,
       allow_multiple_downloads: true,

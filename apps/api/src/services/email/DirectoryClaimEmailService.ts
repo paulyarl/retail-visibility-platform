@@ -128,6 +128,8 @@ Welcome aboard — we're glad to have you.
 
       const result = await emailService.sendEmail({
         to: data.to,
+        from: unifiedConfig.emailReplyTo,
+        replyTo: unifiedConfig.emailReplyTo,
         subject,
         html,
         text,
@@ -214,6 +216,8 @@ Reference: ${data.requestId}
 
       const result = await emailService.sendEmail({
         to: data.to,
+        from: unifiedConfig.emailReplyTo,
+        replyTo: unifiedConfig.emailReplyTo,
         subject,
         html,
         text,

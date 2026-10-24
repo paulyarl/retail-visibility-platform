@@ -18,7 +18,7 @@ export const ANNOUNCE_SNAPSHOT_DATE = '2026-10-19';
 /** Static fallback — the receipt defaults, frozen on the snapshot day. */
 const SNAPSHOT = {
   platformName: 'VisibleShelf',
-  contactEmail: 'billing@visibleshelf.store',
+  contactEmail: 'billing@visibleshelf.com',
   contactPhone: '(913) 703-6157',
   contactAddress: '',
   contactWebsite: 'https://visibleshelf.store',

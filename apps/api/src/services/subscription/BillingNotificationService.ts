@@ -804,6 +804,7 @@ Thank you for your business!`;
         
         await resend.emails.send({
           from: process.env.EMAIL_FROM || 'noreply@visibleshelf.com',
+          reply_to: process.env.EMAIL_REPLY_TO || 'claims@visibleshelf.com',
           to: payload.to,
           subject: payload.subject,
           html: payload.html,

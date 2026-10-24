@@ -1291,8 +1291,11 @@ class DirectoryPresenceSeedService {
       const text = `Claim your listing for ${seed[0].business_name}: ${claimUrl} (expires in 90 days)`;
 
       try {
+        const { unifiedConfig } = await import('../config/unifiedConfig');
         await emailService.sendEmail({
           to: seed[0].owner_email,
+          from: unifiedConfig.emailReplyTo,
+          replyTo: unifiedConfig.emailReplyTo,
           subject: `Claim your ${seed[0].business_name} listing`,
           html,
           text,

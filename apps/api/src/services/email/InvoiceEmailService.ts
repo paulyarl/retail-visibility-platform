@@ -5,6 +5,7 @@
 
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 interface PlatformBranding {
   platformName: string;
@@ -88,10 +89,10 @@ export class InvoiceEmailService {
       themeButtonSize: 'md',
       themeSpacing: 16,
       // Contact information
-      contactEmail: 'billing@visible-shelf.com',
+      contactEmail: 'billing@visibleshelf.com',
       contactPhone: '',
       contactAddress: '',
-      contactWebsite: 'https://visible-shelf.com',
+      contactWebsite: 'https://visibleshelf.com',
       // Social media
       socialFacebook: '',
       socialTwitter: '',
@@ -122,7 +123,8 @@ export class InvoiceEmailService {
         subject,
         html: emailHtml,
         text: emailText,
-        from: branding.contactEmail ? `billing@${branding.platformName.toLowerCase().replace(/\s+/g, '-')}.com` : 'billing@visible-shelf.com', // Platform branded from email
+        from: unifiedConfig.emailFrom,
+        replyTo: branding.contactEmail || unifiedConfig.emailReplyTo,
       });
 
       if (result.success) {
@@ -433,9 +435,9 @@ export class InvoiceEmailService {
             ` : ''}
             
             <div class="footer-links" style="margin-top: 15px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || branding.contactWebsite || 'https://visible-shelf.com'}" style="color: ${branding.themeColors.primary}; text-decoration: none; margin-right: 20px;">Website</a>
-              <a href="mailto:${branding.contactEmail || 'support@visible-shelf.com'}" style="color: ${branding.themeColors.primary}; text-decoration: none; margin-right: 20px;">Support</a>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://visible-shelf.com'}/terms" style="color: ${branding.themeColors.primary}; text-decoration: none; margin-right: 20px;">Terms</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || branding.contactWebsite || 'https://visibleshelf.com'}" style="color: ${branding.themeColors.primary}; text-decoration: none; margin-right: 20px;">Website</a>
+              <a href="mailto:${branding.contactEmail || 'support@visibleshelf.com'}" style="color: ${branding.themeColors.primary}; text-decoration: none; margin-right: 20px;">Support</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://visibleshelf.com'}/terms" style="color: ${branding.themeColors.primary}; text-decoration: none; margin-right: 20px;">Terms</a>
             </div>
             <div class="platform-info" style="margin-top: 20px; padding: 15px; background: #e8f4f8; border-radius: 8px; font-size: 12px; color: #495057;">
               <strong>${branding.platformName}</strong> - ${branding.platformDescription}<br>
@@ -491,8 +493,8 @@ ${branding.socialYoutube ? `YouTube: ${branding.socialYoutube}` : ''}
 
 ---
 ${branding.platformName} - ${branding.platformDescription}
-${branding.contactWebsite || process.env.NEXT_PUBLIC_APP_URL || 'https://visible-shelf.com'}
-${branding.contactEmail || 'support@visible-shelf.com'}
+${branding.contactWebsite || process.env.NEXT_PUBLIC_APP_URL || 'https://visibleshelf.com'}
+${branding.contactEmail || 'support@visibleshelf.com'}
     `;
   }
 

@@ -424,7 +424,7 @@ class UserService extends UniversalSingleton {
       },
       {
         id: 'user-support-001',
-        email: 'support@rvp.com',
+        email: 'support@visibleshelf.com',
         name: 'Support Agent',
         role: 'support',
         status: 'active',

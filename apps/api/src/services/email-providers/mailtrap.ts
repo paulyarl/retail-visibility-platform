@@ -8,7 +8,7 @@ export class MailtrapEmailProvider implements EmailProvider {
 
   constructor() {
     this.apiToken = process.env.MAILTRAP_API_TOKEN || '';
-    this.fromEmail = process.env.MAILTRAP_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@visibleshelf.store';
+    this.fromEmail = process.env.MAILTRAP_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@visibleshelf.com';
     this.fromName = process.env.MAILTRAP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'VisibleShelf';
   }
 
@@ -23,6 +23,7 @@ export class MailtrapEmailProvider implements EmailProvider {
           email: params.from || this.fromEmail,
           name: this.fromName,
         },
+        ...(params.replyTo ? { reply_to: { email: params.replyTo } } : {}),
         to: [
           {
             email: params.to,

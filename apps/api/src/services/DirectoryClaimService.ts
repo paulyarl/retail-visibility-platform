@@ -466,8 +466,11 @@ class DirectoryClaimService {
       if (deliveryMethod === 'email') {
         try {
           const { emailService } = await import('../services/email-service.js');
+          const { unifiedConfig } = await import('../config/unifiedConfig');
           await emailService.sendEmail({
             to: deliveryTarget,
+            from: unifiedConfig.emailReplyTo,
+            replyTo: unifiedConfig.emailReplyTo,
             subject: 'Your Directory Claim Verification Code',
             text: `Your verification code is: ${otpCode}. It expires in 10 minutes.`,
             html: `<p>Your verification code is: <strong>${otpCode}</strong></p><p>It expires in 10 minutes.</p>`,
@@ -809,8 +812,11 @@ Review at Settings → Directory → Presence Seeds.`,
     const text = `Confirm your claim request for ${businessName}: ${verifyUrl} (expires in 24 hours)`;
 
     const { emailService } = await import('../services/email-service.js');
+    const { unifiedConfig } = await import('../config/unifiedConfig');
     await emailService.sendEmail({
       to,
+      from: unifiedConfig.emailReplyTo,
+      replyTo: unifiedConfig.emailReplyTo,
       subject: 'Confirm your listing claim request',
       html,
       text,

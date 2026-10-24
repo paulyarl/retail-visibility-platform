@@ -1021,7 +1021,7 @@ router.get('/statements/:statementId/download', requireAuth, async (req: Request
       platformName: platformSettings?.platform_name || 'VisibleShelf',
       logoUrl: platformSettings?.logo_url,
       primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
-      contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',
+      contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.com',
       contactPhone: platformSettings?.contact_phone || '(913) 703-6157',
       contactAddress: platformSettings?.contact_address || '',
       contactWebsite: platformSettings?.contact_website || 'https://visibleshelf.store',

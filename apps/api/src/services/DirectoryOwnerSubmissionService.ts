@@ -419,8 +419,11 @@ Review at the seed detail page.`,
     const text = `Verify your submission for ${businessName}: ${verifyUrl} (expires in 24 hours)`;
 
     try {
+      const { unifiedConfig } = await import('../config/unifiedConfig');
       await emailService.sendEmail({
         to,
+        from: unifiedConfig.emailReplyTo,
+        replyTo: unifiedConfig.emailReplyTo,
         subject: 'Confirm your business submission',
         html,
         text,

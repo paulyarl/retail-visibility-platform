@@ -511,7 +511,11 @@ class UnifiedConfig {
   }
 
   get emailFrom(): string {
-    return this.env.EMAIL_FROM || 'noreply@rvp-platform.com';
+    return this.env.EMAIL_FROM || 'noreply@visibleshelf.com';
+  }
+
+  get emailReplyTo(): string {
+    return this.env.EMAIL_REPLY_TO || 'claims@visibleshelf.com';
   }
 
   get emailFromName(): string {

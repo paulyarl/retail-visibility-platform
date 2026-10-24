@@ -13,6 +13,7 @@ export interface EmailProvider {
 export interface SendEmailParams {
   to: string;
   from?: string;
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
