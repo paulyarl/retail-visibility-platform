@@ -94,7 +94,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
 
 /**
  * GET /api/admin/custom-domains/:tenantId
- * Per-tenant detail: domain rows + composed entitlement/flag state (5.2) —
+ * Per-tenant detail: domain rows + resolved capability entitlement (5.2) —
  * the answer to "why can't this tenant add a domain" in one call.
  */
 router.get('/:tenantId', requirePlatformAdmin, async (req: Request, res: Response) => {
@@ -114,7 +114,7 @@ router.get('/:tenantId', requirePlatformAdmin, async (req: Request, res: Respons
 /**
  * POST /api/admin/custom-domains/:tenantId
  * Operator attach — the DFY/concierge path. Body: { domain, apex?, reason? }
- * The capability + flag gate still applies (D12): grant the capability via
+ * The capability gate still applies (D12): grant the capability via
  * admin override first — that's what makes the demo-tenant flow work too.
  */
 router.post('/:tenantId', requirePlatformAdmin, async (req: Request, res: Response) => {

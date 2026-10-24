@@ -8,7 +8,6 @@ import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Globe, ExternalLink, RefreshCw, Clock, Copy } from 'lucide-react';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { useEffectiveStorefrontDomains } from '@/hooks/useEffectiveCapabilities';
-import { useEffectiveTenantFlags } from '@/hooks/useEffectiveFlags';
 import { clientLogger } from '@/lib/client-logger';
 
 interface CustomDomainSettingsProps {
@@ -83,11 +82,6 @@ function DnsRecordRow({ type, name, value }: { type: string; name: string; value
 
 export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsProps) {
   const { data: storefrontDomains, isLoading: capsLoading } = useEffectiveStorefrontDomains(tenantId);
-  const { data: tenantFlags } = useEffectiveTenantFlags(tenantId);
-  // Tenant-scoped payload: the tenant's decision is tenantEffectiveOn;
-  // effectiveOn is the platform-level state (misleading in beta posture).
-  const customDomainsFlag = tenantFlags?.['custom_domains'];
-  const flagOn = customDomainsFlag?.tenantEffectiveOn ?? customDomainsFlag?.effectiveOn ?? false;
   const entitled = storefrontDomains?.customDomainEnabled ?? false;
 
   const [domains, setDomains] = useState<CustomDomain[]>([]);
@@ -98,9 +92,9 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // The list route is entitlement/flag-agnostic (checkTenantAccess only) —
+  // The list route is entitlement-agnostic (checkTenantAccess only) —
   // always fetch so an admin-attached domain stays visible even when the
-  // rollout flag or capability gate is off.
+  // capability gate is off.
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -184,8 +178,8 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
   const hasDomain = domains.length > 0;
 
   // A domain already attached (incl. DFY-attached by a platform admin) is
-  // always shown — the rollout flag only gates NEW attaches, never
-  // visibility or management of an existing domain.
+  // always shown — the capability gates NEW attaches, never visibility or
+  // management of an existing domain.
   // Not entitled + no domain → upsell (capability-authoritative per D12, not a tier-name check)
   if (!capsLoading && !loading && !hasDomain && !entitled) {
     return (
@@ -210,26 +204,6 @@ export default function CustomDomainSettings({ tenantId }: CustomDomainSettingsP
           >
             View plans
           </Link>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Entitled but the platform flag (beta rollout) is off for this tenant,
-  // and nothing is attached yet
-  if (!loading && !hasDomain && entitled && !flagOn) {
-    return (
-      <Card className="dark:bg-gray-800 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-            <Globe className="h-5 w-5" />
-            Your Own Domain
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Custom domains are rolling out gradually and aren&apos;t enabled for your account yet. Contact support to join the early access group.
-          </p>
         </CardContent>
       </Card>
     );

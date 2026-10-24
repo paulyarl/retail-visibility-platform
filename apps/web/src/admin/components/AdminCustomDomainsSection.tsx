@@ -2,10 +2,11 @@
  * AdminCustomDomainsSection
  *
  * Custom-domain ops console — the admin counterpart of Active Subdomains.
- * Surfaces the two-gate write path (capability entitlement + custom_domains
- * flag) and gives operators the full mini-workflow in one place:
+ * Surfaces the capability-gated write path (the `custom_domains` rollout
+ * flag is deprecated and no longer consulted) and gives operators the full
+ * mini-workflow in one place:
  *
- *   pick tenant → entitlement card → [Grant via BSaaS] / [Enable flag]
+ *   pick tenant → entitlement card → [Grant via BSaaS]
  *   → attach domain → watch pending_verification → force check → active
  *
  * Backed by /api/admin/custom-domains (requirePlatformAdmin) and the tenant
@@ -37,7 +38,6 @@ import {
   Trash2,
   Plus,
   Gift,
-  Flag,
   ChevronDown,
   ChevronUp,
   CheckCircle,
@@ -47,7 +47,6 @@ import {
 
 const PAGE_SIZE = 20;
 const CUSTOM_DOMAIN_FEATURE_KEY = 'storefront_domains_custom_domain';
-const CUSTOM_DOMAINS_FLAG = 'custom_domains';
 
 const STATUS_BADGE: Record<string, { variant: 'success' | 'info' | 'warning' | 'error' | 'secondary'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -67,7 +66,7 @@ const STATUS_FILTERS = [
 ];
 
 const ATTACH_ERROR_MESSAGE: Record<string, string> = {
-  not_entitled: 'Not entitled — grant the capability (BSaaS) and enable the flag first.',
+  not_entitled: 'Not entitled — grant the capability (BSaaS) first.',
   domain_taken: 'That domain is already attached to another tenant.',
   domain_limit: 'This tenant already has the maximum number of custom domains.',
   invalid_domain: 'Invalid domain format.',
@@ -129,7 +128,6 @@ export default function AdminCustomDomainsSection() {
 
   // Mini-workflows
   const [grantOpen, setGrantOpen] = useState(false);
-  const [flagSetting, setFlagSetting] = useState(false);
 
   const fetchRows = useCallback(async (nextSearch: string, nextStatus: string, nextPage: number) => {
     setListLoading(true);
@@ -205,7 +203,7 @@ export default function AdminCustomDomainsSection() {
     if (!attachTenantId) return;
     setDetailLoading(true);
     try {
-      // Post-grant/flag refetch must not see the 30s cache
+      // Post-grant refetch must not see the 30s cache
       await platformHomeService.invalidateCache('platform-admin-custom-domains*');
       const detail = await platformHomeService.getAdminTenantDomains(attachTenantId);
       setTenantDetail(detail);
@@ -260,23 +258,6 @@ export default function AdminCustomDomainsSection() {
     setRemoveReason('');
     setError('');
     await fetchRows(search, status, page);
-  };
-
-  const enableFlag = async () => {
-    if (!attachTenantId) return;
-    setFlagSetting(true);
-    const result = await platformHomeService.setAdminTenantFlag(
-      attachTenantId,
-      CUSTOM_DOMAINS_FLAG,
-      true,
-      'Enabled via admin domain console',
-    );
-    setFlagSetting(false);
-    if (!result.success) {
-      setAttachError(`Failed to enable flag (${result.error ?? 'unknown'})`);
-      return;
-    }
-    await refreshTenantDetail();
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -476,7 +457,7 @@ export default function AdminCustomDomainsSection() {
         isOpen={attachOpen}
         onClose={() => setAttachOpen(false)}
         title="Attach Custom Domain"
-        description="Operator attach (DFY) — capability + flag gates apply"
+        description="Operator attach (DFY) — capability gate applies"
       >
         <div className="space-y-4">
           {attachError && (
@@ -519,25 +500,6 @@ export default function AdminCustomDomainsSection() {
                       <Button variant="secondary" size="sm" onClick={() => setGrantOpen(true)}>
                         <Gift className="w-3.5 h-3.5 mr-1.5" />
                         Grant via BSaaS
-                      </Button>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      {tenantDetail.entitlement.flagOn ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      )}
-                      <span className="text-sm">
-                        Flag <code className="text-xs">{CUSTOM_DOMAINS_FLAG}</code>
-                        {tenantDetail.entitlement.flagOn ? ' — on' : ' — off'}
-                      </span>
-                    </div>
-                    {!tenantDetail.entitlement.flagOn && (
-                      <Button variant="secondary" size="sm" onClick={enableFlag} disabled={flagSetting}>
-                        <Flag className="w-3.5 h-3.5 mr-1.5" />
-                        {flagSetting ? 'Enabling…' : 'Enable flag'}
                       </Button>
                     )}
                   </div>

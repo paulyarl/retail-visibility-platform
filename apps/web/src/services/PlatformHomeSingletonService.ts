@@ -436,7 +436,7 @@ export interface AdminCustomDomainStats {
 
 export interface AdminTenantDomainDetail {
   domains: AdminCustomDomainRow[];
-  entitlement: { entitled: boolean; flagOn: boolean };
+  entitlement: { entitled: boolean };
 }
 
 export interface AdminCustomDomainMutationResult {
@@ -2006,8 +2006,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
-   * Per-tenant custom-domain detail: domain rows + composed entitlement/flag
-   * state — the "why can't this tenant attach" answer in one call.
+   * Per-tenant custom-domain detail: domain rows + resolved capability
+   * entitlement — the "why can't this tenant attach" answer in one call.
    */
   async getAdminTenantDomains(tenantId: string): Promise<AdminTenantDomainDetail | null> {
     const result = await this.makeDefaultRequest<AdminTenantDomainDetail>(
@@ -2030,7 +2030,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
-   * Operator attach (DFY/concierge). Capability + flag gates still apply
+   * Operator attach (DFY/concierge). The capability gate still applies
    * server-side — use the entitlement card first.
    */
   async attachAdminCustomDomain(tenantId: string, domain: string, opts: { apex?: boolean; reason?: string } = {}): Promise<AdminCustomDomainMutationResult> {

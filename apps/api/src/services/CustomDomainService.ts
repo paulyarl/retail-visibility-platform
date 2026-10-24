@@ -6,13 +6,13 @@
  * sweeper) → verified (Vercel `verified && !misconfigured`) → active (our own
  * HTTPS probe — the cert state is probe-derived only, H4).
  *
- * Gates (composed per D10/D12):
- *   - flag `custom_domains` (platform flag + tenant override, effectiveFlags)
- *     = deployed-to-you
+ * Gate (D12):
  *   - capability `storefront_domains_custom_domain` (MV feature keys,
  *     flexible composed inline to mirror the resolver's `flexible ||` —
  *     F-H1 corrected) = entitled-to-you
- *   addDomain requires BOTH; the resolve path is never gated.
+ *   addDomain requires the capability; the resolve path is never gated.
+ *   (The `custom_domains` rollout flag predates the capability architecture
+ *   and is deprecated — it no longer gates any path.)
  *
  * One row per LOGICAL domain (D9): `domain` stores the root with `www.`
  * stripped. Apex-declared inputs attach apex + `www` project domains and
@@ -34,12 +34,10 @@ import {
   type CustomDomainFailureCode,
 } from '../lib/custom-domain';
 import { vercelDomainsService, VercelUnconfiguredError } from './VercelDomainsService';
-import { getEffectiveTenant } from '../utils/effectiveFlags';
 
 const CUSTOM_DOMAIN_FEATURE = 'storefront_domains_custom_domain';
 const STOREFRONT_FLEXIBLE = 'storefront_domains_flexible';
 const STOREFRONT_DISABLED = 'storefront_domains_disabled';
-const PLATFORM_FLAG = 'custom_domains';
 const MAX_LIVE_DOMAINS_PER_TENANT = 1;
 const HTTPS_PROBE_TIMEOUT_MS = 5000;
 
@@ -134,19 +132,12 @@ export class CustomDomainService extends BaseService {
     return keys.has(STOREFRONT_FLEXIBLE) || keys.has(CUSTOM_DOMAIN_FEATURE);
   }
 
-  /** Flag check (D10): platform flag + tenant override via effectiveFlags. */
-  private async isFlagOn(tenantId: string): Promise<boolean> {
-    const flag = await getEffectiveTenant(PLATFORM_FLAG, tenantId);
-    return flag.tenantEffectiveOn;
-  }
-
   /**
-   * Admin/support visibility (5.2): the composed entitlement + rollout state
-   * for a tenant — what the gate evaluated, without mutating anything.
+   * Admin/support visibility (5.2): the resolved capability entitlement for
+   * a tenant — what the gate evaluated, without mutating anything.
    */
-  async entitlementFor(tenantId: string): Promise<{ entitled: boolean; flagOn: boolean }> {
-    const [entitled, flagOn] = await Promise.all([this.isEntitled(tenantId), this.isFlagOn(tenantId)]);
-    return { entitled, flagOn };
+  async entitlementFor(tenantId: string): Promise<{ entitled: boolean }> {
+    return { entitled: await this.isEntitled(tenantId) };
   }
 
   async addDomain(
@@ -154,10 +145,8 @@ export class CustomDomainService extends BaseService {
     rawDomain: string,
     opts: { apexDeclared?: boolean } = {},
   ): Promise<AddDomainResult> {
-    // Flag + capability compose (D10/D12)
-    if (!(await this.isFlagOn(tenantId))) {
-      return { ok: false, code: 'not_entitled', message: 'Custom domains are not enabled for your account yet.' };
-    }
+    // Capability is the sole gate (D12) — the `custom_domains` rollout flag
+    // is deprecated and no longer consulted.
     if (!(await this.isEntitled(tenantId))) {
       return { ok: false, code: 'not_entitled', message: 'Custom domains are not included in your plan.' };
     }
