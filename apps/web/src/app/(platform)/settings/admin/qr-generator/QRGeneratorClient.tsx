@@ -7,7 +7,7 @@ import {
   generateQrDataUrl,
   type QrTemplateName,
 } from '@/lib/qr-engine';
-import { Download, Copy, Check, QrCode, Palette, Sparkles, Link2, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { Download, Copy, Check, QrCode, Palette, Sparkles, Link2, AlertCircle, Image as ImageIcon, Upload } from 'lucide-react';
 
 import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES, SIZE_OPTIONS } from '@/lib/qr-style-constants';
 import { SectionBadge } from '@/components/qr/SectionBadge';
@@ -38,13 +38,19 @@ export default function QRGeneratorClient() {
   const [gradientOnCornerDots, setGradientOnCornerDots] = useState(true);
   const [logoUrl, setLogoUrl] = useState('');
   const [logoShape, setLogoShape] = useState('square');
+  const [customLogoDataUrl, setCustomLogoDataUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstanceRef = useRef<any>(null);
 
-  const trimmedLogoUrl = logoUrl.trim() || undefined;
+  // An uploaded file wins over the URL field — same pattern as the claim QR
+  // designer (data URLs are same-origin, so overlayLogoOnQRAsync draws them
+  // without CORS risk).
+  const trimmedLogoUrl = customLogoDataUrl ?? (logoUrl.trim() || undefined);
 
   const validateUrl = (url: string): boolean => {
     if (!url.trim()) return false;
@@ -80,6 +86,23 @@ export default function QRGeneratorClient() {
   const handleUrlChange = (value: string) => {
     setTargetUrl(value);
     setUrlError(null);
+  };
+
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Logo must be an image file');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomLogoDataUrl(typeof reader.result === 'string' ? reader.result : null);
+      setLogoError(null);
+    };
+    reader.onerror = () => setLogoError('Failed to read logo file');
+    reader.readAsDataURL(file);
   };
 
   const effectiveUrl = targetUrl.trim()
@@ -571,13 +594,49 @@ export default function QRGeneratorClient() {
                       <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
                       Logo Overlay
                     </div>
+                    {customLogoDataUrl ? (
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={customLogoDataUrl}
+                          alt="Uploaded logo"
+                          className="h-8 w-8 object-contain rounded border border-gray-200 dark:border-neutral-600 bg-white"
+                        />
+                        <span className="text-xs text-neutral-500">Uploaded logo</span>
+                        <button
+                          onClick={() => setCustomLogoDataUrl(null)}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          value={logoUrl}
+                          onChange={(e) => setLogoUrl(e.target.value)}
+                          placeholder="https://example.com/logo.png (optional)"
+                          className="w-full px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <button
+                          onClick={() => logoFileRef.current?.click()}
+                          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 hover:underline"
+                        >
+                          <Upload className="w-3 h-3" />
+                          Upload image file
+                        </button>
+                      </>
+                    )}
                     <input
-                      type="text"
-                      value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      placeholder="https://example.com/logo.png (optional)"
-                      className="w-full px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      ref={logoFileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      className="hidden"
+                      onChange={handleLogoFile}
                     />
+                    {logoError && (
+                      <p className="text-xs text-red-500">{logoError}</p>
+                    )}
                     {trimmedLogoUrl && (
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5">
@@ -598,12 +657,14 @@ export default function QRGeneratorClient() {
                             ))}
                           </div>
                         </div>
-                        <button
-                          onClick={() => setLogoUrl('')}
-                          className="text-xs text-red-500 hover:text-red-600"
-                        >
-                          Remove
-                        </button>
+                        {!customLogoDataUrl && (
+                          <button
+                            onClick={() => setLogoUrl('')}
+                            className="text-xs text-red-500 hover:text-red-600"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     )}
                     {trimmedLogoUrl && (
