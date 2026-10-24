@@ -3351,6 +3351,11 @@ export interface DirectoryClaimRequest {
   city: string;
   state: string;
   attachmentCount: number;
+  /** Claimant proof-of-inbox (migration 358). Null when the claimant's
+   *  email was already account-verified or the request predates the gate. */
+  claimantEmailVerifiedAt: string | null;
+  claimVerificationEmail: string | null;
+  claimVerificationSentAt: string | null;
 }
 
 // ============================

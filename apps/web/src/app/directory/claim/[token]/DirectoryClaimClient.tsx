@@ -50,6 +50,7 @@ import directoryClaimPublicService, {
 } from '@/services/DirectoryClaimPublicService';
 import directoryPresenceUpgradeService from '@/services/DirectoryPresenceUpgradeService';
 import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
+import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, sortPresenceModes } from '@/lib/presence-modes';
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 
@@ -1247,70 +1248,10 @@ export default function DirectoryClaimClient() {
 // Renders the three Entry Presence mode cards on the claim success screen.
 // Live values come from the upgradeOptions embedded in the claim accept
 // response (or the authenticated refresh when a platform session exists);
-// the static fallback below renders only when no options are available.
-const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
-  {
-    tierKey: 'presence',
-    name: 'Storefront+',
-    displayName: 'Storefront+',
-    description: null,
-    priceMonthly: 39,
-    priceAnnual: 468,
-    sortOrder: 10,
-    billingType: 'subscription',
-    mode: 'commerce',
-    tagline: 'Sell with deposit checkout',
-    isPrimary: true,
-    newFeatures: [],
-  },
-  {
-    tierKey: 'discovery',
-    name: 'SWIS',
-    displayName: 'SWIS',
-    description: null,
-    priceMonthly: 29,
-    priceAnnual: 348,
-    sortOrder: 20,
-    billingType: 'subscription',
-    mode: 'google',
-    tagline: 'Put your products on Google',
-    isPrimary: false,
-    newFeatures: [],
-  },
-  {
-    tierKey: 'storefront',
-    name: 'Storefront',
-    displayName: 'Storefront',
-    description: null,
-    priceMonthly: 59,
-    priceAnnual: 708,
-    sortOrder: 30,
-    billingType: 'subscription',
-    mode: 'platform',
-    tagline: 'Showcase your full catalog',
-    isPrimary: false,
-    newFeatures: [],
-  },
-];
-
-// Curated per-mode unlock copy — must stay within each tier's actual feature
-// set (spec copy accuracy rules: no premium layout, no featured products;
-// hours/map/contact/QR/SNAP are already free). presence is the one mode with
-// native checkout — deposit-only, Stripe.
-const MODE_UNLOCK_COPY: Record<string, string> = {
-  presence:
-    'Full directory chrome plus a hosted storefront with deposit checkout (Stripe). Upgrade to full payment and more gateways anytime as add-ons.',
-  discovery:
-    'Your products on Google — Merchant Center feed, Shopping and local inventory visibility, hosted on your platform subdomain.',
-  storefront:
-    'A full, branded storefront browse experience with product catalog on your subdomain — add checkout anytime as an à-la-carte add-on.',
-};
-
+// the shared static fallback renders only when no options are available.
 function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
   const isFallback = !options || options.length === 0;
-  const modes = isFallback ? FALLBACK_PRESENCE_MODES : options;
-  // Primary (presence) first — mirrors the upgrade page's gateway sort
-  const sorted = [...modes].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+  const sorted = sortPresenceModes(isFallback ? FALLBACK_PRESENCE_MODES : options);
 
   return (
     <Stack gap="xs">

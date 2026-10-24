@@ -407,6 +407,12 @@ function PresenceSeedsContent() {
                             Verified
                           </span>
                         )}
+                        {req.claimantEmailVerifiedAt && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">
+                            <Mail className="w-3 h-3" />
+                            Email confirmed {new Date(req.claimantEmailVerifiedAt).toLocaleDateString()}
+                          </span>
+                        )}
                         {req.attachmentCount > 0 && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                             <FileText className="w-3 h-3" />
@@ -503,6 +509,12 @@ function PresenceSeedsContent() {
               <div className="mt-2 space-y-0.5 text-xs text-gray-600">
                 <p><span className="font-medium">Claimant:</span> {[verifyRequest.claimantFirstName, verifyRequest.claimantLastName].filter(Boolean).join(' ') || verifyRequest.customerName || '—'}</p>
                 <p><span className="font-medium">Email:</span> {verifyRequest.customerEmail || '—'}</p>
+                <p>
+                  <span className="font-medium">Email verification:</span>{' '}
+                  {verifyRequest.claimantEmailVerifiedAt
+                    ? `Confirmed via link ${new Date(verifyRequest.claimantEmailVerifiedAt).toLocaleDateString()}${verifyRequest.claimVerificationSentAt ? ` (sent ${new Date(verifyRequest.claimVerificationSentAt).toLocaleDateString()})` : ''}`
+                    : 'Not on file — account-verified email or pre-gate request'}
+                </p>
                 <p><span className="font-medium">Phone:</span> {verifyRequest.claimantPhone || '—'}</p>
                 {verifyRequest.claimantBusinessAddress && (
                   <p><span className="font-medium">Stated address:</span> {verifyRequest.claimantBusinessAddress}</p>

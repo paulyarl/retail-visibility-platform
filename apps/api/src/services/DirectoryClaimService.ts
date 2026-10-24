@@ -1668,6 +1668,39 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       }
     }
 
+    // Batch-load the claimant email-verification record per token
+    // (migration 358) — the proof-of-inbox stamp operators see on the
+    // request card / verification worksheet. Non-fatal: absent the table
+    // (migration not applied in this env) the list still renders.
+    let verificationsByToken: Record<
+      string,
+      { email: string; verifiedAt: Date | null; sentAt: Date }
+    > = {};
+    const tokenIds = [...new Set(rows.map((r) => r.token_id).filter(Boolean))];
+    if (tokenIds.length > 0) {
+      try {
+        const vRows = await prisma.$queryRaw<any[]>`
+          SELECT token_id, claimant_email, verified_at, created_at AS sent_at
+          FROM directory_claim_request_verifications
+          WHERE token_id = ANY(${tokenIds}::text[])
+          ORDER BY created_at DESC
+        `;
+        for (const v of vRows) {
+          if (!verificationsByToken[v.token_id]) {
+            verificationsByToken[v.token_id] = {
+              email: v.claimant_email,
+              verifiedAt: v.verified_at ? new Date(v.verified_at) : null,
+              sentAt: new Date(v.sent_at),
+            };
+          }
+        }
+      } catch (err) {
+        logger.warn('DirectoryClaimService.listClaimRequests — verification lookup failed (migration 358 pending?)', undefined, {
+          error: (err as Error).message,
+        });
+      }
+    }
+
     return rows.map((r) => ({
       id: r.id,
       seedId: r.seed_id,
@@ -1697,6 +1730,11 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       city: r.city,
       state: r.state,
       attachmentCount: attachmentCounts[r.id] || 0,
+      // Claimant proof-of-inbox (migration 358). Null when the claimant's
+      // email was already account-verified or the request predates the gate.
+      claimantEmailVerifiedAt: verificationsByToken[r.token_id]?.verifiedAt ?? null,
+      claimVerificationEmail: verificationsByToken[r.token_id]?.email ?? null,
+      claimVerificationSentAt: verificationsByToken[r.token_id]?.sentAt ?? null,
     }));
   }
 
