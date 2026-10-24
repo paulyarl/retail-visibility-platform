@@ -432,7 +432,7 @@ The token is public by design; `NEXT_PUBLIC_` is correct.
 | `places.xml` | City markets | 10 | `/place/city/{city}-{state}` |
 | `places.xml` | Seed listings | 70 | `/place/{slug}` |
 | `directory.xml` | Claimed/tenant listings | 2 (measured; not 72 — that total includes seeds) | `/directory/{slug}` |
-| `storefronts.xml` | Tenant storefront homes | = live tenants | canonical ladder: custom → `{sub}.visibleshelf.com` → `/tenant/{id}` |
+| `storefronts.xml` | Tenant storefront homes | = renderable storefronts | canonical ladder: custom → `{sub}.visibleshelf.com` → `/tenant/{id}`; gated on `EXISTS mv_storefront_discovery` (the view `/api/public/shops/id/:tenantId` reads — `/tenant/{id}` 404s without it) |
 | `products-N.xml` | Public products | = active public items | `{owning tenant canonical origin}/products/{id}` |
 
 `/sitemap.xml` is a `<sitemapindex>` over those files (§4.8). Per-file limit 20,000 URLs for products (headroom under the 50,000 cap), 50,000 for the rest.
@@ -762,7 +762,13 @@ All §7 criteria pass against production; §8 returns a single `N 200` line acro
 | Legacy paths | `/directory/sitemap.xml` → 308; API `/places-sitemap.xml` → 301 |
 | **Host canonicalization** | ✅ prod: `www` → `301` apex (incl. `/robots.txt`, `/sitemap.xml`); wildcard `*.visibleshelf.com` **served** (a redirect there 301'd all tenant subdomains — observed and reverted same day); baraka subdomain + all 35 off-apex `<loc>`s re-verified `200`. ⚠️ staging still split — `visibleshelf.store` and `www.` both `200`, robots/sitemap hosts disagree (API `WEB_URL` vs web `NEXT_PUBLIC_WEB_URL`) |
 
-Remaining: fix staging host alignment (one canonical host + redirect), then Search Console submission and the §9 baseline.
+**Post-promotion finds (2026-10-23, second pass):**
+
+- Path-form `<loc>`s now emit `/tenant/{id}` (matching the canonical); this un-dropped ~90 slug-less tenants and exposed that the storefront gate was too loose: the first deploy advertised **95 storefront URLs of which 59 → 404** (tenants with a published listing but no `mv_storefront_discovery` row — no active items, so `/tenant/{id}` 404s). Query now requires `EXISTS mv_storefront_discovery`; the 36 storefronts that render are the advertised set. **Pending redeploy.**
+- Staging now mirrors prod's domain config (`visibleshelf.store` canonical, `www` → 301, wildcard served) — **but** the API `WEB_URL` still names `www.visibleshelf.store`, so every staging `<loc>` 301s to the apex. Flip staging `WEB_URL` to `https://visibleshelf.store` (and confirm the web `NEXT_PUBLIC_WEB_URL` agrees) — env change, no code.
+- `placeshelf.store` confirmed live as a demo storefront on a custom domain: self-canonical, `noindex` (demo), excluded from sitemaps, and serving the **global** sitemap at its own `/sitemap.xml` — the live instance of the Domain Visibility spec's cross-tenant leak.
+
+Remaining: redeploy the storefront gate, fix staging `WEB_URL`, then Search Console submission and the §9 baseline.
 
 ---
 
