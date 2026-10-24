@@ -559,6 +559,11 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
       return res.status(400).json({ error: 'token_required' });
     }
 
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Please slow down.' });
+    }
+
     // Extract customer info (if authenticated) for operator-approval requests
     let customer = (req as any).customer;
     const platformUser = (req as any).user;
@@ -586,7 +591,7 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
             // Fetch customer details to get email + name
             const { prisma } = await import('../prisma');
             const custRows = await prisma.$queryRaw<any[]>`
-              SELECT id, email, first_name, last_name FROM customers WHERE id = ${payload.customerId} LIMIT 1
+              SELECT id, email, first_name, last_name, email_verified FROM customers WHERE id = ${payload.customerId} LIMIT 1
             `;
             if (custRows[0]) {
               customer = {
@@ -594,6 +599,7 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
                 email: custRows[0].email,
                 firstName: custRows[0].first_name,
                 lastName: custRows[0].last_name,
+                email_verified: custRows[0].email_verified,
               };
             }
           }
@@ -613,7 +619,15 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     const headerCustomerEmail = req.get('x-customer-email') || undefined;
     const actorId = customer?.id || platformUser?.id || body.customerId || headerCustomerId || undefined;
     const customerEmail = customer?.email || platformUser?.email || body.customerEmail || headerCustomerEmail || undefined;
-    const customerName = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || undefined;
+    const customerName = [customer?.firstName || customer?.first_name, customer?.lastName || customer?.last_name].filter(Boolean).join(' ') || undefined;
+
+    // Proof-of-inbox gate (migration 358): an operator-approval claim files
+    // a pending request immediately only when the claimant email is already
+    // proven — platform (Auth0) session, or a customer with
+    // email_verified=true. Body/header-supplied identity is self-asserted
+    // and never counts as verified.
+    const claimantEmailVerified =
+      !!platformUser || customer?.email_verified === true || customer?.emailVerified === true;
 
     // Claim-time owner verification (migration 274). Absent on OTP resends —
     // the service only requires it while the seed has no owner_verified_at.
@@ -641,6 +655,7 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
       claimantLastName,
       claimantPhone,
       claimantBusinessAddress,
+      claimantEmailVerified,
     } as any, verification);
 
     if (result.error) {
@@ -650,6 +665,8 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
         already_claimed: 409,
         verification_required: 400,
         verification_not_confirmed: 400,
+        claimant_email_required: 400,
+        email_send_failed: 502,
       };
       return res.status(statusMap[result.error] || 400).json({
         error: result.error,
@@ -662,6 +679,7 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
       verificationRequired: result.verificationRequired,
       sentTo: result.sentTo,
       operatorApprovalRequired: result.operatorApprovalRequired,
+      claimantVerificationRequired: result.claimantVerificationRequired,
       requestId: result.requestId,
       proposedCategories: result.proposedCategories,
     });
@@ -679,6 +697,11 @@ router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (r
     const { token } = req.params;
     if (!token || typeof token !== 'string') {
       return res.status(400).json({ error: 'token_required' });
+    }
+
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Please slow down.' });
     }
 
     // Auth: the caller must be authenticated. We accept both customer JWT
@@ -700,6 +723,10 @@ router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (r
       actorId: userId,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
+      customerEmail: customer?.email || platformUser?.email || (req.body || {}).customerEmail || req.get('x-customer-email') || undefined,
+      customerName: [customer?.firstName, customer?.lastName].filter(Boolean).join(' ')
+        || [platformUser?.firstName, platformUser?.lastName].filter(Boolean).join(' ')
+        || undefined,
     } as any, otpCode);
 
     if (!result.success) {
@@ -736,6 +763,57 @@ router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (r
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/claim/:token/accept] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/public/directory/claim-requests/verify — confirm the claimant's
+ * email and file the pending claim request for operator review
+ * (migration 358). The verification link is emailed by
+ * /claim/:token/initiate when the claim needs operator approval and the
+ * claimant's email isn't already proven.
+ */
+router.post('/claim-requests/verify', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'token_required' });
+    }
+
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    if (!checkDirectoryPresenceRateLimit(ip)) {
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Please slow down.' });
+    }
+
+    const result = await DirectoryClaimService.verifyClaimRequestEmail(token, {
+      ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        token_not_found: 404,
+        token_already_verified: 410,
+        token_expired: 410,
+        already_claimed: 409,
+      };
+      return res.status(statusMap[result.error!] || 400).json({
+        error: result.error,
+        claimToken: result.claimToken,
+      });
+    }
+
+    res.json({
+      success: true,
+      requestId: result.requestId,
+      claimToken: result.claimToken,
+      businessName: result.businessName,
+    });
+  } catch (error) {
+    logger.error('[POST /api/public/directory/claim-requests/verify] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

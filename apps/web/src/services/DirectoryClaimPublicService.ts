@@ -44,6 +44,15 @@ export interface DirectoryClaimSummary {
   isConsumed: boolean;
   expiresAt: string;
   consumedAt: string | null;
+  /** Latest operator-review state for this token — 'rejected' renders an
+   *  honest "not approved" state rather than the misleading Already Claimed
+   *  screen; 'pending' restores the review screen on revisit. */
+  claimRequestStatus?: 'pending' | 'approved' | 'rejected' | null;
+  /** A live claimant email verification exists for this token (migration
+   *  358) — restore the "check your email" screen on revisit. */
+  claimEmailVerificationPending?: boolean;
+  /** Masked email the live verification was sent to. */
+  claimVerificationSentTo?: string | null;
   /** Wedge-fidelity verdict (project-phase spec §4/§6). 'misaligned' routes
    *  the landing page to the inquiry path instead of the claim form. */
   seedFidelity?: 'aligned' | 'thin' | 'misaligned' | 'unknown';
@@ -95,6 +104,9 @@ export interface DirectoryClaimInitiateResult {
   verificationRequired?: boolean;
   sentTo?: string;
   operatorApprovalRequired?: boolean;
+  /** Claimant email confirmation needed before the request is filed —
+   *  a verification link was sent to `sentTo` (migration 358). */
+  claimantVerificationRequired?: boolean;
   /** True when the claim cannot initiate without the owner verification
    *  (categories + attributes consent gate, migration 274). */
   ownerVerificationRequired?: boolean;
@@ -281,6 +293,46 @@ export class DirectoryClaimPublicService extends PublicApiSingleton {
       return data?.patterns || [];
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * POST /api/public/directory/claim-requests/verify — confirm the
+   * claimant's email link (migration 358) and file the pending request.
+   * `claimToken` comes back so the page can link the claimant to their
+   * claim screen (proof upload, pending status).
+   */
+  async verifyClaimRequestEmail(
+    token: string,
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    requestId?: string;
+    claimToken?: string;
+    businessName?: string;
+  }> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/public/directory/claim-requests/verify',
+        {
+          method: 'POST',
+          body: JSON.stringify({ token }),
+        },
+        undefined,
+        0,
+      );
+
+      if (!result.success) {
+        const error = typeof result.error === 'string' ? result.error : 'unknown';
+        const data = result.data?.data ?? result.data;
+        return { success: false, error, claimToken: (data as any)?.claimToken };
+      }
+
+      const data = result.data?.data ?? result.data;
+      return (data as any) ?? { success: false, error: 'unknown' };
+    } catch (err: any) {
+      const body = err?.data || err?.body || {};
+      return { success: false, error: body?.error || err?.message || 'unknown', claimToken: body?.claimToken };
     }
   }
 

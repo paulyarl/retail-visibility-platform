@@ -39,6 +39,8 @@ import {
   IconSparkles,
   IconTag,
   IconPencil,
+  IconUser,
+  IconMail,
 } from '@tabler/icons-react';
 import { getCategoryUrl } from '@/utils/slug';
 import directoryClaimPublicService, {
@@ -51,7 +53,7 @@ import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeServi
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 
-type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'invalid' | 'misaligned' | 'success' | 'otp_sent' | 'pending_approval';
+type PageState = 'loading' | 'valid' | 'expired' | 'claimed' | 'rejected' | 'invalid' | 'misaligned' | 'success' | 'otp_sent' | 'email_sent' | 'pending_approval';
 
 /**
  * Best-effort platform (Auth0) session detection for success-screen CTAs.
@@ -128,10 +130,23 @@ export default function DirectoryClaimClient() {
         return;
       }
       setSummary(s);
-      if (s.isExpired) {
-        setState('expired');
+      if (s.claimRequestStatus === 'rejected') {
+        // Rejection consumes the token — check before isConsumed so the owner
+        // sees "not approved" rather than the misleading Already Claimed.
+        setState('rejected');
       } else if (s.isConsumed) {
         setState('claimed');
+      } else if (s.isExpired) {
+        setState('expired');
+      } else if (s.claimRequestStatus === 'pending') {
+        // Claimant revisiting while under review — restore the pending screen
+        // (proof upload + corrections) instead of the submit form.
+        setState('pending_approval');
+      } else if (s.claimEmailVerificationPending) {
+        // Claimant revisiting before clicking their emailed confirmation
+        // link (migration 358) — restore the "check your email" screen.
+        setSentTo(s.claimVerificationSentTo || null);
+        setState('email_sent');
       } else if (s.seedFidelity === 'misaligned') {
         setState('misaligned');
       } else {
@@ -194,7 +209,14 @@ export default function DirectoryClaimClient() {
         setSentTo(result.sentTo || null);
         setState('otp_sent');
       } else if (result.operatorApprovalRequired) {
-        setState('pending_approval');
+        if (result.claimantVerificationRequired) {
+          // Proof-of-inbox first (migration 358) — the request is only
+          // filed once the emailed confirmation link is clicked.
+          setSentTo(result.sentTo || null);
+          setState('email_sent');
+        } else {
+          setState('pending_approval');
+        }
       } else {
         // No verification required — proceed directly to accept
         await handleAccept();
@@ -385,9 +407,51 @@ export default function DirectoryClaimClient() {
               Someone&apos;s already claimed this listing. If this is your business and that
               wasn&apos;t you, reach out — we&apos;ll get it sorted.
             </Text>
-            <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
-              Back to Directory
-            </Button>
+            <Group gap="sm" justify="center">
+              {customer && (
+                <Button component={Link} href="/account" variant="light" leftSection={<IconUser size={16} />}>
+                  Go to My Account
+                </Button>
+              )}
+              <Button component={Link} href="/directory" variant="light" leftSection={<IconArrowLeft size={16} />}>
+                Back to Directory
+              </Button>
+            </Group>
+          </Stack>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (state === 'rejected') {
+    return (
+      <Container size="sm" className="py-12">
+        <Card withBorder shadow="sm" padding="xl" radius="md">
+          <Stack align="center" gap="md" ta="center">
+            <ThemeIcon size={56} radius="xl" color="red">
+              <IconAlertCircle size={28} />
+            </ThemeIcon>
+            <Title order={3}>Claim Not Approved</Title>
+            <Text c="dimmed">
+              We reviewed the claim request for <strong>{summary?.businessName}</strong> and
+              weren&apos;t able to verify ownership, so the listing stays unclaimed for now.
+              If you think that&apos;s a mistake — or you have more proof of ownership,
+              like a business license or utility bill — reach out and we&apos;ll take
+              another look.
+            </Text>
+            <Group gap="sm" justify="center">
+              <Button component={Link} href="/support" variant="light" leftSection={<IconShieldCheck size={16} />}>
+                Contact Support
+              </Button>
+              {customer && (
+                <Button component={Link} href="/account" variant="light" leftSection={<IconUser size={16} />}>
+                  Go to My Account
+                </Button>
+              )}
+              <Button component={Link} href="/directory" variant="subtle" leftSection={<IconArrowLeft size={16} />}>
+                Back to Directory
+              </Button>
+            </Group>
           </Stack>
         </Card>
       </Container>
@@ -472,7 +536,69 @@ export default function DirectoryClaimClient() {
               >
                 Resend code
               </Button>
+
+              <Button
+                component={Link}
+                href="/directory"
+                variant="subtle"
+                size="xs"
+                leftSection={<IconArrowLeft size={14} />}
+              >
+                Back to Directory
+              </Button>
             </Stack>
+          </Stack>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (state === 'email_sent') {
+    return (
+      <Container size="sm" className="py-12">
+        <Card withBorder shadow="sm" padding="xl" radius="md">
+          <Stack align="center" gap="md" ta="center">
+            <ThemeIcon size={56} radius="xl" color="blue">
+              <IconMail size={28} />
+            </ThemeIcon>
+            <Title order={3}>Check your email</Title>
+            <Text c="dimmed">
+              We sent a confirmation link{sentTo ? ` to ${sentTo}` : ' to your email'}.
+              Click it to submit your claim for <strong>{summary?.businessName}</strong> —
+              our team then reviews it, usually within 1–2 business days.
+            </Text>
+            <Text size="xs" c="dimmed">
+              The link expires in 24 hours. Didn&apos;t get it? Check spam, or resend below.
+            </Text>
+
+            {error && (
+              <Alert color="red" variant="light" w="100%">
+                {error === 'rate_limited'
+                  ? 'Too many attempts — please wait a moment and try again.'
+                  : error === 'email_send_failed'
+                    ? 'We could not send the confirmation email — please try again.'
+                    : error}
+              </Alert>
+            )}
+
+            <Button
+              variant="subtle"
+              size="xs"
+              onClick={handleInitiate}
+              loading={initiating}
+            >
+              Resend confirmation email
+            </Button>
+
+            <Button
+              component={Link}
+              href="/directory"
+              variant="subtle"
+              size="xs"
+              leftSection={<IconArrowLeft size={14} />}
+            >
+              Back to Directory
+            </Button>
           </Stack>
         </Card>
       </Container>
@@ -879,10 +1005,12 @@ export default function DirectoryClaimClient() {
               The owner's confirmed categories + attributes are minted on the
               business at claim submit and flow through to the listing. */}
           {summary && (
-            <ClaimVerificationPanel
-              summary={summary}
-              onChange={setVerification}
-            />
+            <div id="claim-verification">
+              <ClaimVerificationPanel
+                summary={summary}
+                onChange={setVerification}
+              />
+            </div>
           )}
 
           {/* Optional pre-claim corrections — the same optional-submission
@@ -920,8 +1048,8 @@ export default function DirectoryClaimClient() {
             </Text>
             <List size="sm" c="dimmed" spacing={4}>
               <List.Item>
-                We may email you a 6-digit code to confirm it&apos;s you, or our team may
-                review the claim — reviews usually take 1–2 business days.
+                We may email you a 6-digit code or a confirmation link to prove it&apos;s
+                you, or our team may review the claim — reviews usually take 1–2 business days.
               </List.Item>
               <List.Item>
                 If your claim goes to review, the confirmation screen lets you upload proof
@@ -1002,13 +1130,36 @@ export default function DirectoryClaimClient() {
                       ? 'This listing has already been claimed.'
                       : error === 'verification_required' || error === 'verification_not_confirmed'
                         ? 'Please review and confirm your business info above before claiming.'
-                        : 'Something went wrong. Please try again.'}
+                        : error === 'claimant_email_required'
+                          ? 'We need an email address on your account to send your confirmation link.'
+                          : error === 'rate_limited'
+                            ? 'Too many attempts — please wait a moment and try again.'
+                            : error === 'email_send_failed'
+                              ? 'We could not send the confirmation email — please try again.'
+                              : 'Something went wrong. Please try again.'}
                 </Alert>
               )}
               {!verification && (
-                <Text size="xs" c="dimmed" ta="center">
-                  Review and confirm your business info above to claim this listing.
-                </Text>
+                <Alert color="yellow" variant="light" icon={<IconAlertCircle size={16} />}>
+                  <Group justify="space-between" align="center" gap="sm">
+                    <Text size="sm">
+                      One step left — check the confirmation box in{' '}
+                      <strong>Verify your business info</strong> above to claim this listing.
+                    </Text>
+                    <Button
+                      variant="subtle"
+                      size="compact-sm"
+                      style={{ flexShrink: 0 }}
+                      onClick={() =>
+                        document
+                          .getElementById('claim-verification')
+                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
+                    >
+                      Take me there
+                    </Button>
+                  </Group>
+                </Alert>
               )}
               <Button
                 size="md"
@@ -1045,6 +1196,40 @@ export default function DirectoryClaimClient() {
               </Group>
             </Stack>
           )}
+
+          <Group justify="center" gap="xs">
+            {summary?.slug && (
+              <Button
+                component={Link}
+                href={`/place/${summary.slug}`}
+                variant="subtle"
+                size="xs"
+                leftSection={<IconMapPin size={14} />}
+              >
+                View this listing
+              </Button>
+            )}
+            {customer && (
+              <Button
+                component={Link}
+                href="/account"
+                variant="subtle"
+                size="xs"
+                leftSection={<IconUser size={14} />}
+              >
+                My Account
+              </Button>
+            )}
+            <Button
+              component={Link}
+              href="/directory"
+              variant="subtle"
+              size="xs"
+              leftSection={<IconArrowLeft size={14} />}
+            >
+              Back to Directory
+            </Button>
+          </Group>
 
           <Divider />
 

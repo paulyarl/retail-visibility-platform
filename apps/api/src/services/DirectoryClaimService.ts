@@ -16,7 +16,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
-import { generateUserId, generateUserTenantId, generateTenantKey, generateDirectoryClaimRequestId } from '../lib/id-generator';
+import { generateUserId, generateUserTenantId, generateTenantKey, generateDirectoryClaimRequestId, generateDirectoryClaimRequestVerificationId } from '../lib/id-generator';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { authService } from '../auth/auth.service';
 import { user_role } from '@prisma/client';
@@ -77,6 +77,13 @@ interface ClaimAuditCtx {
   claimantPhone?: string;
   /** Claimant's stated business address (optional, for cross-reference) */
   claimantBusinessAddress?: string;
+  /** True only for identity already proven elsewhere: platform (Auth0)
+   *  users, or customers whose email is verified (OAuth — password
+   *  customers register with email_verified=false). Anything else —
+   *  unverified customers, body/header-supplied identity, anonymous —
+   *  must confirm their email before a claim request is filed
+   *  (migration 358). */
+  claimantEmailVerified?: boolean;
 }
 
 export interface ClaimTokenSummary {
@@ -116,6 +123,17 @@ export interface ClaimTokenSummary {
   isConsumed: boolean;
   expiresAt: Date;
   consumedAt: Date | null;
+  /** Latest operator-review state for this token's claim request. 'rejected'
+   *  lets the claim page show an honest "not approved" state instead of the
+   *  misleading Already Claimed screen; 'pending' restores the review screen
+   *  for a claimant revisiting their link. */
+  claimRequestStatus: 'pending' | 'approved' | 'rejected' | null;
+  /** A live claimant email verification exists for this token (migration
+   *  358) — the claim page restores the "check your email" screen on
+   *  revisit instead of the submit form. */
+  claimEmailVerificationPending: boolean;
+  /** Masked email the live verification was sent to (e.g. j***@gmail.com). */
+  claimVerificationSentTo: string | null;
   /** Wedge-fidelity verdict (project-phase spec §4/§6). 'misaligned' tells the
    *  claim landing page to render the inquiry path instead of the claim form —
    *  a stale link degrades safely rather than inviting a claim on bad data. */
@@ -181,6 +199,11 @@ export interface InitiateClaimResult {
   verificationRequired: boolean;
   sentTo?: string;
   operatorApprovalRequired?: boolean;
+  /** True when the claim request is held until the claimant clicks the
+   *  email confirmation link — proof-of-inbox before the request reaches
+   *  the operator queue (migration 358). `sentTo` carries the masked
+   *  target. */
+  claimantVerificationRequired?: boolean;
   requestId?: string;
   /** True when the claim cannot proceed because the owner has not yet
    *  submitted the required business-info verification (categories +
@@ -244,6 +267,31 @@ class DirectoryClaimService {
     const now = new Date();
     const expiresAt = new Date(r.expires_at);
 
+    // Latest operator-review state for this token — a rejected request leaves
+    // the token consumed (revoked), which is indistinguishable from a real
+    // claim without this status.
+    const requestRows = await prisma.$queryRaw<any[]>`
+      SELECT status FROM directory_claim_requests
+      WHERE token_id = ${r.token_id}
+      ORDER BY submitted_at DESC
+      LIMIT 1
+    `;
+    const claimRequestStatus = ['pending', 'approved', 'rejected'].includes(requestRows[0]?.status)
+      ? (requestRows[0].status as 'pending' | 'approved' | 'rejected')
+      : null;
+
+    // Live claimant email verification (migration 358) — restores the
+    // "check your email" screen for a claimant revisiting their link.
+    const verificationRows = await prisma.$queryRaw<any[]>`
+      SELECT claimant_email FROM directory_claim_request_verifications
+      WHERE token_id = ${r.token_id}
+        AND verified = FALSE
+        AND expires_at > now()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    const pendingVerification = verificationRows[0] ?? null;
+
     return {
       seedId: r.seed_id,
       tenantId: r.tenant_id,
@@ -284,6 +332,9 @@ class DirectoryClaimService {
       isConsumed: !!r.consumed_at,
       expiresAt,
       consumedAt: r.consumed_at ? new Date(r.consumed_at) : null,
+      claimRequestStatus,
+      claimEmailVerificationPending: !!pendingVerification,
+      claimVerificationSentTo: pendingVerification ? this.maskTarget(pendingVerification.claimant_email) : null,
       seedFidelity: ['aligned', 'thin', 'misaligned', 'unknown'].includes(r.seed_fidelity)
         ? r.seed_fidelity
         : 'unknown',
@@ -442,131 +493,40 @@ class DirectoryClaimService {
 
     // No verification required — check if operator approval is needed
     if (r.operator_approval_required) {
-      // Persist a pending claim request so operators can review it.
-      // Idempotent: if a pending request already exists for this token,
-      // return the existing one rather than creating a duplicate.
-      const existing = await prisma.$queryRaw<any[]>`
-        SELECT id FROM directory_claim_requests
-        WHERE token_id = ${r.token_id} AND status = 'pending'
-        LIMIT 1
-      `;
-
-      let requestId: string;
-      if (existing[0]) {
-        requestId = existing[0].id;
-      } else {
-        requestId = generateDirectoryClaimRequestId(r.tenant_id);
-        await prisma.$executeRaw`
-          INSERT INTO directory_claim_requests (
-            id, seed_id, tenant_id, token_id,
-            customer_id, customer_email, customer_name,
-            claimant_first_name, claimant_middle_name, claimant_last_name,
-            claimant_phone, claimant_business_address,
-            status, submitted_at
-          ) VALUES (
-            ${requestId},
-            ${r.seed_id},
-            ${r.tenant_id},
-            ${r.token_id},
-            ${ctx?.actorId || null},
-            ${ctx?.customerEmail || null},
-            ${ctx?.customerName || null},
-            ${ctx?.claimantFirstName || null},
-            ${ctx?.claimantMiddleName || null},
-            ${ctx?.claimantLastName || null},
-            ${ctx?.claimantPhone || null},
-            ${ctx?.claimantBusinessAddress || null},
-            'pending',
-            now()
-          )
-        `;
-
-        // Fire a platform-scoped CRM alert so operators see it in their feed
-        try {
-          const { generateCrmAlertId } = await import('../lib/id-generator.js');
-          await prisma.$executeRaw`
-            INSERT INTO crm_alerts (
-              id, tenant_id, type, title, body, icon, is_read, is_dismissed, metadata, created_at
-            ) VALUES (
-              ${generateCrmAlertId(PLATFORM_SCOPE)},
-              ${PLATFORM_SCOPE},
-              'directory_claim_pending',
-              'Pending directory claim request',
-              ${`A business owner has submitted a claim request for a directory listing.\n\nClaimant: ${[ctx?.claimantFirstName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}\nEmail: ${ctx?.customerEmail || '—'}\nPhone: ${ctx?.claimantPhone || '—'}\n\nReview and approve at Settings → Directory → Presence Seeds.`},
-              'clock',
-              false,
-              false,
-              ${JSON.stringify({ requestId, seedId: r.seed_id, tenantId: r.tenant_id, claimantEmail: ctx?.customerEmail, claimantPhone: ctx?.claimantPhone })}::jsonb,
-              now()
-            )
-          `;
-        } catch (alertErr) {
-          logger.error('DirectoryClaimService.initiateClaim — CRM alert insert failed', undefined, {
-            error: (alertErr as Error).message,
-          });
-          // Non-fatal — the request row is already persisted
+      // Claimant email must be proven before a request enters the operator
+      // queue (migration 358): platform users and customers with
+      // email_verified=true are already proven; everyone else confirms
+      // their inbox via a verification link — the pending request (and its
+      // operator notifications) only exists after that click. Self-asserted
+      // body/header identity is NOT proof — ctx.claimantEmailVerified is
+      // only set for middleware- or JWT-verified identity.
+      if (ctx?.claimantEmailVerified !== true) {
+        const claimantEmail = ctx?.customerEmail?.trim().toLowerCase();
+        if (!claimantEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(claimantEmail)) {
+          return {
+            verificationRequired: false,
+            error: 'claimant_email_required',
+            proposedCategories,
+          };
         }
-
-        // Also create a CRM support ticket so the claim appears in the
-        // operator's Admin CRM dashboard (requests / tickets / dashboard stats).
         try {
-          const listingRows = await prisma.$queryRaw<any[]>`
-            SELECT dl.business_name FROM directory_presence_seeds dps
-            JOIN directory_listings_list dl ON dl.id = dps.listing_id
-            WHERE dps.id = ${r.seed_id}
-            LIMIT 1
-          `;
-          const businessName = listingRows[0]?.business_name || 'Unknown Business';
-
-          const ticket = await CrmTicketService.getInstance().create({
-            tenant_id: PLATFORM_SCOPE,
-            title: `Directory listing claim request: ${businessName}`,
-            description: `A business owner submitted a claim request for a directory listing.
-
-Business: ${businessName}
-Seed ID: ${r.seed_id}
-Tenant ID: ${r.tenant_id}
-Request ID: ${requestId}
-Claimant: ${[ctx?.claimantFirstName, ctx?.claimantMiddleName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}
-Email: ${ctx?.customerEmail || '—'}
-Phone: ${ctx?.claimantPhone || '—'}
-Stated address: ${ctx?.claimantBusinessAddress || '—'}
-
-Review at Settings → Directory → Presence Seeds.`,
-            priority: 'high',
-            category: 'directory_claim',
-            inquiry_id: requestId,
+          await this.createOrResendClaimVerification(r, claimantEmail, ctx);
+        } catch (err) {
+          logger.error('DirectoryClaimService.initiateClaim — claim verification email failed', undefined, {
+            error: (err as Error).message,
           });
-
-          await CrmTicketMessageService.getInstance().create({
-            ticket_id: ticket.id,
-            author_id: 'system',
-            author_type: 'platform',
-            author_name: 'Directory Claims',
-            content_blocks: {
-              version: '1',
-              blocks: [
-                { type: 'paragraph', text: `A business owner submitted a claim request for ${businessName}.` },
-                { type: 'paragraph', text: `Request ID: ${requestId} · Seed: ${r.seed_id}` },
-                { type: 'button', label: 'Review claim in Presence Seeds', url: '/settings/admin/directory/presence-seeds', variant: 'primary' },
-              ],
-            },
-          });
-        } catch (ticketErr) {
-          logger.error('DirectoryClaimService.initiateClaim — CRM support ticket creation failed', undefined, {
-            error: (ticketErr as Error).message,
-          });
-          // Non-fatal — the request row is already persisted
+          return { verificationRequired: false, error: 'email_send_failed' };
         }
-
-        audit({
-          actor: ctx?.actorId,
-          actorType: ctx?.actorType,
-          action: 'directory_claim.submit_approval_request',
-          payload: { seedId: r.seed_id, tenantId: r.tenant_id, tokenId: r.token_id, requestId },
-        });
+        return {
+          verificationRequired: false,
+          operatorApprovalRequired: true,
+          claimantVerificationRequired: true,
+          sentTo: this.maskTarget(claimantEmail),
+          proposedCategories,
+        };
       }
 
+      const { requestId } = await this.findOrCreateClaimRequest(r, ctx, 'Claimant email verified (account).');
       return {
         verificationRequired: false,
         operatorApprovalRequired: true,
@@ -577,6 +537,362 @@ Review at Settings → Directory → Presence Seeds.`,
 
     // No verification, no approval — direct claim
     return { verificationRequired: false, proposedCategories };
+  }
+
+  /**
+   * Persist a pending claim request for operator review and notify
+   * operators (platform CRM alert + Requests-Hub ticket). Idempotent: an
+   * existing pending request for the token is returned rather than
+   * duplicated, and notifications only fire for a new request.
+   *
+   * Called from initiateClaim (already-verified claimants) and from
+   * verifyClaimRequestEmail (post proof-of-inbox, migration 358).
+   */
+  private async findOrCreateClaimRequest(
+    claim: { seed_id: string; tenant_id: string; token_id: string },
+    ctx?: ClaimAuditCtx,
+    verificationNote?: string,
+  ): Promise<{ requestId: string; isNew: boolean }> {
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT id FROM directory_claim_requests
+      WHERE token_id = ${claim.token_id} AND status = 'pending'
+      LIMIT 1
+    `;
+
+    if (existing[0]) {
+      return { requestId: existing[0].id, isNew: false };
+    }
+
+    const requestId = generateDirectoryClaimRequestId(claim.tenant_id);
+    await prisma.$executeRaw`
+      INSERT INTO directory_claim_requests (
+        id, seed_id, tenant_id, token_id,
+        customer_id, customer_email, customer_name,
+        claimant_first_name, claimant_middle_name, claimant_last_name,
+        claimant_phone, claimant_business_address,
+        status, submitted_at
+      ) VALUES (
+        ${requestId},
+        ${claim.seed_id},
+        ${claim.tenant_id},
+        ${claim.token_id},
+        ${ctx?.actorId || null},
+        ${ctx?.customerEmail || null},
+        ${ctx?.customerName || null},
+        ${ctx?.claimantFirstName || null},
+        ${ctx?.claimantMiddleName || null},
+        ${ctx?.claimantLastName || null},
+        ${ctx?.claimantPhone || null},
+        ${ctx?.claimantBusinessAddress || null},
+        'pending',
+        now()
+      )
+    `;
+
+    // Fire a platform-scoped CRM alert so operators see it in their feed
+    try {
+      const { generateCrmAlertId } = await import('../lib/id-generator.js');
+      await prisma.$executeRaw`
+        INSERT INTO crm_alerts (
+          id, tenant_id, type, title, body, icon, is_read, is_dismissed, metadata, created_at
+        ) VALUES (
+          ${generateCrmAlertId(PLATFORM_SCOPE)},
+          ${PLATFORM_SCOPE},
+          'directory_claim_pending',
+          'Pending directory claim request',
+          ${`A business owner has submitted a claim request for a directory listing.\n\nClaimant: ${[ctx?.claimantFirstName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}\nEmail: ${ctx?.customerEmail || '—'}\nPhone: ${ctx?.claimantPhone || '—'}${verificationNote ? `\n${verificationNote}` : ''}\n\nReview and approve at Settings → Directory → Presence Seeds.`},
+          'clock',
+          false,
+          false,
+          ${JSON.stringify({ requestId, seedId: claim.seed_id, tenantId: claim.tenant_id, claimantEmail: ctx?.customerEmail, claimantPhone: ctx?.claimantPhone })}::jsonb,
+          now()
+        )
+      `;
+    } catch (alertErr) {
+      logger.error('DirectoryClaimService.findOrCreateClaimRequest — CRM alert insert failed', undefined, {
+        error: (alertErr as Error).message,
+      });
+      // Non-fatal — the request row is already persisted
+    }
+
+    // Also create a CRM support ticket so the claim appears in the
+    // operator's Admin CRM dashboard (requests / tickets / dashboard stats).
+    try {
+      const listingRows = await prisma.$queryRaw<any[]>`
+        SELECT dl.business_name FROM directory_presence_seeds dps
+        JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dps.id = ${claim.seed_id}
+        LIMIT 1
+      `;
+      const businessName = listingRows[0]?.business_name || 'Unknown Business';
+
+      const ticket = await CrmTicketService.getInstance().create({
+        tenant_id: PLATFORM_SCOPE,
+        title: `Directory listing claim request: ${businessName}`,
+        description: `A business owner submitted a claim request for a directory listing.
+
+Business: ${businessName}
+Seed ID: ${claim.seed_id}
+Tenant ID: ${claim.tenant_id}
+Request ID: ${requestId}
+Claimant: ${[ctx?.claimantFirstName, ctx?.claimantMiddleName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}
+Email: ${ctx?.customerEmail || '—'}
+Phone: ${ctx?.claimantPhone || '—'}
+Stated address: ${ctx?.claimantBusinessAddress || '—'}${verificationNote ? `\n${verificationNote}` : ''}
+
+Review at Settings → Directory → Presence Seeds.`,
+        priority: 'high',
+        category: 'directory_claim',
+        inquiry_id: requestId,
+      });
+
+      await CrmTicketMessageService.getInstance().create({
+        ticket_id: ticket.id,
+        author_id: 'system',
+        author_type: 'platform',
+        author_name: 'Directory Claims',
+        content_blocks: {
+          version: '1',
+          blocks: [
+            { type: 'paragraph', text: `A business owner submitted a claim request for ${businessName}.` },
+            { type: 'paragraph', text: `Request ID: ${requestId} · Seed: ${claim.seed_id}` },
+            { type: 'button', label: 'Review claim in Presence Seeds', url: '/settings/admin/directory/presence-seeds', variant: 'primary' },
+          ],
+        },
+      });
+    } catch (ticketErr) {
+      logger.error('DirectoryClaimService.findOrCreateClaimRequest — CRM support ticket creation failed', undefined, {
+        error: (ticketErr as Error).message,
+      });
+      // Non-fatal — the request row is already persisted
+    }
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_claim.submit_approval_request',
+      payload: { seedId: claim.seed_id, tenantId: claim.tenant_id, tokenId: claim.token_id, requestId },
+    });
+
+    return { requestId, isNew: true };
+  }
+
+  /**
+   * Create (or resend) a claimant-email verification for an
+   * operator-approval claim (migration 358). The pending claim request is
+   * only filed by verifyClaimRequestEmail after the claimant proves inbox
+   * access — self-asserted contact info never reaches the operator queue.
+   * Repeat initiates resend the live verification for the same
+   * token + email rather than minting a fresh one.
+   */
+  private async createOrResendClaimVerification(
+    claim: { token_id: string; seed_id: string; tenant_id: string },
+    claimantEmail: string,
+    ctx?: ClaimAuditCtx,
+  ): Promise<void> {
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT id, token FROM directory_claim_request_verifications
+      WHERE token_id = ${claim.token_id}
+        AND claimant_email = ${claimantEmail}
+        AND verified = FALSE
+        AND expires_at > now()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    let verifyToken: string;
+    if (existing[0]) {
+      verifyToken = existing[0].token;
+    } else {
+      verifyToken = crypto.randomBytes(32).toString('hex');
+      const verificationId = generateDirectoryClaimRequestVerificationId(claim.tenant_id);
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const payload = {
+        customerId: ctx?.actorId ?? null,
+        customerName: ctx?.customerName ?? null,
+        claimantFirstName: ctx?.claimantFirstName ?? null,
+        claimantMiddleName: ctx?.claimantMiddleName ?? null,
+        claimantLastName: ctx?.claimantLastName ?? null,
+        claimantPhone: ctx?.claimantPhone ?? null,
+        claimantBusinessAddress: ctx?.claimantBusinessAddress ?? null,
+      };
+
+      await prisma.$executeRaw`
+        INSERT INTO directory_claim_request_verifications (
+          id, token, token_id, seed_id, tenant_id, claimant_email,
+          payload, verified, expires_at, created_at, updated_at
+        ) VALUES (
+          ${verificationId},
+          ${verifyToken},
+          ${claim.token_id},
+          ${claim.seed_id},
+          ${claim.tenant_id},
+          ${claimantEmail},
+          ${JSON.stringify(payload)}::jsonb,
+          FALSE,
+          ${expiresAt},
+          now(),
+          now()
+        )
+      `;
+    }
+
+    const nameRows = await prisma.$queryRaw<any[]>`
+      SELECT dl.business_name FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${claim.seed_id}
+      LIMIT 1
+    `;
+    const businessName = nameRows[0]?.business_name || 'your listing';
+
+    await this.sendClaimVerificationEmail(claimantEmail, verifyToken, businessName);
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_claim.request_email_verification',
+      payload: { seedId: claim.seed_id, tenantId: claim.tenant_id, tokenId: claim.token_id, claimantEmail: this.maskTarget(claimantEmail) },
+    });
+  }
+
+  /**
+   * Email the claimant a confirmation link for their pending claim
+   * request. Mirrors DirectoryOwnerSubmissionService.sendVerificationEmail.
+   * Throws on send failure — initiateClaim maps it to email_send_failed
+   * (the verification row persists, so a resend retry reuses it).
+   */
+  private async sendClaimVerificationEmail(
+    to: string,
+    verifyToken: string,
+    businessName: string,
+  ): Promise<void> {
+    const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+    const verifyUrl = `${baseUrl}/directory/claim-verify?token=${encodeURIComponent(verifyToken)}`;
+
+    const html = `
+      <h1>Confirm your claim request</h1>
+      <p>You requested to claim <strong>${businessName}</strong> on the directory.</p>
+      <p>Click the link below to confirm your email and submit the claim for review:</p>
+      <p><a href="${verifyUrl}" style="padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">Confirm my claim</a></p>
+      <p>Or copy and paste this URL into your browser:</p>
+      <p><code>${verifyUrl}</code></p>
+      <p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>
+    `;
+
+    const text = `Confirm your claim request for ${businessName}: ${verifyUrl} (expires in 24 hours)`;
+
+    const { emailService } = await import('../services/email-service.js');
+    await emailService.sendEmail({
+      to,
+      subject: 'Confirm your listing claim request',
+      html,
+      text,
+    } as any);
+  }
+
+  /**
+   * Confirm a claimant's email verification link and file the pending
+   * claim request (migration 358). Mirrors
+   * DirectoryOwnerSubmissionService.verifyToken — the request row and its
+   * operator notifications only exist after proof-of-inbox.
+   */
+  async verifyClaimRequestEmail(
+    verifyToken: string,
+    ctx?: ClaimAuditCtx,
+  ): Promise<{
+    success: boolean;
+    requestId?: string;
+    claimToken?: string;
+    businessName?: string;
+    error?: string;
+  }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        v.id,
+        v.token_id,
+        v.seed_id,
+        v.tenant_id,
+        v.claimant_email,
+        v.payload,
+        v.verified,
+        v.expires_at,
+        dct.token AS claim_token,
+        dct.consumed_at,
+        dct.single_use,
+        dct.expires_at AS claim_expires_at,
+        dps.status AS seed_status,
+        dl.business_name
+      FROM directory_claim_request_verifications v
+      JOIN directory_claim_tokens dct ON dct.id = v.token_id
+      JOIN directory_presence_seeds dps ON dps.id = v.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE v.token = ${verifyToken}
+      LIMIT 1
+    `;
+
+    if (!rows[0]) {
+      return { success: false, error: 'token_not_found' };
+    }
+
+    const v = rows[0];
+    const now = new Date();
+
+    if (v.verified) {
+      return { success: false, error: 'token_already_verified', claimToken: v.claim_token, businessName: v.business_name };
+    }
+    if (now > new Date(v.expires_at)) {
+      return { success: false, error: 'token_expired' };
+    }
+    if (v.seed_status === 'claimed' || (v.consumed_at && v.single_use)) {
+      return { success: false, error: 'already_claimed' };
+    }
+    if (now > new Date(v.claim_expires_at)) {
+      return { success: false, error: 'token_expired' };
+    }
+
+    await prisma.$executeRaw`
+      UPDATE directory_claim_request_verifications
+      SET verified = TRUE, verified_at = now(), updated_at = now()
+      WHERE id = ${v.id}
+    `;
+
+    const payload = (v.payload ?? {}) as Record<string, any>;
+    const { requestId } = await this.findOrCreateClaimRequest(
+      { seed_id: v.seed_id, tenant_id: v.tenant_id, token_id: v.token_id },
+      {
+        actorType: 'customer',
+        actorId: payload.customerId ?? undefined,
+        customerEmail: v.claimant_email,
+        customerName: payload.customerName ?? undefined,
+        claimantFirstName: payload.claimantFirstName ?? undefined,
+        claimantMiddleName: payload.claimantMiddleName ?? undefined,
+        claimantLastName: payload.claimantLastName ?? undefined,
+        claimantPhone: payload.claimantPhone ?? undefined,
+        claimantBusinessAddress: payload.claimantBusinessAddress ?? undefined,
+        ip: ctx?.ip,
+        userAgent: ctx?.userAgent,
+      },
+      'Claimant email verified via confirmation link.',
+    );
+
+    audit({
+      actor: payload.customerId ?? undefined,
+      actorType: 'customer',
+      action: 'directory_claim.verify_email',
+      payload: { seedId: v.seed_id, tenantId: v.tenant_id, tokenId: v.token_id, requestId },
+    });
+
+    logger.info('DirectoryClaimService.verifyClaimRequestEmail — claimant email verified', undefined, {
+      seedId: v.seed_id,
+      requestId,
+    });
+
+    return {
+      success: true,
+      requestId,
+      claimToken: v.claim_token,
+      businessName: v.business_name,
+    };
   }
 
   /**
@@ -1135,6 +1451,18 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     // tenant_id/customer_id backfill + repair_fulfillment.seed_claimed stamp.
     await this.propagateClaimToLinkedCampaigns(r.seed_id, r.tenant_id, platformUserId);
 
+    // Post-claim notifications — operator Requests-Hub alert + owner
+    // welcome email. Non-fatal: failures are logged inside the helper.
+    await this.sendClaimSuccessNotifications({
+      seedId: r.seed_id,
+      tenantId: r.tenant_id,
+      claimPath: 'self_serve',
+      customerId: isCustomer ? userId : null,
+      platformUserId,
+      ownerEmail: ctx?.customerEmail,
+      ownerName: ctx?.customerName,
+    });
+
     // Embed the gateway upgrade preview so the claim success screen can
     // render the Entry Presence mode cards without a platform (Auth0)
     // session (claim handoff spec). A failure here must never fail the claim.
@@ -1380,6 +1708,8 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         dcr.tenant_id,
         dcr.token_id,
         dcr.customer_id,
+        dcr.customer_email,
+        dcr.customer_name,
         dcr.status,
         dct.expires_at,
         dct.consumed_at,
@@ -1529,11 +1859,24 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         });
     }
 
+    // Post-claim notifications — operator Requests-Hub alert + owner
+    // welcome email. Non-fatal: failures are logged inside the helper.
+    await this.sendClaimSuccessNotifications({
+      seedId: r.seed_id,
+      tenantId: r.tenant_id,
+      claimPath: 'operator_approved',
+      requestId,
+      customerId: r.customer_id,
+      platformUserId,
+      ownerEmail: r.customer_email,
+      ownerName: r.customer_name,
+    });
+
     audit({
       actor: adminUserId,
       actorType: 'user',
       action: 'directory_claim.approve_request',
-      payload: { requestId, seedId: r.seed_id, tenantId: r.tenant_id, customerId: r.customer_id, platformUserId },
+      payload: { requestId, seedId: r.seedId, tenantId: r.tenant_id, customerId: r.customer_id, platformUserId },
     });
 
     logger.info('DirectoryClaimService.approveClaimRequest', undefined, {
@@ -1563,10 +1906,15 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     ctx?: ClaimAuditCtx,
   ): Promise<{ success: boolean; message: string }> {
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT id, token_id, tenant_id, seed_id, status
-      FROM directory_claim_requests
-      WHERE id = ${requestId}
-      FOR UPDATE
+      SELECT dcr.id, dcr.token_id, dcr.tenant_id, dcr.seed_id, dcr.status,
+             dcr.customer_email, dcr.customer_name,
+             dcr.claimant_first_name, dcr.claimant_last_name,
+             dl.business_name, dps.city, dps.state
+      FROM directory_claim_requests dcr
+      JOIN directory_presence_seeds dps ON dps.id = dcr.seed_id
+      LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dcr.id = ${requestId}
+      FOR UPDATE OF dcr
     `;
 
     if (!rows[0]) {
@@ -1596,6 +1944,38 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
 
     // Close the linked CRM support ticket
     await this.closeClaimTicket(requestId, 'closed');
+
+    // Claimant notification — rejection was previously silent; the claimant's
+    // only signal was the claim link dying. Non-fatal: a mail failure must
+    // not roll back the rejection.
+    if (r.customer_email) {
+      try {
+        const { getDirectoryClaimEmailService } = await import('./email/DirectoryClaimEmailService.js');
+        const ownerName =
+          r.customer_name ||
+          [r.claimant_first_name, r.claimant_last_name].filter(Boolean).join(' ') ||
+          null;
+        const result = await getDirectoryClaimEmailService().sendClaimRejectedEmail({
+          to: r.customer_email,
+          ownerName,
+          businessName: r.business_name || 'your listing',
+          city: r.city,
+          state: r.state,
+          requestId,
+        });
+        logger.info('DirectoryClaimService.rejectClaimRequest — rejection email', undefined, {
+          requestId,
+          seedId: r.seed_id,
+          sent: result.success,
+        });
+      } catch (emailErr) {
+        logger.error('DirectoryClaimService.rejectClaimRequest — rejection email failed', undefined, {
+          requestId,
+          seedId: r.seed_id,
+          error: (emailErr as Error).message,
+        });
+      }
+    }
 
     audit({
       actor: adminUserId,
@@ -1776,6 +2156,191 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         error: (err as Error).message,
         requestId,
         status,
+      });
+    }
+  }
+
+  /**
+   * Post-claim notifications — the backend actions that fire once a claim
+   * has fully completed (both paths: self-serve accept + operator approval).
+   *
+   *   1. Operator alert — a platform-scope crm_alerts row + a CRM support
+   *      ticket so the claim lands in the operator Requests Hub at
+   *      /settings/admin/crm/requests (same inbox pattern the pending-claim
+   *      and category-proposal paths use).
+   *   2. Owner welcome email — a congratulations email to the claimant's
+   *      email address when one is known.
+   *
+   * Owner contact resolution order: explicit params (route ctx / request
+   * row) → the promoted platform user → the customer row.
+   *
+   * Fully non-fatal — every step is individually guarded so a notification
+   * failure can never roll back a completed claim.
+   */
+  private async sendClaimSuccessNotifications(params: {
+    seedId: string;
+    tenantId: string;
+    claimPath: 'self_serve' | 'operator_approved';
+    requestId?: string;
+    customerId?: string | null;
+    platformUserId?: string;
+    ownerEmail?: string | null;
+    ownerName?: string | null;
+  }): Promise<void> {
+    const { seedId, tenantId, claimPath, requestId } = params;
+
+    // Listing display info for the alert + email copy.
+    let businessName = 'Unknown Business';
+    let slug: string | null = null;
+    let category: string | null = null;
+    let city: string | null = null;
+    let state: string | null = null;
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT dl.business_name, dl.slug, dps.category, dps.city, dps.state
+        FROM directory_presence_seeds dps
+        JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dps.id = ${seedId}
+        LIMIT 1
+      `;
+      if (rows[0]) {
+        businessName = rows[0].business_name || businessName;
+        slug = rows[0].slug ?? null;
+        category = rows[0].category ?? null;
+        city = rows[0].city ?? null;
+        state = rows[0].state ?? null;
+      }
+    } catch (err) {
+      logger.warn('DirectoryClaimService.sendClaimSuccessNotifications — listing lookup failed', undefined, {
+        seedId,
+        error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err) },
+      });
+    }
+
+    // Resolve the claimant's email + name (params → platform user → customer).
+    let ownerEmail = params.ownerEmail || null;
+    let ownerName = params.ownerName || null;
+    try {
+      if ((!ownerEmail || !ownerName) && params.platformUserId) {
+        const rows = await prisma.$queryRaw<any[]>`
+          SELECT email, first_name, last_name FROM users WHERE id = ${params.platformUserId} LIMIT 1
+        `;
+        if (rows[0]) {
+          ownerEmail = ownerEmail || rows[0].email || null;
+          ownerName = ownerName || [rows[0].first_name, rows[0].last_name].filter(Boolean).join(' ') || null;
+        }
+      }
+      if ((!ownerEmail || !ownerName) && params.customerId) {
+        const rows = await prisma.$queryRaw<any[]>`
+          SELECT email, first_name, last_name FROM customers WHERE id = ${params.customerId} LIMIT 1
+        `;
+        if (rows[0]) {
+          ownerEmail = ownerEmail || rows[0].email || null;
+          ownerName = ownerName || [rows[0].first_name, rows[0].last_name].filter(Boolean).join(' ') || null;
+        }
+      }
+    } catch (err) {
+      logger.warn('DirectoryClaimService.sendClaimSuccessNotifications — contact lookup failed', undefined, {
+        seedId,
+        error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err) },
+      });
+    }
+
+    // ── Operator alert: platform-scope crm_alerts row ──────────────────
+    try {
+      const { generateCrmAlertId } = await import('../lib/id-generator.js');
+      await prisma.$executeRaw`
+        INSERT INTO crm_alerts (
+          id, tenant_id, type, title, body, icon, is_read, is_dismissed, metadata, created_at
+        ) VALUES (
+          ${generateCrmAlertId(PLATFORM_SCOPE)},
+          ${PLATFORM_SCOPE},
+          'directory_claim_completed',
+          'Directory listing claimed',
+          ${`A business owner claimed their directory listing.\n\nBusiness: ${businessName}\nOwner: ${ownerName || '—'}\nEmail: ${ownerEmail || '—'}\n\nView the seed at Settings → Directory → Presence Seeds.`},
+          'check',
+          false,
+          false,
+          ${JSON.stringify({ seedId, tenantId, requestId, claimPath, ownerEmail, ownerName })}::jsonb,
+          now()
+        )
+      `;
+    } catch (alertErr) {
+      logger.error('DirectoryClaimService.sendClaimSuccessNotifications — CRM alert insert failed', undefined, {
+        error: (alertErr as Error).message,
+      });
+    }
+
+    // ── Operator alert: Requests-Hub work item ─────────────────────────
+    try {
+      const ticket = await CrmTicketService.getInstance().create({
+        tenant_id: PLATFORM_SCOPE,
+        title: `Directory listing claimed: ${businessName}`,
+        description: `A business owner claimed their directory listing.
+
+Business: ${businessName}
+Seed ID: ${seedId}
+Tenant ID: ${tenantId}
+Claim path: ${claimPath === 'operator_approved' ? 'Operator approved' : 'Self-serve (owner accepted)'}
+Owner: ${ownerName || '—'}
+Email: ${ownerEmail || '—'}
+
+View the seed at Settings → Directory → Presence Seeds.`,
+        priority: 'medium',
+        category: 'directory_claim',
+        inquiry_id: requestId || seedId,
+      });
+
+      await CrmTicketMessageService.getInstance().create({
+        ticket_id: ticket.id,
+        author_id: 'system',
+        author_type: 'platform',
+        author_name: 'Directory Claims',
+        content_blocks: {
+          version: '1',
+          blocks: [
+            { type: 'paragraph', text: `${businessName} was claimed by ${ownerName || 'the business owner'}${ownerEmail ? ` (${ownerEmail})` : ''}.` },
+            { type: 'paragraph', text: `Seed: ${seedId} · Tenant: ${tenantId}` },
+            { type: 'button', label: 'View claimed seed', url: `/settings/admin/directory/presence-seeds/${seedId}`, variant: 'primary' },
+          ],
+        },
+      });
+    } catch (ticketErr) {
+      logger.error('DirectoryClaimService.sendClaimSuccessNotifications — CRM ticket create failed', undefined, {
+        error: (ticketErr as Error).message,
+      });
+    }
+
+    // ── Owner welcome email ────────────────────────────────────────────
+    if (ownerEmail) {
+      try {
+        const { getDirectoryClaimEmailService } = await import('./email/DirectoryClaimEmailService.js');
+        const result = await getDirectoryClaimEmailService().sendClaimWelcomeEmail({
+          to: ownerEmail,
+          ownerName,
+          businessName,
+          category,
+          city,
+          state,
+          slug,
+          tenantId,
+        });
+        logger.info('DirectoryClaimService.sendClaimSuccessNotifications — welcome email', undefined, {
+          seedId,
+          tenantId,
+          sent: result.success,
+        });
+      } catch (emailErr) {
+        logger.error('DirectoryClaimService.sendClaimSuccessNotifications — welcome email failed', undefined, {
+          error: (emailErr as Error).message,
+          seedId,
+          tenantId,
+        });
+      }
+    } else {
+      logger.info('DirectoryClaimService.sendClaimSuccessNotifications — no claimant email, welcome email skipped', undefined, {
+        seedId,
+        tenantId,
       });
     }
   }

@@ -596,7 +596,7 @@ export async function authenticateCustomer(req: Request, res: Response, next: Ne
     const { prisma } = await import('../prisma');
     const customer = await prisma.customers.findUnique({
       where: { id: payload.customerId },
-      select: { id: true, email: true, first_name: true, last_name: true, phone: true }
+      select: { id: true, email: true, first_name: true, last_name: true, phone: true, email_verified: true }
     });
 
     if (!customer) {
@@ -638,7 +638,7 @@ export async function optionalCustomerAuth(req: Request, res: Response, next: Ne
     const { prisma } = await import('../prisma');
     const customer = await prisma.customers.findUnique({
       where: { id: payload.customerId },
-      select: { id: true, email: true, first_name: true, last_name: true, phone: true }
+      select: { id: true, email: true, first_name: true, last_name: true, phone: true, email_verified: true }
     });
 
     if (customer) {
