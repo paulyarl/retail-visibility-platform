@@ -241,6 +241,16 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
             <span aria-hidden>·</span>
             <Link href="/features#pricing" className="hover:text-white transition-colors">Pricing</Link>
           </div>
+
+          {/* Three-doors awareness — same store on every surface. */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/50">
+            <span>One store, three doors:</span>
+            <Link href="/tenant/tid-25we5qgj" className="hover:text-white transition-colors">platform</Link>
+            <span aria-hidden>·</span>
+            <a href="https://place-shelf.visibleshelf.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">subdomain</a>
+            <span aria-hidden>·</span>
+            <a href="https://placeshelf.store" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">your own address</a>
+          </div>
         </div>
       </div>
 

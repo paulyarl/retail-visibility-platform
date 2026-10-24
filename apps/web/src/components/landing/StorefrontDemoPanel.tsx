@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AnimatedCard } from '@/components/ui';
 import { Button } from '@mantine/core';
 import { generateQrDataUrl } from '@/lib/qr-engine';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 
 /**
  * Storefront demo panel — "Same store, three doors."
@@ -19,7 +20,6 @@ import { generateQrDataUrl } from '@/lib/qr-engine';
 
 const DEMO_TENANT_ID = 'tid-25we5qgj';
 const PLATFORM_ORIGIN = 'https://visibleshelf.com';
-const PLATFORM_LOGO = '/icons/icon-512x512.png';
 
 interface DemoDoor {
   key: string;
@@ -52,6 +52,24 @@ const DOORS: DemoDoor[] = [
 
 export function StorefrontDemoPanel() {
   const [qrs, setQrs] = useState<Record<string, string>>({});
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Platform logo resolves like the QR designer's default — the uploaded
+  // platform_settings logo, not a static icon path.
+  useEffect(() => {
+    let cancelled = false;
+    platformSettingsService
+      .getPlatformSettings()
+      .then((s) => {
+        if (!cancelled) setLogoUrl(s?.logoUrl ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setLogoUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +81,7 @@ export function StorefrontDemoPanel() {
               data: door.url,
               exportSize: 480,
               styled: true,
-              logoUrl: PLATFORM_LOGO,
+              logoUrl,
               logoShape: 'circle',
             });
             return [door.key, dataUrl] as const;
@@ -81,7 +99,7 @@ export function StorefrontDemoPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [logoUrl]);
 
   return (
     <AnimatedCard delay={0.7} hover={true} className="mt-8 overflow-hidden">
