@@ -1619,20 +1619,22 @@ async function loadDirectoryEntries(pool: any, baseUrl: string) {
 
 /** Tenant storefront homes, ladder-resolved (custom → subdomain → path). */
 async function loadStorefrontEntries(pool: any, baseUrl: string) {
-  // Renderable storefront = a row in mv_storefront_discovery — that is the
-  // view /api/public/shops/id/:tenantId reads, and /tenant/{id} 404s without
-  // it (verified: tenants with no active items 404 on both slug and id
-  // forms). Advertising non-renderable tenants would fill the sitemap with
-  // 404s — the sweep gate counts those as failures.
+  // Renderable storefront = a real tenant, not a directory seed. Unclaimed
+  // seeds pushed by presence campaigns get a `directory_presence` tenants row
+  // — they surface at /place/{slug} and /directory/{slug} but /tenant/{id}
+  // 404s for them (verified: 59/95 advertised locs were seed rows). Their
+  // product count is NOT the gate: a real tenant with zero active items still
+  // has a storefront. `google_only` storefronts render but carry noindex —
+  // never advertise a URL that suppresses itself. NULL tier is kept
+  // (pre-assignment real tenants); only known non-storefront tiers excluded.
   const result = await pool.query(
     `SELECT t.id AS tenant_id, t.subdomain, cd.domain AS custom_domain
      FROM tenants t
      ${TENANT_LADDER_JOIN}
      WHERE t.is_demo IS NOT TRUE
        AND (t.location_status IS NULL OR t.location_status = 'active')
-       AND EXISTS (
-         SELECT 1 FROM mv_storefront_discovery sf WHERE sf.tenant_id = t.id
-       )
+       AND (t.subscription_tier IS NULL
+         OR t.subscription_tier NOT IN ('directory_presence', 'google_only'))
      ORDER BY t.id`,
   );
 
