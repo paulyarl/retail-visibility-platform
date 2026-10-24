@@ -33,19 +33,19 @@ const DOORS: DemoDoor[] = [
   {
     key: 'platform',
     label: 'On the platform',
-    hint: 'Hosted storefront path',
+    hint: 'visibleshelf.com/tenant/your-store',
     url: `${PLATFORM_ORIGIN}/tenant/${DEMO_TENANT_ID}`,
   },
   {
     key: 'subdomain',
     label: 'On a subdomain',
-    hint: 'Yourname.visibleshelf.com',
+    hint: 'yourstore.visibleshelf.com',
     url: 'https://place-shelf.visibleshelf.com',
   },
   {
     key: 'domain',
-    label: 'On your own domain',
-    hint: 'Your custom domain',
+    label: 'On your own web address',
+    hint: 'like www.yourstore.com',
     url: 'https://placeshelf.store',
   },
 ];
@@ -64,7 +64,7 @@ export function StorefrontDemoPanel() {
               exportSize: 480,
               styled: true,
               logoUrl: PLATFORM_LOGO,
-              logoShape: 'square',
+              logoShape: 'circle',
             });
             return [door.key, dataUrl] as const;
           } catch {
