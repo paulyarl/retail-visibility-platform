@@ -171,17 +171,22 @@ router.put("/api/tenant/gbp-category", authenticateToken, checkTenantAccess, asy
 
     const pool = getDirectPool();
 
+    const toCategoryId = (cat: any) => (cat && typeof cat === 'object' ? cat.id : cat);
+    const primaryId = toCategoryId(primary);
+
     await pool.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenantId]);
 
-    if (primary) {
+    if (primaryId) {
       await pool.query(
         'INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type) VALUES ($1, $2, $3)',
-        [tenantId, primary, 'primary']
+        [tenantId, primaryId, 'primary']
       );
     }
 
     if (secondary && Array.isArray(secondary)) {
-      for (const catId of secondary) {
+      for (const cat of secondary) {
+        const catId = toCategoryId(cat);
+        if (!catId || catId === primaryId) continue;
         await pool.query(
           'INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type) VALUES ($1, $2, $3)',
           [tenantId, catId, 'secondary']

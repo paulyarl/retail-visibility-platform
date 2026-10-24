@@ -98,21 +98,24 @@ export class GBPCategorySyncService {
 
     // Get tenant info to create listing
     const tenantQuery = `
-      SELECT 
-        business_name,
-        address,
-        city,
-        state,
-        zip_code,
-        phone,
-        email,
-        website,
-        latitude,
-        longitude,
-        logo_url,
-        description
-      FROM tenants
-      WHERE id = $1
+      SELECT
+        COALESCE(bp.business_name, t.name) AS business_name,
+        bp.address_line1 AS address,
+        bp.city,
+        bp.state,
+        bp.postal_code AS zip_code,
+        bp.phone_number AS phone,
+        bp.email,
+        bp.website,
+        bp.latitude,
+        bp.longitude,
+        bp.logo_url,
+        bp.business_description AS description,
+        bp.hours AS business_hours,
+        t.subscription_tier
+      FROM tenants t
+      LEFT JOIN tenant_business_profiles_list bp ON bp.tenant_id = t.id
+      WHERE t.id = $1
     `;
 
     const tenantResult = await db.query(tenantQuery, [tenantId]);
@@ -126,6 +129,7 @@ export class GBPCategorySyncService {
     // Create directory listing
     const insertQuery = `
       INSERT INTO directory_listings_list (
+        id,
         tenant_id,
         business_name,
         slug,
@@ -140,9 +144,15 @@ export class GBPCategorySyncService {
         longitude,
         logo_url,
         description,
-        is_published
+        business_hours,
+        secondary_categories,
+        keywords,
+        subscription_tier,
+        is_published,
+        created_at,
+        updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, '{}'::text[], '{}'::text[], $17, true, NOW(), NOW())
       RETURNING id
     `;
 
@@ -150,6 +160,7 @@ export class GBPCategorySyncService {
     const slug = await slugSingletonService.getOrCreateSlug(tenantId);
 
     const insertResult = await db.query(insertQuery, [
+      tenantId,
       tenantId,
       tenant.business_name,
       slug,
@@ -164,6 +175,8 @@ export class GBPCategorySyncService {
       tenant.longitude,
       tenant.logo_url,
       tenant.description,
+      tenant.business_hours,
+      tenant.subscription_tier,
     ]);
 
     return insertResult.rows[0].id;
@@ -255,7 +268,26 @@ export class GBPCategorySyncService {
         ]
       );
 
-      // 8. Refresh materialized view (async, don't wait)
+      // 8. Mirror selections into the tenant_gbp_categories junction
+      // (recommendations + usage stats read this table)
+      await client.query('DELETE FROM tenant_gbp_categories WHERE tenant_id = $1', [tenantId]);
+      await client.query(
+        `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type) VALUES ($1, $2, 'primary')`,
+        [tenantId, gbpCategories.primary.id]
+      );
+      const seenSecondaryIds = new Set<string>();
+      for (const secondary of gbpCategories.secondary) {
+        if (secondary.id === gbpCategories.primary.id || seenSecondaryIds.has(secondary.id)) {
+          continue;
+        }
+        seenSecondaryIds.add(secondary.id);
+        await client.query(
+          `INSERT INTO tenant_gbp_categories (tenant_id, gbp_category_id, category_type) VALUES ($1, $2, 'secondary')`,
+          [tenantId, secondary.id]
+        );
+      }
+
+      // 9. Refresh materialized view (async, don't wait)
       // Note: In production, this should be queued as a background job
       client.query('SELECT refresh_directory_category_listings()').catch(err => {
         logger.error('[GBP Sync] Failed to refresh MV:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
