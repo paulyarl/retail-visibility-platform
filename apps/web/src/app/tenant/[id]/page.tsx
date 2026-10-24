@@ -533,14 +533,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const canonicalLookup = await tenantPublicService.getStorefrontCanonical(id).catch(() => null);
   const canonicalUrl = canonicalStorefrontHome(canonicalLookup, data.resolvedTenantId);
 
-  // Demo storefronts are sample pages, and a storefront that renders the
-  // "not available" gate (closed message, google_only tier) is not a storefront
-  // at all — neither belongs in the index (spec §4.9).
+  // Demo storefronts are sample pages; a "not available" gate (closed
+  // message, google_only tier); and a directory_presence seed storefront —
+  // unclaimed seeds surface at /place and /directory, their /tenant page is a
+  // claim-preview, not an indexable storefront (spec §4.9, §13.4).
   const storefrontUnavailable =
     Boolean((tenant as any).storefrontMessage) || tenant.subscriptionTier === 'google_only';
-  const robots = tenant.isDemo || storefrontUnavailable
-    ? { index: false, follow: false }
-    : undefined;
+  const robots =
+    tenant.isDemo || storefrontUnavailable || tenant.subscriptionTier === 'directory_presence'
+      ? { index: false, follow: false }
+      : undefined;
 
   // Basic metadata — always emitted
   const basicMetadata: Metadata = {

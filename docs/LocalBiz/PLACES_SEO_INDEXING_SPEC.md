@@ -432,7 +432,7 @@ The token is public by design; `NEXT_PUBLIC_` is correct.
 | `places.xml` | City markets | 10 | `/place/city/{city}-{state}` |
 | `places.xml` | Seed listings | 70 | `/place/{slug}` |
 | `directory.xml` | Claimed/tenant listings | 2 (measured; not 72 — that total includes seeds) | `/directory/{slug}` |
-| `storefronts.xml` | Tenant storefront homes | = real tenants with storefronts | canonical ladder: custom → `{sub}.visibleshelf.com` → `/tenant/{id}`; excludes `directory_presence` seed rows (unclaimed seeds — `/tenant/{id}` 404s; they surface on `/place` + `/directory`) and `google_only` (noindex). Product count is NOT a gate — a storefront can be live with zero items |
+| `storefronts.xml` | Tenant storefront homes | = real tenants with storefronts | canonical ladder: custom → `{sub}.visibleshelf.com` → `/tenant/{id}`; gate = declared `storefront_visible` predicate (§13.4): not demo, active location, not `google_only`, not an unclaimed `directory_presence` seed — inventory-independent |
 | `products-N.xml` | Public products | = active public items | `{owning tenant canonical origin}/products/{id}` |
 
 `/sitemap.xml` is a `<sitemapindex>` over those files (§4.8). Per-file limit 20,000 URLs for products (headroom under the 50,000 cap), 50,000 for the rest.
@@ -764,7 +764,7 @@ All §7 criteria pass against production; §8 returns a single `N 200` line acro
 
 **Post-promotion finds (2026-10-23, second pass):**
 
-- Path-form `<loc>`s now emit `/tenant/{id}` (matching the canonical); this un-dropped ~90 slug-less tenants and exposed that the storefront gate was too loose: the first deploy advertised **95 storefront URLs of which 59 → 404** — those rows are **unclaimed presence seeds** (`subscription_tier = 'directory_presence'`), which surface at `/place/{slug}` + `/directory/{slug}` but have no storefront. Gate is now the tier (`NOT IN ('directory_presence','google_only')`, NULL kept), **not** product count — a storefront can be live with zero items. **Pending redeploy.**
+- Path-form `<loc>`s now emit `/tenant/{id}` (matching the canonical); this un-dropped ~90 slug-less tenants and exposed that the storefront gate was undefined: the first deploy advertised **95 storefront URLs of which 59 → 404** — unclaimed presence seeds (freshness-gated render, not a real predicate). Iterated to the declared `storefront_visible` gate (§13.4): excludes unclaimed seeds by tier+origin (not inventory — flyer-only and zero-item storefronts qualify), plus `noindex` on `/tenant/{id}` for `directory_presence` so claim-preview renders never index. **Pending redeploy — expect storefronts.xml ≈ 7–10 locs, all 200.**
 - Staging now mirrors prod's domain config (`visibleshelf.store` canonical, `www` → 301, wildcard served) — **but** the API `WEB_URL` still names `www.visibleshelf.store`, so every staging `<loc>` 301s to the apex. Flip staging `WEB_URL` to `https://visibleshelf.store` (and confirm the web `NEXT_PUBLIC_WEB_URL` agrees) — env change, no code.
 - `placeshelf.store` confirmed live as a demo storefront on a custom domain: self-canonical, `noindex` (demo), excluded from sitemaps, and serving the **global** sitemap at its own `/sitemap.xml` — the live instance of the Domain Visibility spec's cross-tenant leak.
 
@@ -799,7 +799,33 @@ Cost: two lines each. Verify by grepping SSR HTML for `<link rel="canonical"` on
 
 Even with 13.2 fixed, categories without an `enrichment` row emit no JSON-LD at all. Every category page is a list of places — emit a baseline `ItemList` (or `CollectionPage` with `mainEntity: ItemList` of `ListItem → /place/{slug}`) built from the SSR-prefilled `places`, independent of enrichment. Cheap: the data is already in the component.
 
-### 13.4 Sweep anomalies to keep watching
+### 13.4 Storefront existence must be a declared property, not an inventory side-effect
+
+**Finding (2026-10-23, prod data):** `/tenant/{id}` renderability is emergent — there is **no declared storefront flag** on `tenants` (only `google_sync_enabled` matched a flag scan). Empirically:
+
+- `directory_presence` spans both outcomes: ~29 such tenants **render** real storefronts (Garaya, `tid-541v3dug`: title, canonical, JSON-LD, no `noindex`); 59 **404** — and the 404s correlate with `created_at` = today's PG push, not with any data predicate (same tier, same `invited` seed status, same null slug, same published listing).
+- `mv_storefront_discovery` presence is **not** the render contract either: Garaya renders with `in_mv = false`. It only looked like the gate because it correlated on the first sample.
+- The likely mechanism is a freshness dependency in the render path (an MV/cache that hasn't picked up today's rows) — i.e., the 404s will probably self-heal on the next refresh, at which point *all* unclaimed seeds will render storefronts, which is itself contrary to the intended surface split (seeds = `/place` + `/directory` only).
+
+**Shipped predicate (2026-10-23):**
+
+```sql
+storefront_visible(t) :=
+  t.is_demo IS NOT TRUE
+  AND (t.location_status IS NULL OR t.location_status = 'active')
+  AND t.subscription_tier IS DISTINCT FROM 'google_only'
+  AND NOT (t.subscription_tier = 'directory_presence'
+           AND EXISTS (sl.tenant_id = t.id AND sl.listing_origin = 'directory_seed'))
+```
+
+- **Unclaimed seeds** (tier `directory_presence` + `listing_origin='directory_seed'`) → no storefront in the sitemap; they render at `/place/{slug}` and `/directory/{slug}` only. Claiming flips the listing origin → the predicate turns on → the storefront is advertised on next publish. Seed storefronts that still render also get `noindex` on the page (added alongside this gate) so rendering for claim/preview UX cannot leak into the index.
+- **Real tenants** (any other tier, or a claimed seed) → storefront is advertised **regardless of inventory**. A tenant maintaining a storefront purely for flyer display qualifies — `tenant_flyers` are visibility content, not `inventory_items`, so any product-count gate is wrong by construction.
+- **Consumers wired:** `storefronts.xml` (this predicate) and `/tenant/{id}` `robots` (`directory_presence` now emits `noindex`). `/shops/{slug}` resolution unchanged — it stays crawlable per §4.9.
+- **Known gap, deliberate:** the page still *renders* seed storefronts (404s on today's push are a freshness accident, not policy) — the `noindex` makes that safe. If seed storefronts should hard-404 instead, that's a product decision — verify nothing links `/tenant/{id}` to a seed as a preview surface before flipping to `notFound()`.
+
+**Optional follow-up:** flyers may deserve their own indexable surface (`/flyers/{id}`-style detail + a `flyers.xml` sitemap file) once flyer display is a productized storefront reason — out of scope here, flagged for the Domain Visibility work.
+
+### 13.5 Sweep anomalies to keep watching
 
 - **59 storefront 404s** — `directory_presence` seed rows; fixed in code, pending promote. Re-sweep `storefronts.xml` post-deploy: expect ~36 locs, all 200.
 - **1 transient product 404** (`sid-er0kwf2z` → 200 on retry, API healthy) — likely a cold miss; note if it recurs in weekly checks.

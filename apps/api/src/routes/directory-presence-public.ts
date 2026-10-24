@@ -1619,22 +1619,28 @@ async function loadDirectoryEntries(pool: any, baseUrl: string) {
 
 /** Tenant storefront homes, ladder-resolved (custom → subdomain → path). */
 async function loadStorefrontEntries(pool: any, baseUrl: string) {
-  // Renderable storefront = a real tenant, not a directory seed. Unclaimed
-  // seeds pushed by presence campaigns get a `directory_presence` tenants row
-  // — they surface at /place/{slug} and /directory/{slug} but /tenant/{id}
-  // 404s for them (verified: 59/95 advertised locs were seed rows). Their
-  // product count is NOT the gate: a real tenant with zero active items still
-  // has a storefront. `google_only` storefronts render but carry noindex —
-  // never advertise a URL that suppresses itself. NULL tier is kept
-  // (pre-assignment real tenants); only known non-storefront tiers excluded.
+  // Declared storefront predicate (spec §13.4): a storefront exists when the
+  // tenant is real — not demo, active location — and not an UNCLAIMED seed
+  // (directory_presence tier + a listing that is still 'directory_seed').
+  // Claiming flips listing_origin → the storefront turns on. Inventory is
+  // deliberately absent from the gate: flyers-only and zero-item storefronts
+  // are legitimate visibility surfaces. google_only pages carry noindex, so
+  // they are never advertised.
   const result = await pool.query(
     `SELECT t.id AS tenant_id, t.subdomain, cd.domain AS custom_domain
      FROM tenants t
      ${TENANT_LADDER_JOIN}
      WHERE t.is_demo IS NOT TRUE
        AND (t.location_status IS NULL OR t.location_status = 'active')
-       AND (t.subscription_tier IS NULL
-         OR t.subscription_tier NOT IN ('directory_presence', 'google_only'))
+       AND t.subscription_tier IS DISTINCT FROM 'google_only'
+       AND NOT (
+         t.subscription_tier = 'directory_presence'
+         AND EXISTS (
+           SELECT 1 FROM directory_listings_list sl
+           WHERE sl.tenant_id = t.id
+             AND sl.listing_origin = 'directory_seed'
+         )
+       )
      ORDER BY t.id`,
   );
 
