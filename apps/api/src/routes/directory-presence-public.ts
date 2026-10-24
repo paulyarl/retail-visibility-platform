@@ -1864,16 +1864,16 @@ const claimListingUpdateSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
-  zipCode: z.string().optional().or(z.literal('').transform(() => null)),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  website: z.string().optional().or(z.literal('')),
+  zipCode: z.string().optional().or(z.literal('').transform(() => null)).or(z.null()),
+  phone: z.string().optional().or(z.null()),
+  email: z.string().email().optional().or(z.literal('')).or(z.null()),
+  website: z.string().optional().or(z.literal('')).or(z.null()),
   latitude: z.number().optional().or(z.null()),
   longitude: z.number().optional().or(z.null()),
   businessHours: z.any().optional(),
-  primaryCategory: z.string().optional().or(z.literal('').transform(() => null)),
+  primaryCategory: z.string().optional().or(z.literal('').transform(() => null)).or(z.null()),
   secondaryCategories: z.array(z.string()).optional(),
-  notes: z.string().optional(),
+  notes: z.string().optional().or(z.null()),
   socialLinks: z.array(socialLinkSchema).optional(),
   slug: z.string().optional(),
 });
@@ -1900,7 +1900,7 @@ router.put('/claim/:token/listing', optionalAuth, optionalCustomerAuth, async (r
     if (data.zipCode !== undefined) fields.zipCode = data.zipCode;
     if (data.phone !== undefined) fields.phone = data.phone;
     if (data.email !== undefined) fields.email = data.email || null;
-    if (data.website !== undefined) fields.website = data.website || undefined;
+    if (data.website !== undefined) fields.website = data.website || null;
     if (data.latitude !== undefined) fields.latitude = data.latitude;
     if (data.longitude !== undefined) fields.longitude = data.longitude;
     if (data.businessHours !== undefined) fields.businessHours = data.businessHours;

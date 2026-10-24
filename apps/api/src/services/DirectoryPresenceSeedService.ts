@@ -1306,9 +1306,9 @@ class DirectoryPresenceSeedService {
       fulfillmentSource?: string | null;
       fulfillmentSourceName?: string | null;
       attributes?: DirectoryListingAttribute[] | null;
-      phone?: string;
+      phone?: string | null;
       email?: string | null;
-      website?: string;
+      website?: string | null;
       businessHours?: any;
       description?: string | null;
       primaryCategory?: string | null;
