@@ -303,6 +303,31 @@ ORG ──> organizations_list row + tenants.organization_id set
 CHAIN TIER ──> capability-aware ladder (chain_* mirrors base tier grants)
 ```
 
+### §6.0 Pitch order — ownership before the pitch
+
+**The first owner-facing touch is the ordinary claim invitation, never
+the chain story.** The signals in §2 are operator-internal intelligence —
+they decide *who to invite first* and *how to frame the invite*, but they
+are not opener copy:
+
+- **The claim IS the chain verification.** A `chain_probable` group is
+  still a guess (the shared phone could be an answering service). An
+  owner who claims both seeds converts the inference into confirmed fact
+  for free — pitching the chain before ownership risks asserting a
+  relationship that turns out wrong, on the record.
+- **"We already knew" reads surveillance; "now that you own both, here's
+  the umbrella" reads service.** The chain reveal is a claim-page moment
+  (§6.1 sibling step), not a cold-outreach line.
+- **Post-claim, the pitch isn't a pitch.** Linking two claimed tenants
+  under an org is a product affordance the owner is owed anyway — leading
+  with it sells a feature they haven't earned context for yet.
+
+So the motion is: signals pick the lead and arm the operator → invite
+(all members, bound to the shared phone) → claim (sibling reveal
+establishes group ownership through consent) → org link → chain tier.
+The §7 pitch hooks belong to the post-claim register and operator
+framing, not the first touch.
+
 ### §6.1 Chain claim
 
 Today `POST /api/public/directory/claim/:token/accept` consumes one
