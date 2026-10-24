@@ -71,6 +71,10 @@ export interface CleanupSeedRef {
   isPublished: boolean;
   hasActiveClaimToken: boolean;
   primaryCampaignId: string | null;
+  /** Prospect-queue lane for the seed's producing entry — null when the
+   *  seed was born campaign-side (no queue row). 'verify_then_outreach'
+   *  renders as "verify pending" on the card. */
+  queueStatus: string | null;
 }
 
 export interface CleanupDuplicateGroup {
@@ -158,7 +162,13 @@ class DirectorySeedCleanupService {
                SELECT dscl.campaign_id FROM directory_seed_campaign_links dscl
                WHERE dscl.seed_id = dps.id AND dscl.link_role = 'primary'
                LIMIT 1
-             ) AS primary_campaign_id
+             ) AS primary_campaign_id,
+             (
+               SELECT pq.status FROM mkt_prospect_queue pq
+               WHERE pq.seed_id = dps.id
+               ORDER BY pq.created_at DESC
+               LIMIT 1
+             ) AS queue_status
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dps.status IS DISTINCT FROM 'suppressed'
@@ -179,6 +189,7 @@ class DirectorySeedCleanupService {
       isPublished: !!s.is_published,
       hasActiveClaimToken: !!s.has_active_claim_token,
       primaryCampaignId: s.primary_campaign_id,
+      queueStatus: s.queue_status ?? null,
     });
 
     // ── Duplicate groups — same normalizers as the funnel detection so
@@ -526,6 +537,77 @@ class DirectorySeedCleanupService {
     });
 
     return { suppressed: toSuppress, alreadySuppressed, tokensRevoked, verdictRecorded };
+  }
+
+  /**
+   * "Needs a call" action for an open duplicate group — same-address /
+   * same-phone groups the signals can't settle get routed into the
+   * verify_then_outreach lane so an operator's call can return a merge /
+   * distinct / chain verdict with evidence.
+   *
+   * Per member: finds its producing queue entry and requests verification.
+   * Members already in the verify lane report 'already_pending'; members
+   * whose entries moved on (campaign_created, dismissed, intake) or have
+   * no queue row report 'skipped' with the reason. The group itself stays
+   * open — this defers the verdict, it doesn't record one.
+   */
+  async requestVerificationForGroup(input: {
+    seedIds: string[];
+    requestedBy?: string | null;
+  }, ctx?: SeedAuditCtx): Promise<{
+    results: Array<{ seedId: string; status: 'requested' | 'already_pending' | 'skipped'; reason?: string }>;
+  }> {
+    const reqCtx = ctx ? {
+      region: 'us-east-1' as const,
+      userId: ctx.actorId,
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
+    } : undefined;
+    const members = await prisma.$queryRaw<any[]>`
+      SELECT dps.id AS seed_id, pq.id AS queue_entry_id, pq.status AS queue_status
+      FROM directory_presence_seeds dps
+      LEFT JOIN LATERAL (
+        SELECT id, status FROM mkt_prospect_queue
+        WHERE seed_id = dps.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) pq ON true
+      WHERE dps.id = ANY(${input.seedIds}::varchar[])
+    `;
+
+    const { default: queueService } = await import('./MarketingProspectQueueService.js');
+    const results: Array<{ seedId: string; status: 'requested' | 'already_pending' | 'skipped'; reason?: string }> = [];
+    for (const m of members) {
+      if (!m.queue_entry_id) {
+        results.push({ seedId: m.seed_id, status: 'skipped', reason: 'no_queue_entry' });
+        continue;
+      }
+      if (m.queue_status === 'verify_then_outreach') {
+        results.push({ seedId: m.seed_id, status: 'already_pending' });
+        continue;
+      }
+      if (m.queue_status !== 'queued') {
+        results.push({ seedId: m.seed_id, status: 'skipped', reason: `queue_${m.queue_status ?? 'unknown'}` });
+        continue;
+      }
+      try {
+        await queueService.requestVerification(
+          { queueEntryId: m.queue_entry_id, actingUserId: input.requestedBy ?? undefined },
+          reqCtx,
+        );
+        results.push({ seedId: m.seed_id, status: 'requested' });
+      } catch (err: any) {
+        results.push({ seedId: m.seed_id, status: 'skipped', reason: err?.message || 'request_failed' });
+      }
+    }
+
+    audit({
+      actor: input.requestedBy ?? undefined,
+      actorType: 'user',
+      action: 'directory_presence_seed.group_request_verification',
+      payload: { seedIds: input.seedIds, results },
+    });
+    return { results };
   }
 
   /**

@@ -483,6 +483,39 @@ router.post('/presence-seeds/dedup-verdicts', requirePlatformAdmin, async (req: 
   }
 });
 
+/** POST /api/admin/directory/presence-seeds/dedup-groups/request-verification —
+ *  "needs a call" action on an open duplicate group: routes each member's
+ *  queue entry into verify_then_outreach so an operator's call can settle
+ *  merge / distinct / chain with evidence. Defers the verdict — records
+ *  none. */
+const groupVerificationSchema = z.object({
+  seedIds: z.array(z.string().min(1)).min(2),
+});
+
+router.post('/presence-seeds/dedup-groups/request-verification', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = groupVerificationSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'invalid_input', details: validation.error.issues });
+    }
+    const result = await DirectorySeedCleanupService.requestVerificationForGroup({
+      seedIds: validation.data.seedIds,
+      requestedBy: (req as any).user?.userId || (req as any).user?.id,
+    }, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.status(201).json({ success: true, ...result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/dedup-groups/request-verification] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/presence-seeds/chain-groups — the chain
  *  prospecting feed (Migration 359, spec §5.2): groups + members +
  *  copy-ready pitch hooks. */

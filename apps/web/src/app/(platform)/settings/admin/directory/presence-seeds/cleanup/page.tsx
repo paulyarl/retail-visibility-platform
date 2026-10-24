@@ -18,6 +18,7 @@ import {
   ExternalLink,
   GitMerge,
   Link2,
+  PhoneCall,
   RefreshCw,
   ShieldAlert,
   Sparkles,
@@ -88,6 +89,11 @@ function SeedMiniRow({ seed, keeper, onPick, disabled }: {
               live token
             </span>
           )}
+          {seed.queueStatus === 'verify_then_outreach' && (
+            <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+              verify pending
+            </span>
+          )}
           {seed.slug && (
             <Link
               href={`/place/${seed.slug}`}
@@ -114,12 +120,14 @@ function DuplicateGroupCard({
   onResolve,
   onMarkDistinct,
   onLinkChain,
+  onRequestVerification,
 }: {
   group: CleanupDuplicateGroup;
   busy: boolean;
   onResolve: (group: CleanupDuplicateGroup, keepSeedId: string) => void;
   onMarkDistinct: (group: CleanupDuplicateGroup) => void;
   onLinkChain: (group: CleanupDuplicateGroup) => void;
+  onRequestVerification: (group: CleanupDuplicateGroup) => void;
 }) {
   const claimedIds = group.seeds.filter((s) => s.status === 'claimed').map((s) => s.seedId);
   const [keepId, setKeepId] = useState<string | null>(claimedIds[0] ?? null);
@@ -200,6 +208,16 @@ function DuplicateGroupCard({
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-gray-300"
           >
             Not duplicates — mark distinct
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onRequestVerification(group)}
+            title="Signals can't settle this — route each member's queue entry to verify_then_outreach so a call resolves it"
+            className="inline-flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-300"
+          >
+            <PhoneCall className="h-3.5 w-3.5" />
+            Needs verification — call to settle
           </button>
           {group.chain && (
             <button
@@ -475,6 +493,18 @@ function CleanupContent() {
         : base;
     });
 
+  const handleRequestVerification = (group: CleanupDuplicateGroup) =>
+    runAction(async () => {
+      const r = await directoryPresenceAdminService.requestGroupVerification(group.seedIds);
+      const requested = r.results.filter((m) => m.status === 'requested').length;
+      const pending = r.results.filter((m) => m.status === 'already_pending').length;
+      const skipped = r.results.filter((m) => m.status === 'skipped');
+      return `Verification requested for ${requested} member${requested !== 1 ? 's' : ''}` +
+        (pending ? `, ${pending} already pending` : '') +
+        (skipped.length ? ` — skipped: ${skipped.map((s) => s.reason).join(', ')}` : '') +
+        '.';
+    });
+
   const handleBackfillAll = () =>
     runAction(async () => {
       const ids = thinSeeds
@@ -572,6 +602,7 @@ function CleanupContent() {
             onResolve={handleResolve}
             onMarkDistinct={handleMarkDistinct}
             onLinkChain={handleLinkChain}
+            onRequestVerification={handleRequestVerification}
           />
         ))}
         {resolvedGroups.length > 0 && (
@@ -588,6 +619,7 @@ function CleanupContent() {
                   onResolve={handleResolve}
                   onMarkDistinct={handleMarkDistinct}
                   onLinkChain={handleLinkChain}
+                  onRequestVerification={handleRequestVerification}
                 />
               ))}
             </div>

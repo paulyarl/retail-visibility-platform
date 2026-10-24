@@ -2587,6 +2587,21 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data?.chainGroups ?? [];
   }
 
+  /** POST /api/admin/directory-presence/presence-seeds/dedup-groups/request-verification —
+   *  "needs a call" action on an open duplicate group: routes each member's
+   *  queue entry into verify_then_outreach. Defers the verdict — records none. */
+  async requestGroupVerification(seedIds: string[]): Promise<{
+    results: Array<{ seedId: string; status: 'requested' | 'already_pending' | 'skipped'; reason?: string }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/dedup-groups/request-verification`,
+      { method: 'POST', body: JSON.stringify({ seedIds }) },
+      undefined,
+      0,
+    );
+    return result.data?.data ?? result.data;
+  }
+
   /** POST /api/admin/directory-presence/presence-seeds/chain-groups/:id/campaigns —
    *  the §7.2 1-click prospect build: promotes each member's queue entry,
    *  groups the campaigns under one business_prospect_id, and seed-links
@@ -3502,6 +3517,9 @@ export interface CleanupSeedRef {
   isPublished: boolean;
   hasActiveClaimToken: boolean;
   primaryCampaignId: string | null;
+  /** Prospect-queue lane for the seed's producing entry —
+   *  'verify_then_outreach' renders as "verify pending". */
+  queueStatus: string | null;
 }
 
 export interface CleanupDuplicateGroup {
