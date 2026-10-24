@@ -530,7 +530,18 @@ function Home() {
                 Start with a free listing in our directory. Then show up on Google and your own storefront — and turn discovery into sales when you're ready.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <Link href="/directory/add-business" className="w-full sm:w-auto">
+                <Link
+                  href="/directory/add-business"
+                  className="w-full sm:w-auto"
+                  onClick={() =>
+                    trackBehaviorClient({
+                      entityType: 'platform',
+                      entityId: 'home_midband_claim',
+                      entityName: 'Claim your free listing (mid-band)',
+                      pageType: 'platform_home',
+                    })
+                  }
+                >
                   <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Claim your free listing →
                   </Button>
@@ -1007,7 +1018,18 @@ function Home() {
               We seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming it takes about two minutes and costs nothing — then you own the listing and can fix your details.
             </p>
           </div>
-          <Link href="/directory/add-business" className="flex-shrink-0">
+          <Link
+            href="/directory/add-business"
+            className="flex-shrink-0"
+            onClick={() =>
+              trackBehaviorClient({
+                entityType: 'platform',
+                entityId: 'home_already_listed_claim',
+                entityName: 'Claim your free listing (already-listed card)',
+                pageType: 'platform_home',
+              })
+            }
+          >
             <Button variant="gradient" size="md" style={{ color: 'white' }}>
               Claim your free listing →
             </Button>

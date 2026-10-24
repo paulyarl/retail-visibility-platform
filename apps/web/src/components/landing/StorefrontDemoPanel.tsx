@@ -5,6 +5,7 @@ import { AnimatedCard } from '@/components/ui';
 import { Button } from '@mantine/core';
 import { generateQrDataUrl } from '@/lib/qr-engine';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 /**
  * Storefront demo panel — "Same store, three doors."
@@ -136,6 +137,14 @@ export function StorefrontDemoPanel() {
                 href={door.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() =>
+                  trackBehaviorClient({
+                    entityType: 'platform',
+                    entityId: `home_demo_door_${door.key}`,
+                    entityName: `Demo door: ${door.label}`,
+                    pageType: 'platform_home',
+                  })
+                }
                 className="group bg-white/10 backdrop-blur-sm border-2 border-white/30 rounded-2xl p-5 text-center hover:bg-white/20 transition-all duration-200"
               >
                 <div className="w-32 h-32 mx-auto mb-4 bg-white rounded-xl flex items-center justify-center overflow-hidden">
@@ -166,7 +175,19 @@ export function StorefrontDemoPanel() {
             <p className="text-white/80 text-sm mb-4">
               Real tenant. Real storefront. Every capability module on display.
             </p>
-            <a href={`${PLATFORM_ORIGIN}/tenant/${DEMO_TENANT_ID}`} target="_blank" rel="noopener noreferrer">
+            <a
+              href={`${PLATFORM_ORIGIN}/tenant/${DEMO_TENANT_ID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                trackBehaviorClient({
+                  entityType: 'platform',
+                  entityId: 'home_demo_see_live',
+                  entityName: 'See a live storefront',
+                  pageType: 'platform_home',
+                })
+              }
+            >
               <Button
                 variant="gradient"
                 style={{ color: 'white' }}
