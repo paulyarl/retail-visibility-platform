@@ -86,6 +86,10 @@ export interface DiscoveredBusiness {
   /** Optional benchmark marker — a leader observed as reference point, not
    *  a prospect (spec §3). Card-display only. */
   benchmark_only?: boolean | null;
+  /** Analyst-written public directory description (1–2 sentences, evidence-
+   *  grounded). Rides business_snapshot.description into the seed listing so
+   *  batch-born seeds carry default copy instead of NULL. */
+  description?: string | null;
   /** Canonical day-grid opening hours observed on a cited source
    *  (monday…sunday → { open "HH:MM", close "HH:MM", closed }, optional
    *  timezone — the shape apps/web/src/lib/business-hours.ts parses).
@@ -413,6 +417,9 @@ export default function IntelligenceDiscoveryAuditCard({
           // verify-record editor, carries onto campaign.business_hours at
           // derive, and lands on the seed listing at promotion.
           hours: biz.hours ?? undefined,
+          // Analyst-written public description — batch seed creation reads
+          // business_snapshot.description as the listing's default copy.
+          description: biz.description ?? undefined,
           // Sourced attributes ride the snapshot so queue → campaign → seed
           // carries the analyst-recorded evidence (migration 267).
           attributes: Array.isArray(biz.observed_attributes) ? biz.observed_attributes : [],

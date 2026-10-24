@@ -547,6 +547,20 @@ class DirectoryPresenceSeedService {
     // Create the directory listing
     const slug = await this.ensureUniqueSlug(input.slug || input.businessName, undefined, tenantId);
 
+    // Description normalization — every public listing description carries
+    // the disclosure sentence (updateFields appends it on edit; the SEO
+    // composer bakes it in). Ensure it here so batch-born seeds whose
+    // description came from the discovery analyst — and manual creates —
+    // get the same treatment. `includes` (not endsWith) because composed
+    // packets may have the sentence truncated mid-way at the 300-char cap.
+    const listingDescription = (() => {
+      const raw = (input.description || '').trim();
+      if (!raw) return null;
+      return raw.includes('Listed on VisibleShelf from public information')
+        ? raw
+        : raw + DISCLOSURE_SENTENCE;
+    })();
+
     await prisma.$executeRaw`
       INSERT INTO directory_listings_list (
         id, tenant_id, business_name, slug, address, city, state, zip_code,
@@ -589,7 +603,7 @@ class DirectoryPresenceSeedService {
         ${JSON.stringify(input.attributes || [])}::jsonb,
         'directory_presence',
         0,
-        ${input.description || null},
+        ${listingDescription},
         ${input.keywords || []}::text[],
         ${input.sameAs || []}::text[],
         now(), now()
@@ -608,7 +622,7 @@ class DirectoryPresenceSeedService {
         false,
         ${input.primaryCategory},
         ${input.secondaryCategories || []}::text[],
-        ${input.description || null},
+        ${listingDescription},
         ${input.keywords || []}::text[],
         ${slug},
         now()
@@ -632,7 +646,7 @@ class DirectoryPresenceSeedService {
         ${input.phone || null},
         ${input.website || null},
         null,
-        ${input.description || null},
+        ${listingDescription},
         ${input.businessHours ? JSON.stringify(input.businessHours) : null}::jsonb,
         ${input.latitude || null},
         ${input.longitude || null},
@@ -1485,7 +1499,7 @@ class DirectoryPresenceSeedService {
     }
     if (fields.businessHours !== undefined) {
       setClauses.push('business_hours = $' + (params.length + 1) + '::jsonb');
-      params.push(JSON.stringify(fields.businessHours));
+      params.push(fields.businessHours === null ? null : JSON.stringify(fields.businessHours));
     }
     if (fields.description !== undefined) {
       if (fields.description && fields.description.length > 500) {
@@ -2166,6 +2180,11 @@ class DirectoryPresenceSeedService {
           identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
           categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
           notes: entry.note || null,
+          // Analyst-written public description from the discovery scan —
+          // rides business_snapshot.description so batch-born seeds carry
+          // default listing copy instead of NULL. createSeed normalizes it
+          // (trims + appends the disclosure sentence when absent).
+          description: (snapshot.description as string) || undefined,
           businessHours: seedBusinessHours,
           provenance: [
             ...this.toSeedProvenance(entry.discovery_provenance),
@@ -2326,6 +2345,9 @@ class DirectoryPresenceSeedService {
           identityConfidence: (entry.identity_confidence as 'high' | 'medium') || 'medium',
           categoryFit: (entry.category_fit as 'verified' | 'probable') || 'probable',
           notes: entry.note || null,
+          // Analyst-written public description from the discovery scan —
+          // same snapshot handoff as createSeedsFromBatch.
+          description: (snapshot.description as string) || undefined,
           businessHours: seedBusinessHours,
           provenance: [
             ...this.toSeedProvenance(entry.discovery_provenance),

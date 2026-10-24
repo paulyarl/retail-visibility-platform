@@ -186,7 +186,7 @@ const updateFieldsSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   businessHours: z.any().optional(),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).nullable().optional(),
   primaryCategory: z.string().nullable().optional(),
   secondaryCategories: z.array(z.string()).optional(),
   address: z.string().optional(),

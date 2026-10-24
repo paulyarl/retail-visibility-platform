@@ -128,7 +128,13 @@ Discovery discipline:
 4. Assess category_fit: verified / probable / insufficient.
 5. Assess business_seek_priority: high / medium / low / hold.
    - hold = identity_confidence conflict OR category_fit = insufficient
-6. Do NOT compute benchmarks, tiers, fees, or audit-adjacent metrics — those are
+6. Write a "description" for each candidate — a 1–2 sentence shopper-facing
+   summary that becomes its directory listing's default copy. Ground it only
+   in the evidence you recorded for that business (assortment, specialization,
+   services, location); never invent offerings, history, or quality claims,
+   and never include a platform disclosure/claim sentence (the platform
+   appends it). Omit it when nothing beyond name/category/city is evidenced.
+7. Do NOT compute benchmarks, tiers, fees, or audit-adjacent metrics — those are
    Business Audit scope. Intelligence scope is discovery-only.
 
 === DISCOVERY SIGNALS (INT_ family) ===

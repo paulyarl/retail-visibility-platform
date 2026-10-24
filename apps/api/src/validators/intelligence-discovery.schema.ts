@@ -112,6 +112,15 @@ const discoveredBusinessSchema = z.object({
   // them; that source's evidence_types then includes "hours".
   hours: discoveryHoursSchema.nullable().optional(),
 
+  // Public directory description — the analyst's 1–2 sentence shopper-facing
+  // summary, grounded only in the candidate's recorded evidence. Rides
+  // business_snapshot.description → CreateSeedInput.description → the seed
+  // listing so batch-born seeds carry a default description instead of NULL.
+  // The platform appends the public-listing disclosure sentence server-side;
+  // the analyst never writes it. Capped so description + disclosure stays
+  // under the listing's 500-char column contract.
+  description: z.string().max(400).nullable().optional(),
+
   // Geographic classification (§G2)
   location_status: locationStatusEnum,
 
@@ -973,6 +982,7 @@ Return a single JSON object with this structure:
       "website": "<url or null>",
       "gbp_url": "<gbp url or null>",
       "hours": { "monday": { "open": "09:00", "close": "18:00", "closed": false }, "...": "<one entry per weekday the cited source lists, monday–sunday>", "timezone": "<IANA zone or null>" },
+      "description": "<1–2 sentence public directory description — a factual shopper-facing summary grounded ONLY in this candidate's recorded evidence (assortment, specialization, services, neighborhood). No marketing claims or unverified superlatives; omit or null when nothing beyond name/category/city is evidenced>",
       "location_status": "inside_city" | "adjacent_city" | "metro_area" | "outside_market",
       "ownership_type": "independent" | "local_chain" | "franchise" | "national_chain" | "national_franchise" | "regional_chain" | "unknown",
       "category_fit": "verified" | "probable" | "insufficient",
@@ -1122,6 +1132,7 @@ Rules:
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
 - Do NOT infer a deficiency from absence of evidence. Record what you found and what you could not verify as separate observations.
 - OBSERVED ATTRIBUTES: For each candidate, record the attribute chips its platform profiles actually display (payments accepted, accessibility, ownership, service options, certifications) in observed_attributes — one entry per attribute with the platform, a snake_case key, a display label, the profile URL where it was observed, and the date observed. Never infer attributes from the business's category, name, or neighborhood — record only what the profile itself shows. Omit the field entirely when no attribute chips are observed.
+- DIRECTORY DESCRIPTION: emit "description" for each candidate — a 1–2 sentence public-facing summary for its directory shelf, written for shoppers and grounded ONLY in evidence you recorded for that business (assortment, category specialization, services, location). Never invent offerings, history, or quality claims. Do NOT include any platform disclosure or claim-this-listing sentence — the platform appends it automatically. Omit the field (or emit null) when the record holds nothing beyond name/category/city — absence is honest.
 - OPENING HOURS: emit "hours" ONLY when a source you cite in discovery_provenance displays the business's opening hours (GBP hours block, directory profile, the business's own site). Shape is the canonical day grid — lowercase full day keys monday…sunday, each { "open": "HH:MM", "close": "HH:MM", "closed": <boolean> } with 24-hour times — plus an optional "timezone" (IANA zone) only when the source names one. Mark a day "closed": true when the source lists it closed; omit days the source does not list. Never infer or interpolate hours from the category, typical conventions, or a different location of a chain. The source that displayed the hours MUST carry "hours" in its evidence_types with its url and accessed_at. Omit the field entirely (or null) when no cited source displays hours — absence is honest.
 - GOLD STANDARD RATING: When a "=== GOLD STANDARD DISCOVERY BENCHMARK ===" block is present in the prompt, populate gold_standard_match and gold_standard_gate_results per candidate (rate each candidate per-platform against the established expected fields and quality gates), and populate the platform_analysis section with per-platform presence counts, gate-failure aggregation, and platform-aware outreach recommendations. The primary_platform should be where the gold standard is deepest AND where candidates have the most fixable gaps (highest-opportunity platform for outreach, not just the most-present platform). The recommended_platform_focus tells downstream business audits which platform to target.
 - When NO gold standard block is present (degraded mode), OMIT gold_standard_match, gold_standard_gate_results, and platform_analysis entirely. Rate candidates on category-general heuristics only.
