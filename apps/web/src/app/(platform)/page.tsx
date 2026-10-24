@@ -18,6 +18,7 @@ import Image from "next/image";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
+import { StorefrontDemoPanel } from "@/components/landing/StorefrontDemoPanel";
 import { computeStoreStatus } from "@/lib/hours-utils";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
@@ -1102,6 +1103,10 @@ function Home() {
             </div>
           </div>
         </AnimatedCard>
+
+        {/* Storefront demo — "one store, three doors" canonical-ladder
+            triptych beside the directory pillar (PIONEER_RECRUITMENT_SPEC §3) */}
+        <StorefrontDemoPanel />
 
         {/* Value Showcase - Only show to authenticated users with products */}
         {isAuthenticated && !loading && stats.total > 0 && (
