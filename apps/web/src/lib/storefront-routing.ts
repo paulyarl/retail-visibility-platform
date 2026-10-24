@@ -233,10 +233,12 @@ export function managePathSuffix(pathname: string): string | null {
  * Returns:
  *  - { kind: 'self', path } — strip the prefix: /tenant/{id} → '/',
  *    /tenant/{id}/policies/x → '/policies/x' (prefix roots only). The proxy
- *    301s to it so the canonical URL is host-relative.
+ *    301s to it so the canonical URL is host-relative. The BARE /tenant root
+ *    canonicalizes to '/' the same way — on a tenant host the root IS the
+ *    storefront, so "/tenant" with no id means "this tenant".
  *  - { kind: 'foreign' } — another tenant's internal path; proxy redirects
  *    to the platform origin's canonical /tenant/{otherId}.
- *  - null — not a /tenant/ path, or a non-storefront subpath under the
+ *  - null — not a /tenant path, or a non-storefront subpath under the
  *    resolved tenant (e.g. /tenant/{id}/junk) — left to pass through and
  *    404 naturally in the app router.
  */
@@ -283,6 +285,9 @@ export type TenantHostCanonical =
   | { kind: 'foreign'; tenantId: string };
 
 export function tenantHostCanonicalPath(pathname: string, tenantId: string): TenantHostCanonical | null {
+  if (pathname === '/tenant' || pathname === '/tenant/') {
+    return { kind: 'self', path: '/' };
+  }
   const m = pathname.match(/^\/tenant\/([^/]+)(\/.*)?$/);
   if (!m) return null;
   const [, pathTenantId, rest = ''] = m;

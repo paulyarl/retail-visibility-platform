@@ -165,7 +165,10 @@ a different domain and needs its own verification.
 ## 2. Submit the sitemap
 
 1. In the property, open **Indexing → Sitemaps**.
-2. Enter **`sitemap.xml`** (not the full URL — Search Console prefixes the property).
+2. Enter **`https://visibleshelf.com/sitemap.xml`** — the full URL. A Domain
+   property shows no host prefix on the input, so a bare `sitemap.xml` is
+   rejected as "Invalid sitemap address" (a URL-prefix property prefixes the
+   input and would take just `sitemap.xml`, but that is not what we use).
 3. **Submit**.
 4. Open the entry and confirm:
    - **Status:** `Success`
@@ -354,11 +357,12 @@ Copy this into the ticket and tick as you go.
 
 | Date | Action | Result / notes |
 |---|---|---|
-| | Pre-flight (§0) run | |
-| | Property verified | |
-| | Sitemap submitted | |
-| | Indexing requested (which URLs) | |
-| | Baseline recorded | |
+| 2026-10-24 | Pre-flight (§0) run | All 7 checks pass. 160 `<loc>`s, all `200` (80 `/place/*` seeds, 23 categories, 12 cities, 2 `/directory/*`, 7 `/tenant/*`, 32 products + 1 storefront root on `placeshelf.store`, 3 core). No `api.` hosts; `www` 301s → apex; `placeshelf.store/robots.txt` authorizes the platform sitemap (§0.5). Note: storefront `<loc>`s are `/tenant/tid-*` IDs, not slugs; no `/shops/<slug>` `<loc>`s exist (only the `/shops` index). |
+| | Property verified | Domain property `visibleshelf.com` already existed — 2 indexed / 13 not indexed at start |
+| 2026-10-24 | Sitemap submitted | `https://visibleshelf.com/sitemap.xml` — status **Success** (briefly showed "Couldn't fetch" immediately after submit; flipped to Success within minutes). Discovered pages: 0 at submit time (lags while children parse) |
+| 2026-10-24 | Indexing requested | 7 URLs: `/place/enerem-african-food-store`, `/directory/global-grace-grocery`, `/place/city/indianapolis-in`, `/place/category/african-grocery-store`, `/tenant/tid-3x142y4v`, `/place`, `/shops`. `/directory` already indexed; `/shops` already attributed to sitemap.xml discovery. Also: `placeshelf.store` is outside this Domain property; products are not inspectable here. |
+| 2026-10-24 | Smoke-test tenants retired | Initial "canonical drift" hypothesis was wrong — the `/tenant/tid-*` `<loc>`s were **duplicate fake tenant records** for businesses that have real tenants (real Baraka = `tid-m8ijkrnk`, subdomain `baraka-international-market`, `ecommerce`, `location_status: pending`). Gate analysis: the storefronts query only excludes `directory_presence` tenants that have an *unclaimed seed listing* — bare tenants with **no listing row** pass as "real storefronts". Retired 7 fake tenants to `location_status='inactive'` (`95z7cwca`, `xha7tg6k`, `88ng3zem`, `3x142y4v`, `drevvhrc`, `g22hluvc`, `wlm4vswo`; `closure_reason`/`status_changed_*` stamped; `tid-vde9sc6a` was already `archived`). `storefronts.xml` re-verified = 2 locs (`placeshelf.store/` + `tid-vqg85k8p`). **Engineering follow-ups:** (a) retired storefronts still serve `200` self-canonical with **no `noindex`** — inactive tenants should 404/410 or noindex (we'd already queued `tid-3x142y4v` for indexing); (b) consider gating storefronts on having ≥1 listing or an explicit storefront flag, not just "no unclaimed-seed listing"; (c) `/tenant/` bare root resolved **same day** — platform host 308s to `/shops` (`app/tenant/page.tsx`), tenant hosts 301 to `/` via `tenantHostCanonicalPath`; building a `/tenant` index was rejected (duplicate of `/shops`, tenant-host leak). Remaining gap: `/shops` index is client-rendered — SSR HTML has no canonical and zero storefront anchors, yet it's advertised in `core.xml`. SSR the grid + self-canonical + `ItemList` JSON-LD before expecting it to index. |
+| 2026-10-24 | Baseline recorded | Indexed **2** / Not indexed **13** = `Crawled – currently not indexed` 10 (pre-dates submission — content-quality watch item per §5), `Page with redirect` 2, `Duplicate without user-selected canonical` 1. Zero `Discovered`, `Alternate page`, `noindex` — all expected to move once the sitemap's 160 URLs process. Sitemap side: 160 locs (80 place, 2 directory, 32 products, 23 categories, 12 cities, 2 storefronts post-retirement, 3 core). |
 | | Week 1 | |
 | | Week 2 | |
 | | Week 3 | |

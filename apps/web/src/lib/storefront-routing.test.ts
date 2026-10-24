@@ -153,11 +153,15 @@ describe('tenantHostCanonicalPath (custom-domain canonicalization)', () => {
     expect(tenantHostCanonicalPath('/tenant/tid-8622qs2t/cart', TID)).toBeNull();
   });
 
-  it('ignores non-/tenant paths and bare /tenant/', () => {
+  it('ignores non-/tenant paths', () => {
     expect(tenantHostCanonicalPath('/', TID)).toBeNull();
     expect(tenantHostCanonicalPath('/products/p1', TID)).toBeNull();
-    expect(tenantHostCanonicalPath('/tenant', TID)).toBeNull();
-    expect(tenantHostCanonicalPath('/tenant/', TID)).toBeNull();
+  });
+
+  // Bare /tenant means "this tenant" on a tenant host — '/' IS the storefront.
+  it('canonicalizes the bare /tenant root to /', () => {
+    expect(tenantHostCanonicalPath('/tenant', TID)).toEqual({ kind: 'self', path: '/' });
+    expect(tenantHostCanonicalPath('/tenant/', TID)).toEqual({ kind: 'self', path: '/' });
   });
 });
 

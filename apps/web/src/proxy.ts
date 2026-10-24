@@ -195,7 +195,7 @@ export async function proxy(req: NextRequest) {
           // under this host. Self → 301 to the host-relative canonical;
           // foreign → 301 to the platform origin.
           let destPath: string;
-          if (pathname.startsWith('/tenant/')) {
+          if (pathname === '/tenant' || pathname.startsWith('/tenant/')) {
             const canon = tenantHostCanonicalPath(pathname, tenantId);
             if (canon?.kind === 'foreign') {
               const dest = new URL(`${pathname}${req.nextUrl.search}`, PLATFORM_APP_ORIGIN);
@@ -312,7 +312,7 @@ export async function proxy(req: NextRequest) {
         // host-relative canonical. A foreign tenant's path 301s to the
         // platform origin instead of serving cross-tenant content here.
         let destPath: string;
-        if (pathname.startsWith('/tenant/')) {
+        if (pathname === '/tenant' || pathname.startsWith('/tenant/')) {
           const canon = tenantHostCanonicalPath(pathname, resolved.tenantId);
           if (canon?.kind === 'foreign') {
             const dest = new URL(`${pathname}${req.nextUrl.search}`, PLATFORM_APP_ORIGIN);
