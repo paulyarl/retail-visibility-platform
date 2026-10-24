@@ -17,6 +17,11 @@
  *   - dismissForVerdict(seedIds) — a later same_entity/distinct verdict
  *     that covers a group's full membership dismisses it; the verdict
  *     row still protects the funnel gate.
+ *   - buildCampaignsForGroup(chainGroupId) — the §7.2 1-click prospect
+ *     build: promote each member's prospect-queue entry, group the
+ *     campaigns under one business_prospect_id, and seed-link each
+ *     member so the normal campaign pipelines (comms, diagnostics,
+ *     VAST, log contact) take over from there.
  *   - listFeed() — the prospecting feed: groups + members + copy-ready
  *     pitch hooks generated from the stored signals.
  *
@@ -26,6 +31,8 @@
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { audit } from '../audit';
+import type { RequestCtx } from '../context';
 import { generateDirectoryChainGroupId } from '../lib/id-generator';
 
 export type ChainConfidence = 'chain_confirmed' | 'chain_probable';
@@ -281,6 +288,231 @@ class DirectoryChainService {
   }
 
   /**
+   * §7.2 — the 1-click prospect build behind the feed's "Build sibling
+   * campaigns" action. For each live member: promote its prospect-queue
+   * entry via createCampaignFromQueue (idempotent — PG-seeded entries
+   * graduate straight to the `seed` stage), group every resulting
+   * campaign under one business_prospect_id (first member's campaign is
+   * the primary sibling), and seed-link each member so the campaign's
+   * seeded-listing surfaces resolve.
+   *
+   * Link role is always 'sibling': the seed's 'primary' link already
+   * belongs to the scan campaign that produced it, and inside a chain
+   * each location campaign is a sibling of the others. 'sibling' also
+   * avoids ensureProspectSiblingLinks cross-wiring every location's
+   * campaign to every location's seed.
+   *
+   * Partial-success semantics mirror createSeedsForProvingGround: each
+   * member reports created/existing/skipped/failed and the group keeps
+   * going. A member whose campaign already sits in a different
+   * business_prospect_id is never stolen — if the members resolve to
+   * more than one existing prospect, grouping is skipped entirely and
+   * prospectConflict reports the ids for manual resolution.
+   */
+  async buildCampaignsForGroup(input: {
+    chainGroupId: string;
+    actorId?: string | null;
+    ip?: string;
+    userAgent?: string;
+  }, ctx?: RequestCtx): Promise<{
+    chainGroupId: string;
+    businessProspectId: string | null;
+    prospectConflict: string[] | null;
+    members: Array<{
+      seedId: string;
+      status: 'created' | 'existing' | 'skipped' | 'failed';
+      campaignId?: string;
+      reason?: string;
+      linked?: boolean;
+    }>;
+  }> {
+    const groups = await prisma.$queryRaw<any[]>`
+      SELECT id, status, source_signals
+      FROM directory_chain_groups
+      WHERE id = ${input.chainGroupId}
+      LIMIT 1
+    `;
+    const group = groups[0];
+    if (!group) throw new Error('chain_group_not_found');
+    if (group.status === 'dismissed') throw new Error('chain_group_dismissed');
+
+    const reqCtx: RequestCtx = ctx ?? {
+      region: 'us-east-1',
+      userId: input.actorId ?? undefined,
+      ip: input.ip,
+      userAgent: input.userAgent,
+    };
+
+    const members = await prisma.$queryRaw<any[]>`
+      SELECT dcgm.seed_id, dps.status AS seed_status,
+             pq.id AS queue_entry_id, pq.status AS queue_status,
+             pq.processed_campaign_id
+      FROM directory_chain_group_members dcgm
+      JOIN directory_presence_seeds dps ON dps.id = dcgm.seed_id
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      LEFT JOIN LATERAL (
+        SELECT id, status, processed_campaign_id
+        FROM mkt_prospect_queue
+        WHERE seed_id = dps.id
+        ORDER BY (processed_campaign_id IS NOT NULL) DESC, created_at DESC
+        LIMIT 1
+      ) pq ON true
+      WHERE dcgm.chain_group_id = ${input.chainGroupId}
+        AND dps.status <> 'suppressed'
+      ORDER BY dl.business_name
+    `;
+    if (members.length === 0) throw new Error('chain_group_empty');
+
+    const { default: MarketingProspectQueueService } = await import('./MarketingProspectQueueService.js');
+    const { default: DirectorySeedCampaignLinkService } = await import('./DirectorySeedCampaignLinkService.js');
+    const { BusinessProspectService } = await import('./BusinessProspectService.js');
+    const prospectService = BusinessProspectService.getInstance();
+
+    const results: Array<{
+      seedId: string;
+      status: 'created' | 'existing' | 'skipped' | 'failed';
+      campaignId?: string;
+      reason?: string;
+      linked?: boolean;
+    }> = [];
+
+    // 1. Promote each member's queue entry — createCampaignFromQueue is
+    //    idempotent and already handles the PG-seeded graduation path.
+    for (const m of members) {
+      if (!m.queue_entry_id) {
+        results.push({ seedId: m.seed_id, status: 'skipped', reason: 'no_queue_entry' });
+        continue;
+      }
+      try {
+        const r = await MarketingProspectQueueService.createCampaignFromQueue({
+          queueEntryId: m.queue_entry_id,
+          actingUserId: input.actorId ?? undefined,
+        }, reqCtx);
+        results.push({
+          seedId: m.seed_id,
+          status: r.created ? 'created' : 'existing',
+          campaignId: r.campaign.id,
+        });
+      } catch (err: any) {
+        results.push({ seedId: m.seed_id, status: 'failed', reason: err?.message || 'promote_failed' });
+        logger.warn('DirectoryChainService.buildCampaignsForGroup — member promote failed', reqCtx, {
+          chainGroupId: input.chainGroupId, seedId: m.seed_id,
+          error: err?.message || String(err),
+        });
+      }
+    }
+
+    // 2. Group the campaigns under one business_prospect_id. Adopt an
+    //    existing prospect when exactly one member already belongs to
+    //    one; refuse to merge two pre-existing groups.
+    const promoted = results.filter((r) => r.campaignId);
+    let businessProspectId: string | null = null;
+    let prospectConflict: string[] | null = null;
+    if (promoted.length > 0) {
+      const campRows = await prisma.mkt_campaigns_list.findMany({
+        where: { id: { in: promoted.map((p) => p.campaignId!) } },
+        select: { id: true, business_prospect_id: true, is_primary_sibling: true },
+      }) as any[];
+      const existingProspects = [...new Set(
+        campRows.map((c) => c.business_prospect_id as string | null).filter(Boolean),
+      )] as string[];
+
+      if (existingProspects.length > 1) {
+        prospectConflict = existingProspects;
+        logger.warn('DirectoryChainService.buildCampaignsForGroup — members span multiple prospects', reqCtx, {
+          chainGroupId: input.chainGroupId, prospects: existingProspects,
+        });
+      } else {
+        businessProspectId = existingProspects[0]
+          ?? await prospectService.initializeProspectFromCampaign(promoted[0].campaignId!, reqCtx);
+        for (const c of campRows) {
+          if (c.business_prospect_id !== businessProspectId) {
+            await prisma.mkt_campaigns_list.update({
+              where: { id: c.id },
+              data: { business_prospect_id: businessProspectId, is_primary_sibling: false } as any,
+            });
+          }
+        }
+        // An adopted prospect should already have a primary — but if the
+        // build is the only member (or the flag was lost), pin it.
+        const primaryCount = await prisma.mkt_campaigns_list.count({
+          where: { business_prospect_id: businessProspectId, is_primary_sibling: true } as any,
+        });
+        if (primaryCount === 0) {
+          await prisma.mkt_campaigns_list.update({
+            where: { id: promoted[0].campaignId! },
+            data: { is_primary_sibling: true } as any,
+          });
+        }
+      }
+    }
+
+    // 3. Seed-link each promoted member (non-fatal per member).
+    const linkCtx = {
+      actorType: 'user' as const,
+      actorId: input.actorId ?? undefined,
+      ip: input.ip,
+      userAgent: input.userAgent,
+    };
+    for (const r of results) {
+      if (!r.campaignId) continue;
+      try {
+        // Already linked — leave the row alone (the upsert would otherwise
+        // downgrade an existing 'primary' role to 'sibling').
+        const existingLink = await prisma.$queryRaw<any[]>`
+          SELECT link_role FROM directory_seed_campaign_links
+          WHERE seed_id = ${r.seedId} AND campaign_id = ${r.campaignId}
+          LIMIT 1
+        `;
+        if (existingLink[0]) {
+          r.linked = true;
+          continue;
+        }
+        await DirectorySeedCampaignLinkService.linkCampaign(r.seedId, r.campaignId, 'sibling', linkCtx);
+        r.linked = true;
+      } catch (err: any) {
+        r.linked = false;
+        logger.warn('DirectoryChainService.buildCampaignsForGroup — seed link failed (non-fatal)', reqCtx, {
+          chainGroupId: input.chainGroupId, seedId: r.seedId, campaignId: r.campaignId,
+          error: err?.message || String(err),
+        });
+      }
+    }
+
+    // 4. The operator worked the lead — candidate → confirmed, and stamp
+    //    the prospect pointer onto source_signals for durable lineage.
+    if (businessProspectId) {
+      await prisma.$executeRaw`
+        UPDATE directory_chain_groups
+        SET status = CASE WHEN status = 'candidate' THEN 'confirmed' ELSE status END,
+            source_signals = source_signals || ${JSON.stringify({ business_prospect_id: businessProspectId })}::jsonb,
+            updated_at = now()
+        WHERE id = ${input.chainGroupId}
+      `;
+    }
+
+    audit({
+      actor: input.actorId ?? undefined,
+      actorType: 'user',
+      action: 'directory_chain_group.build_campaigns',
+      payload: {
+        chainGroupId: input.chainGroupId,
+        businessProspectId,
+        prospectConflict,
+        memberStatuses: results.map((r) => ({ seedId: r.seedId, status: r.status, campaignId: r.campaignId ?? null })),
+      },
+    });
+    logger.info('DirectoryChainService.buildCampaignsForGroup', reqCtx, {
+      chainGroupId: input.chainGroupId,
+      businessProspectId,
+      created: results.filter((r) => r.status === 'created').length,
+      existing: results.filter((r) => r.status === 'existing').length,
+    });
+
+    return { chainGroupId: input.chainGroupId, businessProspectId, prospectConflict, members: results };
+  }
+
+  /**
    * Chain-group memberships for a set of seeds — the cleanup report calls
    * this once per run so group chips can show "already linked".
    */
@@ -311,6 +543,8 @@ class DirectoryChainService {
              dps.owner_email, dps.owner_phone,
              dl.business_name, dl.slug, dl.city, dl.state, dl.phone, dl.is_published,
              dl.listing_origin,
+             mcamp.id AS campaign_id, mcamp.display_id AS campaign_display_id,
+             mcamp.business_prospect_id AS campaign_prospect_id,
              EXISTS(
                SELECT 1 FROM directory_claim_tokens dct
                WHERE dct.seed_id = dps.id AND dct.consumed_at IS NULL AND dct.expires_at > now()
@@ -318,6 +552,14 @@ class DirectoryChainService {
       FROM directory_chain_group_members dcgm
       JOIN directory_presence_seeds dps ON dps.id = dcgm.seed_id
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      LEFT JOIN LATERAL (
+        SELECT processed_campaign_id
+        FROM mkt_prospect_queue
+        WHERE seed_id = dps.id AND processed_campaign_id IS NOT NULL
+        ORDER BY processed_at DESC NULLS LAST, created_at DESC
+        LIMIT 1
+      ) pq ON true
+      LEFT JOIN mkt_campaigns_list mcamp ON mcamp.id = pq.processed_campaign_id
       ORDER BY dl.business_name
     `;
 
@@ -340,6 +582,12 @@ class DirectoryChainService {
       const cities = [...new Set(live.map((m) => m.city).filter(Boolean))] as string[];
       const names = live.map((m) => m.business_name).filter(Boolean) as string[];
       const contact = live.find((m) => m.owner_email || m.owner_phone) ?? null;
+      // The §7.2 prospect build stamps source_signals.business_prospect_id;
+      // member campaigns' own prospect ids are the fallback witness (and
+      // surface a conflict when members somehow span multiple prospects).
+      const memberProspects = [...new Set(
+        live.map((m) => m.campaign_prospect_id as string | null).filter(Boolean),
+      )] as string[];
 
       return {
         chainGroupId: g.id,
@@ -348,6 +596,10 @@ class DirectoryChainService {
         confidence: g.confidence,
         sourceSignals,
         cities,
+        businessProspectId:
+          (sourceSignals.business_prospect_id as string | undefined)
+          ?? (memberProspects.length === 1 ? memberProspects[0] : null),
+        prospectConflict: memberProspects.length > 1 ? memberProspects : null,
         contact: {
           phone: live.find((m) => m.phone)?.phone ?? null,
           ownerEmail: contact?.owner_email ?? null,
@@ -363,6 +615,8 @@ class DirectoryChainService {
           isPublished: !!m.is_published,
           listingOrigin: m.listing_origin,
           hasActiveClaimToken: !!m.has_active_claim_token,
+          campaignId: m.campaign_id ?? null,
+          campaignDisplayId: m.campaign_display_id ?? null,
         })),
         claimProgress: {
           total: ms.length,

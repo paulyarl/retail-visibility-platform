@@ -1,6 +1,12 @@
 # Chain Signal Prospecting Feed — Spec
 
-Status: **v0.1 (draft — insights captured, not yet built)**
+Status: **v0.2 — Phases 1–3 shipped** (verdict + chain entity + detection
+chips + feed on the cleanup tab + public "Also visit" strip), plus the
+§7.2 1-click prospect build (`POST /presence-seeds/chain-groups/:id/campaigns`
+→ `DirectoryChainService.buildCampaignsForGroup`): promotes each member's
+queue entry, groups the campaigns under one `business_prospect_id`, and
+seed-links each member. Phases 4–6 (chain claim, org link, feed metrics)
+remain unbuilt.
 
 Scope: turns the post-publish dedup surface into a prospecting feed.
 Today a duplicate group resolves to a binary verdict — `same_entity` (merge

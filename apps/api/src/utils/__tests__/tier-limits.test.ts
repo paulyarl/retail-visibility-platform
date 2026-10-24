@@ -19,8 +19,11 @@ describe('getSKULimit', () => {
 
   it('proxies trial tiers to their base tier', () => {
     expect(getSKULimit('trial_omnichannel')).toBe(2000);
-    expect(getSKULimit('trial_discovery')).toBe(75);
-    expect(getSKULimit('expired_trial')).toBe(0); // deprecated → presence
+    // Triad redesign: discovery moved to SKU parity (200), not the old 75.
+    expect(getSKULimit('trial_discovery')).toBe(200);
+    // deprecated → presence, whose cap is 200 under the triad parity redesign
+    // (was 0 when presence was directory-mode with no catalog).
+    expect(getSKULimit('expired_trial')).toBe(200);
   });
 
   it('falls back to directory_presence for genuinely unknown or absent tiers', () => {

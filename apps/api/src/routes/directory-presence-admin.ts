@@ -498,6 +498,37 @@ router.get('/presence-seeds/chain-groups', requirePlatformStaff, async (_req: Re
   }
 });
 
+/** POST /api/admin/directory/presence-seeds/chain-groups/:id/campaigns —
+ *  the §7.2 1-click prospect build: promotes each live member's queue
+ *  entry (idempotent — already-promoted members return their existing
+ *  campaign), groups the campaigns under one business_prospect_id, and
+ *  seed-links each member. From there the normal campaign pipelines
+ *  (comms, diagnostics, VAST, log contact) take over. */
+router.post('/presence-seeds/chain-groups/:id/campaigns', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const result = await DirectoryChainService.buildCampaignsForGroup({
+      chainGroupId: req.params.id,
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    res.status(201).json({ success: true, ...result });
+  } catch (error: any) {
+    const statusMap: Record<string, number> = {
+      chain_group_not_found: 404,
+      chain_group_dismissed: 409,
+      chain_group_empty: 409,
+    };
+    const status = statusMap[error?.message] || 500;
+    if (status === 500) {
+      logger.error('[POST /api/admin/directory/presence-seeds/chain-groups/:id/campaigns] Error:', undefined, {
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+    res.status(status).json({ error: error?.message || 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/presence-seeds/dedup-verdicts — audit view. */
 router.get('/presence-seeds/dedup-verdicts', requirePlatformStaff, async (_req: Request, res: Response) => {
   try {

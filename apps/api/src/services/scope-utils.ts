@@ -39,6 +39,10 @@ export const SCOPE_VARIABLES: Record<string, string[]> = {
     'has_website', 'website_url', 'nap_consistent', 'pain_score', 'estimated_tier',
     'notes', 'tone', 'attributes', 'business_origin', 'business_address',
     'business_phone',
+    // PB-08 website positioning audit — auto-sourced per campaign from the
+    // prior-evidence lane (MarketingExecutionService §556+); body-declared in
+    // the seeded template, so it must be scope-legal, not caller-provided.
+    'prior_website_findings',
   ],
   category: ['category', 'city', 'state', 'neighborhood', 'tone', 'attributes', 'business_origin'],
   city: ['city', 'state', 'neighborhood'],

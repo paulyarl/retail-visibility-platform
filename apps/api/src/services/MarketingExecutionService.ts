@@ -743,13 +743,23 @@ export class MarketingExecutionService extends BaseService {
           || (input.campaign.audits ?? []).find((a: any) => a.platform === 'category_identification')
           || (input.campaign.mkt_audits_list ?? []).find((a: any) => a.platform === 'category_identification');
         if (!audit && input.campaign.id) {
-          audit = await this.prisma.mkt_audits_list.findFirst({
-            where: { campaign_id: input.campaign.id, platform: 'business_analysis' },
-            orderBy: { created_at: 'desc' },
-          }) ?? await this.prisma.mkt_audits_list.findFirst({
-            where: { campaign_id: input.campaign.id, platform: 'category_identification' },
-            orderBy: { created_at: 'desc' },
-          });
+          // Own try/catch: a failed audit read degrades to audit=null and
+          // auto-sourcing continues — a DB hiccup must not disable every
+          // downstream variable fill (voice/services/complaintText etc.).
+          try {
+            audit = await this.prisma.mkt_audits_list.findFirst({
+              where: { campaign_id: input.campaign.id, platform: 'business_analysis' },
+              orderBy: { created_at: 'desc' },
+            }) ?? await this.prisma.mkt_audits_list.findFirst({
+              where: { campaign_id: input.campaign.id, platform: 'category_identification' },
+              orderBy: { created_at: 'desc' },
+            });
+          } catch (err) {
+            logger.warn('resolvePrompt audit fallback read failed — continuing without audit', ctx, {
+              campaignId: input.campaign.id,
+              error: (err as Error).message,
+            });
+          }
         }
         seekAuditData = audit?.audit_data ?? null;
 

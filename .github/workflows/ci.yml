@@ -37,6 +37,11 @@ jobs:
         run: pnpm -r lint || true
 
       - name: Run API unit tests (Vitest)
+        # Dummy Supabase creds — service constructors throw on missing config
+        # at instantiation (DigitalAssetService); nothing here calls the API.
+        env:
+          SUPABASE_URL: https://ci-placeholder.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-key
         run: pnpm -C apps/api test
 
   web-e2e:

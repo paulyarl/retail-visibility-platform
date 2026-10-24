@@ -85,11 +85,14 @@ const REGISTERED_SIGNALS = new Set([
   // PB-09 integrity code (migration 336) — registered but never added to a
   // hook's signals list until the profile_rescue angle picked it up.
   'DS_PROFILE_NOT_PUBLIC',
+  // WC domain-hijack code (migration 353) — the domain_hijacked angle's
+  // single governing signal.
+  'WC_DOMAIN_HIJACKED',
 ]);
 
 describe('Hook Library catalog', () => {
-  it('has exactly 24 entries', () => {
-    expect(HOOK_LIBRARY).toHaveLength(24);
+  it('has exactly 25 entries', () => {
+    expect(HOOK_LIBRARY).toHaveLength(25);
   });
 
   it('every angle key is unique', () => {
@@ -98,7 +101,7 @@ describe('Hook Library catalog', () => {
   });
 
   it('HOOK_ANGLE_KEYS matches the library', () => {
-    expect(HOOK_ANGLE_KEYS).toHaveLength(24);
+    expect(HOOK_ANGLE_KEYS).toHaveLength(25);
     expect(HOOK_ANGLE_KEYS).toEqual(HOOK_LIBRARY.map((h) => h.angle));
   });
 
@@ -244,6 +247,9 @@ describe('website signal ↔ angle alignment', () => {
       WC_MOBILE_FRICTION: 'borderline',
       WC_MISSING_AVAILABILITY_INQUIRY: 'borderline',
       WC_MISSING_PICKUP_DELIVERY: 'borderline',
+      // A hijacked domain is a live reputation leak — crisis, same class
+      // as MISSING/BROKEN (signal-magnitude maps it deliberately).
+      WC_DOMAIN_HIJACKED: 'crisis',
     };
     for (const code of WC_SIGNALS) {
       const severity = computeSignalSeverity(code, {} as any);

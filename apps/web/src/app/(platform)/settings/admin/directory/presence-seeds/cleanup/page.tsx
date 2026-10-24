@@ -223,7 +223,15 @@ function DuplicateGroupCard({
   );
 }
 
-function ChainFeedCard({ chain }: { chain: ChainGroupFeedItem }) {
+function ChainFeedCard({
+  chain,
+  busy,
+  onBuildCampaigns,
+}: {
+  chain: ChainGroupFeedItem;
+  busy: boolean;
+  onBuildCampaigns: (chain: ChainGroupFeedItem) => void;
+}) {
   const statusTone: Record<string, string> = {
     candidate: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
     confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
@@ -255,6 +263,16 @@ function ChainFeedCard({ chain }: { chain: ChainGroupFeedItem }) {
           {chain.claimProgress.claimed}/{chain.claimProgress.live} claimed
           {chain.claimProgress.invited > 0 ? ` · ${chain.claimProgress.invited} invited` : ''}
         </span>
+        {chain.businessProspectId && (
+          <span className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            prospect {chain.businessProspectId}
+          </span>
+        )}
+        {chain.prospectConflict && (
+          <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">
+            prospect conflict — members in {chain.prospectConflict.length} groups
+          </span>
+        )}
         {(chain.contact.ownerPhone || chain.contact.ownerEmail || chain.contact.phone) && (
           <span className="ml-auto text-xs text-gray-500">
             pitch → {chain.contact.ownerPhone || chain.contact.ownerEmail || chain.contact.phone}
@@ -282,6 +300,15 @@ function ChainFeedCard({ chain }: { chain: ChainGroupFeedItem }) {
                 live token
               </span>
             )}
+            {m.campaignId && (
+              <Link
+                href={`/settings/admin/marketing-ops/campaigns/${m.campaignId}`}
+                className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300"
+              >
+                <ArrowUpRight className="h-3 w-3" />
+                {m.campaignDisplayId ?? 'campaign'}
+              </Link>
+            )}
             <span className="text-xs text-gray-500">
               {[m.city, m.state].filter(Boolean).join(', ') || '—'}
             </span>
@@ -308,6 +335,26 @@ function ChainFeedCard({ chain }: { chain: ChainGroupFeedItem }) {
               <li key={i}>{h}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* §7.2 — 1-click prospect build: one business_prospect_id for the
+          chain, one sibling campaign per member location, seed-linked.
+          Shown while any member still lacks a campaign. */}
+      {chain.members.some((m) => !m.campaignId) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onBuildCampaigns(chain)}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <ArrowUpRight className="h-3.5 w-3.5" />
+            Build sibling campaigns — {chain.members.length} location{chain.members.length !== 1 ? 's' : ''}
+          </button>
+          <span className="text-xs text-gray-500">
+            one prospect group · promotes each member's queue entry · seed-linked
+          </span>
         </div>
       )}
     </div>
@@ -412,6 +459,20 @@ function CleanupContent() {
       return cg
         ? `Linked as chain ${cg.chainGroupId} (${cg.confidence.replace('chain_', '')}) — ${cg.memberCount} location(s) in the prospecting feed.`
         : 'Group linked as chain — added to the prospecting feed.';
+    });
+
+  const handleBuildChainCampaigns = (chain: ChainGroupFeedItem) =>
+    runAction(async () => {
+      const r = await directoryPresenceAdminService.buildChainCampaigns(chain.chainGroupId);
+      const created = r.members.filter((m) => m.status === 'created').length;
+      const existing = r.members.filter((m) => m.status === 'existing').length;
+      const skipped = r.members.filter((m) => m.status === 'skipped' || m.status === 'failed');
+      const base = r.prospectConflict
+        ? `Campaigns built but members already sit in different prospects (${r.prospectConflict.join(', ')}) — resolve manually.`
+        : `Prospect ${r.businessProspectId} — ${created} campaign${created !== 1 ? 's' : ''} built, ${existing} existing.`;
+      return skipped.length
+        ? `${base} ${skipped.length} member${skipped.length !== 1 ? 's' : ''} not promoted (${skipped.map((m) => m.reason ?? m.status).join('; ')}).`
+        : base;
     });
 
   const handleBackfillAll = () =>
@@ -553,7 +614,12 @@ function CleanupContent() {
           </div>
         )}
         {chains.filter((c) => c.status !== 'dismissed').map((c) => (
-          <ChainFeedCard key={c.chainGroupId} chain={c} />
+          <ChainFeedCard
+            key={c.chainGroupId}
+            chain={c}
+            busy={busy}
+            onBuildCampaigns={handleBuildChainCampaigns}
+          />
         ))}
       </section>
 

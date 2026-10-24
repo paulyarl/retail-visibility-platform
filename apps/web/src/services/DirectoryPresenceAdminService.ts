@@ -2587,6 +2587,31 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return data?.chainGroups ?? [];
   }
 
+  /** POST /api/admin/directory-presence/presence-seeds/chain-groups/:id/campaigns —
+   *  the §7.2 1-click prospect build: promotes each member's queue entry,
+   *  groups the campaigns under one business_prospect_id, and seed-links
+   *  each member. Idempotent — re-runs report 'existing'. */
+  async buildChainCampaigns(chainGroupId: string): Promise<{
+    chainGroupId: string;
+    businessProspectId: string | null;
+    prospectConflict: string[] | null;
+    members: Array<{
+      seedId: string;
+      status: 'created' | 'existing' | 'skipped' | 'failed';
+      campaignId?: string;
+      reason?: string;
+      linked?: boolean;
+    }>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/chain-groups/${encodeURIComponent(chainGroupId)}/campaigns`,
+      { method: 'POST' },
+      undefined,
+      0,
+    );
+    return result.data?.data ?? result.data;
+  }
+
   /** GET /api/admin/directory-presence/presence-seeds/dedup-verdicts */
   async listDedupVerdicts(): Promise<any[]> {
     const result = await this.makeDefaultRequest<any>(
@@ -3507,6 +3532,11 @@ export interface ChainGroupFeedItem {
   confidence: 'chain_confirmed' | 'chain_probable';
   sourceSignals: Record<string, unknown>;
   cities: string[];
+  /** The shared business_prospect_id once the §7.2 build has run —
+   *  source_signals first, member campaigns' own ids as fallback. */
+  businessProspectId: string | null;
+  /** Multiple member prospect ids — the build refused to merge them. */
+  prospectConflict: string[] | null;
   contact: { phone: string | null; ownerEmail: string | null; ownerPhone: string | null };
   members: Array<{
     seedId: string;
@@ -3518,6 +3548,8 @@ export interface ChainGroupFeedItem {
     isPublished: boolean;
     listingOrigin: string | null;
     hasActiveClaimToken: boolean;
+    campaignId: string | null;
+    campaignDisplayId: string | null;
   }>;
   claimProgress: { total: number; live: number; claimed: number; invited: number };
   pitchHooks: string[];

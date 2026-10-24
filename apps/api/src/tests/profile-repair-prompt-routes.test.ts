@@ -78,7 +78,7 @@ describe('Profile Repair Prompt Routes', () => {
       expect(res.body.data.executionId).toBe('exec-123');
       expect(res.body.data.recommendation.severity_score).toBe(8);
       expect(res.body.data.recommendation.recommended_track).toBe('escalated');
-      expect(mockPromptService.executeSeekSync).toHaveBeenCalledWith('camp-1', undefined, expect.anything());
+      expect(mockPromptService.executeSeekSync).toHaveBeenCalledWith('camp-1', undefined, expect.anything(), undefined);
     });
   });
 
