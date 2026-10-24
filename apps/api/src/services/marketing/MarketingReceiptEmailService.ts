@@ -187,8 +187,9 @@ ${branding.platformName} · ${branding.contactEmail}`;
       subject,
       html,
       text,
-      from: unifiedConfig.emailFrom,
-      replyTo: branding.contactEmail || unifiedConfig.emailReplyTo,
+      from: unifiedConfig.emailBilling,
+      fromName: 'Billing',
+      replyTo: branding.contactEmail || unifiedConfig.emailBilling,
       attachments: [
         {
           filename,
@@ -359,8 +360,9 @@ ${branding.platformName} · ${branding.contactEmail}`;
       subject,
       html,
       text,
-      from: unifiedConfig.emailFrom,
-      replyTo: branding.contactEmail || unifiedConfig.emailReplyTo,
+      from: unifiedConfig.emailBilling,
+      fromName: 'Billing',
+      replyTo: branding.contactEmail || unifiedConfig.emailBilling,
     });
 
     // Log to notification_logs regardless of outcome

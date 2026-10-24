@@ -5,6 +5,7 @@
 
 import { prisma } from '../../prisma';
 import { emailService } from '../email-service';
+import { unifiedConfig } from '../../config/unifiedConfig';
 import { getOrderNotificationService } from '../OrderNotificationService';
 import { logger } from '../../logger';
 
@@ -40,6 +41,9 @@ export class DigitalDownloadEmailService {
     try {
       const result = await emailService.sendEmail({
         to: data.customerEmail,
+        from: unifiedConfig.emailOrders,
+        fromName: 'Orders',
+        replyTo: unifiedConfig.emailOrders,
         subject,
         html: emailHtml,
         text: emailText,
@@ -310,6 +314,9 @@ Thanks for your business!
     try {
       const result = await emailService.sendEmail({
         to: data.customerEmail,
+        from: unifiedConfig.emailOrders,
+        fromName: 'Orders',
+        replyTo: unifiedConfig.emailOrders,
         subject,
         html: emailHtml,
         text: emailText,

@@ -24,7 +24,7 @@ export class SendGridEmailProvider implements EmailProvider {
         to: params.to,
         from: {
           email: params.from || this.fromEmail,
-          name: this.fromName,
+          name: params.fromName ? `${this.fromName} ${params.fromName}` : this.fromName,
         },
         ...(params.replyTo ? { reply_to: { email: params.replyTo } } : {}),
         subject: params.subject,

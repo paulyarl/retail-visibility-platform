@@ -11,6 +11,7 @@
 import { prisma } from '../prisma';
 import { emailService } from './email-service';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 interface ReceiptItem {
   productName: string;
@@ -117,6 +118,9 @@ class OrderReceiptEmailService {
 
       await emailService.sendEmail({
         to: order.customer_email,
+        from: unifiedConfig.emailOrders,
+        fromName: 'Orders',
+        replyTo: unifiedConfig.emailOrders,
         subject: `Order Receipt - ${orderRef}`,
         html,
         text,

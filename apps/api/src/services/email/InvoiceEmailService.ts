@@ -123,8 +123,9 @@ export class InvoiceEmailService {
         subject,
         html: emailHtml,
         text: emailText,
-        from: unifiedConfig.emailFrom,
-        replyTo: branding.contactEmail || unifiedConfig.emailReplyTo,
+        from: unifiedConfig.emailBilling,
+        fromName: 'Billing',
+        replyTo: branding.contactEmail || unifiedConfig.emailBilling,
       });
 
       if (result.success) {

@@ -5,6 +5,7 @@
 
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 export interface PayoutEmailData {
   merchantEmail: string;
@@ -45,6 +46,9 @@ class MerchantPayoutEmailService {
 
       const result = await emailService.sendEmail({
         to: data.merchantEmail,
+        from: unifiedConfig.emailBilling,
+        fromName: 'Billing',
+        replyTo: unifiedConfig.emailBilling,
         subject,
         html,
         text,

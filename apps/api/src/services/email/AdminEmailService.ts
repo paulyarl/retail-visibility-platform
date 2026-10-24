@@ -5,6 +5,7 @@
 
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 export interface AdminNotificationData {
   type: 'merchant_onboarding_complete' | 'merchant_onboarding_requires_action' | 'platform_revenue_summary' | 'new_merchant_signup' | 'subscription_cancellation_request';
@@ -73,8 +74,8 @@ class AdminEmailService {
 
       // Send to all admins
       const results = await Promise.all(
-        adminEmails.map(email => 
-          emailService.sendEmail({ to: email, subject, html, text })
+        adminEmails.map(email =>
+          emailService.sendEmail({ to: email, from: unifiedConfig.emailAdmin, fromName: 'Admin', replyTo: unifiedConfig.emailAdmin, subject, html, text })
         )
       );
 

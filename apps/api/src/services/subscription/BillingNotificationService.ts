@@ -803,8 +803,8 @@ Thank you for your business!`;
         const resend = new Resend(resendApiKey);
         
         await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@visibleshelf.com',
-          reply_to: process.env.EMAIL_REPLY_TO || 'claims@visibleshelf.com',
+          from: `${process.env.EMAIL_FROM_NAME || 'VisibleShelf'} Billing <${process.env.EMAIL_BILLING || process.env.EMAIL_FROM || 'billing@visibleshelf.com'}>`,
+          reply_to: process.env.EMAIL_BILLING || 'billing@visibleshelf.com',
           to: payload.to,
           subject: payload.subject,
           html: payload.html,

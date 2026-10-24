@@ -518,6 +518,18 @@ class UnifiedConfig {
     return this.env.EMAIL_REPLY_TO || 'claims@visibleshelf.com';
   }
 
+  get emailBilling(): string {
+    return this.env.EMAIL_BILLING || 'billing@visibleshelf.com';
+  }
+
+  get emailOrders(): string {
+    return this.env.EMAIL_ORDERS || 'orders@visibleshelf.com';
+  }
+
+  get emailAdmin(): string {
+    return this.env.EMAIL_ADMIN || 'admin@visibleshelf.com';
+  }
+
   get emailFromName(): string {
     return this.env.EMAIL_FROM_NAME || 'VisibleShelf';
   }

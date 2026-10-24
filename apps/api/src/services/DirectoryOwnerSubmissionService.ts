@@ -423,6 +423,7 @@ Review at the seed detail page.`,
       await emailService.sendEmail({
         to,
         from: unifiedConfig.emailReplyTo,
+        fromName: 'Claims',
         replyTo: unifiedConfig.emailReplyTo,
         subject: 'Confirm your business submission',
         html,

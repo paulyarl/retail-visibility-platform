@@ -2,6 +2,7 @@ import { BaseService } from './BaseService';
 import { emailService } from './email-service';
 import { CrmAlertService } from './CrmAlertService';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 import { generateAbandonedCartId } from '../lib/id-generator';
 
 export interface CartItemInput {
@@ -274,6 +275,9 @@ class AbandonedCartService extends BaseService {
 
       const result = await emailService.sendEmail({
         to: cart.customer_email,
+        from: unifiedConfig.emailOrders,
+        fromName: 'Orders',
+        replyTo: unifiedConfig.emailOrders,
         subject: `Don't forget your cart at ${tenantName}!`,
         html,
         text: `You left items in your cart at ${tenantName}. Total: $${(cart.cart_value_cents / 100).toFixed(2)}. Visit ${recoveryUrl} to complete your purchase.`,

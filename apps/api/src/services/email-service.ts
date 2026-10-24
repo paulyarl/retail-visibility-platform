@@ -13,6 +13,8 @@ export interface EmailProvider {
 export interface SendEmailParams {
   to: string;
   from?: string;
+  /** Module qualifier merged after EMAIL_FROM_NAME — e.g. 'Billing' renders "VisibleShelf Billing". */
+  fromName?: string;
   replyTo?: string;
   subject: string;
   html: string;

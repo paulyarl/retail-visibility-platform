@@ -470,6 +470,7 @@ class DirectoryClaimService {
           await emailService.sendEmail({
             to: deliveryTarget,
             from: unifiedConfig.emailReplyTo,
+            fromName: 'Claims',
             replyTo: unifiedConfig.emailReplyTo,
             subject: 'Your Directory Claim Verification Code',
             text: `Your verification code is: ${otpCode}. It expires in 10 minutes.`,
@@ -816,6 +817,7 @@ Review at Settings → Directory → Presence Seeds.`,
     await emailService.sendEmail({
       to,
       from: unifiedConfig.emailReplyTo,
+      fromName: 'Claims',
       replyTo: unifiedConfig.emailReplyTo,
       subject: 'Confirm your listing claim request',
       html,

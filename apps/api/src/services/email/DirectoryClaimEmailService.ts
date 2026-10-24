@@ -129,6 +129,7 @@ Welcome aboard — we're glad to have you.
       const result = await emailService.sendEmail({
         to: data.to,
         from: unifiedConfig.emailReplyTo,
+        fromName: 'Claims',
         replyTo: unifiedConfig.emailReplyTo,
         subject,
         html,
@@ -217,6 +218,7 @@ Reference: ${data.requestId}
       const result = await emailService.sendEmail({
         to: data.to,
         from: unifiedConfig.emailReplyTo,
+        fromName: 'Claims',
         replyTo: unifiedConfig.emailReplyTo,
         subject,
         html,

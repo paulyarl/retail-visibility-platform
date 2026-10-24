@@ -24,8 +24,9 @@ export class SESEmailProvider implements EmailProvider {
 
       const ses = await this.getSESClient();
       
+      const displayName = params.fromName ? `${this.fromName} ${params.fromName}` : this.fromName;
       const emailParams = {
-        Source: `${this.fromName} <${params.from || this.fromEmail}>`,
+        Source: `${displayName} <${params.from || this.fromEmail}>`,
         ...(params.replyTo ? { ReplyToAddresses: [params.replyTo] } : {}),
         Destination: {
           ToAddresses: [params.to],

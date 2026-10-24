@@ -21,7 +21,7 @@ export class MailtrapEmailProvider implements EmailProvider {
       const emailData = {
         from: {
           email: params.from || this.fromEmail,
-          name: this.fromName,
+          name: params.fromName ? `${this.fromName} ${params.fromName}` : this.fromName,
         },
         ...(params.replyTo ? { reply_to: { email: params.replyTo } } : {}),
         to: [

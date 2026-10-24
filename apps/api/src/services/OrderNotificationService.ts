@@ -13,6 +13,7 @@ import { prisma } from '../prisma';
 import { emailService } from './email-service';
 import CrmAlertService from './CrmAlertService';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 export type OrderNotificationType = 
   | 'order_placed'
@@ -65,14 +66,14 @@ class OrderNotificationService {
       // Send to merchant for certain notification types
       if (merchantEmail && ['order_placed', 'order_cancelled', 'deposit_forfeited'].includes(data.type)) {
         const merchantEmailPayload = this.buildMerchantEmailPayload(merchantEmail, tenantName, data);
-        const merchantSent = await emailService.sendEmail(merchantEmailPayload);
+        const merchantSent = await emailService.sendEmail({ ...merchantEmailPayload, from: unifiedConfig.emailOrders, fromName: 'Orders', replyTo: unifiedConfig.emailOrders });
         emailsSent.push(merchantSent.success);
       }
 
       // Send to customer for certain notification types
       if (data.customerEmail && ['order_cancelled', 'order_fulfilled', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'deposit_forfeited', 'refund_processed', 'digital_delivered', 'service_scheduled', 'service_completed'].includes(data.type)) {
         const customerEmailPayload = this.buildCustomerEmailPayload(data.customerEmail, data.customerName || 'Customer', tenantName, data);
-        const customerSent = await emailService.sendEmail(customerEmailPayload);
+        const customerSent = await emailService.sendEmail({ ...customerEmailPayload, from: unifiedConfig.emailOrders, fromName: 'Orders', replyTo: unifiedConfig.emailOrders });
         emailsSent.push(customerSent.success);
       }
 

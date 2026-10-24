@@ -1295,6 +1295,7 @@ class DirectoryPresenceSeedService {
         await emailService.sendEmail({
           to: seed[0].owner_email,
           from: unifiedConfig.emailReplyTo,
+          fromName: 'Claims',
           replyTo: unifiedConfig.emailReplyTo,
           subject: `Claim your ${seed[0].business_name} listing`,
           html,

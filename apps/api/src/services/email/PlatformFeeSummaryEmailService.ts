@@ -5,6 +5,7 @@
 
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 export interface FeeSummaryData {
   merchantEmail: string;
@@ -115,6 +116,9 @@ class PlatformFeeSummaryEmailService {
       
       const result = await emailService.sendEmail({
         to: summary.merchantEmail,
+        from: unifiedConfig.emailBilling,
+        fromName: 'Billing',
+        replyTo: unifiedConfig.emailBilling,
         subject: `Monthly Fee Summary - ${tenant.name} (${this.formatMonth(periodStart)})`,
         html: this.generateSummaryHtml(summary),
         text: this.generateSummaryText(summary),
