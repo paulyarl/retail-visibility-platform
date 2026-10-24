@@ -15,13 +15,17 @@ export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | '
 
 /**
  * Resolve effective storefront type state.
+ * This is a pure function — no DB access. The features bag is the merged
+ * grant set (tier rows + purchases + overrides + flexible expansion) built by
+ * fetchRawCapabilities / fetchRawCapabilitiesFromMV, so storefront types grant
+ * like every other module: purchase- and override-driven grants count too.
  */
-export async function resolveStorefrontType(
-  tenantId: string,
+export function resolveStorefrontType(
+  features: Record<string, boolean>,
   merchantPrefs: StorefrontTypeMerchantSettings | null
-): Promise<EffectiveStorefront> {
+): EffectiveStorefront {
   const service = StorefrontTypeService.getInstance();
-  const tierState = await service.resolveStorefrontTypeState(tenantId);
+  const tierState = service.resolveFromFeatures(features);
 
   // Merchant preferences (soft toggle, default true when unset)
   const storefrontTypeEnabled = merchantPrefs?.storefront_type_enabled !== false;

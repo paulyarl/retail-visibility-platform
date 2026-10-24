@@ -313,7 +313,7 @@ export default function StorefrontEditorialLayout({
           </div>
         </header>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <StorefrontStatusPanel tenantInfo={storefrontStatus.tenant as any} />
+          <StorefrontStatusPanel tenantId={tenantId} tenantInfo={storefrontStatus.tenant as any} />
         </div>
       </div>
     );

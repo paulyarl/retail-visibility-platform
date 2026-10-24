@@ -2169,6 +2169,15 @@ export function generateDedupVerdictId(): string {
   return `mpv-${nanoid()}`;
 }
 
+/**
+ * Generate directory chain group ID (chain prospecting feed, Migration 359)
+ * Format: dcg-{nanoid} (12 chars)
+ */
+export function generateDirectoryChainGroupId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `dcg-${nanoid()}`;
+}
+
 // ─── Outreach Intelligence Prep (Sprint 1) ──────────────────────────────
 // Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
 

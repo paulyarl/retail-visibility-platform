@@ -83,6 +83,13 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
   const sourcedAttributes: Array<{ key: string; label: string; sourcePlatform?: string; sourceUrl?: string; asOf?: string }> =
     Array.isArray(listing?.attributes) ? listing.attributes : [];
 
+  // Claimed seeds carry the same composed description on the listing and the
+  // business profile — render the profile copy only when it adds something.
+  const profileDescription =
+    businessProfile?.business_description || businessProfile?.businessDescription || null;
+  const showProfileDescription =
+    !!profileDescription && profileDescription.trim() !== (listing.description || '').trim();
+
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
@@ -203,10 +210,6 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                       {attributesVisible && (
                         <AttributeChips attributes={sourcedAttributes} />
                       )}
-                      <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
-                      {listing.keywords && listing.keywords.length > 0 && (
-                        <div className="mt-3"><DirectoryKeywordTags keywords={listing.keywords} /></div>
-                      )}
                     </div>
                   </div>
                   {!showStatusPanel && (showsHours || isStorefrontEnabled) && (
@@ -238,6 +241,86 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                       <DirectoryActions listing={{ business_name: listing.businessName, slug: listing.slug, tenantId: listing.tenantId, id: listing.id }} currentUrl={currentUrl} />
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Contact — primary directory content: NAP + social */}
+              {!showStatusPanel && (canShowContact || whatsappCtaNumber) && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
+                  {canShowContact ? (
+                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} onPhoneClick={trackCallClick} />
+                  ) : (
+                    whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
+                  )}
+                  <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
+                  {/* Social Links */}
+                  {canShowSocial && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
+                    <div className="pt-3 border-t border-neutral-200 mt-3">
+                      <h2 className="text-lg font-semibold text-neutral-500 mb-3">Follow Us</h2>
+                      <div className="flex flex-wrap gap-4">
+                        {(businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook) && (
+                          <a href={businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook} target="_blank" rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700" title="Facebook">Facebook</a>
+                        )}
+                        {(businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram) && (
+                          <a href={businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram} target="_blank" rel="noopener noreferrer"
+                            className="text-pink-600 hover:text-pink-700" title="Instagram">Instagram</a>
+                        )}
+                        {(businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter) && (
+                          <a href={businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter} target="_blank" rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-500" title="Twitter/X">Twitter/X</a>
+                        )}
+                        {(businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin) && (
+                          <a href={businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin} target="_blank" rel="noopener noreferrer"
+                            className="text-blue-700 hover:text-blue-800" title="LinkedIn">LinkedIn</a>
+                        )}
+                        {(businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube) && (
+                          <a href={businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube} target="_blank" rel="noopener noreferrer"
+                            className="text-red-600 hover:text-red-700" title="YouTube">YouTube</a>
+                        )}
+                        {(businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok) && (
+                          <a href={businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok} target="_blank" rel="noopener noreferrer"
+                            className="text-gray-700 hover:text-gray-800" title="TikTok">TikTok</a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Business Hours */}
+              {!showStatusPanel && showsHours && businessHours && (
+                <>
+                  <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
+                  <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+                </>
+              )}
+
+              {/* Map */}
+              {!showStatusPanel && showsMap && listing.address && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Our Location</h2>
+                  <GoogleMapEmbed address={listing.address} />
+                </div>
+              )}
+
+              {/* Inquiry Form — shopper contact channel, grouped with NAP */}
+              {crmFlags?.crm_enabled && crmFlags?.crm_inquiry_directory_enabled && !showStatusPanel && tenantId && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Send an Inquiry</h3>
+                      <p className="text-xs text-neutral-500">Ask {listing.businessName || listing.name || 'this store'} a question</p>
+                    </div>
+                  </div>
+                  <PublicInquiryForm tenantId={tenantId} tenantName={listing.businessName || listing.name} sourceLabel="Directory" />
                 </div>
               )}
 
@@ -364,7 +447,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
               )}
 
               {/* Business Description */}
-              {(!showStatusPanel && canShowAbout && (listing.description || businessProfile?.business_description || businessProfile?.businessDescription)) && (
+              {(!showStatusPanel && canShowAbout && (listing.description || profileDescription)) && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
                   <div className="prose prose-gray max-w-none">
@@ -373,11 +456,11 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                         {listing.description}
                       </p>
                     )}
-                    {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                    {showProfileDescription && (
                       <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
-                        {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200
-                          ? `${(businessProfile.business_description || businessProfile.businessDescription)?.substring(0, 200)}...`
-                          : (businessProfile.business_description || businessProfile.businessDescription)}
+                        {(profileDescription.length || 0) > 200
+                          ? `${profileDescription.substring(0, 200)}...`
+                          : profileDescription}
                       </p>
                     )}
                   </div>
@@ -395,6 +478,26 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                   <ProductCategoriesCollapsible categories={storefrontCategories.categories} tenantId={listing.tenantId} uncategorizedCount={storefrontCategories.uncategorizedCount} />
                 </div>
               )}
+              {/* Reviews */}
+              {!showStatusPanel && <div id="reviews-section" className="flex w-full"><StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} /></div>}
+
+              {/* FAQ */}
+              {faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion && tenantId && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <FaqStorefrontDisplay tenantId={tenantId}
+                    enabled={faqFlags.faq_enabled && faqFlags.faq_display_storefront_accordion}
+                    feedbackEnabled={faqFlags.faq_enabled && faqFlags.faq_display_feedback}
+                    defaultExpanded={false} />
+                </div>
+              )}
+
+              {/* Keyword tags — secondary SEO/search links */}
+              {listing.keywords && listing.keywords.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <DirectoryKeywordTags keywords={listing.keywords} />
+                </div>
+              )}
+
               {!showStatusPanel && canShowQr && (
                 <TenantQRCode url={currentUrl} tenantId={listing.tenantId} label="Scan to Share"
                   downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
@@ -412,102 +515,7 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                   />
                 </div>
               )}
-
-              {/* FAQ */}
-              {faqFlags?.faq_enabled && faqFlags?.faq_display_storefront_accordion && tenantId && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <FaqStorefrontDisplay tenantId={tenantId}
-                    enabled={faqFlags.faq_enabled && faqFlags.faq_display_storefront_accordion}
-                    feedbackEnabled={faqFlags.faq_enabled && faqFlags.faq_display_feedback}
-                    defaultExpanded={false} />
-                </div>
-              )}
-
-              {/* Reviews */}
-              {!showStatusPanel && <div id="reviews-section" className="flex w-full"><StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} /></div>}
             </div>
-
-            {/* Right Column */}
-            {!showStatusPanel && (canShowContact || whatsappCtaNumber) && (
-              <div className="space-y-6">
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
-                  {canShowContact ? (
-                    <ContactInformationCollapsible tenant={listing} fullAddress={showsLocation ? fullAddress : ''} initialExpanded={true} isRetailStore={true} whatsappCtaNumber={whatsappCtaNumber} onPhoneClick={trackCallClick} />
-                  ) : (
-                    whatsappCtaNumber && <WhatsAppCtaButton number={whatsappCtaNumber} />
-                  )}
-                  <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
-                  {/* Social Links */}
-                  {canShowSocial && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
-                    <div className="pt-3 border-t border-neutral-200 mt-3">
-                      <h2 className="text-lg font-semibold text-neutral-500 mb-3">Follow Us</h2>
-                      <div className="flex flex-wrap gap-4">
-                        {(businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook) && (
-                          <a href={businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook} target="_blank" rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700" title="Facebook">Facebook</a>
-                        )}
-                        {(businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram) && (
-                          <a href={businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram} target="_blank" rel="noopener noreferrer"
-                            className="text-pink-600 hover:text-pink-700" title="Instagram">Instagram</a>
-                        )}
-                        {(businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter) && (
-                          <a href={businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter} target="_blank" rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-500" title="Twitter/X">Twitter/X</a>
-                        )}
-                        {(businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin) && (
-                          <a href={businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin} target="_blank" rel="noopener noreferrer"
-                            className="text-blue-700 hover:text-blue-800" title="LinkedIn">LinkedIn</a>
-                        )}
-                        {(businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube) && (
-                          <a href={businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube} target="_blank" rel="noopener noreferrer"
-                            className="text-red-600 hover:text-red-700" title="YouTube">YouTube</a>
-                        )}
-                        {(businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok) && (
-                          <a href={businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok} target="_blank" rel="noopener noreferrer"
-                            className="text-gray-700 hover:text-gray-800" title="TikTok">TikTok</a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Business Hours */}
-            {!showStatusPanel && showsHours && businessHours && (
-              <>
-                <BusinessHoursCollapsible businessHours={businessHours} isRetailStore={true} />
-                <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-              </>
-            )}
-
-            {/* Map */}
-            {!showStatusPanel && showsMap && listing.address && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Our Location</h2>
-                <GoogleMapEmbed address={listing.address} />
-              </div>
-            )}
-
-            {/* Inquiry Form */}
-            {crmFlags?.crm_enabled && crmFlags?.crm_inquiry_directory_enabled && !showStatusPanel && tenantId && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Send an Inquiry</h3>
-                    <p className="text-xs text-neutral-500">Ask {listing.businessName || listing.name || 'this store'} a question</p>
-                  </div>
-                </div>
-                <PublicInquiryForm tenantId={tenantId} tenantName={listing.businessName || listing.name} sourceLabel="Directory" />
-              </div>
-            )}
           </div>
         </div>
       </div>

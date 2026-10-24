@@ -24,7 +24,7 @@ import { ValidationError } from '../middleware/errorHandler';
 import { generateDedupVerdictId } from '../lib/id-generator';
 
 export type DedupMatchKey = 'phone' | 'address_city';
-export type DedupVerdict = 'same_entity' | 'distinct';
+export type DedupVerdict = 'same_entity' | 'distinct' | 'distinct_chain';
 
 export interface RecordVerdictInput {
   seedIds: string[];          // the surfaced group (sorted canonical set)

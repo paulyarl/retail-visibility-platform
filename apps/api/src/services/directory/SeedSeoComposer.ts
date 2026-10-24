@@ -365,7 +365,8 @@ function composeDescription(
     : '';
   const stateClause = campaign.addressState ? `, ${campaign.addressState}` : '';
 
-  const template = `${campaign.businessName} is a ${categoryLabel}${cityClause}${stateClause}.${disclosure}`;
+  const article = /^[aeiou]/i.test(categoryLabel.trim()) ? 'an' : 'a';
+  const template = `${campaign.businessName} is ${article} ${categoryLabel}${cityClause}${stateClause}.${disclosure}`;
 
   return truncateAtWordBoundary(template, DESCRIPTION_MAX);
 }

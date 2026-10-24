@@ -157,7 +157,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.payment_gateway_options?.features || {},
       merchantBundle.paymentGateway
     ),
-    resolveStorefrontType(tenantId, merchantBundle.storefrontType),
+    resolveStorefrontType(
+      rawCaps.capabilities.storefront_types?.features || {},
+      merchantBundle.storefrontType
+    ),
     resolveFulfillment(
       rawCaps.capabilities.fulfillment_options?.features || {},
       merchantBundle.fulfillment
@@ -677,7 +680,10 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.payment_gateway_options?.features || {},
       merchantBundle.paymentGateway
     ),
-    resolveStorefrontType(tenantId, merchantBundle.storefrontType),
+    resolveStorefrontType(
+      rawCaps.capabilities.storefront_types?.features || {},
+      merchantBundle.storefrontType
+    ),
     resolveFulfillment(
       rawCaps.capabilities.fulfillment_options?.features || {},
       merchantBundle.fulfillment

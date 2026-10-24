@@ -317,8 +317,8 @@ describe('SeedSeoComposer', () => {
         goldStandard: null,
       });
 
-      // Template format: "Sahel African Market is a African Grocery Store in..."
-      expect(packet.description).toContain('Sahel African Market is a');
+      // Template format: "Sahel African Market is an African Grocery Store in..."
+      expect(packet.description).toContain('Sahel African Market is an');
       expect(packet.description).not.toContain('community-anchored');
     });
 
@@ -330,7 +330,7 @@ describe('SeedSeoComposer', () => {
         goldStandard: null,
       });
 
-      expect(packet.description).toContain('Sahel African Market is a');
+      expect(packet.description).toContain('Sahel African Market is an');
     });
 
     it('never contains review, score, tier, or deficiency language', () => {
