@@ -339,3 +339,36 @@ export function canonicalStorefrontHome(
   if (canon?.kind === 'subdomain' && canon.host) return `https://${canon.host}.${platformApexHost()}/`;
   return `${platformOrigin()}/tenant/${idOrSlug}`;
 }
+
+/**
+ * Absolute URL for a TENANT-HOST pathname on the tenant's canonical surface —
+ * the redirect target when a known-but-inactive custom domain (pending /
+ * verified / error / disabled) is requested and must bounce to the
+ * next-highest active layer.
+ *
+ *   canon kind custom/subdomain → `https://{canonicalHost}{pathname}`
+ *     (host-relative storefront paths are verbatim-valid there; the receiving
+ *     proxy canonicalizes any `/tenant/{id}` leak itself)
+ *   canon kind path             → platform origin; the storefront home and
+ *     prefix roots take `/tenant/{id}` via storefrontPath, passthrough roots
+ *     (`/products/{id}`, public/directory pages) are valid verbatim
+ */
+export function canonicalSurfaceUrl(
+  canon: StorefrontCanonical | null | undefined,
+  tenantId: string,
+  pathname: string,
+  search = '',
+): string {
+  const path = pathname || '/';
+  if (canon?.kind === 'custom' && canon.host) {
+    return `https://${canon.host}${path}${search}`;
+  }
+  if (canon?.kind === 'subdomain' && canon.host) {
+    return `https://${canon.host}.${platformApexHost()}${path}${search}`;
+  }
+  const mapped =
+    path === '/' || STOREFRONT_PREFIX_ROOTS.some((r) => path === r || path.startsWith(`${r}/`))
+      ? storefrontPath(false, tenantId, path)
+      : path;
+  return `${platformOrigin()}${mapped}${search}`;
+}

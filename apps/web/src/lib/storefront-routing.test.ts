@@ -12,6 +12,7 @@ import {
   STOREFRONT_PASSTHROUGH_ROOTS,
   canonicalStorefrontOrigin,
   canonicalStorefrontHome,
+  canonicalSurfaceUrl,
   platformOrigin,
   platformApexHost,
 } from './storefront-routing';
@@ -272,5 +273,37 @@ describe('canonical ladder helpers', () => {
     expect(canonicalStorefrontHome(null, 'tid-1')).toBe(`${ORIGIN}/tenant/tid-1`);
     expect(canonicalStorefrontOrigin({ kind: 'custom', host: null })).toBe(ORIGIN);
     expect(canonicalStorefrontHome({ kind: 'subdomain', host: null }, 'tid-1')).toBe(`${ORIGIN}/tenant/tid-1`);
+  });
+});
+
+describe('canonicalSurfaceUrl (inactive-host bounce target)', () => {
+  const ORIGIN = platformOrigin();
+  const APEX = platformApexHost();
+
+  it('keeps paths verbatim on a custom-domain canonical', () => {
+    expect(canonicalSurfaceUrl({ kind: 'custom', host: 'mybrand.com' }, 'tid-1', '/')).toBe('https://mybrand.com/');
+    expect(canonicalSurfaceUrl({ kind: 'custom', host: 'mybrand.com' }, 'tid-1', '/products/pid-1', '?x=1')).toBe('https://mybrand.com/products/pid-1?x=1');
+  });
+
+  it('keeps paths verbatim on a subdomain canonical (receiving proxy canonicalizes)', () => {
+    expect(canonicalSurfaceUrl({ kind: 'subdomain', host: 'baraka' }, 'tid-1', '/')).toBe(`https://baraka.${APEX}/`);
+    expect(canonicalSurfaceUrl({ kind: 'subdomain', host: 'baraka' }, 'tid-1', '/policies/refund')).toBe(`https://baraka.${APEX}/policies/refund`);
+  });
+
+  it('prefixes the storefront home and prefix roots on a path-tier canonical', () => {
+    expect(canonicalSurfaceUrl({ kind: 'path', tenantId: 'tid-1' }, 'tid-1', '/')).toBe(`${ORIGIN}/tenant/tid-1`);
+    expect(canonicalSurfaceUrl({ kind: 'path', tenantId: 'tid-1' }, 'tid-1', '/services/delivery')).toBe(`${ORIGIN}/tenant/tid-1/services/delivery`);
+    expect(canonicalSurfaceUrl({ kind: 'path', tenantId: 'tid-1' }, 'tid-1', '/policies/refund')).toBe(`${ORIGIN}/tenant/tid-1/policies/refund`);
+  });
+
+  it('keeps passthrough roots verbatim on the platform origin', () => {
+    expect(canonicalSurfaceUrl({ kind: 'path', tenantId: 'tid-1' }, 'tid-1', '/products/pid-1')).toBe(`${ORIGIN}/products/pid-1`);
+    expect(canonicalSurfaceUrl({ kind: 'path', tenantId: 'tid-1' }, 'tid-1', '/directory/x')).toBe(`${ORIGIN}/directory/x`);
+    expect(canonicalSurfaceUrl({ kind: 'path', tenantId: 'tid-1' }, 'tid-1', '/tenant/tid-1')).toBe(`${ORIGIN}/tenant/tid-1`);
+  });
+
+  it('falls back to the path mapping when the canonical is missing', () => {
+    expect(canonicalSurfaceUrl(null, 'tid-1', '/')).toBe(`${ORIGIN}/tenant/tid-1`);
+    expect(canonicalSurfaceUrl({ kind: 'custom', host: null }, 'tid-1', '/')).toBe(`${ORIGIN}/tenant/tid-1`);
   });
 });

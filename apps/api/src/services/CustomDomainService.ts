@@ -416,6 +416,24 @@ export class CustomDomainService extends BaseService {
     return row ? { tenantId: row.tenant_id, domain: row.domain } : null;
   }
 
+  /**
+   * Any-status host lookup — same normalization as resolveHostToTenant but
+   * returns the row regardless of status. The proxy uses it to 302 an
+   * attached-but-inactive domain (pending/verified/error/disabled) to the
+   * tenant's canonical surface instead of fail-closing to 404.
+   */
+  async resolveHostState(host: string): Promise<{ tenantId: string; domain: string; status: string } | null> {
+    const normalized = normalizeHostForResolve(host);
+    if (!normalized || isPlatformDomain(normalized) || isNonDnsHost(normalized)) {
+      return null;
+    }
+    const row = await prisma.custom_domains.findFirst({
+      where: { domain: normalized },
+      select: { tenant_id: true, domain: true, status: true },
+    });
+    return row ? { tenantId: row.tenant_id, domain: row.domain, status: row.status } : null;
+  }
+
   /** Rows the B4 sweeper re-checks: not active, not disabled, not brand-new. */
   async listSweepable(limit = 50): Promise<Array<{ id: string; tenant_id: string; domain: string }>> {
     return prisma.custom_domains.findMany({

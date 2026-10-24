@@ -3,7 +3,7 @@ import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 import { clientLogger } from '@/lib/client-logger';
-import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, STOREFRONT_PREFIX_ROOTS, tenantHostCanonicalPath } from '@/lib/storefront-routing';
+import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, STOREFRONT_PREFIX_ROOTS, tenantHostCanonicalPath, canonicalSurfaceUrl, type StorefrontCanonical } from '@/lib/storefront-routing';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
@@ -18,20 +18,36 @@ const PLATFORM_APP_ORIGIN = platformOrigin();
 // Resolve-cache (1.4): positive AND definitive-miss entries cached briefly so
 // the resolve endpoint isn't hit per request; transient 429/5xx is never
 // cached — the next request retries live. Per-isolate, ephemeral — fine.
-const customHostCache = new Map<string, { value: { tenantId: string; domain: string } | null; expires: number }>();
+const customHostCache = new Map<string, { value: { tenantId: string; domain: string; active: boolean; status: string } | null; expires: number }>();
 const CUSTOM_HOST_CACHE_TTL_MS = 60_000;
 
-async function resolveCustomHost(req: NextRequest, hostname: string): Promise<{ tenantId: string; domain: string } | null> {
+interface CustomHostResolution {
+  tenantId: string;
+  domain: string;
+  active: boolean;
+  status: string;
+}
+
+async function resolveCustomHost(req: NextRequest, hostname: string): Promise<CustomHostResolution | null> {
   const key = hostname.toLowerCase();
   const hit = customHostCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.value;
 
-  const resp = await fetch(`${API_BASE_URL}/api/tenants/resolve-custom-domain/${encodeURIComponent(key)}`, {
+  // ?v=2 — extended contract: known-but-inactive rows resolve too so the
+  // proxy can bounce them to the canonical surface instead of 404ing.
+  const resp = await fetch(`${API_BASE_URL}/api/tenants/resolve-custom-domain/${encodeURIComponent(key)}?v=2`, {
     headers: { 'x-forwarded-for': req.headers.get('x-forwarded-for') ?? '' },
   });
   if (resp.ok) {
     const data = await resp.json();
-    const value = data?.success && data.tenantId ? { tenantId: data.tenantId as string, domain: data.domain as string } : null;
+    const value: CustomHostResolution | null = data?.success && data.tenantId
+      ? {
+          tenantId: data.tenantId as string,
+          domain: data.domain as string,
+          active: data.active === true,
+          status: String(data.status ?? ''),
+        }
+      : null;
     customHostCache.set(key, { value, expires: Date.now() + CUSTOM_HOST_CACHE_TTL_MS });
     return value;
   }
@@ -39,6 +55,28 @@ async function resolveCustomHost(req: NextRequest, hostname: string): Promise<{ 
     customHostCache.set(key, { value: null, expires: Date.now() + CUSTOM_HOST_CACHE_TTL_MS });
   }
   return null; // 429/5xx — definitive miss handling but NOT cached
+}
+
+// Canonical lookup for the inactive-host bounce — separate cache keyed by
+// tenant, same TTL. A miss (404/5xx) is not cached: the redirect depends on
+// it, so the next request retries live.
+const tenantCanonicalCache = new Map<string, { value: StorefrontCanonical | null; expires: number }>();
+
+async function resolveTenantCanonical(req: NextRequest, tenantId: string): Promise<StorefrontCanonical | null> {
+  const hit = tenantCanonicalCache.get(tenantId);
+  if (hit && hit.expires > Date.now()) return hit.value;
+
+  const resp = await fetch(`${API_BASE_URL}/api/tenants/storefront-canonical/${encodeURIComponent(tenantId)}`, {
+    headers: { 'x-forwarded-for': req.headers.get('x-forwarded-for') ?? '' },
+  });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  if (!data?.success || (data.kind !== 'custom' && data.kind !== 'subdomain' && data.kind !== 'path')) {
+    return null;
+  }
+  const value: StorefrontCanonical = { kind: data.kind, host: data.host ?? null, tenantId: data.tenantId ?? tenantId };
+  tenantCanonicalCache.set(tenantId, { value, expires: Date.now() + CUSTOM_HOST_CACHE_TTL_MS });
+  return value;
 }
 
 function getCookie(req: NextRequest, name: string): string | undefined {
@@ -215,6 +253,33 @@ export async function proxy(req: NextRequest) {
     try {
       const resolved = await resolveCustomHost(req, hostname);
 
+      // Known-but-inactive domain (pending/verified/error/disabled): the row
+      // exists, so this IS a tenant host — just mid-lifecycle or suspended.
+      // Don't 404 the storefront; bounce to the next-highest ACTIVE layer
+      // (the resolved canonical is never this host — it isn't active). 302,
+      // not 301: activation flips canonical back here and a permanent
+      // redirect would have to be un-learned.
+      if (resolved && !resolved.active) {
+        const manageSuffix = managePathSuffix(pathname);
+        if (manageSuffix !== null) {
+          const dest = new URL(`${PLATFORM_APP_ORIGIN}/t/${resolved.tenantId}${manageSuffix}${req.nextUrl.search}`);
+          console.log(`[Proxy] Custom-host inactive /manage: ${hostname}${pathname} → ${dest.toString()}`);
+          return NextResponse.redirect(dest, { status: 302 });
+        }
+        if (!isStorefrontPath(pathname)) {
+          return NextResponse.rewrite(new URL('/404', req.url));
+        }
+        const canon = await resolveTenantCanonical(req, resolved.tenantId);
+        if (!canon) {
+          // Canonical lookup failed (outage/404) — fail closed rather than
+          // redirect blind or serve the platform app on a tenant-named host.
+          return NextResponse.rewrite(new URL('/404', req.url));
+        }
+        const dest = canonicalSurfaceUrl(canon, resolved.tenantId, pathname, req.nextUrl.search);
+        console.log(`[Proxy] Custom-host inactive bounce (${resolved.status}): ${hostname}${pathname} → ${dest}`);
+        return NextResponse.redirect(dest, { status: 302 });
+      }
+
       if (resolved) {
         // D9 host canonicalization first: the www companion 301s to the
         // stored (www-stripped) host. Path + query preserved — a /manage
@@ -277,9 +342,10 @@ export async function proxy(req: NextRequest) {
         return res;
       }
 
-      // Unresolved custom host → fail closed (H8-style): never render the
-      // platform app on a host that might be a tenant domain. Transient
-      // resolve failures land here too — a 404 beats serving the wrong app.
+      // Unknown custom host (no custom_domains row at all) → fail closed
+      // (H8-style): never render the platform app on a host that might be a
+      // tenant domain. Transient resolve failures land here too — a 404
+      // beats serving the wrong app.
       return NextResponse.rewrite(new URL('/404', req.url));
     } catch (error) {
       clientLogger.error('[Proxy] Error in custom-domain routing:', { detail: error });

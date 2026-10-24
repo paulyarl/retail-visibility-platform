@@ -772,6 +772,41 @@ Remaining: redeploy the storefront gate, fix staging `WEB_URL`, then Search Cons
 
 ---
 
+## 13. Post-launch hardening (non-blocking)
+
+Findings from the 2026-10-23 production sweep (397 advertised URLs: 337 → 200, 59 → 404 pending the storefront-tier gate, 1 transient). None block submission; all are one-PR fixes.
+
+### 13.1 Index pages emit no self-canonical
+
+`/place` and `/directory` render without `<link rel="canonical">`. The URLs are the canonical set *declared* in `core.xml`, but a missing self-canonical leaves `?utm=`/tracking-param duplicates to consolidate by inference instead of declaration.
+
+**Fix:** add `alternates.canonical` — `metadataBase`-relative, so it's host-correct on every surface:
+
+- `apps/web/src/app/place/page.tsx` → `canonical: '/place'`
+- `apps/web/src/app/directory/page.tsx` → `canonical: '/directory'`
+
+Cost: two lines each. Verify by grepping SSR HTML for `<link rel="canonical"` on both routes.
+
+### 13.2 Category JSON-LD is hydration-only
+
+`PlaceCategoryClient` builds `enrichment` in `useState(null)` + `useEffect` (`PlaceCategoryClient.tsx:56,63`), so both the `CollectionPage` block (line 129) and the `FAQPage` block (line 382) **never exist in the initial HTML** — they only appear after client hydration. Googlebot's deferred render may pick them up, but structured data that only exists post-JS is a weaker, slower signal — and any crawler without a render pass never sees it.
+
+**Fix:** server-prefetch enrichment in `page.tsx` (identical pattern to the `initialPlaces` prop added in PR4 — fetch `getCategoryEnrichment(categorySlug)` server-side, pass `initialEnrichment`), hydrate `useState(initialEnrichment ?? null)`, and skip the enrichment call inside the `useEffect` when it's present. Then both scripts render into the server document.
+
+**Also fix while there:** `jsonLd.url` falls back to a hardcoded apex (`PlaceCategoryClient.tsx:138`) and on the client uses `window.location.href` — which carries `?city=`/`?state=` params the canonical strips. Set `url` to the same canonical the metadata emits (sans filters), so the schema URL, the canonical, and the sitemap `<loc>` are identical byte-for-byte.
+
+### 13.3 Unenriched category pages have zero structured data
+
+Even with 13.2 fixed, categories without an `enrichment` row emit no JSON-LD at all. Every category page is a list of places — emit a baseline `ItemList` (or `CollectionPage` with `mainEntity: ItemList` of `ListItem → /place/{slug}`) built from the SSR-prefilled `places`, independent of enrichment. Cheap: the data is already in the component.
+
+### 13.4 Sweep anomalies to keep watching
+
+- **59 storefront 404s** — `directory_presence` seed rows; fixed in code, pending promote. Re-sweep `storefronts.xml` post-deploy: expect ~36 locs, all 200.
+- **1 transient product 404** (`sid-er0kwf2z` → 200 on retry, API healthy) — likely a cold miss; note if it recurs in weekly checks.
+- **Methodology note:** sweep from a *fresh* fetch of the five child files only — a stale staging capture injected 34 `www.visibleshelf.store` locs into one run (they 301; staging is healthy). Prod sitemap contains zero staging locs.
+
+---
+
 ## Appendix A — Probe log (2026-10-23)
 
 ```

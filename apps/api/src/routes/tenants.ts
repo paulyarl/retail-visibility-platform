@@ -672,10 +672,18 @@ router.get('/resolve-subdomain/:subdomain', async (req: Request, res: Response) 
  * Resolve a tenant-owned custom host to tenant ID for storefront routing
  * (sprint plan 1.4 — identical contract to resolve-subdomain; the proxy
  * treats both the same). Strips a leading www.; only `active` rows serve.
+ *
+ * `?v=2` extends the contract: a KNOWN but inactive row (pending/verified/
+ * error/disabled) returns `{ tenantId, domain, status, active: false }` so
+ * the proxy can 302 the host to the tenant's canonical surface instead of
+ * fail-closing to 404. The legacy (no-param) shape is unchanged — a stale
+ * proxy keeps treating inactive rows as unresolvable, which is the safe
+ * direction during rolling deploys.
  */
 router.get('/resolve-custom-domain/:host', async (req: Request, res: Response) => {
   try {
     const { host } = req.params;
+    const extended = req.query.v === '2';
 
     const clientKey = ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.ip || 'anonymous';
     const rateLimitResult = checkRateLimit(clientKey, 'customDomainResolve');
@@ -684,6 +692,24 @@ router.get('/resolve-custom-domain/:host', async (req: Request, res: Response) =
         success: false,
         error: 'rate_limit_exceeded',
         message: `Too many domain resolutions. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)} seconds.`
+      });
+    }
+
+    if (extended) {
+      const state = await customDomainService.resolveHostState(host);
+      if (!state) {
+        return res.status(404).json({
+          success: false,
+          error: 'domain_not_found',
+          message: 'No custom domain for this host'
+        });
+      }
+      return res.json({
+        success: true,
+        tenantId: state.tenantId,
+        domain: state.domain,
+        status: state.status,
+        active: state.status === 'active'
       });
     }
 
@@ -715,7 +741,8 @@ router.get('/resolve-custom-domain/:host', async (req: Request, res: Response) =
 // ─── Tenant custom domains (sprint plan 3.1) ────────────────────────────────
 // Self-service DIY flow: add → DNS at registrar → "Check status" → active.
 // Auth: authenticateToken + checkTenantAccess — same scope as /subdomain.
-// Entitlement (flag + capability) is enforced inside the service.
+// Entitlement (capability only — the rollout flag is deprecated) is enforced
+// inside the service.
 
 const CUSTOM_DOMAIN_ERROR_STATUS: Record<string, number> = {
   not_entitled: 403,
