@@ -430,6 +430,17 @@ export default function IntelligenceDiscoveryAuditCard({
           // Competitive weaknesses ride the same snapshot — the incumbent's
           // named exposures become the downstream pitch wedge (spec §7).
           competitive_weaknesses: Array.isArray(biz.competitive_weaknesses) ? biz.competitive_weaknesses : undefined,
+          // Analyst-suggested shelf labels (category = the queue entry's
+          // primary, so it is excluded here). Batch seed birth writes these
+          // to directory_listings_list.secondary_categories; the shelf
+          // sweep and enrichment-pair checks also read this snapshot key.
+          secondary_categories: Array.isArray(biz.suggested_categories)
+            ? Array.from(new Set(
+                biz.suggested_categories
+                  .map((sc) => String(sc?.category ?? '').trim())
+                  .filter((c) => c && c.toLowerCase() !== String(categoryOverride ?? biz.category ?? '').trim().toLowerCase()),
+              ))
+            : undefined,
         },
         priority: biz.business_seek_priority === 'high' ? 'high' : 'normal',
         // Intelligence discovery columns

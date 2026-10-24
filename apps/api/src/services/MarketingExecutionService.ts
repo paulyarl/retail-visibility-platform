@@ -32,7 +32,7 @@ import MarketingPlaybookCatalogService from './MarketingPlaybookCatalogService';
 import { MarketContextLoader } from './intelligence/MarketContextLoader';
 import { buildGeographyGridDirective, buildGeographyGrid, parseZipCodes, isNationalSentinel, type GeographyGrid } from './intelligence/geography-grid';
 import { GeographyGridService } from './intelligence/GeographyGridService';
-import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary, formatEnrichmentCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
+import { formatEstablishmentMarketContext, formatDiscoveryMarketContext, formatCategoryIdentificationMarketContext, formatKnownCategoryVocabulary, formatEnrichmentCategoryVocabulary, formatDiscoveryCategoryVocabulary } from './intelligence/MarketContextBindingFormatters';
 import { CategoryVocabularyService } from './CategoryVocabularyService';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { WEBSITE_POSITIONING_SCHEMA_NAME } from '../validators/website-positioning.schema';
@@ -1708,6 +1708,44 @@ export class MarketingExecutionService extends BaseService {
             state: campaignState,
           });
         }
+      }
+
+      // ─── Known-category vocabulary injection (both focuses) ──────────
+      // Same union the category-identification scan gets: every candidate's
+      // `category` is the primary shelf and suggested_categories are the
+      // secondary shelves its queue → batch-seed path carries verbatim onto
+      // the listing. The analyst can only emit listed labels verbatim and
+      // judge is_known_category correctly when the lists are in the prompt.
+      // Category-agnostic and focus-agnostic — national scans get it too.
+      // Never blocks the render: the service degrades per-source to empty
+      // lists and the formatter returns '' when all are empty.
+      try {
+        const vocab = await CategoryVocabularyService.getInstance().loadVocabulary(ctx);
+        const vocabBlock = formatDiscoveryCategoryVocabulary(
+          vocab.directoryLabels,
+          vocab.registeredLabels,
+          vocab.supplementLabels,
+        );
+        if (vocabBlock) {
+          rendered = rendered + '\n' + vocabBlock;
+          logger.info('Known-category vocabulary injected into intelligence discovery scan', ctx, {
+            campaignId: input.campaign.id,
+            category,
+            focus,
+            directoryLabelCount: vocab.directoryLabels.length,
+            registeredLabelCount: vocab.registeredLabels.length,
+            supplementLabelCount: vocab.supplementLabels.length,
+          });
+        } else {
+          logger.warn('Category vocabulary empty — no KNOWN CATEGORY VOCABULARY block injected into discovery scan', ctx, {
+            campaignId: input.campaign.id,
+          });
+        }
+      } catch (err) {
+        logger.warn('Failed to load category vocabulary — discovery scan proceeds without it', ctx, {
+          campaignId: input.campaign.id,
+          error: (err as Error).message,
+        });
       }
 
       // ─── Geography grid injection (category-independent enumeration floor) ─

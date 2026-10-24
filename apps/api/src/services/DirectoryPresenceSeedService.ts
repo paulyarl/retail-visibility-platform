@@ -280,6 +280,50 @@ class DirectoryPresenceSeedService {
   }
 
   /**
+   * Secondary shelf labels captured on the queue snapshot. The queue card
+   * writes the scan's suggested_categories labels (minus the resolved
+   * primary) into business_snapshot.secondary_categories; tolerate
+   * {category} objects so any producer shape lands. The resolved primary
+   * is always excluded — it is already the seed's canonical shelf.
+   */
+  private toSnapshotSecondaryCategories(
+    snapshot: any,
+    primaryCategory: string | null | undefined,
+  ): string[] {
+    const raw = Array.isArray(snapshot?.secondary_categories) ? snapshot.secondary_categories : [];
+    const primary = String(primaryCategory ?? '').trim().toLowerCase();
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const entry of raw) {
+      const label = String(
+        typeof entry === 'object' && entry ? entry.category ?? '' : entry ?? '',
+      ).trim();
+      const key = label.toLowerCase();
+      if (!label || key === primary || seen.has(key)) continue;
+      seen.add(key);
+      out.push(label);
+    }
+    return out;
+  }
+
+  /**
+   * Field-level provenance for secondary shelf labels — cited to the
+   * discovery scan that suggested them (same lane as scan-captured hours).
+   */
+  private toSecondaryCategoriesProvenance(
+    categories: string[],
+  ): NonNullable<CreateSeedInput['provenance']> {
+    if (categories.length === 0) return [];
+    return [{
+      fieldKey: 'secondary_categories',
+      value: categories.join(', '),
+      sourceName: 'discovery_scan',
+      confidence: 'medium' as const,
+      showOnPublic: true,
+    }];
+  }
+
+  /**
    * List all presence seeds, optionally filtered by seed_batch, status, city,
    * state, category, identity_confidence, category_fit, or claim-token state.
    *
@@ -2161,6 +2205,11 @@ class DirectoryPresenceSeedService {
         // (snapshot.hours / verified_nap.hours) or observed on a cited
         // discovery source (snapshot.hours emitted by the scan).
         const seedBusinessHours = snapshot.hours || snapshot.verified_nap?.hours || undefined;
+        const primaryCategory = entry.category || 'Unknown Category';
+        // Suggested shelf labels the scan emitted (snapshot.secondary_
+        // categories) — the listing's secondary_categories, minus the
+        // resolved primary.
+        const seedSecondaryCategories = this.toSnapshotSecondaryCategories(snapshot, primaryCategory);
         const seedInput: CreateSeedInput = {
           businessName: entry.business_name || entry.title || 'Unknown Business',
           address: snapshot.address || 'Address not available',
@@ -2169,7 +2218,8 @@ class DirectoryPresenceSeedService {
           zipCode: snapshot.zip_code || null,
           phone: snapshot.phone || null,
           website: snapshot.website || null,
-          primaryCategory: entry.category || 'Unknown Category',
+          primaryCategory,
+          secondaryCategories: seedSecondaryCategories.length > 0 ? seedSecondaryCategories : undefined,
           latitude: snapshot.latitude || null,
           longitude: snapshot.longitude || null,
           snapEbtReported: snapshot.snap_ebt_reported || false,
@@ -2189,6 +2239,7 @@ class DirectoryPresenceSeedService {
           provenance: [
             ...this.toSeedProvenance(entry.discovery_provenance),
             ...this.toHoursProvenance(seedBusinessHours, snapshot, entry.discovery_provenance),
+            ...this.toSecondaryCategoriesProvenance(seedSecondaryCategories),
           ],
         };
 
@@ -2326,6 +2377,10 @@ class DirectoryPresenceSeedService {
         // (snapshot.hours / verified_nap.hours) or observed on a cited
         // discovery source (snapshot.hours emitted by the scan).
         const seedBusinessHours = snapshot.hours || snapshot.verified_nap?.hours || undefined;
+        const primaryCategory = entry.category || 'Unknown Category';
+        // Suggested shelf labels the scan emitted (snapshot.secondary_
+        // categories) — same snapshot handoff as createSeedsFromBatch.
+        const seedSecondaryCategories = this.toSnapshotSecondaryCategories(snapshot, primaryCategory);
         const seedInput: CreateSeedInput = {
           businessName: entry.business_name || entry.title || 'Unknown Business',
           address: snapshot.address || 'Address not available',
@@ -2334,7 +2389,8 @@ class DirectoryPresenceSeedService {
           zipCode: snapshot.zip_code || null,
           phone: snapshot.phone || null,
           website: snapshot.website || null,
-          primaryCategory: entry.category || 'Unknown Category',
+          primaryCategory,
+          secondaryCategories: seedSecondaryCategories.length > 0 ? seedSecondaryCategories : undefined,
           latitude: snapshot.latitude || null,
           longitude: snapshot.longitude || null,
           snapEbtReported: snapshot.snap_ebt_reported || false,
@@ -2352,6 +2408,7 @@ class DirectoryPresenceSeedService {
           provenance: [
             ...this.toSeedProvenance(entry.discovery_provenance),
             ...this.toHoursProvenance(seedBusinessHours, snapshot, entry.discovery_provenance),
+            ...this.toSecondaryCategoriesProvenance(seedSecondaryCategories),
           ],
         };
 

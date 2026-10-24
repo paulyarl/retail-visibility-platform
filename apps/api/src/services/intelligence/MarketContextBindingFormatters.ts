@@ -531,6 +531,93 @@ export function formatEnrichmentCategoryVocabulary(
   return lines.join('\n');
 }
 
+/**
+ * Format the platform category vocabulary for intelligence DISCOVERY scans
+ * (emerging/competitive).
+ *
+ * Same union as formatKnownCategoryVocabulary, discovery framing: each
+ * candidate's `category` is the primary shelf its prospect queue entry is
+ * filed under, and each suggested_categories entry is an additional public
+ * shelf the same business lands on — the queue → batch-seed path carries
+ * both verbatim onto the listing. The analyst is told to emit listed
+ * labels verbatim (chips hot-link by exact label match) and to judge
+ * is_known_category against ANY of the three lists.
+ *
+ * Returns '' when all lists are empty (per-source degraded vocabulary).
+ */
+export function formatDiscoveryCategoryVocabulary(
+  directoryLabels: string[],
+  registeredLabels: string[],
+  supplementLabels: string[] = [],
+): string {
+  const { directory, registered, supplement } = partitionCategoryVocabulary(
+    directoryLabels, registeredLabels, supplementLabels,
+  );
+  if (directory.length === 0 && registered.length === 0 && supplement.length === 0) return '';
+
+  const lines: string[] = [
+    '=== KNOWN CATEGORY VOCABULARY (platform directory shelves) ===',
+    '',
+    'PLATFORM GOAL: this directory exists to make the PHYSICAL SHELVES of',
+    'independent brick-and-mortar retailers visible to customers who walk',
+    'through the door. The vocabulary is therefore shelf-shaped by design —',
+    `the ${directory.length} canonical category labels below are the storefront`,
+    'categories those retailers are shelved under, each a public directory',
+    'page, not an abstract taxonomy node.',
+    '',
+    'Every candidate you emit propagates across shelves: its `category` is',
+    'the primary shelf its prospect lands on, and each suggested_categories',
+    'entry is an additional public shelf the same business is filed on —',
+    'both ride the queue → seed pipeline verbatim onto the live listing.',
+    'Choose labels for the shelves they create, not just for how well they',
+    'describe the business.',
+    '',
+    'Labels that match a shelf name exactly (trimmed, case-insensitive)',
+    'render as live linked chips on the public pages; a near-miss degrades',
+    'to plain text and misses the shelf. Emit listed labels verbatim — if',
+    'your best-fit name is a close variant of a listed label (singular vs',
+    'plural, word order, "Shop" vs "Store"), emit the listed label.',
+    '',
+    'Judge `is_known_category` against ANY list below:',
+    '',
+    '  - KNOWN CATEGORIES = the platform\'s canonical directory shelves.',
+    '  - ENRICHED CATEGORIES = categories established by enrichment campaigns',
+    '    and intelligence profiles; each names a live category page in the',
+    '    ecosystem.',
+    '  - REGISTERED LABELS = operator- and analyst-added labels, including',
+    '    service packages that are not directory shelves.',
+    '',
+    'PRIMARY vs SECONDARY:',
+    '  - `category` is the business\'s canonical shelf. Prefer a listed',
+    '    label whenever one fits; propose a new label only when no listed',
+    '    shelf fits.',
+    '  - suggested_categories file the same business on additional shelves:',
+    '    freely propose adjacent shelves, broader parent (super) categories,',
+    '    and narrower niche (sub) categories the business legitimately',
+    '    belongs on — including labels not in this list. Near-duplicate',
+    '    spellings of a listed shelf should still resolve to the listed',
+    '    label.',
+  ];
+
+  if (directory.length > 0) {
+    lines.push('', `KNOWN CATEGORIES (${directory.length}):`);
+    lines.push(`  ${directory.join(', ')}`);
+  }
+
+  if (supplement.length > 0) {
+    lines.push('', `ENRICHED CATEGORIES (${supplement.length}) — established by enrichment campaigns`);
+    lines.push('  and profiles; each names a live category page in the ecosystem:');
+    lines.push(`  ${supplement.join(', ')}`);
+  }
+
+  if (registered.length > 0) {
+    lines.push('', `REGISTERED LABELS (${registered.length}) — operator- and analyst-added, not all are directory shelves:`);
+    lines.push(`  ${registered.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Discovery binding ──────────────────────────────────────────────────
 
 /**

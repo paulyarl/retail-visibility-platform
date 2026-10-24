@@ -485,6 +485,8 @@ class DirectorySeedCleanupService {
       skipped?: string;
       provenanceWritten?: number;
       attributesWritten?: number;
+      secondaryCategoriesWritten?: number;
+      hoursWritten?: boolean;
       seoSharpened?: boolean;
     }>;
   }> {
@@ -625,6 +627,88 @@ class DirectorySeedCleanupService {
         }
       }
 
+      // Sourced secondary shelves — the queue card now writes the scan's
+      // suggested_categories into snapshot.secondary_categories, and batch
+      // seed birth carries them onto the listing. Fill-missing only (same
+      // as attributes): never reorder an operator-curated shelf list.
+      let secondaryCategoriesWritten = 0;
+      const snapshotSecondaryRaw = Array.isArray(snapshot?.secondary_categories) && snapshot.secondary_categories.length > 0
+        ? snapshot.secondary_categories
+        : (Array.isArray(snapshot?.suggested_categories) ? snapshot.suggested_categories : []);
+      const primaryCatKey = String(s.primary_category ?? '').trim().toLowerCase();
+      const seenSecondary = new Set<string>();
+      const snapshotSecondary: string[] = [];
+      for (const entry of snapshotSecondaryRaw) {
+        const label = String(
+          typeof entry === 'object' && entry ? (entry as any).category ?? '' : entry ?? '',
+        ).trim();
+        const key = label.toLowerCase();
+        if (!label || key === primaryCatKey || seenSecondary.has(key)) continue;
+        seenSecondary.add(key);
+        snapshotSecondary.push(label);
+      }
+      if (secondary.length === 0 && snapshotSecondary.length > 0) {
+        await prisma.$executeRaw`
+          UPDATE directory_listings_list
+          SET secondary_categories = ${snapshotSecondary}::text[], updated_at = now()
+          WHERE id = ${s.listing_id}
+        `;
+        await prisma.$executeRaw`
+          INSERT INTO directory_field_provenance (
+            id, seed_id, tenant_id, field_key, value,
+            source_name, accessed_at, confidence, show_on_public,
+            created_at, updated_at
+          ) VALUES (
+            ${generateDirectoryFieldProvenanceId(s.tenant_id)},
+            ${seedId},
+            ${s.tenant_id},
+            'secondary_categories',
+            ${snapshotSecondary.join(', ')},
+            'prospect_queue',
+            now(),
+            ${confidence},
+            true,
+            now(), now()
+          )
+          ON CONFLICT (seed_id, field_key) DO NOTHING
+        `;
+        secondaryCategoriesWritten = snapshotSecondary.length;
+      }
+
+      // Sourced opening hours — same fill-missing snapshot carry as the
+      // batch seed paths (snapshot.hours, verified_nap.hours fallback).
+      let hoursWritten = false;
+      const snapshotHours = snapshot?.hours ?? snapshot?.verified_nap?.hours ?? null;
+      if (!s.business_hours && snapshotHours && typeof snapshotHours === 'object') {
+        const hoursSource = snapshot?.verified_nap?.hours ? 'verification_call' : 'prospect_queue';
+        const hoursConfidence = snapshot?.verified_nap?.hours ? 'high' : confidence;
+        await prisma.$executeRaw`
+          UPDATE directory_listings_list
+          SET business_hours = ${JSON.stringify(snapshotHours)}::jsonb, updated_at = now()
+          WHERE id = ${s.listing_id}
+        `;
+        await prisma.$executeRaw`
+          INSERT INTO directory_field_provenance (
+            id, seed_id, tenant_id, field_key, value,
+            source_name, accessed_at, confidence, show_on_public,
+            created_at, updated_at
+          ) VALUES (
+            ${generateDirectoryFieldProvenanceId(s.tenant_id)},
+            ${seedId},
+            ${s.tenant_id},
+            'hours',
+            ${JSON.stringify(snapshotHours)},
+            ${hoursSource},
+            now(),
+            ${hoursConfidence},
+            true,
+            now(), now()
+          )
+          ON CONFLICT (seed_id, field_key) DO NOTHING
+        `;
+        hoursWritten = true;
+      }
+
       // SEO — per-seed compose through getComposedEnrichment: linked seeds
       // get the campaign packet (latest audit narrative), unlinked seeds the
       // market profile. Writes are fill-missing only — an existing
@@ -706,6 +790,8 @@ class DirectorySeedCleanupService {
         seedId,
         provenanceWritten,
         attributesWritten,
+        secondaryCategoriesWritten,
+        hoursWritten,
         seoSharpened: seoWritten,
       });
     }
@@ -718,6 +804,8 @@ class DirectorySeedCleanupService {
         seedIds,
         provenanceWritten: results.reduce((n, r) => n + (r.provenanceWritten ?? 0), 0),
         attributesWritten: results.reduce((n, r) => n + (r.attributesWritten ?? 0), 0),
+        secondaryCategoriesWritten: results.reduce((n, r) => n + (r.secondaryCategoriesWritten ?? 0), 0),
+        hoursWritten: results.filter((r) => r.hoursWritten).map((r) => r.seedId),
         seoSharpened: results.filter((r) => r.seoSharpened).map((r) => r.seedId),
       },
     });

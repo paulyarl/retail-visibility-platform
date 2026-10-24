@@ -34,7 +34,7 @@ vi.mock('../MarketingServiceCategoryService', () => ({
 }));
 
 import { CategoryVocabularyService } from '../CategoryVocabularyService';
-import { formatKnownCategoryVocabulary, formatEnrichmentCategoryVocabulary } from '../intelligence/MarketContextBindingFormatters';
+import { formatKnownCategoryVocabulary, formatEnrichmentCategoryVocabulary, formatDiscoveryCategoryVocabulary } from '../intelligence/MarketContextBindingFormatters';
 
 const service = CategoryVocabularyService.getInstance();
 
@@ -284,6 +284,73 @@ describe('formatEnrichmentCategoryVocabulary', () => {
     const registeredSection = block.split('REGISTERED LABELS')[1];
     expect(registeredSection).toContain('Somali Grocery Store');
     expect(registeredSection).not.toContain('Grocery Store,');
+  });
+});
+
+// ─── formatDiscoveryCategoryVocabulary ──────────────────────────────────
+// Same union, discovery framing: each candidate's `category` is the primary
+// shelf and suggested_categories are the secondary shelves its queue →
+// batch-seed path carries verbatim onto the listing.
+
+describe('formatDiscoveryCategoryVocabulary', () => {
+  it('renders all sections with dynamic counts when all lists are present', () => {
+    const block = formatDiscoveryCategoryVocabulary(
+      ['Grocery Store', 'Auto Repair'],
+      ['Somali Grocery Store'],
+      ['Middle Eastern Grocery Store'],
+    );
+
+    expect(block).toContain('KNOWN CATEGORY VOCABULARY');
+    expect(block).toContain('the 2 canonical category labels');
+    expect(block).toContain('KNOWN CATEGORIES (2):');
+    expect(block).toContain('Auto Repair, Grocery Store');
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    expect(block).toContain('Middle Eastern Grocery Store');
+    expect(block).toContain('REGISTERED LABELS (1)');
+    expect(block).toContain('Somali Grocery Store');
+  });
+
+  it('frames primary (category) and secondary (suggested_categories) shelf propagation', () => {
+    const block = formatDiscoveryCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('`category` is');
+    expect(block).toContain('suggested_categories');
+    expect(block).toContain('additional public shelf');
+    expect(block).toContain('queue → seed pipeline');
+  });
+
+  it('steers verbatim listed labels and judges is_known_category against any list', () => {
+    const block = formatDiscoveryCategoryVocabulary(['Grocery Store'], []);
+
+    expect(block).toContain('match a shelf name exactly');
+    expect(block).toContain('emit the listed label');
+    expect(block).toContain('ANY list below');
+    expect(block).toContain('PLATFORM GOAL');
+    expect(block).toContain('PHYSICAL SHELVES');
+  });
+
+  it("returns '' when all lists are empty", () => {
+    expect(formatDiscoveryCategoryVocabulary([], [])).toBe('');
+    expect(formatDiscoveryCategoryVocabulary(['  ', ''], ['   '])).toBe('');
+    expect(formatDiscoveryCategoryVocabulary([], [], [])).toBe('');
+    expect(formatDiscoveryCategoryVocabulary([], [], ['  '])).toBe('');
+  });
+
+  it('partitions registered and supplement labels against directory labels (case-insensitive)', () => {
+    const block = formatDiscoveryCategoryVocabulary(
+      ['Grocery Store'],
+      ['grocery store', 'Somali Grocery Store'],
+      ['  Somali Grocery Store ', 'Middle Eastern Grocery Store'],
+    );
+
+    expect(block).toContain('REGISTERED LABELS (1)');
+    const registeredSection = block.split('REGISTERED LABELS (1)')[1];
+    expect(registeredSection).toContain('Somali Grocery Store');
+    expect(registeredSection).not.toContain('Grocery Store,');
+    expect(block).toContain('ENRICHED CATEGORIES (1)');
+    const supplementSection = block.split('ENRICHED CATEGORIES (1)')[1].split('REGISTERED LABELS (1)')[0];
+    expect(supplementSection).toContain('Middle Eastern Grocery Store');
+    expect(supplementSection).not.toContain('Somali Grocery Store');
   });
 });
 
