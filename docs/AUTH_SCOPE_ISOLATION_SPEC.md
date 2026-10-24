@@ -18,8 +18,8 @@
 - Updated frontend URLs:
   - `UnifiedCapabilityService.ts` → `/api/public/tenants/${tenantId}/effective-capabilities`
   - `PublicApiSingleton.ts` → `/api/public/tenants/resolve/${identifier}`
-- Created `scripts/verify-auth-scope.ts` (Check A + Check B) and wired it into `.github/workflows/ci.yml`.
-- `pnpm checkapi`, `pnpm checkweb`, and `npx ts-node scripts/verify-auth-scope.ts` all pass.
+- Created `scripts/verify-auth-scope.mjs` (Check A + Check B) and wired it into `.github/workflows/ci.yml`.
+- `pnpm checkapi`, `pnpm checkweb`, and `node scripts/verify-auth-scope.mjs` all pass.
 
 **Still pending:** deprecated aliases with `Deprecation` + `Sunset` headers (FR-8 step 4), audit of remaining `/api/tenants/` public routes (FR-8 step 6), Phase B/C router-level auth migrations.
 
@@ -241,7 +241,7 @@ router.use('/', tenantsRoutes);
 
 **Check B — No router-level auth in orchestrator sub-routers:** No router file mounted inside a domain orchestrator may contain `router.use(authenticateToken)` or `router.use(requireAdmin)` at the router level.
 
-**Detection approach:** Implemented in `scripts/verify-auth-scope.ts`.
+**Detection approach:** Implemented in `scripts/verify-auth-scope.mjs`.
 
 - **Check A** parses `routeRegistry.ts`, extracts `path` + `authLevel`, and fails if a `public` entry starts with `/api/tenants/`, `/api/admin/`, or `/api/organizations/`, or if a `tenant`/`admin` entry starts with `/api/public/`.
 - **Check B** reads each orchestrator's relative imports and scans only those sub-router files for bare `router.use(authenticateToken)`, `router.use(requireAuth)`, `router.use(requireAdmin)`, or `router.use(requirePlatformAdmin)`. Mount-level auth such as `router.use('/path', authenticateToken, subRouter)` is intentionally allowed.
@@ -314,7 +314,7 @@ The URL prefix (`/api/public/` vs `/api/tenants/` vs `/api/admin/`) MUST be the 
 
 ### V-1: URL/authLevel consistency test
 
-Add a test to `scripts/verify-auth-scope.ts`:
+Add a test to `scripts/verify-auth-scope.mjs`:
 
 1. Parse `routeRegistry.ts`.
 2. For each entry, assert `authLevel` is consistent with URL prefix (FR-7 Check A).
@@ -330,12 +330,12 @@ Add a test to `scripts/verify-auth-scope.ts`:
 
 ### V-3: CI check
 
-`scripts/verify-auth-scope.ts` is the single source of truth. It parses `routeRegistry.ts` for URL/`authLevel` consistency (Check A) and scans sub-routers imported by `tenant.routes.ts`, `admin.routes.ts`, and `directory.routes.ts` for forbidden router-level auth middleware (Check B). Standalone routers mounted directly in `routeRegistry.ts` are exempt from Check B.
+`scripts/verify-auth-scope.mjs` is the single source of truth. It parses `routeRegistry.ts` for URL/`authLevel` consistency (Check A) and scans sub-routers imported by `tenant.routes.ts`, `admin.routes.ts`, and `directory.routes.ts` for forbidden router-level auth middleware (Check B). Standalone routers mounted directly in `routeRegistry.ts` are exempt from Check B.
 
 ```yaml
 # In .github/workflows/ci.yml
 - name: Verify auth scope isolation
-  run: npx ts-node scripts/verify-auth-scope.ts
+  run: node scripts/verify-auth-scope.mjs
 ```
 
 ### V-4: Smoke test

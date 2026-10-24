@@ -17,9 +17,11 @@
  *     (they have no siblings to bleed into).
  *   - Mount-level auth (router.use('/path', authenticateToken, subRouter))
  *     is NOT a violation — only bare router.use(authMiddleware) is.
+ *   - Comments are stripped before matching — an explanatory comment
+ *     mentioning the pattern is not a violation.
  *
  * Exit code 0 = pass, 1 = violations found.
- * Usage: npx tsx scripts/verify-auth-scope.ts
+ * Usage: node scripts/verify-auth-scope.mjs
  */
 
 import fs from 'fs';
@@ -44,28 +46,23 @@ const FORBIDDEN_AUTH_MIDDLEWARE = [
   'requirePlatformAdmin',
 ];
 
-interface RegistryEntry {
-  path: string;
-  authLevel: string;
-}
-
 // ─── Check A: Parse routeRegistry.ts ──────────────────────────────────────
 
-function parseRouteRegistry(content: string): RegistryEntry[] {
-  const entries: RegistryEntry[] = [];
+function parseRouteRegistry(content) {
+  const entries = [];
   // Matches { path: '...' ... authLevel: '...' ... } entries.
   // Handles single, double, and backtick quoted strings.
   const objectRegex =
     /\{\s*path:\s*['"`]([^'"`]+)['"`][\s\S]*?authLevel:\s*['"`]([^'"`]+)['"`]/g;
-  let match: RegExpExecArray | null;
+  let match;
   while ((match = objectRegex.exec(content)) !== null) {
     entries.push({ path: match[1], authLevel: match[2] });
   }
   return entries;
 }
 
-function checkUrlAuthLevelConsistency(entries: RegistryEntry[]): string[] {
-  const errors: string[] = [];
+function checkUrlAuthLevelConsistency(entries) {
+  const errors = [];
 
   for (const entry of entries) {
     if (
@@ -98,14 +95,14 @@ function checkUrlAuthLevelConsistency(entries: RegistryEntry[]): string[] {
  * Parse an orchestrator file to extract the relative import paths of all
  * sub-routers it mounts. Returns absolute file paths.
  */
-function getOrchestratorSubRouters(orchestratorPath: string): string[] {
+function getOrchestratorSubRouters(orchestratorPath) {
   const content = fs.readFileSync(orchestratorPath, 'utf-8');
-  const subRouters: string[] = [];
+  const subRouters = [];
 
   // Match import statements: import foo from './path';
   // Only relative imports (./ or ../) are sub-routers.
   const importRegex = /import\s+\w+\s+from\s+['"](\.[^'"]+)['"]/g;
-  let match: RegExpExecArray | null;
+  let match;
 
   while ((match = importRegex.exec(content)) !== null) {
     const importPath = match[1];
@@ -121,14 +118,27 @@ function getOrchestratorSubRouters(orchestratorPath: string): string[] {
 }
 
 /**
+ * Strip comments before matching — a comment that mentions the forbidden
+ * pattern (e.g. tenant-users.ts's explanatory note) is not a violation.
+ * Block comments are removed wholesale; `//` tails are cut per line.
+ */
+function stripComments(content) {
+  return content
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n');
+}
+
+/**
  * Check a single file for forbidden router-level auth middleware.
  * Only flags bare router.use(authMiddleware) — NOT mount-level
  * router.use('/path', authMiddleware, subRouter).
  */
-function checkFileForRouterLevelAuth(filePath: string): string[] {
-  const content = fs.readFileSync(filePath, 'utf-8');
+function checkFileForRouterLevelAuth(filePath) {
+  const content = stripComments(fs.readFileSync(filePath, 'utf-8'));
   const relativePath = path.relative(ROOT, filePath);
-  const violations: string[] = [];
+  const violations = [];
 
   // Match router.use( followed directly by an auth middleware name
   // (not a path string). This catches:
@@ -153,8 +163,8 @@ function checkFileForRouterLevelAuth(filePath: string): string[] {
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-function main(): void {
-  const violations: string[] = [];
+function main() {
+  const violations = [];
 
   // ── Check A: URL / authLevel consistency ────────────────────────────────
   const registryContent = fs.readFileSync(REGISTRY_PATH, 'utf-8');
@@ -167,7 +177,7 @@ function main(): void {
   }
 
   // ── Check B: No router-level auth in orchestrator sub-routers ───────────
-  const checkedFiles = new Set<string>();
+  const checkedFiles = new Set();
 
   for (const orchestratorPath of ORCHESTRATORS) {
     if (!fs.existsSync(orchestratorPath)) continue;
