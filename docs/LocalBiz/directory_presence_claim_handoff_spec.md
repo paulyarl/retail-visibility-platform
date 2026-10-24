@@ -129,7 +129,7 @@ The success block currently hides the entire action group while `requiresPasswor
 
 Claims routed through operator approval (`operator_approval_required`) never render the success screen in-browser: the owner sees the `pending_approval` state and leaves, and `approveClaimRequest` completes the claim server-side (token consumed, tenant flipped, customer promoted) without notifying the owner. This cohort gets no upgrade handoff from this spec.
 
-Named follow-up (separate change): an approval notification email to the claimant containing the upgrade link, plus alignment of the dashboard `TierUpgradeCard` copy with this spec's card copy. Until then, the dashboard `TierUpgradeCard` is the only in-product handoff for approved claimants.
+Named follow-up (separate change): an approval notification email to the claimant containing the upgrade link, plus alignment of the dashboard `TierUpgradeCard` copy with this spec's card copy. ~~Until then, the dashboard `TierUpgradeCard` is the only in-product handoff for approved claimants.~~ **Shipped 2026-10-24**: the post-claim welcome email (`DirectoryClaimEmailService.sendClaimWelcomeEmail`) fires on both claim paths and now carries a "See upgrade options" link (`src=claim_welcome_email`, session-aware through `/auth/login?returnTo=`); `TierUpgradeCard` renders the shared mode triad from `apps/web/src/lib/presence-modes.ts` (same source as the claim success teaser) with live options via the authenticated endpoint. Rejection is also no longer silent — `sendClaimRejectedEmail` notifies the claimant and the claim page renders an honest "Claim Not Approved" state via `claimRequestStatus`.
 
 ## Measurement
 

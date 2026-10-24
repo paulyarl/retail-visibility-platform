@@ -92,10 +92,15 @@ router.post('/:tenantId/upgrade', authenticateToken, checkTenantAccess, async (r
       return res.status(401).json({ error: 'authentication_required' });
     }
 
-    const { targetTier, billingCycle = 'monthly', paymentMethodId } = req.body || {};
+    const { targetTier, billingCycle = 'monthly', paymentMethodId, src } = req.body || {};
     if (!targetTier || typeof targetTier !== 'string') {
       return res.status(400).json({ error: 'target_tier_required' });
     }
+
+    // Optional upgrade-page attribution (claim handoff spec — `src` query
+    // param on the claim success CTA). Sanitized: short slug only.
+    const upgradeSrc =
+      typeof src === 'string' && /^[a-z0-9_-]{1,64}$/i.test(src) ? src : undefined;
 
     // Verify the user is an OWNER of this tenant
     const membership = await prisma.user_tenants.findFirst({
@@ -142,7 +147,7 @@ router.post('/:tenantId/upgrade', authenticateToken, checkTenantAccess, async (r
         actor: userId,
         actorType: 'user',
         action: 'directory_tier_upgrade',
-        payload: { tenantId, targetTier, billingCycle, free: true },
+        payload: { tenantId, targetTier, billingCycle, free: true, ...(upgradeSrc ? { src: upgradeSrc } : {}) },
       });
 
       return res.json({
@@ -164,7 +169,7 @@ router.post('/:tenantId/upgrade', authenticateToken, checkTenantAccess, async (r
       actor: userId,
       actorType: 'user',
       action: 'directory_tier_upgrade',
-      payload: { tenantId, targetTier, billingCycle, stripeSubscriptionId: result.stripeSubscriptionId },
+      payload: { tenantId, targetTier, billingCycle, stripeSubscriptionId: result.stripeSubscriptionId, ...(upgradeSrc ? { src: upgradeSrc } : {}) },
     });
 
     res.json({

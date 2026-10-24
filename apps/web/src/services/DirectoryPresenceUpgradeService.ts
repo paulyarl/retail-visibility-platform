@@ -81,19 +81,21 @@ export class DirectoryPresenceUpgradeService extends AuthenticatedApiSingleton {
     }
   }
 
-  /** POST /api/tenant/:tenantId/upgrade */
+  /** POST /api/tenant/:tenantId/upgrade — `src` is optional upgrade-page
+   *  attribution (claim handoff spec: claim_success, claim_welcome_email). */
   async upgrade(
     tenantId: string,
     targetTier: string,
     billingCycle: 'monthly' | 'annual' = 'monthly',
     paymentMethodId?: string,
+    src?: string,
   ): Promise<UpgradeResult> {
     try {
       const result = await this.makeDefaultRequest<any>(
         `/api/tenant/${encodeURIComponent(tenantId)}/upgrade`,
         {
           method: 'POST',
-          body: JSON.stringify({ targetTier, billingCycle, paymentMethodId }),
+          body: JSON.stringify({ targetTier, billingCycle, paymentMethodId, ...(src ? { src } : {}) }),
         },
         undefined,
         0,

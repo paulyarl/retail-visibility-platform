@@ -143,6 +143,7 @@ interface Tenant {
   hasActivePaymentGateway?: boolean;
   isDemo?: boolean;
   demoExpiresAt?: string | null;
+  hasUnclaimedSeedListing?: boolean;
   metadata?: {
     businessName?: string;
     phone?: string;
@@ -534,13 +535,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const canonicalUrl = canonicalStorefrontHome(canonicalLookup, data.resolvedTenantId);
 
   // Demo storefronts are sample pages; a "not available" gate (closed
-  // message, google_only tier); and a directory_presence seed storefront —
-  // unclaimed seeds surface at /place and /directory, their /tenant page is a
-  // claim-preview, not an indexable storefront (spec §4.9, §13.4).
+  // message, google_only tier); and a directory_presence UNCLAIMED-seed
+  // storefront — unclaimed seeds surface at /place and /directory, their
+  // /tenant page is a claim-preview, not an indexable storefront. Claimed
+  // (listing_origin flipped) and listing-less directory_presence tenants are
+  // real storefronts: indexable, matching the storefronts.xml gate
+  // (spec §4.9, §13.4).
+  const unclaimedSeedPreview =
+    tenant.subscriptionTier === 'directory_presence' && tenant.hasUnclaimedSeedListing === true;
   const storefrontUnavailable =
     Boolean((tenant as any).storefrontMessage) || tenant.subscriptionTier === 'google_only';
   const robots =
-    tenant.isDemo || storefrontUnavailable || tenant.subscriptionTier === 'directory_presence'
+    tenant.isDemo || storefrontUnavailable || unclaimedSeedPreview
       ? { index: false, follow: false }
       : undefined;
 

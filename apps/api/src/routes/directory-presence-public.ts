@@ -619,7 +619,10 @@ router.post('/claim/:token/initiate', optionalAuth, optionalCustomerAuth, async 
     const headerCustomerEmail = req.get('x-customer-email') || undefined;
     const actorId = customer?.id || platformUser?.id || body.customerId || headerCustomerId || undefined;
     const customerEmail = customer?.email || platformUser?.email || body.customerEmail || headerCustomerEmail || undefined;
-    const customerName = [customer?.firstName || customer?.first_name, customer?.lastName || customer?.last_name].filter(Boolean).join(' ') || undefined;
+    const customerName =
+      [customer?.firstName || customer?.first_name, customer?.lastName || customer?.last_name].filter(Boolean).join(' ') ||
+      [claimantFirstName, claimantLastName].filter(Boolean).join(' ') ||
+      undefined;
 
     // Proof-of-inbox gate (migration 358): an operator-approval claim files
     // a pending request immediately only when the claimant email is already

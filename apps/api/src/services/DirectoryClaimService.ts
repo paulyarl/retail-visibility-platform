@@ -535,7 +535,18 @@ class DirectoryClaimService {
         };
       }
 
-      const { requestId } = await this.findOrCreateClaimRequest(r, ctx, 'Claimant email verified (account).');
+      const { requestId } = await this.findOrCreateClaimRequest(
+        r,
+        ctx,
+        'Claimant email verified (account).',
+        // Session proof rides onto the request's verification columns so the
+        // operator queue can fast-lane it — Verified badge + notes render for
+        // free on the pending-claims card.
+        {
+          method: 'claimant_session',
+          note: `Claimant identity proven by authenticated session (${ctx?.customerEmail || 'unknown email'}).`,
+        },
+      );
       return {
         verificationRequired: false,
         operatorApprovalRequired: true,
@@ -561,6 +572,7 @@ class DirectoryClaimService {
     claim: { seed_id: string; tenant_id: string; token_id: string },
     ctx?: ClaimAuditCtx,
     verificationNote?: string,
+    claimantProof?: { method: string; note: string },
   ): Promise<{ requestId: string; isNew: boolean }> {
     const existing = await prisma.$queryRaw<any[]>`
       SELECT id FROM directory_claim_requests
@@ -579,7 +591,9 @@ class DirectoryClaimService {
         customer_id, customer_email, customer_name,
         claimant_first_name, claimant_middle_name, claimant_last_name,
         claimant_phone, claimant_business_address,
-        status, submitted_at
+        status, submitted_at,
+        verification_method, verification_notes,
+        verification_completed_at, verification_completed_by
       ) VALUES (
         ${requestId},
         ${claim.seed_id},
@@ -594,7 +608,11 @@ class DirectoryClaimService {
         ${ctx?.claimantPhone || null},
         ${ctx?.claimantBusinessAddress || null},
         'pending',
-        now()
+        now(),
+        ${claimantProof?.method || null},
+        ${claimantProof?.note || null},
+        ${claimantProof ? new Date() : null},
+        ${claimantProof ? 'system' : null}
       )
     `;
 
@@ -882,6 +900,10 @@ Review at Settings → Directory → Presence Seeds.`,
         userAgent: ctx?.userAgent,
       },
       'Claimant email verified via confirmation link.',
+      {
+        method: 'claimant_email',
+        note: `Claimant inbox proof via confirmation link (${v.claimant_email}).`,
+      },
     );
 
     audit({

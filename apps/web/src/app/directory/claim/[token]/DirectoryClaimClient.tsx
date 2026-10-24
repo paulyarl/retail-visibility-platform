@@ -162,6 +162,16 @@ export default function DirectoryClaimClient() {
     loadSummary();
   }, [loadSummary]);
 
+  // Prefill claimant contact fields from the customer session — the data is
+  // already on the account; don't make the owner retype it. Only fills
+  // fields the owner hasn't typed into.
+  useEffect(() => {
+    if (!customer) return;
+    setClaimantFirstName((v) => v || customer.firstName || '');
+    setClaimantLastName((v) => v || customer.lastName || '');
+    setClaimantPhone((v) => v || customer.phone || '');
+  }, [customer]);
+
   // Refresh the teaser cards from the authenticated options endpoint when a
   // platform session exists (e.g., an existing platform user claiming from a
   // logged-in browser). Skipped otherwise — that endpoint requires an Auth0
@@ -741,7 +751,9 @@ export default function DirectoryClaimClient() {
     // usually has none (customer JWT only), so route through /auth/login
     // preserving the destination — the /t/[tenantId] layout hardcodes its
     // own returnTo to the dashboard and would drop the upgrade context.
-    const upgradePath = tenantId ? `/t/${tenantId}/settings/subscription/upgrade` : null;
+    const upgradePath = tenantId
+      ? `/t/${tenantId}/settings/subscription/upgrade?src=claim_success`
+      : null;
     const dashboardPath = tenantId ? `/t/${tenantId}/dashboard` : '/account';
     const withReturnTo = (path: string) => `/auth/login?returnTo=${encodeURIComponent(path)}`;
     const upgradeHref = upgradePath

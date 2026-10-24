@@ -50,6 +50,10 @@ export async function audit(opts: {
       entity_id: opts.payload?.id || 'unknown', // Prisma model expects snake_case
       entity_type: entityType,
       diff: opts.payload || {}, // Required field
+      // Preserve the caller's raw action name (e.g. 'directory_claim.accept')
+      // in metadata — `action` above is the coarse enum, so without this the
+      // event name is unrecoverable for funnel/conversion reporting.
+      metadata: { audit_action: opts.action },
     };
 
     await prisma.audit_log.create({

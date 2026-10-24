@@ -55,7 +55,7 @@ class DirectoryClaimEmailService {
         `${webUrl}/auth/login?returnTo=${encodeURIComponent(path)}`;
       const dashboardUrl = withReturnTo(`/t/${data.tenantId}/dashboard`);
       const addProductsUrl = withReturnTo(`/t/${data.tenantId}/items/create`);
-      const upgradeUrl = withReturnTo(`/t/${data.tenantId}/settings/subscription/upgrade`);
+      const upgradeUrl = withReturnTo(`/t/${data.tenantId}/settings/subscription/upgrade?src=claim_welcome_email`);
 
       const greeting = data.ownerName?.trim() || data.businessName;
       const location = [data.city, data.state].filter(Boolean).join(', ');

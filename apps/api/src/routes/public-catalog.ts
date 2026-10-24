@@ -782,8 +782,15 @@ router.get('/tenant/:identifier', async (req, res) => {
           }
         });
 
-		   hasDirectory = tenantResult?.is_published === true; 
+		   hasDirectory = tenantResult?.is_published === true;
       }
+    // Unclaimed directory seeds: the /tenant page is a claim-preview, not an
+    // indexable storefront (spec §13.4 — the storefronts.xml sitemap gate uses
+    // the same predicate). Claiming flips listing_origin → 'claimed'.
+    const unclaimedSeedListing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: resolvedTenant.id, listing_origin: 'directory_seed' },
+      select: { id: true },
+    });
     // Return basic tenant information
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
     res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
@@ -881,7 +888,8 @@ router.get('/tenant/:identifier', async (req, res) => {
         gbpPrimaryCategoryName: tenant.gbp_primary_category_name,
         gbpSecondaryCategories: tenant.gbp_secondary_categories || [],
         isDemo: tenant.is_demo || false,
-        demoExpiresAt: tenant.demo_expires_at || null
+        demoExpiresAt: tenant.demo_expires_at || null,
+        hasUnclaimedSeedListing: Boolean(unclaimedSeedListing)
       },
       metadata: {
         tenant: {

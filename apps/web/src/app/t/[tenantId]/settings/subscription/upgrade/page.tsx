@@ -138,6 +138,14 @@ export default function TierUpgradePage() {
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<UpgradeTierOption | null>(null);
+  // Upgrade attribution (claim handoff spec — `src` param carried by the
+  // claim success CTA and the claim welcome email's upgrade link). Read via
+  // window.location so this client page needs no Suspense boundary.
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('src');
+    if (s && /^[a-z0-9_-]{1,64}$/i.test(s)) setSrc(s);
+  }, []);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -160,6 +168,7 @@ export default function TierUpgradePage() {
         tier.tierKey,
         billingCycle,
         paymentMethodId,
+        src ?? undefined,
       );
       if (result.success) {
         setSuccess(tier.displayName || tier.name);
