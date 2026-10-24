@@ -28,6 +28,7 @@ import { refreshSeedFidelityIfStale } from '../seed-fidelity';
 import {
   PROJECT_PHASE_PREDICATES_VERSION,
   PROJECT_PHASE_PREDICATES_CURRENT,
+  predicateCopyKeys,
   type ProjectPhasePredicateSeed,
 } from '../../lib/project-phase-predicates';
 import { selectProjectPhases } from '../outreach-openers/project-phases';
@@ -423,13 +424,18 @@ export async function loadPredicates(
       ? PROJECT_PHASE_PREDICATES_CURRENT
       : [];
   }
-  return rows.map((r) => ({
-    phaseKey: r.phase_key as ProjectPhasePredicateSeed['phaseKey'],
-    signals: (r.signals as string[]) ?? [],
-    minSeverity: (r.min_severity as Record<string, string> | null) ?? null,
-    intRankModifiers: (r.int_rank_modifiers as string[]) ?? [],
-    copyKeys: (r.copy_keys as ProjectPhasePredicateSeed['copyKeys']) ?? {},
-  }));
+  return rows.map((r) => {
+    const phaseKey = r.phase_key as ProjectPhasePredicateSeed['phaseKey'];
+    return {
+      phaseKey,
+      signals: (r.signals as string[]) ?? [],
+      minSeverity: (r.min_severity as Record<string, string> | null) ?? null,
+      intRankModifiers: (r.int_rank_modifiers as string[]) ?? [],
+      // A null copy_keys column falls back to the §13 convention keys — a
+      // bare `{}` doesn't satisfy the required-keys record type.
+      copyKeys: (r.copy_keys as ProjectPhasePredicateSeed['copyKeys'] | null) ?? predicateCopyKeys(phaseKey),
+    };
+  });
 }
 
 /**

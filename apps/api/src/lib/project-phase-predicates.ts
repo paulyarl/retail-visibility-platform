@@ -51,7 +51,7 @@ export interface ProjectPhasePredicateSeed {
   copyKeys: Record<'name' | 'goal' | 'evidence' | 'actions' | 'exit_criterion', string>;
 }
 
-const copyKeys = (phaseKey: ProjectPhaseKey): ProjectPhasePredicateSeed['copyKeys'] => ({
+export const predicateCopyKeys = (phaseKey: ProjectPhaseKey): ProjectPhasePredicateSeed['copyKeys'] => ({
   name: `project_phase.${phaseKey}.name`,
   goal: `project_phase.${phaseKey}.goal`,
   evidence: `project_phase.${phaseKey}.evidence`,
@@ -73,14 +73,14 @@ export const PROJECT_PHASE_PREDICATES_V1: readonly ProjectPhasePredicateSeed[] =
     ],
     minSeverity: null,
     intRankModifiers: ['INT_SINGLE_SOURCE'],
-    copyKeys: copyKeys('foundation'),
+    copyKeys: predicateCopyKeys('foundation'),
   },
   {
     phaseKey: 'claim',
     signals: ['DS_CLAIMED_STATUS'],
     minSeverity: null,
     intRankModifiers: [],
-    copyKeys: copyKeys('claim'),
+    copyKeys: predicateCopyKeys('claim'),
   },
   {
     phaseKey: 'findability',
@@ -109,7 +109,7 @@ export const PROJECT_PHASE_PREDICATES_V1: readonly ProjectPhasePredicateSeed[] =
       'INT_POSSIBLE_CATEGORY_MISALIGNMENT',
       'INT_VERTICAL_SOURCE_DISCOVERY',
     ],
-    copyKeys: copyKeys('findability'),
+    copyKeys: predicateCopyKeys('findability'),
   },
   {
     phaseKey: 'trust',
@@ -122,7 +122,7 @@ export const PROJECT_PHASE_PREDICATES_V1: readonly ProjectPhasePredicateSeed[] =
     ],
     minSeverity: null,
     intRankModifiers: ['INT_HIDDEN_TRUST', 'INT_UNDEREXPOSED_CREDENTIAL'],
-    copyKeys: copyKeys('trust'),
+    copyKeys: predicateCopyKeys('trust'),
   },
   {
     phaseKey: 'expansion',
@@ -143,7 +143,7 @@ export const PROJECT_PHASE_PREDICATES_V1: readonly ProjectPhasePredicateSeed[] =
     ],
     minSeverity: null,
     intRankModifiers: [],
-    copyKeys: copyKeys('expansion'),
+    copyKeys: predicateCopyKeys('expansion'),
   },
 ];
 
