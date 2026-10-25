@@ -199,32 +199,31 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
             <span className="inline-block w-[3px] h-[0.9em] ml-1 align-middle bg-white/70 animate-pulse" />
           </div>
           <p className="text-gray-300/90 mt-4 sm:mt-6 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
-            Most local shops are missing from the places shoppers actually look — and it's
-            rarely their fault. We start you free: your business can be listed in our directory
-            from public information, and claiming it takes about two minutes. From there, show
-            up on Google and your own storefront — and sell when you're ready.
+            We list local shops from public info so shoppers can already find you — claim yours
+            and it becomes a full online presence: your storefront, your products, your tools,
+            your directory.
           </p>
 
           {/* CTA buttons — claim is the primary top-of-funnel action */}
           <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Link
-              href="/directory/add-business"
+              href="/directory"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto px-6 py-3 rounded-xl text-black font-semibold hover:bg-gray-100 transition-colors"
               style={{ background: "rgba(255,255,255,0.95)" }}
             >
-              Claim your free listing →
+              Find your store →
             </Link>
-            <Link
-              href="/directory/about"
+            <a
+              href="https://visibleshelf.com/tenant/tid-25we5qgj"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto px-6 py-3 rounded-xl text-white font-semibold border border-white/20 hover:border-white/40 transition-colors"
               style={{ background: "rgba(15,15,20,0.5)", backdropFilter: "blur(8px)" }}
             >
-              See how it works
-            </Link>
+              See a live storefront
+            </a>
           </div>
 
           {/* Trust strip */}

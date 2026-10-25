@@ -193,6 +193,20 @@ export default function PlaceAboutClient() {
             </div>
           </div>
         </div>
+
+        {/* Directory = bidirectional shelf exposure — the channel maps can't match */}
+        <div className="mt-8 rounded-2xl bg-gradient-to-br from-indigo-50 to-teal-50 dark:from-indigo-950/40 dark:to-teal-950/30 border-2 border-indigo-100 dark:border-indigo-900 p-6 sm:p-8">
+          <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2">
+            Every shelf you belong on — not just one dot on a map
+          </h3>
+          <p className="text-sm sm:text-base text-neutral-700 dark:text-neutral-300 leading-relaxed">
+            Google shows your store as a single pin under one category label. Our directory works both ways:
+            your page exposes <strong>every category shelf you qualify for</strong> — and each of those shelf
+            pages carries your business. A specialty grocer can surface under African Grocery, International
+            Foods, and Halal all at once, with no extra work. It&apos;s presence Google structurally can&apos;t
+            give you.
+          </p>
+        </div>
       </div>
 
       {/* ─── 5 Free Product Slots Showcase ─── */}

@@ -127,6 +127,12 @@ the angle the prospect's record already suggests — the scans detect them:
   listing here is already live."
 - **Strong reviews, no web presence** — "4.9 stars and customers still
   can't see what you sell."
+- **The directory is a presence channel Google can't match** — a Google
+  listing is a point; the directory exposes *all eligible category shelves*
+  on the seed's own surface AND places the business on each shelf's page.
+  Bidirectional shelf membership: the seed shows which shelves it qualifies
+  for, each shelf page carries the seed. "Google shows you one dot on a
+  map — we put you on every shelf you belong on."
 - **BOPIS — the store is the fulfillment center** — "order online, pick up
   in store" turns their existing shelves into a fulfillment node; the big
   competitors already run it, and the platform's BOPIS machinery gives an
