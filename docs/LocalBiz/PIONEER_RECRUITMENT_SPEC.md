@@ -5,6 +5,11 @@
 `MARKET_LAUNCH_PLAYBOOK_SPEC.md`; invents no machinery — it wraps existing
 surfaces in a field workflow).
 
+**Note:** §1 (the offer, word-of-mouth, operator pitch, stickiness, moat)
+doubles as the **shared narrative spine** for the door pitch, the
+community-partner pitch, and the investor pitch — pull from here rather
+than fork the story into separate decks.
+
 **Purpose:** Recruit the pioneer cohort — **10 real, claimed retailers** —
 by walking into stores. Cross-category by design: each pioneer targets a
 category with **no live shelf**, so 10 pioneers ≈ 10 new `/place/category/*`
@@ -133,6 +138,13 @@ the angle the prospect's record already suggests — the scans detect them:
   Bidirectional shelf membership: the seed shows which shelves it qualifies
   for, each shelf page carries the seed. "Google shows you one dot on a
   map — we put you on every shelf you belong on."
+- **The $2,500 anchor** — a branded agency website runs $2,500+ before
+  hosting, and most of these owners have already been quoted and declined
+  (that's why the scans keep finding missing/parked/hijacked domains).
+  The pitch: "a real branded storefront usually costs thousands — yours is
+  already live, and claiming it costs nothing." The scans surface the
+  *evidence* (the dead link) and the *objection killer* (the price) in the
+  same record.
 - **BOPIS — the store is the fulfillment center** — "order online, pick up
   in store" turns their existing shelves into a fulfillment node; the big
   competitors already run it, and the platform's BOPIS machinery gives an
@@ -146,6 +158,80 @@ the angle the prospect's record already suggests — the scans detect them:
 
 The angle is chosen per door from the seed/queue record — the pitch is
 templated, not improvised.
+
+### 1.45 The two-act recruitment arc
+
+The whole motion is two acts, and act 1 already contains a taste of act 2:
+
+- **Act 1 — the seed (free, already live):** the category-channel listing
+  exists before the retailer ever signs up. Discoverable, indexed,
+  shelf-member — presence for free, no action needed. This is the opening
+  act of recruitment: *"you're already on it."*
+- **The free taste (the bridge):** claiming unlocks the free 5-product
+  slots — the storefront's minimum working set. Five products is enough to
+  feel the storefront working — indexed items, shopper views, pickup
+  asks — and exactly small enough to outgrow. **Act 1 ships with a free
+  taste of act 2 built in.**
+- **Act 2 — the full storefront (the growth path):** more than the free 5
+  slots — the complete catalog, BOPIS, coupons, QR kits, custom domain.
+  The upgrade isn't sold cold; it's the natural next move for an owner who
+  already watched 5 products start working.
+
+The structure matters: nobody is asked to imagine act 2 — they've already
+*used* it at 5-slot scale by the time the paid path is offered. The pitch
+isn't "buy a storefront," it's "keep going."
+
+### 1.5 The stickiness hypothesis — the partnership compounds into moat
+
+The growth-partnership framing is also the retention model. There is no
+contractual lock-in — the switching cost is **accumulated value**:
+
+- **Indexed equity** — their `/place/*` pages, products, and shelf
+  membership are indexed and earning search position. Leaving forfeits
+  ranking they didn't have to build themselves.
+- **Deployed artifacts** — QR kits printed and taped to the door, coupons
+  in circulation, BOPIS running, customers in the CRM, inquiries landing
+  in the Requests Hub. These are operational dependencies, not features.
+- **Verified standing** — claimed + physically verified status is a
+  credential earned here; it doesn't port.
+- **Depth keeps expanding** — the capability ladder (app store, chatbot,
+  advanced tiers, custom domains) means the platform grows *into* their
+  business over time. Every module they adopt deepens the entanglement —
+  a competitor would have to replace a channel, not a listing.
+
+**Why the moat compounds:** every capability module is *native* — built on
+one architecture with tier/capability gating, no bolt-on third-party
+plugins. That means each adopted module shares the retailer's own data
+(products, customers, inquiries, reviews) instead of syncing across vendor
+silos — and each upgrade is a key flip, not a migration. Competitors can
+clone a feature; they can't clone the coherence.
+
+**The chatbot is the showcase case.** It isn't a bolt-on or even a
+separate product — it's a **capability-aware module on the same
+capability architecture that powers the whole platform**: tenant scope,
+storefront scope, directory scope, all governed by the same capability
+keys. It turns on when the tier unlocks it, scopes itself to the surface
+it lives on (the tenant's storefront answers store questions; the
+directory surface answers platform questions), and inherits the same
+gating, audit, and context plumbing as every other module. A bolt-on bot
+scrapes the page and guesses; this one is *context-aware by
+construction* — it reads the tenant's live inventory, real hours, BOPIS
+state, verification facts, and inquiry history. "Do you carry {product}?" gets a real answer from the
+catalog; "can I pick up today?" gets a real answer from the pickup
+capability flag.
+
+The awareness net is wider than catalog data — the tenant's **directory
+presence itself is a context source**: active promotions, coupons,
+featured status, products, FAQ entries, open inquiries, flyer content,
+CRM communication history. "Any deals this week?" answers from the coupon
+surface; "what do people ask you?" answers from the FAQ/inquiry records;
+a returning customer's earlier conversation is in the CRM the bot sits on
+top of. The bot doesn't approximate the store — it *is* the store's
+data, speaking.
+
+Design consequence: stickiness is earned by *delivery cadence*, not
+contracts. The retention plan is the roadmap — keep shipping capability
+modules, and each pioneer becomes progressively harder to move.
 
 **Community channels are the multiplier.** In the target communities
 (international grocery, halal, beauty), the trusted broadcast surfaces are
@@ -216,7 +302,17 @@ Per target corridor, before walking:
    a live `/place/category/{slug}` page on publish (`count > 0` gate);
    brand-new labels become plain-text chips until their first listing —
    pioneers ARE that first listing.
-4. **Field kit:**
+4. **Tier insurance audit (hard gate).** Before the first door, verify at
+   least **two tiers are fully armed and tested** — the gateway
+   `directory_presence` (what a claim lands on) plus one growth tier
+   (e.g. `professional`, already exercised live by the demo tenant).
+   Walk every *eligible* capability module per tier — QR, coupons, BOPIS,
+   chatbot, FAQ, CRM — on staging AND prod. The demo tenant exposed
+   exactly what an under-configured tier looks like: a promised module
+   that doesn't render in front of a prospect is a credibility kill
+   mid-pitch. A pioneer upgrading on the spot must hit armed keys, not
+   stubs.
+5. **Field kit:**
    - Phone with the seeds admin + claim surfaces reachable
    - **Business cards** (ordered, arriving ~Oct 31) — the leave-behind +
      invite artifact. Generic QR → **platform root** (not per-target links):
