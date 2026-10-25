@@ -975,7 +975,8 @@ function Home() {
           )}
         </div>
 
-        {/* Browse Directory - Prominent Platform Pillar */}
+        {/* Directory + Places — the two public browse surfaces: the directory
+            holds every seed, Places holds the unclaimed ones. */}
         <AnimatedCard delay={0.6} hover={true} className="mt-8 overflow-hidden">
           <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-600 p-8 md:p-12">
             {/* Background Pattern */}
@@ -1004,14 +1005,14 @@ function Home() {
                 <div className="flex-1 text-center md:text-left">
                   <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold mb-4">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    Platform Pillar
+                    The directory
                   </div>
                   <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
-                    Discover Online Presence
+                    Your store, on a shelf shoppers browse
                   </h2>
                   <p className="text-lg md:text-xl text-white/90 mb-6 max-w-2xl">
-                    Browse our curated directory of {platformStats.activeRetailersFormatted}+ retailers with {platformStats.productsListedFormatted}+ products.
-                    Find exactly what you need, right in your neighborhood.
+                    We build the directory from public business information, so your store may already be
+                    listed. Unclaimed listings also live on Places, where the owner can claim them.
                   </p>
 
                   {/* Features Grid */}
@@ -1019,46 +1020,60 @@ function Home() {
                     <div className="flex items-center gap-3 text-white/90">
                       <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                      <span className="text-sm font-medium">Search by Location</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-white/90">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
                       </div>
-                      <span className="text-sm font-medium">Filter by Category</span>
+                      <span className="text-sm font-medium">Browse by category</span>
                     </div>
                     <div className="flex items-center gap-3 text-white/90">
                       <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                       </div>
-                      <span className="text-sm font-medium">View Ratings</span>
+                      <span className="text-sm font-medium">Search by location</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-white/90">
+                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.2 9.4 5.6 5h12.8l1.4 4.4M4.2 9.4v10.8h16V9.4M9.8 20.2v-5.6h4.4v5.6" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium">Filter by store type</span>
                     </div>
                   </div>
 
-                  {/* CTA Button */}
-                  <Link href="/directory" target="_blank" rel="noopener noreferrer">
-                    <Button
-                      variant='gradient' style={{ color: 'white' }}
-                      size="lg"
-                      className="bg-white text-indigo-600 hover:bg-gray-50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 font-bold text-lg px-8 py-6"
+                  {/* CTAs — the directory and its Places partner */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <Link href="/directory" target="_blank" rel="noopener noreferrer">
+                      <Button
+                        variant='gradient' style={{ color: 'white' }}
+                        size="lg"
+                        className="bg-white text-indigo-600 hover:bg-gray-50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 font-bold text-lg px-8 py-6"
+                      >
+                        <svg className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Browse the directory
+                        <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </Button>
+                    </Link>
+                    <Link
+                      href="/place"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-white font-semibold border-2 border-white/30 hover:bg-white/10 transition-colors"
                     >
-                      <svg className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      Browse Directory
-                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </Button>
-                  </Link>
+                      Browse Places
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
