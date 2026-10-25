@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import React from 'react';
 
 export const metadata: Metadata = {
-  title: 'Features: Make Your Physical Shelves Visible | VisibleShelf',
+  title: 'Features: Make Your Physical Shelves Visible',
   description:
     'Discover how VisibleShelf brings physical retail shelves online: POS sync, item-level Google search, branded mobile storefronts, and deposit-backed counter pickup. Zero delivery logistics, zero commissions.',
   openGraph: {

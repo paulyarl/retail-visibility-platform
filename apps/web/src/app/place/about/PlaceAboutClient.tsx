@@ -19,33 +19,43 @@ import {
   Users,
   Check,
 } from 'lucide-react';
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 
+function tierPrice(key: string): string {
+  const price = TIER_PRICING[key];
+  return price === 0 ? 'Free' : `$${price}/mo`;
+}
+
+// The Entry Presence triad, in claim-upgrade order (presence → discovery →
+// storefront). Names and prices come from the tier ladder; the mode framing
+// mirrors ENTRY_PRESENCE_MODES in DirectoryPresenceUpgradeOptionsService so a
+// claimed tenant sees the same three choices here as on the claim screen.
 const ENTRY_PRESENCE_MODES = [
   {
-    mode: 'directory',
-    badge: '100% Free Forever',
-    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+    key: 'presence',
+    surface: 'Platform storefront + checkout',
+    primary: true,
+    badgeColor: 'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800',
     icon: Store,
-    title: 'Verified Local Storefront',
-    tagline: 'Put your physical store on the map',
+    title: 'Sell with deposit checkout',
     description:
-      'Take ownership of your place page. Keep your store hours, phone, street address, and specialty categories accurate so nearby shoppers discover your physical doors.',
+      'An all-purpose storefront for your store and your products, with deposit checkout built in. Your register stays the fulfillment point — zero delivery drivers, zero commission.',
     features: [
-      'Verified store hours & phone number',
-      'Specialty category alignment',
-      'Local directory citation for search engines',
-      '5 free product slots to showcase top sellers',
+      'Deposit checkout (Stripe) built in',
+      'Branded mobile storefront for your whole catalog',
+      'Full online payment as an add-on when you want it',
+      '0% commission on orders (keep 100% of your margins)',
     ],
   },
   {
-    mode: 'google',
-    badge: 'Discovery Tier',
-    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
+    key: 'discovery',
+    surface: 'Third-party (Google)',
+    primary: false,
+    badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800',
     icon: Search,
-    title: 'Shelf Search & Google Visibility',
-    tagline: 'Win shoppers searching for specific items',
+    title: 'Put your products on Google',
     description:
-      'Stop losing customers who search for specific products like "cassava flour", "halal ribeye", or specialty imports. Your in-stock inventory gets indexed so searchers see you have it in stock today.',
+      'Stop losing customers who search for specific products like "cassava flour", "halal ribeye", or specialty imports. Your in-stock inventory gets indexed so searchers see you have it today.',
     features: [
       'Up to 75 products indexed for local search',
       'Item-level "In-Stock Nearby" discovery',
@@ -54,19 +64,19 @@ const ENTRY_PRESENCE_MODES = [
     ],
   },
   {
-    mode: 'platform',
-    badge: 'Storefront Tier',
-    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
+    key: 'storefront',
+    surface: 'Platform in-house marketplace',
+    primary: false,
+    badgeColor: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800',
     icon: ShoppingBag,
-    title: 'Digital Storefront & In-Store Pickup',
-    tagline: 'Turn online searches into walk-in foot traffic',
+    title: 'Showcase your full catalog',
     description:
-      'Give local shoppers a branded mobile catalog to browse your aisles, check prices, and reserve or pay for counter pickup. Your physical register is the fulfillment hub — zero delivery drivers, zero packing boxes, 0% marketplace commission.',
+      'A branded, browsable storefront inside the marketplace — your aisles, your prices, no checkout required. Shoppers browse online and walk in.',
     features: [
       'Branded mobile web app (installable PWA)',
-      'Click-and-collect in-store & curbside pickup',
-      'Expand up to 200+ inventory items',
-      '0% commission on orders (keep 100% of your margins)',
+      'Browse, inquire, and connect',
+      'Up to 200 inventory items',
+      'Hosted on your platform subdomain',
     ],
   },
 ];
@@ -75,36 +85,36 @@ export default function PlaceAboutClient() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
       {/* ─── Hero Section ─── */}
-      <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-slate-900 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-violet-600 via-violet-700 to-indigo-800 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_60%)] pointer-events-none" />
         <div className="max-w-5xl mx-auto px-6 py-20 relative">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-sm font-medium mb-6 backdrop-blur-sm">
-            <Store className="w-4 h-4 text-amber-300" />
+            <Store className="w-4 h-4 text-white/80" />
             <span>Built for Independent Physical Retailers</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 leading-[1.15]">
             Make your physical shelves <br className="hidden sm:inline" />
-            <span className="text-amber-300">visible to local shoppers.</span>
+            <span className="text-violet-200">visible to local shoppers.</span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-blue-100 leading-relaxed max-w-3xl mb-8 font-normal">
+          <p className="text-lg sm:text-xl text-violet-100 leading-relaxed max-w-3xl mb-8 font-normal">
             Google knows your building&apos;s address, but it has no idea what is actually inside your door.
             When nearby customers search for specialty items on their phones, algorithms send them to big-box chains
             or delivery apps because your shelves are invisible online.
           </p>
 
-          <p className="text-base text-blue-200/90 leading-relaxed max-w-3xl mb-10">
+          <p className="text-base text-violet-200/90 leading-relaxed max-w-3xl mb-10">
             Claim your free store listing in 60 seconds. Put your in-stock inventory in front of local shoppers,
             and turn online product searches into walk-in foot traffic. <strong>Zero delivery logistics, zero commissions.</strong>
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
             <Link
-              href="/directory"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl transition-all font-bold text-base shadow-lg shadow-black/20 hover:shadow-black/30 transform hover:-translate-y-0.5"
+              href="/place/search"
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-white hover:bg-violet-50 text-violet-700 rounded-xl transition-all font-bold text-base shadow-lg shadow-black/20 hover:shadow-black/30 transform hover:-translate-y-0.5"
             >
-              Find & Claim Your Store <ArrowRight className="w-5 h-5" />
+              Find Your Store <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               href="/directory/add-business"
@@ -118,15 +128,15 @@ export default function PlaceAboutClient() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12 pt-8 border-t border-white/15">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span className="text-sm text-blue-100 font-medium">Free 5-product shelf on claim</span>
+              <span className="text-sm text-violet-100 font-medium">Free 5-product shelf on claim</span>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span className="text-sm text-blue-100 font-medium">Your store is the fulfillment hub</span>
+              <span className="text-sm text-violet-100 font-medium">Your store is the fulfillment hub</span>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span className="text-sm text-blue-100 font-medium">0% commission on in-store sales</span>
+              <span className="text-sm text-violet-100 font-medium">0% commission on in-store sales</span>
             </div>
           </div>
         </div>
@@ -135,7 +145,7 @@ export default function PlaceAboutClient() {
       {/* ─── The Invisible Shelf Problem ─── */}
       <div className="max-w-5xl mx-auto px-6 py-16">
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-semibold uppercase tracking-wider mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-100 dark:bg-violet-950/50 text-violet-800 dark:text-violet-300 text-xs font-semibold uppercase tracking-wider mb-3">
             The Local Retail Dilemma
           </div>
           <h2 className="text-3xl font-bold tracking-tight">
@@ -214,7 +224,7 @@ export default function PlaceAboutClient() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-semibold mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold mb-4">
                 <Tag className="w-3.5 h-3.5" />
                 Free With Your Claimed Listing
               </div>
@@ -262,39 +272,55 @@ export default function PlaceAboutClient() {
       <div className="max-w-5xl mx-auto px-6 py-20">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">
-            Three simple tiers to grow your foot traffic
+            Pick the surface that fits
           </h2>
           <p className="text-neutral-600 dark:text-neutral-400 text-base">
-            Start completely free with your claimed directory listing. Upgrade only when you want to index more inventory or take online pre-orders for in-store pickup.
+            Your claimed listing is the free gateway. From there you choose where your products show up —
+            the rest is a step up from here, not a replacement.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {ENTRY_PRESENCE_MODES.map((mode) => {
             const Icon = mode.icon;
+            const name = TIER_DISPLAY_NAMES[mode.key];
             return (
               <div
-                key={mode.mode}
-                className="bg-white dark:bg-neutral-900 rounded-2xl p-7 border border-neutral-200 dark:border-neutral-800 shadow-sm flex flex-col justify-between hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+                key={mode.key}
+                className={`bg-white dark:bg-neutral-900 rounded-2xl p-7 border shadow-sm flex flex-col justify-between hover:border-violet-400 dark:hover:border-violet-600 transition-colors ${
+                  mode.primary
+                    ? 'border-violet-300 dark:border-violet-700 ring-1 ring-violet-200 dark:ring-violet-800'
+                    : 'border-neutral-200 dark:border-neutral-800'
+                }`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <div className="flex items-start justify-between gap-2 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
                       <Icon className="w-6 h-6" />
                     </div>
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${mode.badgeColor}`}>
-                      {mode.badge}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${mode.badgeColor}`}>
+                        {name}
+                      </span>
+                      {mode.primary && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                          Recommended
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-1">
                     {mode.title}
                   </h3>
-                  <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-3">
-                    {mode.tagline}
+                  <p className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-3">
+                    {mode.surface}
                   </p>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
                     {mode.description}
+                  </p>
+                  <p className="text-lg font-bold text-neutral-900 dark:text-white mb-6">
+                    {tierPrice(mode.key)}
                   </p>
 
                   <div className="space-y-2.5 mb-8">
@@ -308,10 +334,10 @@ export default function PlaceAboutClient() {
                 </div>
 
                 <Link
-                  href="/directory"
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white font-semibold text-sm transition-colors"
+                  href={`/auth/signup?tier=${mode.key}`}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm transition-colors"
                 >
-                  Get Started <ArrowRight className="w-4 h-4" />
+                  Choose {name} <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             );
@@ -323,7 +349,7 @@ export default function PlaceAboutClient() {
       <div className="bg-slate-900 text-white py-16 border-t border-slate-800">
         <div className="max-w-5xl mx-auto px-6">
           <div className="max-w-3xl mb-12">
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-400">
+            <span className="text-xs font-bold uppercase tracking-widest text-violet-300">
               The Retail Advantage
             </span>
             <h2 className="text-3xl font-extrabold tracking-tight mt-2 mb-4">
@@ -337,7 +363,7 @@ export default function PlaceAboutClient() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700/80">
-              <Building2 className="w-8 h-8 text-amber-400 mb-4" />
+              <Building2 className="w-8 h-8 text-violet-300 mb-4" />
               <h3 className="text-lg font-bold mb-2">Zero Extra Rent or Storage</h3>
               <p className="text-sm text-slate-300 leading-relaxed">
                 You already pay rent for your storefront, electricity for your coolers, and wages for your staff.
@@ -355,7 +381,7 @@ export default function PlaceAboutClient() {
             </div>
 
             <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700/80">
-              <Package className="w-8 h-8 text-blue-400 mb-4" />
+              <Package className="w-8 h-8 text-violet-400 mb-4" />
               <h3 className="text-lg font-bold mb-2">Basket Expansion at Counter</h3>
               <p className="text-sm text-slate-300 leading-relaxed">
                 When a customer comes through your doors to buy the specific item they found online,
@@ -379,7 +405,7 @@ export default function PlaceAboutClient() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 relative">
           <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
+            <div className="w-12 h-12 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
               1
             </div>
             <h3 className="text-base font-bold mb-1">Find Your Store</h3>
@@ -389,7 +415,7 @@ export default function PlaceAboutClient() {
           </div>
 
           <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
+            <div className="w-12 h-12 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
               2
             </div>
             <h3 className="text-base font-bold mb-1">Confirm Ownership</h3>
@@ -399,7 +425,7 @@ export default function PlaceAboutClient() {
           </div>
 
           <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
+            <div className="w-12 h-12 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
               3
             </div>
             <h3 className="text-base font-bold mb-1">List 5 Signature Items</h3>
@@ -411,25 +437,25 @@ export default function PlaceAboutClient() {
       </div>
 
       {/* ─── Final CTA Banner ─── */}
-      <div className="bg-blue-600 text-white py-16">
+      <div className="bg-gradient-to-br from-violet-600 via-violet-700 to-indigo-800 text-white py-16">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
             Ready to bring your physical shelves online?
           </h2>
-          <p className="text-blue-100 text-base sm:text-lg mb-8 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-violet-100 text-base sm:text-lg mb-8 max-w-2xl mx-auto leading-relaxed">
             Find your store&apos;s place page now. Claim it in under a minute and start capturing the local customers
             already searching for what is sitting on your shelves.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
-              href="/directory"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-white hover:bg-blue-50 text-blue-700 rounded-xl transition-all font-bold text-base shadow-lg shadow-black/10 hover:shadow-black/20"
+              href="/place/search"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white hover:bg-violet-50 text-violet-700 rounded-xl transition-all font-bold text-base shadow-lg shadow-black/10 hover:shadow-black/20"
             >
               Find Your Store Listing <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               href="/directory/add-business"
-              className="inline-flex items-center gap-2 px-6 py-4 bg-blue-700 hover:bg-blue-800 border border-blue-400/40 text-white rounded-xl transition-colors font-semibold text-base"
+              className="inline-flex items-center gap-2 px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-xl transition-colors font-semibold text-base"
             >
               Add My Store
             </Link>

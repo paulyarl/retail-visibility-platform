@@ -498,19 +498,26 @@ function ShelfChip({
   hrefFor: (slug: string) => string;
 }) {
   const base =
-    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300';
+    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border';
 
+  // Cold chip — label doesn't resolve to a live shelf in this market.
   if (!shelf) {
-    return <span className={base}>{label}</span>;
+    return (
+      <span className={`${base} border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 text-neutral-500 dark:text-neutral-400`}>
+        {label}
+      </span>
+    );
   }
 
+  // Hot chip — links to a live shelf, styled as the platform's link-chip
+  // vocabulary so the tap target is visible at a glance.
   return (
     <Link
       href={hrefFor(shelf.slug)}
-      className={`${base} hover:border-blue-300 hover:text-blue-700 dark:hover:border-blue-700 dark:hover:text-blue-400 transition-colors`}
+      className={`${base} border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 hover:border-blue-300 dark:hover:bg-blue-900/50 dark:hover:border-blue-700 transition-colors`}
     >
       {label}
-      <span className="text-xs text-neutral-400 dark:text-neutral-500">{shelf.count}</span>
+      <span className="text-xs font-semibold text-blue-500 dark:text-blue-400">{shelf.count}</span>
     </Link>
   );
 }

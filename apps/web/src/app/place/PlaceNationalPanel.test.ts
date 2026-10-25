@@ -54,6 +54,47 @@ describe('PlaceNationalPanel', () => {
     expect(html).toContain('/place/city/columbus-oh');
   });
 
+  it('overrides packet stats and chip counts with live coverage, re-sorts and drops empty markets', () => {
+    const enrichment = {
+      ...nationalEnrichment,
+      context: {
+        national_coverage: {
+          totalStates: 3,
+          totalCities: 12,
+          totalListings: 340,
+          topCities: [
+            { city: 'Indianapolis', state: 'IN', listingCount: 1 },
+            { city: 'Columbus', state: 'OH', listingCount: 30 },
+            { city: 'Ghostburg', state: 'IN', listingCount: 9 },
+          ],
+        },
+      },
+    } as any;
+    const liveCoverage = {
+      totalPlaces: 144,
+      totalCities: 11,
+      totalStates: 2,
+      cityCounts: {
+        'indianapolis|in': 46,
+        'columbus|oh': 1,
+        // ghostburg absent → live count 0 → chip dropped
+      },
+    };
+    const html = renderToStaticMarkup(
+      createElement(PlaceNationalPanel, { enrichment, liveCoverage }),
+    );
+
+    expect(html).toContain('144 places listed');
+    expect(html).toContain('11 markets');
+    expect(html).toContain('2 states covered');
+    // Indianapolis sorts first on the live count, not the stale packet order.
+    expect(html.indexOf('/place/city/indianapolis-in')).toBeLessThan(
+      html.indexOf('/place/city/columbus-oh'),
+    );
+    expect(html).toContain('46');
+    expect(html).not.toContain('Ghostburg');
+  });
+
   it('falls back to effective.description when bodyCopy is absent', () => {
     const html = renderToStaticMarkup(
       createElement(PlaceNationalPanel, {

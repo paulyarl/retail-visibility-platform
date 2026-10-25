@@ -10,7 +10,7 @@ import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 export const dynamic = 'force-dynamic';
 
-const FALLBACK_TITLE = 'Places Directory — VisibleShelf';
+const FALLBACK_TITLE = 'Places Directory';
 const FALLBACK_DESCRIPTION =
   'Browse local businesses listed on VisibleShelf from public information. Find places by category and city. Claim your listing to take control.';
 
@@ -65,6 +65,29 @@ export default async function PlacesIndexPage() {
     cityLinks.sort((a, b) => a.label.localeCompare(b.label));
   }
 
+  // Live coverage for the national panel — the packet's baked-in stats and
+  // top-market counts go stale the moment a seed publishes. Summed per market
+  // from the shelf index; null when the index read failed (packet fallback).
+  const liveCoverage = categories?.categories
+    ? (() => {
+        const cityCounts: Record<string, number> = {};
+        const states = new Set<string>();
+        for (const cat of categories.categories) {
+          for (const c of cat.cities ?? []) {
+            const key = `${c.city.trim().toLowerCase()}|${(c.state ?? '').trim().toLowerCase()}`;
+            cityCounts[key] = (cityCounts[key] ?? 0) + (c.placeCount ?? 0);
+            if (c.state) states.add(c.state.trim().toUpperCase());
+          }
+        }
+        return {
+          totalPlaces: categories.totalPlaces ?? 0,
+          totalCities: Object.keys(cityCounts).length,
+          totalStates: states.size,
+          cityCounts,
+        };
+      })()
+    : null;
+
   return (
     <>
       {/* Header leads the page — the national coverage band below reads as page
@@ -73,7 +96,7 @@ export default async function PlacesIndexPage() {
         totalPlaces={categories?.totalPlaces ?? 0}
         categoryCount={categories?.categories.length ?? 0}
       />
-      {national && <PlaceNationalPanel enrichment={national} />}
+      {national && <PlaceNationalPanel enrichment={national} liveCoverage={liveCoverage} />}
       <Suspense
         fallback={
           <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">

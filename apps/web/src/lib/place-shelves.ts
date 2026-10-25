@@ -11,6 +11,71 @@ export interface ShelfLink {
 }
 
 /**
+ * Generic retail nouns that suffix nearly every shelf label. Stripped (in any
+ * position) when computing a label's "head" for alias matching — "halal
+ * market" and "halal grocery store" share the head "halal".
+ */
+const SHELF_TAIL_NOUNS = new Set([
+  'store', 'stores', 'market', 'markets', 'grocery', 'groceries',
+  'supermarket', 'supermarkets', 'food', 'foods', 'shop', 'shops',
+  'retail', 'mart', 'bodega', 'deli', 'place',
+]);
+
+const SHELF_NOISE_WORDS = new Set(['and', 'the', 'of', 'or', 'at', '&']);
+
+/** Light plural folding for alias matching — not a stemmer, just the
+ *  suffixes shelf names actually use. Note 'ies' must run before the bare
+ *  's' rule, and 'es' is intentionally absent — it mangles 'stores'→'stor'. */
+function foldPlural(token: string): string {
+  if (token.endsWith('ies') && token.length > 3) return `${token.slice(0, -3)}y`;
+  if (token.endsWith('s') && token.length > 1 && !token.endsWith('ss')) return token.slice(0, -1);
+  return token;
+}
+
+/**
+ * Normalize a shelf label for alias matching: lowercase, drop punctuation,
+ * parentheticals, `[language]` tags and noise words, fold plurals. Returns
+ * the full normalized token list (tail nouns kept — they're meaningful for
+ * exact-ish matching) plus the "head" tokens (tail nouns stripped).
+ */
+function normalizeShelfLabel(label: string): { tokens: string[]; head: string[] } {
+  const cleaned = label
+    .toLowerCase()
+    .replace(/\s*\[[^\]]*\]\s*$/, ' ')       // language annotations — never display text
+    .replace(/\s*\([^)]*\)\s*/g, ' ')        // qualifiers ("(probable)", "(unverified)")
+    .replace(/[&/\\,;:+–—_-]+/g, ' ')        // separators → spaces
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return { tokens: [], head: [] };
+  const tokens = cleaned
+    .split(' ')
+    .map(foldPlural)
+    .filter((t) => t && !SHELF_NOISE_WORDS.has(t));
+  const head = tokens.filter((t) => !SHELF_TAIL_NOUNS.has(t));
+  return { tokens, head };
+}
+
+/** Same-tail match: normalized token lists identical (order-insensitive). */
+function sameTokens(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((t) => set.has(t));
+}
+
+/** Head-subset alias: shelf head ⊆ label head AND first tokens align.
+ *  "Somali East African Halal market" → head {somali,east,african,halal}
+ *  contains {somali} with matching first token → Somali Grocery Store.
+ *  "Latin American grocery" head {latin,american} vs shelf {american} —
+ *  first tokens differ → refused (latin american ≠ american grocery). */
+function headSubsetMatch(labelHead: string[], shelfHead: string[]): boolean {
+  if (!labelHead.length || !shelfHead.length) return false;
+  if (labelHead[0] !== shelfHead[0]) return false;
+  const labelSet = new Set(labelHead);
+  return shelfHead.every((t) => labelSet.has(t));
+}
+
+/**
  * Resolve an enrichment taxonomy label (sub-category or related category) to
  * the live shelf for a market.
  *
@@ -20,8 +85,14 @@ export interface ShelfLink {
  * here resolve — a chip linking into an empty shelf is a dead end, so those
  * callers render plain text instead.
  *
- * Matching is exact on the trimmed, lowercased name: 'Somali Grocery' and
- * 'Somali Grocery Store' are different labels and are not merged.
+ * Matching ladder (conservative → lenient):
+ *   1. Exact match on the trimmed, lowercased name.
+ *   2. Normalized match — punctuation/parentheticals/noise/plurals folded,
+ *      token order ignored ("Halal Grocery" ≡ "halal grocery store").
+ *   3. Head-subset alias — the shelf's head tokens must all appear in the
+ *      label's head AND share its first token; longest matching head wins,
+ *      only when unique. Ambiguity stays cold — a wrong link is worse than
+ *      a plain-text chip.
  */
 export function resolveShelfForLabel(
   label: string,
@@ -32,7 +103,37 @@ export function resolveShelfForLabel(
   const key = label.trim().toLowerCase();
   if (!key) return null;
 
-  const shelf = shelves.find((s) => s.category.trim().toLowerCase() === key);
+  // 1. Exact match — the canonical fast path.
+  let shelf = shelves.find((s) => s.category.trim().toLowerCase() === key);
+
+  if (!shelf) {
+    const { tokens, head } = normalizeShelfLabel(key);
+    if (tokens.length > 0) {
+      // 2. Normalized token-equality (tail nouns compared too — "halal meat
+      // market" and "halal grocery store" are genuinely different shelves).
+      shelf = shelves.find((s) => {
+        const st = normalizeShelfLabel(s.category);
+        return sameTokens(tokens, st.tokens);
+      });
+    }
+    if (!shelf && head.length > 0) {
+      // 3. Head-subset alias — most specific (longest head) unique winner.
+      let best: { shelf: PlaceCategory; headLen: number } | null = null;
+      let ambiguous = false;
+      for (const s of shelves) {
+        const sh = normalizeShelfLabel(s.category).head;
+        if (!headSubsetMatch(head, sh)) continue;
+        if (!best || sh.length > best.headLen) {
+          best = { shelf: s, headLen: sh.length };
+          ambiguous = false;
+        } else if (sh.length === best.headLen) {
+          ambiguous = true;
+        }
+      }
+      if (best && !ambiguous) shelf = best.shelf;
+    }
+  }
+
   if (!shelf) return null;
 
   const count = city

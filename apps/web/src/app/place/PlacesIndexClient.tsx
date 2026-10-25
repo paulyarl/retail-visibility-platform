@@ -73,6 +73,12 @@ export default function PlacesIndexClient({
     );
   }
 
+  // Shelf order: fullest shelves first, name as the tie-break — same order
+  // applied to the per-card city chips below.
+  const sortedCategories = [...categories].sort(
+    (a, b) => b.placeCount - a.placeCount || a.category.localeCompare(b.category),
+  );
+
   if (categories.length === 0) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
@@ -103,7 +109,7 @@ export default function PlacesIndexClient({
       {/* Categories grid */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((cat) => (
+          {sortedCategories.map((cat) => (
             <div
               key={cat.slug}
               className="group bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-6 hover:shadow-md hover:border-violet-300 dark:hover:border-violet-600 transition-all"
@@ -141,7 +147,10 @@ export default function PlacesIndexClient({
                   (/place/city/{city}-{state}, the canonical market slug). */}
               {cat.cities.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {cat.cities.slice(0, 4).map((c) => (
+                  {[...cat.cities]
+                    .sort((a, b) => b.placeCount - a.placeCount || a.city.localeCompare(b.city))
+                    .slice(0, 4)
+                    .map((c) => (
                     <Link
                       key={`${c.city}-${c.state}`}
                       href={getPlaceCityShelfUrl(c.city, c.state)}

@@ -9,10 +9,23 @@ import { getPlaceCityShelfUrl } from '@/utils/slug';
  * measured coverage stats, and the top covered markets linking into the seed
  * city shelves. Renders nothing when no national packet exists.
  */
+export interface NationalLiveCoverage {
+  totalPlaces: number;
+  totalCities: number;
+  totalStates: number;
+  /** Live listing counts per market — key `${city}|${state}`, lowercased. */
+  cityCounts: Record<string, number>;
+}
+
 export default function PlaceNationalPanel({
   enrichment,
+  liveCoverage,
 }: {
   enrichment: LocationEnrichmentResponse;
+  /** Live coverage computed from the shelf index — overrides the packet's
+   *  baked-in stats (stale the moment a seed publishes). Falls back to the
+   *  packet counts when absent. */
+  liveCoverage?: NationalLiveCoverage | null;
 }) {
   const coverage = enrichment.context?.national_coverage as
     | {
@@ -22,8 +35,28 @@ export default function PlaceNationalPanel({
         topCities?: { city: string; state: string; listingCount: number }[];
       }
     | undefined;
-  const topCities = coverage?.topCities?.slice(0, 8) ?? [];
   const intro = enrichment.bodyCopy || enrichment.effective?.description || null;
+
+  // Live shelf-index counts win; the packet's baked counts are the fallback.
+  // A market with no live count drops off the chip list entirely — an empty
+  // shelf link is a dead end for a shopper.
+  const liveCountFor = (c: { city: string; state: string; listingCount?: number }): number => {
+    if (!liveCoverage) return c.listingCount ?? 0;
+    return (
+      liveCoverage.cityCounts[
+        `${c.city.trim().toLowerCase()}|${(c.state ?? '').trim().toLowerCase()}`
+      ] ?? 0
+    );
+  };
+  const topCities = (coverage?.topCities ?? [])
+    .map((c) => ({ ...c, count: liveCountFor(c) }))
+    .filter((c) => (c.count ?? 0) > 0)
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.city.localeCompare(b.city))
+    .slice(0, 8);
+
+  const totalListings = liveCoverage?.totalPlaces ?? coverage?.totalListings;
+  const totalCities = liveCoverage?.totalCities ?? coverage?.totalCities;
+  const totalStates = liveCoverage?.totalStates ?? coverage?.totalStates;
 
   if (!intro && topCities.length === 0) return null;
 
@@ -39,22 +72,22 @@ export default function PlaceNationalPanel({
           </p>
         )}
 
-        {(coverage?.totalListings || coverage?.totalCities || coverage?.totalStates) && (
+        {(totalListings || totalCities || totalStates) && (
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-neutral-500 dark:text-neutral-400">
-            {!!coverage.totalListings && (
+            {!!totalListings && (
               <span className="inline-flex items-center gap-1.5">
                 <Store className="w-4 h-4" />
-                {coverage.totalListings} places listed
+                {totalListings} places listed
               </span>
             )}
-            {!!coverage.totalCities && (
+            {!!totalCities && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="w-4 h-4" />
-                {coverage.totalCities} markets
+                {totalCities} markets
               </span>
             )}
-            {!!coverage.totalStates && (
-              <span>{coverage.totalStates} states covered</span>
+            {!!totalStates && (
+              <span>{totalStates} states covered</span>
             )}
           </div>
         )}
@@ -74,7 +107,7 @@ export default function PlaceNationalPanel({
                   <MapPin className="w-3.5 h-3.5" />
                   {c.city}, {c.state}
                   <span className="text-neutral-500 dark:text-neutral-400">
-                    {c.listingCount}
+                    {c.count}
                   </span>
                 </Link>
               ))}

@@ -1085,7 +1085,13 @@ class CategoryMarketEnrichmentService extends BaseService {
       for (const syn of cfg.synonyms) {
         const value = typeof syn === 'string' ? syn : null;
         if (!value) continue;
-        const trimmed = value.trim();
+        // Profile synonyms are language-annotated ("african grocery store
+        // [English]", "habesha store [endonym — Amharic/Tigrinya]") — the
+        // bracketed tag is analyst provenance, not display text. Strip it
+        // the same way SeedSeoComposer.stripLanguageTag does; the term
+        // itself is real search vocabulary and is kept verbatim. Strip
+        // before dedupe so tag variants collapse to one term.
+        const trimmed = value.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
         const lower = trimmed.toLowerCase();
         if (!trimmed || prohibited.has(lower) || seen.has(lower)) continue;
         seen.add(lower);
