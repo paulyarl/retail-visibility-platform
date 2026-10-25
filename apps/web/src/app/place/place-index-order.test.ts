@@ -22,6 +22,7 @@ vi.mock('@/services/PlacesBrowsePublicService', async (importOriginal) => {
 });
 
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 import PlacesIndexPage from './page';
 import PlacesIndexHero from './PlacesIndexHero';
 import PlaceNationalPanel from './PlaceNationalPanel';
@@ -103,5 +104,18 @@ describe('/place home band order', () => {
     expect(index?.props.cities).toEqual([
       { label: 'Indianapolis, IN', href: '/place/city/indianapolis-in' },
     ]);
+  });
+
+  it('closes the page with the platform footer, after the crawl index', async () => {
+    // Regression: the footer used to live inside PlacesIndexClient, so it
+    // rendered above the server crawl index — "Browse every place" sat below
+    // the footer. The page owns it now and renders it last.
+    const children = await pageChildren();
+    const types = children.map((child) => child.type);
+
+    expect(types[types.length - 1]).toBe(PoweredByFooter);
+    expect(types.indexOf(PoweredByFooter)).toBeGreaterThan(
+      types.indexOf(PlacesIndexDirectory),
+    );
   });
 });

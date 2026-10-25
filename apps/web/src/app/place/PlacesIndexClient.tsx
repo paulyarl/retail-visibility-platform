@@ -7,7 +7,6 @@ import placesBrowsePublicService, {
   PlaceCategory,
   NationalCategoryRosterEntry,
 } from '@/services/PlacesBrowsePublicService';
-import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 export default function PlacesIndexClient({
@@ -95,7 +94,6 @@ export default function PlacesIndexClient({
             </Link>
           </div>
         </div>
-        <PoweredByFooter />
       </div>
     );
   }
@@ -183,8 +181,6 @@ export default function PlacesIndexClient({
           </div>
         </div>
       </div>
-
-      <PoweredByFooter />
     </div>
   );
 }

@@ -127,6 +127,8 @@ router.get('/search', async (req: Request, res: Response) => {
     ];
     const params: any[] = [];
     let paramIndex = 1;
+    // Index of the category param, reused by the `is_primary` projection below.
+    let categoryParamIndex: number | null = null;
 
     // Category filter - match by slug for directory listing categories (store types)
     // This filters by the categories assigned in the directory settings page
@@ -138,6 +140,7 @@ router.get('/search', async (req: Request, res: Response) => {
         .join(' ');
       
       // Add category filter to conditions
+      categoryParamIndex = paramIndex;
       conditions.push(`(dll.primary_category = $${paramIndex}::text OR $${paramIndex}::text = ANY(dll.secondary_categories))`);
       params.push(categoryName);
       paramIndex++;
@@ -261,7 +264,7 @@ router.get('/search', async (req: Request, res: Response) => {
             null as google_category_id,
             null as googleCategoryId,
             null as icon,
-            ${category ? `CASE WHEN dll.primary_category = $${paramIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
+            ${categoryParamIndex ? `CASE WHEN dll.primary_category = $${categoryParamIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
             dll.rating_avg,
             dll.rating_count,
             COALESCE(real_counts.product_count, 0) as product_count,
@@ -321,7 +324,7 @@ router.get('/search', async (req: Request, res: Response) => {
           null as google_category_id,
           null as googleCategoryId,
           null as icon,
-          ${category ? `CASE WHEN dll.primary_category = $${paramIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
+          ${categoryParamIndex ? `CASE WHEN dll.primary_category = $${categoryParamIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
           dll.rating_avg,
           dll.rating_count,
           COALESCE(real_counts.product_count, 0) as product_count,

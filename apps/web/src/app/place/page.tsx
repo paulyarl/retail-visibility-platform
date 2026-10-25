@@ -5,6 +5,7 @@ import PlacesIndexClient from './PlacesIndexClient';
 import PlacesIndexHero from './PlacesIndexHero';
 import PlaceNationalPanel from './PlaceNationalPanel';
 import PlacesIndexDirectory, { type PlacesIndexCityLink } from './PlacesIndexDirectory';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 export const dynamic = 'force-dynamic';
@@ -77,7 +78,7 @@ export default async function PlacesIndexPage() {
         fallback={
           <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
               <p className="text-neutral-600 dark:text-neutral-400">Loading places...</p>
             </div>
           </div>
@@ -91,6 +92,10 @@ export default async function PlacesIndexPage() {
       {/* Crawl index — server-rendered so every listing and city has an
           inbound link in the first HTML response. */}
       <PlacesIndexDirectory cities={cityLinks} places={allPlaces} />
+      {/* Footer closes the page — it lives here, not inside PlacesIndexClient,
+          because the client renders above the crawl index (a footer inside it
+          would land mid-page). */}
+      <PoweredByFooter />
     </>
   );
 }
