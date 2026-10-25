@@ -37,8 +37,34 @@ A business counts as a pioneer when ALL of:
 works; the upgrade triad works it afterward. Target: 10 pioneers, ≥5
 distinct categories, ≥3 with no prior live shelf.
 
+**Success includes the engagement loop, not just the claim.** Pioneering
+is only successful if feedback handling and engagement are *integrated
+into the workflow* — a claimed pioneer whose feedback disappears is a
+public churn story; a pioneer whose suggestion ships is a testimony.
+Feedback capture (CRM pipeline), cadence check-ins, and testimonial
+harvest are cohort deliverables, not post-cohort ops.
+
 **Sizing the door list:** decision-maker present ≈ 1 in 3 doors.
 10 pioneers ⇒ ~40–60 doors ⇒ 2–3 walk days on dense corridors.
+
+**Cohort segmentation by aspirational fit.** The capability architecture
+makes the offer itself segmentable — pioneer benefits match the retailer's
+stated ambition rather than a one-size grant:
+
+- **Segment A — the ambitious** (wants the full channel: catalog, BOPIS,
+  own domain): grant a **professional-tier flexible key** — test every
+  module at will, full playground. Their feedback covers the deepest
+  surface.
+- **Segment B — the steady grower** (wants visibility + pickup, not an
+  empire): grant the tier matching their aspiration (storefront /
+  discovery), scoped to what they'll actually use.
+- **Selection criteria therefore includes aspirational fit** — the door
+  conversation ("what do you want this to become?") isn't just rapport,
+  it's segmentation input.
+
+Bonus: a segmented cohort **field-tests multiple tier configurations in
+the wild simultaneously** — the §3 tier insurance audit plus real users
+exercising each armed tier. The cohort IS the capability-matrix test plan.
 
 **Market:** Indianapolis. Home market, existing indexed seed depth (80
 `/place/*` seeds incl. Enerem — already in Google results), claim precedent
@@ -233,6 +259,34 @@ Design consequence: stickiness is earned by *delivery cadence*, not
 contracts. The retention plan is the roadmap — keep shipping capability
 modules, and each pioneer becomes progressively harder to move.
 
+### 1.6 Social DM — the low-cost pitch channel and its reciprocal duty
+
+Every DM-capable social channel is a recruitment lane — Facebook,
+Instagram, LinkedIn, TikTok, X. The pitch lands in the same app the owner
+already uses daily, with the link to their live listing one tap away.
+
+- **Low expectation, free engagement.** DM conversion rates are modest —
+  that's fine; the channel costs nothing but touches, and it reaches
+  owners who aren't at their store when the doors get walked. A DM that
+  opens with their own live listing link (*"you're already on it —
+  {url}"*) is the door pitch compressed into a message.
+- **The reciprocal duty.** If the platform DMs niche members, the
+  platform must *be* there — real accounts following and engaging with
+  the community (independent grocers, beauty supply owners, halal
+  markets, neighborhood business groups), not a broadcast shell. A DM
+  from an account that visibly participates in the community reads as an
+  introduction; the same DM from an empty profile reads as spam. The
+  social presence is part of the channel's credibility — build it before
+  the first message.
+- **Content = the platform's own context.** The profiles post about what
+  the platform *is doing*: new shelves going live, businesses getting
+  indexed, capability demos, pioneer stories, market launches. The
+  account becomes a living portfolio — a retailer who clicks the DM
+  sender's profile sees the pitch already in motion, not an ad.
+- **Funnel fit.** A DM touch is a queue touch like any other — log it on
+  the same outreach ladder so response rates are measurable against call
+  and door rates.
+
 **Community channels are the multiplier.** In the target communities
 (international grocery, halal, beauty), the trusted broadcast surfaces are
 institutional — church testimony, mosque announcements, association
@@ -290,14 +344,22 @@ conversation is mandatory anyway. Let the owner name their own shelf.
 
 ## 3. Pre-walk preparation
 
-Per target corridor, before walking:
+Per target corridor, the walk-day-1 pipeline:
 
-1. **Run the intelligence stage for candidate categories** — establishment
-   profile if none exists for the category (discovery is gated on it), then
-   discovery scans to populate the queue.
-2. **Pre-seed targets.** Publish seeds for every door on the list — the
-   opener *"you're already listed"* only works if it's true. Queue → seed
-   path (`from-queue-<entryId>` batch), provenance rows required.
+1. **Select target categories → set up intelligence.** Pick the cohort's
+   category mix (cross-category by design, §1); run **gold-standards +
+   establishment** benchmarks first (discovery is gated on an active
+   establishment profile), then **discovery** scans to populate the queue.
+2. **Scan the market → audit the prospects → seed the prospects.**
+2. **Pre-seed targets — enriched, not thin.** Publish seeds for every
+   door on the list — the opener *"you're already listed"* only works if
+   the listing is *good*. A walk target's seed must carry a **complete
+   business audit** — enriched categories, attributes, review-backed
+   context, hours — not a thin discovery-scan row promoted straight into
+   a seed. Not necessarily the sibling-triage path either: a complete
+   campaign producing a complete seed. The listing shown on the door IS
+   the product sample — a skeleton seed makes "you're already on it"
+   sound like a liability, not a gift.
 3. **Verify the shelves resolve.** Each target's category should resolve to
    a live `/place/category/{slug}` page on publish (`count > 0` gate);
    brand-new labels become plain-text chips until their first listing —
@@ -448,13 +510,25 @@ Every outcome is data. A refusal still leaves a live, indexed seed listing
 ## 9. Open decisions
 
 1. **Pioneer terms** — the *frame* is decided: **initially free, growth
-   partnership** (§1.1) — not a free product, not a promo window. Still
-   open: how the growth path is stated on the door ("free to start, grow
-   into it"? a named timeline?), what the pioneer *commits* to in return
-   (feedback cadence — monthly check-in? open channel?), and what "product
-   input" concretely routes to (a real surface — requests hub? a quarterly
-   pioneer review?). Decide before door 1 — the pitch makes promises, and
-   a promise with no machinery behind it is churn.
+   partnership** (§1.1) — not a free product, not a promo window. The
+   *benefits menu* is now concrete: **feature grants** (capability modules
+   unlocked ahead of tier), **discounted tiers** (founders' rate on the
+   first paid tier), **extra product slots** (beyond the free 5), or a mix.
+   Still open: which benefit(s) actually get offered on the door, how the
+   growth path is stated ("free to start, grow into it"? a named
+   timeline?), and what the pioneer *commits* to in return (feedback
+   cadence — monthly check-in? open channel?).
+   **Feedback surface — resolved toward the platform's own CRM** (over a
+   cloud spreadsheet): the Kanban gives a feedback card a lifecycle —
+   heard → triaged → shipped — plus status, priority, tracking, and a
+   communication thread back to the pioneer who raised it. Dogfooding
+   again: pioneer feedback *is* a CRM pipeline, and running it on our own
+   module field-tests the surface tenants get. The CRM is both the
+   *enabler* (the workflow that keeps pioneers heard) and the *testimony*
+   — every tool used to serve the cohort is a live demo of the engineering
+   depth the pioneer gets. Decide before door 1 — the
+   pitch makes promises, and a promise with no machinery behind it is
+   churn.
 2. **Corridor choice** — which 2–3 Indy corridors (density of target
    categories vs. existing seed coverage).
 3. **Field capture form** — build now or defer to post-cohort review.
