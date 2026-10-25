@@ -4,14 +4,6 @@ on:
   push:
     branches:
       - staging
-    paths:
-      - 'apps/api/**'
-      - 'packages/shared/**'
-      - 'shared/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'fly.staging.toml'
-      - '.github/workflows/deploy-staging.yml'
   workflow_dispatch: # Manual trigger
 
 jobs:
@@ -21,7 +13,35 @@ jobs:
       - name: Trigger Vercel Deployment
         run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_STAGING }}"
 
+  # Detect api-relevant changes so the Fly deploy is skipped on web-only
+  # pushes (same idea as Railway's change detector).
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.check.outputs.api }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check api-affecting paths
+        id: check
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BEFORE" HEAD | grep -qE '^(apps/api/|packages/shared/|shared/|pnpm-lock\.yaml|pnpm-workspace\.yaml|fly\.staging\.toml|\.github/workflows/deploy-staging\.yml)'; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+
   api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     concurrency:
       group: fly-deploy-staging
