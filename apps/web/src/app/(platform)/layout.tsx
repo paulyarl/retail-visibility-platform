@@ -15,14 +15,12 @@ export const metadata: Metadata = {
     description:
       'Make every local shelf visible online. Connect your inventory to Google Shopping, your storefront, and our business directory.',
     type: 'website',
-    images: [{ url: '/favicon.ico' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'VisibleShelf - Local Retail Visibility Platform',
     description:
       'Make every local shelf visible online. Connect your inventory to Google Shopping, your storefront, and our business directory.',
-    images: [{ url: '/favicon.ico' }],
   },
 };
 

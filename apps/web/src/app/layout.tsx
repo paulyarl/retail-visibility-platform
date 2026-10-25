@@ -81,20 +81,11 @@ export const metadata: Metadata = {
     siteName: "VisibleShelf",
     title: "VisibleShelf",
     description: "Product visibility platform for retail",
-    images: [
-      {
-        url: "/icons/icon-512x512.png",
-        width: 512,
-        height: 512,
-        alt: "VisibleShelf",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "VisibleShelf",
     description: "Product visibility platform for retail",
-    images: ["/icons/icon-512x512.png"],
   },
   icons: {
     icon: [
