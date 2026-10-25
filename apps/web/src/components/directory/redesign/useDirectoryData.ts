@@ -19,7 +19,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useDirectoryStores } from '@/hooks/useDirectoryStores';
 import { directoryService } from '@/services/DirectorySingletonService';
-import type { DirectoryCategory, DirectoryStore } from '@/services/DirectorySingletonService';
+import type { DirectoryCategory } from '@/services/DirectorySingletonService';
 import { externalApiService } from '@/services/ExternalApiService';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
@@ -419,9 +419,7 @@ export function useDirectoryData(): DirectoryData {
   const counts: DirectoryCounts = {
     totalStores: pagination?.totalItems ?? stores.length,
     totalCategories: categories.length,
-    openNowCount:
-      openNowCount ||
-      stores.filter((s: DirectoryStore) => s.isOpen === true).length,
+    openNowCount,
   };
 
   const hasActiveQuery = !!(
