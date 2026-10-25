@@ -5,6 +5,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockOpenAiClient, mockLogger, mockPrisma } = vi.hoisted(() => {
+  // Provider singletons are constructed at module load and read process.env
+  // once (OpenAiProvider) — the key must exist before the factory imports.
+  process.env.OPENAI_API_KEY ||= 'test-openai-key';
+
   const mockOpenAiClient = {
     chat: {
       completions: {
@@ -183,6 +187,13 @@ describe('AiProviderFactory with Gateway Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     AiProviderFactory.invalidateCache();
+    // unifiedConfig.env is a copy of process.env — tests must reset it
+    // explicitly or gateway keys leak between cases.
+    (unifiedConfig as any).env.AI_GATEWAY_ENABLED = undefined;
+    (unifiedConfig as any).env.AI_GATEWAY_API_KEY = undefined;
+    (unifiedConfig as any).env.VERCEL_AI_GATEWAY_TOKEN = undefined;
+    (unifiedConfig as any).env.AI_GATEWAY_SECRET = undefined;
+    (unifiedConfig as any).env.AI_GATEWAY_DEFAULT_CHAT_MODEL = undefined;
   });
 
   it('routes to vercel-gateway when AI_GATEWAY_ENABLED is true', async () => {

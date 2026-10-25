@@ -58,7 +58,7 @@ class AiProviderFactory {
     if (!provider || !provider.isAvailable()) {
       // Fallback to Gateway or OpenAI if the configured provider isn't available
       const gateway = this.providers.get('vercel-gateway');
-      if (gateway?.isAvailable()) {
+      if (unifiedConfig.aiGatewayEnabled && gateway?.isAvailable()) {
         return { provider: gateway, model: unifiedConfig.aiGatewayDefaultChatModel };
       }
       const fallback = this.providers.get('openai');
@@ -90,7 +90,7 @@ class AiProviderFactory {
     if (!provider || !provider.isAvailable()) {
       // Fallback to Gateway or OpenAI if the configured provider isn't available
       const gateway = this.providers.get('vercel-gateway');
-      if (gateway?.isAvailable()) {
+      if (unifiedConfig.aiGatewayEnabled && gateway?.isAvailable()) {
         return { provider: gateway, model: unifiedConfig.aiGatewayDefaultEmbeddingModel };
       }
       const fallback = this.providers.get('openai');

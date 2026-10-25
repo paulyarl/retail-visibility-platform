@@ -161,6 +161,9 @@ function stubQueries(options: { seedLink?: boolean; campaigns?: any[] } = {}) {
     if (sql.includes('FROM directory_seed_campaign_links')) {
       return Promise.resolve(seedLink ? [{ seed_id: 'dps-1', tenant_id: 'tid-1' }] : []);
     }
+    if (sql.includes('FROM directory_presence_seeds')) {
+      return Promise.resolve(seedLink ? [{ seed_id: 'dps-1', tenant_id: 'tid-1' }] : []);
+    }
     if (sql.includes('owner_names, phones, email, phone FROM mkt_campaigns_list')) {
       return Promise.resolve(campaigns);
     }

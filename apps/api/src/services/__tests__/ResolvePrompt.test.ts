@@ -2387,11 +2387,22 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     });
 
     it('NONE — no prior audit renders the from-scratch banner', async () => {
-      const { renderedPrompt } = await service.resolvePrompt({
-        template: makeWpTemplate(), campaign: makeWpCampaign([]), variables: undefined,
-      });
-      expect(renderedPrompt).toContain('EVIDENCE COVERAGE: NONE');
-      expect(renderedPrompt).toContain('https://example.test');
+      // No audits in memory → buildPriorWebsiteFindings falls back to a DB
+      // read; stub it to return no rows (real prisma has no DB in tests).
+      const realPrisma = (service as any).prisma;
+      (service as any).prisma = {
+        ...realPrisma,
+        mkt_audits_list: { findMany: vi.fn(async () => []) },
+      };
+      try {
+        const { renderedPrompt } = await service.resolvePrompt({
+          template: makeWpTemplate(), campaign: makeWpCampaign([]), variables: undefined,
+        });
+        expect(renderedPrompt).toContain('EVIDENCE COVERAGE: NONE');
+        expect(renderedPrompt).toContain('https://example.test');
+      } finally {
+        (service as any).prisma = realPrisma;
+      }
     });
 
     it('caller-supplied prior_website_findings overrides auto-sourcing', async () => {

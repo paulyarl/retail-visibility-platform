@@ -443,13 +443,15 @@ function Home() {
                   Stocked shelves shouldn't be a secret
                 </h2>
                 <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
-                  Right now your products sit on physical shelves — and unless someone walks through your
-                  door, your neighborhood has no idea what you carry. We fix that, starting free: your
-                  business may already be listed in our directory, sourced from public information, and
-                  claiming it takes about two minutes. Then you choose how you show up — a richer directory
-                  listing, Google Search and Shopping, or your own storefront — and when you're ready to
-                  take the sale, turn on deposits, pickup, delivery, or full online payment. No developer,
-                  no enterprise budget, no months of setup.
+                  Right now, your products sit on physical shelves — visible only to whoever walks through
+                  your door. We fix that, starting free: your business may already be seeded in our directory
+                  from public information, and claiming it takes about two minutes. From there your catalog
+                  travels — the directory puts it on our shelves, Google Search and Shopping put it in front
+                  of searchers, and your own storefront gives it a home you own. Tools and integrations keep
+                  it in sync behind the scenes, and when a shopper is ready to buy, your storefront doubles
+                  as the fulfillment center — deposits, pickup, delivery, or full online payment, all run
+                  straight off your shelves. The product that was hidden on your shelf ends up in a
+                  neighbor's hands. No developer, no enterprise budget, no months of setup.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
                   <motion.div

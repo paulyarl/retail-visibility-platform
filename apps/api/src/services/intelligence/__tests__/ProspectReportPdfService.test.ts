@@ -59,6 +59,7 @@ const report = {
       evidence: 'rajabazaar.com delivery banner',
     },
   ],
+  benefits: ['Customers order in dollars and get a real confirmation.'],
   data_quality: {
     verified: ['Site reachable'],
     couldnt_check: ['WhatsApp response time'],
