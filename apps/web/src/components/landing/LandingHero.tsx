@@ -155,6 +155,12 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
               Directory
             </Link>
             <Link
+              href="/tenant/tid-25we5qgj"
+              className="text-white/70 hover:text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
+            >
+              Demo
+            </Link>
+            <Link
               href="/support"
               className="text-white/70 hover:text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
             >
