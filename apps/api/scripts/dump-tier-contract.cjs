@@ -31,6 +31,17 @@ if (!dbUrl) {
   process.exit(1);
 }
 
+// pg-connection-string parses ssl* URL params into ssl settings that
+// OVERRIDE the `ssl` option below (sslmode=require → verify-full semantics
+// → rejectUnauthorized:true → "self-signed certificate in certificate
+// chain"). Strip them so the explicit option is authoritative. Same fix as
+// scripts/apply-sql-file.cjs.
+const SSL_PARAMS = /^(sslmode|sslcert|sslkey|sslrootcert|sslcrl|sslcompression|uselibpqcompat)=/;
+const [base, ...qs] = dbUrl.split('?');
+const cleanUrl = qs.length
+  ? `${base}?${qs.join('?').split('&').filter((p) => p && !SSL_PARAMS.test(p)).join('&')}`.replace(/\?$/, '')
+  : base;
+
 const outPath = path.resolve(
   process.cwd(),
   flag('out', '../../shared/tier-contract-db-witness.json'),
@@ -38,8 +49,8 @@ const outPath = path.resolve(
 
 async function main() {
   const client = new Client({
-    connectionString: dbUrl,
-    ssl: /localhost|127\.0\.0\.1/.test(dbUrl) ? false : { rejectUnauthorized: false },
+    connectionString: cleanUrl,
+    ssl: /localhost|127\.0\.0\.1/.test(cleanUrl) ? false : { rejectUnauthorized: false },
   });
   await client.connect();
   const q = async (sql) => (await client.query(sql)).rows;
@@ -77,7 +88,7 @@ async function main() {
 
   const witness = {
     generated_at: new Date().toISOString(),
-    env: flag('env', 'unknown'),
+    env: flag('env', process.env.DOPPLER_CONFIG || 'unknown'),
     tiers,
     tier_features: tierFeatures,
     capability_features: capabilityFeatures,

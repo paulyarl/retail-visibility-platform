@@ -416,6 +416,36 @@ export class AdminCapabilityService extends AdminApiSingleton {
     return result.data!;
   }
 
+  // ===== Tier Inheritance =====
+
+  async getTierInheritance(): Promise<Array<{ tierKey: string; sortOrder: number; price: number; parents: string[] }>> {
+    const result = await this.makeDefaultRequest<{ tiers: Array<{ tierKey: string; sortOrder: number; price: number; parents: string[] }> }>(
+      '/api/admin/tier-inheritance',
+      {},
+      'admin-tier-inheritance',
+      0,
+    );
+    if (!result.success) throw new Error('Failed to fetch tier inheritance');
+    return result.data?.tiers ?? [];
+  }
+
+  async setTierInheritance(
+    tierKey: string,
+    parents: string[],
+  ): Promise<Array<{ tierKey: string; sortOrder: number; price: number; parents: string[] }>> {
+    const result = await this.makeDefaultRequest<{ tiers: Array<{ tierKey: string; sortOrder: number; price: number; parents: string[] }> }>(
+      `/api/admin/tier-inheritance/${encodeURIComponent(tierKey)}`,
+      { method: 'PUT', body: JSON.stringify({ parents }) },
+      'admin-tier-inheritance-set',
+      0,
+    );
+    if (!result.success) {
+      const detail = typeof (result as { error?: unknown }).error === 'string' ? `: ${(result as { error: string }).error}` : '';
+      throw new Error(`Failed to save tier inheritance${detail}`);
+    }
+    return result.data?.tiers ?? [];
+  }
+
   async createConstraint(data: Omit<ConstraintData, 'id' | 'created_at' | 'updated_at'>): Promise<ConstraintData> {
     const result = await this.makeDefaultRequest<ConstraintData>(
       '/api/admin/capability-constraints',

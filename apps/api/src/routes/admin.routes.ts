@@ -80,6 +80,7 @@ import capabilityTypesRoutes from './admin/capability-types';
 import featuresRoutes from './admin/features';
 import capabilitiesRoutes from './admin/capabilities';
 import tierCapabilitiesRoutes from './admin/tier-capabilities';
+import tierInheritanceRoutes from './admin/tier-inheritance';
 import taxonomyAdminRoutes from './taxonomy-admin';
 import crmAdminRoutes from './crm/admin/crm-admin';
 import botPlatformRoutes from './admin/bot-platform';
@@ -148,6 +149,7 @@ router.use('/flyer-reports', authenticateToken, requireAdmin, flyerReportRoutes)
 router.use('/features', authenticateToken, requireAdmin, featuresRoutes);
 router.use('/capabilities', authenticateToken, requireAdmin, capabilitiesRoutes);
 router.use('/tier-capabilities', authenticateToken, requireAdmin, tierCapabilitiesRoutes);
+router.use('/tier-inheritance', authenticateToken, requireAdmin, tierInheritanceRoutes);
 router.use('/taxonomy', authenticateToken, requireAdmin, taxonomyAdminRoutes);
 router.use('/crm', authenticateToken, requireAdmin, crmAdminRoutes);
 router.use('/bot', authenticateToken, requireAdmin, botPlatformRoutes);

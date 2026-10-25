@@ -111,6 +111,15 @@ describe('0.2 witness — dump sanity', () => {
     expect(witness.tiers.length).toBeGreaterThan(15);
     expect(Object.keys(witness.capability_features).length).toBeGreaterThan(0);
   });
+
+  // The artifact is the PRD witness (AGENTS.md: dump with `--config prd`). A
+  // local dump overwrites it with a different database and nothing else here
+  // notices — that happened 2026-10-25 (local `professional` had 236 enabled
+  // keys vs prd's 48, and the migration-360 names were un-swapped). The dump
+  // script now stamps DOPPLER_CONFIG, so a wrong-env artifact fails loudly.
+  it('was dumped from prd, not a local or staging database', () => {
+    expect(witness.env, 're-dump with: doppler run --config prd -- node scripts/dump-tier-contract.cjs').toBe('prd');
+  });
 });
 
 describe('0.2 witness — tier universe parity', () => {

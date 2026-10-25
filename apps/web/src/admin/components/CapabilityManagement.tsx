@@ -853,6 +853,7 @@ export default function CapabilityManagement() {
           <TabsTrigger value="features">Features</TabsTrigger>
           <TabsTrigger value="capability-types">Capability Types</TabsTrigger>
           <TabsTrigger value="tier-capabilities">Tier Capabilities</TabsTrigger>
+          <TabsTrigger value="inheritance">Inheritance</TabsTrigger>
           <TabsTrigger value="legacy-tiers">Legacy Tiers</TabsTrigger>
           <TabsTrigger value="constraints">Constraints</TabsTrigger>
           <TabsTrigger value="tier-coverage">Tier Coverage</TabsTrigger>
@@ -1764,6 +1765,10 @@ export default function CapabilityManagement() {
             })()}
           </div>
         </TabsContent>
+        <TabsContent value="inheritance">
+          <TierInheritancePanel />
+        </TabsContent>
+
       </Tabs>
 
       {/* ===== Feature Dialog ===== */}
@@ -2608,6 +2613,137 @@ export default function CapabilityManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/**
+ * Tier Inheritance — the tier graph the capability resolver walks.
+ *
+ * Structure used to exist only as a codebase assertion (fixture + static
+ * TIER_HIERARCHY), so a tier could be emptied in the Tier Capabilities tab
+ * without the resolver noticing. Editing parents here changes what a tier
+ * consumes at resolve time — no row copying required.
+ */
+function TierInheritancePanel() {
+  const [rows, setRows] = useState<Array<{ tierKey: string; sortOrder: number; price: number; parents: string[] }>>([]);
+  const [draft, setDraft] = useState<Record<string, string[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminCapabilityService
+      .getTierInheritance()
+      .then((data) => {
+        setRows(data);
+        setDraft(Object.fromEntries(data.map((r) => [r.tierKey, [...r.parents]])));
+      })
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async (tierKey: string) => {
+    setSaving(tierKey);
+    setError(null);
+    try {
+      const data = await adminCapabilityService.setTierInheritance(tierKey, draft[tierKey] ?? []);
+      setRows(data);
+      setDraft(Object.fromEntries(data.map((r) => [r.tierKey, [...r.parents]])));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save inheritance');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-sm text-gray-500">Loading inheritance…</div>;
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Tier Inheritance</h2>
+        <p className="text-sm text-gray-500">
+          A tier inherits from tiers <strong>below</strong> it — never above. It exists to be an
+          upgrade over them, so an emptied tier falls back to its immediate lower tier, never to a
+          more expensive one it didn&apos;t pay for.
+        </p>
+      </div>
+      <div>
+        {error && (
+          <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+        <div className="space-y-4">
+          {rows.map(({ tierKey, price, parents: savedParents }) => {
+            const parents = draft[tierKey] ?? [];
+            const dirty = JSON.stringify(parents) !== JSON.stringify(savedParents);
+            // Direction is one-way and measured in PRICE: a tier inherits only
+            // from tiers that cost no more. Reaching upward would let a cheap
+            // tier act like one it never paid for.
+            const available = rows
+              .filter((r) => r.price <= price && !parents.includes(r.tierKey))
+              .map((r) => r.tierKey);
+            return (
+              <div key={tierKey} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{tierKey}</span>
+                    <Badge variant="default">
+                      {parents.length} inherited
+                    </Badge>
+                  </div>
+                  <Button size="sm" disabled={!dirty || saving === tierKey} onClick={() => save(tierKey)}>
+                    {saving === tierKey ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {parents.length === 0 && (
+                    <span className="text-xs text-gray-400">No inherited tiers — this tier stands alone.</span>
+                  )}
+                  {parents.map((parent) => (
+                    <span
+                      key={parent}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-xs text-gray-800"
+                    >
+                      {parent}
+                      <button
+                        type="button"
+                        className="text-gray-500 hover:text-red-600"
+                        aria-label={`Remove ${parent}`}
+                        onClick={() =>
+                          setDraft((d) => ({ ...d, [tierKey]: (d[tierKey] ?? []).filter((p) => p !== parent) }))
+                        }
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                <select
+                  className="text-xs border border-gray-300 rounded px-2 py-1"
+                  value=""
+                  onChange={(e) => {
+                    const parent = e.target.value;
+                    if (!parent) return;
+                    setDraft((d) => ({ ...d, [tierKey]: [...(d[tierKey] ?? []), parent] }));
+                  }}
+                >
+                  <option value="">Inherit from…</option>
+                  {available.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

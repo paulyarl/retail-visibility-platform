@@ -13,6 +13,7 @@ import { prisma } from '../prisma';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { DEFAULT_TIER } from '../utils/tier-defaults';
 import { mergeCapabilitySources } from './effectiveCapabilityMerge';
+import { getTierClosure } from './TierInheritanceService';
 import { deriveInternalStatus, getMaintenanceState } from '../utils/subscription-status';
 import { logger } from '../logger';
 import { generateCorrelationId, generateTenantKey } from '../lib/id-generator';
@@ -1012,8 +1013,19 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     ? await prisma.subscription_tiers_list.findMany({ where: { tier_key: { in: tierKeys } } })
     : [];
 
+  // Inheritance — a tier consumes its ancestors' capabilities because of its
+  // position in the graph, not because the rows were copied down. Without this
+  // the capability admin UI can empty a tier and this path serves the emptied
+  // set while the web path (static TIER_HIERARCHY) still gates on the full one.
+  const ancestorKeys = await getTierClosure(tierKeys);
+  const ancestorTiers = ancestorKeys.length > 0
+    ? await prisma.subscription_tiers_list.findMany({
+        where: { tier_key: { in: ancestorKeys }, id: { notIn: tiers.map((t) => t.id) } },
+      })
+    : [];
+
   const tierMap = new Map(tiers.map((t) => [t.tier_key, t]));
-  const allTierIds = tiers.map((t) => t.id);
+  const allTierIds = [...tiers, ...ancestorTiers].map((t) => t.id);
 
   let tierFeatures: any[] = [];
   if (allTierIds.length > 0) {
