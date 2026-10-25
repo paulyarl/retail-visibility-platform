@@ -516,11 +516,6 @@ function Home() {
               </div>
             </div>
 
-            {/* Features Showcase - WOW Factor for visitors */}
-            <div className="my-8 sm:my-12">
-              <FeaturesShowcase mode={showcaseMode} />
-            </div>
-
           </div>
         )}
 
@@ -1152,6 +1147,15 @@ function Home() {
               </div>
             </div>
           </AnimatedCard>
+        )}
+
+        {/* Features Showcase / tier explorer — last in the visitor flow:
+            directory → storefront demo → growth options. Visibility
+            surfaces first, then the tiers they ladder into. */}
+        {!isAuthenticated && !authLoading && (
+          <div className="my-8 sm:my-12">
+            <FeaturesShowcase mode={showcaseMode} />
+          </div>
         )}
 
         {/* Value Showcase - Only show to authenticated users with products */}
