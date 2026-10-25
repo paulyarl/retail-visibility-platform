@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - staging
+    paths:
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'fly.staging.toml'
+      - '.github/workflows/deploy-staging.yml'
   workflow_dispatch: # Manual trigger
 
 jobs:

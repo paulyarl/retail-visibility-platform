@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'fly.toml'
+      - '.github/workflows/deploy-production.yml'
   workflow_dispatch: # Manual trigger
 
 jobs:
