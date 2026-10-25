@@ -521,40 +521,6 @@ function Home() {
               <FeaturesShowcase mode={showcaseMode} />
             </div>
 
-            {/* CTA for visitors */}
-            <Card className="p-6 sm:p-8 text-center bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200">
-              <h3 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-2">
-                Make your products visible — and make yourself found
-              </h3>
-              <p className="text-sm sm:text-base text-neutral-600 mb-6 max-w-2xl mx-auto">
-                Start with a free listing in our directory. Then show up on Google and your own storefront — and turn discovery into sales when you're ready.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <Link
-                  href="/directory/add-business"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto"
-                  onClick={() =>
-                    trackBehaviorClient({
-                      entityType: 'platform',
-                      entityId: 'home_midband_claim',
-                      entityName: 'Claim your free listing (mid-band)',
-                      pageType: 'platform_home',
-                    })
-                  }
-                >
-                  <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
-                    Claim your free listing →
-                  </Button>
-                </Link>
-                <Link href={withUTM('/features')} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
-                  <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
-                    See features &amp; pricing
-                  </Button>
-                </Link>
-              </div>
-            </Card>
           </div>
         )}
 
@@ -630,13 +596,16 @@ function Home() {
           </Card>
         )}
 
-        {/* Hero Metrics */}
-        {!loading && stats.total > 0 && stats.isChain && stats.locations > 1 && (
+        {/* Hero Metrics — authenticated only. `stats` derives from
+            platformStats, so for visitors this row repeats the
+            platform-health badges above with the same numbers under
+            tenant labels (Catalog Size = Products Listed, etc.). */}
+        {isAuthenticated && !loading && stats.total > 0 && stats.isChain && stats.locations > 1 && (
           <h3 className="text-lg font-semibold text-neutral-900 mb-4">
             Current Location Metrics
           </h3>
         )}
-        {loading ? (
+        {isAuthenticated && (loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i} className="p-6">
@@ -648,7 +617,7 @@ function Home() {
               </Card>
             ))}
           </div>
-        ) : stats.total > 0 && (
+        ) : stats.total > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Link href={scopedLinks.items}>
               <AnimatedCard delay={0} className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
@@ -764,7 +733,7 @@ function Home() {
               </AnimatedCard>
             </Link>
           </div>
-        )}
+        ) : null)}
 
         {/* Business Hours Card (tenant-scoped) */}
         {isAuthenticated && selectedTenantId && (
@@ -1095,9 +1064,10 @@ function Home() {
           </div>
         </AnimatedCard>
 
-        {/* Already listed — free. Claim CTA AFTER the directory pillar:
-            browse/demo first, claim second — same flow as the storefront
-            panel + post-demo CTA below it. */}
+        {/* The one claim CTA — merged from the old mid-band card and the
+            already-listed card so the page asks once. Kept AFTER the
+            directory pillar: browse/demo first, claim second — same flow as
+            the storefront panel + post-demo CTA below it. */}
         <div className="mt-8 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-100 p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
             <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1106,30 +1076,36 @@ function Home() {
           </div>
           <div className="flex-1 text-center sm:text-left">
             <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
-              Already listed — free
+              Make your products visible — and make yourself found
             </h3>
             <p className="text-sm text-neutral-600">
-              We seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming it takes about two minutes and costs nothing — then you own the listing and can fix your details.
+              Your business may already be listed — we seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming takes about two minutes and costs nothing — then you own the listing, show up on Google and your own storefront, and turn discovery into sales when you're ready.
             </p>
           </div>
-          <Link
-            href="/directory/add-business"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0"
-            onClick={() =>
-              trackBehaviorClient({
-                entityType: 'platform',
-                entityId: 'home_already_listed_claim',
-                entityName: 'Claim your free listing (already-listed card)',
-                pageType: 'platform_home',
-              })
-            }
-          >
-            <Button variant="gradient" size="md" style={{ color: 'white' }}>
-              Claim your free listing →
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+            <Link
+              href="/directory/add-business"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                trackBehaviorClient({
+                  entityType: 'platform',
+                  entityId: 'home_already_listed_claim',
+                  entityName: 'Claim your free listing (already-listed card)',
+                  pageType: 'platform_home',
+                })
+              }
+            >
+              <Button variant="gradient" size="md" style={{ color: 'white' }}>
+                Claim your free listing →
+              </Button>
+            </Link>
+            <Link href={withUTM('/features')} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="md">
+                See features &amp; pricing
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Storefront demo — "one store, three doors" canonical-ladder
