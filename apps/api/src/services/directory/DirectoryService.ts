@@ -247,8 +247,16 @@ class DirectoryService {
     const pool = getDirectPool();
 
     const query = `
-      SELECT * FROM directory_listings_list 
-      WHERE (tenant_id = $1 OR slug = $1) AND is_published = true 
+      SELECT dll.*, dps.observed_assets AS seed_observed_assets
+      FROM directory_listings_list dll
+      LEFT JOIN LATERAL (
+        SELECT observed_assets FROM directory_presence_seeds
+        WHERE listing_id = dll.id
+          AND status IN ('published', 'invited', 'claimed')
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) dps ON true
+      WHERE (dll.tenant_id = $1 OR dll.slug = $1) AND dll.is_published = true
       LIMIT 1
     `;
 
@@ -262,6 +270,21 @@ class DirectoryService {
 
     // Transform categories
     const categories = this.parseCategories(listing);
+
+    // Public-safe projection of the seed's observed_assets — the internal
+    // fields (underexposed, underexposure_note, source internals) are
+    // operator-only, so emit only what the public shelf preview needs.
+    const shelfItems = Array.isArray(listing.seed_observed_assets)
+      ? (listing.seed_observed_assets as any[])
+          .filter((a) => a && typeof a.asset === 'string' && a.asset.trim())
+          .slice(0, 5)
+          .map((a) => ({
+            name: String(a.asset),
+            evidence: typeof a.evidence === 'string' ? a.evidence : null,
+            observedOn: typeof a.observed_on === 'string' ? a.observed_on : null,
+            confidence: typeof a.confidence === 'string' ? a.confidence : null,
+          }))
+      : null;
 
     return {
       id: listing.id,
@@ -294,6 +317,7 @@ class DirectoryService {
       updatedAt: listing.updated_at,
       keywords: listing.keywords,
       categories,
+      shelfItems,
     };
   }
 

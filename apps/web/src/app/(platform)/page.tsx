@@ -888,8 +888,8 @@ function Home() {
                   <div className="flex items-center gap-2 mb-4">
                     <div className="h-3 w-3 rounded-full bg-orange-500"></div>
                     <div className="flex-1">
-                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Why Choose Us?</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Everything you need to succeed online</p>
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Why retailers choose us</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">One catalog, everywhere shoppers look</p>
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
@@ -900,8 +900,8 @@ function Home() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
-                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Every surface shoppers check</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Your products show up in our directory, on Google Search, Shopping &amp; Maps, and on your own storefront</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -911,8 +911,8 @@ function Home() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
-                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Already listed? It's yours</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">We seed the directory from public business info — claim your listing free in about two minutes</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -922,8 +922,8 @@ function Home() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
-                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Sell on your terms</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Deposits, pickup, delivery, or full online checkout — switch it on when you're ready</p>
                       </div>
                     </div>
                   </div>
@@ -935,8 +935,8 @@ function Home() {
                   <div className="flex items-center gap-2 mb-4">
                     <div className="h-3 w-3 rounded-full bg-blue-500"></div>
                     <div className="flex-1">
-                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Get Started Today</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Join retailers already using our platform</p>
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Start free today</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Claim your listing or open a storefront — pay only when you're ready to grow</p>
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
@@ -949,7 +949,7 @@ function Home() {
                       </Button>
                     </a>
                     <a href="/auth/login" target="_blank" rel="noopener noreferrer" className="block">
-                      <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
+                      <Button variant="outline" className="w-full justify-start" size="md">
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                         </svg>

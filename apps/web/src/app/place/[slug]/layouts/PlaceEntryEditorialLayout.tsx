@@ -87,6 +87,25 @@ export interface PlaceEntryEditorialLayoutProps {
   secondaryShelves?: SecondaryShelf[];
 }
 
+/**
+ * Map the listing's public `shelfItems` (sanitized projection of the seed's
+ * observed_assets — emitted by GET /api/directory/:slug) into preview items.
+ * The tag is honest framing ("Shoppers mention"/"Commonly carried") derived
+ * from where the item was observed — never a stock/price claim.
+ */
+function mapShelfItems(
+  shelfItems: Array<{ name: string; evidence?: string | null; observedOn?: string | null; confidence?: string | null }> | null | undefined,
+): { name: string; tag: string; evidence?: string | null }[] | undefined {
+  if (!Array.isArray(shelfItems) || shelfItems.length === 0) return undefined;
+  const tagFor = (it: { observedOn?: string | null }) =>
+    it.observedOn === 'reviews' ? 'Shoppers mention' : 'Commonly carried';
+  return shelfItems.map((it) => ({
+    name: it.name,
+    tag: tagFor(it),
+    evidence: it.evidence ?? null,
+  }));
+}
+
 export default function PlaceEntryEditorialLayout({
   tenantId,
   slug,
@@ -446,7 +465,10 @@ export default function PlaceEntryEditorialLayout({
                 </Link>
               </div>
               <div className="flex justify-center">
-                <ShelfSlotsPreview className="w-full max-w-sm" />
+                <ShelfSlotsPreview
+                  className="w-full max-w-sm"
+                  items={mapShelfItems(listing.shelfItems)}
+                />
               </div>
             </div>
           </div>
