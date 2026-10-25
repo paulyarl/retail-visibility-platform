@@ -444,14 +444,16 @@ function Home() {
                 </h2>
                 <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
                   Right now, your products sit on physical shelves — visible only to whoever walks through
-                  your door. We fix that, starting free: your business may already be seeded in our directory
-                  from public information, and claiming it takes about two minutes. From there your catalog
-                  travels — the directory puts it on our shelves, Google Search and Shopping put it in front
-                  of searchers, and your own storefront gives it a home you own. Tools and integrations keep
-                  it in sync behind the scenes, and when a shopper is ready to buy, your storefront doubles
-                  as the fulfillment center — deposits, pickup, delivery, or full online payment, all run
-                  straight off your shelves. The product that was hidden on your shelf ends up in a
-                  neighbor's hands. No developer, no enterprise budget, no months of setup.
+                  your door. Worse, most neighbors don't even know the door is there. And a store nobody can
+                  find takes its products with it. We put both on the map, starting free — your business may
+                  already be in our directory from public information, and claiming it takes about two
+                  minutes. From there your catalog travels: the directory puts it on our shelves, Google
+                  Search and Shopping put it in front of searchers, and your own storefront gives it a home
+                  you own. Tools and integrations keep it in sync behind the scenes, and when a shopper is
+                  ready to buy, your storefront doubles as the fulfillment center — deposits, pickup,
+                  delivery, or full online payment, all run straight off your shelves. The store that was off
+                  the map gets found, and the product that was hidden on your shelf ends up in a neighbor's
+                  hands. No developer, no enterprise budget, no months of setup.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
                   <motion.div

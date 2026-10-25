@@ -2390,10 +2390,12 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       // No audits in memory → buildPriorWebsiteFindings falls back to a DB
       // read; stub it to return no rows (real prisma has no DB in tests).
       const realPrisma = (service as any).prisma;
-      (service as any).prisma = {
-        ...realPrisma,
-        mkt_audits_list: { findMany: vi.fn(async () => []) },
-      };
+      (service as any).prisma = new Proxy(realPrisma, {
+        get: (target, prop) =>
+          prop === 'mkt_audits_list'
+            ? { findMany: vi.fn(async () => []) }
+            : (target as any)[prop],
+      });
       try {
         const { renderedPrompt } = await service.resolvePrompt({
           template: makeWpTemplate(), campaign: makeWpCampaign([]), variables: undefined,

@@ -2,7 +2,24 @@
  * Unit test: Currency rate job stub
  * REQ: REQ-2025-905
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+
+// CI has no database — the flag resolver's platform_feature_flags_list read
+// would throw past the route's 503 guard. The flag layer is not what this
+// suite tests; pin the platform flag OFF.
+vi.mock("../utils/effectiveFlags", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../utils/effectiveFlags")>();
+  return {
+    ...orig,
+    getEffectivePlatform: vi.fn(async (flag: string) => ({
+      flag,
+      effectiveOn: false,
+      effectiveSource: "off",
+      sources: { platform_env: false, platform_db: false, allow_override: false },
+    })),
+  };
+});
+
 import request from "supertest";
 import app from "../index";
 
@@ -31,7 +48,7 @@ describe("Currency Rate Job Stub (REQ-2025-905)", () => {
 
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("unauthorized");
-  });
+  }, 60_000); // request path pays prisma retry latency without a DB
 
   it("should return 401 when service token is invalid", async () => {
     const res = await request(app)
@@ -40,7 +57,7 @@ describe("Currency Rate Job Stub (REQ-2025-905)", () => {
 
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("unauthorized");
-  });
+  }, 60_000); // request path pays prisma retry latency without a DB
 
   // This test would pass if FF_CURRENCY_RATE_STUB=true and currency_rates table exists
   it.skip("should insert mock rates when flag is ON and token is valid", async () => {

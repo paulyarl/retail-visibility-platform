@@ -42,6 +42,9 @@ jobs:
         env:
           SUPABASE_URL: https://ci-placeholder.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-key
+          SUPABASE_ANON_KEY: ci-placeholder-key
+          TOKEN_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+          MFA_ENCRYPTION_KEY: "1111111111111111111111111111111111111111111111111111111111111111"
         run: pnpm -C apps/api test
 
   web-e2e:
