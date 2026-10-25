@@ -300,49 +300,130 @@ function Home() {
           </div>
         )}
 
-        {/* Welcome Section */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-2">
-            {isAuthenticated && tenantData?.logoUrl && (
-              <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0">
-                <Image
-                  src={tenantData.logoUrl}
-                  alt={tenantData.name}
-                  fill
-                  className="object-contain rounded-lg"
-                />
-                {/* Hours Badge - Status */}
-                <HoursStatusBadge status={hoursStatus} />
+        {/* Welcome Section — authenticated only. Visitors open on the
+            executive summary instead (the summary band below), so the
+            internal "Platform Overview" label never reaches them. */}
+        {isAuthenticated && (
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-2">
+              {tenantData?.logoUrl && (
+                <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0">
+                  <Image
+                    src={tenantData.logoUrl}
+                    alt={tenantData.name}
+                    fill
+                    className="object-contain rounded-lg"
+                  />
+                  {/* Hours Badge - Status */}
+                  <HoursStatusBadge status={hoursStatus} />
 
-              </div>
-            )}
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
-                {isAuthenticated
-                  ? (user?.firstName
+                </div>
+              )}
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
+                  {user?.firstName
                     ? `Welcome, ${user.firstName}!`
                     : (user?.businessName
                       ? `${user.businessName} Dashboard`
-                      : 'Welcome to Your Dashboard'))
-                  : 'Platform Overview'}
-              </h2>
-              <p className="text-sm sm:text-base text-neutral-600 mt-1">
-                {isAuthenticated
-                  ? (stats.isChain
+                      : 'Welcome to Your Dashboard')}
+                </h2>
+                <p className="text-sm sm:text-base text-neutral-600 mt-1">
+                  {stats.isChain
                     ? `Managing ${stats.locations} locations across ${stats.organizationName || 'your organization'}`
-                    : 'Manage your retail inventory and visibility across platforms'
-                  )
-                  : 'Making your shelves visible online so you can compete with the giants'
-                }
-              </p>
+                    : 'Manage your retail inventory and visibility across platforms'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Public Platform Health - For visitors/non-authenticated users */}
+        )}
+        {/* Visitor flow — the executive summary leads, then the honest
+            platform-health row. The summary is first because it is the only
+            prose on the page that explains the product. */}
         {!isAuthenticated && !authLoading && (
           <div className="mb-6 sm:mb-8">
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
+            {/* Mission / Vision / Promise — the executive summary, for visitors */}
+            <div className="mb-8 sm:mb-12 md:mb-16 text-center max-w-4xl mx-auto px-2">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-neutral-900 mb-3 sm:mb-4">
+                  Stocked shelves shouldn't be a secret
+                </h2>
+                <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
+                  Right now, your products sit on physical shelves — visible only to whoever walks through
+                  your door. Worse, most neighbors don't even know you're there. And a store nobody can
+                  find takes its products with it. We put both on the map, starting free — your business may
+                  already be in our directory from public information, and claiming it takes about two
+                  minutes. From there your catalog travels: the directory puts it on our shelves, Google
+                  Search and Shopping put it in front of searchers, and your own storefront gives it a home
+                  you own. Tools and integrations keep it in sync behind the scenes, and when a shopper is
+                  ready to buy, your storefront doubles as the fulfillment center — deposits, pickup,
+                  delivery, or full online payment, all run straight off your shelves. The store that was off
+                  the map gets found, and the product that was hidden on your shelf ends up in a neighbor's
+                  hands. No developer, no enterprise budget, no months of setup.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
+                  <motion.div
+                    className="p-4 sm:p-6 bg-primary-50 rounded-xl border-2 border-primary-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                  >
+                    <div className="mx-auto mb-3 sm:mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25">
+                      <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 3.2c-2.9 0-5.2 2.3-5.2 5.2 0 3.7 5.2 8.9 5.2 8.9s5.2-5.2 5.2-8.9c0-2.9-2.3-5.2-5.2-5.2Z" />
+                        <circle cx="12" cy="8.4" r="1.9" />
+                        <path d="M3.5 19.6h17" />
+                      </svg>
+                    </div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                      Put every local business on the map — with the same discovery-to-sale tools the big chains built for themselves.
+                    </p>
+                  </motion.div>
+                  <motion.div
+                    className="p-4 sm:p-6 bg-green-50 rounded-xl border-2 border-green-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                  >
+                    <div className="mx-auto mb-3 sm:mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/25">
+                      <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M4.2 9.4 5.6 5h12.8l1.4 4.4" />
+                        <path d="M4.2 9.4v10.8h16V9.4" />
+                        <path d="M9.8 20.2v-5.6h4.4v5.6" />
+                      </svg>
+                    </div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                      Buying from the shop down the street should be as easy as buying from a national chain.
+                    </p>
+                  </motion.div>
+                  <motion.div
+                    className="p-4 sm:p-6 bg-amber-50 rounded-xl border-2 border-amber-100"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.5 }}
+                  >
+                    <div className="mx-auto mb-3 sm:mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
+                      <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 3 5 5.8v5.4c0 4.2 2.9 7.4 7 9 4.1-1.6 7-4.8 7-9V5.8L12 3Z" />
+                        <path d="m9.2 11.4 2 2 3.6-3.9" />
+                      </svg>
+                    </div>
+                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Promise</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                      Start free, stay in control: claim your listing at no cost, unlock only what you need, and pay when you're ready to grow.
+                    </p>
+                  </motion.div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Public Platform Health - For visitors/non-authenticated users */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
               <AnimatedCard delay={0} className="p-4 sm:p-5 md:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -377,7 +458,7 @@ function Home() {
                     >
                       {platformStats.productsListedFormatted}
                     </motion.p>
-                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">on Google Shopping</p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">live across the platform</p>
                   </div>
                   <div className="h-12 w-12 bg-success rounded-lg flex items-center justify-center">
                     <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,136 +471,31 @@ function Home() {
               <AnimatedCard delay={0.2} className="p-4 sm:p-5 md:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Storefronts Live</p>
+                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Avg. Catalog Size</p>
                     <motion.p
                       className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
                       initial={{ scale: 0.5 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.4, type: "spring" }}
                     >
-                      {platformStats.storefrontsLiveFormatted}
+                      {platformStats.activeRetailers > 0
+                        ? Math.round(platformStats.productsListed / platformStats.activeRetailers).toLocaleString()
+                        : '—'}
                     </motion.p>
-                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">total products</p>
+                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">products per retailer</p>
                   </div>
                   <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                  </div>
-                </div>
-              </AnimatedCard>
-
-              <AnimatedCard delay={0.3} className="p-4 sm:p-5 md:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-medium text-neutral-600">Platform Uptime</p>
-                    <motion.p
-                      className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
-                      initial={{ scale: 0.5 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.5, type: "spring" }}
-                    >
-                      {platformStats.platformUptimeFormatted}
-                    </motion.p>
-                    <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">last 30 days</p>
-                  </div>
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
                 </div>
               </AnimatedCard>
             </div>
 
-            {/* Mission / Vision / Promise — the executive summary, for visitors */}
-            <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-neutral-900 mb-3 sm:mb-4">
-                  Stocked shelves shouldn't be a secret
-                </h2>
-                <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
-                  Right now, your products sit on physical shelves — visible only to whoever walks through
-                  your door. Worse, most neighbors don't even know the door is there. And a store nobody can
-                  find takes its products with it. We put both on the map, starting free — your business may
-                  already be in our directory from public information, and claiming it takes about two
-                  minutes. From there your catalog travels: the directory puts it on our shelves, Google
-                  Search and Shopping put it in front of searchers, and your own storefront gives it a home
-                  you own. Tools and integrations keep it in sync behind the scenes, and when a shopper is
-                  ready to buy, your storefront doubles as the fulfillment center — deposits, pickup,
-                  delivery, or full online payment, all run straight off your shelves. The store that was off
-                  the map gets found, and the product that was hidden on your shelf ends up in a neighbor's
-                  hands. No developer, no enterprise budget, no months of setup.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
-                  <motion.div
-                    className="p-4 sm:p-6 bg-primary-50 rounded-xl border-2 border-primary-100"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.3 }}
-                  >
-                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎯</div>
-                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
-                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Put every local business on the map — with the same discovery-to-sale tools the big chains built for themselves.
-                    </p>
-                  </motion.div>
-                  <motion.div
-                    className="p-4 sm:p-6 bg-green-50 rounded-xl border-2 border-green-100"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.4 }}
-                  >
-                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💡</div>
-                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
-                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Buying from the shop down the street should be as easy as buying from a national chain.
-                    </p>
-                  </motion.div>
-                  <motion.div
-                    className="p-4 sm:p-6 bg-blue-50 rounded-xl border-2 border-blue-100"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.5 }}
-                  >
-                    <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">⚡</div>
-                    <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Promise</h3>
-                    <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Start free, stay in control: claim your listing at no cost, unlock only what you need, and pay when you're ready to grow.
-                    </p>
-                  </motion.div>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Help Desk Support CTA - for visitors */}
-            <div className="my-8 sm:my-12">
-              <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1 text-center sm:text-left">
-                  <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
-                    Need Help? Our Help Desk Has You Covered
-                  </h3>
-                  <p className="text-sm text-neutral-600">
-                    Questions about the platform? Our support team is here to help — no account needed. Reach out anytime.
-                  </p>
-                </div>
-                <Link href="/support" className="flex-shrink-0">
-                  <Button variant="gradient" size="md" style={{ color: 'white' }}>
-                    Contact Help Desk →
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
+            {/* Help Desk Support CTA — moved to the end of the visitor flow;
+                it was reading as the fifth band, before the product was
+                explained. */}
           </div>
         )}
 
@@ -940,18 +916,31 @@ function Home() {
                     <div className="h-3 w-3 rounded-full bg-blue-500"></div>
                     <div className="flex-1">
                       <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Start free today</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Claim your listing or open a storefront — pay only when you're ready to grow</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Claim your listing free — open a storefront when you're ready</p>
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
-                    <a href={withUTM('/auth/signup')} target="_blank" rel="noopener noreferrer" className="block">
+                    <Link
+                      href="/directory/add-business"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                      onClick={() =>
+                        trackBehaviorClient({
+                          entityType: 'platform',
+                          entityId: 'home_start_free_claim',
+                          entityName: 'Claim your free listing (start-free card)',
+                          pageType: 'platform_home',
+                        })
+                      }
+                    >
                       <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Create Free Account
+                        Claim your free listing →
                       </Button>
-                    </a>
+                    </Link>
                     <a href="/auth/login" target="_blank" rel="noopener noreferrer" className="block">
                       <Button variant="outline" className="w-full justify-start" size="md">
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1107,7 +1096,7 @@ function Home() {
           </div>
         </div>
 
-        {/* Storefront demo — "one store, three doors" canonical-ladder
+        {/* Storefront demo — "one store, three addresses" canonical-ladder
             triptych beside the directory pillar (PIONEER_RECRUITMENT_SPEC §3) */}
         <StorefrontDemoPanel />
 
@@ -1122,7 +1111,7 @@ function Home() {
                   Ready to open your storefront?
                 </h3>
                 <p className="text-sm text-neutral-600">
-                  You just saw what a store looks like on all three doors — same store, your choice of address. Create a free account and yours is next.
+                  You just saw what a store looks like on all three addresses — same store, your choice of address. Create a free account and yours is next.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
@@ -1159,6 +1148,33 @@ function Home() {
         {!isAuthenticated && !authLoading && (
           <div className="my-8 sm:my-12">
             <FeaturesShowcase mode={showcaseMode} />
+          </div>
+        )}
+
+        {/* Help Desk Support CTA — closes the visitor flow, after the pitch
+            and the tiers, where a support ask belongs. */}
+        {!isAuthenticated && !authLoading && (
+          <div className="my-8 sm:my-12">
+            <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
+                  Need Help? Our Help Desk Has You Covered
+                </h3>
+                <p className="text-sm text-neutral-600">
+                  Questions about the platform? Our support team is here to help — no account needed. Reach out anytime.
+                </p>
+              </div>
+              <Link href="/support" className="flex-shrink-0">
+                <Button variant="gradient" size="md" style={{ color: 'white' }}>
+                  Contact Help Desk →
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
 

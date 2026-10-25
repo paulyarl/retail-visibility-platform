@@ -8,7 +8,7 @@ import { platformSettingsService } from '@/services/PlatformSettingsSingletonSer
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 /**
- * Storefront demo panel — "Same store, three doors."
+ * Storefront demo panel — "Same store, three addresses."
  *
  * Demos the canonical ladder with a real professional-tier tenant (Place
  * Shelf, tid-25we5qgj): the SAME storefront reachable on the platform path,
@@ -121,7 +121,7 @@ export function StorefrontDemoPanel() {
               Live demo
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
-              One store, three doors
+              One store, three addresses
             </h2>
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
               The same storefront on the platform, on its own subdomain, and on
@@ -162,7 +162,7 @@ export function StorefrontDemoPanel() {
                 <h3 className="text-white font-bold text-lg mb-1">{door.label}</h3>
                 <p className="text-white/80 text-xs mb-3 break-all">{door.hint}</p>
                 <span className="inline-flex items-center text-white text-sm font-semibold group-hover:underline">
-                  Open this door
+                  Open this address
                   <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>

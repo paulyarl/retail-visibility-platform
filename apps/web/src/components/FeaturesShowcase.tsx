@@ -4,45 +4,89 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { TIER_PRICING } from '@/lib/tiers/tier-features';
 
-// Business journey stages aligned with tier progression
+// Prices are read off the tier ladder rather than hand-typed, so the
+// showcase can't drift from TIER_PRICING when a price changes.
+function tierPrice(id: string): string {
+  const price = TIER_PRICING[id];
+  return price === 0 ? 'Free' : `$${price}/mo`;
+}
+
+// Business journey stages aligned with tier progression.
+// `priority` drives layout: 0 = the free gateway strip, 1 = the Entry
+// Presence triad (three peer modes, not a ladder), 2 = the growth ladder
+// above it. Triad copy mirrors the claim-upgrade mode picker
+// (DirectoryPresenceUpgradeOptionsService ENTRY_PRESENCE_MODES) so a claimed
+// tenant sees the same three choices here as on the claim screen.
 const businessJourney = [
+  {
+    id: 'directory_presence',
+    icon: '📍',
+    title: 'Get found in the directory',
+    description: 'We build the directory from public business information, so your listing may already be live. Claiming it takes about two minutes and costs nothing.',
+    subtext: 'The free gateway — no account, no card, no developer.',
+    gradient: 'from-teal-500 to-emerald-600',
+    badge: 'Directory',
+    priority: 0,
+    price: tierPrice('directory_presence'),
+    cta: { href: '/directory/add-business', label: 'Claim your free listing →' },
+    upgradeTrigger: 'My listing is claimed — now I want to show up when shoppers search Google.',
+    nextEvolution: 'Entry Presence →',
+  },
+  {
+    id: 'presence',
+    icon: '�',
+    mode: 'commerce',
+    surface: 'Platform storefront + checkout',
+    title: 'Sell with deposit checkout',
+    description: 'An all-purpose storefront for your store and your products, with deposit checkout built in. Full online payment stays an add-on for when you want it.',
+    subtext: 'Commerce mode — the deposit-commerce surface of the triad.',
+    gradient: 'from-teal-500 to-cyan-600',
+    badge: 'Storefront+',
+    priority: 1,
+    isPrimary: true,
+    price: tierPrice('presence'),
+    upgradeTrigger: 'Shoppers are reserving — now I want to take the full payment online.',
+  },
   {
     id: 'discovery',
     icon: '🔎',
-    title: 'Get Found on Google',
-    description: 'Shoppers discover your products on Search, Shopping & Maps — instantly.',
-    subtext: 'Visibility-only tier for retailers who want Google presence without commerce complexity.',
+    mode: 'google',
+    surface: 'Third-party (Google)',
+    title: 'Put your products on Google',
+    description: 'Your catalog goes to Search, Shopping and Maps, so a searcher finds the product before they find a competitor.',
+    subtext: 'SWIS mode — products to Google, no hosted storefront.',
     gradient: 'from-blue-500 to-indigo-600',
-    badge: 'DISCOVERY',
+    badge: 'SWIS',
     priority: 1,
-    price: '$29/mo',
+    price: tierPrice('discovery'),
     upgradeTrigger: 'People are finding my products — now I want them to find my whole store.',
-    nextEvolution: 'Storefront Tier →',
   },
   {
     id: 'storefront',
     icon: '🏪',
-    title: 'Own Your Platform Presence',
-    description: 'A branded storefront inside the marketplace — browse, inquire, and connect.',
-    subtext: 'Platform presence for retailers ready to be discovered beyond Google.',
+    mode: 'platform',
+    surface: 'Platform in-house marketplace',
+    title: 'Showcase your full catalog',
+    description: 'A branded, browsable storefront inside the marketplace — browse, inquire, and connect.',
+    subtext: 'Platform mode — hosted catalog, no SWIS feed, no checkout.',
     gradient: 'from-indigo-500 to-purple-600',
-    badge: 'STOREFRONT',
+    badge: 'Storefront',
     priority: 1,
-    price: '$59/mo',
+    price: tierPrice('storefront'),
     upgradeTrigger: 'Shoppers are browsing — now I want them to commit to buying.',
-    nextEvolution: 'Commitment Tier →',
   },
   {
     id: 'commitment',
     icon: '🤝',
     title: 'Capture Intent & Drive Foot Traffic',
-    description: 'Deposit-based reservations guarantee serious buyers walk through your door.',
+    description: 'Deposit-based reservations turn browsers into people who show up at your counter.',
     subtext: 'Commitment commerce for physical retailers. Transaction closes in-store via Clover POS.',
     gradient: 'from-purple-500 to-pink-600',
-    badge: 'COMMITMENT',
-    priority: 1,
-    price: '$79/mo',
+    badge: 'Commitment',
+    priority: 2,
+    price: tierPrice('commitment'),
     upgradeTrigger: 'Shoppers reserve and show up — now I want to close the full sale online.',
     nextEvolution: 'E-commerce Tier →',
   },
@@ -53,9 +97,9 @@ const businessJourney = [
     description: 'Complete checkout, payment collection & delivery — pure e-commerce.',
     subtext: 'Full online sales for digital-first retailers. No deposit confusion.',
     gradient: 'from-pink-500 to-rose-600',
-    badge: 'E-COMMERCE',
-    priority: 1,
-    price: '$99/mo',
+    badge: 'E-commerce',
+    priority: 2,
+    price: tierPrice('ecommerce'),
     upgradeTrigger: 'I\'m selling online successfully — now I want to add physical pickup options.',
     nextEvolution: 'Omnichannel Tier →',
   },
@@ -66,9 +110,9 @@ const businessJourney = [
     description: 'Shoppers choose: pay in full for delivery OR deposit & pick up in store.',
     subtext: 'Unified commerce for retailers with both physical and online presence.',
     gradient: 'from-rose-500 to-orange-600',
-    badge: 'OMNICHANNEL',
+    badge: 'Omnichannel',
     priority: 2,
-    price: '$149/mo',
+    price: tierPrice('omnichannel'),
     upgradeTrigger: 'I have a physical store AND online sales — I want to offer every way to buy.',
     nextEvolution: 'Enterprise Tier →',
   },
@@ -79,9 +123,9 @@ const businessJourney = [
     description: 'Multi-location, enterprise-grade tools, custom contracts & white-label options.',
     subtext: 'For chains, franchises, and regional retailers with advanced needs.',
     gradient: 'from-orange-500 to-amber-600',
-    badge: 'ENTERPRISE',
+    badge: 'Enterprise',
     priority: 2,
-    price: '$499/mo',
+    price: tierPrice('enterprise'),
     upgradeTrigger: 'Growth, scale, and advanced business needs.',
     nextEvolution: 'Ultimate Scale',
   },
@@ -139,7 +183,9 @@ export default function FeaturesShowcase({ mode = 'grid', className = '' }: Feat
 // ==================== MODE 1: SLIDER ====================
 function SliderMode({ stages, prefersReducedMotion, className }: any) {
   const [isPaused, setIsPaused] = useState(false);
-  const duplicatedStages = [...stages, ...stages, ...stages];
+  const gateway = stages.find((s: any) => s.priority === 0);
+  const tiers = stages.filter((s: any) => s.priority !== 0);
+  const duplicatedStages = [...tiers, ...tiers, ...tiers];
 
   return (
     <div className={`relative overflow-hidden py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
@@ -157,6 +203,10 @@ function SliderMode({ stages, prefersReducedMotion, className }: any) {
         </motion.div>
       </div>
 
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6">
+        <GatewayStrip stage={gateway} />
+      </div>
+
       <div
         className="relative"
         onMouseEnter={() => setIsPaused(true)}
@@ -167,13 +217,13 @@ function SliderMode({ stages, prefersReducedMotion, className }: any) {
         <motion.div
           className="flex gap-3 sm:gap-4 md:gap-6 px-2 sm:px-4"
           animate={{
-            x: prefersReducedMotion || isPaused ? undefined : [0, -((stages.length * 320) + (stages.length * 24))],
+            x: prefersReducedMotion || isPaused ? undefined : [0, -((tiers.length * 320) + (tiers.length * 24))],
           }}
           transition={{
             x: {
               repeat: Infinity,
               repeatType: "loop",
-              duration: stages.length * 4,
+              duration: tiers.length * 4,
               ease: "linear",
             },
           }}
@@ -200,10 +250,11 @@ function SliderMode({ stages, prefersReducedMotion, className }: any) {
 
 // ==================== MODE 2: HYBRID (RECOMMENDED) ====================
 function HybridMode({ stages, prefersReducedMotion, className }: any) {
-  const topStages = stages.filter((s: any) => s.priority === 1);
-  const secondaryStages = stages.filter((s: any) => s.priority === 2);
+  const gateway = stages.find((s: any) => s.priority === 0);
+  const triad = stages.filter((s: any) => s.priority === 1);
+  const growth = stages.filter((s: any) => s.priority === 2);
   const [isPaused, setIsPaused] = useState(false);
-  const duplicatedSecondary = [...secondaryStages, ...secondaryStages];
+  const duplicatedGrowth = [...growth, ...growth];
 
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
@@ -220,63 +271,20 @@ function HybridMode({ stages, prefersReducedMotion, className }: any) {
           </motion.div>
         </div>
 
-        {/* Baseline / Pre-Discovery Mindset Shift */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="mb-8"
-        >
-          <div className="bg-neutral-900/5 border border-dashed border-neutral-300 rounded-2xl p-5 md:p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="absolute top-0 right-0 p-3 text-neutral-200/50 text-7xl font-serif pointer-events-none select-none z-0">
-              &ldquo;
-            </div>
-            <div className="relative z-10 max-w-2xl">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-neutral-200 text-neutral-700 border border-neutral-300 mb-2">
-                🔒 Baseline (The Retailer's Dilemma)
-              </span>
-              <p className="text-sm md:text-base text-neutral-600 font-medium italic leading-relaxed">
-                &ldquo;My products are sitting on the physical shelves right now, but unless someone walks through my door, nobody in my neighborhood even knows what I have in stock.&rdquo;
-              </p>
-            </div>
-            <div className="relative z-10 shrink-0 self-start md:self-center">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 block mb-1">Next Evolution</span>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1">
-                🔎 Discovery Tier →
-              </span>
-            </div>
-          </div>
-        </motion.div>
+        {/* Free gateway — the step before any tier */}
+        <GatewayStrip stage={gateway} />
 
-        {/* Hero Feature - Largest, with video option */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-6 sm:mb-8"
-        >
-          <HeroFeatureCard feature={topStages[0]} />
-        </motion.div>
+        {/* Entry Presence triad — three peer modes, not a ladder */}
+        <TriadSection stages={triad} />
 
-        {/* Top 2 Features - Side by side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {topStages.slice(1, 3).map((stage: any, index: number) => (
-            <motion.div
-              key={stage.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
-            >
-              <LargeFeatureCard feature={stage} />
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Secondary Features - Slider */}
+        {/* Growth ladder above the triad */}
         <div className="mb-6 sm:mb-8">
-          <h4 className="text-lg sm:text-xl font-bold text-neutral-900 mb-3 sm:mb-4 text-center">
-            Advanced Tiers for Growing Businesses
+          <h4 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1 text-center">
+            Grow into commerce and scale
           </h4>
+          <p className="text-sm text-neutral-600 mb-3 sm:mb-4 text-center">
+            Commerce, fulfillment, and multi-location once a surface is working
+          </p>
           <div className="relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-r from-neutral-50 to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-l from-neutral-50 to-transparent z-10 pointer-events-none" />
@@ -290,19 +298,19 @@ function HybridMode({ stages, prefersReducedMotion, className }: any) {
               <motion.div
                 className="flex gap-3 sm:gap-4"
                 animate={{
-                  x: prefersReducedMotion || isPaused ? undefined : [0, -((secondaryStages.length * 280) + (secondaryStages.length * 16))],
+                  x: prefersReducedMotion || isPaused ? undefined : [0, -((growth.length * 280) + (growth.length * 16))],
                 }}
                 transition={{
                   x: {
                     repeat: Infinity,
                     repeatType: "loop",
-                    duration: secondaryStages.length * 3,
+                    duration: growth.length * 3,
                     ease: "linear",
                   },
                 }}
                 style={{ width: 'fit-content' }}
               >
-                {duplicatedSecondary.map((stage: any, index: number) => (
+                {duplicatedGrowth.map((stage: any, index: number) => (
                   <SmallFeatureCard key={`${stage.id}-${index}`} feature={stage} />
                 ))}
               </motion.div>
@@ -319,6 +327,8 @@ function HybridMode({ stages, prefersReducedMotion, className }: any) {
 // ==================== MODE 3: TABS ====================
 function TabsMode({ stages, className }: any) {
   const [activeTab, setActiveTab] = useState(0);
+  const gateway = stages.find((s: any) => s.priority === 0);
+  const tiers = stages.filter((s: any) => s.priority !== 0);
 
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
@@ -330,37 +340,12 @@ function TabsMode({ stages, className }: any) {
           <p className="text-sm sm:text-base text-neutral-600">Click each tier to see the business model it unlocks</p>
         </div>
 
-        {/* Baseline / Pre-Discovery Mindset Shift */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="mb-8"
-        >
-          <div className="bg-neutral-900/5 border border-dashed border-neutral-300 rounded-2xl p-5 md:p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="absolute top-0 right-0 p-3 text-neutral-200/50 text-7xl font-serif pointer-events-none select-none z-0">
-              &ldquo;
-            </div>
-            <div className="relative z-10 max-w-2xl">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-neutral-200 text-neutral-700 border border-neutral-300 mb-2">
-                🔒 Baseline (The Retailer's Dilemma)
-              </span>
-              <p className="text-sm md:text-base text-neutral-600 font-medium italic leading-relaxed">
-                &ldquo;My products are sitting on the physical shelves right now, but unless someone walks through my door, nobody in my neighborhood even knows what I have in stock.&rdquo;
-              </p>
-            </div>
-            <div className="relative z-10 shrink-0 self-start md:self-center">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 block mb-1">Next Evolution</span>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1">
-                🔎 Discovery Tier →
-              </span>
-            </div>
-          </div>
-        </motion.div>
+        {/* Free gateway — the step before any tier */}
+        <GatewayStrip stage={gateway} />
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap justify-center gap-2 mb-6 sm:mb-8">
-          {stages.map((stage: any, index: number) => (
+          {tiers.map((stage: any, index: number) => (
             <button
               key={stage.id}
               onClick={() => setActiveTab(index)}
@@ -382,7 +367,7 @@ function TabsMode({ stages, className }: any) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <DetailedFeatureCard feature={stages[activeTab]} />
+          <DetailedFeatureCard feature={tiers[activeTab]} />
         </motion.div>
 
         <CTAButton />
@@ -393,6 +378,10 @@ function TabsMode({ stages, className }: any) {
 
 // ==================== MODE 4: GRID ====================
 function GridMode({ stages, className }: any) {
+  const gateway = stages.find((s: any) => s.priority === 0);
+  const triad = stages.filter((s: any) => s.priority === 1);
+  const growth = stages.filter((s: any) => s.priority === 2);
+
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
@@ -403,8 +392,12 @@ function GridMode({ stages, className }: any) {
           <p className="text-sm sm:text-base text-neutral-600">Align your tier with your business model — not the other way around</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {stages.map((stage: any, index: number) => (
+        <GatewayStrip stage={gateway} />
+
+        <TriadSection stages={triad} />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {growth.map((stage: any, index: number) => (
             <motion.div
               key={stage.id}
               initial={{ opacity: 0, scale: 0.9 }}
@@ -425,6 +418,8 @@ function GridMode({ stages, className }: any) {
 // ==================== MODE 5: VIDEO HERO ====================
 function VideoHeroMode({ stages, className }: any) {
   const heroStage = stages.find((s: any) => s.priority === 1);
+  const gateway = stages.find((s: any) => s.priority === 0);
+  const tiers = stages.filter((s: any) => s.priority !== 0);
 
   return (
     <div className={`py-8 bg-gradient-to-br from-neutral-50 via-primary-50/30 to-neutral-50 ${className}`}>
@@ -435,6 +430,8 @@ function VideoHeroMode({ stages, className }: any) {
           </h3>
           <p className="text-sm sm:text-base text-neutral-600">How local retailers move from discovery to conversion</p>
         </div>
+
+        <GatewayStrip stage={gateway} />
 
         {/* Video Section */}
         <div className="bg-neutral-900 rounded-xl sm:rounded-2xl overflow-hidden mb-6 sm:mb-8 aspect-video">
@@ -449,7 +446,7 @@ function VideoHeroMode({ stages, className }: any) {
 
         {/* Feature Grid Below */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {stages.slice(0, 4).map((stage: any) => (
+          {tiers.slice(0, 4).map((stage: any) => (
             <div key={stage.id} className="text-center p-3 sm:p-4 bg-white rounded-lg">
               <div className="text-2xl sm:text-3xl mb-2">{stage.icon}</div>
               <p className="text-xs sm:text-sm font-semibold text-neutral-900">{stage.badge}</p>
@@ -464,6 +461,53 @@ function VideoHeroMode({ stages, className }: any) {
 }
 
 // ==================== FEATURE CARD COMPONENTS ====================
+
+/**
+ * The free gateway — the step before any paid tier. Rendered by every mode
+ * so the ladder never starts at a price, and so a business that is already
+ * seeded from public information can see itself on the page.
+ */
+function GatewayStrip({ stage }: { stage?: any }) {
+  if (!stage) return null;
+  const cta = stage.cta ?? { href: '/directory/add-business', label: 'Claim your free listing →' };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.1 }}
+      className="mb-8"
+    >
+      <div className="bg-neutral-900/5 border border-dashed border-neutral-300 rounded-2xl p-5 md:p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="absolute top-0 right-0 p-3 text-neutral-200/50 text-7xl font-serif pointer-events-none select-none z-0">
+          &ldquo;
+        </div>
+        <div className="relative z-10 max-w-2xl">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-neutral-200 text-neutral-700 border border-neutral-300 mb-2">
+            🔒 Baseline (The Retailer's Dilemma)
+          </span>
+          <p className="text-sm md:text-base text-neutral-600 font-medium italic leading-relaxed">
+            &ldquo;My products are sitting on the physical shelves right now, but unless someone walks through my door, nobody in my neighborhood even knows what I have in stock.&rdquo;
+          </p>
+          <p className="text-sm text-neutral-600 leading-relaxed mt-3">
+            <span className="font-semibold text-neutral-800">{stage.icon} {stage.title}.</span> {stage.description}
+          </p>
+        </div>
+        <div className="relative z-10 shrink-0 self-start md:self-center max-w-xs">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 block mb-1">
+            First step — {stage.price}
+          </span>
+          <Link
+            href={cta.href}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 hover:bg-emerald-100 transition-colors"
+          >
+            {cta.label}
+          </Link>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 function FeatureCard({ feature }: any) {
   return (
@@ -482,7 +526,7 @@ function FeatureCard({ feature }: any) {
           >
             {feature.icon}
           </motion.div>
-          <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold">
+          <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold uppercase">
             {feature.badge}
           </span>
         </div>
@@ -500,64 +544,72 @@ function FeatureCard({ feature }: any) {
   );
 }
 
-function HeroFeatureCard({ feature }: any) {
+/**
+ * The Entry Presence triad — three peer modes, rendered as a picker rather
+ * than a ladder. Copy mirrors the claim-upgrade options payload
+ * (`ENTRY_PRESENCE_MODES` in DirectoryPresenceUpgradeOptionsService): mode
+ * surface, tagline, and which mode is primary.
+ */
+function TriadSection({ stages }: { stages: any[] }) {
+  if (!stages.length) return null;
+
   return (
-    <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br ${feature.gradient} p-6 sm:p-8 md:p-12`}>
-      <div className="relative z-10 text-white">
-        <div className="flex items-start justify-between mb-4 sm:mb-6">
-          <div className="text-5xl sm:text-6xl md:text-7xl">{feature.icon}</div>
-          <div className="flex flex-col items-end gap-2">
-            <span className="bg-white/20 backdrop-blur-sm px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold">
-              {feature.badge}
-            </span>
-            {feature.nextEvolution && (
-              <span className="bg-white/10 backdrop-blur-sm px-2 py-1 rounded-lg text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-white/90 border border-white/15">
-                Next Evolution: {feature.nextEvolution}
-              </span>
-            )}
-          </div>
-        </div>
-        <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">{feature.title}</h3>
-        <p className="text-base sm:text-lg md:text-xl mb-2">{feature.description}</p>
-        <p className="text-sm sm:text-base md:text-lg text-white/80 mb-2 sm:mb-3">{feature.price}</p>
-        {feature.upgradeTrigger && (
-          <div className="mt-4 mb-6 p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-white/60" />
-            <p className="text-xs font-semibold tracking-wider text-white/50 uppercase mb-1">Retailer Growth Mindset</p>
-            <p className="text-sm md:text-base text-white font-medium italic relative z-10 leading-relaxed">
-              &ldquo;{feature.upgradeTrigger}&rdquo;
-            </p>
-            <div className="absolute -right-4 -bottom-4 text-white/5 text-6xl font-serif pointer-events-none select-none">
-              &rdquo;
-            </div>
-          </div>
-        )}
-        <Link href={`/auth/signup?tier=${feature.id}`}>
-          <Button size="lg" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100">
-            Start with {feature.badge} →
-          </Button>
-        </Link>
+    <div className="mb-8">
+      <div className="text-center mb-4 sm:mb-6">
+        <h4 className="text-lg sm:text-xl md:text-2xl font-bold text-neutral-900 mb-2">
+          Pick the surface that fits
+        </h4>
+        <p className="text-sm sm:text-base text-neutral-600 max-w-2xl mx-auto">
+          Three ways to show up. Choose the one where your customers already look — the rest is a step
+          up from here, not a replacement.
+        </p>
       </div>
-      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        {stages.map((stage: any) => (
+          <TriadCard key={stage.id} feature={stage} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function LargeFeatureCard({ feature }: any) {
+function TriadCard({ feature }: any) {
   return (
-    <div className={`relative rounded-xl sm:rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${feature.gradient} p-4 sm:p-5 md:p-6 h-56 sm:h-60 md:h-64`}>
-      <div className="relative z-10 text-white h-full flex flex-col justify-between">
-        <div className="flex items-start justify-between">
+    <div className={`relative rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${feature.gradient} p-5 sm:p-6 flex flex-col`}>
+      <div className="relative z-10 text-white flex flex-col h-full">
+        <div className="flex items-start justify-between gap-2 mb-3">
           <div className="text-4xl sm:text-5xl">{feature.icon}</div>
-          <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold">
-            {feature.badge}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold uppercase">
+              {feature.badge}
+            </span>
+            {feature.isPrimary && (
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
+                Recommended
+              </span>
+            )}
+          </div>
         </div>
-        <div>
-          <h4 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">{feature.title}</h4>
-          <p className="text-xs sm:text-sm mb-1 sm:mb-2">{feature.description}</p>
-          <p className="text-xs text-white/90 font-semibold">{feature.price}</p>
+        {feature.surface && (
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1">
+            {feature.surface}
+          </p>
+        )}
+        <h4 className="text-lg sm:text-xl font-bold mb-2">{feature.title}</h4>
+        <p className="text-xs sm:text-sm text-white/90 mb-3">{feature.description}</p>
+        {feature.upgradeTrigger && (
+          <div className="mb-4 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20">
+            <p className="text-[10px] font-semibold tracking-wider text-white/50 uppercase mb-1">Retailer Growth Mindset</p>
+            <p className="text-xs text-white font-medium italic leading-relaxed">&ldquo;{feature.upgradeTrigger}&rdquo;</p>
+          </div>
+        )}
+        <div className="mt-auto">
+          <p className="text-sm font-semibold text-white mb-2">{feature.price}</p>
+          <Link href={feature.cta?.href ?? `/auth/signup?tier=${feature.id}`}>
+            <Button size="md" variant="secondary" className="bg-white text-neutral-900 hover:bg-neutral-100 w-full">
+              Choose {feature.badge} →
+            </Button>
+          </Link>
         </div>
       </div>
       <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20" />
@@ -571,7 +623,7 @@ function SmallFeatureCard({ feature }: any) {
       <div className="relative z-10 text-white h-full flex flex-col justify-between">
         <div className="flex items-start justify-between">
           <div className="text-2xl sm:text-3xl">{feature.icon}</div>
-          <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold">
+          <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold uppercase">
             {feature.badge}
           </span>
         </div>
@@ -592,9 +644,14 @@ function DetailedFeatureCard({ feature }: any) {
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="text-4xl sm:text-5xl md:text-6xl">{feature.icon}</div>
             <div>
-              <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold mb-2 inline-block">
+              <span className="bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 rounded-full text-xs font-bold mb-2 inline-block uppercase">
                 {feature.badge}
               </span>
+              {feature.surface && (
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1">
+                  {feature.surface}
+                </p>
+              )}
               <h4 className="text-2xl sm:text-3xl font-bold">{feature.title}</h4>
             </div>
           </div>
@@ -641,7 +698,7 @@ function GridFeatureCard({ feature }: any) {
   return (
     <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-5 md:p-6 shadow-md hover:shadow-xl transition-shadow">
       <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">{feature.icon}</div>
-      <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-xs font-bold mb-2 inline-block">
+      <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-xs font-bold mb-2 inline-block uppercase">
         {feature.badge}
       </span>
       <h4 className="text-base sm:text-lg font-bold text-neutral-900 mb-1 sm:mb-2">{feature.title}</h4>

@@ -235,7 +235,7 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
           {/* Trust strip */}
           <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm text-white/70">
             {typeof businessCount === "number" && businessCount > 0 && (
-              <span>✓ {businessCount.toLocaleString()} local businesses listed</span>
+              <span>✓ {businessCount.toLocaleString()} retailers on the platform</span>
             )}
             <span>✓ Built by retailers, for retailers</span>
           </div>
@@ -253,7 +253,7 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
 
           {/* Three-doors awareness — same store on every surface. */}
           <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/50">
-            <span>One store, three doors:</span>
+            <span>One store, three addresses:</span>
             <Link href="/tenant/tid-25we5qgj" className="hover:text-white transition-colors">platform</Link>
             <span aria-hidden>·</span>
             <a href="https://place-shelf.visibleshelf.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">subdomain</a>
