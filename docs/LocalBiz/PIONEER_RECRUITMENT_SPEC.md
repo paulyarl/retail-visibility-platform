@@ -488,6 +488,7 @@ Every outcome is data. A refusal still leaves a live, indexed seed listing
 | **Pioneer landing page** (`/s/` short-code → landing) | Card→landing for the close: hero claim + demo storefront link + Directory entry + claim/signup CTA | Medium — one static landing page + short-code |
 | Field capture form (slim) | Not-pre-seeded doors: name + photo + card → draft seed. Create Seed works from a phone but is admin-shaped | Medium — could defer; pre-seeding covers most doors |
 | Claim-token quick-mint on the seeds admin row | Bound-token creation in-field without navigating to the seed detail | Small |
+| **Sourced shelf items** (replace SAMPLE_SHELF_ITEMS) | The audit schema already produces `observed_assets` — per-seed evidence-backed items — and `seo_enrichment` **already consumes it** into description/keywords/tags (that's why indexed snippets carry honest sourced copy). Remaining gap is the *visual* consumer only: expose observed_assets on the **public** place listing payload → `ShelfSlotsPreview` renders real items with likelihood framing ("Commonly carried" / "Shoppers mention X" — NOT "In Stock"/real prices unless sourced) → hide teaser when no items. Sample is client-only (SSR leak fixed) — this makes the indexed version honest AND per-seed | Small–medium — one listing-field exposure + preview prop wiring |
 
 ## 7. Post-visit pipeline
 
