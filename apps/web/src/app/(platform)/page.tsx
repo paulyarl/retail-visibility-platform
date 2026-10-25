@@ -915,33 +915,46 @@ function Home() {
                   <div className="flex items-center gap-2 mb-4">
                     <div className="h-3 w-3 rounded-full bg-blue-500"></div>
                     <div className="flex-1">
-                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Start free today</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Claim your listing free — open a storefront when you're ready</p>
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Start today</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Open your storefront — create your account, pay only when you're ready to grow</p>
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
-                    <Link
-                      href="/directory/add-business"
+                    <a
+                      href={withUTM('/auth/signup?utm_content=start_free')}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block"
                       onClick={() =>
                         trackBehaviorClient({
                           entityType: 'platform',
-                          entityId: 'home_start_free_claim',
-                          entityName: 'Claim your free listing (start-free card)',
+                          entityId: 'home_start_free_signup',
+                          entityName: 'Create Free Account (start-free card)',
                           pageType: 'platform_home',
                         })
                       }
                     >
                       <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>
-                        Claim your free listing →
+                        Create Free Account
                       </Button>
-                    </Link>
-                    <a href="/auth/login" target="_blank" rel="noopener noreferrer" className="block">
+                    </a>
+                    <a
+                      href="/auth/login"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                      onClick={() =>
+                        trackBehaviorClient({
+                          entityType: 'platform',
+                          entityId: 'home_start_free_signin',
+                          entityName: 'Sign In (start-free card)',
+                          pageType: 'platform_home',
+                        })
+                      }
+                    >
                       <Button variant="outline" className="w-full justify-start" size="md">
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
@@ -1116,7 +1129,7 @@ function Home() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
                 <a
-                  href={withUTM('/auth/signup')}
+                  href={withUTM('/auth/signup?utm_content=postdemo')}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -1132,7 +1145,19 @@ function Home() {
                     Create Free Account
                   </Button>
                 </a>
-                <Link href="/auth/login" target="_blank" rel="noopener noreferrer">
+                <Link
+                  href="/auth/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    trackBehaviorClient({
+                      entityType: 'platform',
+                      entityId: 'home_postdemo_signin',
+                      entityName: 'Sign In (post-demo)',
+                      pageType: 'platform_home',
+                    })
+                  }
+                >
                   <Button variant="outline" size="md">
                     Sign In
                   </Button>
