@@ -43,6 +43,7 @@ const ENTRY_PRESENCE_MODES = [
     features: [
       'Deposit checkout (Stripe) built in',
       'Branded mobile storefront for your whole catalog',
+      'Up to 200 inventory items',
       'Full online payment as an add-on when you want it',
       '0% commission on orders (keep 100% of your margins)',
     ],
@@ -57,7 +58,7 @@ const ENTRY_PRESENCE_MODES = [
     description:
       'Stop losing customers who search for specific products like "cassava flour", "halal ribeye", or specialty imports. Your in-stock inventory gets indexed so searchers see you have it today.',
     features: [
-      'Up to 75 products indexed for local search',
+      'Up to 200 products indexed for local search',
       'Item-level "In-Stock Nearby" discovery',
       'Google Business Profile synchronization',
       'Customer direction and phone call tracking',
@@ -71,12 +72,12 @@ const ENTRY_PRESENCE_MODES = [
     icon: ShoppingBag,
     title: 'Showcase your full catalog',
     description:
-      'A branded, browsable storefront inside the marketplace — your aisles, your prices, no checkout required. Shoppers browse online and walk in.',
+      'The full storefront surface inside the marketplace — your aisles, your prices, your own address. Shoppers browse online and walk in; checkout, a custom domain, and fulfillment are add-ons you switch on when you need them.',
     features: [
       'Branded mobile web app (installable PWA)',
-      'Browse, inquire, and connect',
+      'Storefront layouts, options, and your own subdomain',
       'Up to 200 inventory items',
-      'Hosted on your platform subdomain',
+      'Checkout, custom domain, and fulfillment as add-ons',
     ],
   },
 ];
@@ -343,6 +344,11 @@ export default function PlaceAboutClient() {
             );
           })}
         </div>
+
+        <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-8 max-w-2xl mx-auto">
+          All three modes carry 200 product slots and a platform subdomain. Coupons, funnels, social
+          commerce, wholesale matching, and chatbot unlock on the tiers above.
+        </p>
       </div>
 
       {/* ─── The Store is the Fulfillment Center (DoorDash Contrast) ─── */}
