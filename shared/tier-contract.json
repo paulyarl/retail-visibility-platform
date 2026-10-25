@@ -78,13 +78,13 @@
     "enterprise": 499
   },
   "display_names": {
-    "$comment": "Canonical TIER_DISPLAY_NAMES (web tier-features.ts is the reference copy). `custom` is absent by rule — the assigned tier has no catalog-facing name. Triad redesign (ENTRY_PRESENCE_TRIAD_REDESIGN_SPEC): `presence` renders 'Storefront+' (deposit-commerce surface — the 'Starter' collision with legacy `starter` is retired), `discovery` renders 'SWIS' (Google surface). `starter` keeps 'Starter' as the legacy-only holder.",
+    "$comment": "Canonical TIER_DISPLAY_NAMES (web tier-features.ts is the reference copy). `custom` is absent by rule — the assigned tier has no catalog-facing name. Triad redesign (ENTRY_PRESENCE_TRIAD_REDESIGN_SPEC): `presence` renders 'Storefront' (the deposit-commerce surface — the 'Starter' collision with legacy `starter` is retired), `discovery` renders 'SWIS' (Google surface), `storefront` renders 'Storefront+' (the enhanced storefront rung). `starter` keeps 'Starter' as the legacy-only holder.",
     "google_only": "Google-Only",
     "directory_presence": "Directory Presence",
-    "presence": "Storefront+",
+    "presence": "Storefront",
     "starter": "Starter",
     "discovery": "SWIS",
-    "storefront": "Storefront",
+    "storefront": "Storefront+",
     "commitment": "Commitment",
     "ecommerce": "E-commerce",
     "omnichannel": "Omnichannel",

@@ -107,9 +107,9 @@ export const TIER_BADGE_CLASSES: Record<string, string> = {
 // title-cased key in formatTierDisplay (known gap: directory_presence,
 // starter, google_only, chain_enterprise render as raw keys).
 export const TENANT_TIER_DISPLAY_NAMES: Record<string, string> = {
-  presence: 'Storefront+',
+  presence: 'Storefront',
   discovery: 'SWIS',
-  storefront: 'Storefront',
+  storefront: 'Storefront+',
   commitment: 'Commitment',
   ecommerce: 'E-commerce',
   omnichannel: 'Omnichannel',

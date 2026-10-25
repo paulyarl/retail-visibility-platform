@@ -77,7 +77,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     maxSkus: 250,
   },
   presence: {
-    name: 'Storefront+',
+    name: 'Storefront',
     maxSkus: 200, // Triad redesign: commerce surface, SKU parity across the triad
   },
   discovery: {
@@ -85,7 +85,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     maxSkus: 200, // Triad redesign: SWIS mode, SKU parity across the triad
   },
   storefront: {
-    name: 'Storefront',
+    name: 'Storefront+',
     maxSkus: 200,  // V2: Lower limit for storefront tier
   },
   commitment: {

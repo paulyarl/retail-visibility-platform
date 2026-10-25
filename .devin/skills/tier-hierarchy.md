@@ -39,10 +39,10 @@ Scale            professional | organization | enterprise
 |---|-----|---------|----------|-------|-------|
 | 0 | `directory_presence` | Directory Presence | $0 | Gateway | active |
 | 1 | `google_only` | Google-Only | — | — | inactive legacy |
-| 2 | `presence` | Storefront+ | $39 | Entry Presence | active |
+| 2 | `presence` | Storefront | $39 | Entry Presence | active |
 | 3 | `starter` | Starter | — | — | inactive legacy |
 | 4 | `discovery` | SWIS | $29 | Entry Presence | active |
-| 5 | `storefront` | Storefront | $59 | Entry Presence | active |
+| 5 | `storefront` | Storefront+ | $59 | Entry Presence | active |
 | 6 | `commitment` | Commitment | $79 | Commerce | active |
 | 7 | `ecommerce` | E-commerce | $99 | Commerce | active |
 | 8 | `omnichannel` | Omnichannel | $149 | Commerce | active |

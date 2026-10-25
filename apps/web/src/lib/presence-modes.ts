@@ -12,8 +12,8 @@ import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeServi
 export const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
   {
     tierKey: 'presence',
-    name: 'Storefront+',
-    displayName: 'Storefront+',
+    name: 'Storefront',
+    displayName: 'Storefront',
     description: null,
     priceMonthly: 39,
     priceAnnual: 468,
@@ -40,8 +40,8 @@ export const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
   },
   {
     tierKey: 'storefront',
-    name: 'Storefront',
-    displayName: 'Storefront',
+    name: 'Storefront+',
+    displayName: 'Storefront+',
     description: null,
     priceMonthly: 59,
     priceAnnual: 708,

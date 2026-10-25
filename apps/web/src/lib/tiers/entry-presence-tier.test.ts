@@ -89,8 +89,9 @@ describe('V3.1 Entry Presence tier feature maps', () => {
   });
 
   describe('presence tier display and pricing', () => {
-    it('has display name "Storefront+"', () => {
-      expect(TIER_DISPLAY_NAMES.presence).toBe('Storefront+');
+    it('has display name "Storefront" (the + belongs to the $59 enhanced rung)', () => {
+      expect(TIER_DISPLAY_NAMES.presence).toBe('Storefront');
+      expect(TIER_DISPLAY_NAMES.storefront).toBe('Storefront+');
     });
 
     it('is priced at $39/month', () => {

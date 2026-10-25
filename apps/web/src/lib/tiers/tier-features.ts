@@ -20,7 +20,7 @@ export const TIER_FEATURES = {
     'storefront_retail',
     'directory_visibility_snap_ebt',
   ],
-  // Entry Presence triad — commerce surface (display: "Storefront+", $39).
+  // Entry Presence triad — commerce surface (display: "Storefront", $39).
   // Clean key `presence` — does NOT inherit google_only or legacy starter feature bag.
   // Deposit commerce + payment_gateway_stripe live in its tier_features_list
   // bag (DB leg) — see ENTRY_PRESENCE_TRIAD_REDESIGN_SPEC.
@@ -234,10 +234,10 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
 export const TIER_DISPLAY_NAMES: Record<string, string> = {
   google_only: 'Google-Only',
   directory_presence: 'Directory Presence',
-  presence: 'Storefront+',
+  presence: 'Storefront',
   starter: 'Starter',
   discovery: 'SWIS',
-  storefront: 'Storefront',
+  storefront: 'Storefront+',
   commitment: 'Commitment',
   ecommerce: 'E-commerce',
   omnichannel: 'Omnichannel',
