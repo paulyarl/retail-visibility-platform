@@ -440,16 +440,16 @@ function Home() {
                 transition={{ duration: 0.6, delay: 0.2 }}
               >
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-neutral-900 mb-3 sm:mb-4">
-                  Every local business, findable — and ready to sell
+                  Stocked shelves shouldn't be a secret
                 </h2>
                 <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
-                  Most neighborhood businesses are missing from the places shoppers actually look — and it's
-                  almost never for lack of a good business. We start you free: your business may already be
-                  listed in our directory, sourced from public information, and claiming it takes about two
-                  minutes at no cost. From there you choose how you show up — a richer directory listing,
-                  Google Search and Shopping, or a storefront on our marketplace — and when you're ready to
-                  sell, turn on deposits, pickup, delivery, or full online payment. No developer, no
-                  enterprise budget, no months of setup.
+                  Right now your products sit on physical shelves — and unless someone walks through your
+                  door, your neighborhood has no idea what you carry. We fix that, starting free: your
+                  business may already be listed in our directory, sourced from public information, and
+                  claiming it takes about two minutes. Then you choose how you show up — a richer directory
+                  listing, Google Search and Shopping, or your own storefront — and when you're ready to
+                  take the sale, turn on deposits, pickup, delivery, or full online payment. No developer,
+                  no enterprise budget, no months of setup.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
                   <motion.div
@@ -461,7 +461,7 @@ function Home() {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎯</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Mission</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      Put every local business on the map — and give it the same tools to turn discovery into sales that the big chains built for themselves.
+                      Put every local business on the map — with the same discovery-to-sale tools the big chains built for themselves.
                     </p>
                   </motion.div>
                   <motion.div
@@ -473,7 +473,7 @@ function Home() {
                     <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💡</div>
                     <h3 className="font-bold text-neutral-900 mb-1 sm:mb-2 text-base sm:text-lg">Our Vision</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                      A world where finding and buying from a neighborhood business is as easy as finding and buying from a national chain.
+                      Buying from the shop down the street should be as easy as buying from a national chain.
                     </p>
                   </motion.div>
                   <motion.div
