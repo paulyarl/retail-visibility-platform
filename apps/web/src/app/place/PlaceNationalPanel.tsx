@@ -30,7 +30,7 @@ export default function PlaceNationalPanel({
   return (
     <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-400 mb-2">
           National coverage
         </p>
         {intro && (
@@ -69,7 +69,7 @@ export default function PlaceNationalPanel({
                 <Link
                   key={`${c.city}-${c.state}`}
                   href={getPlaceCityShelfUrl(c.city, c.state)}
-                  className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-900/40 dark:hover:text-violet-300 transition-colors"
                 >
                   <MapPin className="w-3.5 h-3.5" />
                   {c.city}, {c.state}

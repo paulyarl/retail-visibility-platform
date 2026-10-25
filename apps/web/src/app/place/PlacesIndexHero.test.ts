@@ -19,6 +19,14 @@ describe('PlacesIndexHero', () => {
     expect(html).toContain('Local businesses listed from public information.');
   });
 
+  it('renders as the violet banner band, mirroring the directory hero', () => {
+    const html = renderToStaticMarkup(createElement(PlacesIndexHero, {}));
+
+    expect(html).toContain('aria-label="Places banner"');
+    expect(html).toContain('from-violet-600');
+    expect(html).toContain('to-indigo-800');
+  });
+
   it('carries the shelf counts when the server read the categories', () => {
     const html = renderToStaticMarkup(
       createElement(PlacesIndexHero, { totalPlaces: 10, categoryCount: 7 }),

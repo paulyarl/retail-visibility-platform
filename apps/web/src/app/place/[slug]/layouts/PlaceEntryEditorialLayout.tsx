@@ -176,18 +176,20 @@ export default function PlaceEntryEditorialLayout({
       <StoreViewTracker tenantId={tenantId} storeName={listing.businessName} categories={listing.categories} listingOrigin="directory_seed" surface="place" />
 
       <div className="min-h-screen bg-white">
-        {/* Editorial Hero — seed-adapted */}
+        {/* Editorial Hero — seed-adapted. Default palette is the /place violet
+            family (the sibling of the directory entry's blue banner); a claimed
+            tenant's own primaryColor still wins. */}
         <div
-          className="relative text-white overflow-hidden"
-          style={primaryColor ? { background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}88 50%, ${primaryColor}33 100%)` } : { backgroundColor: '#171717' }}
+          className={`relative text-white overflow-hidden ${primaryColor ? '' : 'bg-gradient-to-br from-violet-700 via-violet-800 to-indigo-900'}`}
+          style={primaryColor ? { background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}88 50%, ${primaryColor}33 100%)` } : undefined}
         >
           <div className="absolute inset-0 opacity-20">
-            <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-neutral-900" />
+            <div className="w-full h-full bg-gradient-to-br from-violet-400 to-indigo-600" />
           </div>
           <div className="relative max-w-5xl mx-auto px-6 py-16 sm:py-24">
             <Link
               href={referrerShelf?.href || '/directory'}
-              className="inline-flex items-center text-sm text-neutral-300 hover:text-white mb-8 transition-colors"
+              className="inline-flex items-center text-sm text-white/70 hover:text-white mb-8 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to {referrerShelf?.label || 'Directory'}
             </Link>
@@ -195,7 +197,7 @@ export default function PlaceEntryEditorialLayout({
               <div className="-mt-4 mb-2">
                 <Link
                   href={getCategoryUrl({ name: listing.primaryCategory })}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white transition-colors"
                 >
                   <Tag className="w-4 h-4" />
                   Browse {listing.primaryCategory} stores
@@ -207,7 +209,7 @@ export default function PlaceEntryEditorialLayout({
               <div className="mb-6">
                 <Link
                   href={getCityUrl(listing.city, listing.state)}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-neutral-300 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white transition-colors"
                 >
                   <MapPin className="w-4 h-4" />
                   Browse stores in {listing.city}, {listing.state}
@@ -217,20 +219,20 @@ export default function PlaceEntryEditorialLayout({
             )}
             {(secondaryShelves?.length ?? 0) > 0 && (
               <div className="-mt-2 mb-6 flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-neutral-400">Also on:</span>
+                <span className="text-white/60">Also on:</span>
                 {secondaryShelves!.map((shelf) =>
                   shelf.href ? (
                     <Link
                       key={shelf.label}
                       href={shelf.href}
-                      className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-neutral-200 hover:text-white transition-colors"
+                      className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/90 hover:text-white transition-colors"
                     >
                       {shelf.label}
                     </Link>
                   ) : (
                     <span
                       key={shelf.label}
-                      className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 text-neutral-400"
+                      className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 text-white/50"
                     >
                       {shelf.label}
                     </span>
@@ -246,7 +248,7 @@ export default function PlaceEntryEditorialLayout({
                 <div>
                   <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">{listing.businessName}</h1>
                   {displayCategory && (
-                    <p className="text-neutral-300 mt-2 text-lg">{displayCategory}</p>
+                    <p className="text-white/80 mt-2 text-lg">{displayCategory}</p>
                   )}
                   {!listing.isClaimed && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 mt-3 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-sm font-medium text-yellow-300">

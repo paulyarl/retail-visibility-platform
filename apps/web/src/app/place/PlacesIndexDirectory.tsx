@@ -50,7 +50,7 @@ export default function PlacesIndexDirectory({ cities, places }: PlacesIndexDire
             <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
               {cities.map((city) => (
                 <li key={city.href}>
-                  <a href={city.href} className="text-sm text-blue-700 hover:underline">
+                  <a href={city.href} className="text-sm text-violet-700 hover:underline">
                     {city.label}
                   </a>
                 </li>
@@ -69,7 +69,7 @@ export default function PlacesIndexDirectory({ cities, places }: PlacesIndexDire
                 <li key={place.id} className="break-inside-avoid py-1">
                   <a
                     href={`/place/${place.slug}`}
-                    className="text-neutral-700 hover:text-blue-700 hover:underline"
+                    className="text-neutral-700 hover:text-violet-700 hover:underline"
                   >
                     {place.businessName}
                   </a>

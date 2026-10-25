@@ -10,12 +10,14 @@ export const metadata: Metadata = {
     description:
       'Everything your physical store needs to turn local search into foot traffic: POS sync, item-level Google search, branded mobile storefronts, and in-store pickup.',
     type: 'website',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'VisibleShelf' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'VisibleShelf Features: Make Physical Shelves Visible',
     description:
       'Everything your physical store needs to turn local search into foot traffic: POS sync, item-level Google search, branded mobile storefronts, and in-store pickup.',
+    images: ['/opengraph-image'],
   },
 };
 

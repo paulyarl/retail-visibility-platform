@@ -31,6 +31,8 @@ export interface UseDirectoryStoresReturn {
   loading: boolean;
   error: string | null;
   pagination: DirectoryStoresResponse['pagination'] | null;
+  /** Open-now listings across the whole filtered set (API-computed). */
+  openNowCount: number;
   refetch: () => Promise<void>;
   fromCache: boolean;
   metrics: {
@@ -63,6 +65,7 @@ export const useDirectoryStores = (
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<DirectoryStoresResponse['pagination'] | null>(null);
+  const [openNowCount, setOpenNowCount] = useState(0);
   const [fromCache, setFromCache] = useState(false);
   const [localMetrics, setLocalMetrics] = useState({
     cacheHits: 0,
@@ -110,7 +113,8 @@ export const useDirectoryStores = (
       }
 
       // Deduplicate listings by tenant_id (MV returns one row per category)
-      // Keep the first occurrence of each store
+      // Keep the first occurrence of each store. The API already reports
+      // distinct-tenant totals, so pagination stays authoritative.
       if (result.listings) {
         const seenIds = new Set();
         result.listings = result.listings.filter((listing: any) => {
@@ -121,15 +125,15 @@ export const useDirectoryStores = (
           seenIds.add(id);
           return true;
         });
-        // Update pagination count to reflect deduplicated results
-        if (result.pagination) {
-          result.pagination.totalItems = result.listings.length;
-        }
       }
 
       // Store the fetched stores (service handles caching automatically)
       setStores(result.listings || []);
       setPagination(result.pagination);
+      setOpenNowCount(
+        result.openNowCount ??
+          (result.listings || []).filter((s) => s.isOpen === true).length,
+      );
       setFromCache(false);
 
       const endTime = Date.now();
@@ -169,6 +173,7 @@ export const useDirectoryStores = (
     loading,
     error,
     pagination,
+    openNowCount,
     refetch,
     fromCache,
     metrics: localMetrics,

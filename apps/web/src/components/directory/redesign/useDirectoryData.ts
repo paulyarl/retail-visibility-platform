@@ -191,6 +191,7 @@ export function useDirectoryData(): DirectoryData {
     loading,
     error,
     pagination,
+    openNowCount,
     refetch,
   } = useDirectoryStores({
     search: searchQuery || undefined,
@@ -413,12 +414,14 @@ export function useDirectoryData(): DirectoryData {
   );
 
   // --- Derived counts ---
+  // The hero chips describe the whole filtered result set, so totals and the
+  // open-now count come from the API rather than the current page slice.
   const counts: DirectoryCounts = {
-    totalStores: pagination?.totalItems ?? 0,
+    totalStores: pagination?.totalItems ?? stores.length,
     totalCategories: categories.length,
-    openNowCount: stores.filter(
-      (s: DirectoryStore) => s.businessHours != null,
-    ).length,
+    openNowCount:
+      openNowCount ||
+      stores.filter((s: DirectoryStore) => s.isOpen === true).length,
   };
 
   const hasActiveQuery = !!(

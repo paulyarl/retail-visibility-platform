@@ -56,6 +56,8 @@ export interface DirectoryStore {
   latitude?: number; // Flattened coordinate
   longitude?: number; // Flattened coordinate
   businessHours?: any;
+  /** Server-computed open-now status from `businessHours` (null when unknown). */
+  isOpen?: boolean | null;
   distance?: number;
   canUseExternalLink?: boolean;
   /** `directory_seed` marks an unclaimed seed — routed to /place/{slug}. */
@@ -96,6 +98,8 @@ export interface DirectorySearchResult {
   listings: DirectoryStore[]; // API returns 'listings', not 'stores'
   categories?: DirectoryCategory[];
   locations?: DirectoryLocation[];
+  /** Open-now listings across the whole filtered set (not just this page). */
+  openNowCount?: number;
   pagination: {
     page: number;
     limit: number;

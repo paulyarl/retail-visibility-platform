@@ -57,11 +57,15 @@ function to24Hour(hh: string, mm: string, amPm: string): string {
 
 /**
  * Normalize a listing's business_hours JSON into the day-object shape that
- * computeStoreStatus understands. Directory listings mix two formats:
+ * computeStoreStatus understands. Directory listings mix three formats:
  *   - structured: { monday: { open: "10:30", close: "19:00", closed: false }, timezone }
  *   - legacy strings: { friday: "9:00 AM - 8:00 PM", sunday: "Closed" }
+ *   - periods: { periods: [{ day: "SUNDAY", open: "11:00", close: "17:00" }], timezone }
+ *
+ * computeStoreStatus keys days by their capitalized name ("Monday"), while the
+ * stored day-map is lowercase — capitalize here or every listing reads closed.
  */
-function normalizeListingHours(businessHours: any): any | null {
+export function normalizeListingHours(businessHours: any): any | null {
   if (!businessHours || typeof businessHours !== 'object') return null;
   const normalized: any = {};
   if (typeof businessHours.timezone === 'string') {
@@ -69,10 +73,11 @@ function normalizeListingHours(businessHours: any): any | null {
   }
   for (const [day, entry] of Object.entries(businessHours)) {
     if (['timezone', 'special', 'periods'].includes(day)) continue;
+    const dayKey = day.charAt(0).toUpperCase() + day.slice(1).toLowerCase();
     if (typeof entry === 'string') {
       const m = entry.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (m) {
-        normalized[day] = {
+        normalized[dayKey] = {
           open: to24Hour(m[1], m[2], m[3]),
           close: to24Hour(m[4], m[5], m[6]),
         };
@@ -80,9 +85,15 @@ function normalizeListingHours(businessHours: any): any | null {
     } else if (entry && typeof entry === 'object') {
       const hours = entry as { open?: string; close?: string; closed?: boolean };
       if (hours.open && hours.close && !hours.closed) {
-        normalized[day] = { open: hours.open, close: hours.close };
+        normalized[dayKey] = { open: hours.open, close: hours.close };
       }
     }
+  }
+  // Period-array shape (tenant-style hours) — computeStoreStatus reads
+  // `periods` directly when the listing carries no day-map.
+  const hasDayMap = Object.keys(normalized).some((key) => key !== 'timezone');
+  if (!hasDayMap && Array.isArray(businessHours.periods)) {
+    normalized.periods = businessHours.periods;
   }
   return Object.keys(normalized).length > 0 ? normalized : null;
 }
@@ -91,7 +102,7 @@ function normalizeListingHours(businessHours: any): any | null {
  * Derive open-now from a listing's own businessHours (no per-tenant lookups).
  * Returns null when the listing has no usable hours data.
  */
-function computeIsOpenFromHours(businessHours: any): boolean | null {
+export function computeIsOpenFromHours(businessHours: any): boolean | null {
   const normalized = normalizeListingHours(businessHours);
   if (!normalized) return null;
   return computeStoreStatus(normalized)?.isOpen ?? null;
@@ -214,6 +225,15 @@ router.get('/search', async (req: Request, res: Response) => {
       orderByClause = 'is_featured DESC, rating_avg DESC NULLS LAST';
     }
 
+    // Open-now is derived from each listing's own hours (see
+    // computeIsOpenFromHours), which SQL cannot reproduce for the mixed stored
+    // shapes — so an open-now request fetches the full matching set and pages
+    // in memory, keeping the filter and its total consistent.
+    const wantsOpenNow = openNow === 'true';
+    const pagingClause = wantsOpenNow
+      ? ''
+      : `LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int`;
+
     // Query using directory_listings_list directly, with MV data where available
     // For distance sorting, we need to use a subquery to handle deduplication properly
     let listingsQuery: string;
@@ -277,7 +297,7 @@ router.get('/search', async (req: Request, res: Response) => {
         ) sub
         WHERE rn = 1
         ORDER BY distance_km ASC NULLS LAST
-        LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int
+        ${pagingClause}
       `;
     } else {
       // For other sorting, use DISTINCT ON as before
@@ -334,14 +354,14 @@ router.get('/search', async (req: Request, res: Response) => {
         ) real_counts ON dll.tenant_id = real_counts.tenant_id
         WHERE ${conditions.join(' AND ')}
         ORDER BY dll.tenant_id, dll.rating_avg DESC NULLS LAST, dll.rating_count DESC
-        LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int
+        ${pagingClause}
       `;
     }
     
     //console.log('[Directory MV Search] Query:', listingsQuery);
     //console.log('[Directory MV Search] Params:', [...params, limitNum, skip]);
 
-    const listingsResult = await getDirectPool().query(listingsQuery, [...params, limitNum, skip]);
+    const pool = getDirectPool();
 
     // Get total count (using same source as search) - count distinct tenants
     const countQuery = `
@@ -351,21 +371,50 @@ router.get('/search', async (req: Request, res: Response) => {
       LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
       WHERE ${conditions.join(' AND ')}
     `;
-    const countResult = await getDirectPool().query(countQuery, params);
 
-    const total = parseInt(countResult.rows[0]?.count || '0');
+    // Open-now across the whole filtered set (not just the visible page) —
+    // this feeds the hero stat chip. Skipped on open-now requests, where the
+    // full result set is already being fetched.
+    const openNowQuery = `
+      SELECT dll.tenant_id, dll.business_hours
+      FROM directory_listings_list dll
+      INNER JOIN tenants t ON dll.tenant_id = t.id
+      LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+      WHERE ${conditions.join(' AND ')}
+    `;
+
+    const listingsParams = wantsOpenNow ? params : [...params, limitNum, skip];
+    const [listingsResult, countResult, openNowRowsResult] = await Promise.all([
+      pool.query(listingsQuery, listingsParams),
+      wantsOpenNow ? Promise.resolve(null) : pool.query(countQuery, params),
+      wantsOpenNow ? Promise.resolve(null) : pool.query(openNowQuery, params),
+    ]);
+
+    const total = countResult
+      ? parseInt(countResult.rows[0]?.count || '0')
+      : 0;
 
     // Open-now filter — derived from each listing's own businessHours
     // (handles both "9:00 AM - 5:00 PM" strings and {open, close, closed} objects)
-    const wantsOpenNow = openNow === 'true';
+    const openNowTenantIds = new Set<string>();
+    for (const row of openNowRowsResult?.rows ?? []) {
+      if (computeIsOpenFromHours(row.business_hours) === true) {
+        openNowTenantIds.add(row.tenant_id);
+      }
+    }
+
     let resultRows = listingsResult.rows;
+    let effectiveTotal = total;
+    let openNowCount = openNowTenantIds.size;
     if (wantsOpenNow) {
       resultRows = resultRows.filter(
         (row: any) => computeIsOpenFromHours(row.business_hours) === true,
       );
+      effectiveTotal = resultRows.length;
+      openNowCount = effectiveTotal;
+      resultRows = resultRows.slice(skip, skip + limitNum);
     }
 
-    const effectiveTotal = wantsOpenNow ? resultRows.length : total;
     const totalPages = Math.ceil(effectiveTotal / limitNum);
 
     // Transform to camelCase for frontend - simplified since we only have primary_category
@@ -408,10 +457,11 @@ router.get('/search', async (req: Request, res: Response) => {
 
     return res.json({
       listings,
+      openNowCount,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        totalItems: total,
+        totalItems: effectiveTotal,
         totalPages,
       },
     });
