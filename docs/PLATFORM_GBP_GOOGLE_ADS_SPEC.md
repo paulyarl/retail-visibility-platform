@@ -228,6 +228,8 @@ GBP supports linking social profiles directly on the listing — every linked pr
 1. Create the GA4 **account + property** for the platform (`VisibleShelf — Web`), business details set to the platform's real category/size.
 2. Create a **web data stream** for `visibleshelf.com` with enhanced measurement on (page views, scrolls, outbound clicks, site search, form interactions).
 3. Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` in deploy env; verify `page_view` and `lead_form_submitted` fire in Realtime before linking anything.
+
+**CSP gotcha (cost a day of "Realtime is 0", fixed 2026-10-26):** the production CSP in `next.config.ts` is a hand-maintained allowlist, and `script-src` did not include `https://www.googletagmanager.com`. The tag was in the served HTML, but the browser refused to load `gtag.js`, so no hit ever left the page — GA4 showed "No data received", Tag Assistant showed "Could not connect to visibleshelf.com" / "tag wasn't detected". `dataLayer` still had entries, which makes it look like the tag is running. Any new third-party script host must be added to the CSP or it fails silently. The directives now live in `apps/web/src/lib/content-security-policy.ts` with `content-security-policy.test.ts` pinning the GA hosts (and cross-checking every host `GtagScript.tsx` loads).
 4. Mark the conversion-path events in §4.1 below as **key events** in GA4, then import them into Ads (don't recreate them manually in Ads — one source of truth).
 5. **Link GA4 ↔ Google Ads** (Admin → Product links): enables conversion import, audience export for remarketing/RLSA, and cross-channel attribution.
 6. Configure **consent mode** and **enhanced conversions** (hashed first-party data from signup/lead forms) before spend begins.
@@ -412,7 +414,8 @@ The `draft` status and QC-park behavior already exist (`DirectoryPresenceSeedSer
 - [ ] Tracked line provisioned → CPO; hours set to real answer schedule; missed-call handling confirmed
 - [ ] Citations NAP sweep (Bing, Apple, Yelp, FB)
 - [x] GA4 tag landed (`GtagScript`, env-gated on `NEXT_PUBLIC_GA_MEASUREMENT_ID`); `lead_form_submitted` event wired (2026-10-26)
-- [ ] GA4 account/property created, data stream live, env var set, tag verified in Realtime
+- [x] GA4 account/property created, data stream live, env var set, tag verified — CSP `script-src` fix 2026-10-26 made `gtag.js` load; headless probe against prod saw `g/collect` → 204 with `en=page_view`
+- [ ] Confirm the hit appears in GA4 Realtime / DebugView in a browser without an ad blocker
 - [x] Key-driver events wired 2026-10-26: `lead_form_submitted` (`/contact`), `claim_request_submitted` (`/directory/claim-verify`), `claim_completed` (`acceptClaim` success in `DirectoryClaimClient`)
 - [ ] Key-driver events remaining: `signup`/`trial_started` (auth), `call_>60s` (tracked line)
 - [ ] GA4 ↔ Ads linked; key events marked + imported as conversions; enhanced conversions verified
