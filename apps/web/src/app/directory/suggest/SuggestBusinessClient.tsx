@@ -215,7 +215,10 @@ export default function SuggestBusinessClient({
               <Checkbox
                 label="It's OK to contact me about this suggestion (leave unchecked for no follow-up)"
                 checked={form.contactConsent}
-                onChange={(e) => setForm((prev) => ({ ...prev, contactConsent: e.currentTarget.checked }))}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  setForm((prev) => ({ ...prev, contactConsent: checked }));
+                }}
                 disabled={!form.submitterEmail.trim()}
                 description={!form.submitterEmail.trim() ? 'Add your email above to enable contact' : undefined}
               />

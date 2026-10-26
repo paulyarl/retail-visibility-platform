@@ -272,7 +272,10 @@ export default function AddBusinessClient({
                     label="You may contact me about this listing"
                     description="Unchecked means we'll review the listing but won't reach out to you."
                     checked={form.contactConsent}
-                    onChange={(e) => setForm((prev) => ({ ...prev, contactConsent: e.currentTarget.checked }))}
+                    onChange={(e) => {
+                      const checked = e.currentTarget.checked;
+                      setForm((prev) => ({ ...prev, contactConsent: checked }));
+                    }}
                   />
                 </div>
               </div>

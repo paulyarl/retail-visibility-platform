@@ -479,7 +479,10 @@ export function FulfillmentDashboard({ tenantId, tenantName }: FulfillmentDashbo
           <Switch
             label="Active"
             checked={newTimeSlot.isActive}
-            onChange={(event) => setNewTimeSlot(prev => ({ ...prev, isActive: event.currentTarget.checked }))}
+            onChange={(event) => {
+              const checked = event.currentTarget.checked;
+              setNewTimeSlot(prev => ({ ...prev, isActive: checked }));
+            }}
           />
           
           <Group justify="flex-end" gap="xs">

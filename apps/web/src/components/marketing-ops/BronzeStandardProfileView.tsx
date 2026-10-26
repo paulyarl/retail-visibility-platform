@@ -1058,7 +1058,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
             description="Immutable snake_case identifier (lowercase letters, numbers, underscores)"
             placeholder="e.g. ethnic_community_classifieds_only"
             value={authorForm.reason_key}
-            onChange={(e) => setAuthorForm((prev) => ({ ...prev, reason_key: e.currentTarget.value }))}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setAuthorForm((prev) => ({ ...prev, reason_key: value }));
+            }}
             required
             ff="monospace"
           />
@@ -1068,7 +1071,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
             description="Human-readable short name"
             placeholder="e.g. Exclusively visible on community-specific classifieds"
             value={authorForm.label}
-            onChange={(e) => setAuthorForm((prev) => ({ ...prev, label: e.currentTarget.value }))}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setAuthorForm((prev) => ({ ...prev, label: value }));
+            }}
             required
           />
 
@@ -1078,7 +1084,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
             placeholder="Explain the discovery mechanics..."
             rows={3}
             value={authorForm.definition}
-            onChange={(e) => setAuthorForm((prev) => ({ ...prev, definition: e.currentTarget.value }))}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setAuthorForm((prev) => ({ ...prev, definition: value }));
+            }}
             required
           />
 
@@ -1123,7 +1132,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
               }
               placeholder="e.g. grocery"
               value={authorForm.scope_category_key}
-              onChange={(e) => setAuthorForm((prev) => ({ ...prev, scope_category_key: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setAuthorForm((prev) => ({ ...prev, scope_category_key: value }));
+              }}
             />
           )}
 
@@ -1133,14 +1145,20 @@ export default function BronzeStandardProfileView({ profile }: Props) {
                 label="City"
                 placeholder="e.g. Indianapolis"
                 value={authorForm.scope_city}
-                onChange={(e) => setAuthorForm((prev) => ({ ...prev, scope_city: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setAuthorForm((prev) => ({ ...prev, scope_city: value }));
+                }}
               />
               <TextInput
                 label="State"
                 placeholder="e.g. IN"
                 maxLength={2}
                 value={authorForm.scope_state}
-                onChange={(e) => setAuthorForm((prev) => ({ ...prev, scope_state: e.currentTarget.value.toUpperCase() }))}
+                onChange={(e) => {
+                  const value = e.currentTarget.value.toUpperCase();
+                  setAuthorForm((prev) => ({ ...prev, scope_state: value }));
+                }}
               />
             </Group>
           )}
@@ -1167,7 +1185,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
             description="Searchable signal vocabulary an agent or analyst can pattern-match"
             rows={2}
             value={authorForm.signals}
-            onChange={(e) => setAuthorForm((prev) => ({ ...prev, signals: e.currentTarget.value }))}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setAuthorForm((prev) => ({ ...prev, signals: value }));
+            }}
           />
 
           <Textarea
@@ -1175,7 +1196,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
             description="Discovery vectors / specialized sources that reach this blind spot"
             rows={2}
             value={authorForm.expected_vectors}
-            onChange={(e) => setAuthorForm((prev) => ({ ...prev, expected_vectors: e.currentTarget.value }))}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setAuthorForm((prev) => ({ ...prev, expected_vectors: value }));
+            }}
           />
 
           <NumberInput
@@ -1248,7 +1272,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
               label="Label"
               description="Human-readable short name"
               value={signalModal.label}
-              onChange={(e) => setSignalModal((prev) => prev && ({ ...prev, label: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setSignalModal((prev) => prev && ({ ...prev, label: value }));
+              }}
               required
             />
 
@@ -1257,7 +1284,10 @@ export default function BronzeStandardProfileView({ profile }: Props) {
               description="What the observed pattern means"
               rows={3}
               value={signalModal.definition}
-              onChange={(e) => setSignalModal((prev) => prev && ({ ...prev, definition: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setSignalModal((prev) => prev && ({ ...prev, definition: value }));
+              }}
             />
 
             <Select

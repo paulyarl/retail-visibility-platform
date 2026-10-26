@@ -341,7 +341,10 @@ export default function EnhancedTickerSettings({
             </div>
             <Switch
               checked={config?.enabled || false}
-              onChange={(e) => setConfig(prev => ({ ...prev, enabled: e?.currentTarget?.checked || false }))}
+              onChange={(e) => {
+                const checked = e?.currentTarget?.checked || false;
+                setConfig(prev => ({ ...prev, enabled: checked }));
+              }}
             />
           </Group>
 
@@ -662,13 +665,19 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
         <Switch
           label="Enable scrolling"
           checked={formData.scrolling}
-          onChange={(e) => setFormData(prev => ({ ...prev, scrolling: e?.currentTarget?.checked || false }))}
+          onChange={(e) => {
+            const checked = e?.currentTarget?.checked || false;
+            setFormData(prev => ({ ...prev, scrolling: checked }));
+          }}
         />
 
         <Switch
           label="Allow dismissal"
           checked={formData.dismissible}
-          onChange={(e) => setFormData(prev => ({ ...prev, dismissible: e?.currentTarget?.checked || false }))}
+          onChange={(e) => {
+            const checked = e?.currentTarget?.checked || false;
+            setFormData(prev => ({ ...prev, dismissible: checked }));
+          }}
         />
       </Group>
 
@@ -746,7 +755,10 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
       <Switch
         label="Active"
         checked={formData.isActive}
-        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e?.currentTarget?.checked || false }))}
+        onChange={(e) => {
+          const checked = e?.currentTarget?.checked || false;
+          setFormData(prev => ({ ...prev, isActive: checked }));
+        }}
       />
 
       <Group justify="flex-end">
