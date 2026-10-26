@@ -361,6 +361,19 @@ Start: manual CPC / maximize-clicks with caps until ~30 conversions, then tCPA o
 
 ---
 
+### 4.8 Seed-publish discipline (indexing gate — decided 2026-10-26)
+
+GSC baseline: 207 discovered / 8 indexed; all 32 "crawled — currently not indexed" URLs are `/place/*` and `/place/city/*` — unenriched seeds publishing as near-identical templates that Google declines to index.
+
+**Rule: enrich before publish.** The push pipeline becomes two-stage:
+
+```
+Partial push → status='draft' → QA + cleanup + enrichment →
+publishSeed() → status='published' (live seed)
+```
+
+The `draft` status and QC-park behavior already exist (`DirectoryPresenceSeedService` ~3238 "parked in 'draft' so the operator can QC"); the discipline change is making draft the default on every auto-publish call site and gating `publishSeed` on enrichment-complete — so `/place` pages enter the sitemap/index only once they carry unique narrative content, resolved category labels, and real NAP.
+
 ## 5. Measurement & Attribution
 
 - Weekly report: spend / claims / activations / paid / CAC by campaign; GBP insights (calls, direction requests, website clicks — via UTM not GBP's own metrics, which are unreliable).
