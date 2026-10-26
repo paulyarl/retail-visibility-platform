@@ -15,7 +15,7 @@ import { logger } from '../logger';
 import { emailService } from './email-service';
 import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
 import { generateDirectoryPresenceSubmissionVerificationId } from '../lib/id-generator';
-import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { PLATFORM_SCOPE, PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
 import MarketingProspectQueueService from './MarketingProspectQueueService';
@@ -251,7 +251,7 @@ class DirectoryOwnerSubmissionService {
   private async notifyNewSeed(seed: any, input: OwnerSubmissionInput): Promise<void> {
     try {
       const ticket = await CrmTicketService.getInstance().create({
-        tenant_id: PLATFORM_SCOPE,
+        project_id: PLATFORM_CRM_PROJECT_ID,
         title: `Owner-submitted business needs review: ${input.businessName}`,
         description: `A business owner submitted their business for the directory (Add Your Business). The draft seed awaits publish or delete.
 

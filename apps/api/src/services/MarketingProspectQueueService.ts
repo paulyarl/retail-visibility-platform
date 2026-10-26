@@ -26,7 +26,7 @@ import type { RequestCtx } from '../context';
 import { NotFoundError, ConflictError, ValidationError } from '../middleware/errorHandler';
 import { generateProspectQueueId } from '../lib/id-generator';
 import { addressParser } from '../lib/address-parser';
-import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 import MarketingCampaignService, { INACTIVE_STAGES } from './MarketingCampaignService';
 import { MarketingHotProspectService } from './MarketingHotProspectService';
 import { validateDiscoveryContext, type DiscoveryContext } from '../validators/intelligence-discovery.schema';
@@ -2063,7 +2063,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       await this.prisma.$executeRaw`
         UPDATE crm_support_tickets
         SET status = 'resolved', resolved_at = now(), updated_at = now()
-        WHERE tenant_id = ${PLATFORM_SCOPE}
+        WHERE project_id = ${PLATFORM_CRM_PROJECT_ID}
           AND inquiry_id = ${suggestionId}
           AND category = 'directory_suggestion'
           AND status IN ('open', 'in_progress', 'waiting')

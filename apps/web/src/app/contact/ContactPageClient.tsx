@@ -111,8 +111,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">Documentation</p>
-                    <a href="/docs" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
-                      View user guides
+                    <a href="/features" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                      View features & guides
                     </a>
                   </div>
                 </div>
@@ -169,6 +169,7 @@ export default function ContactPage() {
                   </Alert>
                 )}
 
+                {!success && (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <Input
                     label="Name"
@@ -247,6 +248,7 @@ export default function ContactPage() {
                     {submitting ? 'Sending...' : 'Send Message'}
                   </Button>
                 </form>
+                )}
             </Card>
           </motion.div>
         </div>

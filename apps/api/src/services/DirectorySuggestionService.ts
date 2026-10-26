@@ -13,7 +13,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { generateDirectoryPresenceSuggestionId } from '../lib/id-generator';
-import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 import CrmTicketService from './CrmTicketService';
 import CrmTicketMessageService from './CrmTicketMessageService';
 import DirectoryPresenceSeedService, { CreateSeedInput } from './DirectoryPresenceSeedService';
@@ -257,7 +257,7 @@ class DirectorySuggestionService {
     try {
       const location = [suggestion.city, suggestion.state].filter(Boolean).join(', ');
       const ticket = await CrmTicketService.getInstance().create({
-        tenant_id: PLATFORM_SCOPE,
+        project_id: PLATFORM_CRM_PROJECT_ID,
         title: `Directory suggestion: ${suggestion.businessName}${location ? ` (${location})` : ''}`,
         description: `A visitor suggested a missing business for the directory.
 
@@ -307,7 +307,7 @@ Review at Settings → Directory → Suggestions.`,
       await prisma.$executeRaw`
         UPDATE crm_support_tickets
         SET status = 'resolved', resolved_at = now(), updated_at = now()
-        WHERE tenant_id = ${PLATFORM_SCOPE}
+        WHERE project_id = ${PLATFORM_CRM_PROJECT_ID}
           AND inquiry_id = ${suggestionId}
           AND category = 'directory_suggestion'
           AND status IN ('open', 'in_progress', 'waiting')

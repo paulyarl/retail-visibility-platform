@@ -27,3 +27,11 @@ export const PLATFORM_SCOPE = 'platform' as const;
  * rather than "this commerce row is platform-scoped".
  */
 export const PLATFORM_CRM_TENANT_ID = PLATFORM_SCOPE;
+
+/**
+ * Platform-level CRM tickets do NOT consume tenant_id — 'platform' is not a
+ * tenants row, so tenant-scoped writes violate fk_crm_tickets_tenant. The
+ * admin intake path is project-scoped instead: tickets carry this
+ * project_id and surface in the Requests Hub with tenant_name = null.
+ */
+export const PLATFORM_CRM_PROJECT_ID = 'crmproj-platform-intake';

@@ -17,7 +17,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
 import { generateUserId, generateUserTenantId, generateTenantKey, generateDirectoryClaimRequestId, generateDirectoryClaimRequestVerificationId } from '../lib/id-generator';
-import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { PLATFORM_SCOPE, PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 import { authService } from '../auth/auth.service';
 import { user_role } from '@prisma/client';
 import crypto from 'crypto';
@@ -658,7 +658,7 @@ class DirectoryClaimService {
       const businessName = listingRows[0]?.business_name || 'Unknown Business';
 
       const ticket = await CrmTicketService.getInstance().create({
-        tenant_id: PLATFORM_SCOPE,
+        project_id: PLATFORM_CRM_PROJECT_ID,
         title: `Directory listing claim request: ${businessName}`,
         description: `A business owner submitted a claim request for a directory listing.
 
@@ -1185,7 +1185,7 @@ Review at Settings → Directory → Presence Seeds.`,
       try {
         const businessName = listing.business_name || 'Unknown Business';
         const ticket = await CrmTicketService.getInstance().create({
-          tenant_id: PLATFORM_SCOPE,
+          project_id: PLATFORM_CRM_PROJECT_ID,
           title: `Owner-proposed categories need review: ${businessName}`,
           description: `A business owner proposed new categories while claiming their directory listing.
 
@@ -2351,7 +2351,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
     // ── Operator alert: Requests-Hub work item ─────────────────────────
     try {
       const ticket = await CrmTicketService.getInstance().create({
-        tenant_id: PLATFORM_SCOPE,
+        project_id: PLATFORM_CRM_PROJECT_ID,
         title: `Directory listing claimed: ${businessName}`,
         description: `A business owner claimed their directory listing.
 

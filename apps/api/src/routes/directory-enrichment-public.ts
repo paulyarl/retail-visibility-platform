@@ -329,11 +329,11 @@ router.post('/lead-gen', async (req: Request, res: Response) => {
     // (/settings/admin/crm/requests), same surface owner submissions file to.
     const entryId = (result as any)?.entry?.id;
     try {
-      const { PLATFORM_SCOPE } = await import('../lib/platform-scope');
+      const { PLATFORM_CRM_PROJECT_ID } = await import('../lib/platform-scope');
       const { default: CrmTicketService } = await import('../services/CrmTicketService');
       const { default: CrmTicketMessageService } = await import('../services/CrmTicketMessageService');
       const ticket = await CrmTicketService.getInstance().create({
-        tenant_id: PLATFORM_SCOPE,
+        project_id: PLATFORM_CRM_PROJECT_ID,
         title: `Lead intake: ${businessName}`,
         description: `A merchant submitted the public lead-intake form.
 
