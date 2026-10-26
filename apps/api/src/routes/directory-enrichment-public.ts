@@ -292,7 +292,7 @@ router.get('/enrich/:token/options', async (req: Request, res: Response) => {
  */
 router.post('/lead-gen', async (req: Request, res: Response) => {
   try {
-    const { businessName, category, city, state, phone, email, note } = req.body || {};
+    const { businessName, name, category, city, state, phone, posSystem, email, note } = req.body || {};
     if (!businessName || typeof businessName !== 'string') {
       return res.status(400).json({ error: 'business_name_required' });
     }
@@ -309,13 +309,60 @@ router.post('/lead-gen', async (req: Request, res: Response) => {
       source_kind: 'directory_lead_gen' as any,
       scope: 'business',
       business_snapshot: {
+        name,
         phone,
+        pos_system: posSystem,
         email,
         note,
         source: 'directory_lead_gen',
       },
       priority: 'normal',
     });
+
+    // Acknowledge the submission — fire-and-forget, never fails the intake.
+    if (email && typeof email === 'string' && email.includes('@')) {
+      const { default: LeadIntakeEmailService } = await import('../services/email/LeadIntakeEmailService');
+      LeadIntakeEmailService.sendLeadAcknowledgement({ to: email, name, businessName }).catch(() => {});
+    }
+
+    // Requests-Hub ticket so the lead lands in the CRM activity inbox
+    // (/settings/admin/crm/requests), same surface owner submissions file to.
+    const entryId = (result as any)?.entry?.id;
+    try {
+      const { PLATFORM_SCOPE } = await import('../lib/platform-scope');
+      const { default: CrmTicketService } = await import('../services/CrmTicketService');
+      const { default: CrmTicketMessageService } = await import('../services/CrmTicketMessageService');
+      const ticket = await CrmTicketService.getInstance().create({
+        tenant_id: PLATFORM_SCOPE,
+        title: `Lead intake: ${businessName}`,
+        description: `A merchant submitted the public lead-intake form.
+
+Business: ${businessName}
+Contact: ${name || '—'} ${email ? `<${email}>` : ''}${phone ? ` ${phone}` : ''}
+POS: ${posSystem || '—'}
+Note: ${note || '—'}
+Queue entry: ${entryId || '—'}`,
+        priority: 'medium',
+        category: 'directory_lead_gen',
+        inquiry_id: entryId || undefined,
+      });
+      await CrmTicketMessageService.getInstance().create({
+        ticket_id: ticket.id,
+        author_id: 'system',
+        author_type: 'platform',
+        author_name: 'Lead Intake',
+        content_blocks: {
+          version: '1',
+          blocks: [
+            { type: 'paragraph', text: `${businessName} submitted the lead-intake form and was queued for prospecting.` },
+          ],
+        },
+      });
+    } catch (ticketErr) {
+      logger.error('[POST /api/public/directory/lead-gen] Ticket create failed (non-fatal)', undefined, {
+        error: { name: (ticketErr as any)?.name || 'Error', message: (ticketErr as any)?.message || String(ticketErr) },
+      });
+    }
 
     audit({
       actorType: 'customer',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { UnifiedStoreCard, DirectoryListing } from './UnifiedStoreCard';
+import AddBusinessCta from './AddBusinessCta';
 import { Skeleton } from '@/components/ui';
 import { fetchMultipleStoreStats } from '@/utils/storeStatsCalculator';
 
@@ -90,6 +91,9 @@ export default function DirectoryList({ listings, loading, contextCategory, show
         <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
           Try adjusting your search or filters to find what you're looking for.
         </p>
+        <div className="max-w-md mx-auto mt-6">
+          <AddBusinessCta source="directory_search_empty" />
+        </div>
       </div>
     );
   }

@@ -109,10 +109,12 @@ export class DirectoryEnrichmentPublicService extends PublicApiSingleton {
   /** POST /api/public/directory/lead-gen */
   async submitLeadGen(input: {
     businessName: string;
+    name?: string;
     category?: string;
     city?: string;
     state?: string;
     phone?: string;
+    posSystem?: string;
     email?: string;
     note?: string;
   }): Promise<{ success: boolean; error?: string }> {

@@ -223,9 +223,11 @@ GBP supports linking social profiles directly on the listing — every linked pr
 
 #### Google Analytics (GA4) setup
 
+**Tag landed 2026-10-26:** `components/GtagScript.tsx` renders gtag.js sitewide from the root layout, gated on `NEXT_PUBLIC_GA_MEASUREMENT_ID` — no tag existed before (Vercel Analytics commented out, no double-tag risk). `lead_form_submitted` fires on the `/contact` intake success path with the UTM campaign attached. Remaining steps are console-side:
+
 1. Create the GA4 **account + property** for the platform (`VisibleShelf — Web`), business details set to the platform's real category/size.
 2. Create a **web data stream** for `visibleshelf.com` with enhanced measurement on (page views, scrolls, outbound clicks, site search, form interactions).
-3. Install the tag sitewide (gtag.js or via the existing tag setup in `apps/web`); verify `page_view` and key events fire in Realtime before linking anything.
+3. Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` in deploy env; verify `page_view` and `lead_form_submitted` fire in Realtime before linking anything.
 4. Mark the conversion-path events in §4.1 below as **key events** in GA4, then import them into Ads (don't recreate them manually in Ads — one source of truth).
 5. **Link GA4 ↔ Google Ads** (Admin → Product links): enables conversion import, audience export for remarketing/RLSA, and cross-channel attribution.
 6. Configure **consent mode** and **enhanced conversions** (hashed first-party data from signup/lead forms) before spend begins.
@@ -316,7 +318,9 @@ Not every merchant is ready to claim or sign up from an ad click. Every landing 
 | **2. Signup** | "Start free trial" → `/auth/signup` | Merchants whose store isn't seeded yet, or who skip claim | `signup` / `trial_started` |
 | **3. Lead intake** | Short form (name, business name, phone/email, POS system, "what do you need help with") routed to the CPO — same human who answers the tracked line | High-intent but not self-serve; the owner-operator who wants a person | `lead_form_submitted` |
 
-**Verified gap (2026-10-26):** no self-serve intake exists yet. `/contact` renders a form whose submit handler is a stub (`setTimeout` fake, `TODO: Implement email sending`) — it returns success and **silently drops leads**. `/g/{shortCode}` is the per-prospect diagnostic-gallery resolver (Marketing Ops-generated audits), not a request surface. Until a real intake ships, public CTAs route to `/directory` — the seeded listing is itself the honest "see how you appear" artifact. **Do not run the "free audit" Offer post against a stub form** — substitute the "Free visibility check → /directory" variant used for the launch post.
+**Intake is live (landed 2026-10-26):** `/contact` submits to `POST /api/public/directory/lead-gen` → `MarketingProspectQueueService.addToQueue` (`source_kind: directory_lead_gen`, dedup vs active queue + existing campaigns) with business name, contact name, email, phone, **POS system** (clover/square/other/none — the Clover-signal capture for campaign-1 attribution), note (+ UTM source captured in the note). The seed-search miss is covered too: `DirectoryList`'s empty state now renders `AddBusinessCta` (`source=directory_search_empty`) → `/directory/add-business` (existing owner-submission flow, email-verified). **Both intakes file into the CRM Requests Hub** (`/settings/admin/crm/requests`): owner submissions via `DirectoryOwnerSubmissionService.notifyNewSeed` (`directory_owner_submission` ticket + prospect-queue mirror), lead-gen via a `directory_lead_gen` ticket on `crm_support_tickets` linked to the queue entry (added 2026-10-26 — previously queue-only).
+
+**Inbound-lead SOP (decided 2026-10-26):** lead-gen entries differ from outbound prospects — they carry no discovery evidence and hold a promised 1-business-day SLA (the ack email). Processing: Requests-Hub ticket is the clock → look the business up on `/directory` → **seeded**: send the claim link/gallery; **unseeded**: enqueue a seed+report run — the generated seed is the reply ("we found your business; claim it"). Response sets next-steps expectations — the ack email now carries the three-step path: seed/find listing → claim invite by email → **claim activates 5 free product slots** → tenant dashboard onboarding (add products, manage listing, storefront + directory surfaces), plus post-claim address education: **tenant ID** (`visibleshelf.com/t/<tenant-id>` — dashboard/products/settings) vs **listing slug** (`visibleshelf.com/directory/<slug>` — the public address; storefront/subdomain/custom domain unlock on claim). Clover-flagged leads are the campaign-1 demo segment. Consent caveat: the form collects an inquiry, not marketing opt-in — broadcast cadence needs consent before enrolling a lead. On submit the API sends a branded acknowledgement email (`LeadIntakeEmailService.sendLeadAcknowledgement`, fire-and-forget) from `support@visibleshelf.com` (`EMAIL_SUPPORT` env, `unifiedConfig.emailSupport`) — greeting, one-business-day SLA, "find your store" + "create a free account" CTAs. The success state links to `/customerlogin?mode=register` — the customer account flow (`customer-auth` register/dashboard shows claim requests) is the durable response channel. `/g/{shortCode}` remains the per-prospect diagnostic-gallery resolver (Marketing Ops-generated audits), not a request surface.
 
 **The audit offer is fulfillable by the existing seed pipeline — the build is a front door, not a product.** The pipeline already does: public signals → seed construction → per-field provenance → automated seed intelligence report → claim token → `directory_presence` tenant (see `docs/LocalBiz/AUTOMATED_SEED_INTELLIGENCE_REPORT_SPEC.md`, `.devin/skills/directory-presence-seed-claim/SKILL.md`; `audits/*.json` are its report artifacts). What's missing is only a **request intake**: a form (business name + location + contact) that enqueues a seed/report run for a business not yet seeded, or returns the existing claim link when it is — the pipeline is operator/campaign-driven today, not request-driven. Delivery surface already exists: the generated report + claim-token link (`/preview/{token}` via `/g/{shortCode}`).
 
@@ -333,6 +337,8 @@ Lead-intake rules:
 - Schedule: all-hours initially; review dayparting after 4 weeks.
 
 ### 4.6 Budget ramp (extends GTM Phase-2 table)
+
+**Phase note (2026-10-26): no spend authorized yet — viability testing only.** The live promo funnel (GBP posts → `/directory` claim-check → `/contact` intake → prospect queue + branded ack) is what is being validated; no Ads budget is committed. The `/solutions/*` landing set and GA4/Ads wiring are required **before spend**, not before the test. Priority upgrade for the test phase: the audit-request intake front door (§4.4 seed-pipeline hook) makes the real "free visibility audit" offer deliverable and is the strongest viability signal.
 
 | Month | Clover | Square | SWIS | GBP Mgmt | Storefront | Meta | Pinterest | Total |
 |---|---|---|---|---|---|---|---|---|
@@ -392,9 +398,11 @@ Start: manual CPC / maximize-clicks with caps until ~30 conversions, then tCPA o
 - [ ] Claim the $500 new-advertiser Google Ads credit when the Ads account is created
 - [ ] Tracked line provisioned → CPO; hours set to real answer schedule; missed-call handling confirmed
 - [ ] Citations NAP sweep (Bing, Apple, Yelp, FB)
-- [ ] GA4 account/property created, data stream live, tag verified in Realtime
+- [x] GA4 tag landed (`GtagScript`, env-gated on `NEXT_PUBLIC_GA_MEASUREMENT_ID`); `lead_form_submitted` event wired (2026-10-26)
+- [ ] GA4 account/property created, data stream live, env var set, tag verified in Realtime
+- [ ] Key-driver events still to wire: `claim_completed` (claim flow), `signup`/`trial_started` (auth), `call_>60s` (tracked line) — the viability test's attribution set
 - [ ] GA4 ↔ Ads linked; key events marked + imported as conversions; enhanced conversions verified
-- [ ] Lead-intake surface built — `/contact` form is currently a stub that drops submissions (verified 2026-10-26); wire to a real destination (DB + CPO notify) before any lead-gen CTA or ad traffic points at it
+- [x] Lead-intake surface live 2026-10-26 — `/contact` → `/api/public/directory/lead-gen` → prospect queue + branded ack email (`support@`) + account-create CTA
 - [ ] Audit-request intake — thin form feeding business name+location into the existing seed→report→claim pipeline (request-driven entry; delivery via `/g/{shortCode}` claim link)
 - [ ] GBP linked as location asset in Ads
 - [ ] `/solutions/clover-storefront` + `/solutions/google-visibility` shipped (minimum viable two, shared with PinTraffix P-01/P-02), each with claim + signup + lead-intake paths

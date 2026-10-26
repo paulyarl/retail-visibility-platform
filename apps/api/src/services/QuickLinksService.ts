@@ -40,6 +40,8 @@ interface LinkContext {
   tierKey: string;
   capabilities: EffectiveCapabilities | null;
   businessState: {
+    directorySlug: string | null;
+    listingOrigin: string | null;
     hasProducts: boolean;
     activeItems: number;
     hasPublishedDirectory: boolean;
@@ -255,9 +257,16 @@ const LINKS: LinkDefinition[] = [
     id: 'directory',
     label: () => 'Directory Entry',
     description: (ctx) => ctx.businessState.hasPublishedDirectory ? 'Your public directory listing' : 'Publish your directory listing',
-    href: (ctx) => ctx.businessState.hasPublishedDirectory
-      ? `/directory/${ctx.slug || ctx.tenantId}`
-      : `/t/${ctx.tenantId}/settings/directory`,
+    href: (ctx) => {
+      if (!ctx.businessState.hasPublishedDirectory) {
+        return `/t/${ctx.tenantId}/settings/directory`;
+      }
+      const identifier = ctx.businessState.directorySlug || ctx.slug || ctx.tenantId;
+      const isPlace =
+        ctx.businessState.listingOrigin === 'directory_seed' ||
+        ctx.tierKey === 'directory_presence';
+      return isPlace ? `/place/${identifier}` : `/directory/${identifier}`;
+    },
     icon: 'MapPin',
     category: 'visibility',
     badge: (ctx) => ctx.businessState.hasPublishedDirectory ? 'Live' : undefined,
@@ -576,6 +585,8 @@ async function resolveTenantId(identifier: string): Promise<string | null> {
 
 interface BusinessState {
   slug: string | null;
+  directorySlug: string | null;
+  listingOrigin: string | null;
   hasProducts: boolean;
   activeItems: number;
   hasPublishedDirectory: boolean;
@@ -617,7 +628,7 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
 
     prisma.directory_listings_list.findFirst({
       where: { tenant_id: tenantId },
-      select: { is_published: true },
+      select: { is_published: true, slug: true, listing_origin: true },
     }).catch(() => null),
 
     prisma.faqs.count({
@@ -653,6 +664,8 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
 
   return {
     slug: tenant?.slug ?? null,
+    directorySlug: directoryListing?.slug ?? null,
+    listingOrigin: directoryListing?.listing_origin ?? null,
     hasProducts: totalItems > 0,
     activeItems,
     hasPublishedDirectory: directoryListing?.is_published === true,

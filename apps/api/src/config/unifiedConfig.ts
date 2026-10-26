@@ -530,6 +530,11 @@ class UnifiedConfig {
     return this.env.EMAIL_ADMIN || 'admin@visibleshelf.com';
   }
 
+  /** Catch-all support/lead address — from + replyTo for lead-intake acknowledgements. */
+  get emailSupport(): string {
+    return this.env.EMAIL_SUPPORT || 'support@visibleshelf.com';
+  }
+
   get emailFromName(): string {
     return this.env.EMAIL_FROM_NAME || 'VisibleShelf';
   }

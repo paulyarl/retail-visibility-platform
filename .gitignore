@@ -83,3 +83,6 @@ DATABASE_MIGRATION_PLAN.md
 
 # Local scratch (env backups, temp exports) — never commit secrets
 tmp/
+
+# Generated audit snapshots — large local artifacts, not source
+audits/
