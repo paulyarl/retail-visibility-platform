@@ -266,6 +266,11 @@ export default function DirectoryClaimClient() {
         setHasPlatformSession(detectPlatformSession());
         setClaimResult(result);
         setState('success');
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'claim_completed', {
+            event_category: 'claim',
+          });
+        }
       } else {
         setError(result.error || 'claim_failed');
         if (result.error === 'otp_max_attempts') {

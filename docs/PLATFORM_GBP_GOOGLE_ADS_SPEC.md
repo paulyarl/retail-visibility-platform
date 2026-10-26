@@ -400,7 +400,8 @@ Start: manual CPC / maximize-clicks with caps until ~30 conversions, then tCPA o
 - [ ] Citations NAP sweep (Bing, Apple, Yelp, FB)
 - [x] GA4 tag landed (`GtagScript`, env-gated on `NEXT_PUBLIC_GA_MEASUREMENT_ID`); `lead_form_submitted` event wired (2026-10-26)
 - [ ] GA4 account/property created, data stream live, env var set, tag verified in Realtime
-- [ ] Key-driver events still to wire: `claim_completed` (claim flow), `signup`/`trial_started` (auth), `call_>60s` (tracked line) — the viability test's attribution set
+- [x] Key-driver events wired 2026-10-26: `lead_form_submitted` (`/contact`), `claim_request_submitted` (`/directory/claim-verify`), `claim_completed` (`acceptClaim` success in `DirectoryClaimClient`)
+- [ ] Key-driver events remaining: `signup`/`trial_started` (auth), `call_>60s` (tracked line)
 - [ ] GA4 ↔ Ads linked; key events marked + imported as conversions; enhanced conversions verified
 - [x] Lead-intake surface live 2026-10-26 — `/contact` → `/api/public/directory/lead-gen` → prospect queue + branded ack email (`support@`) + account-create CTA
 - [ ] Audit-request intake — thin form feeding business name+location into the existing seed→report→claim pipeline (request-driven entry; delivery via `/g/{shortCode}` claim link)

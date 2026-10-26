@@ -35,6 +35,11 @@ export default function VerifyClaimClient() {
 
       if (result.success) {
         setStatus('success');
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'claim_request_submitted', {
+            event_category: 'claim',
+          });
+        }
       } else if (result.error === 'token_already_verified') {
         setStatus('already');
       } else {
