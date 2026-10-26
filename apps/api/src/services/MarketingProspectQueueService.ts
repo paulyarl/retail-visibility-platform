@@ -1141,9 +1141,15 @@ class MarketingProspectQueueServiceClass extends BaseService {
         if (existingCampaign) {
           // Heal the campaign→seed link for rows promoted before the
           // preflight-seed link existed (chain builds also self-heal via
-          // their own link step, but a plain re-run should too).
+          // their own link step, but a plain re-run should too). The seed
+          // may also have been minted AFTER the campaign graduated —
+          // createSeedsForProvingGround links late seeds itself, but a
+          // re-run here graduates a still-seek campaign the same way.
           if (entry.seed_id) {
             await this.ensureCampaignSeedLink(existingCampaign.id, entry.seed_id, input.actingUserId, ctx);
+            await MarketingCampaignService.graduateCampaignForPreflightSeed(
+              existingCampaign.id, entry.seed_id, ctx,
+            );
           }
           logger.info('createCampaignFromQueue: idempotent return', ctx, {
             queueEntryId: input.queueEntryId, campaignId: existingCampaign.id,
@@ -1592,37 +1598,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // already progressed past seek untouched.
       if (entry.seed_id && result.campaign?.id && result.campaign.stage === 'seek') {
         try {
-          await MarketingCampaignService.transitionStage({
-            campaignId: result.campaign.id,
-            toStage: 'seed',
-            triggerType: 'automated',
-            notes: `Auto-advanced on queue graduation — proving-ground preflight minted seed ${entry.seed_id}.`,
-          }, ctx);
-          result.campaign = { ...result.campaign, stage: 'seed' };
-
-          const { generateCampaignChecklistProgressId } = await import('../lib/id-generator.js');
-          for (const stepId of [
-            '_permanent_seed_place_listing',
-            '_permanent_publish_seed',
-            '_permanent_mint_claim_token',
-            '_permanent_pitch_free_claim',
-          ]) {
-            await this.prisma.mkt_campaign_checklist_progress.upsert({
-              where: { campaign_id_step_id: { campaign_id: result.campaign.id, step_id: stepId } },
-              create: {
-                id: generateCampaignChecklistProgressId(),
-                campaign_id: result.campaign.id,
-                step_id: stepId,
-                completed_at: new Date(),
-                completed_by: 'pg_preflight',
-                note: `Auto-completed — proving-ground preflight minted seed ${entry.seed_id}.`,
-              },
-              update: {
-                completed_at: new Date(),
-                completed_by: 'pg_preflight',
-              },
-            });
-          }
+          const { advanced } = await MarketingCampaignService.graduateCampaignForPreflightSeed(
+            result.campaign.id, entry.seed_id, ctx,
+          );
+          if (advanced) result.campaign = { ...result.campaign, stage: 'seed' };
         } catch (advanceError) {
           logger.warn('createCampaignFromQueue: seed auto-advance failed (non-fatal)', ctx, {
             queueEntryId: input.queueEntryId,

@@ -2332,6 +2332,11 @@ class DirectoryPresenceSeedService {
     for (const entry of entries) {
       try {
         if (entry.seed_id) {
+          // Campaign-first ordering heal — the entry may carry a processed
+          // campaign that graduated before the seed was minted and so never
+          // got its seed link / seek→seed graduation. Converge it here so
+          // a re-run of promote repairs the campaign instead of no-oping.
+          await this.ensureProcessedCampaignSeedLink(entry, entry.seed_id, ctx);
           skipped.push({ queueEntryId: entry.id, reason: 'already_seeded' });
           continue;
         }
@@ -2355,6 +2360,9 @@ class DirectoryPresenceSeedService {
               SET seed_id = ${linkedSeed[0].seed_id}, updated_at = now()
               WHERE id = ${entry.id}
             `;
+            // The link exists but the campaign may still sit at seek
+            // (linked before the preflight graduation ran) — converge it.
+            await this.ensureProcessedCampaignSeedLink(entry, linkedSeed[0].seed_id, ctx);
             skipped.push({ queueEntryId: entry.id, reason: 'already_seeded' });
             continue;
           }
@@ -2502,6 +2510,13 @@ class DirectoryPresenceSeedService {
           WHERE id = ${entry.id}
         `;
 
+        // Campaign-first ordering: the entry's business campaign may have
+        // graduated BEFORE this preflight mint ran — the promote-time heal
+        // in createCampaignFromQueue only sees seeds that already existed.
+        // Link + graduate it here or the campaign never learns about its
+        // seed ("Push draft seed" against an already-live listing).
+        await this.ensureProcessedCampaignSeedLink(entry, result.id, ctx);
+
         created.push({ queueEntryId: entry.id, seedId: result.id, claimToken });
       } catch (err) {
         failed.push({ queueEntryId: entry.id, error: (err as Error).message });
@@ -2530,6 +2545,75 @@ class DirectoryPresenceSeedService {
     });
 
     return { created, skipped, failed };
+  }
+
+  /**
+   * Campaign-first ordering heal: a queue entry can graduate to its
+   * business campaign BEFORE the preflight seeds it (the promote-time
+   * link in createCampaignFromQueue only runs when queue.seed_id was
+   * already stamped). Ensure the processed campaign carries a 'sibling'
+   * link to the seed — 'primary' stays with the producing scan campaign —
+   * then run the same seek→seed graduation the promote path performs.
+   * Without this the campaign never learns about its seed ("Push draft
+   * seed" against an already-live listing).
+   *
+   * Idempotent + non-fatal: an existing link row is left alone
+   * (linkCampaign's upsert would demote 'primary' to 'sibling'), the
+   * graduation is stage-guarded, and the seed-not-found / campaign-not-
+   * found throws are swallowed — only a verified link state advances
+   * the campaign.
+   */
+  private async ensureProcessedCampaignSeedLink(
+    entry: { id: string; processed_campaign_id: string | null },
+    seedId: string,
+    ctx?: SeedAuditCtx,
+  ): Promise<void> {
+    if (!entry.processed_campaign_id) return;
+
+    let linked = false;
+    try {
+      const existing = await prisma.$queryRaw<any[]>`
+        SELECT link_role FROM directory_seed_campaign_links
+        WHERE seed_id = ${seedId} AND campaign_id = ${entry.processed_campaign_id}
+        LIMIT 1
+      `;
+      if (!existing[0]) {
+        await DirectorySeedCampaignLinkService.linkCampaign(
+          seedId, entry.processed_campaign_id, 'sibling', ctx,
+        );
+      }
+      linked = true;
+    } catch (err) {
+      logger.warn('createSeedsForProvingGround: processed-campaign seed link failed (non-fatal)', undefined, {
+        queueEntryId: entry.id,
+        seedId,
+        campaignId: entry.processed_campaign_id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    if (!linked) return;
+
+    try {
+      // Dynamic import mirrors createFromCampaign — avoids a module-load
+      // circular dependency with MarketingCampaignService.
+      const { default: MarketingCampaignService } = await import('./MarketingCampaignService.js');
+      const requestCtx: RequestCtx = {
+        region: 'us-east-1',
+        userId: ctx?.actorId,
+        ip: ctx?.ip,
+        userAgent: ctx?.userAgent,
+      };
+      await MarketingCampaignService.graduateCampaignForPreflightSeed(
+        entry.processed_campaign_id, seedId, requestCtx,
+      );
+    } catch (err) {
+      logger.warn('createSeedsForProvingGround: processed-campaign graduation failed (non-fatal)', undefined, {
+        queueEntryId: entry.id,
+        seedId,
+        campaignId: entry.processed_campaign_id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   /**

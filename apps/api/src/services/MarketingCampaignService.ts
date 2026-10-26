@@ -3408,6 +3408,75 @@ export class MarketingCampaignService extends BaseService {
   }
 
   /**
+   * PG retrofit (D2 — CAMPAIGN_SEED_STAGE_SPRINT_PLAN): a business campaign
+   * whose prospect was preflight-seeded by its proving ground already has
+   * the seed wedge done (listing created + published, claim token minted +
+   * invited). Graduate the campaign straight into `seed` and mark the
+   * objectively-complete seed-wedge checklist steps done so the checklist
+   * reflects the preflight work. qcSeed stays unchecked — field-level QC
+   * is still human review.
+   *
+   * Stage-guarded (only fires from `seek`) and non-fatal — it exists so
+   * every path that discovers a campaign-side seed link can converge the
+   * campaign: promote-time (createCampaignFromQueue fresh + idempotent
+   * paths) and seed-time (createSeedsForProvingGround campaign-first
+   * ordering, where the campaign graduated before the seed was minted).
+   * Returns whether the advance ran.
+   */
+  async graduateCampaignForPreflightSeed(
+    campaignId: string,
+    seedId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ advanced: boolean }> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { id: true, stage: true },
+      });
+      if (!campaign || campaign.stage !== 'seek') return { advanced: false };
+
+      await this.transitionStage({
+        campaignId,
+        toStage: 'seed',
+        triggerType: 'automated',
+        notes: `Auto-advanced on queue graduation — proving-ground preflight minted seed ${seedId}.`,
+      }, ctx);
+
+      const { generateCampaignChecklistProgressId } = await import('../lib/id-generator.js');
+      for (const stepId of [
+        '_permanent_seed_place_listing',
+        '_permanent_publish_seed',
+        '_permanent_mint_claim_token',
+        '_permanent_pitch_free_claim',
+      ]) {
+        await this.prisma.mkt_campaign_checklist_progress.upsert({
+          where: { campaign_id_step_id: { campaign_id: campaignId, step_id: stepId } },
+          create: {
+            id: generateCampaignChecklistProgressId(),
+            campaign_id: campaignId,
+            step_id: stepId,
+            completed_at: new Date(),
+            completed_by: 'pg_preflight',
+            note: `Auto-completed — proving-ground preflight minted seed ${seedId}.`,
+          },
+          update: {
+            completed_at: new Date(),
+            completed_by: 'pg_preflight',
+          },
+        });
+      }
+      return { advanced: true };
+    } catch (advanceError) {
+      logger.warn('graduateCampaignForPreflightSeed failed (non-fatal)', ctx, {
+        campaignId,
+        seedId,
+        error: (advanceError as Error).message,
+      });
+      return { advanced: false };
+    }
+  }
+
+  /**
    * When a Track B sibling campaign resolves, flip the escalated platform
    * on the parent Track A campaign's repair_fulfillment.platform_status to
    * 'verified'. Best-effort — logs + continues on failure.

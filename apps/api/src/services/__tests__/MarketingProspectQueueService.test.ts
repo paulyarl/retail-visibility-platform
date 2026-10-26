@@ -78,8 +78,17 @@ vi.mock('../MarketingCampaignService', () => ({
   default: {
     deriveBusinessCampaign: vi.fn(),
     createCampaign: vi.fn(),
+    transitionStage: vi.fn(),
+    graduateCampaignForPreflightSeed: vi.fn().mockResolvedValue({ advanced: true }),
   },
   INACTIVE_STAGES: new Set(['lost', 'dead', 'closed', 'resolved_and_closed']),
+}));
+
+// The preflight-seed link heals through a dynamic import in
+// ensureCampaignSeedLink — mock the module so the test asserts the call
+// instead of running the real NAP-match/link write.
+vi.mock('../DirectorySeedCampaignLinkService', () => ({
+  default: { linkCampaign: vi.fn().mockResolvedValue({ link: null, autoProjected: false, napMatch: null }) },
 }));
 
 // MarketingHotProspectService is a named-export class with getInstance().
@@ -96,6 +105,7 @@ vi.mock('../MarketingHotProspectService', () => ({
 
 import MarketingProspectQueueService from '../MarketingProspectQueueService';
 import MarketingCampaignService from '../MarketingCampaignService';
+import DirectorySeedCampaignLinkService from '../DirectorySeedCampaignLinkService';
 import { MarketingHotProspectService } from '../MarketingHotProspectService';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────
@@ -1364,6 +1374,67 @@ describe('MarketingProspectQueueService', () => {
       // No derive service called, no update.
       expect((MarketingHotProspectService as any).getInstance().deriveBusinessCampaignFromScanBusiness).not.toHaveBeenCalled();
       expect(mockQueue.update).not.toHaveBeenCalled();
+    });
+
+    it('idempotent path heals the seed link and graduates a still-seek campaign', async () => {
+      // Campaign graduated BEFORE the proving-ground preflight minted the
+      // seed — a re-run of create-campaign must link the seed ('sibling')
+      // and run the same seek→seed graduation the fresh-create path does.
+      const entry = queueRow({
+        status: 'campaign_created',
+        processed_campaign_id: 'mcamp-preseed-001',
+        seed_id: 'dps-preseed-001',
+      });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      mockCampaigns.findUnique.mockResolvedValue({ id: 'mcamp-preseed-001', stage: 'seek' });
+
+      const result = await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(result.created).toBe(false);
+      expect(DirectorySeedCampaignLinkService.linkCampaign).toHaveBeenCalledWith(
+        'dps-preseed-001',
+        'mcamp-preseed-001',
+        'sibling',
+        expect.objectContaining({ actorId: ACTING_USER_ID }),
+      );
+      expect(MarketingCampaignService.graduateCampaignForPreflightSeed).toHaveBeenCalledWith(
+        'mcamp-preseed-001',
+        'dps-preseed-001',
+        undefined,
+      );
+    });
+
+    it('fresh create auto-advances seek → seed when the queue entry carries seed_id', async () => {
+      const entry = queueRow({ source_kind: 'scan_unmatched', seed_id: 'dps-preflight-001' });
+      mockQueue.findUnique.mockResolvedValue(entry);
+      (MarketingHotProspectService as any).getInstance().deriveBusinessCampaignFromScanBusiness.mockResolvedValue({
+        campaign: { id: 'mcamp-new-001', stage: 'seek' },
+        created: true,
+      });
+      mockQueue.update.mockImplementation(({ where, data }: any) =>
+        Promise.resolve({ ...entry, ...data, id: where.id }),
+      );
+
+      const result = await MarketingProspectQueueService.createCampaignFromQueue({
+        queueEntryId: 'pque-test-001',
+        actingUserId: ACTING_USER_ID,
+      });
+
+      expect(DirectorySeedCampaignLinkService.linkCampaign).toHaveBeenCalledWith(
+        'dps-preflight-001',
+        'mcamp-new-001',
+        'sibling',
+        expect.objectContaining({ actorId: ACTING_USER_ID }),
+      );
+      expect(MarketingCampaignService.graduateCampaignForPreflightSeed).toHaveBeenCalledWith(
+        'mcamp-new-001',
+        'dps-preflight-001',
+        undefined,
+      );
+      expect(result.campaign.stage).toBe('seed');
     });
 
     it('still marks the entry processed when the derive service returns created:false (AC84 collision)', async () => {

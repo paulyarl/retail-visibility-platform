@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 // import { Analytics } from "@vercel/analytics/react"; // Disabled - not configured in Vercel
 import "./globals.css";
 import { ClientRootLayout } from "@/components/ClientRootLayout";
+import { PlatformStructuredData } from "@/components/PlatformStructuredData";
 import { auth0 } from "@/lib/auth0";
 import type { ServerResolvedAuth } from "@/components/tenant/ServerResolvedContextProvider";
 
@@ -140,6 +141,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white text-neutral-900`} suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <PlatformStructuredData />
         <ClientRootLayout initialUser={serverUser}>{children}</ClientRootLayout>
         {/* <Analytics /> */}
       </body>
