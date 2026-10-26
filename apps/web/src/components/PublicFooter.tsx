@@ -133,7 +133,7 @@ export default function PublicFooter() {
         {/* Bottom Bar */}
         <div className="mt-8 pt-8 border-t border-neutral-200">
           <p className="text-neutral-500 text-sm text-center">
-            © {currentYear} {settings?.platformName || 'VisibleShelf'}. All rights reserved.
+            © {currentYear} VisibleShelf. All rights reserved.
           </p>
         </div>
       </div>
