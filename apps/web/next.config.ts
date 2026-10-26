@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 import path from "path";
 import { withSentryConfig } from "@sentry/nextjs/config";
 import withPWAInit from "next-pwa";
+import { PAGE_CSP, API_CSP } from "./src/lib/content-security-policy";
 
 const isSentryEnabled = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT) && process.env.SENTRY_DISABLE_BUILD_PLUGIN !== 'true';
 const isPwaEnabled = process.env.ENABLE_PWA === 'true';
@@ -187,7 +188,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: process.env.NODE_ENV === 'development' 
               ? "" // Disable CSP entirely in development
-              : "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' https: ws: wss: https://api.stripe.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://js.stripe.com https://checkout.stripe.com https://web.squarecdn.com https://sandbox.web.squarecdn.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://web.squarecdn.com https://sandbox.web.squarecdn.com; img-src 'self' data: blob: https: https://maps.googleapis.com https://maps.gstatic.com https://js.stripe.com; media-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com https://cash-f.squarecdn.com; frame-src 'self' https://www.google.com https://maps.google.com https://js.stripe.com https://checkout.stripe.com https://web.squarecdn.com https://sandbox.web.squarecdn.com https://www.youtube.com https://player.vimeo.com; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:; block-all-mixed-content;"
+              : PAGE_CSP
           },
         ],
       },
@@ -196,7 +197,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; worker-src 'self' blob:;"
+            value: API_CSP
           },
         ],
       },
