@@ -2316,6 +2316,7 @@ class DirectoryPresenceSeedService {
     queueEntryIds: string[],
     seedBatch: string,
     ctx?: SeedAuditCtx,
+    opts?: { publish?: boolean },
   ): Promise<{
     created: Array<{ queueEntryId: string; seedId: string; claimToken: string | null }>;
     skipped: Array<{ queueEntryId: string; reason: string }>;
@@ -2425,7 +2426,12 @@ class DirectoryPresenceSeedService {
         };
 
         const result = await this.createSeed(seedInput, ctx);
-        await this.publishSeed(result.id, ctx);
+        // Draft-first promote (spec PLATFORM_GBP_GOOGLE_ADS_SPEC §4.8): PG
+        // seeds park as 'draft' for QA + enrichment; publishing is the
+        // separate full-push step (bulk publish), not implicit on promote.
+        if (opts?.publish === true) {
+          await this.publishSeed(result.id, ctx);
+        }
 
         // Link to the entry's source (intelligence) campaign so the funnel's
         // directory_seed_campaign_links join sees the seed for tree-filtered

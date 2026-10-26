@@ -674,14 +674,41 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     setPromoteError(null);
     setPromoteResult(null);
     try {
-      const seedBatch = `pg-${campaignId}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-      const result = await directoryPresenceAdminService.provingGroundSeed(ids, seedBatch);
-      const parts = [
-        `${result.created.length} listing${result.created.length === 1 ? '' : 's'} created`,
-        result.skipped.length ? `${result.skipped.length} skipped` : null,
-        result.failed.length ? `${result.failed.length} failed` : null,
-      ].filter(Boolean);
-      setPromoteResult(`Promotion complete: ${parts.join(', ')}.`);
+      // Status-aware split (spec §4.8): unseeded rows take the PARTIAL promote
+      // (draft seeds); draft-seeded rows take the FULL promote (publish).
+      const selected = promoteEntries.filter((e) => ids.includes(e.id));
+      const unseeded = selected.filter((e) => !e.seed_id).map((e) => e.id);
+      const seeded = selected.filter((e) => e.seed_id).map((e) => e.seed_id as string);
+      const parts: string[] = [];
+
+      if (unseeded.length > 0) {
+        const seedBatch = `pg-${campaignId}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+        const result = await directoryPresenceAdminService.provingGroundSeed(unseeded, seedBatch);
+        parts.push(
+          `${result.created.length} draft seed${result.created.length === 1 ? '' : 's'} created`,
+          result.skipped.length ? `${result.skipped.length} skipped` : null,
+          result.failed.length ? `${result.failed.length} failed` : null,
+        );
+      }
+
+      if (seeded.length > 0) {
+        let published = 0;
+        let publishFailed = 0;
+        for (const seedId of seeded) {
+          try {
+            await directoryPresenceAdminService.publishSeed(seedId);
+            published += 1;
+          } catch {
+            publishFailed += 1;
+          }
+        }
+        parts.push(
+          `${published} seed${published === 1 ? '' : 's'} published`,
+          publishFailed ? `${publishFailed} publish failed` : null,
+        );
+      }
+
+      setPromoteResult(`Promote complete: ${parts.filter(Boolean).join(', ')}.`);
       await load();
     } catch (err: any) {
       setPromoteError(err.message || 'Failed to promote prospects');
@@ -1637,8 +1664,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         <div id="queue" className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 scroll-mt-4">
           <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <MapPin className="w-4 h-4" /> Promote to listings (preflight step 2)
+              <MapPin className="w-4 h-4" /> Promote to listings — partial (preflight step 2)
             </h2>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-0.5 mb-1">
+              Sequence: partial promote → draft seeds → QA + enrich (Enrich button / seed cleanup page) → full promote (publish) → live listing.
+            </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleAllPromote}
@@ -1653,7 +1683,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                 onClick={handlePromoteSelected}
                 disabled={promoteBusy || promoteSelected.size === 0}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
-                title="Create + publish a directory listing per selected prospect, link it to its discovery campaign, and mint a claim token"
+                title="Unseeded rows: create DRAFT seeds (QA + enrich before publish). Draft-seeded rows: full promote — publish the seed live"
               >
                 {promoteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
                 Promote selected ({promoteSelected.size})
@@ -1709,7 +1739,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={promoted || promoteBusy}
+                          disabled={promoteBusy}
                           onChange={() => togglePromote(e.id)}
                           className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
                         />
