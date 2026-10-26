@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { SlidersHorizontal, Sparkles, Store as StoreIcon } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import DirectoryHero from '../DirectoryHero';
 import DirectoryContextBar from '../DirectoryContextBar';
@@ -21,6 +21,7 @@ import { Pagination } from '@/components/ui';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { MarketIntelBanner } from '@/components/place/MarketIntelBanner';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
+import DirectoryMerchantCtaBand from '@/components/directory/DirectoryMerchantCtaBand';
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts';
 import { ActiveFeaturedSection } from '../ActiveFeaturedSection';
@@ -205,49 +206,7 @@ export default function DirectoryDiscoveryLayout({ data }: DirectoryLayoutProps)
         )}
 
         {/* CTAs */}
-        {!data.loading && (
-          <div className="mt-16 grid md:grid-cols-2 gap-6">
-            <div className="p-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl">
-              <div className="text-center">
-                <StoreIcon className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-3" />
-                <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-3">
-                  Are you a merchant?
-                </h2>
-                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-                  Get your store listed in our directory and reach more customers.
-                  It's free and takes just a few minutes to set up.
-                </p>
-                <a
-                  href="/register"
-                  className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
-                >
-                  Get Started →
-                </a>
-              </div>
-            </div>
-
-            <div className="p-8 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl">
-              <div className="text-center">
-                <div className="inline-flex items-center gap-2 mb-3">
-                  <Sparkles className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
-                    How does this work?
-                  </h2>
-                </div>
-                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-                  Discover the zero-effort magic behind this directory.
-                  No manual curation, just pure automation.
-                </p>
-                <Link
-                  href={platformUrl('/directory/about')}
-                  className="inline-flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
-                >
-                  See the Magic →
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
+        {!data.loading && <DirectoryMerchantCtaBand source="/directory" />}
       </div>
 
       <PoweredByFooter />
