@@ -205,6 +205,8 @@ GBP supports linking social profiles directly on the listing — every linked pr
 | Pinterest | `shelfvisible` | Campaign 7 — Pinterest commerce ads point at the same org |
 | TikTok | `shelfvisible` | Merchant-facing short video (claim demos, storefront tours) |
 | X | `shelfvisible` | Product/launch updates |
+| LinkedIn | `linkedin.com/company/visibleshelf` | ✅ live 2026-10-26 — page created (first post + 2 scheduled); wired into `PublicFooter` + JSON-LD `sameAs`; add to GBP social links |
+| YouTube | `@shelfvisible` — to create | Claim/setup demos; same wiring on creation (footer + `sameAs` + GBP) |
 
 **Consistency flag:** the brand/domain is `VisibleShelf` / `visibleshelf.com` but every handle is `shelfvisible`. Before linking, decide whether to (a) keep handles as-is and treat them as the accepted social name, or (b) migrate to `@visibleshelf` where available — GBP, ads, and citation sweep should present one consistent identity. Logged as open question §7.
 

@@ -4,6 +4,7 @@ const SOCIAL_PROFILES = [
   'https://facebook.com/shelfvisible',
   'https://instagram.com/shelfvisible',
   'https://x.com/shelfvisible',
+  'https://www.linkedin.com/company/visibleshelf',
   'https://pinterest.com/shelfvisible',
   'https://tiktok.com/@shelfvisible',
   'https://threads.net/@shelfvisible',
