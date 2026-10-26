@@ -293,7 +293,7 @@ Existing: `/` (hero, claim-first), `/directory`, `/features`, `/features#pricing
 
 | Route | Purpose | PinTraffix loop |
 |---|---|---|
-| `/solutions/clover-storefront` | Clover wedge — OAuth screenshot, "5 minutes" claim, sync demo | P-01 (P0) |
+| `/solutions/clover-storefront` | Clover wedge — OAuth screenshot, "5 minutes" claim, sync demo. **Shipped 2026-10-26** — server-rendered, metadata + canonical + OG, claim/signup/lead paths | P-01 (P0) |
 | `/solutions/google-visibility` | SWIS tier + Google presence — feed mechanics, "see what's in store" | P-02 (P0) |
 | `/solutions/deposit-commerce` | Storefront/deposit-commerce story, three addresses, QR | P-03 (P0) |
 | `/solutions/omnichannel` | Unified-commerce rung | P-04 (P0) |
