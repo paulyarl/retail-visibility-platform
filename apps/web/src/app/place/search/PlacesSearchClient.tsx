@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 interface PlaceResult {
@@ -92,7 +93,7 @@ export default function PlacesSearchClient() {
   const delivery = searchParams.get('delivery') === 'true';
   const pickup = searchParams.get('pickup') === 'true';
   const sort = searchParams.get('sort') || 'name';
-  const page = parseInt(searchParams.get('page') || '1');
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
 
   const [searchInput, setSearchInput] = useState(q);
   const [results, setResults] = useState<SearchResponse | null>(null);
@@ -134,151 +135,168 @@ export default function PlacesSearchClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Search Places</h1>
-        <p className="text-gray-600 mb-6">Find businesses across all cities and categories</p>
+    <div className="bg-neutral-50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        {/* Search panel */}
+        <form
+          onSubmit={handleSearch}
+          className="bg-white border border-neutral-200 rounded-2xl p-4 sm:p-6 shadow-sm"
+        >
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by business name, city, or category..."
+              aria-label="Search places"
+              className="flex-1 px-4 py-3 border border-neutral-300 rounded-lg text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium transition-colors"
+            >
+              <Search className="w-4 h-4" aria-hidden="true" />
+              Search
+            </button>
+          </div>
 
-        {/* Search bar */}
-        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by business name, city, or category..."
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-            Search
-          </button>
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-neutral-100">
+            <input
+              type="text"
+              value={city}
+              onChange={(e) => updateParam('city', e.target.value)}
+              placeholder="City"
+              aria-label="Filter by city"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => updateParam('category', e.target.value)}
+              placeholder="Category"
+              aria-label="Filter by category"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={snapEbt}
+                onChange={(e) => updateParam('snapEbt', e.target.checked ? 'true' : '')}
+                className="rounded accent-violet-600"
+              />
+              SNAP/EBT only
+            </label>
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={delivery}
+                onChange={(e) => updateParam('delivery', e.target.checked ? 'true' : '')}
+                className="rounded accent-violet-600"
+              />
+              Delivery only
+            </label>
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={pickup}
+                onChange={(e) => updateParam('pickup', e.target.checked ? 'true' : '')}
+                className="rounded accent-violet-600"
+              />
+              Pickup only
+            </label>
+            <select
+              value={sort}
+              onChange={(e) => updateParam('sort', e.target.value)}
+              aria-label="Sort results"
+              className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            >
+              <option value="name">Name (A-Z)</option>
+              <option value="city">City</option>
+              <option value="recent">Recently Added</option>
+              <option value="snap">SNAP/EBT First</option>
+            </select>
+          </div>
         </form>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => updateParam('city', e.target.value)}
-            placeholder="City"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          />
-          <input
-            type="text"
-            value={category}
-            onChange={(e) => updateParam('category', e.target.value)}
-            placeholder="Category"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={snapEbt}
-              onChange={(e) => updateParam('snapEbt', e.target.checked ? 'true' : '')}
-              className="rounded"
-            />
-            SNAP/EBT only
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={delivery}
-              onChange={(e) => updateParam('delivery', e.target.checked ? 'true' : '')}
-              className="rounded"
-            />
-            Delivery only
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={pickup}
-              onChange={(e) => updateParam('pickup', e.target.checked ? 'true' : '')}
-              className="rounded"
-            />
-            Pickup only
-          </label>
-          <select
-            value={sort}
-            onChange={(e) => updateParam('sort', e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="name">Name (A-Z)</option>
-            <option value="city">City</option>
-            <option value="recent">Recently Added</option>
-            <option value="snap">SNAP/EBT First</option>
-          </select>
-        </div>
-
         {/* Results */}
-        {loading && <p className="text-gray-500">Loading...</p>}
-        {!loading && results && results.places.length === 0 && (
-          <p className="text-gray-500">No places found. Try a different search.</p>
-        )}
-        {!loading && results && results.places.length > 0 && (
-          <>
-            <p className="text-sm text-gray-500 mb-4">
-              {results.total} result{results.total !== 1 ? 's' : ''}
-              {q && ` for "${q}"`}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {results.places.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/place/${p.slug}?source=search`}
-                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start gap-3">
-                    {p.iconEmoji && <span className="text-2xl">{p.iconEmoji}</span>}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{p.businessName}</h3>
-                      <p className="text-sm text-gray-500">{p.category}</p>
-                      <p className="text-sm text-gray-600 mt-1">{p.city}, {p.state}</p>
-                      {p.snapEbtReported && (
-                        <span className="inline-block mt-2 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
-                          SNAP/EBT
-                        </span>
-                      )}
-                      {p.deliveryOffered && (
-                        <span className="inline-block mt-2 ml-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                          Delivery
-                        </span>
-                      )}
-                      {p.pickupOffered && (
-                        <span className="inline-block mt-2 ml-1 text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
-                          Pickup
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+        <div className="mt-8">
+          {loading && <p className="text-neutral-500">Loading...</p>}
+          {!loading && results && results.places.length === 0 && (
+            <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center">
+              <p className="text-neutral-700 font-medium">No places found.</p>
+              <p className="text-sm text-neutral-500 mt-1">
+                Try a different search, or add the business below so it shows up next time.
+              </p>
             </div>
-
-            {/* Pagination */}
-            {results.totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
-                {page > 1 && (
-                  <button
-                    onClick={() => updateParam('page', String(page - 1))}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+          )}
+          {!loading && results && results.places.length > 0 && (
+            <>
+              <p className="text-sm text-neutral-500 mb-4">
+                {results.total} result{results.total !== 1 ? 's' : ''}
+                {q && ` for "${q}"`}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {results.places.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/place/${p.slug}?source=search`}
+                    className="bg-white border border-neutral-200 rounded-xl p-4 hover:border-violet-300 hover:shadow-md transition-all"
                   >
-                    ← Prev
-                  </button>
-                )}
-                <span className="text-sm text-gray-600">
-                  Page {page} of {results.totalPages}
-                </span>
-                {page < results.totalPages && (
-                  <button
-                    onClick={() => updateParam('page', String(page + 1))}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-                  >
-                    Next →
-                  </button>
-                )}
+                    <div className="flex items-start gap-3">
+                      {p.iconEmoji && <span className="text-2xl">{p.iconEmoji}</span>}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-neutral-900 truncate">{p.businessName}</h3>
+                        <p className="text-sm text-neutral-500">{p.category}</p>
+                        <p className="text-sm text-neutral-600 mt-1">{p.city}, {p.state}</p>
+                        {p.snapEbtReported && (
+                          <span className="inline-block mt-2 text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                            SNAP/EBT
+                          </span>
+                        )}
+                        {p.deliveryOffered && (
+                          <span className="inline-block mt-2 ml-1 text-xs bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full">
+                            Delivery
+                          </span>
+                        )}
+                        {p.pickupOffered && (
+                          <span className="inline-block mt-2 ml-1 text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
+                            Pickup
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            )}
-          </>
-        )}
+
+              {/* Pagination */}
+              {results.totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8">
+                  {page > 1 && (
+                    <button
+                      onClick={() => updateParam('page', String(page - 1))}
+                      className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white hover:bg-neutral-50"
+                    >
+                      ← Prev
+                    </button>
+                  )}
+                  <span className="text-sm text-neutral-600">
+                    Page {page} of {results.totalPages}
+                  </span>
+                  {page < results.totalPages && (
+                    <button
+                      onClick={() => updateParam('page', String(page + 1))}
+                      className="px-3 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-700 bg-white hover:bg-neutral-50"
+                    >
+                      Next →
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
