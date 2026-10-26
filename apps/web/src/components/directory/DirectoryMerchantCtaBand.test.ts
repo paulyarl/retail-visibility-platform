@@ -24,15 +24,19 @@ describe('DirectoryMerchantCtaBand', () => {
     const html = render();
 
     expect(html).toContain('Are you a merchant?');
-    expect(html).toContain('may already be listed');
-    expect(html).toContain('Claim yours free');
+    expect(html).toContain('may already be here');
+    expect(html).toContain('claiming takes about two minutes and is free');
   });
 
-  it('leads with the claim path, never the signup wizard', () => {
+  it('leads with the directory search, never the signup wizard or place search', () => {
     const html = render();
 
-    expect(html).toContain('href="/place/search"');
+    // The directory holds claimed tenants AND unclaimed seeds; /place/search
+    // returns unclaimed seeds only, so it would not find an existing tenant.
+    expect(html).toContain('action="/directory"');
+    expect(html).toContain('name="q"');
     expect(html).toContain('Find your listing');
+    expect(html).not.toContain('/place/search');
     expect(html).not.toContain('/register');
     expect(html).not.toContain('/auth/signup');
     expect(html).not.toContain('Get Started');

@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, Sparkles, Store as StoreIcon } from 'lucide-react';
+import { Sparkles, Store as StoreIcon } from 'lucide-react';
 import AddBusinessCta from './AddBusinessCta';
 import SuggestBusinessCta from './SuggestBusinessCta';
+import DirectoryBusinessSearch from './DirectoryBusinessSearch';
 import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
 
 /**
@@ -12,11 +13,12 @@ import { usePlatformUrl } from '@/components/storefront/StorefrontUrlContext';
  *
  * Seed-aware: the directory is built from public business information, so a
  * merchant arriving here is usually already listed. The primary action is
- * therefore "find your place page and claim it" — not account creation, which
+ * therefore "find your listing in the directory" — not account creation, which
  * is what /register (→ /auth/signup/wizard) asked of merchants who already have
- * a page built from public records. The not-listed and missing-business paths
- * follow as the same add/suggest pair the /place shelves close with, so the
- * band never assumes the visitor is new.
+ * a page, and not /place/search, which only returns unclaimed, non-tenant
+ * seeds. The directory search covers claimed tenants and unclaimed seeds alike.
+ * The not-listed and missing-business paths follow as the same add/suggest pair
+ * the /place shelves close with, so the band never assumes the visitor is new.
  */
 export default function DirectoryMerchantCtaBand({
   source = '/directory',
@@ -35,17 +37,13 @@ export default function DirectoryMerchantCtaBand({
               Are you a merchant?
             </h2>
             <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-              Your store may already be listed — we build place pages from public
-              business information. Claim yours free in about two minutes to verify
-              your hours, phone, and address, and showcase 5 top sellers.
+              We build listings from public business information, so yours may
+              already be here. Search the directory by business name — claiming
+              takes about two minutes and is free.
             </p>
-            <Link
-              href={platformUrl('/place/search')}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
-            >
-              <Search className="w-4 h-4" aria-hidden="true" />
-              Find your listing →
-            </Link>
+            <div className="flex justify-center">
+              <DirectoryBusinessSearch variant="card" />
+            </div>
           </div>
         </div>
 

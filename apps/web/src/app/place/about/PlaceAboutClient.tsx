@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import DirectoryBusinessSearch from '@/components/directory/DirectoryBusinessSearch';
 import ShelfSlotsPreview from '@/components/place/ShelfSlotsPreview';
 import {
   ShieldCheck,
@@ -111,12 +112,7 @@ export default function PlaceAboutClient() {
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
-            <Link
-              href="/place/search"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-white hover:bg-violet-50 text-violet-700 rounded-xl transition-all font-bold text-base shadow-lg shadow-black/20 hover:shadow-black/30 transform hover:-translate-y-0.5"
-            >
-              Find Your Store <ArrowRight className="w-5 h-5" />
-            </Link>
+            <DirectoryBusinessSearch variant="hero" label="Find your store" />
             <Link
               href="/directory/add-business"
               className="inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white rounded-xl transition-colors font-semibold text-base backdrop-blur-sm"
@@ -452,13 +448,8 @@ export default function PlaceAboutClient() {
             Find your store&apos;s place page now. Claim it in under a minute and start capturing the local customers
             already searching for what is sitting on your shelves.
           </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link
-              href="/place/search"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-white hover:bg-violet-50 text-violet-700 rounded-xl transition-all font-bold text-base shadow-lg shadow-black/10 hover:shadow-black/20"
-            >
-              Find Your Store Listing <ArrowRight className="w-5 h-5" />
-            </Link>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <DirectoryBusinessSearch variant="hero" label="Find your store" />
             <Link
               href="/directory/add-business"
               className="inline-flex items-center gap-2 px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-xl transition-colors font-semibold text-base"
