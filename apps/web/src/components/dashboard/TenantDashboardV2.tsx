@@ -55,6 +55,7 @@ import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { useTenantBehaviorAccess } from '@/hooks/tenant-access/useTenantBehaviorAccess';
 import DirectoryClaimWelcomeBanner from '@/components/dashboard/DirectoryClaimWelcomeBanner';
 import TierUpgradeCard from '@/components/dashboard/TierUpgradeCard';
+import DashboardThemeSelector, { useDashboardTheme } from './DashboardThemeSelector';
 
 interface TenantDashboardV2Props {
   tenantId: string;
@@ -81,6 +82,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   const allCaps = useAllCapabilities(tenantId);
   const { gates: merchantGates } = useMerchantGates(tenantId);
   const { canEdit } = useTenantBehaviorAccess(tenantId);
+  const { theme, setTheme, themeClasses } = useDashboardTheme();
 
   // Subscription-status-aware capability flags
   const chatbotEnabled = allCaps.data?.chatbotOptions?.enabled ?? true;
@@ -240,7 +242,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${themeClasses}`}>
       {/* ── Page Header ── */}
       <header className="bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -323,14 +325,17 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
           )}
           <TenantLimitBadge variant="compact" showUpgrade={true} />
           {tier && <TierBadge tier={tier} showDetails={false} />}
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <DashboardThemeSelector theme={theme} onChange={setTheme} />
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         {/* ── Constraint Alert Banner ── */}
