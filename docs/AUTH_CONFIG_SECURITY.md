@@ -293,10 +293,18 @@ was accepted (`401` would mean a bad token) and *after* the API was found enable
 SERVICE_DISABLED` would mean it wasn't). `apps/api/src/routes/google-business-oauth.ts` maps that
 shape to the user-facing `503 api_not_approved`.
 
-**Status 2026-10-17: submitted, pending.** Case ID **`3-3112000041953`**, project
-`407743626849`, quoted review window **7–10 business days** (~Oct 27–30). Do not file a second case
-or a quota-increase request — both slow it down, and only one project per business can ever be
-granted access.
+**Status: resubmitted 2026-10-27, pending.** Case ID **`5-5364000041203`**, project
+`407743626849`, quoted review window **7–10 business days** (~Nov 7–10).
+
+History: first application **2026-10-17**, case `3-3112000041953` — rejected during review
+(reported 2026-10-27) because the website URL on the request form did not match the URL in the
+profile's website field. The reviewer's check is a literal comparison and the profile's website
+field carries UTM params (`https://visibleshelf.com/?utm_source=google&utm_medium=organic&utm_campaign=gbp`,
+see `PLATFORM_GBP_GOOGLE_ADS_SPEC.md` §3.2). **Resubmission entered the full UTM'd URL
+byte-identically on both sides**, verified the profile is 60+ days verified (Yes), and confirmed
+no allowlisted project exists (No — that is the state being applied for); the resubmit cited the
+prior case ID in the reason field. Do not file a quota-increase request — it auto-rejects, and
+only one project per business can ever be granted access.
 
 **Checking status** (there is no tracker on the form itself):
 
