@@ -17,6 +17,7 @@ import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 import { ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
 import { EnhancedCacheOptions } from '@/utils/contextAwareCacheManager';
 import { getOrCreateCorrelationId, setCorrelationId, CORRELATION_ID_HEADER, CORRELATION_ID_RESPONSE_HEADER } from '@/lib/correlation-id';
+import { markSurfaceScope } from '@/lib/ga-scope';
 
 // Re-export all types for compatibility with existing services
 export {
@@ -588,6 +589,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     ttl?: number,
     requestOptions?: PublicRequestOptions & EnhancedCacheOptions
   ): Promise<PublicApiResponse<T>> {
+    markSurfaceScope(RequestType.PUBLIC);
     // 🎯 ENHANCED: Check if we should delegate to enhanced version
     // If context/isolation are not explicitly provided, use enhanced defaults
     if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
@@ -668,6 +670,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     ttl?: number,
     requestOptions?: AuthenticatedRequestOptions & EnhancedCacheOptions
   ): Promise<AuthenticatedApiResponse<T>> {
+    markSurfaceScope(RequestType.AUTHENTICATED);
     // 🎯 ENHANCED: Check if we should delegate to enhanced version
     // If context/isolation are not explicitly provided, use enhanced defaults
     if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
@@ -743,6 +746,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options?: RequestInit,
     requestOptions?: TenantRequestOptions & ApiEnhancedCacheOptions
   ): Promise<TenantApiResponse<T>> {
+    markSurfaceScope(RequestType.TENANT);
     // 🎯 ENHANCED: Check if we should delegate to enhanced version
     // If context/isolation are not explicitly provided, use enhanced defaults
     if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
@@ -820,6 +824,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options?: RequestInit,
     requestOptions?: AdminRequestOptions & ApiEnhancedCacheOptions
   ): Promise<AdminApiResponse<T>> {
+    markSurfaceScope(RequestType.ADMIN);
     // 🎯 ENHANCED: Check if we should delegate to enhanced version
     // If context/isolation are not explicitly provided, use enhanced defaults
     if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
@@ -900,6 +905,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options?: RequestInit,
     requestOptions?: SystemRequestOptions & EnhancedCacheOptions
   ): Promise<SystemApiResponse<T>> {
+    markSurfaceScope(RequestType.SYSTEM);
     // 🎯 ENHANCED: Always delegate to enhanced version for context-aware caching
     const enhancedResult = await this.makeEnhancedDefaultRequest<T>(
       url,
@@ -922,6 +928,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options?: RequestInit,
     requestOptions?: ExternalRequestOptions & EnhancedCacheOptions
   ): Promise<ExternalApiResponse<T>> {
+    markSurfaceScope(RequestType.EXTERNAL);
     // 🎯 ENHANCED: Check if we should delegate to enhanced version
     // If context/isolation are not explicitly provided, use enhanced defaults
     if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
@@ -995,6 +1002,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     requestOptions?: RequestOptions & EnhancedCacheOptions & TenantRequestOptions
   ): Promise<ApiResult<T>> {
     const requestType = requestOptions?.requestType || this.defaultRequestType;
+    markSurfaceScope(requestType);
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
     // const requestContext = requestOptions?.context || this.defaultContext;
     // const requestIsolation = requestOptions?.isolation || this.defaultIsolation;

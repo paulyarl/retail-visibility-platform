@@ -9,6 +9,14 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Website URL validation (HTTPS required to match backend)
 const websiteRegex = /^https:\/\/.+\..+/;
 
+// Coordinates arrive as strings from the API (Postgres Decimal columns serialize
+// to strings), so coerce numeric strings and treat blank values as absent.
+const coordinateSchema = (min: number, max: number) =>
+  z.preprocess(
+    (v) => (typeof v === 'string' ? (v.trim() === '' ? undefined : Number(v)) : v),
+    z.number().min(min).max(max).optional().nullable()
+  );
+
 export const businessProfileSchema = z.object({
   business_name: z.string()
     .min(2, 'Business name must be at least 2 characters')
@@ -99,8 +107,8 @@ export const businessProfileSchema = z.object({
   seo_tags: z.array(z.string()).optional().nullable(),
   
   // Geocoding fields for map display
-  latitude: z.number().min(-90).max(90).optional().nullable(),
-  longitude: z.number().min(-180).max(180).optional().nullable(),
+  latitude: coordinateSchema(-90, 90),
+  longitude: coordinateSchema(-180, 180),
   
   // Slug field for URL customization
   slug: z.string()
