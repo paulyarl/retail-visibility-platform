@@ -228,6 +228,12 @@ export default function CrmTicketDetailPage() {
                 />
               </div>
             </div>
+            {ticket.description && (
+              <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                <label className="block text-xs font-medium text-neutral-500 mb-1">Description</label>
+                <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{ticket.description}</p>
+              </div>
+            )}
             <div className="mt-4 text-sm text-neutral-500 space-y-1">
               <p><span className="font-medium">Scope:</span> {ticket.tenant_id ? (
                 <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_name || ticket.tenant_id}</Link>
