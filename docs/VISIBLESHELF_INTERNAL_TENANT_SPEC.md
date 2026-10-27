@@ -80,6 +80,8 @@ Price shape: $15–60 impulse range for signage/POD, 2–3 $100+ hardware anchor
 
 **Feed gates (validator ERROR set):** `title`, `description` ≥30 chars, `image_url`, `price`; `item_status='active'` + `visibility='public'`; `product_type` ∈ `physical`/`hybrid` for the GMC surface.
 
+**Store categories — inventory-driven, deliberately unset at deploy (decided 2026-10-27).** No category fields are populated yet (`tenant_business_profiles_list.gbp_category_id` null, `tenants.gbp_primary_category_id`/`gbp_secondary_categories` empty, `gbp_categories_sync_status: pending`, no `tenant_gbp_categories` rows — the "Add your store category" Next Step stays open). The primary/secondary pick is made **from the actual stocked inventory once the §5 catalog lands** — the same inventory-driven categorization the platform applies to merchants — not an abstract label chosen before the shelf exists. Two surfaces to keep distinct: the **storefront category pick** (retail-vertical, from the product mix, set at `/t/{id}/settings/gbp-category`) and the **GBP-synced fields** (`tenants.gbp_*`, `tenant_gbp_categories`), which `GBPCategorySync` pulls from the connected profile post-Gate-B — for this tenant that's the platform's own `Software company` listing, so the synced fields describe the platform entity while the storefront pick describes the store; keep both, don't "reconcile" them. **Category candidates (2026-10-27):** `Marketing Store`, `Retail Marketing Store`, `Retail Store` — none is in `platform_categories` today, and each is contingent on Google support for the GBP-mapped side. Platform display is **not** gated on that: new category rows are addable at any time (admin `POST /categories` writes an `is_active` row; `google_category_id` falls back to the slug for platform-local labels), and once active the label is pickable at `/settings/gbp-category` and hot-links on `/directory` + `/place` shelves like any other category. A platform-local label has no real gcid, so it can't be pushed to a GBP listing — moot here since the connected profile is the platform's own `Software company`. Vertical-fit fallbacks if the inventory-driven pick lands elsewhere: `office-supply-store` (supplies/stands/printers), `banner-store` (POD signage/decals), `electronics-store` (scanners, label printers, NFC), `packaging-supply-store`.
+
 ## 6. Capability & readiness
 
 **Relevant capability keys** (feature-registry collections — the merchant-gate surface):
@@ -95,6 +97,7 @@ Price shape: $15–60 impulse range for signage/POD, 2–3 $100+ hardware anchor
 - [ ] **MO resale certificate** under Visible Shelf LLC for tax-exempt wholesale buying; collect/remit MO sales tax
 - [ ] **Order → supplier forward SOP** — manual forwarding is fine at this volume; automation later
 - [ ] **Production checkout smoke test** — a real purchase end-to-end (add to cart → payment capture → order record → supplier forward → refund exercise) on `shelfvisible.visibleshelf.com` before the store is promoted; confirms gateway operational readiness, not just config presence
+- [ ] **Store categories** — set primary + secondary at `/t/{id}/settings/gbp-category` *after* the §5 catalog is stocked; the pick follows the actual product mix (§5 category note), not a pre-chosen label
 
 **Platform build item — storefront order → partner order submit (flagged 2026-10-27):** dropship needs a generic outbound fulfillment layer: order items routed to a partner (POD APIs — Printful/Printify; dealer dropship — Azar/Displays2go; print vendor — Lob) with `submitOrder → vendorOrderId → status webhook`. The shape already exists at flyer scope — `FlyerPrintProvider` (`stub`/`manual`/`lob` vendors, `tenant_flyer_card_orders` in `submitted` state, vendor status via public webhook in `public-flyer.ts`); the build is generalizing it to `inventory_items` fulfillment sources (`source_type`/`supplier_catalog_item_id` already link items to suppliers). Until it ships: manual order→supplier forwarding SOP. This is a *platform* capability — every dropship tenant wants it, this store is just the first consumer.
 
@@ -132,6 +135,7 @@ doppler run --config prd -- node scripts/create-tenant.cjs \
 - [ ] OWNER membership row present (`user_tenants`)
 - [ ] Business profile seeded (`tenant_business_profiles_list`) with platform NAP — phone `+1 913-703-6157`, `contact@visibleshelf.com`, `visibleshelf.com`
 - [ ] Products added per §5
+- [ ] Store categories set — inventory-driven pick, after catalog load (§5 category note)
 - [ ] GBP connect — **after** case `5-5364000041203` approval (quota 300 QPM)
 - [ ] MC link — the existing platform MC row
 - [ ] `GBP_TRANSPORT=record` fixture refresh once live GBP calls work
