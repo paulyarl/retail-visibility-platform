@@ -17,7 +17,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { audit } from '../audit';
-import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 import { isStubBusinessAnalysisAudit } from '../lib/marketing-audits';
 import { resolveCampaignNap } from '../lib/canonical-nap';
 import {
@@ -854,6 +854,7 @@ class DirectoryPresenceSeedService {
       });
     }
     await this.resolveIntakeTickets(seedId);
+    await this.notifyOwnerSeedPublished(seedId, ctx);
     logger.info('DirectoryPresenceSeedService.publishSeed', undefined, { seedId });
   }
 
@@ -867,13 +868,91 @@ class DirectoryPresenceSeedService {
       await prisma.$executeRaw`
         UPDATE crm_support_tickets
         SET status = 'resolved', resolved_at = now(), updated_at = now()
-        WHERE tenant_id = ${PLATFORM_SCOPE}
+        WHERE project_id = ${PLATFORM_CRM_PROJECT_ID}
           AND inquiry_id = ${seedId}
           AND category = 'directory_owner_submission'
           AND status IN ('open', 'in_progress', 'waiting')
       `;
     } catch (err) {
       logger.error('DirectoryPresenceSeedService.resolveIntakeTickets', undefined, {
+        error: (err as Error).message,
+        seedId,
+      });
+    }
+  }
+
+  /**
+   * Email the owner when their owner-submitted listing goes live — the
+   * publish-side status response the intake flow promised ("we'll review
+   * your submission"). Fires only for listing_origin='owner_submitted'
+   * seeds where the owner opted into contact; the suggestion approve path
+   * sends its own claim invite via approveAndInvite. Non-fatal — the
+   * publish is already committed.
+   */
+  private async notifyOwnerSeedPublished(seedId: string, ctx?: SeedAuditCtx): Promise<void> {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT
+          dps.owner_email,
+          dps.owner_name,
+          dps.owner_contact_consent,
+          dl.listing_origin,
+          dl.business_name,
+          dl.slug,
+          dl.city,
+          dl.state
+        FROM directory_presence_seeds dps
+        JOIN directory_listings_list dl ON dl.id = dps.listing_id
+        WHERE dps.id = ${seedId}
+        LIMIT 1
+      `;
+      const row = rows[0];
+      if (row?.listing_origin !== 'owner_submitted' || !row.owner_contact_consent || !row.owner_email) return;
+
+      const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+      const placeUrl = row.slug ? `${baseUrl}/place/${row.slug}` : `${baseUrl}/directory`;
+
+      const html = `
+        <h1>Your business listing is live</h1>
+        <p><strong>${row.business_name}</strong>${row.city ? ` in ${row.city}, ${row.state}` : ''} has been reviewed and published in the directory.</p>
+        <p>View your listing:</p>
+        <p><a href="${placeUrl}" style="padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">View my listing</a></p>
+        <p>Or copy and paste this URL into your browser:</p>
+        <p><code>${placeUrl}</code></p>
+      `;
+      const text = `Your listing for ${row.business_name} is live: ${placeUrl}`;
+
+      const { unifiedConfig } = await import('../config/unifiedConfig');
+      await emailService.sendEmail({
+        to: row.owner_email,
+        from: unifiedConfig.emailReplyTo,
+        fromName: 'Claims',
+        replyTo: unifiedConfig.emailReplyTo,
+        subject: `Your ${row.business_name} listing is live`,
+        html,
+        text,
+      });
+
+      // The owner has been notified — a queued announce must not stay open.
+      try {
+        const { default: announceService } = await import('./SeedAnnounceService.js');
+        await announceService.markDelivered(
+          seedId,
+          {
+            channel: 'email',
+            notes: 'Listing-live email sent by publishSeed (owner-submission path).',
+            metadata: { trigger_source: 'publishSeed' },
+          },
+          ctx,
+        );
+      } catch (err) {
+        logger.warn('publishSeed: announce delivery marker failed (non-fatal)', undefined, {
+          seedId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } catch (err) {
+      logger.error('DirectoryPresenceSeedService.notifyOwnerSeedPublished failed (non-fatal)', undefined, {
         error: (err as Error).message,
         seedId,
       });
@@ -1902,7 +1981,7 @@ class DirectoryPresenceSeedService {
         await prisma.$executeRaw`
           UPDATE crm_support_tickets
           SET status = 'resolved', resolved_at = now(), updated_at = now()
-          WHERE tenant_id = ${PLATFORM_SCOPE}
+          WHERE project_id = ${PLATFORM_CRM_PROJECT_ID}
             AND inquiry_id = ${seedId}
             AND category = 'directory_claim'
             AND title LIKE 'Owner-proposed categories%'
