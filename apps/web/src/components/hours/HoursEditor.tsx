@@ -1,6 +1,8 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "./TimeInput";
+import GoogleHoursPaste from "@/components/business-hours/GoogleHoursPaste";
+import { DAYS, type DayHours } from "@/lib/business-hours";
 import { tenantManagementService } from "@/services/TenantManagementService";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { platformHomeService } from "@/services/PlatformHomeSingletonService";
@@ -207,6 +209,21 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
   };
   const remove = (i: number) => setPeriods(periods.filter((_, idx) => idx !== i));
 
+  // Paste-and-parse emits the seed editor's per-day DayHours map — convert it
+  // to this editor's Period[] shape (open days only). Pending until Save.
+  const applyParsedHours = (parsed: Record<string, DayHours>) => {
+    const next: Period[] = [];
+    for (const day of DAYS) {
+      const h = parsed[day];
+      if (h && !h.closed) {
+        next.push({ day: day.toUpperCase(), open: h.open, close: h.close });
+      }
+    }
+    setPeriods(next);
+    setMsg("✓ Hours parsed — review below, then Save");
+    setTimeout(() => setMsg(null), 4000);
+  };
+
   const save = async () => {
     // Validate that open time is before close time for each period
     const invalidPeriods = periods.filter(p => {
@@ -274,7 +291,10 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
         <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{currentTimezone}</span>
         <span className="ml-2 text-gray-500">Manage timezone above.</span>
       </div>
-      
+
+      {/* Paste from Google Business Profile (same panel as the seed editor) */}
+      <GoogleHoursPaste onApply={applyParsedHours} />
+
       <div className="space-y-2">
         {periods.map((p, i) => {
           const isInvalid = p.open && p.close && p.open >= p.close;
