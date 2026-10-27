@@ -63,9 +63,9 @@ export default function CrmRequestsHubPage() {
     }
   }
 
-  async function handleMarkRead(requestId: string) {
+  async function handleMarkRead(requestId: string, type: string) {
     try {
-      await crmAdminService.markRequestRead(requestId);
+      await crmAdminService.markRequestRead(requestId, type);
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, is_read: true } : r));
     } catch (err) {
       clientLogger.error('[CRM Requests Hub] Mark read error:', { detail: err });
@@ -164,7 +164,7 @@ export default function CrmRequestsHubPage() {
           {requests.map(r => (
             <div
               key={`${r.type}-${r.id}`}
-              onClick={() => !r.is_read && handleMarkRead(r.id)}
+              onClick={() => !r.is_read && handleMarkRead(r.id, r.type)}
               className={`flex items-center gap-3 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer ${
                 !r.is_read ? 'bg-amber-50/50 dark:bg-amber-900/10 border-l-4 border-l-amber-400' : ''
               }`}

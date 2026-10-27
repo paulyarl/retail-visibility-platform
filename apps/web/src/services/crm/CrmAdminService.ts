@@ -397,10 +397,10 @@ class CrmAdminService extends AdminApiSingleton {
     return this.unwrap<CrmRequestItem>(result);
   }
 
-  async markRequestRead(requestId: string): Promise<void> {
+  async markRequestRead(requestId: string, type: string): Promise<void> {
     const result = await this.makeDefaultRequest<void>(
       `/api/admin/crm/requests/${requestId}/read`,
-      { method: 'POST' }
+      { method: 'POST', body: JSON.stringify({ type }) }
     );
     if (!result.success) throw new Error(getErrorMessage(result.error));
   }
