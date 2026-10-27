@@ -3,7 +3,7 @@
 **Status:** DEPLOYED 2026-10-27 (tenant row created; external connects pending)
 **Owner:** Platform team
 **Date:** 2026-10-27
-**Purpose of this doc:** two roles — the deploy record for the `VisibleShelf Internal` tenant, and the **template** for future custom tenant deploys (§9 is the reusable part).
+**Purpose of this doc:** two roles — the deploy record for the `VisibleShelf Internal` tenant, and the **template** for future custom tenant deploys (§10 is the reusable part).
 
 ---
 
@@ -57,17 +57,47 @@ A platform-internal tenant that is our own best customer — "eat our own cookin
 - Practical win: `visibleshelf.com` is already claimed in that MC, and `shelfvisible.visibleshelf.com` lives under the claimed apex — feed `link`s are GMC-clean with zero new domain work.
 - The GBP↔MC link on the platform profile is unaffected — the entity-trust benefit stays.
 
-## 5. Products & content plan
+## 5. Products & merchandising model
 
-Products are operator-authored (brainstorm in progress), not seeded from a template. Every product must pass the feed validator (`GMCValidationService.validateProductForGMC`) — the ERROR set:
+**Decided 2026-10-27:** a real dropship retail store — *tools for retailers* — with GMC (the platform's own MC) as the acquisition channel and a fully functional storefront. Visible Shelf LLC acts as the retailer to wholesalers (resale cert, real margins); suppliers fulfill.
 
-- `title`, `description` (≥30 chars), `image_url`, `price`
-- `item_status = 'active'` + `visibility = 'public'` to enter the feed at all
-- `product_type` ∈ `physical`/`hybrid` for the GMC surface
+**What it sells:** retail-visibility hardware and supplies — the physical toolkit of the product we sell (a merchant touring the demo storefront sees a store selling QR stands, shelf talkers, NFC tags, decals — the tools they're supposed to use).
 
-Content must be real — this is a customer-visible storefront and the posts it publishes through the GBP Suite land on the live acquisition profile (see `PLATFORM_GBP_GOOGLE_ADS_SPEC.md` §3.5 cadence: Mon Update / Wed Offer / Fri Update).
+Three catalog tiers:
 
-## 6. Decisions & rejected alternatives
+| Tier | SKUs | Source | Feed notes |
+|---|---|---|---|
+| Wholesale UPC'd goods | ~10 | Azar Displays / Displays2go / Store Supply Warehouse (fixtures, sign frames, shelf talkers); Seritag/GoToTags (NFC); Amazon Business/POSGuys (scanners, label printers) | Real GTINs — strongest GMC items |
+| POD custom | ~4–6 | Sticker Mule / Signs.com / POD signage — engraved QR stands, window decals, Etsy-inspired formats | `identifier_exists: false`; own designs + imagery |
+| Digital / hybrid | ~3 | Playbook PDF, template packs, Merchant Visibility Starter Kit bundle | Exercises `digital`/`hybrid` product types; digital is weak on the Shopping surface — not the feed lead |
+
+Price shape: $15–60 impulse range for signage/POD, 2–3 $100+ hardware anchors.
+
+**Inventory modeling (`inventory_items`):** POD items → `track_inventory=false` (supplier prints/ships on demand — always in stock, nothing to count); wholesale goods → `source_type` + `supplier_catalog_item_id` link where the supplier catalog supports it (`last_supplier_sync` tracks freshness); `allow_backorder` as the alternative for made-to-order items that should still sell through a stock-out.
+
+**Feed gates (validator ERROR set):** `title`, `description` ≥30 chars, `image_url`, `price`; `item_status='active'` + `visibility='public'`; `product_type` ∈ `physical`/`hybrid` for the GMC surface.
+
+## 6. Capability & readiness
+
+**Relevant capability keys** (feature-registry collections — the merchant-gate surface):
+
+- `payment_gateway_options` collection: `payment_gateway_stripe` (primary for this store), `payment_gateway_paypal`, `payment_gateway_square`; state keys `payment_gateway_enabled` / `_flexible` / `_disabled`
+- `fulfillment_options` collection: dropship = `fulfillment_shipping`; digital/catalog items also exercise `fulfillment_service`; `fulfillment_pickup` / `_delivery` unused here (no physical premises); state keys `fulfillment_enabled` / `_flexible` / `_disabled`
+
+**Storefront readiness checklist for a real store:**
+
+- [ ] **Payment gateway onboard** — all three are wired as per-gateway checkout routes (`routes/checkout/{stripe,paypal,square}.ts`); the `PaymentGatewayFactory` paypal/square cases are a stale parallel abstraction, not the live path. **Stripe Connect onboard** (`/api/tenants/{id}/stripe-connect/onboard`) is the primary (only one with a webhook handler + Connect service). PayPal route is **pinned to `api-m.sandbox.paypal.com`** — needs the prod endpoint for real charges. Square switches on `squareEnvironment` + platform creds and **mocks silently when creds are absent** — so per-gateway prod smoke tests are the only proof of operational readiness (package bumps may be needed — Square path already runs direct-API, no SDK)
+- [ ] **Shipping settings in MC** — honest dropship delivery windows (supplier lead times, not ours)
+- [ ] **Returns/refund policy page** on the storefront — GMC requires it for approval; honest dropship terms
+- [ ] **MO resale certificate** under Visible Shelf LLC for tax-exempt wholesale buying; collect/remit MO sales tax
+- [ ] **Order → supplier forward SOP** — manual forwarding is fine at this volume; automation later
+- [ ] **Production checkout smoke test** — a real purchase end-to-end (add to cart → payment capture → order record → supplier forward → refund exercise) on `shelfvisible.visibleshelf.com` before the store is promoted; confirms gateway operational readiness, not just config presence
+
+**Platform build item — storefront order → partner order submit (flagged 2026-10-27):** dropship needs a generic outbound fulfillment layer: order items routed to a partner (POD APIs — Printful/Printify; dealer dropship — Azar/Displays2go; print vendor — Lob) with `submitOrder → vendorOrderId → status webhook`. The shape already exists at flyer scope — `FlyerPrintProvider` (`stub`/`manual`/`lob` vendors, `tenant_flyer_card_orders` in `submitted` state, vendor status via public webhook in `public-flyer.ts`); the build is generalizing it to `inventory_items` fulfillment sources (`source_type`/`supplier_catalog_item_id` already link items to suppliers). Until it ships: manual order→supplier forwarding SOP. This is a *platform* capability — every dropship tenant wants it, this store is just the first consumer.
+
+Content must be real — this is a customer-visible storefront and anything the GBP Suite publishes lands on the live acquisition profile (`PLATFORM_GBP_GOOGLE_ADS_SPEC.md` §3.5 cadence).
+
+## 7. Decisions & rejected alternatives
 
 | # | Decision | Rejected | Why |
 |---|---|---|---|
@@ -77,7 +107,7 @@ Content must be real — this is a customer-visible storefront and the posts it 
 | D4 | `enterprise` tier | Lower rung | Playground must exercise the full capability surface; tier is cosmetic cost-wise (internal, fee-waived) |
 | D5 | Slug `shelfvisible` | `visibleshelf-internal` | Redundant doubling (`visibleshelf-internal.visibleshelf.com`); `shelfvisible` matches the social handles |
 
-## 7. Deploy procedure
+## 8. Deploy procedure
 
 ```bash
 cd apps/api
@@ -103,7 +133,7 @@ doppler run --config prd -- node scripts/create-tenant.cjs \
 - [ ] MC link — the existing platform MC row
 - [ ] `GBP_TRANSPORT=record` fixture refresh once live GBP calls work
 
-## 8. As-built record
+## 9. As-built record
 
 | Field | Value |
 |---|---|
@@ -114,12 +144,13 @@ doppler run --config prd -- node scripts/create-tenant.cjs \
 | Dashboard | `visibleshelf.com/t/tid-sud4ky1c` |
 | Storefront | `shelfvisible.visibleshelf.com` / `visibleshelf.com/tenant/tid-sud4ky1c` |
 
-## 9. Reusing this spec — custom tenant deploy template
+## 10. Reusing this spec — custom tenant deploy template
 
 For any bespoke tenant (internal, partner, showcase, migration assist):
 
 1. **Fill the §2 field table** — the only required decisions: `name`, `slug`, `subdomain`, `subscription_tier`, `subscription_status`, `is_demo`, owner.
-2. **Run §7's script** with the chosen fields — same command shape, no `--internal` for customer tenants.
+2. **Run §8's script** with the chosen fields — same command shape, no `--internal` for customer tenants.
 3. **Decide address strategy per D3's logic** — custom domain only if the tenant owns its canonical host AND its MC (if any) claims that host.
 4. **External connects are all post-create, tenant-scoped** — GBP/MC/POS are OAuth rows on the tenant; nothing in the tenant row itself references them.
 5. **Gates worth checking:** slug/subdomain uniqueness (script enforces), trial limits (bypassed by direct creation), tier validity (must exist in `shared/tier-contract.json`), `is_demo` indexation consequences.
+6. **Capability control is two-gated** — tier gate via `subscription_tier` → `tier-contract.json` capability modules; merchant gate via `tenant_feature_overrides_list`, `tenant_feature_flags_list`, `tenant_feature_purchases` (org-level: `feature_overrides` + `feature_override_details`). A custom deploy can open the tier and still shape features per-tenant.
