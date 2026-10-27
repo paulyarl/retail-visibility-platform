@@ -49,6 +49,10 @@ interface LinkContext {
     faqEnabled: boolean;
     liveFlyerCount: number;
     hasStorefront: boolean;
+    /** tenants.subdomain — the platform subdomain slug, when assigned */
+    subdomain: string | null;
+    /** tenants.subdomain set OR any custom_domains row */
+    hasDomain: boolean;
     locationStatus: string;
     subscriptionStatus: string;
     isReadOnly: boolean;
@@ -100,6 +104,12 @@ function hasCRM(ctx: LinkContext): boolean {
 
 function hasStorefront(ctx: LinkContext): boolean {
   return ctx.capabilities?.effective.storefront.enabled ?? false;
+}
+
+/** Level 2/3 addressing grants — path (level 1) is baseline, nothing to set up. */
+function hasStorefrontDomains(ctx: LinkContext): boolean {
+  const sd = ctx.capabilities?.effective.storefront_domains;
+  return !!sd && (sd.platform_subdomain_enabled || sd.custom_domain_enabled);
 }
 
 function hasIntegrations(ctx: LinkContext): boolean {
@@ -385,6 +395,22 @@ const LINKS: LinkDefinition[] = [
   // ── VISIBILITY: Integrations & analytics ──
 
   {
+    id: 'storefront-domains',
+    label: () => 'Storefront Domains',
+    description: (ctx) => {
+      if (ctx.businessState.subdomain) return `${ctx.businessState.subdomain} subdomain live`;
+      if (ctx.businessState.hasDomain) return 'Custom domain added';
+      return 'Platform subdomain or your own domain';
+    },
+    href: (ctx) => `/t/${ctx.tenantId}/settings/subdomain`,
+    icon: 'Globe',
+    category: 'visibility',
+    badge: (ctx) => (ctx.businessState.subdomain ? 'Live' : undefined),
+    condition: (ctx) => hasStorefrontDomains(ctx),
+    score: () => 47,
+  },
+
+  {
     id: 'integrations',
     label: () => 'Integrations',
     description: () => 'Google, POS & external syncs',
@@ -594,6 +620,8 @@ interface BusinessState {
   faqEnabled: boolean;
   liveFlyerCount: number;
   hasStorefront: boolean;
+  subdomain: string | null;
+  hasDomain: boolean;
   locationStatus: string;
   subscriptionStatus: string;
   isReadOnly: boolean;
@@ -610,11 +638,13 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
     faqCount,
     faqOptions,
     liveFlyerCount,
+    customDomainCount,
   ] = await Promise.all([
     prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         slug: true,
+        subdomain: true,
         subscription_status: true,
         location_status: true,
         organization_id: true,
@@ -648,6 +678,10 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
         ends_at: { gt: now },
       },
     }).catch(() => 0),
+
+    prisma.custom_domains.count({
+      where: { tenant_id: tenantId },
+    }).catch(() => 0),
   ]);
 
   const [totalItems, activeItems] = itemCounts as [number, number];
@@ -673,6 +707,8 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
     faqEnabled: faqOptions?.faq_enabled ?? true,
     liveFlyerCount,
     hasStorefront: false,
+    subdomain: tenant?.subdomain ?? null,
+    hasDomain: !!tenant?.subdomain || customDomainCount > 0,
     locationStatus: tenant?.location_status || 'active',
     subscriptionStatus: tenant?.subscription_status || 'active',
     isReadOnly: false,

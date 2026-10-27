@@ -51,6 +51,8 @@ interface TaskContext {
     hasMap: boolean;
     hasStoreCategory: boolean;
     hasSlug: boolean;
+    /** tenants.subdomain set OR any custom_domains row (pending counts — added is set up) */
+    hasDomain: boolean;
     locationStatus: string;
     subscriptionStatus: string;
     ordersCount: number;
@@ -110,6 +112,12 @@ function hasCRM(ctx: TaskContext): boolean {
 
 function hasStorefront(ctx: TaskContext): boolean {
   return ctx.capabilities?.effective.storefront.enabled ?? false;
+}
+
+/** Level 2/3 addressing grants — path (level 1) is baseline, nothing to set up. */
+function hasStorefrontDomains(ctx: TaskContext): boolean {
+  const sd = ctx.capabilities?.effective.storefront_domains;
+  return !!sd && (sd.platform_subdomain_enabled || sd.custom_domain_enabled);
 }
 
 function hasSocialCommerce(ctx: TaskContext): boolean {
@@ -334,6 +342,17 @@ const TASKS: TaskDefinition[] = [
     condition: () => true,
     isDone: (ctx) => ctx.businessState.hasPublishedDirectory,
     score: () => 90,
+  },
+
+  {
+    id: 'domain',
+    label: () => 'Set up your storefront domain',
+    link: (ctx) => `/t/${ctx.tenantId}/settings/subdomain`,
+    category: 'visibility',
+    priority: 'high',
+    condition: (ctx) => hasStorefrontDomains(ctx),
+    isDone: (ctx) => ctx.businessState.hasDomain,
+    score: () => 76,
   },
 
   {
@@ -585,6 +604,7 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
     faqCount,
     faqOptions,
     ordersCount,
+    customDomainCount,
   ] = await Promise.all([
     // Tenant record
     prisma.tenants.findUnique({
@@ -592,6 +612,7 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
       select: {
         id: true,
         slug: true,
+        subdomain: true,
         subscription_status: true,
         subscription_tier: true,
         location_status: true,
@@ -643,6 +664,11 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
     prisma.orders.count({
       where: { tenant_id: tenantId },
     }).catch(() => 0),
+
+    // Own-domain rows — any status counts as "set up" (verification has its own UX)
+    prisma.custom_domains.count({
+      where: { tenant_id: tenantId },
+    }).catch(() => 0),
   ]);
 
   // Tier billing info (billing_type + price_monthly) — fetched after the
@@ -672,6 +698,7 @@ async function fetchBusinessState(tenantId: string): Promise<TaskContext['busine
     hasMap: !!(businessProfile?.latitude && businessProfile?.longitude),
     hasStoreCategory: !!(businessProfile?.gbp_category_id || tenant?.gbp_primary_category_id),
     hasSlug: !!tenant?.slug,
+    hasDomain: !!tenant?.subdomain || customDomainCount > 0,
     locationStatus: tenant?.location_status || 'active',
     subscriptionStatus: tenant?.subscription_status || 'active',
     ordersCount,
