@@ -162,7 +162,7 @@ describe('acceptClaim — post-claim notifications', () => {
     // Requests-Hub ticket — platform scope, claim category, business in title
     expect(mockTicketCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: 'platform',
+        project_id: 'crmproj-platform-intake',
         category: 'directory_claim',
         title: expect.stringContaining('Sahara Market'),
         inquiry_id: 'seed-1',
@@ -239,7 +239,7 @@ describe('approveClaimRequest — post-claim notifications', () => {
     expect(findCompletedAlertInsert()).toBeDefined();
     expect(mockTicketCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: 'platform',
+        project_id: 'crmproj-platform-intake',
         category: 'directory_claim',
         inquiry_id: 'req-1',
       }),

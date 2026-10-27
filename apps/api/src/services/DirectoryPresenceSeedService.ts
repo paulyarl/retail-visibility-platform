@@ -979,7 +979,11 @@ class DirectoryPresenceSeedService {
 
     // Bind token to owner contact info if available (Sprint 3 verification)
     const boundEmail = seed[0].owner_email || null;
-    const boundPhone = seed[0].owner_phone || null;
+    // Hydrate owner_phone from the freshest linked Google Maps ground-truth
+    // packet when absent — the listing's published phone is the manual
+    // outreach + claim-verification channel (operator call/SMS, touch-logged).
+    const boundPhone = seed[0].owner_phone
+      || await this.hydrateOwnerPhoneFromGroundTruth(seedId, ctx);
     const verificationRequired = !!(boundEmail || boundPhone);
     const operatorApprovalRequired = !verificationRequired;
 
@@ -1035,6 +1039,101 @@ class DirectoryPresenceSeedService {
     logger.info('DirectoryPresenceSeedService.inviteSeed', undefined, { seedId, tokenId, verificationRequired, shortCode });
 
     return { token, expiresAt, shortCode };
+  }
+
+  /**
+   * Hydrate a missing owner_phone from the freshest Google Maps ground-truth
+   * packet (mkt_ground_truth_packets) across the seed's linked campaigns.
+   * The packet's phone is measured from the business's live listing, so it
+   * doubles as 'phone' provenance: written only when no phone provenance row
+   * exists (operator-entered rows always win), with the Maps place link as
+   * source_url carrying the place_id/data_id evidence. Also fills the
+   * listing's display phone and upgrades contact_status to 'contactable' —
+   * same sourced fact, null-only everywhere. Returns the hydrated phone for
+   * token binding, or null when no packet/phone exists. Never throws — a
+   * failed hydration must not block the invite.
+   */
+  private async hydrateOwnerPhoneFromGroundTruth(seedId: string, ctx?: SeedAuditCtx): Promise<string | null> {
+    try {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT p.packet->>'phone' AS packet_phone,
+               p.place_id, p.data_id, p.fetched_at,
+               dps.tenant_id, dps.listing_id
+        FROM mkt_ground_truth_packets p
+        JOIN directory_seed_campaign_links l ON l.campaign_id = p.campaign_id
+        JOIN directory_presence_seeds dps ON dps.id = ${seedId}
+        WHERE l.seed_id = ${seedId}
+          AND p.packet->>'phone' IS NOT NULL
+          AND p.packet->>'phone' <> ''
+        ORDER BY p.fetched_at DESC
+        LIMIT 1
+      `;
+      const row = rows[0];
+      const phone = typeof row?.packet_phone === 'string' ? row.packet_phone.trim() : '';
+      if (!phone) return null;
+
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET owner_phone = ${phone},
+            contact_status = CASE WHEN contact_status = 'contact_unverified' THEN 'contactable' ELSE contact_status END,
+            contact_status_derived_at = CASE WHEN contact_status = 'contact_unverified' THEN now() ELSE contact_status_derived_at END,
+            updated_at = now()
+        WHERE id = ${seedId} AND owner_phone IS NULL
+      `;
+
+      await prisma.$executeRaw`
+        UPDATE directory_listings_list
+        SET phone = ${phone}, updated_at = now()
+        WHERE id = ${row.listing_id} AND (phone IS NULL OR phone = '')
+      `;
+
+      const mapsUrl = row.place_id
+        ? `https://www.google.com/maps/search/?api=1&query_place_id=${encodeURIComponent(row.place_id)}`
+        : row.data_id
+          ? `https://maps.google.com/?cid=${encodeURIComponent(row.data_id)}`
+          : null;
+
+      const provenanceId = generateDirectoryFieldProvenanceId(row.tenant_id);
+      await prisma.$executeRaw`
+        INSERT INTO directory_field_provenance (
+          id, seed_id, tenant_id, field_key, value,
+          source_name, source_url, accessed_at, confidence, show_on_public,
+          created_at, updated_at
+        ) VALUES (
+          ${provenanceId},
+          ${seedId},
+          ${row.tenant_id},
+          'phone',
+          ${phone},
+          'google_maps_ground_truth',
+          ${mapsUrl},
+          ${row.fetched_at ?? null},
+          'high',
+          true,
+          now(), now()
+        )
+        ON CONFLICT (seed_id, field_key) DO NOTHING
+      `;
+
+      audit({
+        actor: ctx?.actorId,
+        actorType: ctx?.actorType,
+        action: 'directory_presence_seed.owner_phone_hydrated',
+        payload: { seedId, tenantId: row.tenant_id, placeId: row.place_id ?? null, source: 'google_maps_ground_truth' },
+      });
+      logger.info('DirectoryPresenceSeedService.hydrateOwnerPhoneFromGroundTruth', undefined, {
+        seedId,
+        placeId: row.place_id,
+      });
+
+      return phone;
+    } catch (err) {
+      logger.warn('Ground-truth owner-phone hydration failed (non-fatal)', undefined, {
+        seedId,
+        error: (err as Error).message,
+      });
+      return null;
+    }
   }
 
   /**

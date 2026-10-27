@@ -1557,6 +1557,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
         },
       });
 
+      // A lead-gen intake ticket resolves the moment its queue entry is
+      // decided — campaign promotion is the terminal decision.
+      await this.resolveLinkedLeadTicket(updated, ctx);
+
       // Migration 317 — re-key attribution rows that were propagated onto
       // this queue entry BEFORE promotion (a second scan attributed an
       // already-queued prospect): they now resolve against the campaign.
@@ -1920,6 +1924,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         // Migration 310 — a suggestion-sourced entry dismissed here rejects
         // the linked public suggestion and resolves its intake ticket.
         await this.syncLinkedSuggestion(existing, 'rejected', null, ctx);
+        await this.resolveLinkedLeadTicket(existing, ctx);
         logger.info('resolveVerification: dismissed (unverified_closed)', ctx, {
           id: input.queueEntryId, outcome: input.outcome,
         });
@@ -1936,6 +1941,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
             business_snapshot: updatedSnapshot as any,
           },
         });
+        await this.resolveLinkedLeadTicket(existing, ctx);
         logger.info('resolveVerification: re-queued with verified NAP', ctx, {
           id: input.queueEntryId, outcome: input.outcome,
           napFields: Object.keys(napPatch),
@@ -2020,6 +2026,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       });
 
       await this.syncLinkedSuggestion(existing, 'under_review', input.actingUserId, ctx);
+      await this.resolveLinkedLeadTicket(existing, ctx);
 
       logger.info('graduate: intake entry graduated', ctx, {
         id: input.queueEntryId, target: input.target,
@@ -2078,6 +2085,33 @@ class MarketingProspectQueueServiceClass extends BaseService {
   }
 
   /**
+   * Resolve a lead-gen intake ticket when its queue entry is decided
+   * (graduate / dismiss / campaign_created). Unlike suggestions, the
+   * ticket's inquiry_id IS the queue entry id — the entry itself is the
+   * intake record. Called from the same decision points as
+   * syncLinkedSuggestion. Non-fatal — the queue transition already
+   * committed.
+   */
+  private async resolveLinkedLeadTicket(entry: any, ctx?: RequestCtx): Promise<void> {
+    if (entry?.source_kind !== 'directory_lead_gen') return;
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE crm_support_tickets
+        SET status = 'resolved', resolved_at = now(), updated_at = now()
+        WHERE project_id = ${PLATFORM_CRM_PROJECT_ID}
+          AND inquiry_id = ${entry.id}
+          AND category = 'directory_lead_gen'
+          AND status IN ('open', 'in_progress', 'waiting')
+      `;
+    } catch (err) {
+      logger.error('resolveLinkedLeadTicket failed (non-fatal)', ctx, {
+        error: (err as Error).message,
+        queueEntryId: entry?.id,
+      });
+    }
+  }
+
+  /**
    * Dismiss a queued entry. Idempotent — dismissing an already-dismissed
    * entry just updates the reason. Re-queueing a dismissed business creates
    * a new row (the partial unique index only covers status='queued').
@@ -2103,6 +2137,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // Migration 310 — dismissing a suggestion-sourced entry rejects the
       // linked public suggestion and resolves its intake ticket.
       await this.syncLinkedSuggestion(existing, 'rejected', null, ctx);
+      await this.resolveLinkedLeadTicket(existing, ctx);
 
       logger.info('dismiss: entry dismissed', ctx, {
         id: input.queueEntryId, reason: input.reason ?? null,

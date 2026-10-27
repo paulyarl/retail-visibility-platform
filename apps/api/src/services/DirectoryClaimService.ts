@@ -427,8 +427,12 @@ class DirectoryClaimService {
       proposedCategories = applied.proposed;
     }
 
-    // If verification required, generate + send OTP
-    if (r.verification_required && (r.bound_email || r.bound_phone)) {
+    // If verification required AND an email is bound, generate + send OTP.
+    // bound_phone alone is not a deliverable channel — SMS is manual by
+    // policy (the operator calls/texts the published number and logs the
+    // touch on the seed), so phone-only bound tokens fall through to the
+    // operator-approval path below.
+    if (r.verification_required && r.bound_email) {
       const otpCode = crypto.randomInt(100000, 999999).toString();
       const codeHash = await bcrypt.hash(otpCode, 10);
       const otpId = `dco-${generateTenantKey(r.tenant_id)}-${crypto.randomBytes(6).toString('hex')}`;
@@ -441,9 +445,8 @@ class DirectoryClaimService {
         WHERE token_id = ${r.token_id} AND consumed_at IS NULL
       `;
 
-      // Insert new OTP
-      const deliveryMethod = r.bound_email ? 'email' : 'sms';
-      const deliveryTarget = r.bound_email || r.bound_phone;
+      const deliveryMethod = 'email';
+      const deliveryTarget = r.bound_email;
 
       await prisma.$executeRaw`
         INSERT INTO directory_claim_otps (
@@ -462,32 +465,23 @@ class DirectoryClaimService {
         )
       `;
 
-      // Send OTP via email (SMS not yet integrated — log for now)
-      if (deliveryMethod === 'email') {
-        try {
-          const { emailService } = await import('../services/email-service.js');
-          const { unifiedConfig } = await import('../config/unifiedConfig');
-          await emailService.sendEmail({
-            to: deliveryTarget,
-            from: unifiedConfig.emailReplyTo,
-            fromName: 'Claims',
-            replyTo: unifiedConfig.emailReplyTo,
-            subject: 'Your Directory Claim Verification Code',
-            text: `Your verification code is: ${otpCode}. It expires in 10 minutes.`,
-            html: `<p>Your verification code is: <strong>${otpCode}</strong></p><p>It expires in 10 minutes.</p>`,
-          } as any);
-        } catch (err) {
-          logger.error('DirectoryClaimService.initiateClaim — email send failed', undefined, {
-            error: (err as Error).message,
-          });
-          // Don't fail the initiation — the OTP is stored, operator can resend
-        }
-      } else {
-        // SMS not yet integrated — log the code for development
-        logger.info('DirectoryClaimService.initiateClaim — SMS OTP (not yet integrated)', undefined, {
-          seedId: r.seed_id,
-          deliveryTarget: this.maskTarget(deliveryTarget),
+      try {
+        const { emailService } = await import('../services/email-service.js');
+        const { unifiedConfig } = await import('../config/unifiedConfig');
+        await emailService.sendEmail({
+          to: deliveryTarget,
+          from: unifiedConfig.emailReplyTo,
+          fromName: 'Claims',
+          replyTo: unifiedConfig.emailReplyTo,
+          subject: 'Your Directory Claim Verification Code',
+          text: `Your verification code is: ${otpCode}. It expires in 10 minutes.`,
+          html: `<p>Your verification code is: <strong>${otpCode}</strong></p><p>It expires in 10 minutes.</p>`,
+        } as any);
+      } catch (err) {
+        logger.error('DirectoryClaimService.initiateClaim — email send failed', undefined, {
+          error: (err as Error).message,
         });
+        // Don't fail the initiation — the OTP is stored, operator can resend
       }
 
       audit({
@@ -504,8 +498,11 @@ class DirectoryClaimService {
       };
     }
 
-    // No verification required — check if operator approval is needed
-    if (r.operator_approval_required) {
+    // No deliverable verification — operator approval. Phone-only bound
+    // tokens land here alongside unbound ones; findOrCreateClaimRequest
+    // surfaces the bound number to the operator as the manual call/SMS
+    // verification target.
+    if (r.operator_approval_required || r.verification_required) {
       // Claimant email must be proven before a request enters the operator
       // queue (migration 358): platform users and customers with
       // email_verified=true are already proven; everyone else confirms
@@ -588,6 +585,17 @@ class DirectoryClaimService {
       return { requestId: existing[0].id, isNew: false };
     }
 
+    // A phone-bound token's verification target rides every operator surface
+    // (alert + ticket): SMS is manual by policy — the operator calls/texts
+    // the published number and logs the touch on the seed.
+    const boundRows = await prisma.$queryRaw<any[]>`
+      SELECT bound_phone FROM directory_claim_tokens WHERE id = ${claim.token_id} LIMIT 1
+    `;
+    const boundPhoneNote = boundRows[0]?.bound_phone
+      ? `Bound phone: ${boundRows[0].bound_phone} — verify claimant by manual call/SMS to this number; log the touch (channel 'call' or 'sms') on the seed.`
+      : null;
+    const operatorNote = [verificationNote, boundPhoneNote].filter(Boolean).join('\n');
+
     const requestId = generateDirectoryClaimRequestId(claim.tenant_id);
     await prisma.$executeRaw`
       INSERT INTO directory_claim_requests (
@@ -631,7 +639,7 @@ class DirectoryClaimService {
           ${PLATFORM_SCOPE},
           'directory_claim_pending',
           'Pending directory claim request',
-          ${`A business owner has submitted a claim request for a directory listing.\n\nClaimant: ${[ctx?.claimantFirstName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}\nEmail: ${ctx?.customerEmail || '—'}\nPhone: ${ctx?.claimantPhone || '—'}${verificationNote ? `\n${verificationNote}` : ''}\n\nReview and approve at Settings → Directory → Presence Seeds.`},
+          ${`A business owner has submitted a claim request for a directory listing.\n\nClaimant: ${[ctx?.claimantFirstName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}\nEmail: ${ctx?.customerEmail || '—'}\nPhone: ${ctx?.claimantPhone || '—'}${operatorNote ? `\n${operatorNote}` : ''}\n\nReview and approve at Settings → Directory → Presence Seeds.`},
           'clock',
           false,
           false,
@@ -669,7 +677,7 @@ Request ID: ${requestId}
 Claimant: ${[ctx?.claimantFirstName, ctx?.claimantMiddleName, ctx?.claimantLastName].filter(Boolean).join(' ') || '—'}
 Email: ${ctx?.customerEmail || '—'}
 Phone: ${ctx?.claimantPhone || '—'}
-Stated address: ${ctx?.claimantBusinessAddress || '—'}${verificationNote ? `\n${verificationNote}` : ''}
+Stated address: ${ctx?.claimantBusinessAddress || '—'}${operatorNote ? `\n${operatorNote}` : ''}
 
 Review at Settings → Directory → Presence Seeds.`,
         priority: 'high',

@@ -300,7 +300,7 @@ describe('initiateClaim — owner verification consent gate (migration 274)', ()
     // (platform-scope crm_support_tickets, category 'directory_claim').
     expect(mockTicketCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: 'platform',
+        project_id: 'crmproj-platform-intake',
         category: 'directory_claim',
         priority: 'medium',
         inquiry_id: 'seed-1',
