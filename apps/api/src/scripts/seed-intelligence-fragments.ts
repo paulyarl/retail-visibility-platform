@@ -139,6 +139,15 @@ Discovery discipline:
    will actually find, then one concrete detail that proves it. A reader should
    finish the sentence knowing something they did not know before.
 
+   Times are numerals, not words: "8am–8pm", "7am start", "closes 6:30pm" —
+   never "eight to eight" or "seven o'clock". Keep any hours you mention exact
+   to the recorded grid instead of rounding to a comfortable phrase (a Friday
+   8:30pm close is not "eight to eight"); if the schedule differs by day, name
+   the day rather than generalizing. Hours are also rendered in their own block
+   on the listing, so when they are unremarkable spend the sentence on the shelf
+   instead — the copy should not become a second, coarser source of truth for
+   opening times.
+
    Use the current trading name only — no former or alternate names, no
    previous ownership, no premises history.
 
