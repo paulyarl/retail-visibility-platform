@@ -4374,8 +4374,8 @@ class DirectoryPresenceSeedService {
    * emitted for this business. Composition must prefer it over the NAP-derived
    * boilerplate: the scan wrote it from observed evidence, while the composer
    * can only assemble name + category + city. Lanes, best first:
-   *   1. the campaign's business_snapshot.description (set at derive)
-   *   2. the discovery scan audit's matching discovered_businesses entry
+   *   1. the discovery scan audit on this campaign
+   *   2. the discovery scan audit on its parent (the "+ Campaign" derive path)
    * Returns null when the scan omitted it (thin evidence) — callers fall back
    * to the composed packet, which is the honest result in that case.
    */
@@ -4387,12 +4387,8 @@ class DirectoryPresenceSeedService {
 
     const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
       where: { id: campaignId },
-      select: { business_snapshot: true, parent_campaign_id: true },
+      select: { parent_campaign_id: true },
     });
-    const snapshotDescription = (campaign as any)?.business_snapshot?.description;
-    if (typeof snapshotDescription === 'string' && snapshotDescription.trim()) {
-      return snapshotDescription.trim();
-    }
 
     // The discovery scan lives on the campaign that ran it. A seed promoted
     // straight from that campaign finds it at once; a seed whose campaign was
