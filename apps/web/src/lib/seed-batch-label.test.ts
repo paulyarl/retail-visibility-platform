@@ -113,4 +113,21 @@ describe('seedBatchDisplayLabel', () => {
       ),
     ).toBe('Oct 28 · African Grocery Store · Indianapolis, IN · 26 seeds · PG');
   });
+
+  it('names the market from a cleanup-report batch row (topPlace)', () => {
+    expect(
+      seedBatchDisplayLabel(
+        {
+          seedBatch: 'pg-mcamp-mdjvk2bu-20261028',
+          seedCount: 26,
+          createdAt: '2026-10-28T13:03:54Z',
+          topCategory: 'African Grocery Store',
+          categoryCount: 1,
+          topPlace: 'Indianapolis, IN',
+          placeCount: 1,
+        },
+        { includePgTag: true },
+      ),
+    ).toBe('Oct 28 · African Grocery Store · Indianapolis, IN · 26 seeds · PG');
+  });
 });

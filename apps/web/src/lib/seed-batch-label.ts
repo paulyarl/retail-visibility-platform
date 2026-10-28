@@ -30,6 +30,8 @@ export interface SeedBatchLabelInput {
    */
   topCategory?: string | null;
   topCity?: string | null;
+  /** Cleanup report's name for the dominant place (SeedCleanupReport row). */
+  topPlace?: string | null;
   totalSeeds?: number | null;
   categories?: string[] | null;
   cities?: string[] | null;
@@ -78,7 +80,7 @@ export function seedBatchDisplayLabel(
   // Accept either the explicit label fields or the raw SeedBatchSummary ones.
   const categoryValue = input.category ?? input.topCategory ?? null;
   const categoryCount = input.categoryCount ?? input.categories?.length ?? 0;
-  const placeValue = input.place ?? input.topCity ?? null;
+  const placeValue = input.place ?? input.topCity ?? input.topPlace ?? null;
   const placeCount = input.placeCount ?? input.cities?.length ?? 0;
   const seedCount =
     typeof input.seedCount === 'number'
