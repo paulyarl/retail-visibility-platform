@@ -12,6 +12,7 @@ import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
 import { generateListingEnrichmentLogId } from '../lib/id-generator';
 import { normalizeCategoryKey } from '../services/intelligence/IntelligenceProfileService';
+import { resolveDirectorySeo } from '../services/SeedSeoFallbackService';
 
 const router = Router();
 
@@ -119,13 +120,23 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       select: { subscription_tier: true },
     });
 
+    // Owner-authored description/keywords fall back to the seed's composed SEO
+    // content (read-only) so a seeded tenant isn't looking at empty fields the
+    // platform already filled on its listing.
+    const seo = await resolveDirectorySeo(tenantId, {
+      description: settings.seo_description,
+      keywords: settings.seo_keywords as string[] | null,
+    });
+
     // Transform snake_case to camelCase for frontend
     return res.json({
       id: settings.id,
       tenantId: settings.tenant_id,
       isPublished: settings.is_published,
-      seoDescription: settings.seo_description,
-      seoKeywords: settings.seo_keywords,
+      seoDescription: seo.description.value || null,
+      seoKeywords: seo.keywords.value,
+      seoDescriptionSource: seo.description.source,
+      seoKeywordsSource: seo.keywords.source,
       primaryCategory: settings.primary_category,
       secondaryCategories: settings.secondary_categories,
       slug: actualSlug,
@@ -651,6 +662,13 @@ router.get('/:id/directory/quality-check', authenticateToken, checkTenantAccess,
       where: { tenant_id: tenantId, item_status: 'active' },
     });
 
+    // Same fallback the settings panel shows, so the check doesn't nag for a
+    // description the panel already prefilled from the seeded listing.
+    const seo = await resolveDirectorySeo(tenantId, {
+      description: settings?.seo_description,
+      keywords: settings?.seo_keywords as string[] | null,
+    });
+
     const checks = {
       business_name: !!profile?.business_name,
       address: !!profile?.address_line1,
@@ -660,7 +678,7 @@ router.get('/:id/directory/quality-check', authenticateToken, checkTenantAccess,
       website: !!profile?.website,
       logo: !!profile?.logo_url,
       hours: !!profile?.hours,
-      description: !!(settings?.seo_description && settings.seo_description.length > 100),
+      description: seo.description.value.length > 100,
       category: !!settings?.primary_category,
       hasItems: itemCount > 0,
       hasMultipleItems: itemCount > 10,
@@ -689,6 +707,7 @@ router.get('/:id/directory/quality-check', authenticateToken, checkTenantAccess,
       checks,
       recommendations,
       itemCount,
+      descriptionSource: seo.description.source,
       canPublish: checks.business_name && checks.cityState && checks.category,
     });
   } catch (error: any) {

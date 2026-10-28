@@ -27,6 +27,7 @@ export default function SeoSettingsPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [seoTags, setSeoTags] = useState<string[]>([]);
+  const [seoTagsSource, setSeoTagsSource] = useState<'profile' | 'directory_seed'>('profile');
   const [tagInput, setTagInput] = useState('');
   const [seoDescription, setSeoDescription] = useState('');
   const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
@@ -41,6 +42,7 @@ export default function SeoSettingsPage() {
 
       if (data) {
         setSeoTags(data.seo_tags || []);
+        setSeoTagsSource(data.seo_tags_source === 'directory_seed' ? 'directory_seed' : 'profile');
         setSeoDescription(data.seo_description || '');
         setSeoKeywords(data.seo_keywords || []);
       }
@@ -105,6 +107,8 @@ export default function SeoSettingsPage() {
         throw new Error('Failed to save SEO settings');
       }
 
+      // The tags are the profile's own from here on.
+      setSeoTagsSource('profile');
       setSuccess('SEO settings saved successfully!');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -250,6 +254,15 @@ export default function SeoSettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {seoTagsSource === 'directory_seed' && seoTags.length > 0 && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 p-3">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Suggested from your directory listing — these tags were derived from your
+                      public listing when it was seeded. Edit them or save to keep them on your
+                      business profile.
+                    </p>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Input
                     value={tagInput}

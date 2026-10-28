@@ -3,6 +3,8 @@ import { clientLogger } from '@/lib/client-logger';
 
 export interface SeoSettings {
   seo_tags: string[];
+  /** `directory_seed` when the tags were inherited from the tenant's seed. */
+  seo_tags_source?: 'profile' | 'directory_seed';
   seo_description: string;
   seo_keywords: string[];
 }

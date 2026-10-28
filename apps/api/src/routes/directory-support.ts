@@ -8,6 +8,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { generateDirectorySupportNoteId } from '../lib/id-generator';
+import { resolveDirectorySeo } from '../services/SeedSeoFallbackService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -105,6 +106,12 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       where: { tenant_id: tenantId, item_status: 'active' },
     });
 
+    // Mirrors the tenant-facing panel: a seeded description counts.
+    const seo = await resolveDirectorySeo(tenantId, {
+      description: settings?.seo_description,
+      keywords: settings?.seo_keywords as string[] | null,
+    });
+
     // Calculate completeness
     const checks = {
       business_name: !!profile?.business_name,
@@ -115,7 +122,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       website: !!profile?.website,
       logo: !!profile?.logo_url,
       hours: !!profile?.hours,
-      description: !!(settings?.seo_description && settings.seo_description.length > 100),
+      description: seo.description.value.length > 100,
       category: !!settings?.primary_category,
       hasItems: itemCount > 0,
       hasMultipleItems: itemCount > 10,
@@ -145,6 +152,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       checks,
       recommendations,
       itemCount,
+      descriptionSource: seo.description.source,
       canPublish: checks.business_name && checks.cityState && checks.category,
     });
   } catch (error: any) {

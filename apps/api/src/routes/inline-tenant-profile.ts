@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getDirectPool } from '../utils/db-pool';
+import { resolveProfileSeoTags } from '../services/SeedSeoFallbackService';
 import { logger } from '../logger';
 
 const router = Router();
@@ -153,6 +154,11 @@ router.get("/api/tenant/profile", authenticateToken, checkTenantAccess, async (r
       };
     }
 
+    // A profile with no tags of its own inherits the directory seed's composed
+    // vocabulary (read-only — saving on the SEO page persists it).
+    const seoTags = await resolveProfileSeoTags(tenant_id, profile.seo_tags);
+    profile = { ...profile, seo_tags: seoTags.tags, seo_tags_source: seoTags.source };
+
     res.json(profile);
   } catch (error) {
     logger.error('[GET /tenant/profile] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
@@ -275,7 +281,10 @@ router.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       return res.status(404).json({ error: "profile_not_found" });
     }
 
-    res.json(profile);
+    // Same seed fallback as the tenant-facing read — product/storefront schema
+    // keywords read this field.
+    const seoTags = await resolveProfileSeoTags(tenant_id, profile.seo_tags);
+    res.json({ ...profile, seo_tags: seoTags.tags, seo_tags_source: seoTags.source });
   } catch (error) {
     logger.error('[GET /public/tenant/:tenant_id/profile] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_profile" });

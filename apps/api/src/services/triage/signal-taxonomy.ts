@@ -53,6 +53,10 @@ export const KNOWN_SIGNAL_CODES = [
   'DS_OUTDATED_HOURS',
   'DS_OUTDATED_HOLIDAY_HOURS',
   'DS_PHOTO_DEFICIT',
+  // Profile taxonomy: the primary category is generic or wrong for the
+  // assortment. Distinct from WC_CATEGORY_MISMATCH, which describes the
+  // owned website's content, not the platform profile's label.
+  'DS_CATEGORY_MISMATCH',
   // Profile presence & integrity (PB-09 / A8)
   'DS_ZERO_INDEXED_PRESENCE',
   'DS_PROFILE_SUSPENDED',

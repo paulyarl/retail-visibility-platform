@@ -121,7 +121,10 @@ const BRONZE_REASON_SIGNAL_MAP: Record<string, SignalCode[]> = {
   zero_or_floor_reviews: ['RA_LOW_REVIEW_VOLUME'],
   community_only_no_reviews: ['RA_LOW_REVIEW_VOLUME'],
   thin_photo_surface: ['DS_PHOTO_DEFICIT'],
-  misaligned_platform_category: ['WC_CATEGORY_MISMATCH'],
+  // The platform profile's own category label, not the website's content —
+  // DS (Digital Surface & Profile) rather than WC, so it routes to PB-01
+  // listing drift instead of PB-08 website gap.
+  misaligned_platform_category: ['DS_CATEGORY_MISMATCH'],
   // A second trading name at the same address/phone is a name-drift
   // (CP_NAP_NAME_DRIFT) AND, when the platform carries two live profiles for
   // one business, a duplicate listing (DS_DUPLICATE_LISTING). The second code

@@ -10,6 +10,9 @@ export interface DirectoryListing {
   isPublished: boolean;
   seoDescription?: string;
   seoKeywords?: string[];
+  /** `directory_seed` when the description/keywords were inherited from the listing. */
+  seoDescriptionSource?: 'settings' | 'directory_seed';
+  seoKeywordsSource?: 'settings' | 'directory_seed';
   primaryCategory?: string;
   secondaryCategories?: string[];
   isFeatured: boolean;

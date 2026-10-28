@@ -36,6 +36,8 @@ export interface DirectoryQualityCheck {
   checks: Record<string, boolean>;
   recommendations: string[];
   itemCount: number;
+  /** `directory_seed` when the description check passed on the seeded narrative. */
+  descriptionSource?: 'settings' | 'directory_seed';
   canPublish: boolean;
 }
 

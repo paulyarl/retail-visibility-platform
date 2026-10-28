@@ -9,6 +9,7 @@ import { Router } from 'express';
 import ShopManagementService from '../services/ShopManagementService';
 import { authenticateToken } from '../middleware/auth';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import { resolveProfileSeoTags } from '../services/SeedSeoFallbackService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 
@@ -414,6 +415,10 @@ router.put('/:tenantId/social', async (req, res) => {
 /**
  * GET /api/shop-management/:tenantId/seo
  * Get SEO settings (seo_tags from business profile + seo_description/seo_keywords from directory settings)
+ *
+ * `seo_tags` falls back to the tenant's directory-seed vocabulary when the
+ * profile has none; `seo_tags_source` says which one the caller is seeing so the
+ * settings page can invite the owner to keep the suggested tags.
  */
 router.get('/:tenantId/seo', async (req, res) => {
   try {
@@ -430,10 +435,13 @@ router.get('/:tenantId/seo', async (req, res) => {
       }),
     ]);
 
+    const seoTags = await resolveProfileSeoTags(tenantId, profile?.seo_tags);
+
     res.json({
       success: true,
       data: {
-        seo_tags: (profile?.seo_tags as string[]) || [],
+        seo_tags: seoTags.tags,
+        seo_tags_source: seoTags.source,
         seo_description: dirSettings?.seo_description || '',
         seo_keywords: dirSettings?.seo_keywords || [],
       },

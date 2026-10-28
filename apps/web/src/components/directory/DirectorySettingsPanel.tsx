@@ -37,6 +37,12 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
   
   const [seoDescription, setSeoDescription] = useState('');
   const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
+  // Where the prefilled description/keywords came from — `directory_seed` means
+  // they were composed for this business's public listing, not typed by the owner.
+  const [seoSource, setSeoSource] = useState<{ description: 'settings' | 'directory_seed'; keywords: 'settings' | 'directory_seed' }>({
+    description: 'settings',
+    keywords: 'settings',
+  });
   const [primaryCategory, setPrimaryCategory] = useState('');
   const [secondaryCategories, setSecondaryCategories] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState('');
@@ -56,6 +62,10 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     if (listing) {
       setSeoDescription(listing.seoDescription || '');
       setSeoKeywords(listing.seoKeywords || []);
+      setSeoSource({
+        description: listing.seoDescriptionSource === 'directory_seed' ? 'directory_seed' : 'settings',
+        keywords: listing.seoKeywordsSource === 'directory_seed' ? 'directory_seed' : 'settings',
+      });
       setPrimaryCategory(listing.primaryCategory || '');
       setSecondaryCategories(listing.secondaryCategories || []);
     }
@@ -474,6 +484,20 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                   </AccordionTrigger>
                   <AccordionContent className="px-6">
                     <div className="space-y-4">
+                      {(seoSource.description === 'directory_seed' || seoSource.keywords === 'directory_seed') && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 p-3">
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            Suggested from your directory listing — we wrote this
+                            {seoSource.description === 'directory_seed' && seoSource.keywords === 'directory_seed'
+                              ? ' description and these keywords'
+                              : seoSource.description === 'directory_seed'
+                                ? ' description'
+                                : ' these keywords'}{' '}
+                            from your public listing when it was seeded. Edit them or save to keep them on your
+                            directory settings.
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <textarea
                           value={seoDescription}
