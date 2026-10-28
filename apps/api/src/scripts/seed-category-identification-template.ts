@@ -83,7 +83,9 @@ Write a 2-4 sentence operator-facing summary of the business's digital footprint
 * Any notable signature products, services, or community role verified during research
 
 === PUBLIC NARRATIVE (required) ===
-Write a factual, public-safe, SEO-rich description of the business for the \`public_narrative\` field. This text will appear on a public directory listing page that visitors and the business owner will see, and it is the primary long-tail SEO surface for unclaimed listings.
+Write a factual, public-safe, SEO-rich description of the business for the \`public_narrative\` field. This is SHELF COPY: it renders as the description on a public directory listing that shoppers browse by category, and it is the primary long-tail SEO surface for unclaimed listings. Write for the shopper scanning a shelf — not for the operator, and not as a business profile.
+
+Use the CURRENT trading name only. Do not mention former or alternate names, previous ownership, or the history of the premises. A shopper who never knew the old name is confused by it, and a listing that opens with "formerly X" reads as stale.
 
 Include:
 * What the business is (category, format, specialization — use the specific category label, not a generic one)
@@ -101,7 +103,7 @@ Exclude (these are internal assessment content — never public):
 
 Tone: warm and professional — a knowledgeable local describing the business to a neighbor. Welcoming and plain-spoken, never casual or promotional: third person only, no exclamation marks, no superlatives, no hype. The business did not write this text and has not claimed the listing — write about the business, not as or for it.
 
-Length: 2-4 sentences, 300-600 characters. Write in third person. Be specific and vivid. Do not invent details; use only verified public information.
+Length: 2-3 sentences, 200-400 characters — the listing hard-caps at 500 including the platform disclosure sentence. Write in third person. Be specific and vivid. Do not invent details; use only verified public information.
 
 === DIGITAL FOOTPRINT (required) ===
 Capture a structured snapshot of what you found across platforms in the \`digital_footprint\` block:

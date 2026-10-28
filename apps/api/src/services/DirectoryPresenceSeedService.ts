@@ -47,6 +47,10 @@ import {
   DISCLOSURE_SENTENCE,
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
+import {
+  resolveSeedListingNarrative,
+  type SeedListingNarrativeSource,
+} from './intelligence/auditPublicNarrative';
 import { resolveCatIdPublicNarrative } from './intelligence/auditPublicNarrative';
 import {
   extractAttributesFromAuditData,
@@ -3327,12 +3331,13 @@ class DirectoryPresenceSeedService {
     // precedence the backfill applies, here at birth so a scan-born seed never
     // starts life on "X is a Y. Listed on VisibleShelf from public
     // information" when the scan wrote real copy.
-    const discoveryDescription = await this.resolveDiscoveryDescription(campaignId, businessName);
-    const descriptionSource = discoveryDescription ? 'discovery_scan' : 'seed_seo_composer';
-    if (discoveryDescription) {
-      seoPacket.description = discoveryDescription.endsWith(DISCLOSURE_SENTENCE)
-        ? discoveryDescription
-        : discoveryDescription + DISCLOSURE_SENTENCE;
+    const resolvedNarrative = await this.resolveDiscoveryDescription(campaignId, businessName);
+    const descriptionSource = resolvedNarrative?.source ?? 'seed_seo_composer';
+    if (resolvedNarrative) {
+      const narrativeText = resolvedNarrative.narrative;
+      seoPacket.description = narrativeText.endsWith(DISCLOSURE_SENTENCE)
+        ? narrativeText
+        : narrativeText + DISCLOSURE_SENTENCE;
     }
 
     // ── Sourced attributes (migration 267) ───────────────────────────────
@@ -4404,74 +4409,24 @@ class DirectoryPresenceSeedService {
    * analyst narrative. Returns null when no lane has one — callers then fall
    * back to the composed packet, which is the honest result.
    */
+  /**
+   * Narrative a seed's public listing should carry. Precedence lives in
+   * resolveSeedListingNarrative (cat-id, then business analysis, then the
+   * discovery scan on the campaign, then on its parent) because
+   * directory_listings_list.description is a cat surface. Returns the source
+   * too, so provenance records which lane actually supplied the copy rather
+   * than stamping every narrative as "discovery_scan".
+   */
   private async resolveDiscoveryDescription(
     campaignId: string | null,
     businessName: string,
-  ): Promise<string | null> {
-    if (!campaignId) return null;
-
-    const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
-      where: { id: campaignId },
-      select: { parent_campaign_id: true },
-    });
-
-    // Lane 1 — the category_identification narrative, top dog on this surface.
-    // The cat-id analyst is what filed this business onto its shelves, and the
-    // listing description IS a cat surface — so its public_narrative outranks
-    // every other lane, business analysis included.
-    // Cat-id audits usually live on the scan campaign, so the shared resolver
-    // checks the campaign then its parent.
-    const catIdNarrative = await resolveCatIdPublicNarrative(
-      prisma as any,
+  ): Promise<{ narrative: string; source: SeedListingNarrativeSource } | null> {
+    const resolved = await resolveSeedListingNarrative(prisma as any, {
       campaignId,
-      (campaign as any)?.parent_campaign_id ?? null,
-    );
-    if (catIdNarrative) return this.clampDescription(catIdNarrative);
-
-    // Lane 2 — the linked campaign's own business_analysis narrative. A real
-    // business analysis has examined this business, so its narrative outranks
-    // anything a discovery blurb can say. Stub audits are skipped: they carry
-    // no narrative, and that is precisely when the discovery ladder below is
-    // the right answer.
-    const businessAudits = await (prisma as any).mkt_audits_list.findMany({
-      where: { campaign_id: campaignId, platform: 'business_analysis' },
-      orderBy: { created_at: 'desc' },
-      take: 10,
+      businessName,
     });
-    for (const businessAudit of Array.isArray(businessAudits) ? businessAudits : []) {
-      if (isStubBusinessAnalysisAudit(businessAudit)) continue;
-      const auditData = (businessAudit as any)?.audit_data ?? {};
-      const narrative = [auditData.summary, auditData.business_summary, auditData.description, auditData.narrative]
-        .find((v: any) => typeof v === 'string' && v.trim().length > 0);
-      if (narrative) return this.clampDescription(String(narrative).trim());
-    }
-
-    // The discovery scan lives on the campaign that ran it. A seed promoted
-    // straight from that campaign finds it at once; a seed whose campaign was
-    // derived from discovery (the "+ Campaign" path) must look one level up,
-    // because the child campaign only carries business_analysis audits.
-    const campaignIds = [campaignId, (campaign as any)?.parent_campaign_id]
-      .filter((id): id is string => typeof id === 'string' && id.length > 0);
-
-    const scans = await (prisma as any).mkt_audits_list.findMany({
-      where: { campaign_id: { in: campaignIds }, platform: 'intelligence_discovery' },
-      orderBy: { created_at: 'desc' },
-      take: 5,
-    });
-    const wanted = businessName.trim().toLowerCase();
-    for (const scan of Array.isArray(scans) ? scans : []) {
-      const list = (scan as any)?.audit_data?.discovered_businesses;
-      if (!Array.isArray(list)) continue;
-      const hit = list.find(
-        (b: any) =>
-          typeof b?.business_name === 'string' &&
-          b.business_name.trim().toLowerCase() === wanted,
-      );
-      if (hit && typeof hit.description === 'string' && hit.description.trim()) {
-        return hit.description.trim();
-      }
-    }
-    return null;
+    if (!resolved) return null;
+    return { narrative: this.clampDescription(resolved.narrative), source: resolved.source };
   }
 
   async getComposedEnrichment(seedId: string, ctx?: RequestCtx): Promise<any> {
@@ -4578,18 +4533,19 @@ class DirectoryPresenceSeedService {
     // preview panel, "Reset to composed" and the backfill all resolve to the
     // same copy — the scan's, not boilerplate.
     if (packet && linkedCampaignId) {
-      const discoveryDescription = await this.resolveDiscoveryDescription(
+      const resolvedNarrative = await this.resolveDiscoveryDescription(
         linkedCampaignId,
         row.business_name || '',
       );
-      if (discoveryDescription) {
+      if (resolvedNarrative) {
+        const narrativeText = resolvedNarrative.narrative;
         packet = {
           ...packet,
-          description: discoveryDescription.endsWith(DISCLOSURE_SENTENCE)
-            ? discoveryDescription
-            : discoveryDescription + DISCLOSURE_SENTENCE,
+          description: narrativeText.endsWith(DISCLOSURE_SENTENCE)
+            ? narrativeText
+            : narrativeText + DISCLOSURE_SENTENCE,
         };
-        sourceName = 'discovery_scan';
+        sourceName = resolvedNarrative.source;
       }
     }
 

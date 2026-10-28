@@ -319,7 +319,7 @@ const PUBLIC_NARRATIVE_SCHEMA_LINE = '"summary": "",\n  "public_narrative": ""';
 const PUBLIC_NARRATIVE_DIRECTIVE = `
 ### Public Narrative (required)
 
-Write a factual, public-safe, SEO-rich description of the business for the \`public_narrative\` field. This text will appear on a public directory listing page that visitors and the business owner will see, and it is the primary long-tail SEO surface for unclaimed listings — it must help the listing rank for the searches real customers actually type.
+Write a factual, public-safe, SEO-rich description of the business for the \`public_narrative\` field. This copy has two readers: the operator, who sees it in the seed report as the summary of what public sources established about the business, and the general public, who reads it on the business's own page. Write for both — depth on ownership, history, operations and the range of what the business carries, drawn only from verified public information. It is NOT the directory shelf card: the category-identification pass owns that surface, and its shorter, shopper-facing copy wins there.
 
 Include:
 * What the business is (category, format, specialization — prefer the requested category label ({{category}}) verbatim when it is accurate: it names the shelf the listing is filed under; otherwise use the most specific accurate label, never a generic one)
