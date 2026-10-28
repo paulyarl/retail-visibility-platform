@@ -12,6 +12,7 @@ import AccessDenied from '@/components/AccessDenied';
 import { Spinner } from '@/components/ui';
 import { onboardingDataService } from '@/services/onboardingDataService';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
+import { mergeTenantProfile } from '@/lib/settings/tenant-profile-merge';
 import { clientLogger } from '@/lib/client-logger';
 
 
@@ -72,36 +73,10 @@ export default function TenantBusinessProfilePage() {
     const onboardingData = await loadOnboardingData();
     //console.log('[TenantSettings] Onboarding data:', onboardingData);
     //console.log('[TenantSettings] Profile data:', profileData);
-    if (!profileData) {
-      // If no profile exists, use onboarding data as base
-      setMergedProfile(onboardingData as BusinessProfile);
-      return;
-    }
-    
-    // Merge profile data with onboarding data
-    // Priority: existing profile > onboarding data
-    const merged: BusinessProfile = {
-      business_name: profileData.business_name || onboardingData.business_name || '',
-      address_line1: profileData.address_line1 || onboardingData.address_line1 || '',
-      address_line2: profileData.address_line2 || onboardingData.address_line2 || '',
-      city: profileData.city || onboardingData.city || '',
-      state: profileData.state || onboardingData.state || '',
-      postal_code: profileData.postal_code || onboardingData.postal_code || '',
-      country_code: profileData.country_code || onboardingData.country_code || 'US',
-      phone_number: profileData.phone_number || onboardingData.phone_number || '',
-      email: profileData.email || onboardingData.email || '',
-      website: profileData.website || onboardingData.website || '',
-      contact_person: profileData.contact_person || onboardingData.contact_person || '',
-      logo_url: profileData.logo_url || onboardingData.logo_url || '',
-      business_description: profileData.business_description || onboardingData.business_description || '',
-      social_links: profileData.social_links || onboardingData.social_links || {},
-      latitude: profileData.latitude || onboardingData.latitude,
-      longitude: profileData.longitude || onboardingData.longitude,
-      slug: (profileData as any).slug || (onboardingData as any).slug || '',
-    };
-    
-    //console.log('[TenantSettings] Merged profile data:', merged);
-    setMergedProfile(merged);
+    // Profile wins, onboarding fills the gaps. The helper carries every field
+    // the readiness score reads (hours/seo_tags included) so the card can't
+    // under-report a profile that has them stored.
+    setMergedProfile(mergeTenantProfile(profileData, onboardingData));
   };
 
   const loadProfile = async () => {
