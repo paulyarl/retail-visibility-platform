@@ -340,6 +340,15 @@ export function getMissingProfileFields(profile: Partial<BusinessProfile>): stri
     .map((field) => FIELD_LABELS[field]);
 }
 
+// Enrichment fields that are still empty. They don't block "SEO Ready" but they
+// are the remainder of the percentage, so the card names them instead of leaving
+// a bare "93%" with no way to close the gap.
+export function getOptionalProfileFields(profile: Partial<BusinessProfile>): string[] {
+  return ENRICHMENT_PROFILE_FIELDS
+    .filter((field) => !isFieldPresent(profile, field))
+    .map((field) => FIELD_LABELS[field]);
+}
+
 // Helper to check if profile is complete for SEO
 export function isSEOReady(profile: Partial<BusinessProfile>): boolean {
   return getMissingProfileFields(profile).length === 0 && calculateSEOReadiness(profile) >= 85;

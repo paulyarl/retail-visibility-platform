@@ -159,6 +159,16 @@ export interface IntelligenceProfile {
   status: IntelligenceProfileStatus;
   created_at: Date;
   updated_at: Date;
+  /**
+   * listDrafts() annotation only — true when nothing is active at this
+   * draft's scope tuple, i.e. the draft is a profile awaiting its first
+   * activation. False when an active profile already covers the same
+   * (category_key, focus, city, state, platform): the draft is then a
+   * candidate pool / next-version draft produced by a later scan or a
+   * consumer write-back, and must not be presented as "ready to activate".
+   * Absent on every other read path.
+   */
+  awaiting_activation?: boolean;
 }
 
 export interface IntelligenceProfileConfiguration {
@@ -332,6 +342,29 @@ export function normalizeReferenceState(s: string | null | undefined): string | 
 export function normalizePlatformScope(s: string | null | undefined): string | null {
   const normalized = s ? s.trim().toLowerCase() || null : null;
   return normalized === 'all' ? null : normalized;
+}
+
+/**
+ * Stringify the identity tuple that scopes ONE active profile — mirrors the
+ * partial unique index idx_mkt_intel_profiles_active_scope and activateDraft's
+ * retire filter. NULL city/state/platform are distinct scope values (a
+ * city-agnostic draft must not match a city-scoped profile), so they are
+ * kept as empty strings rather than dropped.
+ */
+function profileScopeTuple(p: {
+  category_key: string;
+  intelligence_focus: string;
+  reference_city?: string | null;
+  reference_state?: string | null;
+  reference_platform?: string | null;
+}): string {
+  return [
+    p.category_key,
+    p.intelligence_focus,
+    p.reference_city ?? '',
+    p.reference_state ?? '',
+    p.reference_platform ?? '',
+  ].join('|');
 }
 
 // ─── Platform signal weights (signal-weight spec) ────────────────────────
@@ -1057,16 +1090,41 @@ export class IntelligenceProfileService extends BaseService {
   }
 
   /**
-   * List all draft profiles awaiting activation (GAP-P8 — for admin UI).
+   * List all draft profiles (GAP-P8 — for admin UI).
    * Optional focus filter — e.g. 'gold_standards' to list only gold-standard drafts.
+   *
+   * Each row carries `awaiting_activation`: a draft whose scope tuple already
+   * has an ACTIVE profile is a candidate pool / next-version draft (a scan or
+   * consumer write-back landed on an established market), NOT a profile
+   * awaiting its first activation. Activating it would replace the operator's
+   * committed board, so the admin surfaces must not offer it as "ready to
+   * activate" — see the profile-activation regression guard in activateDraft.
    */
   async listDrafts(focus?: IntelligenceFocus, ctx?: RequestCtx): Promise<IntelligenceProfile[]> {
     try {
-      const profiles = await this.prisma.mkt_intelligence_profiles.findMany({
-        where: { status: 'draft', ...(focus ? { intelligence_focus: focus } : {}) },
-        orderBy: [{ category_key: 'asc' }, { version: 'desc' }],
-      });
-      return profiles as IntelligenceProfile[];
+      const [profiles, active] = await Promise.all([
+        this.prisma.mkt_intelligence_profiles.findMany({
+          where: { status: 'draft', ...(focus ? { intelligence_focus: focus } : {}) },
+          orderBy: [{ category_key: 'asc' }, { version: 'desc' }],
+        }),
+        this.prisma.mkt_intelligence_profiles.findMany({
+          where: { status: 'active', ...(focus ? { intelligence_focus: focus } : {}) },
+          select: {
+            category_key: true,
+            intelligence_focus: true,
+            reference_city: true,
+            reference_state: true,
+            reference_platform: true,
+          },
+        }),
+      ]);
+      const establishedScopes = new Set(
+        (active as Array<Parameters<typeof profileScopeTuple>[0]>).map(profileScopeTuple),
+      );
+      return (profiles as IntelligenceProfile[]).map((profile) => ({
+        ...profile,
+        awaiting_activation: !establishedScopes.has(profileScopeTuple(profile)),
+      }));
     } catch (error) {
       logger.error('IntelligenceProfileService.listDrafts failed', ctx, { error: (error as Error).message });
       throw this.handleError(error, ctx);
@@ -1290,6 +1348,24 @@ export class IntelligenceProfileService extends BaseService {
         }
         if (draft.status !== 'draft') {
           throw new Error(`Profile ${profileId} v${version} is not a draft (status: ${draft.status})`);
+        }
+
+        // 1b. Regression guard. A draft older than the version already
+        //     active for this profile id must never be activated: the
+        //     "retire the active, activate the draft" pair would roll the
+        //     profile BACKWARDS, discarding the newer board (and any fills
+        //     committed to it). Older drafts are left behind whenever a
+        //     fill/consumer write-back creates a new active version, or a
+        //     newer draft is activated — activating one used to silently
+        //     revert the profile. Newer drafts promote normally.
+        const newerActive = await tx.mkt_intelligence_profiles.findFirst({
+          where: { id: profileId, status: 'active', version: { gt: version } },
+          orderBy: { version: 'desc' },
+        });
+        if (newerActive) {
+          throw new Error(
+            `Profile ${profileId} v${version} is older than the active v${(newerActive as any).version} — activating it would roll the profile back. Activate a newer draft instead.`,
+          );
         }
 
         // 2. Retire any existing active version for this

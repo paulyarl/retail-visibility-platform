@@ -214,6 +214,10 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
   const bestDraft = draftProfiles[0] ?? null;
   const detailProfile = activeProfile ?? bestDraft;
   const detailIsDraft = !activeProfile && bestDraft != null;
+  // A draft whose scope already has an active profile is the latest scan's
+  // candidate pool — its finds are promoted slot by slot from the campaign
+  // panel, so it is NOT awaiting activation and must not be listed as such.
+  const awaitingDrafts = draftProfiles.filter((p) => p.awaiting_activation !== false);
 
   // Per-platform gold-standard slot counts + occupants from the rendered
   // profile's candidates. Gold-standards-only — emerging/competitive profiles
@@ -311,7 +315,9 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
           ) : (
             <div className="text-sm text-gray-400">
               {bestDraft
-                ? `No active profile yet — draft v${bestDraft.version} awaiting activation`
+                ? bestDraft.awaiting_activation === false
+                  ? `No active profile at this scope — draft v${bestDraft.version} is a candidate pool for the active profile`
+                  : `No active profile yet — draft v${bestDraft.version} awaiting activation`
                 : 'No active profile yet'}
             </div>
           )}
@@ -427,17 +433,17 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
         <div className="text-xs text-red-600 dark:text-red-400">{error}</div>
       )}
 
-      {draftProfiles.length > 0 && (
+      {awaitingDrafts.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
           <h5 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">
-            Draft Profiles Awaiting Review ({draftProfiles.length})
+            Draft Profiles Awaiting Review ({awaitingDrafts.length})
           </h5>
           <p className="text-xs text-blue-800 dark:text-blue-400 mb-3">
             The establishment scan produced a draft {theme.establishmentNoun}. Review and activate it
             in the Intelligence Profiles page before running {isGoldStandard ? 'discovery campaigns' : `${theme.label.toLowerCase()} discovery campaigns`}.
           </p>
           <div className="space-y-2">
-            {draftProfiles.map((p) => (
+            {awaitingDrafts.map((p) => (
               <div key={`${p.id}-${p.version}`} className="flex items-center justify-between bg-white dark:bg-neutral-800 rounded p-2 border border-blue-100 dark:border-blue-800">
                 <div className="text-sm">
                   <span className="font-medium text-gray-900 dark:text-white">{p.category_name}</span>

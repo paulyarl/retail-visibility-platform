@@ -65,4 +65,23 @@ describe('BusinessProfileCard — logo awareness', () => {
     expect(withoutLogo).toContain('94%');
     expect(withLogo).toContain('100%');
   });
+
+  it('names the enrichment gaps when the profile is ready but not at 100%', () => {
+    // The live shape for a claimed tenant: logo + hours + socials, no contact
+    // person and no SEO tags → 60 + 25 + 7.5 = 93%.
+    const { contact_person, seo_tags, ...liveShape } = baseProfile;
+    const html = render({ ...liveShape, logo_url: 'https://cdn.example.com/logo.png' });
+
+    expect(html).toContain('93%');
+    expect(html).toContain('SEO Ready');
+    expect(html).not.toContain('Missing:');
+    expect(html).toContain('Optional: Contact person, SEO tags');
+  });
+
+  it('says nothing extra once the profile is at 100%', () => {
+    const html = render({ ...baseProfile, logo_url: 'https://cdn.example.com/logo.png' });
+
+    expect(html).not.toContain('Missing:');
+    expect(html).not.toContain('Optional:');
+  });
 });

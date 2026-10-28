@@ -11,6 +11,7 @@ import {
   BusinessProfile,
   calculateSEOReadiness,
   getMissingProfileFields,
+  getOptionalProfileFields,
   isSEOReady,
 } from './businessProfile';
 
@@ -100,5 +101,21 @@ describe('getMissingProfileFields', () => {
 
   it('is empty for a complete profile', () => {
     expect(getMissingProfileFields(completeProfile)).toEqual([]);
+  });
+});
+
+describe('getOptionalProfileFields', () => {
+  it('names the enrichment gaps that make up the rest of the percentage', () => {
+    const { contact_person, seo_tags, ...rest } = completeProfile;
+    expect(getOptionalProfileFields(rest)).toEqual(['Contact person', 'SEO tags']);
+  });
+
+  it('is empty once every enrichment field is filled', () => {
+    expect(getOptionalProfileFields(completeProfile)).toEqual([]);
+  });
+
+  it('does not list required/trust fields — those are the blocking set', () => {
+    const { logo_url, website, ...rest } = completeProfile;
+    expect(getOptionalProfileFields(rest)).toEqual([]);
   });
 });

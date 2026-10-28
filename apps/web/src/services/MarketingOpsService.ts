@@ -7511,6 +7511,14 @@ export interface IntelligenceProfile {
   status: ProfileStatus;
   created_at: string;
   updated_at: string;
+  /**
+   * Draft lists only (`listIntelligenceProfileDrafts`). False when an ACTIVE
+   * profile already covers this draft's scope — the row is then a candidate
+   * pool / next-version draft from a later scan, not a profile awaiting its
+   * first activation. Absent (undefined) on every other read path, so callers
+   * must treat `!== false` as "awaiting activation".
+   */
+  awaiting_activation?: boolean;
 }
 
 export interface IntelligenceProfileWithVersions extends IntelligenceProfile {

@@ -448,6 +448,11 @@ export default function IntelligenceProfilesClient() {
     const key = `${profile.id}:${profile.version}`;
     const gsSummary = goldStandardSummary(profile);
     const bsSummary = bronzeStandardSummary(profile);
+    // A draft whose scope already has an active profile is the latest scan's
+    // candidate pool for that profile — activating it wholesale would replace
+    // the operator's committed board, so it is not offered as "ready to
+    // activate" (its finds are promoted per-slot from the campaign panel).
+    const awaitingActivation = profile.awaiting_activation !== false;
 
     return (
       <Paper key={key} shadow="xs" radius="md" withBorder p="md" mb="sm">
@@ -476,6 +481,16 @@ export default function IntelligenceProfilesClient() {
                 {platformLabel(profile.reference_platform || 'all')}
               </Badge>
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
+              {isDraft && !awaitingActivation && (
+                <Badge
+                  size="xs"
+                  variant="light"
+                  color="cyan"
+                  title="An active profile already covers this category, focus and scope — this draft holds the latest scan's candidate fills."
+                >
+                  Candidate pool
+                </Badge>
+              )}
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
             <Text size="xs" c="dimmed">
@@ -519,7 +534,7 @@ export default function IntelligenceProfilesClient() {
             >
               View
             </Button>
-            {isDraft && (
+            {isDraft && awaitingActivation && (
               <Button
                 size="xs"
                 color="green"
@@ -560,6 +575,13 @@ export default function IntelligenceProfilesClient() {
       </Paper>
     );
   };
+
+  // Split the draft list: only drafts with nothing active at their scope are
+  // awaiting activation. Everything else is a scan candidate pool for an
+  // already-established profile — activating one wholesale would replace the
+  // operator's committed board, so it never renders an Activate action.
+  const awaitingDrafts = draftProfiles.filter((p) => p.awaiting_activation !== false);
+  const candidatePoolDrafts = draftProfiles.filter((p) => p.awaiting_activation === false);
 
   return (
     <Stack gap="md">
@@ -608,26 +630,45 @@ export default function IntelligenceProfilesClient() {
         </Group>
       ) : (
         <>
-          {/* Draft Profiles */}
+          {/* Draft Profiles — only drafts with nothing active at their scope */}
           <div>
             <Group gap="xs" mb="xs">
               <IconBrain size={18} />
               <Text size="sm" fw={600}>Draft Profiles</Text>
-              <Badge size="sm" variant="light" color="orange">{draftProfiles.length}</Badge>
+              <Badge size="sm" variant="light" color="orange">{awaitingDrafts.length}</Badge>
             </Group>
             <Text size="xs" c="dimmed" mb="sm">
               Drafts are inert — they don&apos;t affect any prompts until explicitly activated.
               Activating a draft retires the previously active version for the same category
               <strong> and focus type</strong>.
             </Text>
-            {draftProfiles.length === 0 ? (
+            {awaitingDrafts.length === 0 ? (
               <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
                 <Text size="xs" c="dimmed">No draft profiles awaiting activation.</Text>
               </Paper>
             ) : (
-              draftProfiles.map((p) => renderProfileCard(p, true))
+              awaitingDrafts.map((p) => renderProfileCard(p, true))
             )}
           </div>
+
+          {/* Scan candidate pools — drafts for scopes that already have an
+              active profile. Never activatable wholesale: their finds are
+              promoted slot by slot from the campaign that produced them. */}
+          {candidatePoolDrafts.length > 0 && (
+            <div>
+              <Group gap="xs" mb="xs">
+                <IconBrain size={18} />
+                <Text size="sm" fw={600}>Scan Candidate Pools</Text>
+                <Badge size="sm" variant="light" color="cyan">{candidatePoolDrafts.length}</Badge>
+              </Group>
+              <Text size="xs" c="dimmed" mb="sm">
+                These drafts were produced by a scan or consumer write-back for a category, focus and
+                scope that already has an active profile. They are not awaiting activation — review
+                their discovered fills on the campaign that produced them and promote them slot by slot.
+              </Text>
+              {candidatePoolDrafts.map((p) => renderProfileCard(p, true))}
+            </div>
+          )}
 
           <Divider />
 

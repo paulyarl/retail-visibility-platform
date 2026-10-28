@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Skeleton } from '@/components/ui';
 import EditBusinessProfileModal from './EditBusinessProfileModal';
-import { BusinessProfile, calculateSEOReadiness, isSEOReady, getMissingProfileFields, formatPhoneNumber, countries } from '@/lib/validation/businessProfile';
+import { BusinessProfile, calculateSEOReadiness, isSEOReady, getMissingProfileFields, getOptionalProfileFields, formatPhoneNumber, countries } from '@/lib/validation/businessProfile';
 import { Button } from '@mantine/core';
 
 interface BusinessProfileCardProps {
@@ -79,6 +79,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
   const seoScore = calculateSEOReadiness(profile);
   const seoReady = isSEOReady(profile);
   const missingFields = getMissingProfileFields(profile);
+  const optionalFields = seoReady ? getOptionalProfileFields(profile) : [];
   const country = countries.find(c => c.code === profile.country_code);
 
   return (
@@ -262,6 +263,15 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Missing: {missingFields.join(', ')}
+              </p>
+            )}
+
+            {missingFields.length === 0 && optionalFields.length > 0 && (
+              <p className="text-xs text-neutral-500 mt-2 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Optional: {optionalFields.join(', ')} — add these to reach 100%
               </p>
             )}
           </div>

@@ -127,6 +127,10 @@ export default function BronzeStandardDiscoveryPanel({ campaign }: Props) {
 
   const bestDraft = draftProfiles[0] ?? null;
   const boardProfile = activeProfile ?? bestDraft;
+  // A draft whose scope already has an active profile is a candidate pool, not
+  // a profile awaiting its first activation. It only lands on the board when
+  // the active profile did not resolve for this campaign's scope.
+  const boardIsCandidatePool = !activeProfile && bestDraft?.awaiting_activation === false;
   const boardConfig = boardProfile ? bronzeProfileConfig(boardProfile) : null;
   const coverage: BronzeReasonCoverageEntry[] = boardConfig?.reason_coverage ?? [];
   const catalogLabels = new Map<string, string>();
@@ -328,24 +332,43 @@ export default function BronzeStandardDiscoveryPanel({ campaign }: Props) {
         </div>
       )}
 
-      {/* Draft notice — no active profile yet */}
+      {/* Draft notice — no active profile resolved at this campaign's scope */}
       {!loading && !activeProfile && bestDraft && (
-        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-1">
-            Draft v{bestDraft.version} Awaiting Activation
-          </h4>
-          <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
-            The imported scan produced a draft bronze profile (shown below as proposed coverage).
-            Activate it in the Intelligence Profiles page to establish the slot board — after that,
-            discovery fills commit to the active profile one version at a time.
-          </p>
-          <a
-            href="/settings/admin/marketing-ops/intelligence-profiles"
-            className="inline-block mt-2 text-xs text-amber-700 dark:text-amber-400 hover:underline"
-          >
-            Review &amp; Activate →
-          </a>
-        </div>
+        boardIsCandidatePool ? (
+          <div className="bg-cyan-50 dark:bg-cyan-900/10 border border-cyan-200 dark:border-cyan-700 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-cyan-900 dark:text-cyan-300 mb-1">
+              Candidate Pool for the Active Profile
+            </h4>
+            <p className="text-xs text-cyan-800 dark:text-cyan-400 leading-relaxed">
+              An active bronze profile already covers this category and focus, so draft v{bestDraft.version}
+              is not awaiting activation — it holds the latest scan&apos;s candidate fills. Promote them
+              into the active profile&apos;s slots instead of activating the draft.
+            </p>
+            <a
+              href="/settings/admin/marketing-ops/intelligence-profiles"
+              className="inline-block mt-2 text-xs text-cyan-700 dark:text-cyan-400 hover:underline"
+            >
+              Open Intelligence Profiles →
+            </a>
+          </div>
+        ) : (
+          <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-1">
+              Draft v{bestDraft.version} Awaiting Activation
+            </h4>
+            <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
+              The imported scan produced a draft bronze profile (shown below as proposed coverage).
+              Activate it in the Intelligence Profiles page to establish the slot board — after that,
+              discovery fills commit to the active profile one version at a time.
+            </p>
+            <a
+              href="/settings/admin/marketing-ops/intelligence-profiles"
+              className="inline-block mt-2 text-xs text-amber-700 dark:text-amber-400 hover:underline"
+            >
+              Review &amp; Activate →
+            </a>
+          </div>
+        )
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -385,11 +408,15 @@ export default function BronzeStandardDiscoveryPanel({ campaign }: Props) {
       {!loading && boardProfile && coverage.length > 0 && (
         <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
           <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-            {activeProfile ? 'Reason Slots' : `Proposed Coverage — draft v${boardProfile.version}`}
+            {activeProfile
+              ? 'Reason Slots'
+              : `${boardIsCandidatePool ? 'Candidate Coverage' : 'Proposed Coverage'} — draft v${boardProfile.version}`}
           </h5>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {activeProfile
               ? 'Committed slot occupancy on the active bronze profile. Removing an occupant frees the slot for a new fill.'
+              : boardIsCandidatePool
+              ? 'The scan\u2019s discovered fills for the already-active profile. They are not committed until promoted into a slot.'
               : 'The imported scan is a draft — its fills are not committed until the draft is activated.'}
           </p>
           <div className="space-y-3">
