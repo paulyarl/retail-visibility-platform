@@ -11,6 +11,7 @@
  *
  * Options:
  *   --batch <label>  limit to one seed batch
+ *   --campaign <id>  limit to seeds whose primary link is this campaign
  *   --limit <n>      stop after n seeds (useful for a spot check)
  *   --json <path>    also write the full result set as JSON
  */
@@ -35,6 +36,7 @@ type Row = {
   city: string | null;
   phone: string | null;
   description_source: string | null;
+  primary_campaign_id: string | null;
 };
 
 type Verdict =
@@ -48,6 +50,7 @@ type Verdict =
 type ReportRow = {
   slug: string;
   batch: string | null;
+  campaignId: string | null;
   status: string;
   currentPublishable: boolean;
   currentBlockers: SeedPublishabilityBlocker[];
@@ -75,6 +78,7 @@ function facts(row: Row, description = row.description) {
 
 async function main() {
   const batch = arg('--batch');
+  const campaign = arg('--campaign');
   const limit = Number(arg('--limit') ?? 0);
   const jsonPath = arg('--json');
 
@@ -96,7 +100,14 @@ async function main() {
         WHERE dfp.seed_id = dps.id AND dfp.field_key = 'description'
         ORDER BY dfp.updated_at DESC NULLS LAST
         LIMIT 1
-      ) AS description_source
+      ) AS description_source,
+      (
+        SELECT dscl.campaign_id
+        FROM directory_seed_campaign_links dscl
+        WHERE dscl.seed_id = dps.id AND dscl.link_role = 'primary'
+        ORDER BY dscl.created_at ASC
+        LIMIT 1
+      ) AS primary_campaign_id
     FROM directory_presence_seeds dps
     JOIN directory_listings_list dll ON dll.id = dps.listing_id
     WHERE dps.status IN ('published', 'invited', 'claimed')
@@ -104,7 +115,9 @@ async function main() {
     ORDER BY dps.seed_batch, dll.slug
   `;
 
-  const filtered = (batch ? rows.filter((row) => row.seed_batch === batch) : rows)
+  const filtered = rows
+    .filter((row) => (batch ? row.seed_batch === batch : true))
+    .filter((row) => (campaign ? row.primary_campaign_id === campaign : true))
     .slice(0, limit > 0 ? limit : undefined);
 
   const results: ReportRow[] = [];
@@ -143,6 +156,7 @@ async function main() {
     results.push({
       slug: row.slug,
       batch: row.seed_batch,
+      campaignId: row.primary_campaign_id,
       status: row.status,
       currentPublishable: current.publishable,
       currentBlockers: current.blockers,
@@ -175,6 +189,24 @@ async function main() {
   console.log(`  seeds scanned: ${results.length}`);
   for (const [verdict, count] of Object.entries(counts).sort()) {
     console.log(`  ${verdict}: ${count}`);
+  }
+
+  // Per-campaign roll-up — the phase gate for the re-discovery run. A phase is
+  // solid when `recompose_would_publish` rises and `still_thin` falls without
+  // turning an `already_publishable` seed thin.
+  const byCampaign = results.reduce<Record<string, Record<string, number>>>((acc, row) => {
+    const key = row.campaignId ?? '(no primary campaign)';
+    acc[key] = acc[key] ?? {};
+    acc[key][row.verdict] = (acc[key][row.verdict] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log('\nBy primary campaign');
+  for (const [campaignId, verdicts] of Object.entries(byCampaign).sort()) {
+    const total = Object.values(verdicts).reduce((sum, n) => sum + n, 0);
+    console.log(`  ${campaignId} (${total})`);
+    for (const [verdict, count] of Object.entries(verdicts).sort()) {
+      console.log(`    ${verdict}: ${count}`);
+    }
   }
 
   if (jsonPath) {

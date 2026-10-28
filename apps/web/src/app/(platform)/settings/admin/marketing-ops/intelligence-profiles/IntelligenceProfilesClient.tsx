@@ -545,6 +545,36 @@ export default function IntelligenceProfilesClient() {
                 Activate
               </Button>
             )}
+            {/* Candidate-pool draft: its scope already has an active profile, so
+                this is a NEXT VERSION rather than a first activation. The API
+                permits it (activateDraft only rejects non-drafts and drafts
+                older than the active version), so offer the action explicitly —
+                without it a re-establishment import lands with no way to commit
+                except deleting it. Confirm-gated because it retires the board. */}
+            {isDraft && !awaitingActivation && (
+              <Menu position="bottom-end" withinPortal>
+                <Menu.Target>
+                  <Button
+                    size="xs"
+                    color="orange"
+                    variant="light"
+                    leftSection={<IconCircleCheck size={14} />}
+                    loading={activating === key}
+                  >
+                    Replace active
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Confirm activation</Menu.Label>
+                  <Menu.Item
+                    leftSection={<IconCircleCheck size={14} />}
+                    onClick={() => handleActivate(profile.id, profile.version)}
+                  >
+                    Activate v{profile.version} — retires the active profile for this scope
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            )}
             {isDraft && (
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target>
@@ -630,45 +660,37 @@ export default function IntelligenceProfilesClient() {
         </Group>
       ) : (
         <>
-          {/* Draft Profiles — only drafts with nothing active at their scope */}
+          {/* Draft Profiles — EVERY draft, including next-version drafts for a
+              scope that already has an active profile. Both classes are drafts
+              the operator may need to act on, so they share one list; the card
+              decides the action (Activate vs Replace active). Splitting them
+              into two sections left this one reading "0 — nothing awaiting
+              activation" while the drafts sat below in a pool list. */}
           <div>
             <Group gap="xs" mb="xs">
               <IconBrain size={18} />
               <Text size="sm" fw={600}>Draft Profiles</Text>
-              <Badge size="sm" variant="light" color="orange">{awaitingDrafts.length}</Badge>
+              <Badge size="sm" variant="light" color="orange">{draftProfiles.length}</Badge>
+              {candidatePoolDrafts.length > 0 && (
+                <Text size="xs" c="dimmed">
+                  {candidatePoolDrafts.length} next-version (scope already active)
+                </Text>
+              )}
             </Group>
             <Text size="xs" c="dimmed" mb="sm">
               Drafts are inert — they don&apos;t affect any prompts until explicitly activated.
               Activating a draft retires the previously active version for the same category
-              <strong> and focus type</strong>.
+              <strong> and focus type</strong>. A draft whose scope already has an active profile
+              offers <strong>Replace active</strong> instead, and commits the same way.
             </Text>
-            {awaitingDrafts.length === 0 ? (
+            {draftProfiles.length === 0 ? (
               <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
-                <Text size="xs" c="dimmed">No draft profiles awaiting activation.</Text>
+                <Text size="xs" c="dimmed">No drafts.</Text>
               </Paper>
             ) : (
-              awaitingDrafts.map((p) => renderProfileCard(p, true))
+              [...awaitingDrafts, ...candidatePoolDrafts].map((p) => renderProfileCard(p, true))
             )}
           </div>
-
-          {/* Scan candidate pools — drafts for scopes that already have an
-              active profile. Never activatable wholesale: their finds are
-              promoted slot by slot from the campaign that produced them. */}
-          {candidatePoolDrafts.length > 0 && (
-            <div>
-              <Group gap="xs" mb="xs">
-                <IconBrain size={18} />
-                <Text size="sm" fw={600}>Scan Candidate Pools</Text>
-                <Badge size="sm" variant="light" color="cyan">{candidatePoolDrafts.length}</Badge>
-              </Group>
-              <Text size="xs" c="dimmed" mb="sm">
-                These drafts were produced by a scan or consumer write-back for a category, focus and
-                scope that already has an active profile. They are not awaiting activation — review
-                their discovered fills on the campaign that produced them and promote them slot by slot.
-              </Text>
-              {candidatePoolDrafts.map((p) => renderProfileCard(p, true))}
-            </div>
-          )}
 
           <Divider />
 
