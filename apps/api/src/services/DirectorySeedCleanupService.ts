@@ -620,6 +620,109 @@ class DirectorySeedCleanupService {
    * queue entry's business_snapshot, then SEO via the shared resharpen
    * lane per primary-linked campaign.
    */
+  /**
+   * Batch recompose — overwrite (not fill-missing) the SEO copy for a filtered
+   * set of seeds. The cleanup counterpart to backfillEnrichment: backfill
+   * closes gaps, recompose replaces stale copy, including a disclosure
+   * sentence or a narrative composed before the directives changed. Each seed
+   * goes through getComposedEnrichment, so the narrative precedence
+   * (cat-id → business analysis → discovery → parent) applies per seed.
+   */
+  async recomposeEnrichment(
+    input: { seedIds: string[] },
+    ctx?: SeedAuditCtx,
+  ): Promise<{
+    recomposed: number;
+    skipped: Array<{ seedId: string; reason: string }>;
+    results: Array<{ seedId: string; descriptionSource?: string }>;
+  }> {
+    const seedIds = Array.isArray(input.seedIds) ? input.seedIds.filter(Boolean) : [];
+    const results: Array<{ seedId: string; descriptionSource?: string }> = [];
+    const skipped: Array<{ seedId: string; reason: string }> = [];
+
+    for (const seedId of seedIds) {
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT id, status, listing_id, tenant_id
+        FROM directory_presence_seeds
+        WHERE id = ${seedId}
+        LIMIT 1
+      `;
+      const seed = rows[0];
+      if (!seed) {
+        skipped.push({ seedId, reason: 'seed_not_found' });
+        continue;
+      }
+      if (seed.status === 'claimed' || seed.status === 'suppressed') {
+        skipped.push({ seedId, reason: `status_${seed.status}` });
+        continue;
+      }
+
+      const composed = await DirectoryPresenceSeedService.getComposedEnrichment(seedId, {
+        region: 'us-east-1',
+        userId: ctx?.actorId,
+        ip: ctx?.ip,
+        userAgent: ctx?.userAgent,
+      } as any);
+      const packet = composed.packet as SeedSeoPacket;
+      const sourceName =
+        composed.sourceName && composed.sourceName !== 'none'
+          ? composed.sourceName
+          : 'market_enrichment';
+
+      await prisma.$executeRaw`
+        UPDATE directory_listings_list
+        SET description = ${packet.description},
+            keywords = ${packet.keywords}::text[],
+            same_as = ${packet.sameAs}::text[],
+            updated_at = now()
+        WHERE id = ${seed.listing_id}
+      `;
+
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET seo_enrichment = ${buildSeoEnrichmentJson(packet)}::jsonb, updated_at = now()
+        WHERE id = ${seedId}
+      `;
+
+      const provRows: Array<[string, string]> = [
+        ['description', packet.description],
+        ['keywords', packet.keywords.join(', ')],
+        ['same_as', packet.sameAs.join(', ')],
+      ];
+      for (const [fieldKey, value] of provRows) {
+        if (!value) continue;
+        await prisma.$executeRaw`
+          INSERT INTO directory_field_provenance (
+            id, seed_id, tenant_id, field_key, value,
+            source_name, accessed_at, confidence, show_on_public,
+            created_at, updated_at
+          ) VALUES (
+            ${generateDirectoryFieldProvenanceId(seed.tenant_id)},
+            ${seedId},
+            ${seed.tenant_id},
+            ${fieldKey},
+            ${value},
+            ${sourceName},
+            now(),
+            ${'medium'},
+            true,
+            now(), now()
+          )
+          ON CONFLICT (seed_id, field_key) DO UPDATE
+            SET value = EXCLUDED.value,
+                source_name = EXCLUDED.source_name,
+                accessed_at = EXCLUDED.accessed_at,
+                confidence = EXCLUDED.confidence,
+                updated_at = now()
+        `;
+      }
+
+      results.push({ seedId, descriptionSource: sourceName });
+    }
+
+    return { recomposed: results.length, skipped, results };
+  }
+
   async backfillEnrichment(input: { seedIds: string[] }, ctx?: SeedAuditCtx): Promise<{
     results: Array<{
       seedId: string;

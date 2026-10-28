@@ -723,6 +723,38 @@ const touchSchema = z.object({
   }).optional(),
 });
 
+/**
+ * POST /api/admin/directory/presence-seeds/recompose-enrichment
+ *
+ * Batch recompose: overwrite SEO copy for a filtered seed set. Backfill fills
+ * gaps; this replaces stale copy — a disclosure sentence or narrative written
+ * before the directives changed. Same body shape as backfill-enrichment.
+ */
+const recomposeEnrichmentSchema = z.object({
+  seedIds: z.array(z.string().min(1)).min(1).max(500),
+});
+
+router.post('/presence-seeds/recompose-enrichment', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = recomposeEnrichmentSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: validation.error.issues });
+    }
+    const result = await DirectorySeedCleanupService.recomposeEnrichment(validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.userId || (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    return res.json({ success: true, data: result });
+  } catch (error: any) {
+    logger.error('[POST /api/admin/directory/presence-seeds/recompose-enrichment] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    return res.status(500).json({ success: false, error: 'recompose_enrichment_failed' });
+  }
+});
+
 router.post('/presence-seeds/:id/touches', requirePlatformStaff, async (req: Request, res: Response) => {
   try {
     const parsed = touchSchema.safeParse(req.body);

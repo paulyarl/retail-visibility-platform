@@ -128,9 +128,31 @@ Discovery discipline:
 4. Assess category_fit: verified / probable / insufficient.
 5. Assess business_seek_priority: high / medium / low / hold.
    - hold = identity_confidence conflict OR category_fit = insufficient
-6. Write a "description" for each candidate — a 1–2 sentence shopper-facing
-   summary that becomes its directory listing's default copy. Ground it only
-   in the evidence you recorded for that business (assortment, specialization,
+6. Write a "description" for each candidate — 2–3 sentences, 200–400 characters
+   (the listing hard-caps at 500 including the platform disclosure sentence).
+   This is SHELF COPY: it becomes the description on a public directory listing
+   that shoppers browse by category. Write for the shopper scanning a shelf, not
+   for the operator.
+
+   Voice: a knowledgeable local telling a neighbor what this place is and why it
+   is worth the trip — warm, specific, plain-spoken. Lead with what the shopper
+   will actually find, then one concrete detail that proves it. A reader should
+   finish the sentence knowing something they did not know before.
+
+   Use the current trading name only — no former or alternate names, no
+   previous ownership, no premises history.
+
+   Never put research provenance in the copy: no "named by", no guide,
+   directory, association or community-list names, no "according to", no
+   "listed on". Where you learned it belongs in discovery_provenance; the
+   shopper only wants to know what is on the shelf.
+
+   Cut filler that is true of every storefront: "serving walk-in shoppers",
+   "open to the public", "a local business", "serving the community". If a
+   sentence would read the same for any grocery in the city, replace it with
+   something only this business could say.
+
+   Ground it only in the evidence you recorded (assortment, specialization,
    services, location); never invent offerings, history, or quality claims,
    and never include a platform disclosure/claim sentence (the platform
    appends it). Omit it when nothing beyond name/category/city is evidenced.

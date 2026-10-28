@@ -194,7 +194,10 @@ export interface SeedSeoPacket {
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
-export const DISCLOSURE_SENTENCE = ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+// Provenance disclosure only. The claim call-to-action lives on the listing
+// page itself — repeating it inside the description talks to the owner on the
+// shopper's page, which is what made the copy read unprofessional.
+export const DISCLOSURE_SENTENCE = ' Listed on VisibleShelf from public information (address, phone).';
 
 const COMPOSER_VERSION = 1;
 const META_TITLE_MAX = 70;
@@ -347,7 +350,7 @@ function composeDescription(
   audit: AuditSeoFields | null,
   catIdAudit: CatIdSeoFields | null | undefined,
 ): string {
-  const disclosure = ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+  const disclosure = DISCLOSURE_SENTENCE;
 
   // Prefer the analyst-composed public narrative when present (Phase 1.2).
   // Cat surfaces get the cat-id narrative as PRIMARY — the analyst that

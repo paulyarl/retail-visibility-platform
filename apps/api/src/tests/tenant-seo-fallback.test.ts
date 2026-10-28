@@ -61,7 +61,7 @@ import directoryTenantRouter from '../routes/directory-tenant';
 const TENANT_ID = 'tid-mvmxmdv6';
 const SEED_KEYWORDS = ['african grocery store', 'african market', 'international grocery'];
 const SEED_DESCRIPTION =
-  'African International Market is an African grocery store in Kansas City, MO. Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+  'African International Market is an African grocery store in Kansas City, MO. Listed on VisibleShelf from public information (address, phone).';
 
 const profileRouter = express();
 profileRouter.use(express.json());

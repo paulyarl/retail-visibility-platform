@@ -46,7 +46,7 @@ const SEED_KEYWORDS = [
   'international grocery',
 ];
 const SEED_DESCRIPTION =
-  'African International Market is an African grocery store in Kansas City, MO. Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
+  'African International Market is an African grocery store in Kansas City, MO. Listed on VisibleShelf from public information (address, phone).';
 
 beforeEach(() => {
   vi.clearAllMocks();

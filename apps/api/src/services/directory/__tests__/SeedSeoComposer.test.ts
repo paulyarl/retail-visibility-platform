@@ -233,7 +233,7 @@ describe('SeedSeoComposer', () => {
       });
 
       expect(packet.description).toContain('Listed on VisibleShelf from public information');
-      expect(packet.description).toContain('Claim this listing');
+      expect(packet.description).toContain('Listed on VisibleShelf from public information');
     });
 
     it('includes business name and category label', () => {
@@ -306,7 +306,7 @@ describe('SeedSeoComposer', () => {
 
       expect(packet.description).toContain('community-anchored Central African grocery');
       expect(packet.description).toContain('Listed on VisibleShelf from public information');
-      expect(packet.description).toContain('Claim this listing');
+      expect(packet.description).toContain('Listed on VisibleShelf from public information');
     });
 
     it('falls back to deterministic template when public_narrative is absent', () => {
@@ -1017,7 +1017,7 @@ describe('SeedSeoComposer', () => {
 
       expect(packet.description).toContain('shelf-stocked African grocery');
       expect(packet.description).toContain('Listed on VisibleShelf from public information');
-      expect(packet.description).toContain('Claim this listing');
+      expect(packet.description).toContain('Listed on VisibleShelf from public information');
     });
 
     it('feeds candidate categories into keywords as plain terms', () => {
