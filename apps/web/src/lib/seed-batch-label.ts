@@ -22,6 +22,17 @@ export interface SeedBatchLabelInput {
   place?: string | null;
   /** Distinct places — the surplus collapses to "+N". */
   placeCount?: number | null;
+  /**
+   * Raw `SeedBatchSummary` aliases. Callers that hand the API row straight to
+   * this function (the cleanup page) otherwise render a cohort as
+   * "Oct 28 · 26 seeds · PG" with no market named — the summary carries the
+   * market under topCity/topCategory, not place/category.
+   */
+  topCategory?: string | null;
+  topCity?: string | null;
+  totalSeeds?: number | null;
+  categories?: string[] | null;
+  cities?: string[] | null;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -64,14 +75,26 @@ export function seedBatchDisplayLabel(
   const date = shortDate(input.createdAt) ?? dateFromLabel(input.seedBatch);
   if (date) parts.push(date);
 
-  const category = collapse(input.category, input.categoryCount);
+  // Accept either the explicit label fields or the raw SeedBatchSummary ones.
+  const categoryValue = input.category ?? input.topCategory ?? null;
+  const categoryCount = input.categoryCount ?? input.categories?.length ?? 0;
+  const placeValue = input.place ?? input.topCity ?? null;
+  const placeCount = input.placeCount ?? input.cities?.length ?? 0;
+  const seedCount =
+    typeof input.seedCount === 'number'
+      ? input.seedCount
+      : typeof input.totalSeeds === 'number'
+      ? input.totalSeeds
+      : null;
+
+  const category = collapse(categoryValue, categoryCount);
   if (category) parts.push(category);
 
-  const place = collapse(input.place, input.placeCount);
+  const place = collapse(placeValue, placeCount);
   if (place) parts.push(place);
 
-  if (typeof input.seedCount === 'number' && input.seedCount > 0) {
-    parts.push(`${input.seedCount} seed${input.seedCount === 1 ? '' : 's'}`);
+  if (typeof seedCount === 'number' && seedCount > 0) {
+    parts.push(`${seedCount} seed${seedCount === 1 ? '' : 's'}`);
   }
 
   if (opts?.includePgTag && input.seedBatch.startsWith('pg-')) parts.push('PG');

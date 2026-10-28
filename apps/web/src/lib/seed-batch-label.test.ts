@@ -94,4 +94,23 @@ describe('seedBatchDisplayLabel', () => {
   it('falls back to the raw slug when nothing is known about the cohort', () => {
     expect(seedBatchDisplayLabel({ seedBatch: 'hand-stamped-batch' })).toBe('hand-stamped-batch');
   });
+  // The cleanup page hands the raw SeedBatchSummary row straight to this
+  // function; before the aliases existed it rendered "Oct 28 · 26 seeds · PG"
+  // with no market named.
+  it('names the market when given a raw SeedBatchSummary row', () => {
+    expect(
+      seedBatchDisplayLabel(
+        {
+          seedBatch: 'pg-mcamp-mdjvk2bu-20261028',
+          createdAt: '2026-10-28T13:03:54Z',
+          totalSeeds: 26,
+          topCategory: 'African Grocery Store',
+          topCity: 'Indianapolis, IN',
+          categories: ['African Grocery Store'],
+          cities: ['Indianapolis, IN'],
+        },
+        { includePgTag: true },
+      ),
+    ).toBe('Oct 28 · African Grocery Store · Indianapolis, IN · 26 seeds · PG');
+  });
 });
