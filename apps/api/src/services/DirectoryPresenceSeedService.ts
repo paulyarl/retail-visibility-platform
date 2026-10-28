@@ -3322,6 +3322,18 @@ class DirectoryPresenceSeedService {
     const { packet: seoPacket, enrichmentJson: seoEnrichmentJson, catIdAudit } =
       await this.composeCampaignSeoPacket(campaign, d, (audit ?? stubAudit)?.id ?? '', businessName);
 
+    // Discovery narrative outranks the composed boilerplate — the same
+    // precedence the backfill applies, here at birth so a scan-born seed never
+    // starts life on "X is a Y. Listed on VisibleShelf from public
+    // information" when the scan wrote real copy.
+    const discoveryDescription = await this.resolveDiscoveryDescription(campaignId, businessName);
+    const descriptionSource = discoveryDescription ? 'discovery_scan' : 'seed_seo_composer';
+    if (discoveryDescription) {
+      seoPacket.description = discoveryDescription.endsWith(DISCLOSURE_SENTENCE)
+        ? discoveryDescription
+        : discoveryDescription + DISCLOSURE_SENTENCE;
+    }
+
     // ── Sourced attributes (migration 267) ───────────────────────────────
     // Mine every attribute-bearing audit on THIS campaign (gold-standard
     // scans, business audits, discovery scans, city scans) so the seed is
@@ -3406,7 +3418,7 @@ class DirectoryPresenceSeedService {
         { fieldKey: 'primary_category', value: campaign.category, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'secondary_categories', value: campaignSecondary.length > 0 ? campaignSecondary.join(', ') : undefined, sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: campaignSecondary.length > 0 },
         // SEO provenance rows (spec §4.4.6)
-        { fieldKey: 'description', value: seoPacket.description, sourceName: 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
+        { fieldKey: 'description', value: seoPacket.description, sourceName: descriptionSource, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'keywords', value: seoPacket.keywords.join(', '), sourceName: seoPacket.inputs.intelligenceProfileId ? 'intelligence_profile' : 'seed_seo_composer', sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: true },
         { fieldKey: 'same_as', value: seoPacket.sameAs.join(', '), sourceName, sourceUrl, accessedAt, confidence: provenanceConfidence, showOnPublic: seoPacket.sameAs.length > 0 },
         // Sourced attributes — evidence lives on each attribute entry; the
@@ -4357,6 +4369,52 @@ class DirectoryPresenceSeedService {
     return { profileId: gold.id, expectedFieldNames: expected };
   }
 
+  /**
+   * Discovery description — the analyst-written narrative a discovery scan
+   * emitted for this business. Composition must prefer it over the NAP-derived
+   * boilerplate: the scan wrote it from observed evidence, while the composer
+   * can only assemble name + category + city. Lanes, best first:
+   *   1. the campaign's business_snapshot.description (set at derive)
+   *   2. the discovery scan audit's matching discovered_businesses entry
+   * Returns null when the scan omitted it (thin evidence) — callers fall back
+   * to the composed packet, which is the honest result in that case.
+   */
+  private async resolveDiscoveryDescription(
+    campaignId: string | null,
+    businessName: string,
+  ): Promise<string | null> {
+    if (!campaignId) return null;
+
+    const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
+      where: { id: campaignId },
+      select: { business_snapshot: true },
+    });
+    const snapshotDescription = (campaign as any)?.business_snapshot?.description;
+    if (typeof snapshotDescription === 'string' && snapshotDescription.trim()) {
+      return snapshotDescription.trim();
+    }
+
+    const scans = await (prisma as any).mkt_audits_list.findMany({
+      where: { campaign_id: campaignId, platform: 'intelligence_discovery' },
+      orderBy: { created_at: 'desc' },
+      take: 5,
+    });
+    const wanted = businessName.trim().toLowerCase();
+    for (const scan of Array.isArray(scans) ? scans : []) {
+      const list = (scan as any)?.audit_data?.discovered_businesses;
+      if (!Array.isArray(list)) continue;
+      const hit = list.find(
+        (b: any) =>
+          typeof b?.business_name === 'string' &&
+          b.business_name.trim().toLowerCase() === wanted,
+      );
+      if (hit && typeof hit.description === 'string' && hit.description.trim()) {
+        return hit.description.trim();
+      }
+    }
+    return null;
+  }
+
   async getComposedEnrichment(seedId: string, ctx?: RequestCtx): Promise<any> {
     const seed = await prisma.$queryRaw<any[]>`
       SELECT dps.*, dl.business_name, dl.primary_category, dl.city, dl.state, dl.description, dl.keywords
@@ -4455,6 +4513,25 @@ class DirectoryPresenceSeedService {
         : packet.inputs.intelligenceProfileId
           ? 'market_enrichment'
           : 'none';
+    }
+
+    // Discovery narrative outranks the composed packet here too, so the
+    // preview panel, "Reset to composed" and the backfill all resolve to the
+    // same copy — the scan's, not boilerplate.
+    if (packet && linkedCampaignId) {
+      const discoveryDescription = await this.resolveDiscoveryDescription(
+        linkedCampaignId,
+        row.business_name || '',
+      );
+      if (discoveryDescription) {
+        packet = {
+          ...packet,
+          description: discoveryDescription.endsWith(DISCLOSURE_SENTENCE)
+            ? discoveryDescription
+            : discoveryDescription + DISCLOSURE_SENTENCE,
+        };
+        sourceName = 'discovery_scan';
+      }
     }
 
     const provenance = await prisma.directory_field_provenance.findFirst({
