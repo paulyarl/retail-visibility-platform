@@ -293,6 +293,77 @@ function normalizePlatformValue(value: string | null | undefined): string {
   return v;
 }
 
+const FOCUS_TITLE_LABEL: Record<string, string> = {
+  emerging: 'Emerging',
+  competitive: 'Competitive',
+  gold_standards: 'Gold_standards',
+  bronze_standards: 'Bronze_standards',
+};
+
+/**
+ * Default campaign title. Business campaigns name the business; intelligence
+ * campaigns name the market and lens, because an untitled intelligence row
+ * renders as a blank line in every campaign list and in the cockpit's attach
+ * picker (batch-born discovery campaigns shipped with title=null).
+ */
+function buildDefaultCampaignTitle(input: any): string | null {
+  if (input.scope === 'business' && input.businessName && input.category) {
+    return [input.businessName, input.category, input.city].filter(Boolean).join(' - ');
+  }
+  if (input.scope === 'intelligence' && input.category) {
+    const kind = input.intelligenceCampaignKind === 'establishment' ? 'Establishment' : 'Discovery';
+    const focus = FOCUS_TITLE_LABEL[input.intelligenceFocus ?? 'emerging'] ?? null;
+    const geo = input.city ? `${input.city}${input.state ? `, ${input.state}` : ''}` : 'Nationwide';
+    return [input.category, kind, focus, geo].filter(Boolean).join(' - ');
+  }
+  return null;
+}
+
+const normalizeMarketPart = (value: unknown): string =>
+  String(value ?? '').trim().toLowerCase();
+
+/**
+ * Market compliance for proving-ground children (2026-10-28 batch-born
+ * discovery gap). A discovery run belongs to the proving ground for ITS
+ * market: a Milwaukee scan parented to the Indianapolis PG renders another
+ * market's prospects in the cockpit's Discovery panel and strands its own
+ * queue rows.
+ *
+ * Tolerant by design — the check only fires when BOTH rows carry the fields,
+ * so legacy rows (null state, pre-2026-10 rows) and geography-free PGs keep
+ * attaching exactly as before.
+ */
+function assertChildMarketMatchesParent(parent: any, child: any): void {
+  const parentCity = normalizeMarketPart(parent?.city);
+  if (!parentCity) return; // geography-free (mixed) PG — no market to violate
+
+  const childCategory = normalizeMarketPart(child?.category);
+  const parentCategories = [
+    parent?.category,
+    ...(Array.isArray(parent?.secondary_categories) ? parent.secondary_categories : []),
+  ]
+    .map(normalizeMarketPart)
+    .filter(Boolean);
+  if (childCategory && parentCategories.length && !parentCategories.includes(childCategory)) {
+    throw new ValidationError('child_market_category_mismatch');
+  }
+
+  const childCity = normalizeMarketPart(child?.city);
+  const childState = normalizeMarketPart(child?.state);
+  const geos = [
+    { city: parentCity, state: normalizeMarketPart(parent?.state) },
+    ...(Array.isArray(parent?.member_geos) ? parent.member_geos : []).map((g: any) => ({
+      city: normalizeMarketPart(g?.city),
+      state: normalizeMarketPart(g?.state),
+    })),
+  ].filter((g) => g.city);
+
+  const cityMatches = geos.some(
+    (g) => g.city === childCity && (!g.state || !childState || g.state === childState),
+  );
+  if (!cityMatches) throw new ValidationError('child_market_city_mismatch');
+}
+
 const STAGE_DATE_FIELDS: Record<string, string> = {
   seed:             'date_seed',
   preview_built:    'date_preview_built',
@@ -646,6 +717,11 @@ export class MarketingCampaignService extends BaseService {
           : { intelligence_platform: input.intelligencePlatform }),
         ...activeStageFilter,
       };
+      // A null state must not defeat the signature: batch-born discovery
+      // campaigns launched with state=null and minted unparented twins
+      // (2026-10-28). With a city present, match any state and let the caller
+      // adopt the market's existing campaign.
+      if (city && !state) delete (where as any).state;
     } else if (scope === 'business') {
       const businessName = normalizeSignatureValue(input.businessName);
       where = {
@@ -830,10 +906,7 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
-      const defaultTitle =
-        input.scope === 'business' && input.businessName && input.category
-          ? [input.businessName, input.category, input.city].filter(Boolean).join(' - ')
-          : null;
+      const defaultTitle = buildDefaultCampaignTitle(input);
 
       const campaign = await this.prisma.mkt_campaigns_list.create({
         data: {
@@ -990,6 +1063,9 @@ export class MarketingCampaignService extends BaseService {
         if (childKind !== 'discovery' || (childFocus !== 'emerging' && childFocus !== 'competitive')) {
           throw new ValidationError('child_not_discovery_prospect_run');
         }
+        // Market compliance — the attach picker can no longer parent another
+        // market's discovery run to this PG (see assertChildMarketMatchesParent).
+        assertChildMarketMatchesParent(parent, child);
       } else if (childScope !== 'category' && childScope !== 'city') {
         // Enrichment children are category- or city-scope only.
         throw new ValidationError('child_not_enrichment_scope');

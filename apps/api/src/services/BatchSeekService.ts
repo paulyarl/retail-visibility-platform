@@ -29,6 +29,10 @@ export interface BatchEntryInput {
   city: string;
   state?: string;
   intelligenceFocus?: string;
+  /** Proving ground this entry's discovery run belongs to (select PG >
+   *  select profile > add to queue). Launch adopts the PG's attached
+   *  discovery campaign for the focus, or creates one and attaches it. */
+  provingGroundId?: string | null;
 }
 
 export interface BatchEntry {
@@ -41,6 +45,7 @@ export interface BatchEntry {
   state: string | null;
   intelligenceFocus: string;
   sortOrder: number;
+  provingGroundId: string | null;
 }
 
 export interface CreateBatchInput {
@@ -251,14 +256,64 @@ class BatchSeekService {
     // Insert per-entry rows when entries are provided (queue-based flow)
     const entryRows: BatchEntry[] = [];
     if (hasEntries) {
+      // PG awareness at creation (select PG > select profile > add to queue):
+      // validate each bond and inherit the PG's state, so the entry carries a
+      // complete market identity into launch. Without this, a batch entry could
+      // name a market the PG does not cover, or launch with state=null and mint
+      // an unparented twin (2026-10-28 batch-born discovery gap).
+      const pgBonds = Array.from(
+        new Set(entries.map((e) => e.provingGroundId).filter(Boolean)),
+      ) as string[];
+      const pgById = new Map<string, any>();
+      for (const pgId of pgBonds) {
+        const pg = await prisma.mkt_campaigns_list.findUnique({
+          where: { id: pgId },
+          select: {
+            id: true, city: true, state: true, category: true,
+            secondary_categories: true, campaign_category: true, member_geos: true,
+          },
+        });
+        if (!pg || pg.campaign_category !== 'proving_ground') {
+          throw new ValidationError(`seek batch entry references '${pgId}', which is not a proving ground`);
+        }
+        pgById.set(pgId, pg);
+      }
+      for (const e of entries) {
+        const pg = e.provingGroundId ? pgById.get(e.provingGroundId) : null;
+        if (!pg) continue;
+        const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
+        const pgCategories = [pg.category, ...(Array.isArray(pg.secondary_categories) ? pg.secondary_categories : [])]
+          .map(norm).filter(Boolean);
+        if (pgCategories.length && !pgCategories.includes(norm(e.nicheCategory))) {
+          throw new ValidationError(
+            `entry category '${e.nicheCategory}' is outside proving ground '${pg.id}' (${pg.category})`,
+          );
+        }
+        const pgGeos = [
+          { city: pg.city, state: pg.state },
+          ...(Array.isArray(pg.member_geos) ? pg.member_geos : []),
+        ].map((g: any) => ({ city: norm(g?.city), state: norm(g?.state) })).filter((g) => g.city);
+        const entryState = norm(e.state) || norm(pg.state);
+        const inMarket = pgGeos.some(
+          (g) => g.city === norm(e.city) && (!g.state || !entryState || g.state === entryState),
+        );
+        if (pgGeos.length && !inMarket) {
+          throw new ValidationError(
+            `entry city '${e.city}' is outside proving ground '${pg.id}' (${pg.city ?? 'unconstrained'})`,
+          );
+        }
+      }
+
       for (let i = 0; i < entries.length; i++) {
         const e = entries[i];
         const entryId = generateSeekBatchEntryId();
         const entryFocus = refs[i].resolvedFocus || 'emerging';
+        const pg = e.provingGroundId ? pgById.get(e.provingGroundId) : null;
+        const entryState = (e.state || pg?.state || '').trim() || null;
         await prisma.$executeRaw`
           INSERT INTO mkt_seek_batch_entries (
             id, batch_id, profile_id, profile_version, niche_category,
-            city, state, intelligence_focus, sort_order, created_at
+            city, state, intelligence_focus, sort_order, proving_ground_id, created_at
           ) VALUES (
             ${entryId},
             ${id},
@@ -266,9 +321,10 @@ class BatchSeekService {
             ${e.profileVersion || null},
             ${e.nicheCategory},
             ${e.city},
-            ${e.state || null},
+            ${entryState},
             ${entryFocus},
             ${i},
+            ${e.provingGroundId || null},
             now()
           )
         `;
@@ -279,9 +335,10 @@ class BatchSeekService {
           profileVersion: e.profileVersion || null,
           nicheCategory: e.nicheCategory,
           city: e.city,
-          state: e.state || null,
+          state: entryState,
           intelligenceFocus: entryFocus,
           sortOrder: i,
+          provingGroundId: e.provingGroundId || null,
         });
       }
     }
@@ -339,7 +396,8 @@ class BatchSeekService {
 
     // Load entries if they exist (queue-based flow)
     const entryRows = await prisma.$queryRaw<any[]>`
-      SELECT id, profile_id, profile_version, niche_category, city, state, intelligence_focus, sort_order
+      SELECT id, profile_id, profile_version, niche_category, city, state, intelligence_focus, sort_order,
+             proving_ground_id
       FROM mkt_seek_batch_entries
       WHERE batch_id = ${batchId}
       ORDER BY sort_order ASC
@@ -374,7 +432,41 @@ class BatchSeekService {
       return existing[0]?.id || null;
     };
 
-    const launchEntry = async (category: string, city: string, state: string | null, focus: string) => {
+    const launchEntry = async (
+      category: string,
+      city: string,
+      state: string | null,
+      focus: string,
+      provingGroundId: string | null,
+    ) => {
+      // PG-aware adoption (2026-10-28 batch-born discovery gap). When the entry
+      // is bonded to a proving ground the market already has a home: adopt that
+      // PG's attached discovery campaign for this focus rather than minting an
+      // unparented twin. Falls through to creation when the PG has no child for
+      // the focus yet (the new run is attached at birth below).
+      if (provingGroundId) {
+        const attached = await prisma.$queryRaw<any[]>`
+          SELECT id FROM mkt_campaigns_list
+          WHERE parent_campaign_id = ${provingGroundId}
+            AND scope = 'intelligence'
+            AND COALESCE(intelligence_campaign_kind, 'discovery') = 'discovery'
+            AND LOWER(COALESCE(intelligence_focus, 'emerging')) = LOWER(${focus})
+            AND stage NOT IN ('dead', 'lost', 'closed', 'resolved_and_closed')
+          ORDER BY created_at ASC
+          LIMIT 1
+        `;
+        const attachedId = attached[0]?.id;
+        if (attachedId) {
+          await prisma.$executeRaw`
+            UPDATE mkt_campaigns_list
+            SET seek_batch_id = ${batchId}
+            WHERE id = ${attachedId} AND seek_batch_id IS NULL
+          `;
+          campaignIds.push(attachedId);
+          return;
+        }
+      }
+
       const reused = await reuseExisting(category, city, focus);
       if (reused) {
         campaignIds.push(reused);
@@ -390,6 +482,15 @@ class BatchSeekService {
           intelligenceCampaignKind: 'discovery',
           seekBatchId: batchId,
         }, requestCtx);
+        // Bond the new run to its proving ground at birth — the cockpit reads
+        // children by parent_campaign_id, so an unattached run is invisible.
+        if (provingGroundId) {
+          await prisma.$executeRaw`
+            UPDATE mkt_campaigns_list
+            SET parent_campaign_id = ${provingGroundId}
+            WHERE id = ${campaign.id} AND parent_campaign_id IS NULL
+          `;
+        }
         campaignIds.push(campaign.id);
       } catch (err) {
         // Structural-duplicate conflict: adopt the existing campaign rather
@@ -418,15 +519,38 @@ class BatchSeekService {
     };
 
     if (entryRows.length > 0) {
+      // Resolve bonded proving grounds once per batch. The PG carries the
+      // market's state, which entries historically did not (state=null is what
+      // broke the duplicate signature and minted the 2026-10-28 twins).
+      const pgIds = Array.from(
+        new Set(entryRows.map((e: any) => e.proving_ground_id).filter(Boolean)),
+      ) as string[];
+      const pgById = new Map<string, { id: string; state: string | null }>();
+      for (const pgId of pgIds) {
+        const pg = await prisma.mkt_campaigns_list.findUnique({
+          where: { id: pgId },
+          select: { id: true, state: true, campaign_category: true },
+        });
+        if (pg && pg.campaign_category === 'proving_ground') {
+          pgById.set(pgId, { id: pg.id, state: pg.state ?? null });
+        }
+      }
       // Queue-based launch: one campaign per entry, each using its own profile/category/focus
       for (const entry of entryRows) {
-        await launchEntry(entry.niche_category, entry.city, entry.state, entry.intelligence_focus || 'emerging');
+        const pg = entry.proving_ground_id ? pgById.get(entry.proving_ground_id) : null;
+        await launchEntry(
+          entry.niche_category,
+          entry.city,
+          entry.state || pg?.state || null,
+          entry.intelligence_focus || 'emerging',
+          pg?.id ?? null,
+        );
       }
     } else {
       // Legacy launch: one campaign per city using batch-level profile/category/focus
       const cities: string[] = batch.cities;
       for (const city of cities) {
-        await launchEntry(batch.niche_category, city, batch.state, batch.intelligence_focus || 'emerging');
+        await launchEntry(batch.niche_category, city, batch.state, batch.intelligence_focus || 'emerging', null);
       }
     }
 
@@ -531,7 +655,8 @@ class BatchSeekService {
 
     // Load entries if they exist (queue-based flow)
     const entryRows = await prisma.$queryRaw<any[]>`
-      SELECT id, profile_id, profile_version, niche_category, city, state, intelligence_focus, sort_order
+      SELECT id, profile_id, profile_version, niche_category, city, state, intelligence_focus, sort_order,
+             proving_ground_id
       FROM mkt_seek_batch_entries
       WHERE batch_id = ${batchId}
       ORDER BY sort_order ASC
@@ -547,6 +672,7 @@ class BatchSeekService {
           state: e.state,
           intelligenceFocus: e.intelligence_focus || 'emerging',
           sortOrder: e.sort_order,
+          provingGroundId: e.proving_ground_id ?? null,
         }))
       : undefined;
 

@@ -38,6 +38,7 @@ import directoryPresenceAdminService, {
 import CampaignChecklistTab from '@/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignChecklistTab';
 import IntelligenceDiscoveryAuditCard from '@/components/marketing-ops/IntelligenceDiscoveryAuditCard';
 import ProspectArtifactChips from '@/components/marketing-ops/ProspectArtifactChips';
+import { attachOptionLabel, campaignMatchesPgDomain } from '@/lib/pg-attach-filter';
 import ProspectCommsPanel from '@/components/marketing-ops/ProspectCommsPanel';
 import VastPanel from '@/components/marketing-ops/VastPanel';
 import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
@@ -443,14 +444,26 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       // as the promote action. Establishment and gold-standards runs
       // produce profiles, not prospects, and are often state/nationwide
       // scoped, so they are excluded here too.
+      //
+      // Market-scoped: only runs that belong to THIS PG's domain
+      // (category ∪ secondary_categories × anchor city ∪ member_geos) are
+      // offered. Listing every unparented run let a Milwaukee scan be
+      // attached to the Indianapolis PG (2026-10-28 batch-born gap), which
+      // rendered another market's prospects in the Discovery panel.
       const intel = await marketingOpsService.listCampaigns({ scope: 'intelligence', limit: 100 });
+      const domain = pgDomainOf(camp);
       const discoveryAttachable = intel.items
         .filter((c) =>
           !c.parent_campaign_id
           && !ids.includes(c.id)
           && (c.intelligence_campaign_kind ?? 'discovery') === 'discovery'
-          && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging'))
-        .map((c) => ({ id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage, category: c.category, city: c.city }));
+          && ['emerging', 'competitive'].includes(c.intelligence_focus ?? 'emerging')
+          && campaignMatchesPgDomain(c, domain))
+        .map((c) => ({
+          id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage,
+          category: c.category, city: c.city, state: c.state, intelligence_focus: c.intelligence_focus,
+          created_at: c.created_at,
+        }));
 
       // Mixed PGs (no fixed geography) also accept direct business children
       // (culture-fit §6.5 — the backend guard allows scope='business' only
@@ -460,7 +473,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
         const biz = await marketingOpsService.listCampaigns({ scope: 'business', limit: 100 });
         businessAttachable = biz.items
           .filter((c) => !c.parent_campaign_id && !ids.includes(c.id))
-          .map((c) => ({ id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage, category: c.category, city: c.city }));
+          .map((c) => ({
+            id: c.id, title: c.title, business_name: c.business_name, scope: c.scope, stage: c.stage,
+            category: c.category, city: c.city, state: c.state, intelligence_focus: c.intelligence_focus,
+            created_at: c.created_at,
+          }));
       }
       setAttachable([...discoveryAttachable, ...businessAttachable]);
     } catch (err: any) {
@@ -2021,7 +2038,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
               </option>
               {attachable.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.scope === 'business' ? '[biz] ' : ''}{c.title || c.business_name || `${c.category ?? ''} · ${c.city ?? ''}`}
+                  {c.scope === 'business' ? '[biz] ' : ''}{attachOptionLabel(c)}
                 </option>
               ))}
             </select>

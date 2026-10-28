@@ -276,6 +276,82 @@ describe('attachChildCampaign', () => {
     expect(mockCampaignsList.update).not.toHaveBeenCalled();
   });
 
+  // Market compliance (2026-10-28 batch-born discovery gap): a discovery run
+  // may only be parented to the PG for its own market. Without this the attach
+  // picker could parent a Milwaukee scan to the Indianapolis PG and the
+  // cockpit's Discovery panel would render another market's prospects.
+  const indyPg = {
+    ...pgParent,
+    city: 'Indianapolis',
+    state: 'IN',
+    category: 'African Grocery Store',
+    secondary_categories: ['Middle Eastern Grocery Store'],
+  };
+  const discoveryChild = (over: Record<string, any> = {}) => ({
+    id: 'mcamp-int-001',
+    scope: 'intelligence',
+    parent_campaign_id: null,
+    intelligence_campaign_kind: 'discovery',
+    intelligence_focus: 'emerging',
+    category: 'African Grocery Store',
+    city: 'Indianapolis',
+    state: 'IN',
+    ...over,
+  });
+
+  it('attaches a discovery run for the proving ground market', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(indyPg)
+      .mockResolvedValueOnce(discoveryChild());
+
+    const result = await service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001');
+    expect(result.attached).toBe(true);
+    expect(mockCampaignsList.update).toHaveBeenCalledWith({
+      where: { id: 'mcamp-int-001' },
+      data: { parent_campaign_id: 'mcamp-pg-001' },
+    });
+  });
+
+  it('rejects a discovery run from another city (400)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(indyPg)
+      .mockResolvedValueOnce(discoveryChild({ city: 'Milwaukee', state: 'WI' }));
+
+    await expect(
+      service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001'),
+    ).rejects.toThrow('child_market_city_mismatch');
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a discovery run from another category (400)', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce({ ...indyPg, secondary_categories: [] })
+      .mockResolvedValueOnce(discoveryChild({ category: 'Caribbean Grocery Store' }));
+
+    await expect(
+      service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001'),
+    ).rejects.toThrow('child_market_category_mismatch');
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('accepts a secondary-category discovery run for the same city', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(indyPg)
+      .mockResolvedValueOnce(discoveryChild({ category: 'Middle Eastern Grocery Store' }));
+
+    const result = await service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001');
+    expect(result.attached).toBe(true);
+  });
+
+  it('accepts a legacy batch-born run with no state for the same city', async () => {
+    mockCampaignsList.findUnique
+      .mockResolvedValueOnce(indyPg)
+      .mockResolvedValueOnce(discoveryChild({ state: null }));
+
+    const result = await service.attachChildCampaign('mcamp-pg-001', 'mcamp-int-001');
+    expect(result.attached).toBe(true);
+  });
+
   it('rejects a second attach when the child is already parented (409)', async () => {
     mockCampaignsList.findUnique
       .mockResolvedValueOnce(pgParent)

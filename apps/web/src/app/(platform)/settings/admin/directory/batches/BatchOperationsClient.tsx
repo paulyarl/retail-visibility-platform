@@ -9,6 +9,7 @@ import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
 import { seedBatchDisplayLabel } from '@/lib/seed-batch-label';
+import { campaignMatchesPgDomain } from '@/lib/pg-attach-filter';
 
 export default function BatchOperationsDashboard() {
   const searchParams = useSearchParams();
@@ -109,6 +110,13 @@ export default function BatchOperationsDashboard() {
   const [focus, setFocus] = useState<IntelligenceFocus | ''>('');
   const [selectedCity, setSelectedCity] = useState('');
   const [state, setState] = useState('');
+  // PG awareness (select PG > select profile > add to queue): an entry bonded
+  // to a proving ground adopts that PG's attached discovery campaign at launch
+  // instead of minting an unparented twin (2026-10-28 batch-born gap).
+  const [provingGrounds, setProvingGrounds] = useState<Array<{
+    id: string; title: string | null; category: string | null; city: string | null; state: string | null;
+  }>>([]);
+  const [provingGroundId, setProvingGroundId] = useState('');
   // Queue of tightly-coupled (category, city, profile, focus) entries
   const [queue, setQueue] = useState<Array<{
     profileId: string;
@@ -118,6 +126,8 @@ export default function BatchOperationsDashboard() {
     state?: string;
     intelligenceFocus: string;
     profileLabel: string;
+    provingGroundId?: string;
+    provingGroundLabel?: string;
   }>>([]);
   const [creating, setCreating] = useState(false);
   const [launcherError, setLauncherError] = useState<string | null>(null);
@@ -340,6 +350,36 @@ export default function BatchOperationsDashboard() {
     setState(p?.reference_state || selectedScope.state || '');
   };
 
+  // Proving grounds are city-scope campaigns with campaign_category
+  // 'proving_ground'. Loaded once per launcher open; filtered to the selected
+  // market so the picker only offers the PG the entry would actually join.
+  useEffect(() => {
+    if (!showLauncher || provingGrounds.length > 0) return;
+    let cancelled = false;
+    marketingOpsService
+      .listCampaigns({ scope: 'city', limit: 200 })
+      .then((res: any) => {
+        if (cancelled) return;
+        setProvingGrounds(
+          (res.items ?? [])
+            .filter((c: any) => c.campaign_category === 'proving_ground')
+            .map((c: any) => ({ id: c.id, title: c.title ?? null, category: c.category ?? null, city: c.city ?? null, state: c.state ?? null })),
+        );
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [showLauncher, provingGrounds.length]);
+
+  const matchingProvingGrounds = useMemo(() => {
+    if (!nicheCategory.trim() || !selectedCity.trim()) return [];
+    return provingGrounds.filter((pg) =>
+      campaignMatchesPgDomain(
+        { category: pg.category, city: pg.city, state: pg.state },
+        { categories: [nicheCategory], geos: [{ city: selectedCity, state: (state || '').trim() || null }] },
+      ),
+    );
+  }, [provingGrounds, nicheCategory, selectedCity, state]);
+
   // Check if current (category, scope, profile) is already in the queue.
   // Duplicate = same category + same geographic scope + same lens — the
   // same market may queue once per focus (emerging AND competitive are
@@ -377,6 +417,7 @@ export default function BatchOperationsDashboard() {
       p.version ? `v${p.version}` : '',
     ].filter(Boolean).join(' - ');
 
+    const pg = matchingProvingGrounds.find((g) => g.id === provingGroundId) ?? null;
     setQueue((prev) => [
       ...prev,
       {
@@ -387,12 +428,17 @@ export default function BatchOperationsDashboard() {
         state: (selectedScope.state || state || '').trim() || undefined,
         intelligenceFocus: focusValue,
         profileLabel,
+        provingGroundId: pg?.id,
+        provingGroundLabel: pg
+          ? pg.title || `${pg.category ?? ''} · ${pg.city ?? ''}${pg.state ? `, ${pg.state}` : ''}`
+          : undefined,
       },
     ]);
     // Reset scope + profile for next entry (keep category for rapid multi-scope queueing)
     setSelectedCity('');
     setProfileId('');
     setFocus('');
+    setProvingGroundId('');
   };
 
   const handleRemoveFromQueue = (index: number) => {
@@ -431,6 +477,7 @@ export default function BatchOperationsDashboard() {
           city: q.city,
           state: q.state,
           intelligenceFocus: q.intelligenceFocus,
+          provingGroundId: q.provingGroundId,
         })),
       });
       setCreatedBatch(batch);
@@ -584,6 +631,36 @@ export default function BatchOperationsDashboard() {
                 )}
               </div>
 
+              {/* Proving ground (optional) — bonds the entry to the cockpit */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Proving ground <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <select
+                  value={provingGroundId}
+                  onChange={(e) => setProvingGroundId(e.target.value)}
+                  disabled={!selectedCity || matchingProvingGrounds.length === 0}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">
+                    {!selectedCity
+                      ? 'Select a scope first'
+                      : matchingProvingGrounds.length === 0
+                      ? 'No proving ground for this market'
+                      : 'No PG — standalone discovery run'}
+                  </option>
+                  {matchingProvingGrounds.map((pg) => (
+                    <option key={pg.id} value={pg.id}>
+                      {pg.title || `${pg.category ?? ''} · ${pg.city ?? ''}${pg.state ? `, ${pg.state}` : ''}`}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Bonding a PG adopts its attached discovery campaign at launch, so the scan lands in the cockpit
+                  instead of an unparented twin.
+                </p>
+              </div>
+
               {/* Step 3: Intelligence Profile (filtered by category + city) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -698,6 +775,7 @@ export default function BatchOperationsDashboard() {
                         <th className="py-2 px-4 font-medium">Category</th>
                         <th className="py-2 px-4 font-medium">Scope</th>
                         <th className="py-2 px-4 font-medium">Focus</th>
+                        <th className="py-2 px-4 font-medium">Proving ground</th>
                         <th className="py-2 px-4 font-medium">Profile</th>
                         <th className="py-2 px-4 font-medium w-16"></th>
                       </tr>
@@ -721,6 +799,9 @@ export default function BatchOperationsDashboard() {
                             }`}>
                               {q.intelligenceFocus}
                             </span>
+                          </td>
+                          <td className="py-2 px-4 text-gray-600 text-xs">
+                            {q.provingGroundLabel ?? <span className="text-amber-600">standalone</span>}
                           </td>
                           <td className="py-2 px-4 text-gray-600 text-xs font-mono">
                             {q.profileLabel}

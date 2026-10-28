@@ -2443,6 +2443,10 @@ const createBatchEntrySchema = z.object({
   city: z.string(),
   state: z.string().optional(),
   intelligenceFocus: z.enum(['emerging', 'competitive']).optional(),
+  /** Proving ground the entry's discovery run belongs to (select PG >
+   *  select profile > add to queue). Validated against the PG market at
+   *  create; inherited at launch (adopt the PG's child, else create+attach). */
+  provingGroundId: z.string().optional(),
 });
 
 const createBatchSchema = z.object({
