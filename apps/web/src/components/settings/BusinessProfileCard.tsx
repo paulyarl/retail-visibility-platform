@@ -70,6 +70,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
           onClose={() => setIsEditModalOpen(false)}
           profile={tenantName ? { business_name: tenantName } as Partial<BusinessProfile> : null}
           onSave={onUpdate}
+          tenantId={tenantId}
         />
       </Card>
     );

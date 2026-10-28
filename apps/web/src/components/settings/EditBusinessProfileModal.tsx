@@ -5,6 +5,7 @@ import { Modal, ModalFooter, Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
+import { extractUploadedLogoUrl, normalizeSocialLinks } from '@/lib/settings/business-profile-form';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 import { Button } from '@mantine/core';
@@ -50,22 +51,37 @@ export default function EditBusinessProfileModal({
   const [logoPreview, setLogoPreview] = useState<string | null>(formData.logo_url || null);
   const [geocoding, setGeocoding] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  // Logo failures belong next to the upload control — the modal's error banner
+  // sits at the top of a long scrolling form and was never seen.
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const [metaOAuth, setMetaOAuth] = useState<MetaStatus | null>(null);
   const [tiktokOAuth, setTiktokOAuth] = useState<TikTokStatus | null>(null);
   const { data: socialCap } = useSocialCommerceOptionsCapability(tenantId || null);
 
+  // The tenant whose logo is being uploaded. The route param wins over the
+  // tenant switcher's localStorage value — otherwise a stale selection uploads
+  // the logo onto the wrong tenant (or nowhere, when localStorage is empty).
+  const resolveTenantId = () =>
+    tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+
   // Reset form when modal opens/closes or profile changes
   useEffect(() => {
     if (isOpen) {
-      setFormData(profile || {});
+      setFormData({
+        ...(profile || {}),
+        // Fold legacy keys (x) onto the canonical ones (twitter) up front so the
+        // inputs show what's stored and a save rewrites the canonical key.
+        social_links: normalizeSocialLinks(profile?.social_links),
+      });
       setErrors({});
       setTouched({});
       setError(null);
+      setLogoUploadError(null);
       setSuccess(false);
       setLogoPreview(profile?.logo_url || null);
 
       // Fetch OAuth connection status for Meta and TikTok
-      const tid = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+      const tid = resolveTenantId();
       if (tid) {
         metaIntegrationService.getOAuthStatus(tid).then(setMetaOAuth).catch(() => setMetaOAuth(null));
         tiktokIntegrationService.getOAuthStatus(tid).then(setTiktokOAuth).catch(() => setTiktokOAuth(null));
@@ -78,6 +94,7 @@ export default function EditBusinessProfileModal({
     try {
       setUploadingLogo(true);
       setError(null);
+      setLogoUploadError(null);
 
       // Fetch the image from URL using service with caching
       const { imageFetchService } = await import('@/services/ImageFetchService');
@@ -89,27 +106,32 @@ export default function EditBusinessProfileModal({
 
       // Use centralized image upload middleware
       const result = await uploadImage(file, ImageUploadPresets.logo);
+      if (result.error) {
+        setLogoUploadError(result.error.message);
+        return null;
+      }
 
-      // Get tenant ID from localStorage
-      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
-      if (!tenantId) {
-        setError('No tenant selected');
+      // Get tenant ID from the route, falling back to the switcher's selection
+      const tid = resolveTenantId();
+      if (!tid) {
+        setLogoUploadError('No tenant selected');
         return null;
       }
 
       // Upload logo using service with automatic cache invalidation
-      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
-      
-      if (!uploadResult.success) {
-        setError(uploadResult.error || 'Upload failed');
+      const uploadResult = await platformHomeService.uploadTenantLogo(tid, result.dataUrl, result.contentType);
+      const uploadedUrl = extractUploadedLogoUrl(uploadResult.data);
+
+      if (!uploadResult.success || !uploadedUrl) {
+        setLogoUploadError(uploadResult.error?.message || 'Upload failed');
         return null;
       }
 
       // Return the optimized URL
-      return uploadResult.data?.url || uploadResult.data?.dataUrl;
+      return uploadedUrl;
     } catch (err: any) {
       clientLogger.error('Failed to optimize pasted logo URL:', { detail: err });
-      setError(err.message || 'Failed to fetch and optimize logo from URL');
+      setLogoUploadError(err.message || 'Failed to fetch and optimize logo from URL');
       return null;
     } finally {
       setUploadingLogo(false);
@@ -118,38 +140,48 @@ export default function EditBusinessProfileModal({
 
   // Handle logo file upload
   const handleLogoUpload = async (file: File) => {
+    const previousPreview = logoPreview;
     try {
       setUploadingLogo(true);
       setError(null);
+      setLogoUploadError(null);
 
       // Use centralized image upload middleware
       const result = await uploadImage(file, ImageUploadPresets.logo);
+      // uploadImage resolves with an error instead of throwing (unsupported
+      // type, oversized file, logo aspect ratio) — surface it here or the
+      // preview makes a rejected logo look saved.
+      if (result.error) {
+        setLogoUploadError(result.error.message);
+        return;
+      }
       setLogoPreview(result.dataUrl);
 
-      // Get tenant ID from localStorage
-      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
-      if (!tenantId) {
-        setError('No tenant selected');
+      // Get tenant ID from the route, falling back to the switcher's selection
+      const tid = resolveTenantId();
+      if (!tid) {
+        setLogoUploadError('No tenant selected');
+        setLogoPreview(previousPreview);
         return;
       }
 
       // Upload logo using service with automatic cache invalidation
-      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
-      
-      if (!uploadResult.success) {
-        setError(uploadResult.error || 'Upload failed');
+      const uploadResult = await platformHomeService.uploadTenantLogo(tid, result.dataUrl, result.contentType);
+      const uploadedUrl = extractUploadedLogoUrl(uploadResult.data);
+
+      if (!uploadResult.success || !uploadedUrl) {
+        setLogoUploadError(uploadResult.error?.message || 'Upload failed');
+        setLogoPreview(previousPreview);
         return;
       }
 
       // Update form data with uploaded URL
-      const uploadedUrl = uploadResult.data?.url || uploadResult.data?.dataUrl;
-      if (uploadedUrl) {
-        handleChange('logo_url', uploadedUrl);
-        setLogoPreview(uploadedUrl);
-      }
+      handleChange('logo_url', uploadedUrl);
+      setLogoPreview(uploadedUrl);
     } catch (err: any) {
       clientLogger.error('Logo upload error:', { detail: err });
-      setError(err.message || 'Failed to upload logo');
+      setLogoUploadError(err.message || 'Failed to upload logo');
+      setLogoPreview(previousPreview);
     } finally {
       setUploadingLogo(false);
     }
@@ -159,36 +191,16 @@ export default function EditBusinessProfileModal({
   const handleUploadLogoFromUrl = async () => {
     if (!pastedLogoUrl.trim()) return;
 
-    try {
-      setUploadingLogo(true);
-      setError(null);
+    // The endpoint takes a data URL, not a remote URL — fetch + re-encode it
+    // first, otherwise the base64 decode uploads a corrupt image.
+    const uploadedUrl = await optimizePastedLogoUrl(pastedLogoUrl.trim());
+    if (!uploadedUrl) return;
 
-      // Get tenant ID from localStorage
-      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
-      if (!tenantId) {
-        setError('No tenant selected');
-        return;
-      }
-
-      // Upload logo using service with automatic cache invalidation
-      const result = await platformHomeService.uploadTenantLogo(tenantId, pastedLogoUrl, 'image/*');
-      
-      if (!result.success) {
-        setError(result.error || 'Upload failed');
-        return;
-      }
-
-      // Update form with new logo URL
-      setFormData(prev => ({ ...prev, logo_url: result.data?.logo_url || result.data?.dataUrl }));
-      setLogoPreview(result.data?.logo_url || result.data?.dataUrl);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      clientLogger.error('[EditBusinessProfile] Error uploading logo from URL:', { detail: err });
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploadingLogo(false);
-    }
+    handleChange('logo_url', uploadedUrl);
+    setLogoPreview(uploadedUrl);
+    setPastedLogoUrl('');
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
   };
 
   const validateField = (name: string, value: any) => {
@@ -315,8 +327,8 @@ export default function EditBusinessProfileModal({
         business_description: formData.business_description || undefined,
         phone_number: formData.phone_number ? formData.phone_number : undefined,
         email: formData.email ? formData.email : undefined,
-        // Include social links if they exist
-        social_links: formData.social_links && Object.keys(formData.social_links).length > 0 ? formData.social_links : undefined,
+        // Include social links if they exist (blanks dropped, x folded to twitter)
+        social_links: normalizeSocialLinks(formData.social_links),
         // Explicitly include coordinates if they exist
         latitude: formData.latitude !== undefined && formData.latitude !== null ? formData.latitude : undefined,
         longitude: formData.longitude !== undefined && formData.longitude !== null ? formData.longitude : undefined,
@@ -695,6 +707,7 @@ export default function EditBusinessProfileModal({
                   type="button"
                   onClick={() => {
                     setLogoPreview(null);
+                    setLogoUploadError(null);
                     handleChange('logo_url', '');
                   }}
                   className="text-sm text-red-600 hover:text-red-700"
@@ -722,6 +735,10 @@ export default function EditBusinessProfileModal({
                 </div>
               </label>
             </div>
+
+            {logoUploadError && (
+              <p className="text-sm text-red-600 mb-2" role="alert">{logoUploadError}</p>
+            )}
 
             {/* URL Paste Input */}
             <div className="flex gap-2 mb-2">

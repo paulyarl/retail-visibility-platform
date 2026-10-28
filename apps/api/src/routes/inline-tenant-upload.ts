@@ -30,6 +30,7 @@ const tenantProfileSchema = z.object({
   contact_person: z.string().optional(),
   logo_url: z.string().optional(),
   banner_url: z.string().optional(),
+  social_links: z.record(z.string(), z.string()).nullable().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   display_map: z.boolean().optional(),
@@ -58,6 +59,12 @@ router.get("/api/public/features-showcase-config", async (req, res) => {
 
 // PATCH /api/tenant/profile - partial update
 const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
+
+// Json columns on tenant_business_profiles_list. Raw SQL params must be
+// stringified and cast — Prisma sends a JS object as a Postgres record, not a
+// jsonb literal, and the column would reject it.
+const JSON_COLUMNS = new Set(['social_links', 'hours', 'seo_tags']);
+
 router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async (req, res) => {
   console.log('[PATCH /tenant/profile] Request body:', JSON.stringify(req.body, null, 2));
   const parsed = tenantProfileUpdateSchema.safeParse(req.body ?? {});
@@ -90,8 +97,11 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
         // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
         if (key === 'slug') return;
         if (value !== undefined) {
-          updateParts.push(`"${key}" = $${values.length + 1}`);
-          values.push(value === '' ? null : value);
+          const isJson = JSON_COLUMNS.has(key);
+          updateParts.push(`"${key}" = $${values.length + 1}${isJson ? '::jsonb' : ''}`);
+          if (value === '') values.push(null);
+          else if (isJson && value !== null) values.push(JSON.stringify(value));
+          else values.push(value);
         }
       });
 
@@ -118,7 +128,7 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
       console.log(`[PATCH /tenant/profile] Creating new profile`);
       // Create new profile
       const insertFields = ['tenant_id', 'business_name', 'address_line1', 'city', 'postal_code', 'country_code'];
-      const insertValues = [
+      const insertValues: any[] = [
         tenant_id,
         delta.business_name || existingTenant.name,
         delta.address_line1 || '',
@@ -139,12 +149,15 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
         banner_url: delta.banner_url,
         business_description: delta.business_description,
         seo_title: delta.seo_title,
+        social_links: delta.social_links,
       };
 
       Object.entries(optionalMappings).forEach(([field, value]) => {
         if (value !== undefined) {
           insertFields.push(field);
-          insertValues.push(value === '' ? null : (value as any));
+          if (value === '') insertValues.push(null);
+          else if (JSON_COLUMNS.has(field) && value !== null) insertValues.push(JSON.stringify(value));
+          else insertValues.push(value as any);
         }
       });
 
@@ -152,7 +165,7 @@ router.patch("/api/tenant/profile", authenticateToken, checkTenantAccess, async 
       insertFields.push('updated_at');
       insertValues.push(new Date().toISOString());
 
-      const placeholders = insertFields.map((_, i) => `$${i + 1}`);
+      const placeholders = insertFields.map((field, i) => `$${i + 1}${JSON_COLUMNS.has(field) ? '::jsonb' : ''}`);
       const insertQuery = `
         INSERT INTO "tenant_business_profiles_list" (${insertFields.map(f => `"${f}"`).join(', ')})
         VALUES (${placeholders.join(', ')})

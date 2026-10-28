@@ -679,7 +679,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
       const selected = promoteEntries.filter((e) => ids.includes(e.id));
       const unseeded = selected.filter((e) => !e.seed_id).map((e) => e.id);
       const seeded = selected.filter((e) => e.seed_id).map((e) => e.seed_id as string);
-      const parts: string[] = [];
+      const parts: (string | null)[] = [];
 
       if (unseeded.length > 0) {
         const seedBatch = `pg-${campaignId}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
