@@ -7,7 +7,9 @@ import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPag
 import directoryPresenceAdminService, {
   DirectoryPresenceSeedSummary,
   DirectoryClaimRequest,
+  type SeedBatchSummary,
 } from '@/services/DirectoryPresenceAdminService';
+import { seedBatchDisplayLabel } from '@/lib/seed-batch-label';
 import PresenceSeedsBulkUploadModal from '@/components/directory/PresenceSeedsBulkUploadModal';
 import { List, Plus, Upload, Send, CheckCircle, Eye, MapPin, Tag, Clock, ExternalLink, UserCheck, XCircle, Mail, Phone, ShieldCheck, FileText, Trash2, BarChart3 } from 'lucide-react';
 
@@ -34,6 +36,10 @@ function PresenceSeedsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterBatch, setFilterBatch] = useState('');
+  // Batch filter universe — fetched unfiltered (not derived from the loaded
+  // seeds), so picking a batch can't collapse its own options and the counts
+  // describe the whole cohort rather than the current result page.
+  const [batchOptions, setBatchOptions] = useState<SeedBatchSummary[]>([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterCity, setFilterCity] = useState('');
@@ -97,11 +103,22 @@ function PresenceSeedsContent() {
     fetchSeeds();
   }, [fetchSeeds]);
 
+  useEffect(() => {
+    let cancelled = false;
+    directoryPresenceAdminService
+      .listSeedBatches()
+      .then((list) => {
+        if (!cancelled) setBatchOptions(list);
+      })
+      .catch(() => {
+        if (!cancelled) setBatchOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Derive dropdown options from the loaded seeds
-  const batchOptions = useMemo(
-    () => Array.from(new Set(seeds.map((s) => s.seedBatch).filter(Boolean))).sort(),
-    [seeds],
-  );
   const categoryOptions = useMemo(
     () => Array.from(new Set(seeds.map((s) => s.category).filter(Boolean))).sort(),
     [seeds],
@@ -688,9 +705,27 @@ function PresenceSeedsContent() {
             >
               <option value="">All</option>
               {batchOptions.map((b) => (
-                <option key={b} value={b}>{b}</option>
+                <option key={b.seedBatch} value={b.seedBatch} title={b.seedBatch}>
+                  {seedBatchDisplayLabel(
+                    {
+                      seedBatch: b.seedBatch,
+                      createdAt: b.createdAt,
+                      seedCount: b.totalSeeds,
+                      category: b.topCategory,
+                      categoryCount: b.categories?.length ?? 0,
+                      place: b.topCity,
+                      placeCount: b.cities?.length ?? 0,
+                    },
+                    { includePgTag: true },
+                  )}
+                </option>
               ))}
             </select>
+            {filterBatch && (
+              <span className="mt-1 block truncate font-mono text-[10px] text-gray-400" title="Raw batch label">
+                {filterBatch}
+              </span>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>

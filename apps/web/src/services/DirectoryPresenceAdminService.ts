@@ -844,6 +844,10 @@ export interface SeedBatchSummary {
   invitedSeeds: number;
   cities: string[];
   categories: string[];
+  /** Modal city ("City, ST") — what the cohort mostly is, not what sorts first. */
+  topCity: string | null;
+  /** Modal shelf — same rationale as topCity. */
+  topCategory: string | null;
   /** MIN(created_at) across the batch's seeds — the cohort's birth date. */
   createdAt: string | null;
   /** Proving grounds this batch's seeds are linked to (usually 0 or 1). */
@@ -3607,7 +3611,16 @@ export interface CleanupThinSeed {
 export interface SeedCleanupReport {
   generatedAt: string;
   seedBatch: string | null;
-  batches: Array<{ seedBatch: string; seedCount: number; isPgBatch: boolean }>;
+  batches: Array<{
+    seedBatch: string;
+    seedCount: number;
+    isPgBatch: boolean;
+    createdAt: string | null;
+    topCategory: string | null;
+    categoryCount: number;
+    topPlace: string | null;
+    placeCount: number;
+  }>;
   duplicateGroups: CleanupDuplicateGroup[];
   completeness: {
     totalSeeds: number;

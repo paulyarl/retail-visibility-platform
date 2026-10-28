@@ -8,6 +8,7 @@ import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminServ
 import marketingOpsService from '@/services/MarketingOpsService';
 import type { IntelligenceProfile, IntelligenceFocus } from '@/services/MarketingOpsService';
 import { profileScopeLabel } from '@/lib/intelligence-profile-scope';
+import { seedBatchDisplayLabel } from '@/lib/seed-batch-label';
 
 export default function BatchOperationsDashboard() {
   const searchParams = useSearchParams();
@@ -1085,7 +1086,18 @@ export default function BatchOperationsDashboard() {
                   return (
                     <tr key={b.seedBatch} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">
-                        <span className="font-mono text-xs text-gray-900">{b.seedBatch}</span>
+                        <span className="block text-sm text-gray-900">
+                          {seedBatchDisplayLabel({
+                            seedBatch: b.seedBatch,
+                            createdAt: b.createdAt,
+                            seedCount: b.totalSeeds,
+                            category: b.topCategory ?? b.categories?.[0] ?? null,
+                            categoryCount: b.categories?.length ?? 0,
+                            place: b.topCity ?? b.cities?.[0] ?? null,
+                            placeCount: b.cities?.length ?? 0,
+                          })}
+                        </span>
+                        <span className="font-mono text-xs text-gray-500">{b.seedBatch}</span>
                         {(b.provingGrounds || []).map((pg: { id: string; displayId: string | null }) => (
                           <Link
                             key={pg.id}

@@ -10,6 +10,7 @@ import directoryPresenceAdminService, {
   type CleanupSeedRef,
   type SeedCleanupReport,
 } from '@/services/DirectoryPresenceAdminService';
+import { seedBatchDisplayLabel } from '@/lib/seed-batch-label';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -589,12 +590,16 @@ function CleanupContent() {
           >
             <option value="">All seeds</option>
             {report?.batches.map((b) => (
-              <option key={b.seedBatch} value={b.seedBatch}>
-                {b.seedBatch}
-                {b.isPgBatch ? ' (PG)' : ''} — {b.seedCount}
+              <option key={b.seedBatch} value={b.seedBatch} title={b.seedBatch}>
+                {seedBatchDisplayLabel(b, { includePgTag: true })}
               </option>
             ))}
           </select>
+          {seedBatch && (
+            <span className="font-mono text-[11px] text-gray-400" title="Raw batch label">
+              {seedBatch}
+            </span>
+          )}
         </div>
         <button
           type="button"

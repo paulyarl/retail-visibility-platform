@@ -111,7 +111,23 @@ export interface CleanupThinSeed {
 export interface CleanupReport {
   generatedAt: string;
   seedBatch: string | null;
-  batches: Array<{ seedBatch: string; seedCount: number; isPgBatch: boolean }>;
+  /** Batch option universe — the label plus the facts a human needs to
+   *  recognise the cohort without decoding pg-/from-campaign- slugs. */
+  batches: Array<{
+    seedBatch: string;
+    seedCount: number;
+    isPgBatch: boolean;
+    /** Earliest seed in the cohort — the batch's birth date. */
+    createdAt: string | null;
+    /** Dominant shelf in the cohort (MODE — ties break alphabetically). */
+    topCategory: string | null;
+    /** Distinct shelves, so the label can collapse the rest to "+N". */
+    categoryCount: number;
+    /** Dominant "City, ST" in the cohort (state omitted when absent). */
+    topPlace: string | null;
+    /** Distinct places, so the label can collapse the rest to "+N". */
+    placeCount: number;
+  }>;
   duplicateGroups: CleanupDuplicateGroup[];
   completeness: {
     totalSeeds: number;
@@ -366,8 +382,25 @@ class DirectorySeedCleanupService {
       }
     }
 
+    // Batch selector universe. The label alone (pg-<campaign>-<date>,
+    // from-campaign-<id>) is unreadable in a dropdown, so each row carries
+    // the cohort's birth date, its dominant shelf and its dominant
+    // "City, ST" — the web side composes
+    // "Oct 28 · African Grocery Store · Kansas City, MO +9 · 42 seeds".
+    // MODE (not ARRAY_AGG's alphabetical first) so a multi-city cohort
+    // leads with the city that actually holds most of its seeds.
     const batches = await prisma.$queryRaw<any[]>`
-      SELECT seed_batch, COUNT(*)::int AS seed_count
+      SELECT seed_batch,
+             COUNT(*)::int AS seed_count,
+             MIN(created_at) AS created_at,
+             MODE() WITHIN GROUP (ORDER BY category)
+               FILTER (WHERE NULLIF(category, '') IS NOT NULL) AS top_category,
+             (COUNT(DISTINCT NULLIF(category, ''))
+               FILTER (WHERE NULLIF(category, '') IS NOT NULL))::int AS category_count,
+             MODE() WITHIN GROUP (ORDER BY CONCAT_WS(', ', NULLIF(city, ''), NULLIF(state, '')))
+               FILTER (WHERE COALESCE(NULLIF(city, ''), NULLIF(state, '')) IS NOT NULL) AS top_place,
+             (COUNT(DISTINCT CONCAT_WS(', ', NULLIF(city, ''), NULLIF(state, '')))
+               FILTER (WHERE COALESCE(NULLIF(city, ''), NULLIF(state, '')) IS NOT NULL))::int AS place_count
       FROM directory_presence_seeds
       WHERE seed_batch IS NOT NULL
       GROUP BY seed_batch
@@ -381,6 +414,11 @@ class DirectorySeedCleanupService {
         seedBatch: b.seed_batch,
         seedCount: b.seed_count,
         isPgBatch: this.isPgBatch(b.seed_batch),
+        createdAt: b.created_at ? new Date(b.created_at).toISOString() : null,
+        topCategory: b.top_category ?? null,
+        categoryCount: b.category_count ?? 0,
+        topPlace: b.top_place ?? null,
+        placeCount: b.place_count ?? 0,
       })),
       duplicateGroups,
       completeness: {

@@ -8,6 +8,7 @@ import directoryPresenceAdminService, {
   type CascadeCohortSummary,
   type SeedBatchSummary,
 } from '@/services/DirectoryPresenceAdminService';
+import { seedBatchDisplayLabel } from '@/lib/seed-batch-label';
 import { ArrowLeft, BarChart3, CheckCircle2, Circle, RefreshCw } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -137,8 +138,19 @@ function CohortContent() {
               {batchesLoading ? 'Loading batches…' : 'Select a seed batch…'}
             </option>
             {batches.map((b) => (
-              <option key={b.seedBatch} value={b.seedBatch}>
-                {b.seedBatch} ({b.totalSeeds})
+              <option key={b.seedBatch} value={b.seedBatch} title={b.seedBatch}>
+                {seedBatchDisplayLabel(
+                  {
+                    seedBatch: b.seedBatch,
+                    createdAt: b.createdAt,
+                    seedCount: b.totalSeeds,
+                    category: b.topCategory,
+                    categoryCount: b.categories?.length ?? 0,
+                    place: b.topCity,
+                    placeCount: b.cities?.length ?? 0,
+                  },
+                  { includePgTag: true },
+                )}
               </option>
             ))}
           </select>

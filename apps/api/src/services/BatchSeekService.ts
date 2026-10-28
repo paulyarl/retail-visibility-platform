@@ -858,6 +858,11 @@ class BatchSeekService {
     invitedSeeds: number;
     cities: string[];
     categories: string[];
+    /** Modal city ("City, ST") — what the cohort mostly is, not what sorts
+     *  first. Labels lead with this; `cities` drives the "+N" remainder. */
+    topCity: string | null;
+    /** Modal shelf — same rationale as topCity. */
+    topCategory: string | null;
     createdAt: string | null;
     provingGrounds: Array<{ id: string; displayId: string | null }>;
     sourceCampaigns: Array<{ id: string; displayId: string | null }>;
@@ -930,6 +935,10 @@ class BatchSeekService {
         COUNT(*) FILTER (WHERE dps.invited_at IS NOT NULL) AS invited_seeds,
         ARRAY_AGG(DISTINCT dps.city) AS cities,
         ARRAY_AGG(DISTINCT dps.category) AS categories,
+        MODE() WITHIN GROUP (ORDER BY CONCAT_WS(', ', NULLIF(dps.city, ''), NULLIF(dps.state, '')))
+          FILTER (WHERE COALESCE(NULLIF(dps.city, ''), NULLIF(dps.state, '')) IS NOT NULL) AS top_city,
+        MODE() WITHIN GROUP (ORDER BY dps.category)
+          FILTER (WHERE NULLIF(dps.category, '') IS NOT NULL) AS top_category,
         MIN(dps.created_at) AS created_at
       FROM directory_presence_seeds dps
       WHERE ${conditions.join(' AND ')}
@@ -1041,6 +1050,8 @@ class BatchSeekService {
         invitedSeeds: parseInt(r.invited_seeds) || 0,
         cities: r.cities || [],
         categories: r.categories || [],
+        topCity: r.top_city ?? null,
+        topCategory: r.top_category ?? null,
         createdAt: r.created_at ?? null,
         provingGrounds,
         sourceCampaigns,
