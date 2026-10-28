@@ -2609,6 +2609,25 @@ class DirectoryPresenceSeedService {
         };
 
         const result = await this.createSeed(seedInput, ctx);
+
+        // Persist lineage back onto the queue row. The entry was read FROM the
+        // queue, but nothing stamped the seed id on it — so a draft born
+        // without a campaign link had no joinable parent at all. This keeps
+        // the lineage recoverable even when the link writes below fail.
+        try {
+          await prisma.$executeRaw`
+            UPDATE mkt_prospect_queue
+               SET seed_id = ${result.id}, updated_at = now()
+             WHERE id = ${entry.id} AND seed_id IS NULL
+          `;
+        } catch (lineageErr) {
+          logger.warn('createSeedsForProvingGround: queue lineage stamp failed (non-fatal)', undefined, {
+            queueEntryId: entry.id,
+            seedId: result.id,
+            error: lineageErr instanceof Error ? lineageErr.message : String(lineageErr),
+          });
+        }
+
         // Draft-first promote (spec PLATFORM_GBP_GOOGLE_ADS_SPEC §4.8): PG
         // seeds park as 'draft' for QA + enrichment; publishing is the
         // separate full-push step (bulk publish), not implicit on promote.
@@ -4452,6 +4471,30 @@ class DirectoryPresenceSeedService {
       LIMIT 1
     `;
     const linkedCampaignId = link[0]?.campaign_id ?? null;
+
+    // Campaign-less seeds still know their parent: the queue row carries the
+    // source campaign (and PG) the seed was promoted from. Resolve that
+    // lineage so the narrative lanes stay reachable without a campaign link —
+    // the draft-first promote path parks seeds before any link is written.
+    let lineageCampaignId: string | null = null;
+    if (!linkedCampaignId) {
+      try {
+        const lineage = await prisma.$queryRaw<any[]>`
+          SELECT source_campaign_id, processed_campaign_id
+            FROM mkt_prospect_queue
+           WHERE seed_id = ${seedId}
+           LIMIT 1
+        `;
+        lineageCampaignId =
+          lineage[0]?.source_campaign_id ?? lineage[0]?.processed_campaign_id ?? null;
+      } catch (lineageErr) {
+        logger.warn('getComposedEnrichment: queue lineage lookup failed (non-fatal)', undefined, {
+          seedId,
+          error: lineageErr instanceof Error ? lineageErr.message : String(lineageErr),
+        });
+      }
+    }
+    const narrativeCampaignId = linkedCampaignId ?? lineageCampaignId;
     if (linkedCampaignId) {
       const linkedCampaign = await prisma.mkt_campaigns_list.findUnique({
         where: { id: linkedCampaignId },
@@ -4532,9 +4575,9 @@ class DirectoryPresenceSeedService {
     // Discovery narrative outranks the composed packet here too, so the
     // preview panel, "Reset to composed" and the backfill all resolve to the
     // same copy — the scan's, not boilerplate.
-    if (packet && linkedCampaignId) {
+    if (packet && narrativeCampaignId) {
       const resolvedNarrative = await this.resolveDiscoveryDescription(
-        linkedCampaignId,
+        narrativeCampaignId,
         row.business_name || '',
       );
       if (resolvedNarrative) {
