@@ -2558,6 +2558,9 @@ const deriveBusinessSchema = z.object({
   email: z.string().max(320).optional(),
   website: z.string().max(2000).optional(),
   gbp_url: z.string().max(2000).optional(),
+  // Analyst-written public description from the discovery scan. Capped at the
+  // listing's own limit (500) — the disclosure sentence is appended downstream.
+  description: z.string().max(500).optional(),
   address: z.string().max(500).optional(),
   address_line1: z.string().max(500).optional(),
   address_line2: z.string().max(500).optional(),
@@ -2599,6 +2602,7 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
       email: parsed.email,
       websiteUrl: parsed.website,
       gbpUrl: parsed.gbp_url,
+      description: parsed.description,
       addressLine1: parsed.address_line1 ?? parsed.address,
       addressLine2: parsed.address_line2,
       addressCity: parsed.address_city,

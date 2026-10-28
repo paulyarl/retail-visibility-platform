@@ -48,7 +48,7 @@ import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService
 import ProvingGroundDedupService from './ProvingGroundDedupService';
 import DirectoryChainService, { computeChainSignals } from './DirectoryChainService';
 import { normalizeAttributeEntry } from './directory/listingAttributes';
-import { buildSeoEnrichmentJson, type SeedSeoPacket } from './directory/SeedSeoComposer';
+import { buildSeoEnrichmentJson, DISCLOSURE_SENTENCE, type SeedSeoPacket } from './directory/SeedSeoComposer';
 
 type SeedAuditCtx = {
   actorId?: string;
@@ -915,6 +915,23 @@ class DirectorySeedCleanupService {
             : 'market_enrichment';
         const seoConfidence = seoSource === 'market_enrichment' ? 'medium' : 'high';
 
+        // Sourced description — the discovery scan's analyst-written narrative
+        // rides business_snapshot.description (the same lane as hours above)
+        // and outranks the composed packet: the scan wrote it from observed
+        // evidence, while the composer assembles boilerplate from NAP and
+        // category. Falls back to the packet when the scan omitted it (thin
+        // evidence) or when the seed predates the field.
+        const snapshotDescription =
+          typeof snapshot?.description === 'string' && snapshot.description.trim() !== ''
+            ? snapshot.description.trim()
+            : null;
+        const descriptionValue = snapshotDescription
+          ? snapshotDescription.endsWith(DISCLOSURE_SENTENCE)
+            ? snapshotDescription
+            : snapshotDescription + DISCLOSURE_SENTENCE
+          : packet.description;
+        const descriptionSource = snapshotDescription ? 'discovery_scan' : seoSource;
+
         const hasDesc = typeof s.description === 'string' && s.description.trim() !== '';
         const hasKw = Array.isArray(s.keywords) && s.keywords.length > 0;
         const hasSameAs = Array.isArray(s.same_as) && s.same_as.length > 0;
@@ -923,7 +940,7 @@ class DirectorySeedCleanupService {
         if (!hasDesc || !hasKw || !hasSameAs) {
           await prisma.$executeRaw`
             UPDATE directory_listings_list
-            SET description = CASE WHEN ${hasDesc} THEN description ELSE ${packet.description} END,
+            SET description = CASE WHEN ${hasDesc} THEN description ELSE ${descriptionValue} END,
                 keywords = CASE WHEN ${hasKw} THEN keywords ELSE ${packet.keywords}::text[] END,
                 same_as = CASE WHEN ${hasSameAs} THEN same_as ELSE ${packet.sameAs}::text[] END,
                 updated_at = now()
@@ -939,11 +956,11 @@ class DirectorySeedCleanupService {
         }
         // Provenance rows are insert-only — an existing row (any lane or a
         // human edit) outranks a backfill write.
-        const seoProvRows: Array<[string, string]> = [];
-        if (!hasDesc) seoProvRows.push(['description', packet.description]);
-        if (!hasKw) seoProvRows.push(['keywords', packet.keywords.join(', ')]);
-        if (!hasSameAs && packet.sameAs.length > 0) seoProvRows.push(['same_as', packet.sameAs.join(', ')]);
-        for (const [fieldKey, value] of seoProvRows) {
+        const seoProvRows: Array<[string, string, string]> = [];
+        if (!hasDesc) seoProvRows.push(['description', descriptionValue, descriptionSource]);
+        if (!hasKw) seoProvRows.push(['keywords', packet.keywords.join(', '), seoSource]);
+        if (!hasSameAs && packet.sameAs.length > 0) seoProvRows.push(['same_as', packet.sameAs.join(', '), seoSource]);
+        for (const [fieldKey, value, rowSource] of seoProvRows) {
           await prisma.$executeRaw`
             INSERT INTO directory_field_provenance (
               id, seed_id, tenant_id, field_key, value,
@@ -955,7 +972,7 @@ class DirectorySeedCleanupService {
               ${s.tenant_id},
               ${fieldKey},
               ${value},
-              ${seoSource},
+              ${rowSource},
               now(),
               ${seoConfidence},
               true,

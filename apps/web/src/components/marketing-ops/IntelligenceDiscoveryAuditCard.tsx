@@ -358,6 +358,9 @@ export default function IntelligenceDiscoveryAuditCard({
         address: biz.address ?? undefined,
         address_city: biz.city ?? undefined,
         address_state: biz.state ?? undefined,
+        // Analyst-written public description — carried onto the campaign's
+        // business_snapshot so seed creation uses it as the listing copy.
+        description: biz.description ?? undefined,
         discovery_context: {
           // focus is enum-gated (emerging|competitive) — omit for
           // gold_standards audits rather than failing context validation.
@@ -651,6 +654,14 @@ export default function IntelligenceDiscoveryAuditCard({
                         {biz.address && <div>{biz.address}</div>}
                         {biz.phone && <div>{biz.phone}</div>}
                       </div>
+                    )}
+                    {/* Analyst-written public description — the same text that
+                        rides business_snapshot.description onto the seed
+                        listing, so what the operator reviews is what ships. */}
+                    {biz.description && (
+                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
+                        {biz.description}
+                      </p>
                     )}
                     {/* Suggested categories — the analyst's ranked category
                         suggestions. "Queue as" queues this prospect under that

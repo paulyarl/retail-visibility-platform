@@ -50,6 +50,7 @@ vi.mock('../directory/listingAttributes', () => ({
 }));
 vi.mock('../directory/SeedSeoComposer', () => ({
   buildSeoEnrichmentJson: vi.fn(() => ({})),
+  DISCLOSURE_SENTENCE: ' Listed on VisibleShelf from public information (address, phone).',
 }));
 
 import DirectorySeedCleanupService from '../DirectorySeedCleanupService';
@@ -128,6 +129,60 @@ describe('backfillEnrichment — hours from the linked campaign audit', () => {
     );
     expect(hoursProv).toBeTruthy();
     expect(hoursProv!.slice(1)).toContain('linked_campaign');
+  });
+
+  it('prefers the discovery scan description over the composed packet', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([{ ...SEED_ROW, description: '' }])
+      .mockResolvedValueOnce([
+        {
+          seed_id: 'seed-1',
+          business_snapshot: {
+            description: 'West African grocery carrying fufu, egusi and palm oil.',
+          },
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await DirectorySeedCleanupService.backfillEnrichment({ seedIds: ['seed-1'] });
+
+    const descUpdate = mockExecuteRaw.mock.calls.find(
+      (c) =>
+        sqlText(c[0]).includes('UPDATE directory_listings_list') &&
+        sqlText(c[0]).includes('description'),
+    );
+    expect(descUpdate).toBeTruthy();
+    expect(
+      descUpdate!.slice(1).some((v: any) =>
+        typeof v === 'string' &&
+        v.startsWith('West African grocery carrying fufu, egusi and palm oil. Listed on VisibleShelf'),
+      ),
+    ).toBe(true);
+
+    const descProv = mockExecuteRaw.mock.calls.find(
+      (c) =>
+        sqlText(c[0]).includes('directory_field_provenance') &&
+        c.slice(1).includes('description'),
+    );
+    expect(descProv).toBeTruthy();
+    expect(descProv!.slice(1)).toContain('discovery_scan');
+  });
+
+  it('falls back to the composed packet when the scan carried no description', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([{ ...SEED_ROW, description: '' }])
+      .mockResolvedValueOnce([{ seed_id: 'seed-1', business_snapshot: {} }])
+      .mockResolvedValueOnce([]);
+
+    await DirectorySeedCleanupService.backfillEnrichment({ seedIds: ['seed-1'] });
+
+    const descProv = mockExecuteRaw.mock.calls.find(
+      (c) =>
+        sqlText(c[0]).includes('directory_field_provenance') &&
+        c.slice(1).includes('description'),
+    );
+    expect(descProv).toBeTruthy();
+    expect(descProv!.slice(1)).toContain('campaign_audit');
   });
 
   it('prefers the queue snapshot when it carries verified hours', async () => {

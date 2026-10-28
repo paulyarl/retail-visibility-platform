@@ -2757,6 +2757,9 @@ class MarketingOpsService extends AdminApiSingleton {
     email?: string;
     website?: string;
     gbp_url?: string;
+    // Analyst-written public description — rides the campaign snapshot so seed
+    // creation uses it as the listing copy instead of composing boilerplate.
+    description?: string;
     address?: string;
     address_line1?: string;
     address_line2?: string;

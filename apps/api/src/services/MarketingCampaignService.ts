@@ -2091,6 +2091,10 @@ export class MarketingCampaignService extends BaseService {
     addressCountry?: string;
     directoryProfiles?: DirectoryProfileEntry[];
     gbpUrl?: string;
+    // Analyst-written public description from the discovery scan. Rides the
+    // campaign's business_snapshot so seed creation can use it as the
+    // listing's default copy instead of composing boilerplate from NAP.
+    description?: string;
     socialProfiles?: { platform: string; url: string }[];
     ownerNames?: string[];
     // Category identification override: when the parent is a category-ID
@@ -2343,6 +2347,7 @@ export class MarketingCampaignService extends BaseService {
                 location: input.location ?? null,
                 rating: input.rating ?? null,
                 review_count: input.reviewCount ?? null,
+                description: input.description ?? null,
                 derived_from_campaign_id: child.id,
               } as any,
               detected_signals: triageSignals as any,
