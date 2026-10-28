@@ -244,3 +244,99 @@ describe('syncFromCampaign — name/address/hours projection', () => {
     expect(mockHoursUpsert).not.toHaveBeenCalled();
   });
 });
+
+// Scan-born seeds are linked to the discovery scan campaign, which never
+// carries `business_hours` — the scan records hours per candidate inside its
+// audit. Before the fallback, the seed's "Business hours" diff row rendered
+// blank and its checkbox was disabled, so there was no way to re-sync hours
+// from the scan output.
+describe('hours fallback — campaign audits when the campaign column is empty', () => {
+  const BA_GRID = {
+    monday: { open: '10:00', close: '18:00', closed: false },
+    timezone: 'America/Chicago',
+  };
+  const CANDIDATE_GRID = {
+    monday: { open: '11:00', close: '19:00', closed: false },
+    timezone: 'America/Chicago',
+  };
+  const OTHER_CITY_GRID = {
+    monday: { open: '08:00', close: '16:00', closed: false },
+  };
+
+  const auditRowsByPlatform = (rows: Record<string, any[]>) =>
+    mockFindAudits.mockImplementation(async ({ where }: any) => rows[where?.platform] ?? []);
+
+  it('buildDiff falls back to the business_analysis audit grid', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...DIFF_ROW, camp_hours: null }]);
+    auditRowsByPlatform({
+      business_analysis: [{ audit_data: { business_hours: BA_GRID } }],
+    });
+
+    const diff = await DirectorySeedCampaignLinkService.buildDiff('seed-1', 'camp-1');
+    const hours = diff.find((d) => d.field === 'hours')!;
+
+    expect(hours.campaignValue).toContain('Mon 10:00–18:00');
+    expect(hours.changed).toBe(true);
+  });
+
+  it('buildDiff reads the scan candidate hours, preferring the seed city', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...DIFF_ROW, camp_hours: null }]);
+    auditRowsByPlatform({
+      intelligence_discovery: [
+        {
+          audit_data: {
+            discovered_businesses: [
+              { business_name: 'Old Name', city: 'Milwaukee', hours: OTHER_CITY_GRID },
+              { business_name: 'Old Name', city: 'Kansas City', hours: CANDIDATE_GRID },
+            ],
+          },
+        },
+      ],
+    });
+
+    const diff = await DirectorySeedCampaignLinkService.buildDiff('seed-1', 'camp-1');
+    const hours = diff.find((d) => d.field === 'hours')!;
+
+    expect(hours.campaignValue).toContain('Mon 11:00–19:00');
+    expect(hours.campaignValue).not.toContain('08:00');
+    expect(hours.changed).toBe(true);
+  });
+
+  it('buildDiff leaves hours empty when no audit carries a grid', async () => {
+    mockQueryRaw.mockResolvedValue([{ ...DIFF_ROW, camp_hours: null }]);
+    auditRowsByPlatform({});
+
+    const diff = await DirectorySeedCampaignLinkService.buildDiff('seed-1', 'camp-1');
+    const hours = diff.find((d) => d.field === 'hours')!;
+
+    expect(hours.campaignValue).toBeNull();
+    expect(hours.changed).toBe(false);
+  });
+
+  it('syncFromCampaign projects hours resolved from the scan candidate record', async () => {
+    mockQueryRaw.mockResolvedValue([
+      { ...SYNC_ROW, camp_hours: null, seed_city: 'Kansas City' },
+    ]);
+    auditRowsByPlatform({
+      intelligence_discovery: [
+        { audit_data: { discovered_businesses: [{ business_name: 'Old Name', city: 'Kansas City', hours: CANDIDATE_GRID }] } },
+      ],
+    });
+
+    const res = await DirectorySeedCampaignLinkService.syncFromCampaign('seed-1', 'camp-1', ['hours']);
+
+    expect(res.projected).toEqual(['hours']);
+    expect(res.skipped).toEqual([]);
+    const listingUpdate = mockExecuteRawUnsafe.mock.calls.find((c) =>
+      sqlText(c[0]).includes('UPDATE directory_listings_list'),
+    );
+    expect(sqlText(listingUpdate![0])).toContain('business_hours = $');
+    expect(mockHoursUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          periods: [{ day: 'MONDAY', open: '11:00', close: '19:00' }],
+        }),
+      }),
+    );
+  });
+});

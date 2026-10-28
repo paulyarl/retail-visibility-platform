@@ -603,7 +603,11 @@ class DirectorySeedCampaignLinkService {
       (!!nap.state && this.norm(nap.state) !== this.norm(r.seed_state)) ||
       (!!nap.zip && this.norm(nap.zip) !== this.norm(r.seed_zip));
 
-    const campHoursCanon = this.canonicalHoursJson(r.camp_hours);
+    const campHours = await this.resolveCampaignHours(campaignId, r.camp_hours, {
+      businessName: r.seed_business_name,
+      city: r.seed_city,
+    });
+    const campHoursCanon = this.canonicalHoursJson(campHours);
     const seedHoursCanon = this.canonicalHoursJson(r.seed_hours);
 
     const normalizeCatArray = (v: any): string[] =>
@@ -630,7 +634,7 @@ class DirectorySeedCampaignLinkService {
       },
       {
         field: 'hours',
-        campaignValue: this.summarizeHours(r.camp_hours),
+        campaignValue: this.summarizeHours(campHours),
         seedValue: this.summarizeHours(r.seed_hours),
         changed: !!campHoursCanon && campHoursCanon !== seedHoursCanon,
       },
@@ -713,7 +717,7 @@ class DirectorySeedCampaignLinkService {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT
         dps.tenant_id, dps.listing_id,
-        dl.keywords, dl.business_name,
+        dl.keywords, dl.business_name, dl.city AS seed_city,
         mc.phone AS camp_phone, mc.website_url AS camp_website,
         mc.business_name AS camp_business_name,
         mc.address_line1 AS camp_address_line1,
@@ -834,8 +838,13 @@ class DirectorySeedCampaignLinkService {
           break;
         }
         case 'hours': {
-          const hours = r.camp_hours;
-          if (hours && typeof hours === 'object' && !Array.isArray(hours)) {
+          // Campaign column first, then the campaign's audits — a scan-born
+          // seed's hours only exist in the scan's per-candidate record.
+          const hours = await this.resolveCampaignHours(campaignId, r.camp_hours, {
+            businessName: r.business_name,
+            city: r.seed_city,
+          });
+          if (hours) {
             addSet('business_hours', JSON.stringify(hours), 'jsonb');
             hoursToSync = hours;
             provenanceRows.push({
@@ -1420,6 +1429,65 @@ class DirectorySeedCampaignLinkService {
     return (Array.isArray(auditRows) ? auditRows : []).find(
       (a: any) => !isStubBusinessAnalysisAudit(a),
     ) ?? null;
+  }
+
+  /**
+   * Resolve the hours grid a campaign can project onto a seed.
+   *
+   * `mkt_campaigns_list.business_hours` is only populated by an explicit audit
+   * "Sync to campaign" or a verification call. Scan campaigns never carry it —
+   * a discovery scan records hours per candidate inside its audit
+   * (`audit_data.discovered_businesses[].hours`). Reading only the campaign
+   * column left the seed's "Business hours" row blank and its checkbox
+   * disabled for every scan-born seed, so there was no way to re-sync hours
+   * from the scan output. Precedence:
+   *   1. the campaign record (verification call / operator edit),
+   *   2. the campaign's latest business_analysis audit grid,
+   *   3. this seed's own candidate record in the scan audit (normalized name
+   *      match, city-preferred when the name repeats across markets).
+   *
+   * Public so the cleanup backfill can fill a thin seed's hours from the same
+   * resolution the manual "Sync from campaign" path uses.
+   */
+  async resolveCampaignHours(
+    campaignId: string,
+    campaignHours: any,
+    seed: { businessName?: string | null; city?: string | null },
+  ): Promise<Record<string, any> | null> {
+    const isGrid = (v: any): v is Record<string, any> =>
+      !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0;
+
+    if (isGrid(campaignHours)) return campaignHours;
+
+    const audit = await this.getLatestBusinessAnalysisAudit(campaignId);
+    const auditHours = (audit?.audit_data as any)?.business_hours;
+    if (isGrid(auditHours)) return auditHours;
+
+    const seedName = this.norm(seed.businessName);
+    if (!seedName) return null;
+    const scanRows = await (prisma as any).mkt_audits_list.findMany({
+      where: { campaign_id: campaignId, platform: 'intelligence_discovery' },
+      orderBy: { created_at: 'desc' },
+      take: 5,
+      select: { audit_data: true },
+    }).catch(() => null);
+    if (!Array.isArray(scanRows)) return null;
+
+    const seedCity = this.norm(seed.city);
+    for (const row of scanRows) {
+      const data = (row as any)?.audit_data ?? {};
+      const candidates = [
+        ...(Array.isArray(data.discovered_businesses) ? data.discovered_businesses : []),
+        ...(Array.isArray(data.qualifying_businesses) ? data.qualifying_businesses : []),
+      ];
+      const named = candidates.filter(
+        (c: any) => isGrid(c?.hours) && this.norm(c?.business_name) === seedName,
+      );
+      if (named.length === 0) continue;
+      const sameCity = seedCity ? named.find((c: any) => this.norm(c?.city) === seedCity) : null;
+      return (sameCity ?? named[0]).hours;
+    }
+    return null;
   }
 
   /**

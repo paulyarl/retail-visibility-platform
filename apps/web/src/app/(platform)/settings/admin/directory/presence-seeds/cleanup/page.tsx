@@ -515,7 +515,10 @@ function CleanupContent() {
       const sharpened = r.results.filter((x) => x.seoSharpened).length;
       const prov = r.results.reduce((n, x) => n + (x.provenanceWritten ?? 0), 0);
       const attrs = r.results.reduce((n, x) => n + (x.attributesWritten ?? 0), 0);
-      return `Backfilled ${ids.length} seeds — ${prov} provenance rows, ${sharpened} SEO packets, ${attrs} attribute chips.`;
+      const hours = r.results.filter((x) => x.hoursWritten).length;
+      return `Backfilled ${ids.length} seeds — ${prov} provenance rows, ${sharpened} SEO packets, ${attrs} attribute chips` +
+        (hours > 0 ? `, ${hours} hours grids` : '') +
+        '.';
     });
 
   return (

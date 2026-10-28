@@ -3608,6 +3608,8 @@ export interface BackfillEnrichmentResult {
     skipped?: string;
     provenanceWritten?: number;
     attributesWritten?: number;
+    secondaryCategoriesWritten?: number;
+    hoursWritten?: boolean;
     seoSharpened?: boolean;
   }>;
 }

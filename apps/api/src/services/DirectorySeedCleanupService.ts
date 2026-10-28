@@ -44,6 +44,7 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import { generateDirectoryFieldProvenanceId } from '../lib/id-generator';
 import DirectoryPresenceSeedService from './DirectoryPresenceSeedService';
+import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import ProvingGroundDedupService from './ProvingGroundDedupService';
 import DirectoryChainService, { computeChainSignals } from './DirectoryChainService';
 import { normalizeAttributeEntry } from './directory/listingAttributes';
@@ -634,14 +635,20 @@ class DirectorySeedCleanupService {
     const seeds = await prisma.$queryRaw<any[]>`
       SELECT dps.id, dps.tenant_id, dps.listing_id, dps.status,
              dps.identity_confidence, dps.seo_enrichment,
-             dl.business_name, dl.address, dl.phone, dl.website,
+             dl.business_name, dl.address, dl.phone, dl.website, dl.city,
              dl.primary_category, dl.secondary_categories, dl.business_hours,
              dl.attributes, dl.description, dl.keywords, dl.same_as,
              (
                SELECT dscl.campaign_id FROM directory_seed_campaign_links dscl
                WHERE dscl.seed_id = dps.id AND dscl.link_role = 'primary'
                LIMIT 1
-             ) AS primary_campaign_id
+             ) AS primary_campaign_id,
+             (
+               SELECT mc.business_hours FROM directory_seed_campaign_links dscl
+               JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
+               WHERE dscl.seed_id = dps.id AND dscl.link_role = 'primary'
+               LIMIT 1
+             ) AS primary_campaign_hours
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dps.id = ANY(${seedIds}::varchar[])
@@ -815,16 +822,40 @@ class DirectorySeedCleanupService {
         secondaryCategoriesWritten = snapshotSecondary.length;
       }
 
-      // Sourced opening hours — same fill-missing snapshot carry as the
-      // batch seed paths (snapshot.hours, verified_nap.hours fallback).
+      // Sourced opening hours — fill-missing, best lane first:
+      //   1. the queue snapshot (verification call outranks the scan),
+      //   2. the primary-linked campaign — its record, then the campaign's
+      //      audits. Scan-born seeds carry hours ONLY in the discovery scan's
+      //      per-candidate record (the campaign row has no business_hours), so
+      //      without this lane "hours" stayed permanently missing and the
+      //      backfill could not close it.
       let hoursWritten = false;
       const snapshotHours = snapshot?.hours ?? snapshot?.verified_nap?.hours ?? null;
-      if (!s.business_hours && snapshotHours && typeof snapshotHours === 'object') {
-        const hoursSource = snapshot?.verified_nap?.hours ? 'verification_call' : 'prospect_queue';
-        const hoursConfidence = snapshot?.verified_nap?.hours ? 'high' : confidence;
+      let resolvedHours: any = null;
+      let hoursSource = 'prospect_queue';
+      let hoursConfidence = confidence;
+      if (snapshotHours && typeof snapshotHours === 'object') {
+        resolvedHours = snapshotHours;
+        if (snapshot?.verified_nap?.hours) {
+          hoursSource = 'verification_call';
+          hoursConfidence = 'high';
+        }
+      } else if (s.primary_campaign_id) {
+        const campaignHours = await DirectorySeedCampaignLinkService.resolveCampaignHours(
+          s.primary_campaign_id,
+          s.primary_campaign_hours ?? null,
+          { businessName: s.business_name, city: s.city },
+        );
+        if (campaignHours) {
+          resolvedHours = campaignHours;
+          hoursSource = 'linked_campaign';
+          hoursConfidence = 'high';
+        }
+      }
+      if (!s.business_hours && resolvedHours) {
         await prisma.$executeRaw`
           UPDATE directory_listings_list
-          SET business_hours = ${JSON.stringify(snapshotHours)}::jsonb, updated_at = now()
+          SET business_hours = ${JSON.stringify(resolvedHours)}::jsonb, updated_at = now()
           WHERE id = ${s.listing_id}
         `;
         await prisma.$executeRaw`
@@ -837,7 +868,7 @@ class DirectorySeedCleanupService {
             ${seedId},
             ${s.tenant_id},
             'hours',
-            ${JSON.stringify(snapshotHours)},
+            ${JSON.stringify(resolvedHours)},
             ${hoursSource},
             now(),
             ${hoursConfidence},
