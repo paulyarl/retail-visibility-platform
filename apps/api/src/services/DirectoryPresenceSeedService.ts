@@ -4387,15 +4387,22 @@ class DirectoryPresenceSeedService {
 
     const campaign = await (prisma as any).mkt_campaigns_list.findUnique({
       where: { id: campaignId },
-      select: { business_snapshot: true },
+      select: { business_snapshot: true, parent_campaign_id: true },
     });
     const snapshotDescription = (campaign as any)?.business_snapshot?.description;
     if (typeof snapshotDescription === 'string' && snapshotDescription.trim()) {
       return snapshotDescription.trim();
     }
 
+    // The discovery scan lives on the campaign that ran it. A seed promoted
+    // straight from that campaign finds it at once; a seed whose campaign was
+    // derived from discovery (the "+ Campaign" path) must look one level up,
+    // because the child campaign only carries business_analysis audits.
+    const campaignIds = [campaignId, (campaign as any)?.parent_campaign_id]
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
     const scans = await (prisma as any).mkt_audits_list.findMany({
-      where: { campaign_id: campaignId, platform: 'intelligence_discovery' },
+      where: { campaign_id: { in: campaignIds }, platform: 'intelligence_discovery' },
       orderBy: { created_at: 'desc' },
       take: 5,
     });
