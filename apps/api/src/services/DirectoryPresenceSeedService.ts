@@ -4389,10 +4389,12 @@ class DirectoryPresenceSeedService {
    * preferred over the NAP-derived boilerplate the composer can assemble from
    * name + category + city. Resolution order, best first:
    *
-   *   1. the linked campaign's own business_analysis narrative (stubs skipped —
+   *   1. the category_identification narrative — top dog on a cat surface,
+   *      which the listing description is; the cat-id analyst filed the
+   *      business onto its shelves, and the audit can exist with no business
+   *      analysis at all
+   *   2. the linked campaign's own business_analysis narrative (stubs skipped —
    *      a stub carries none, which is the signal to keep climbing)
-   *   2. the category_identification narrative (the shelf-filing analyst; it
-   *      can exist with no business analysis at all)
    *   3. the discovery scan on that campaign
    *   4. the discovery scan on its parent
    *
@@ -4413,8 +4415,21 @@ class DirectoryPresenceSeedService {
       select: { parent_campaign_id: true },
     });
 
-    // Lane 1 — the linked campaign's own audit narrative. A real business
-    // analysis has actually examined this business, so its narrative outranks
+    // Lane 1 — the category_identification narrative, top dog on this surface.
+    // The cat-id analyst is what filed this business onto its shelves, and the
+    // listing description IS a cat surface — so its public_narrative outranks
+    // every other lane, business analysis included.
+    // Cat-id audits usually live on the scan campaign, so the shared resolver
+    // checks the campaign then its parent.
+    const catIdNarrative = await resolveCatIdPublicNarrative(
+      prisma as any,
+      campaignId,
+      (campaign as any)?.parent_campaign_id ?? null,
+    );
+    if (catIdNarrative) return this.clampDescription(catIdNarrative);
+
+    // Lane 2 — the linked campaign's own business_analysis narrative. A real
+    // business analysis has examined this business, so its narrative outranks
     // anything a discovery blurb can say. Stub audits are skipped: they carry
     // no narrative, and that is precisely when the discovery ladder below is
     // the right answer.
@@ -4430,18 +4445,6 @@ class DirectoryPresenceSeedService {
         .find((v: any) => typeof v === 'string' && v.trim().length > 0);
       if (narrative) return this.clampDescription(String(narrative).trim());
     }
-
-    // Lane 2 — the category_identification narrative. The cat-id analyst is
-    // what filed this business onto its shelves, so its public_narrative is
-    // canonical shelf copy, and it exists even when the campaign has no
-    // business analysis at all. Cat-id audits usually live on the scan
-    // campaign, so the shared resolver checks the campaign then its parent.
-    const catIdNarrative = await resolveCatIdPublicNarrative(
-      prisma as any,
-      campaignId,
-      (campaign as any)?.parent_campaign_id ?? null,
-    );
-    if (catIdNarrative) return this.clampDescription(catIdNarrative);
 
     // The discovery scan lives on the campaign that ran it. A seed promoted
     // straight from that campaign finds it at once; a seed whose campaign was
