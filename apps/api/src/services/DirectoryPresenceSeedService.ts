@@ -47,6 +47,7 @@ import {
   DISCLOSURE_SENTENCE,
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
+import { resolveCatIdPublicNarrative } from './intelligence/auditPublicNarrative';
 import {
   extractAttributesFromAuditData,
   extractAttributesFromAudits,
@@ -4370,14 +4371,36 @@ class DirectoryPresenceSeedService {
   }
 
   /**
-   * Discovery description — the analyst-written narrative a discovery scan
-   * emitted for this business. Composition must prefer it over the NAP-derived
-   * boilerplate: the scan wrote it from observed evidence, while the composer
-   * can only assemble name + category + city. Lanes, best first:
-   *   1. the discovery scan audit on this campaign
-   *   2. the discovery scan audit on its parent (the "+ Campaign" derive path)
-   * Returns null when the scan omitted it (thin evidence) — callers fall back
-   * to the composed packet, which is the honest result in that case.
+   * Keep a narrative inside the public listing budget (500 chars including the
+   * disclosure sentence). Prefers a sentence boundary so the copy does not end
+   * mid-thought; falls back to a word boundary.
+   */
+  private clampDescription(text: string, budget = 440): string {
+    if (text.length <= budget) return text;
+    const window = text.slice(0, budget);
+    const sentenceEnd = Math.max(window.lastIndexOf('. '), window.lastIndexOf('! '), window.lastIndexOf('? '));
+    if (sentenceEnd > budget * 0.5) return window.slice(0, sentenceEnd + 1).trim();
+    const wordEnd = window.lastIndexOf(' ');
+    return (wordEnd > 0 ? window.slice(0, wordEnd) : window).trim();
+  }
+
+  /**
+   * Discovery description — the narrative this business already has on file,
+   * preferred over the NAP-derived boilerplate the composer can assemble from
+   * name + category + city. Resolution order, best first:
+   *
+   *   1. the linked campaign's own business_analysis narrative (stubs skipped —
+   *      a stub carries none, which is the signal to keep climbing)
+   *   2. the category_identification narrative (the shelf-filing analyst; it
+   *      can exist with no business analysis at all)
+   *   3. the discovery scan on that campaign
+   *   4. the discovery scan on its parent
+   *
+   * Lane 3 is load-bearing: a campaign derived from a discovery scan (the
+   * "+ Campaign" path) has no discovery audit of its own and usually has no
+   * real business analysis yet, so the parent climb is the only route to the
+   * analyst narrative. Returns null when no lane has one — callers then fall
+   * back to the composed packet, which is the honest result.
    */
   private async resolveDiscoveryDescription(
     campaignId: string | null,
@@ -4389,6 +4412,36 @@ class DirectoryPresenceSeedService {
       where: { id: campaignId },
       select: { parent_campaign_id: true },
     });
+
+    // Lane 1 — the linked campaign's own audit narrative. A real business
+    // analysis has actually examined this business, so its narrative outranks
+    // anything a discovery blurb can say. Stub audits are skipped: they carry
+    // no narrative, and that is precisely when the discovery ladder below is
+    // the right answer.
+    const businessAudits = await (prisma as any).mkt_audits_list.findMany({
+      where: { campaign_id: campaignId, platform: 'business_analysis' },
+      orderBy: { created_at: 'desc' },
+      take: 10,
+    });
+    for (const businessAudit of Array.isArray(businessAudits) ? businessAudits : []) {
+      if (isStubBusinessAnalysisAudit(businessAudit)) continue;
+      const auditData = (businessAudit as any)?.audit_data ?? {};
+      const narrative = [auditData.summary, auditData.business_summary, auditData.description, auditData.narrative]
+        .find((v: any) => typeof v === 'string' && v.trim().length > 0);
+      if (narrative) return this.clampDescription(String(narrative).trim());
+    }
+
+    // Lane 2 — the category_identification narrative. The cat-id analyst is
+    // what filed this business onto its shelves, so its public_narrative is
+    // canonical shelf copy, and it exists even when the campaign has no
+    // business analysis at all. Cat-id audits usually live on the scan
+    // campaign, so the shared resolver checks the campaign then its parent.
+    const catIdNarrative = await resolveCatIdPublicNarrative(
+      prisma as any,
+      campaignId,
+      (campaign as any)?.parent_campaign_id ?? null,
+    );
+    if (catIdNarrative) return this.clampDescription(catIdNarrative);
 
     // The discovery scan lives on the campaign that ran it. A seed promoted
     // straight from that campaign finds it at once; a seed whose campaign was
