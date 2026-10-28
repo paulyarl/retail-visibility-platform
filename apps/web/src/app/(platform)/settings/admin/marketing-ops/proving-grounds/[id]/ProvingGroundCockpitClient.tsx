@@ -1600,6 +1600,17 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             )}
           </button>
         ))}
+        {/* Post-promote handoff: the cockpit births seeds, then cleanup owns
+            them — duplicates, thin-seed completeness, and batch recompose.
+            Without this the operator has to know the URL. */}
+        <Link
+          href="/settings/admin/directory/presence-seeds/cleanup"
+          title="Post-promote cleanup — duplicates, thin seeds, and batch recompose"
+          className="ml-auto mr-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-gray-300"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Cleanup
+        </Link>
       </div>
 
       {tab === 'preflight' && (
