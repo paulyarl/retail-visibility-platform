@@ -124,6 +124,9 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
   const [activeProfile, setActiveProfile] = useState<IntelligenceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activating, setActivating] = useState<string | null>(null);
+  // Bumped after an activation so the effect re-reads the profile pair.
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (!campaign.category) {
@@ -193,7 +196,7 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [campaign.category, campaign.city, campaign.state, campaign.intelligence_platform, focus]);
+  }, [campaign.category, campaign.city, campaign.state, campaign.intelligence_platform, focus, reloadToken]);
 
   const platformLabel = campaign.intelligence_platform
     ? campaign.intelligence_platform === 'all'
@@ -218,6 +221,30 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
   // candidate pool — its finds are promoted slot by slot from the campaign
   // panel, so it is NOT awaiting activation and must not be listed as such.
   const awaitingDrafts = draftProfiles.filter((p) => p.awaiting_activation !== false);
+
+  // The draft THIS campaign just imported, when it is newer than the active
+  // profile at the same scope. The operator is standing on the page that
+  // produced it, so committing it belongs here — navigating to the profiles
+  // workspace to press the same button is an artificial detour, and a draft
+  // left un-promoted means every scan keeps consuming the older board.
+  const nextVersionDraft =
+    activeProfile && bestDraft && bestDraft.id === activeProfile.id && bestDraft.version > activeProfile.version
+      ? bestDraft
+      : null;
+
+  const handleActivateDraft = async (draft: IntelligenceProfile) => {
+    const key = `${draft.id}:${draft.version}`;
+    setActivating(key);
+    setError(null);
+    try {
+      await marketingOpsService.activateIntelligenceProfileDraft(draft.id, draft.version);
+      setReloadToken((n) => n + 1);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to activate profile');
+    } finally {
+      setActivating(null);
+    }
+  };
 
   // Per-platform gold-standard slot counts + occupants from the rendered
   // profile's candidates. Gold-standards-only — emerging/competitive profiles
@@ -311,6 +338,19 @@ export default function IntelligenceEstablishmentPanel({ campaign }: Props) {
               <div className="text-xs text-gray-500 mt-1">
                 Updated: {activeProfile.updated_at ? new Date(activeProfile.updated_at).toLocaleDateString() : '—'}
               </div>
+              {nextVersionDraft && (
+                <button
+                  type="button"
+                  onClick={() => handleActivateDraft(nextVersionDraft)}
+                  disabled={activating != null}
+                  title="Commits this campaign's imported profile and retires the active version — downstream scans consume the active board, so an un-promoted draft leaves them on the older one"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {activating === `${nextVersionDraft.id}:${nextVersionDraft.version}`
+                    ? 'Activating…'
+                    : `Activate v${nextVersionDraft.version} (replaces v${activeProfile.version})`}
+                </button>
+              )}
             </div>
           ) : (
             <div className="text-sm text-gray-400">

@@ -56,6 +56,7 @@ export default function BronzeStandardDiscoveryPanel({ campaign }: Props) {
   const [draftProfiles, setDraftProfiles] = useState<IntelligenceProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activating, setActivating] = useState<string | null>(null);
   const [fillingKey, setFillingKey] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -131,6 +132,29 @@ export default function BronzeStandardDiscoveryPanel({ campaign }: Props) {
   // a profile awaiting its first activation. It only lands on the board when
   // the active profile did not resolve for this campaign's scope.
   const boardIsCandidatePool = !activeProfile && bestDraft?.awaiting_activation === false;
+
+  // The draft THIS campaign just imported, when it is newer than the active
+  // board at the same scope. The board is the authority every scan consumes,
+  // so an un-promoted draft leaves them hunting the older reason set — and the
+  // operator is already standing on the page that produced it.
+  const nextVersionDraft =
+    activeProfile && bestDraft && bestDraft.id === activeProfile.id && bestDraft.version > activeProfile.version
+      ? bestDraft
+      : null;
+
+  const handleActivateDraft = async (draft: IntelligenceProfile) => {
+    const key = `${draft.id}:${draft.version}`;
+    setActivating(key);
+    setError(null);
+    try {
+      await marketingOpsService.activateIntelligenceProfileDraft(draft.id, draft.version);
+      setRefreshTrigger((n) => n + 1);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to activate bronze-standard profile');
+    } finally {
+      setActivating(null);
+    }
+  };
   const boardConfig = boardProfile ? bronzeProfileConfig(boardProfile) : null;
   const coverage: BronzeReasonCoverageEntry[] = boardConfig?.reason_coverage ?? [];
   const catalogLabels = new Map<string, string>();
@@ -329,6 +353,24 @@ export default function BronzeStandardDiscoveryPanel({ campaign }: Props) {
               <div className="font-medium text-gray-900 dark:text-white">{profileScopeLabel(activeProfile).label}</div>
             </div>
           </div>
+          {nextVersionDraft && (
+            <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800 flex items-center justify-between gap-3">
+              <p className="text-xs text-green-800 dark:text-green-400 leading-relaxed">
+                Draft v{nextVersionDraft.version} was imported by this campaign and is newer than the
+                active board. Until it is activated, scans keep hunting the reasons on v{activeProfile.version}.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleActivateDraft(nextVersionDraft)}
+                disabled={activating != null}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-green-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+              >
+                {activating === `${nextVersionDraft.id}:${nextVersionDraft.version}`
+                  ? 'Activating…'
+                  : `Activate v${nextVersionDraft.version}`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

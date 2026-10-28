@@ -105,6 +105,10 @@ function platformLabel(key: string): string {
 export default function IntelligenceProfilesClient() {
   const [activeProfiles, setActiveProfiles] = useState<IntelligenceProfile[]>([]);
   const [draftProfiles, setDraftProfiles] = useState<IntelligenceProfile[]>([]);
+  // Current bronze catalog revision. A bronze board can only hunt the reasons
+  // it was built against, so a board stamped behind the catalog is a coverage
+  // gap — surfaced on the card rather than only inside the scan prompt.
+  const [catalogRevision, setCatalogRevision] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activating, setActivating] = useState<string | null>(null);
@@ -144,12 +148,16 @@ export default function IntelligenceProfilesClient() {
     setError(null);
     try {
       const focusArg = focusFilter === 'all' ? undefined : focusFilter;
-      const [active, drafts] = await Promise.all([
+      const [active, drafts, bronzeList] = await Promise.all([
         marketingOpsService.listIntelligenceProfiles(focusArg),
         marketingOpsService.listIntelligenceProfileDrafts(focusArg),
+        // Advisory chrome — a failure here must not block the page, so it
+        // resolves to null rather than rejecting the batch.
+        marketingOpsService.listBronzeReasons({}).catch(() => null),
       ]);
       setActiveProfiles(active);
       setDraftProfiles(drafts);
+      setCatalogRevision(bronzeList?.catalog_revision ?? null);
     } catch (err) {
       setError((err as Error).message || 'Failed to load profiles');
     } finally {
@@ -453,6 +461,44 @@ export default function IntelligenceProfilesClient() {
     // the operator's committed board, so it is not offered as "ready to
     // activate" (its finds are promoted per-slot from the campaign panel).
     const awaitingActivation = profile.awaiting_activation !== false;
+    // Level 1 = patterns (gold + bronze standards): what to look for.
+    // Level 2 = establishment (emerging + competitive): how to look for it.
+    // The label says which level is being replaced, so the operator never has
+    // to remember that these are stacked rather than interchangeable.
+    const isPatternDraft = ['gold_standards', 'bronze_standards'].includes(
+      String(profile.intelligence_focus),
+    );
+    // The pairing is the key difference between the two levels: EMERGING
+    // establishment reads the BRONZE board, COMPETITIVE establishment reads the
+    // GOLD board. The level number alone does not say which board feeds which
+    // focus, so each card states it.
+    const levelPairing =
+      profile.intelligence_focus === 'bronze_standards'
+        ? 'Level 1 · read by emerging establishment'
+        : profile.intelligence_focus === 'gold_standards'
+          ? 'Level 1 · read by competitive establishment'
+          : profile.intelligence_focus === 'emerging'
+            ? 'Level 2 · reads the bronze board'
+            : profile.intelligence_focus === 'competitive'
+              ? 'Level 2 · reads the gold board'
+              : null;
+    // A bronze board can only hunt the reasons it was built against, so a
+    // stamp behind the current catalog is a coverage gap — the board is the
+    // authority scans consume, and it is silently hunting an older reason set.
+    const stampedCatalogRevision =
+      typeof (config as any)?.catalog_revision === 'number'
+        ? ((config as any).catalog_revision as number)
+        : null;
+    const catalogDrift =
+      isPatternDraft &&
+      stampedCatalogRevision != null &&
+      catalogRevision != null &&
+      catalogRevision > stampedCatalogRevision
+        ? catalogRevision - stampedCatalogRevision
+        : null;
+    const draftScopeLabel = profile.reference_city
+      ? `${profile.reference_city}${profile.reference_state ? `, ${profile.reference_state}` : ''}`
+      : 'nationwide';
 
     return (
       <Paper key={key} shadow="xs" radius="md" withBorder p="md" mb="sm">
@@ -491,11 +537,31 @@ export default function IntelligenceProfilesClient() {
                 {platformLabel(profile.reference_platform || 'all')}
               </Badge>
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
+              {stampedCatalogRevision != null && (
+                <Badge
+                  size="xs"
+                  variant="dot"
+                  color={catalogDrift ? 'orange' : 'gray'}
+                  title={
+                    catalogDrift
+                      ? `Built against catalog r${stampedCatalogRevision}; the catalog is at r${catalogRevision}. This board cannot hunt the ${catalogDrift} reason revision(s) added since — rebuild it to cover them.`
+                      : `Built against catalog r${stampedCatalogRevision} (current).`
+                  }
+                >
+                  catalog r{stampedCatalogRevision}
+                  {catalogDrift ? ` · ${catalogDrift} behind` : ''}
+                </Badge>
+              )}
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
             <Text size="xs" c="dimmed">
               category_key: {profile.category_key} · created {new Date(profile.created_at).toLocaleString()}
             </Text>
+            {levelPairing && (
+              <Text size="xs" c="dimmed">
+                {levelPairing}
+              </Text>
+            )}
             {sources && (
               <Text size="xs" c="dimmed">
                 {sources.length} specialized source{sources.length !== 1 ? 's' : ''} ·
@@ -561,7 +627,7 @@ export default function IntelligenceProfilesClient() {
                     leftSection={<IconCircleCheck size={14} />}
                     loading={activating === key}
                   >
-                    Replace active
+                    {isPatternDraft ? 'Replace pattern board' : 'Replace establishment'}
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
@@ -570,7 +636,9 @@ export default function IntelligenceProfilesClient() {
                     leftSection={<IconCircleCheck size={14} />}
                     onClick={() => handleActivate(profile.id, profile.version)}
                   >
-                    Activate v{profile.version} — retires the active profile for this scope
+                    {isPatternDraft
+                      ? `Activate v${profile.version} — retires the level 1 pattern board (${draftScopeLabel}); this changes WHAT scans look for`
+                      : `Activate v${profile.version} — retires the level 2 establishment profile (${draftScopeLabel}); this changes HOW scans look for it`}
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
@@ -612,6 +680,18 @@ export default function IntelligenceProfilesClient() {
   // operator's committed board, so it never renders an Activate action.
   const awaitingDrafts = draftProfiles.filter((p) => p.awaiting_activation !== false);
   const candidatePoolDrafts = draftProfiles.filter((p) => p.awaiting_activation === false);
+
+  // Two LEVELS, not two purposes — the lower one is an input to the upper one:
+  //   Level 1 — market PATTERNS (gold + bronze standards): what to look for.
+  //   Level 2 — market ESTABLISHMENT (emerging + competitive): how to look for
+  //     it (sources, sweeps, evidence rules), and it reads the level 1 board.
+  //   Level 3 — market DISCOVERY runs consume level 2; level 4 (PG cockpit)
+  //     consumes level 3. Levels 3 and 4 are campaigns, not profiles, so they
+  //     never appear in this list.
+  const PATTERN_FOCUSES = new Set(['gold_standards', 'bronze_standards']);
+  const allDrafts = [...awaitingDrafts, ...candidatePoolDrafts];
+  const patternDrafts = allDrafts.filter((p) => PATTERN_FOCUSES.has(String(p.intelligence_focus)));
+  const establishmentDrafts = allDrafts.filter((p) => !PATTERN_FOCUSES.has(String(p.intelligence_focus)));
 
   return (
     <Stack gap="md">
@@ -682,13 +762,47 @@ export default function IntelligenceProfilesClient() {
               Activating a draft retires the previously active version for the same category
               <strong> and focus type</strong>. A draft whose scope already has an active profile
               offers <strong>Replace active</strong> instead, and commits the same way.
+              <br />
+              These two groups are <strong>levels</strong>, not alternatives — the lower one feeds
+              the upper one, and the pairing is fixed: <strong>gold → competitive</strong>,{' '}
+              <strong>bronze → emerging</strong>. Level 2 (emerging + competitive) defines
+              <em>how to look for it</em> — sources, sweeps and evidence rules. Level 3 discovery
+              runs consume level 2, and the PG cockpit consumes level 3.
             </Text>
             {draftProfiles.length === 0 ? (
               <Paper withBorder p="lg" radius="md" style={{ textAlign: 'center' }}>
                 <Text size="xs" c="dimmed">No drafts.</Text>
               </Paper>
             ) : (
-              [...awaitingDrafts, ...candidatePoolDrafts].map((p) => renderProfileCard(p, true))
+              <>
+                {patternDrafts.length > 0 && (
+                  <div>
+                    <Text size="xs" fw={600} mb={2}>
+                      Level 1 — market patterns ({patternDrafts.length})
+                    </Text>
+                    <Text size="xs" c="dimmed" mb="xs">
+                      Two different questions, not two versions of one. <strong>Gold</strong> defines
+                      the benchmark standard — what the market&apos;s best looks like — and feeds
+                      competitive establishment. <strong>Bronze</strong> defines discovery reasons —
+                      why a hidden business stays hidden — and feeds emerging establishment.
+                    </Text>
+                    {patternDrafts.map((p) => renderProfileCard(p, true))}
+                  </div>
+                )}
+                {establishmentDrafts.length > 0 && (
+                  <div>
+                    <Text size="xs" fw={600} mb={2}>
+                      Level 2 — market establishment ({establishmentDrafts.length})
+                    </Text>
+                    <Text size="xs" c="dimmed" mb="xs">
+                      How to look for it. <strong>Emerging</strong> reads the bronze board;{' '}
+                      <strong>competitive</strong> reads the gold board. Level 3 discovery runs read
+                      these; the PG cockpit consumes level 3.
+                    </Text>
+                    {establishmentDrafts.map((p) => renderProfileCard(p, true))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
