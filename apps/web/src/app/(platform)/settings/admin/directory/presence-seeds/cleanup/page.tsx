@@ -521,6 +521,32 @@ function CleanupContent() {
         '.';
     });
 
+  /**
+   * Batch recompose — overwrite SEO copy for the filtered set. Backfill closes
+   * gaps; this replaces stale copy (an old disclosure sentence, or a narrative
+   * composed before the directives changed). Destructive by design, so it asks
+   * first and reports what was skipped.
+   */
+  const handleRecomposeAll = () =>
+    runAction(async () => {
+      const ids = thinSeeds
+        .filter((s) => s.status !== 'claimed' && s.status !== 'suppressed')
+        .map((s) => s.seedId);
+      if (ids.length === 0) return 'No live seeds to recompose.';
+      const ok = window.confirm(
+        `Recompose SEO copy for ${ids.length} seed${ids.length !== 1 ? 's' : ''}?\n\n` +
+          'This overwrites description, keywords and same_as with freshly composed copy, ' +
+          'including any hand edits. Claimed and suppressed seeds are skipped.',
+      );
+      if (!ok) return 'Recompose cancelled.';
+      const r = await directoryPresenceAdminService.recomposeSeedEnrichment(ids);
+      return (
+        `Recomposed ${r.recomposed} seed${r.recomposed !== 1 ? 's' : ''}` +
+        (r.skipped.length ? ` — ${r.skipped.length} skipped` : '') +
+        '.'
+      );
+    });
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -672,7 +698,7 @@ function CleanupContent() {
                 : `${thinSeeds.length} of ${report?.completeness.totalSeeds ?? 0} seeds missing fields`}
             </span>
           </div>
-          {thinSeeds.length > 0 && (
+          {thinSeeds.length > 0 && (<>
             <button
               type="button"
               onClick={handleBackfillAll}
@@ -682,7 +708,16 @@ function CleanupContent() {
               <ArrowUpRight className="h-3.5 w-3.5" />
               Backfill all thin seeds
             </button>
-          )}
+            <button
+              type="button"
+              onClick={handleRecomposeAll}
+              disabled={busy || loading}
+              title="Overwrites description, keywords and same_as with freshly composed copy"
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              Recompose SEO copy
+            </button>
+          </>)}
         </div>
 
         {!loading && thinSeeds.length === 0 && (

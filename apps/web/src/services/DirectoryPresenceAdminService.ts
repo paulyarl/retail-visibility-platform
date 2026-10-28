@@ -3293,20 +3293,6 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
   /** POST /api/admin/directory-presence/presence-seeds/backfill-enrichment
    *  Fill-missing backfill: canonical provenance + queue-snapshot attributes
    *  + composed SEO packet (description/keywords/same_as/seo_enrichment). */
-  /** POST /api/admin/directory-presence/presence-seeds/recompose-enrichment
-   *  Batch recompose: overwrite SEO copy for a filtered seed set (backfill
-   *  fills gaps; this replaces stale copy). */
-  async recomposeSeedEnrichment(seedIds: string[]): Promise<{ recomposed: number; skipped: Array<{ seedId: string; reason: string }> }> {
-    const result = await this.makeRequest<{ recomposed: number; skipped: Array<{ seedId: string; reason: string }> }>(
-      `/api/admin/directory-presence/presence-seeds/recompose-enrichment`,
-      { method: 'POST', body: JSON.stringify({ seedIds }) },
-    );
-    if (!result.success) {
-      throw new Error(result.error || 'recompose_enrichment_failed');
-    }
-    return result.data as { recomposed: number; skipped: Array<{ seedId: string; reason: string }> };
-  }
-
   async backfillSeedEnrichment(seedIds: string[]): Promise<BackfillEnrichmentResult> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/backfill-enrichment`,
@@ -3320,6 +3306,27 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     }
     const data = result.data?.data ?? result.data;
     return data as BackfillEnrichmentResult;
+  }
+
+  /** POST /api/admin/directory-presence/presence-seeds/recompose-enrichment
+   *  Batch recompose: overwrite SEO copy for a filtered seed set. Backfill
+   *  fills gaps; this replaces stale copy — an old disclosure sentence, or a
+   *  narrative composed before the directives changed. */
+  async recomposeSeedEnrichment(
+    seedIds: string[],
+  ): Promise<{ recomposed: number; skipped: Array<{ seedId: string; reason: string }> }> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/recompose-enrichment`,
+      { method: 'POST', body: JSON.stringify({ seedIds }) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(errorMessage || 'recompose_enrichment_failed');
+    }
+    const data = result.data?.data ?? result.data;
+    return data as { recomposed: number; skipped: Array<{ seedId: string; reason: string }> };
   }
 
   /** POST /api/admin/directory-presence/presence-seeds/:id/reset */
