@@ -908,6 +908,15 @@ function PresenceSeedDetailClient() {
     if (!statusDraft || statusDraft === status) return;
     setActionError(null);
     setActionSuccess(null);
+    // 'published' is not a plain status write: publishing flips the listing
+    // row public and stamps published_at. Setting the status field alone left
+    // seeds reading "published" with is_published=false and a dead View button
+    // (2026-10-28). Route it through the publish action instead.
+    if (statusDraft === 'published') {
+      setStatusDraft('');
+      await handlePublish();
+      return;
+    }
     try {
       setSavingStatus(true);
       await directoryPresenceAdminService.updateStatus(seedId, statusDraft);
@@ -1085,7 +1094,15 @@ function PresenceSeedDetailClient() {
   const provenance = detail?.provenance ?? [];
   const claimTokens = detail?.claimTokens ?? [];
   const status = seed?.status ?? '—';
-  const canPublish = status === 'draft';
+  // Publish is a first-class action, not a dropdown option: a draft seed is
+  // the normal promote state, and an 'invited' seed that was never published
+  // is the 2026-10-28 defect (promote minted a claim token, which flipped the
+  // status to invited while published_at stayed null — the page then showed no
+  // public affordance at all). Any non-terminal seed without a published_at is
+  // publishable, including the stuck 'published'-without-listing state that the
+  // raw status dropdown could produce.
+  const canPublish =
+    status !== 'claimed' && status !== 'suppressed' && !seed?.published_at;
   const canInvite =
     (status === 'published' || status === 'invited') &&
     !claimTokens.some(

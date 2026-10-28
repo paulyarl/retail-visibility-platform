@@ -1030,8 +1030,17 @@ class DirectoryPresenceSeedService {
       )
     `;
 
+    // Status-preserving mint (2026-10-28): promoting from the cockpit parks the
+    // seed as 'draft' for QA + enrichment, but the claim-token mint below used
+    // to flip it to 'invited' — a draft with an invite status and no published
+    // listing, so the seed page showed no public affordance. A token may exist
+    // while the seed is still draft (the claim link resolves as a private
+    // preview); only a PUBLISHED seed moves to 'invited' on mint.
     await prisma.$executeRaw`
-      UPDATE directory_presence_seeds SET status = 'invited', invited_at = now(), updated_at = now()
+      UPDATE directory_presence_seeds
+      SET status = CASE WHEN status = 'published' THEN 'invited' ELSE status END,
+          invited_at = CASE WHEN status = 'published' THEN now() ELSE invited_at END,
+          updated_at = now()
       WHERE id = ${seedId}
     `;
 
