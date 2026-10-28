@@ -81,7 +81,7 @@ const SEED_ROW = {
   keywords: ['kw'],
   same_as: ['https://example.com'],
   primary_campaign_id: 'mcamp-scan',
-  primary_campaign_hours: null,
+  linked_campaigns: [{ campaign_id: 'mcamp-scan', business_hours: null }],
 };
 
 beforeEach(() => {
@@ -151,6 +151,34 @@ describe('backfillEnrichment — hours from the linked campaign audit', () => {
       (c) => sqlText(c[0]).includes('directory_field_provenance') && sqlText(c[0]).includes("'hours'"),
     );
     expect(hoursProv!.slice(1)).toContain('verification_call');
+  });
+
+  it('uses a linked business campaign audit grid when the scan has none', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([
+        {
+          ...SEED_ROW,
+          linked_campaigns: [
+            { campaign_id: 'mcamp-scan', business_hours: null },
+            { campaign_id: 'mcamp-biz', business_hours: null },
+          ],
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    mockFindAudits.mockImplementation(async ({ where }: any) =>
+      where?.campaign_id === 'mcamp-biz' && where?.platform === 'business_analysis'
+        ? [{ audit_data: { business_hours: CANDIDATE_HOURS } }]
+        : [],
+    );
+
+    const out = await DirectorySeedCleanupService.backfillEnrichment({ seedIds: ['seed-1'] });
+
+    expect(out.results[0].hoursWritten).toBe(true);
+    const hoursUpdate = mockExecuteRaw.mock.calls.find(
+      (c) => sqlText(c[0]).includes('UPDATE directory_listings_list') && sqlText(c[0]).includes('business_hours'),
+    );
+    expect(hoursUpdate!.slice(1)).toContain(JSON.stringify(CANDIDATE_HOURS));
   });
 
   it('leaves hours alone when the listing already has a grid', async () => {

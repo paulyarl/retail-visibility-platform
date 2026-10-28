@@ -644,11 +644,17 @@ class DirectorySeedCleanupService {
                LIMIT 1
              ) AS primary_campaign_id,
              (
-               SELECT mc.business_hours FROM directory_seed_campaign_links dscl
+               SELECT json_agg(
+                        json_build_object(
+                          'campaign_id', dscl.campaign_id,
+                          'business_hours', mc.business_hours
+                        )
+                        ORDER BY (dscl.link_role = 'primary') DESC, dscl.created_at
+                      )
+               FROM directory_seed_campaign_links dscl
                JOIN mkt_campaigns_list mc ON mc.id = dscl.campaign_id
-               WHERE dscl.seed_id = dps.id AND dscl.link_role = 'primary'
-               LIMIT 1
-             ) AS primary_campaign_hours
+               WHERE dscl.seed_id = dps.id
+             ) AS linked_campaigns
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dps.id = ANY(${seedIds}::varchar[])
@@ -824,11 +830,14 @@ class DirectorySeedCleanupService {
 
       // Sourced opening hours — fill-missing, best lane first:
       //   1. the queue snapshot (verification call outranks the scan),
-      //   2. the primary-linked campaign — its record, then the campaign's
+      //   2. every campaign linked to this seed (primary first, then
+      //      siblings/recovery): the campaign record, then that campaign's
       //      audits. Scan-born seeds carry hours ONLY in the discovery scan's
       //      per-candidate record (the campaign row has no business_hours), so
       //      without this lane "hours" stayed permanently missing and the
-      //      backfill could not close it.
+      //      backfill could not close it. Following every link matters once a
+      //      business campaign with its own business_analysis audit is
+      //      attached to the seed — those hours are the best source of all.
       let hoursWritten = false;
       const snapshotHours = snapshot?.hours ?? snapshot?.verified_nap?.hours ?? null;
       let resolvedHours: any = null;
@@ -840,16 +849,22 @@ class DirectorySeedCleanupService {
           hoursSource = 'verification_call';
           hoursConfidence = 'high';
         }
-      } else if (s.primary_campaign_id) {
-        const campaignHours = await DirectorySeedCampaignLinkService.resolveCampaignHours(
-          s.primary_campaign_id,
-          s.primary_campaign_hours ?? null,
-          { businessName: s.business_name, city: s.city },
-        );
-        if (campaignHours) {
-          resolvedHours = campaignHours;
-          hoursSource = 'linked_campaign';
-          hoursConfidence = 'high';
+      } else {
+        const linkedCampaigns: Array<{ campaign_id: string; business_hours: any }> =
+          Array.isArray(s.linked_campaigns) ? s.linked_campaigns.filter(Boolean) : [];
+        for (const link of linkedCampaigns) {
+          if (!link?.campaign_id) continue;
+          const campaignHours = await DirectorySeedCampaignLinkService.resolveCampaignHours(
+            link.campaign_id,
+            link.business_hours ?? null,
+            { businessName: s.business_name, city: s.city },
+          );
+          if (campaignHours) {
+            resolvedHours = campaignHours;
+            hoursSource = 'linked_campaign';
+            hoursConfidence = 'high';
+            break;
+          }
         }
       }
       if (!s.business_hours && resolvedHours) {
