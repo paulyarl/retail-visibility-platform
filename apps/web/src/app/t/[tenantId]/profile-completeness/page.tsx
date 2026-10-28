@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ContextBadges } from '@/components/ContextBadges'
 import { PlatformHomeSingletonService } from '@/services/PlatformHomeSingletonService'
-import { BusinessProfile } from '@/lib/validation/businessProfile'
+import { BusinessProfile, calculateSEOReadiness } from '@/lib/validation/businessProfile'
 
 interface CompletenessData {
   score: number
@@ -51,10 +51,8 @@ export default function ProfileCompletenessPage() {
           throw new Error('Profile not found. Please create your business profile first.')
         }
         
-        // Calculate completeness score based on available fields
-        const totalFields = 14
-        
-        // Track individual field completion
+        // Same weighted score the Business Profile card shows, so the two
+        // surfaces can't disagree about the same profile.
         const fields = {
           businessName: !!profileData.business_name,
           addressLine1: !!profileData.address_line1,
@@ -73,9 +71,7 @@ export default function ProfileCompletenessPage() {
           seoTags: !!(profileData.seo_tags && profileData.seo_tags.length > 0),
         }
         
-        // Count completed fields
-        const score = Object.values(fields).filter(Boolean).length
-        const completenessScore = Math.round((score / totalFields) * 100)
+        const completenessScore = calculateSEOReadiness(profileData as BusinessProfile)
         
         // Determine grade
         let grade = 'poor'
@@ -251,7 +247,7 @@ export default function ProfileCompletenessPage() {
             <ChecklistItem label="Website (HTTPS)" weight="Important" completed={completeness?.fields?.website ?? false} />
             <ChecklistItem label="Geocode (Lat/Lng)" weight="Important" completed={completeness?.fields?.geocode ?? false} />
             <ChecklistItem label="Business Description" weight="Important" completed={completeness?.fields?.businessDescription ?? false} />
-            <ChecklistItem label="Logo" weight="Optional" completed={completeness?.fields?.logo ?? false} />
+            <ChecklistItem label="Logo" weight="Important" completed={completeness?.fields?.logo ?? false} />
             <ChecklistItem label="Business Hours" weight="Optional" completed={completeness?.fields?.businessHours ?? false} />
             <ChecklistItem label="Social Links" weight="Optional" completed={completeness?.fields?.socialLinks ?? false} />
             <ChecklistItem label="SEO Tags" weight="Optional" completed={completeness?.fields?.seoTags ?? false} />

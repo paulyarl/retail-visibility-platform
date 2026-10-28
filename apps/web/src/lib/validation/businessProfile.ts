@@ -249,51 +249,100 @@ export async function geocodeAddress(address: {
 // Partial schema for updates (all fields optional)
 export const businessProfileUpdateSchema = businessProfileSchema.partial();
 
-// Helper to calculate SEO readiness score (0-100)
+// Profile readiness scoring (0-100).
+//
+// Three tiers, so a missing trust field (above all the logo) actually moves the
+// number instead of hiding behind a flat field count:
+//   required 60 — the NAP block every listing needs
+//   trust    25 — the visual/brand proof a shopper judges (logo, website, copy, map pin)
+//   enrich   15 — the nice-to-haves
+// `isSEOReady` additionally gates on every required + trust field, so a profile
+// can't read as "SEO Ready" while it has no logo.
+const REQUIRED_PROFILE_FIELDS = [
+  'business_name',
+  'address_line1',
+  'city',
+  'postal_code',
+  'country_code',
+  'phone_number',
+  'email',
+] as const;
+
+const TRUST_PROFILE_FIELDS = [
+  'logo_url',
+  'website',
+  'business_description',
+  'geocode',
+] as const;
+
+const ENRICHMENT_PROFILE_FIELDS = [
+  'contact_person',
+  'social_links',
+  'hours',
+  'seo_tags',
+] as const;
+
+const FIELD_LABELS: Record<string, string> = {
+  business_name: 'Business name',
+  address_line1: 'Address',
+  city: 'City',
+  postal_code: 'Postal code',
+  country_code: 'Country',
+  phone_number: 'Phone number',
+  email: 'Email',
+  logo_url: 'Logo',
+  website: 'Website',
+  business_description: 'Description',
+  geocode: 'Map coordinates',
+  contact_person: 'Contact person',
+  social_links: 'Social links',
+  hours: 'Business hours',
+  seo_tags: 'SEO tags',
+};
+
+// Treats 0 as present (a longitude of 0 is valid) and objects/arrays as present
+// only when they hold something.
+function hasValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as object).length > 0;
+  return true;
+}
+
+function isFieldPresent(profile: Partial<BusinessProfile>, field: string): boolean {
+  if (field === 'geocode') {
+    const { latitude, longitude } = profile;
+    return latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined;
+  }
+  return hasValue(profile[field as keyof BusinessProfile]);
+}
+
+function tierScore(profile: Partial<BusinessProfile>, fields: readonly string[], weight: number): number {
+  const completed = fields.filter((field) => isFieldPresent(profile, field)).length;
+  return (completed / fields.length) * weight;
+}
+
+// Helper to calculate profile/SEO readiness score (0-100)
 export function calculateSEOReadiness(profile: Partial<BusinessProfile>): number {
-  const requiredFields = [
-    'business_name',
-    'address_line1',
-    'city',
-    'postal_code',
-    'country_code',
-    'phone_number',
-    'email',
-  ];
-  
-  const optionalFields = [
-    'website',
-    'contact_person',
-    'social_links',
-  ];
-  
-  let score = 0;
-  const requiredWeight = 70; // 70% for required fields
-  const optionalWeight = 30; // 30% for optional fields
-  
-  // Check required fields (70 points)
-  const completedRequired = requiredFields.filter(field => {
-    const value = profile[field as keyof BusinessProfile];
-    return value && value !== '';
-  }).length;
-  score += (completedRequired / requiredFields.length) * requiredWeight;
-  
-  // Check optional fields (30 points)
-  const completedOptional = optionalFields.filter(field => {
-    const value = profile[field as keyof BusinessProfile];
-    if (field === 'social_links') {
-      return value && typeof value === 'object' && Object.keys(value).length > 0;
-    }
-    return value && value !== '';
-  }).length;
-  score += (completedOptional / optionalFields.length) * optionalWeight;
-  
+  const score =
+    tierScore(profile, REQUIRED_PROFILE_FIELDS, 60) +
+    tierScore(profile, TRUST_PROFILE_FIELDS, 25) +
+    tierScore(profile, ENRICHMENT_PROFILE_FIELDS, 15);
   return Math.round(score);
+}
+
+// Human-readable fields that still block "SEO Ready" — the card shows these so a
+// missing logo is called out by name instead of a generic "complete all fields".
+export function getMissingProfileFields(profile: Partial<BusinessProfile>): string[] {
+  return [...REQUIRED_PROFILE_FIELDS, ...TRUST_PROFILE_FIELDS]
+    .filter((field) => !isFieldPresent(profile, field))
+    .map((field) => FIELD_LABELS[field]);
 }
 
 // Helper to check if profile is complete for SEO
 export function isSEOReady(profile: Partial<BusinessProfile>): boolean {
-  return calculateSEOReadiness(profile) >= 85;
+  return getMissingProfileFields(profile).length === 0 && calculateSEOReadiness(profile) >= 85;
 }
 
 // Country list with codes (ISO 3166-1 alpha-2)

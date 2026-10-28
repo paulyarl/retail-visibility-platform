@@ -272,6 +272,11 @@ export default function TenantSettingsPage() {
     );
   }
 
+  // The business profile row is the canonical logo home; tenant.metadata is the
+  // legacy copy written by the logo upload endpoint, kept as a fallback so the
+  // stat doesn't read 0% for a tenant that only ever set a logo there.
+  const logoUrl = profile?.logo_url || (tenant.metadata as any)?.logo_url || null;
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
@@ -289,16 +294,16 @@ export default function TenantSettingsPage() {
         <div className="sticky top-0 z-10 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700 mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 py-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4">
-              {tenant.metadata && (tenant.metadata as any).logo_url && (
+              {logoUrl && (
                 <img
-                  src={(tenant.metadata as any).logo_url}
+                  src={logoUrl}
                   alt="Business Logo"
                   className="h-12 w-12 object-contain rounded-lg border border-neutral-200"
                 />
               )}
               <div>
                 <Title order={2}>{tenant.name}</Title>
-                <Text size="sm" c="dimmed">Profile Completion: {Math.round(((profile?.business_name ? 1 : 0) + (profile?.address_line1 ? 1 : 0) + (profile?.phone_number ? 1 : 0) + (profile?.email ? 1 : 0) + ((tenant.metadata as any)?.logo_url ? 1 : 0)) / 5 * 100)}%</Text>
+                <Text size="sm" c="dimmed">Profile Completion: {Math.round(((profile?.business_name ? 1 : 0) + (profile?.address_line1 ? 1 : 0) + (profile?.phone_number ? 1 : 0) + (profile?.email ? 1 : 0) + (logoUrl ? 1 : 0)) / 5 * 100)}%</Text>
               </div>
             </div>
             <a

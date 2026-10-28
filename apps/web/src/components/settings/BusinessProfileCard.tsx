@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Skeleton } from '@/components/ui';
 import EditBusinessProfileModal from './EditBusinessProfileModal';
-import { BusinessProfile, calculateSEOReadiness, isSEOReady, formatPhoneNumber, countries } from '@/lib/validation/businessProfile';
+import { BusinessProfile, calculateSEOReadiness, isSEOReady, getMissingProfileFields, formatPhoneNumber, countries } from '@/lib/validation/businessProfile';
 import { Button } from '@mantine/core';
 
 interface BusinessProfileCardProps {
@@ -78,6 +78,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
 
   const seoScore = calculateSEOReadiness(profile);
   const seoReady = isSEOReady(profile);
+  const missingFields = getMissingProfileFields(profile);
   const country = countries.find(c => c.code === profile.country_code);
 
   return (
@@ -96,13 +97,29 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Business Logo */}
-          {profile.logo_url && (
+          {profile.logo_url ? (
             <div className="flex items-center justify-center pb-4 border-b border-neutral-200">
               <img
                 src={profile.logo_url}
                 alt="Business Logo"
                 className="max-h-24 max-w-full object-contain"
               />
+            </div>
+          ) : (
+            <div className="pb-4 border-b border-neutral-200">
+              <div className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-300 px-4 py-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-neutral-900">No logo yet</p>
+                  <p className="text-xs text-neutral-500">
+                    Shoppers use it to recognise you — upload one under Business Logo when you edit this profile.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -220,7 +237,7 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
                 <p className="text-xs text-neutral-500 mt-0.5">
                   {seoReady
                     ? 'Your profile is optimized for search engines'
-                    : 'Complete all fields to improve visibility'}
+                    : 'Add the missing fields to improve visibility'}
                 </p>
               </div>
               <span className="text-2xl font-bold text-neutral-900">{seoScore}%</span>
@@ -239,12 +256,12 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
               />
             </div>
 
-            {!seoReady && (
+            {missingFields.length > 0 && (
               <p className="text-xs text-neutral-500 mt-2 flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Add website and social links to reach 100%
+                Missing: {missingFields.join(', ')}
               </p>
             )}
           </div>
