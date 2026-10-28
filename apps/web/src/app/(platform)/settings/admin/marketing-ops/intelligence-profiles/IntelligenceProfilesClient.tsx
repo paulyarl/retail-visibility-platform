@@ -460,8 +460,18 @@ export default function IntelligenceProfilesClient() {
           <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
             <Group gap="xs">
               <Text size="sm" fw={600}>{profile.category_name}</Text>
-              <Badge size="xs" variant="light" color={STATUS_COLORS[profile.status]}>
-                {STATUS_LABELS[profile.status]}
+              {/* A draft for a scope that already has an active profile is a
+                  candidate pool, not a profile awaiting activation — it must
+                  not read as another "Draft" the operator has to activate. */}
+              <Badge
+                size="xs"
+                variant="light"
+                color={isDraft && !awaitingActivation ? 'cyan' : STATUS_COLORS[profile.status]}
+                title={isDraft && !awaitingActivation
+                  ? 'An active profile already covers this category, focus and scope — this draft holds the latest scan’s candidate fills.'
+                  : undefined}
+              >
+                {isDraft && !awaitingActivation ? 'Candidate pool' : STATUS_LABELS[profile.status]}
               </Badge>
               <Badge size="xs" variant="dot" color={FOCUS_COLORS[profile.intelligence_focus]}>
                 {FOCUS_LABELS[profile.intelligence_focus]}
@@ -481,16 +491,6 @@ export default function IntelligenceProfilesClient() {
                 {platformLabel(profile.reference_platform || 'all')}
               </Badge>
               <Badge size="xs" variant="dot" color="violet">v{profile.version}</Badge>
-              {isDraft && !awaitingActivation && (
-                <Badge
-                  size="xs"
-                  variant="light"
-                  color="cyan"
-                  title="An active profile already covers this category, focus and scope — this draft holds the latest scan's candidate fills."
-                >
-                  Candidate pool
-                </Badge>
-              )}
             </Group>
             <Text size="xs" c="dimmed" ff="monospace">{profile.id}</Text>
             <Text size="xs" c="dimmed">

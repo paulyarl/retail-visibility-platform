@@ -925,6 +925,8 @@ describe('IntelligenceProfileService — Bronze Standard methods', () => {
     it('retires only the bronze scope tuple (focus is part of the retire where)', async () => {
       const draft = PROFILE({ status: 'draft', version: 2 });
       mockPrisma.mkt_intelligence_profiles.findUnique.mockResolvedValueOnce(draft);
+      // Regression guard lookup — no active version is newer than this draft.
+      mockPrisma.mkt_intelligence_profiles.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mkt_intelligence_profiles.updateMany.mockResolvedValueOnce({ count: 1 });
       mockPrisma.mkt_intelligence_profiles.update.mockResolvedValueOnce({ ...draft, status: 'active' });
 
