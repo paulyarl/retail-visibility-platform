@@ -678,57 +678,84 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
     });
   };
 
+  // Select-all covers EVERY row in the panel, not just the unseeded ones.
+  // Filtering to `!seed_id` made the control a no-op on a queue that was
+  // already 87/90 draft-seeded, while the button still said "select all".
   const toggleAllPromote = () => {
-    const promotable = promoteEntries.filter((e) => !e.seed_id);
-    const allSelected = promotable.length > 0 && promotable.every((e) => promoteSelected.has(e.id));
-    setPromoteSelected(allSelected ? new Set() : new Set(promotable.map((e) => e.id)));
+    const selectable = promoteEntries.filter((e) => e.status !== 'dismissed');
+    const allSelected = selectable.length > 0 && selectable.every((e) => promoteSelected.has(e.id));
+    setPromoteSelected(allSelected ? new Set() : new Set(selectable.map((e) => e.id)));
   };
 
-  const handlePromoteSelected = async () => {
+  // Two explicit actions instead of one status-aware button. "Select all"
+  // covers the whole queue, and a single Promote that silently published the
+  // 87 draft-seeded rows would be a live-listing landmine (2026-10-28).
+  //   createDrafts  — unseeded rows only (preflight step 2, draft-first)
+  //   publishDrafts — draft-seeded rows only (the separate full-push step)
+  const handleCreateDrafts = async () => {
     const ids = [...promoteSelected];
     if (ids.length === 0) return;
+    const unseeded = promoteEntries
+      .filter((e) => ids.includes(e.id) && !e.seed_id)
+      .map((e) => e.id);
+    if (unseeded.length === 0) {
+      setPromoteResult('Nothing to create — every selected prospect already has a seed.');
+      return;
+    }
     setPromoteBusy(true);
     setPromoteError(null);
     setPromoteResult(null);
     try {
-      // Status-aware split (spec §4.8): unseeded rows take the PARTIAL promote
-      // (draft seeds); draft-seeded rows take the FULL promote (publish).
-      const selected = promoteEntries.filter((e) => ids.includes(e.id));
-      const unseeded = selected.filter((e) => !e.seed_id).map((e) => e.id);
-      const seeded = selected.filter((e) => e.seed_id).map((e) => e.seed_id as string);
-      const parts: (string | null)[] = [];
-
-      if (unseeded.length > 0) {
-        const seedBatch = `pg-${campaignId}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-        const result = await directoryPresenceAdminService.provingGroundSeed(unseeded, seedBatch);
-        parts.push(
-          `${result.created.length} draft seed${result.created.length === 1 ? '' : 's'} created`,
-          result.skipped.length ? `${result.skipped.length} skipped` : null,
-          result.failed.length ? `${result.failed.length} failed` : null,
-        );
-      }
-
-      if (seeded.length > 0) {
-        let published = 0;
-        let publishFailed = 0;
-        for (const seedId of seeded) {
-          try {
-            await directoryPresenceAdminService.publishSeed(seedId);
-            published += 1;
-          } catch {
-            publishFailed += 1;
-          }
-        }
-        parts.push(
-          `${published} seed${published === 1 ? '' : 's'} published`,
-          publishFailed ? `${publishFailed} publish failed` : null,
-        );
-      }
-
-      setPromoteResult(`Promote complete: ${parts.filter(Boolean).join(', ')}.`);
+      const seedBatch = `pg-${campaignId}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+      const result = await directoryPresenceAdminService.provingGroundSeed(unseeded, seedBatch);
+      setPromoteResult(
+        `Draft seeds: ${result.created.length} created, ${result.skipped.length} skipped, ${result.failed.length} failed.`,
+      );
       await load();
     } catch (err: any) {
-      setPromoteError(err.message || 'Failed to promote prospects');
+      setPromoteError(err.message || 'Failed to create draft seeds');
+    } finally {
+      setPromoteBusy(false);
+    }
+  };
+
+  const handlePublishDrafts = async () => {
+    const ids = [...promoteSelected];
+    if (ids.length === 0) return;
+    const seeded = promoteEntries
+      .filter((e) => ids.includes(e.id) && e.seed_id)
+      .map((e) => e.seed_id as string);
+    if (seeded.length === 0) {
+      setPromoteResult('Nothing to publish — no selected prospect has a draft seed yet.');
+      return;
+    }
+    // This button makes listings live. Confirm the blast radius explicitly —
+    // "select all" on a draft-heavy queue is 87 publishes.
+    if (typeof window !== 'undefined'
+      && !window.confirm(`Publish ${seeded.length} listing${seeded.length === 1 ? '' : 's'} live? This makes them public immediately.`)) {
+      return;
+    }
+    setPromoteBusy(true);
+    setPromoteError(null);
+    setPromoteResult(null);
+    try {
+      let published = 0;
+      let publishFailed = 0;
+      for (const seedId of seeded) {
+        try {
+          await directoryPresenceAdminService.publishSeed(seedId);
+          published += 1;
+        } catch {
+          publishFailed += 1;
+        }
+      }
+      setPromoteResult(
+        `Published ${published} seed${published === 1 ? '' : 's'}` +
+          (publishFailed ? `, ${publishFailed} failed` : '') + '.',
+      );
+      await load();
+    } catch (err: any) {
+      setPromoteError(err.message || 'Failed to publish draft seeds');
     } finally {
       setPromoteBusy(false);
     }
@@ -1704,18 +1731,37 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                 className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50 disabled:no-underline"
               >
                 {promoteEntries.filter((e) => !e.seed_id).length > 0
-                  && promoteEntries.filter((e) => !e.seed_id).every((e) => promoteSelected.has(e.id))
-                  ? 'clear all' : 'select all'}
+                  && promoteEntries.filter((e) => e.status !== 'dismissed').every((e) => promoteSelected.has(e.id))
+                  ? 'clear all'
+                  : `select all (${promoteEntries.filter((e) => e.status !== 'dismissed').length})`}
               </button>
-              <button
-                onClick={handlePromoteSelected}
-                disabled={promoteBusy || promoteSelected.size === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
-                title="Unseeded rows: create DRAFT seeds (QA + enrich before publish). Draft-seeded rows: full promote — publish the seed live"
-              >
-                {promoteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
-                Promote selected ({promoteSelected.size})
-              </button>
+              {(() => {
+                const selectedRows = promoteEntries.filter((e) => promoteSelected.has(e.id));
+                const unseededCount = selectedRows.filter((e) => !e.seed_id).length;
+                const seededCount = selectedRows.filter((e) => e.seed_id).length;
+                return (
+                  <>
+                    <button
+                      onClick={handleCreateDrafts}
+                      disabled={promoteBusy || unseededCount === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                      title="Creates DRAFT seeds for the selected prospects that have none. Never publishes."
+                    >
+                      {promoteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                      Create drafts ({unseededCount})
+                    </button>
+                    <button
+                      onClick={handlePublishDrafts}
+                      disabled={promoteBusy || seededCount === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                      title="Publishes the draft seeds of the selected prospects. This is the full push — it makes listings live."
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Publish drafts ({seededCount})
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
           <p className="text-[10px] text-gray-400 mb-2">
