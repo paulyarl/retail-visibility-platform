@@ -50,6 +50,7 @@ import LocationMarketEnrichmentService from '../services/LocationMarketEnrichmen
 import directoryPresenceAnalyticsService, {
   checkDirectoryPresenceRateLimit,
 } from '../services/DirectoryPresenceAnalyticsService';
+import { seedPublishableSql } from '../services/directory/seedPublishability';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1606,12 +1607,17 @@ async function countPublicProducts(pool: any): Promise<number> {
 }
 
 async function loadPlacesEntries(pool: any, baseUrl: string) {
+  // §4.8 — only enriched seeds belong in the sitemap. Thin template pages stay
+  // live (claimable, browsable) but are no longer advertised to crawlers.
+  const publishable = seedPublishableSql('dll', 'dps');
+
   const listingsResult = await pool.query(
     `SELECT dll.slug, dll.updated_at
      FROM directory_presence_seeds dps
      JOIN directory_listings_list dll ON dll.id = dps.listing_id
      WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
        AND dll.listing_origin = 'directory_seed'
+       AND ${publishable}
      ORDER BY dll.slug`,
   );
 
@@ -1626,6 +1632,7 @@ async function loadPlacesEntries(pool: any, baseUrl: string) {
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
+         AND ${publishable}
        UNION
        SELECT TRIM(sec)
        FROM directory_presence_seeds dps
@@ -1634,6 +1641,7 @@ async function loadPlacesEntries(pool: any, baseUrl: string) {
        WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
          AND dll.listing_origin = 'directory_seed'
          AND NULLIF(TRIM(sec), '') IS NOT NULL
+         AND ${publishable}
      ) shelf
      LEFT JOIN platform_categories pc ON LOWER(pc.name) = LOWER(shelf.category)
      ORDER BY shelf.category`,
@@ -1647,6 +1655,7 @@ async function loadPlacesEntries(pool: any, baseUrl: string) {
      JOIN directory_listings_list dll ON dll.id = dps.listing_id
      WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
        AND dll.listing_origin = 'directory_seed'
+       AND ${publishable}
      ORDER BY city_slug, state_slug`,
   );
 

@@ -1719,6 +1719,12 @@ router.post('/presence-seeds/:id/publish', requirePlatformAdmin, async (req: Req
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'seed_already_claimed') return res.status(409).json({ error: 'seed_already_claimed' });
+    if (String(error?.message).startsWith('seed_not_publishable:')) {
+      return res.status(409).json({
+        error: 'seed_not_publishable',
+        blockers: String(error.message).split(':')[1]?.split(',') ?? [],
+      });
+    }
     logger.error('[POST /api/admin/directory/presence-seeds/:id/publish] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });

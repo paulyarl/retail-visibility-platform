@@ -2184,3 +2184,24 @@ A tenant that came from a directory seed already has analyst-composed SEO conten
 - **`directory_settings_list.seo_description` / `seo_keywords`** (directory panel "Description & Keywords") → `resolveDirectorySeo`, per field, returning `'settings' | 'directory_seed'`. Applied in `GET /api/tenants/:id/directory/listing` (`seoDescriptionSource`/`seoKeywordsSource`, consumed by `DirectorySettingsPanel`) and in **both** directory quality-check endpoints (`routes/directory-tenant.ts`, `routes/directory-support.ts`), so the health check credits a seeded description instead of recommending one. Fallback keywords are capped at the panel's 10-keyword limit (the composer emits 15); the composed description maxes at 300 chars, under the 500-char settings cap.
 - **Normalization** (`normalizeSeedSeoTags`): `key:value` tags keep the value (`neighborhood:Shaw` → `shaw`), trim + lowercase + dedupe. Never throws — a missing seed/listing must not fail a profile or settings read.
 - Tests: `apps/api/src/tests/seed-seo-fallback.test.ts` (normalization, per-field resolution, caps, failure path), `apps/api/src/tests/tenant-seo-fallback.test.ts` (all four routes: profile GET, shop-management seo, directory listing GET, quality check).
+
+### Seed publish gate — §4.8 is enforced across write, sitemap, and page (added 2026-10-28)
+
+`apps/api/src/services/directory/seedPublishability.ts` is the one predicate behind "enrich before publish" (spec §4.8). It exists because the first seed waves published NAP-template copy (`"X is a African Grocery Store. Listed on VisibleShelf…"`), and Google crawled them as thin content. Three surfaces consume it and must not drift:
+
+- **Write gate** — `DirectoryPresenceSeedService.publishSeed(seedId, ctx, opts?)` refuses with `seed_not_publishable:<blockers>` unless `opts.force`. `approveAndInvite` (owner-submitted/public-suggestion seeds) passes `{ force: true }`; the PG promote and `createFromCampaign` publish paths catch the error and leave the seed `draft` (the claim token still resolves as a private preview, so outreach is not blocked). `publishBatch` records the blocker list per seed in `failed`.
+- **Discovery gate** — `loadPlacesEntries` in `routes/directory-presence-public.ts` adds `seedPublishableSql('dll','dps')` to the place, category, and city sitemap queries. Thin seeds stay live/browsable but are no longer advertised to crawlers.
+- **Indexation gate** — `routes/directory-consolidated.ts` selects `seed_publishable` with the same SQL; `place/[slug]/layout.tsx` emits `robots: { index: false, follow: true }` when it is false. City shelves noindex below 3 listings and 404 at 0 (`place/city/[citySlug]/page.tsx`).
+
+Blockers: `template_description` (short `<name> is a|an <category>` + disclosure, including the old owner-CTA variant), `missing_description`, `missing_address`, `junk_address` (`unverified (… Exa result …)`, `street not captured`, county-only), `missing_category`, `duplicate_seed` (same 10-digit phone or same normalized address+city against another live seed), `seed_suppressed`. The duplicate check lives in `getSeedPublishReadiness`, not the SQL, because it compares against the whole live set.
+
+**Suppression used to leave the page live.** `resolveDuplicates` flips the seed to `suppressed`, but the consolidated read filtered only `dll.is_published = true`, so suppressed seeds still returned 200 with a self-canonical and an active claim token. The consolidated SQL now also requires `dps.status <> 'suppressed'`; the place page keeps a `seedStatus === 'suppressed'` → `notFound()` guard for stale caches. If you add another public listing read, copy that status filter.
+
+Read-only readiness report (no writes; run from `apps/api`):
+
+```bash
+doppler run --config prd -- npx tsx src/scripts/seed-publish-readiness-report.ts \
+  [--batch pg-…] [--limit N] [--json /tmp/seed-readiness.json]
+```
+
+It prints current vs post-recompose publishability and a verdict (`already_publishable`, `recompose_would_publish`, `still_thin`, `skip_operator_override`, `skip_claimed`, `skip_suppressed`). Use it before a recompose batch: a seed whose `getComposedEnrichment` still resolves to `linked_campaign`/`seed_seo_composer` will not gain unique copy, so recompose alone cannot rescue it. Tests: `services/directory/__tests__/seedPublishability.test.ts`, `services/__tests__/DirectoryPresenceSeedService.publishGate.test.ts`, `apps/web/src/app/place/[slug]/place-publish-gate.test.ts`, `apps/web/src/app/place/city/[citySlug]/place-city-index-gate.test.ts`.

@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { logger } from '../logger';
+import { seedPublishableSql } from '../services/directory/seedPublishability';
 
 const router = Router();
 
@@ -92,6 +93,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.attributes,
           dps.id AS seed_id,
           dps.status AS seed_status,
+          CASE WHEN ${seedPublishableSql('dll', 'dps')} THEN true ELSE false END AS seed_publishable,
           dps.seo_enrichment->>'meta_title' as meta_title,
           dps.seo_enrichment->>'schema_type_hint' as schema_type_hint,
           (SELECT json_build_object('token', dct.token, 'short_code', dct.short_code)
@@ -112,6 +114,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
          LEFT JOIN directory_presence_seeds dps ON dps.listing_id = dll.id
          LEFT JOIN tenant_storefront_qr_settings tsqs ON tsqs.tenant_id = dll.tenant_id
          WHERE dll.slug = $1 AND dll.is_published = true
+           AND (dps.status IS NULL OR dps.status <> 'suppressed')
          LIMIT 1`,
         [slug]
       ),
@@ -432,6 +435,9 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       activeClaimToken: (listing as any).active_claim?.token || null,
       claimShortCode: (listing as any).active_claim?.short_code || null,
       isClaimed: (listing as any).seed_status === 'claimed',
+      seedStatus: (listing as any).seed_status || null,
+      /** §4.8 — false means the page is still public but not indexable. */
+      seedPublishable: (listing as any).seed_publishable === true,
       // Sibling locations in the same linked chain (Migration 359) — the
       // "Also visit" strip; empty unless an operator verdict-linked the group.
       chainLocations,

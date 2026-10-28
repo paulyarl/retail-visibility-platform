@@ -86,6 +86,13 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
     notFound();
   }
 
+  // Suppressed seeds are hidden from shoppers even when the underlying
+  // listing row is still published. The consolidated API filters them too;
+  // this is the defence-in-depth gate for a stale cache.
+  if (listing.seedStatus === 'suppressed') {
+    notFound();
+  }
+
   // Non-seed listings are redirected server-side in layout.tsx, but guard
   // here too in case of a race or stale cache.
   if (listing.listingOrigin !== 'directory_seed') {

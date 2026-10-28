@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { permanentRedirect } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import PlaceCityClient from './PlaceCityClient';
 import PlaceCityHero from './PlaceCityHero';
 import PlaceCityEnrichmentContent from './PlaceCityEnrichmentContent';
@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ citySlug:
   // description / keywords (mirrors /directory/location/[location]/page.tsx).
   const summary = await placesBrowsePublicService.getCityShelfSummary(citySlug);
   const effective = summary?.enrichment?.effective;
+  const total = summary?.total ?? 0;
 
   // Legacy packets bake a listing count that goes stale ("0 Businesses in …")
   // — normalize so the SERP never carries a count that can't reflect actual.
@@ -44,6 +45,9 @@ export async function generateMetadata({ params }: { params: Promise<{ citySlug:
     alternates: {
       canonical: `${platformOrigin()}/place/city/${summary?.canonicalSlug ?? citySlug}`,
     },
+    // A city shelf with one or two listings is a thin page; keep it live for
+    // shoppers but out of the index until the market fills out.
+    robots: total >= 3 ? undefined : { index: false, follow: true },
     openGraph: {
       title,
       description,
@@ -82,6 +86,11 @@ export default async function PlaceCityPage({ params }: { params: Promise<{ city
     && summary.canonicalSlug !== decodeURIComponent(citySlug).toLowerCase()
   ) {
     permanentRedirect(`/place/city/${summary.canonicalSlug}`);
+  }
+
+  // An empty shelf (e.g. its only seed was suppressed) is a soft 404.
+  if (summary && summary.total === 0) {
+    notFound();
   }
 
   // DB-spelled city wins over the slug-derived form so the hero/CTA copy never

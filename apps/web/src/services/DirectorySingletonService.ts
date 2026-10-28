@@ -146,6 +146,10 @@ export interface DirectoryConsolidated {
     primaryCategory?: string;
     listingOrigin?: string | null;
     publicDisclaimer?: string | null;
+    /** Seed lifecycle status — `suppressed` must not render publicly. */
+    seedStatus?: string | null;
+    /** §4.8 — false means the page stays live but is not indexable. */
+    seedPublishable?: boolean;
     activeClaimToken?: string | null;
     claimShortCode?: string | null;
     /** Operator-authored banner QR design (PersistedQrStyle, camelCase

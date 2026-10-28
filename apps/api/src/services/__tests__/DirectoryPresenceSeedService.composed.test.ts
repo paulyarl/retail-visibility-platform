@@ -123,7 +123,7 @@ describe('getComposedEnrichment', () => {
 
     const res = await DirectoryPresenceSeedService.getComposedEnrichment('seed-1');
 
-    expect(res.sourceName).toBe('business_analysis_audit');
+    expect(res.sourceName).toBe('business_analysis');
     expect(res.packet.description).toContain('certified halal grocer');
     expect(res.packet.description).toContain('Listed on VisibleShelf');
     expect(res.packet.inputs.auditId).toBe('ba-1');
@@ -166,7 +166,7 @@ describe('resetEnrichment', () => {
     const provInserts = callsMatching('INSERT INTO directory_field_provenance');
     expect(provInserts).toHaveLength(2);
     for (const c of provInserts) {
-      expect(c.slice(1).some((v) => v === 'business_analysis_audit')).toBe(true);
+      expect(c.slice(1).some((v) => v === 'business_analysis')).toBe(true);
       expect(c.slice(1).some((v) => v === 'market_enrichment')).toBe(false);
     }
 

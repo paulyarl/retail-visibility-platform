@@ -19,6 +19,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       return { title: 'Place Not Found' };
     }
 
+    if (listing.seedStatus === 'suppressed') {
+      return {
+        title: 'Place Not Found',
+        robots: { index: false, follow: false },
+      };
+    }
+
     const businessName = listing.businessName || 'Local Business';
     const description =
       listing.description ||
@@ -42,6 +49,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description,
       keywords,
       alternates: { canonical: canonicalUrl },
+      // §4.8 — thin/template seed pages stay live for the claim funnel but
+      // must not be indexed. The API owns the predicate so sitemap, page, and
+      // publish gate cannot drift.
+      robots: listing.seedPublishable === false
+        ? { index: false, follow: true }
+        : undefined,
       openGraph: {
         title: businessName,
         description,

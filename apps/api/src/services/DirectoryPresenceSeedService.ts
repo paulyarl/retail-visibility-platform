@@ -48,6 +48,10 @@ import {
   type SeedSeoPacket,
 } from './directory/SeedSeoComposer';
 import {
+  evaluateSeedPublishability,
+  type SeedPublishability,
+} from './directory/seedPublishability';
+import {
   resolveSeedListingNarrative,
   type SeedListingNarrativeSource,
 } from './intelligence/auditPublicNarrative';
@@ -793,14 +797,94 @@ class DirectoryPresenceSeedService {
   }
 
   /**
-   * Publish a seed: set listing is_published = true and seed status = 'published'.
+   * §4.8 publish gate — a seed is publishable only when its public copy is
+   * not the NAP template, its address can anchor a real page, its category is
+   * resolved, and it does not duplicate another live seed.
+   *
+   * The duplicate check is separate from the shared predicate because it
+   * compares against the rest of the live seed set rather than one row.
    */
-  async publishSeed(seedId: string, ctx?: SeedAuditCtx): Promise<void> {
+  async getSeedPublishReadiness(
+    seedId: string,
+  ): Promise<SeedPublishability & { duplicateOf?: string | null }> {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT dps.status, dps.category, dll.business_name, dll.description,
+             dll.address, dll.city, dll.phone
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dll ON dll.id = dps.listing_id
+      WHERE dps.id = ${seedId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row) throw new Error('seed_not_found');
+
+    const result = evaluateSeedPublishability({
+      status: row.status,
+      businessName: row.business_name,
+      description: row.description,
+      address: row.address,
+      category: row.category,
+    });
+    if (!result.publishable) return result;
+
+    const duplicates = await prisma.$queryRaw<any[]>`
+      SELECT dll2.slug
+      FROM directory_presence_seeds dps2
+      JOIN directory_listings_list dll2 ON dll2.id = dps2.listing_id
+      WHERE dps2.id <> ${seedId}
+        AND dps2.status <> 'suppressed'
+        AND dll2.is_published = true
+        AND (
+          (
+            length(right(regexp_replace(coalesce(dll.phone, ''), '[^0-9]', '', 'g'), 10)) = 10
+            AND right(regexp_replace(coalesce(dll.phone, ''), '[^0-9]', '', 'g'), 10)
+                = right(regexp_replace(coalesce(dll2.phone, ''), '[^0-9]', '', 'g'), 10)
+          )
+          OR (
+            length(regexp_replace(coalesce(dll.address, ''), '[^a-zA-Z0-9]', '', 'g')) > 5
+            AND regexp_replace(coalesce(dll.address, ''), '[^a-zA-Z0-9]', '', 'g')
+                = regexp_replace(coalesce(dll2.address, ''), '[^a-zA-Z0-9]', '', 'g')
+            AND lower(coalesce(dll.city, '')) = lower(coalesce(dll2.city, ''))
+          )
+        )
+      LIMIT 1
+    `;
+
+    if (duplicates[0]) {
+      return {
+        ...result,
+        publishable: false,
+        blockers: [...result.blockers, 'duplicate_seed'],
+        duplicateOf: duplicates[0].slug,
+      };
+    }
+    return { ...result, duplicateOf: null };
+  }
+
+  /**
+   * Publish a seed: set listing is_published = true and seed status = 'published'.
+   *
+   * Gate (§4.8): refuses template-only copy, junk NAP, missing categories, and
+   * live duplicates unless the caller explicitly forces (owner-submitted /
+   * operator-approved seeds).
+   */
+  async publishSeed(
+    seedId: string,
+    ctx?: SeedAuditCtx,
+    opts?: { force?: boolean },
+  ): Promise<void> {
     const seed = await prisma.$queryRaw<any[]>`
       SELECT tenant_id, listing_id, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
     if (!seed[0]) throw new Error('seed_not_found');
     if (seed[0].status === 'claimed') throw new Error('seed_already_claimed');
+
+    if (!opts?.force) {
+      const readiness = await this.getSeedPublishReadiness(seedId);
+      if (!readiness.publishable) {
+        throw new Error(`seed_not_publishable:${readiness.blockers.join(',')}`);
+      }
+    }
 
     await prisma.$executeRaw`
       UPDATE directory_listings_list SET is_published = true, updated_at = now()
@@ -1443,7 +1527,10 @@ class DirectoryPresenceSeedService {
    * the claim link. Used for public suggestions and owner-submitted seeds.
    */
   async approveAndInvite(seedId: string, ctx?: SeedAuditCtx): Promise<{ token: string; expiresAt: Date; claimUrl: string }> {
-    await this.publishSeed(seedId, ctx);
+    // Owner-submitted / operator-approved seeds bypass the §4.8 enrichment
+    // gate: the submitter is the source of truth, and refusing here would
+    // break the public-suggestion flow. The gate targets discovery-born seeds.
+    await this.publishSeed(seedId, ctx, { force: true });
     const { token, expiresAt } = await this.inviteSeed(seedId, 90, ctx);
 
     const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -2641,7 +2728,20 @@ class DirectoryPresenceSeedService {
         // seeds park as 'draft' for QA + enrichment; publishing is the
         // separate full-push step (bulk publish), not implicit on promote.
         if (opts?.publish === true) {
-          await this.publishSeed(result.id, ctx);
+          try {
+            await this.publishSeed(result.id, ctx);
+          } catch (err) {
+            if (String((err as Error).message).startsWith('seed_not_publishable:')) {
+              // Keep the seed draft — the claim token still resolves as a
+              // private preview, so outreach is not blocked by the gate.
+              logger.warn('createSeedsForProvingGround: seed left draft — not publishable', undefined, {
+                seedId: result.id,
+                error: (err as Error).message,
+              });
+            } else {
+              throw err;
+            }
+          }
         }
 
         // Link to the entry's source (intelligence) campaign so the funnel's
@@ -3471,9 +3571,23 @@ class DirectoryPresenceSeedService {
     // window) when the caller explicitly opts in.
     let published = false;
     if (opts.publish === true) {
-      await this.publishSeed(seed.id, ctx);
-      published = true;
+      try {
+        await this.publishSeed(seed.id, ctx);
+        published = true;
+      } catch (err) {
+        if (String((err as Error).message).startsWith('seed_not_publishable:')) {
+          // Leave the seed draft for QC; the caller gets published: false.
+          logger.warn('createFromCampaign: seed left draft — not publishable', undefined, {
+            seedId: seed.id,
+            error: (err as Error).message,
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
 
+    if (published) {
       // ★ Seed Outreach Courtesy Window: trigger campaign-aware outreach
       // after the seed is published and linked. Fire-and-forget — outreach
       // trigger failure must not roll back seed creation.
