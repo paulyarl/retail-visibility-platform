@@ -5,7 +5,7 @@ import { BaseService } from './BaseService';
 import { prisma, basePrisma } from '../prisma';
 import { logger } from '../logger';
 import { generateCrmTicketId, generateCrmActivityId, generateCustomerTenantRelationshipId } from '../lib/id-generator';
-import { PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
+import { PLATFORM_SCOPE, PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 
 export class CrmTicketService extends BaseService {
   private static instance: CrmTicketService;
@@ -138,11 +138,13 @@ export class CrmTicketService extends BaseService {
     const idKey = ticketData.tenant_id || 'project';
     const ticket = await prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(idKey), ...ticketData } });
 
-    // Platform intake tickets (lead-gen, owner submissions, claims) also
-    // email the catch-all inbox — same path, so the Requests-Hub alert and
-    // the email always arrive together. Fire-and-forget; a send failure
-    // must never fail ticket creation.
-    if (data.project_id === PLATFORM_CRM_PROJECT_ID) {
+    // Platform-bound tickets also email the catch-all inbox — same path,
+    // so the Requests-Hub alert and the email always arrive together.
+    // Covers the intake project (lead-gen, owner submissions, claims) and
+    // platform support tickets (tenant_id = 'platform', e.g. the personal
+    // CRM "platform support" form). Fire-and-forget; a send failure must
+    // never fail ticket creation.
+    if (data.project_id === PLATFORM_CRM_PROJECT_ID || data.tenant_id === PLATFORM_SCOPE) {
       void import('./email/PlatformIntakeEmailService')
         .then((m) =>
           m.default.notifyIntakeTicket({

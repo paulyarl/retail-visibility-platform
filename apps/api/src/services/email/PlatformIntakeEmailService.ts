@@ -23,6 +23,9 @@ import { unifiedConfig } from '../../config/unifiedConfig';
 
 export interface PlatformIntakeTicketNotification {
   ticketId: string;
+  /** What the record is — 'Ticket' (default) or 'Inquiry'. Used as the
+   *  reference label in the email body. */
+  kind?: string;
   title: string;
   description?: string | null;
   category?: string | null;
@@ -68,7 +71,7 @@ class PlatformIntakeEmailService {
     ${description ? `<div style="background: #f9fafb; padding: 16px 20px; border-radius: 8px; margin: 0 0 24px; white-space: pre-wrap; color: #374151; font-size: 14px;">${this.escape(description)}</div>` : ''}
 
     <p style="margin: 0 0 24px; color: #6b7280; font-size: 13px;">
-      Ticket ${this.escape(ticket.ticketId)}${ticket.priority ? ` · priority ${this.escape(ticket.priority)}` : ''}
+      ${this.escape(ticket.kind || 'Ticket')} ${this.escape(ticket.ticketId)}${ticket.priority ? ` · priority ${this.escape(ticket.priority)}` : ''}
     </p>
 
     <p style="margin: 0;">
@@ -85,7 +88,7 @@ class PlatformIntakeEmailService {
 
 ${ticket.title}
 
-${description ? `${description}\n\n` : ''}Ticket: ${ticket.ticketId}${ticket.priority ? ` · priority ${ticket.priority}` : ''}
+${description ? `${description}\n\n` : ''}${ticket.kind || 'Ticket'}: ${ticket.ticketId}${ticket.priority ? ` · priority ${ticket.priority}` : ''}
 
 Requests Hub: ${requestsHubUrl}`;
 

@@ -3,7 +3,9 @@
  */
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 import { generateCrmInquiryId, generateCustomerTenantRelationshipId } from '../lib/id-generator';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 
 export class CrmInquiryService extends BaseService {
   private static instance: CrmInquiryService;
@@ -55,7 +57,9 @@ export class CrmInquiryService extends BaseService {
     sender_email?: string;
     sender_phone?: string;
   }) {
-    return prisma.crm_inquiries.create({ data: { id: generateCrmInquiryId(data.tenant_id), ...data } });
+    const inquiry = await prisma.crm_inquiries.create({ data: { id: generateCrmInquiryId(data.tenant_id), ...data } });
+    this.notifyPlatformIntake(inquiry, data.sender_email);
+    return inquiry;
   }
 
   async createFromCustomer(customerId: string, data: {
@@ -86,7 +90,7 @@ export class CrmInquiryService extends BaseService {
       });
     }
 
-    return prisma.crm_inquiries.create({
+    const inquiry = await prisma.crm_inquiries.create({
       data: {
         id: generateCrmInquiryId(data.tenant_id),
         ...data,
@@ -95,6 +99,47 @@ export class CrmInquiryService extends BaseService {
         source: 'customer_portal',
       },
     });
+
+    // Platform-bound customer inquiry — resolve the requestor's email so a
+    // reply from the catch-all reaches them.
+    if (data.tenant_id === PLATFORM_SCOPE) {
+      const customer = await prisma.customers.findUnique({
+        where: { id: customerId },
+        select: { email: true },
+      });
+      this.notifyPlatformIntake(inquiry, customer?.email);
+    }
+
+    return inquiry;
+  }
+
+  /**
+   * Platform-bound inquiries (tenant_id = 'platform', e.g. the anonymous
+   * Help Desk form) also email the catch-all inbox — same path as the
+   * Requests-Hub alert. Tenant-scoped inquiries stay merchant-facing and
+   * never trigger this. Fire-and-forget; never fails inquiry creation.
+   */
+  private notifyPlatformIntake(inquiry: any, replyTo?: string | null): void {
+    if (inquiry.tenant_id !== PLATFORM_SCOPE) return;
+    void import('./email/PlatformIntakeEmailService')
+      .then((m) =>
+        m.default.notifyIntakeTicket({
+          ticketId: inquiry.id,
+          kind: 'Inquiry',
+          title: inquiry.subject,
+          description: inquiry.body,
+          category: inquiry.source || 'platform_inquiry',
+          priority: inquiry.priority,
+          inquiryId: inquiry.id,
+          replyTo,
+        })
+      )
+      .catch((err) => {
+        logger.error('[CrmInquiryService] Intake email notify failed (non-fatal)', undefined, {
+          error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err) },
+          inquiryId: inquiry.id,
+        });
+      });
   }
 
   async update(inquiryId: string, data: {
