@@ -145,6 +145,22 @@ function readAnyNarrative(auditData: unknown): string | null {
 }
 
 /**
+ * Matching key for a business name. Re-discovery is a new list, not a refresh:
+ * the same store can come back re-typeset ("Zam Zam" vs "ZamZam", "C & G" vs
+ * "C and G"). An exact string match silently drops the narrative, which reads
+ * as a failed scan. Case, punctuation, whitespace, and ampersand variants
+ * collapse to one form; genuinely different names still do not match.
+ */
+export function businessNameKey(name: string | null | undefined): string {
+  return (name ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    // Strip every separator, including spaces: "ZamZam" and "Zam Zam" are the
+    // same store, and camel-case concatenation is common in Google listings.
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
  * Resolve the narrative a seed's public listing should carry, in precedence
  * order. Stub business analyses need no special case: they carry no narrative,
  * so the loop simply falls through to the next lane.
@@ -198,14 +214,14 @@ export async function resolveSeedListingNarrative(
     orderBy: { created_at: 'desc' },
     take: 5,
   });
-  const wanted = businessName.trim().toLowerCase();
+  const wanted = businessNameKey(businessName);
   for (const scan of Array.isArray(scans) ? scans : []) {
     const list = (scan as any)?.audit_data?.discovered_businesses;
     if (!Array.isArray(list)) continue;
     const hit = list.find(
       (b: any) =>
         typeof b?.business_name === 'string' &&
-        b.business_name.trim().toLowerCase() === wanted,
+        businessNameKey(b.business_name) === wanted,
     );
     if (hit && typeof hit.description === 'string' && hit.description.trim()) {
       return { narrative: hit.description.trim(), source: 'discovery_scan' };

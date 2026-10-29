@@ -157,6 +157,38 @@ describe('resolveSeedListingNarrative', () => {
     expect(out).toEqual({ narrative: 'Right business.', source: 'discovery_scan' });
   });
 
+  it('matches a re-typeset name (Zam Zam vs ZamZam)', async () => {
+    wire(prisma, {
+      parent: null,
+      catId: null,
+      business: [],
+      scans: [{ business_name: 'Zam Zam Halal Grocery', description: 'Re-typeset match.' }],
+    });
+
+    const out = await resolveSeedListingNarrative(prisma, {
+      campaignId: CAMPAIGN,
+      businessName: 'ZamZam Halal Grocery',
+    });
+
+    expect(out).toEqual({ narrative: 'Re-typeset match.', source: 'discovery_scan' });
+  });
+
+  it('matches an ampersand variant (C & G vs C and G)', async () => {
+    wire(prisma, {
+      parent: null,
+      catId: null,
+      business: [],
+      scans: [{ business_name: 'C and G African Caribbean Market', description: 'Ampersand match.' }],
+    });
+
+    const out = await resolveSeedListingNarrative(prisma, {
+      campaignId: CAMPAIGN,
+      businessName: 'C & G African Caribbean Market',
+    });
+
+    expect(out).toEqual({ narrative: 'Ampersand match.', source: 'discovery_scan' });
+  });
+
   it('returns null when no lane has a narrative (caller composes)', async () => {
     wire(prisma, { parent: null, catId: null, business: [], scans: [] });
 
