@@ -226,7 +226,9 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
     setShowSpawn(true);
     setSpawnCategory(seedCategory || '');
     setSpawnNotes('');
-    setSpawnLinkRole('primary');
+    // 'primary' 409s when a primary link already exists — pre-select
+    // 'sibling' so the default submission succeeds on linked seeds.
+    setSpawnLinkRole(links.some((l) => l.linkRole === 'primary') ? 'sibling' : 'primary');
     setActionError(null);
     setActionSuccess(null);
   };
@@ -676,6 +678,14 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
                 <p className="text-xs text-gray-500 mt-1">
                   &lsquo;primary&rsquo; is blocked if a primary link already exists — use
                   &lsquo;sibling&rsquo; or &lsquo;recovery&rsquo; instead.
+                  {links.some((l) => l.linkRole === 'primary') && (
+                    <>
+                      {' '}This seed&apos;s primary is{' '}
+                      {links.find((l) => l.linkRole === 'primary')?.campaign?.businessName ||
+                        links.find((l) => l.linkRole === 'primary')?.campaignId}
+                      .
+                    </>
+                  )}
                 </p>
               </div>
               <div>

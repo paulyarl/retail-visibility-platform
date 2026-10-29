@@ -452,6 +452,14 @@ function PresenceSeedDetailClient() {
   const [composedLoading, setComposedLoading] = useState(false);
   const [resettingEnrichment, setResettingEnrichment] = useState(false);
 
+  // Owner contact — the claim-channel surface. owner_name/email/phone feed
+  // inviteSeed's bound OTP; not publicly rendered, so no provenance rows.
+  const [editingOwner, setEditingOwner] = useState(false);
+  const [savingOwner, setSavingOwner] = useState(false);
+  const [editOwnerName, setEditOwnerName] = useState('');
+  const [editOwnerEmail, setEditOwnerEmail] = useState('');
+  const [editOwnerPhone, setEditOwnerPhone] = useState('');
+
   // Platform category vocabulary — resolves canonical shelf slugs for the
   // public category-page links rendered in the Listing summary.
   const { categories: directoryCategories } = useDirectoryCategories();
@@ -961,6 +969,31 @@ function PresenceSeedDetailClient() {
       setActionError(
         err instanceof Error ? err.message : 'Failed to update outreach status',
       );
+    }
+  };
+
+  const handleSaveOwnerContact = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      setSavingOwner(true);
+      // status is required by PATCH /outreach — resend the current value so
+      // saving contact fields doesn't clobber the lifecycle state.
+      await directoryPresenceAdminService.updateOutreach(seedId, {
+        status: seed?.outreachStatus || 'unverified',
+        ownerName: editOwnerName.trim() || null,
+        ownerEmail: editOwnerEmail.trim() || null,
+        ownerPhone: editOwnerPhone.trim() || null,
+      });
+      setActionSuccess('Owner contact updated.');
+      setEditingOwner(false);
+      fetchDetail();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to update owner contact',
+      );
+    } finally {
+      setSavingOwner(false);
     }
   };
 
@@ -3782,6 +3815,88 @@ function PresenceSeedDetailClient() {
               <p className={`text-sm ${seed.owner_contact_consent ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
                 {seed.owner_contact_consent ? 'Yes — owner-initiated opt-in on record' : 'No owner-initiated opt-in (cold-contact basis is governed separately)'}
               </p>
+            </div>
+          )}
+
+          {canEdit && (
+            <div className="md:col-span-2">
+              {editingOwner ? (
+                <div className="border border-gray-200 rounded-lg p-3 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Owner Name
+                      </label>
+                      <input
+                        type="text"
+                        value={editOwnerName}
+                        onChange={(e) => setEditOwnerName(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        placeholder="Owner name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Owner Email
+                      </label>
+                      <input
+                        type="email"
+                        value={editOwnerEmail}
+                        onChange={(e) => setEditOwnerEmail(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        placeholder="owner@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Owner Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={editOwnerPhone}
+                        onChange={(e) => setEditOwnerPhone(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        placeholder="(317) 555-0100"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Binds the claim-token OTP channel at invite — never rendered publicly, so no
+                    provenance row. Note the source (e.g. business website contact page) in
+                    outreach notes or the touch log.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveOwnerContact}
+                      disabled={savingOwner}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {savingOwner ? 'Saving...' : 'Save owner contact'}
+                    </button>
+                    <button
+                      onClick={() => setEditingOwner(false)}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setEditOwnerName(seed?.owner_name ?? '');
+                    setEditOwnerEmail(seed?.owner_email ?? '');
+                    setEditOwnerPhone(seed?.owner_phone ?? '');
+                    setEditingOwner(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
+                >
+                  <Pencil className="w-3 h-3" />
+                  {seed?.owner_name || seed?.owner_email || seed?.owner_phone
+                    ? 'Edit owner contact'
+                    : 'Add owner contact'}
+                </button>
+              )}
             </div>
           )}
         </div>

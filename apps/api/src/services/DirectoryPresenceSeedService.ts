@@ -494,9 +494,20 @@ class DirectoryPresenceSeedService {
       FROM directory_claim_tokens WHERE seed_id = ${seedId} ORDER BY created_at DESC
     `;
 
+    // Producing queue entry — the verify_then_outreach lane parks here while
+    // the seed stays live. Surfaced on the seed detail so the cockpit can
+    // open the shared ResolveVerificationModal without leaving the page.
+    const queueEntry = await prisma.$queryRaw<any[]>`
+      SELECT id, business_name, title, category, city, state, status,
+             business_snapshot, verification
+      FROM mkt_prospect_queue WHERE seed_id = ${seedId}
+      ORDER BY created_at DESC LIMIT 1
+    `;
+
     return {
       seed: seed[0],
       listing: listing[0],
+      producingQueueEntry: queueEntry[0] ?? null,
       provenance: provenance.map((p) => ({
         id: p.id,
         fieldKey: p.field_key,

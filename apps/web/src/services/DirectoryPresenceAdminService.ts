@@ -384,6 +384,21 @@ export interface DirectoryPresenceSeedSummary {
 export interface DirectoryPresenceSeedDetail {
   seed: any;
   listing: any;
+  /** Producing prospect-queue entry (newest by created_at). Present while a
+   *  verify_then_outreach resolution is pending — the seed detail renders the
+   *  shared ResolveVerificationModal against this row. Structural
+   *  VerificationEntryLike shape plus queue status/verification. */
+  producingQueueEntry: {
+    id: string;
+    business_name: string | null;
+    title: string | null;
+    category: string | null;
+    city: string | null;
+    state: string | null;
+    status: string | null;
+    business_snapshot: Record<string, any> | null;
+    verification: Record<string, any> | null;
+  } | null;
   provenance: Array<{
     id: string;
     fieldKey: string;
