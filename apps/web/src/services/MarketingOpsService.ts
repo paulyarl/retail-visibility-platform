@@ -1778,6 +1778,9 @@ export interface ProspectQueueEntry {
   verification?: VerificationRecord | null;
   // Proving ground (Migration 262)
   seed_id?: string | null;
+  /** Seed lifecycle status — `draft` is publishable; published/invited/claimed
+   *  are already live and must not be counted as "Publish drafts". */
+  seed_status?: string | null;
   // Migration 282 — direct PG membership for queue-list-initiated proving
   // grounds (OR'd with source_campaign_id in all tree readers).
   proving_ground_id?: string | null;

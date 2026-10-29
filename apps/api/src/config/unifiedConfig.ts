@@ -530,6 +530,15 @@ class UnifiedConfig {
     return this.env.EMAIL_ADMIN || 'admin@visibleshelf.com';
   }
 
+  /**
+   * Catch-all inbox that receives a copy of every platform intake ticket
+   * (Requests Hub). Optional — when unset the intake notifier resolves the
+   * address from email_configuration_list ('intake' then 'general').
+   */
+  get emailIntake(): string | undefined {
+    return this.env.PLATFORM_INTAKE_EMAIL || this.env.EMAIL_INTAKE || undefined;
+  }
+
   /** Catch-all support/lead address — from + replyTo for lead-intake acknowledgements. */
   get emailSupport(): string {
     return this.env.EMAIL_SUPPORT || 'support@visibleshelf.com';

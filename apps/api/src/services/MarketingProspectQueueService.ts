@@ -668,7 +668,20 @@ class MarketingProspectQueueServiceClass extends BaseService {
       // promote panel still offers the prospect a checkbox. Resolving the
       // campaign's seed links at read time keeps the decoration truthful for
       // rows stamped before the write-path heal existed.
-      const seedByCampaignId = new Map<string, string>();
+      const seedByCampaignId = new Map<string, { seed_id: string; seed_status: string | null }>();
+      // Direct queue stamps (migration 262 PG promote) carry seed_id without a
+      // processed campaign. Fetch their status too so the cockpit can tell a
+      // draft seed (publishable) from a live published/invited one.
+      const directSeedIds = Array.from(
+        new Set(entries.map((e: any) => e.seed_id).filter(Boolean)),
+      ) as string[];
+      const seedStatusById = new Map<string, string>();
+      if (directSeedIds.length > 0) {
+        const directSeedRows = await this.prisma.$queryRaw<{ id: string; status: string }[]>`
+          SELECT id, status FROM directory_presence_seeds WHERE id = ANY(${directSeedIds})
+        `;
+        for (const r of directSeedRows) seedStatusById.set(r.id, r.status);
+      }
       if (filters.includeCampaigns) {
         const campaignIds = entries
           .map((e: any) => e.processed_campaign_id)
@@ -710,8 +723,12 @@ class MarketingProspectQueueServiceClass extends BaseService {
             checklistCounts.set(p.campaign_id, p._count.step_id);
           }
 
-          const linkedSeeds = await this.prisma.$queryRaw<{ campaign_id: string; seed_id: string }[]>`
-            SELECT dscl.campaign_id, dscl.seed_id
+          const linkedSeeds = await this.prisma.$queryRaw<{
+            campaign_id: string;
+            seed_id: string;
+            seed_status: string | null;
+          }[]>`
+            SELECT dscl.campaign_id, dscl.seed_id, dps.status AS seed_status
             FROM directory_seed_campaign_links dscl
             JOIN directory_presence_seeds dps ON dps.id = dscl.seed_id
             WHERE dscl.campaign_id = ANY(${campaignIds})
@@ -719,7 +736,10 @@ class MarketingProspectQueueServiceClass extends BaseService {
           `;
           for (const r of linkedSeeds) {
             if (r.seed_id && !seedByCampaignId.has(r.campaign_id)) {
-              seedByCampaignId.set(r.campaign_id, r.seed_id);
+              seedByCampaignId.set(r.campaign_id, {
+                seed_id: r.seed_id,
+                seed_status: r.seed_status,
+              });
             }
           }
         }
@@ -828,11 +848,17 @@ class MarketingProspectQueueServiceClass extends BaseService {
         ? entries.map((e: any) => {
             const camp = e.mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list;
             const { mkt_campaigns_list_mkt_prospect_queue_processed_campaign_idTomkt_campaigns_list, ...rest } = e;
+            const linkedSeed = e.processed_campaign_id
+              ? seedByCampaignId.get(e.processed_campaign_id)
+              : null;
+            const resolvedSeedId = rest.seed_id ?? linkedSeed?.seed_id ?? null;
+            const resolvedSeedStatus = rest.seed_id
+              ? seedStatusById.get(rest.seed_id) ?? null
+              : linkedSeed?.seed_status ?? null;
             return {
               ...rest,
-              seed_id:
-                rest.seed_id ??
-                (e.processed_campaign_id ? seedByCampaignId.get(e.processed_campaign_id) ?? null : null),
+              seed_id: resolvedSeedId,
+              seed_status: resolvedSeedStatus,
               campaign_stage: camp?.stage ?? null,
               campaign_category: camp?.category ?? null,
               repair_track: camp?.repair_track ?? null,
@@ -848,6 +874,16 @@ class MarketingProspectQueueServiceClass extends BaseService {
             };
           })
         : entries;
+
+      // Attach the seed lifecycle status on every read path, not just the
+      // campaign-decorated one. The cockpit's "Publish drafts" count must be
+      // draft-only; a published/invited seed is already live and must not be
+      // offered as a draft again.
+      for (const d of decorated as any[]) {
+        if (d.seed_status === undefined) {
+          d.seed_status = d.seed_id ? seedStatusById.get(d.seed_id) ?? null : null;
+        }
+      }
 
       if (filters.includeEnrichment) {
         for (const d of decorated as any[]) {

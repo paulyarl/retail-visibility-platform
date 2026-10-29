@@ -3,7 +3,9 @@
  */
 import { BaseService } from './BaseService';
 import { prisma, basePrisma } from '../prisma';
+import { logger } from '../logger';
 import { generateCrmTicketId, generateCrmActivityId, generateCustomerTenantRelationshipId } from '../lib/id-generator';
+import { PLATFORM_CRM_PROJECT_ID } from '../lib/platform-scope';
 
 export class CrmTicketService extends BaseService {
   private static instance: CrmTicketService;
@@ -125,12 +127,43 @@ export class CrmTicketService extends BaseService {
     assigned_to?: string;
     inquiry_id?: string;
     faq_id?: string;
+    /** Not a column — the requestor's email for the platform-intake
+     *  notification's Reply-To. Stripped before the ticket insert. */
+    reply_to_email?: string;
   }) {
     if (!data.tenant_id && !data.project_id) {
       throw new Error('Either tenant_id or project_id is required');
     }
-    const idKey = data.tenant_id || 'project';
-    return prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(idKey), ...data } });
+    const { reply_to_email, ...ticketData } = data;
+    const idKey = ticketData.tenant_id || 'project';
+    const ticket = await prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(idKey), ...ticketData } });
+
+    // Platform intake tickets (lead-gen, owner submissions, claims) also
+    // email the catch-all inbox — same path, so the Requests-Hub alert and
+    // the email always arrive together. Fire-and-forget; a send failure
+    // must never fail ticket creation.
+    if (data.project_id === PLATFORM_CRM_PROJECT_ID) {
+      void import('./email/PlatformIntakeEmailService')
+        .then((m) =>
+          m.default.notifyIntakeTicket({
+            ticketId: ticket.id,
+            title: ticket.title,
+            description: ticket.description,
+            category: ticket.category,
+            priority: ticket.priority,
+            inquiryId: ticket.inquiry_id,
+            replyTo: reply_to_email,
+          })
+        )
+        .catch((err) => {
+          logger.error('[CrmTicketService] Intake email notify failed (non-fatal)', undefined, {
+            error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err) },
+            ticketId: ticket.id,
+          });
+        });
+    }
+
+    return ticket;
   }
 
   /**

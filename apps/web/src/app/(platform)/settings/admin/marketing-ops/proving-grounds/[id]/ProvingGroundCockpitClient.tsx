@@ -722,13 +722,15 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const handlePublishDrafts = async () => {
     const ids = [...promoteSelected];
     if (ids.length === 0) return;
+    // Draft-only. Published/invited/claimed seeds are already live — including
+    // them made "select all" read as 28 publishes when nothing was a draft.
     const seeded = [...new Set(
       promoteEntries
-        .filter((e) => ids.includes(e.id) && e.seed_id)
+        .filter((e) => ids.includes(e.id) && e.seed_id && e.seed_status === 'draft')
         .map((e) => e.seed_id as string),
     )];
     if (seeded.length === 0) {
-      setPromoteResult('Nothing to publish — no selected prospect has a draft seed yet.');
+      setPromoteResult('Nothing to publish — no selected prospect has a draft seed (published/invited seeds are already live).');
       return;
     }
     // This button makes listings live. Confirm the blast radius explicitly —
@@ -1740,7 +1742,9 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
               {(() => {
                 const selectedRows = promoteEntries.filter((e) => promoteSelected.has(e.id));
                 const unseededCount = selectedRows.filter((e) => !e.seed_id).length;
-                const seededCount = selectedRows.filter((e) => e.seed_id).length;
+                const draftSeedCount = selectedRows.filter(
+                  (e) => e.seed_id && e.seed_status === 'draft',
+                ).length;
                 return (
                   <>
                     <button
@@ -1754,12 +1758,12 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                     </button>
                     <button
                       onClick={handlePublishDrafts}
-                      disabled={promoteBusy || seededCount === 0}
+                      disabled={promoteBusy || draftSeedCount === 0}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-                      title="Publishes the draft seeds of the selected prospects. This is the full push — it makes listings live."
+                      title="Publishes the DRAFT seeds of the selected prospects. Published/invited seeds are already live and are not counted."
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      Publish drafts ({seededCount})
+                      Publish drafts ({draftSeedCount})
                     </button>
                   </>
                 );
@@ -1786,23 +1790,20 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                     {' '}· {promoteEntries.filter((e) => !e.seed_id && e.campaign_has_business_audit !== true).length} awaiting campaign/audit
                   </span>
                 )}
-                {[...promoteSelected].filter((id) => {
-                  const e = promoteEntries.find((p) => p.id === id);
-                  return e && e.campaign_has_business_audit !== true;
-                }).length > 0 && (
+                {promoteEntries.filter((e) => promoteSelected.has(e.id) && !e.seed_id && e.campaign_has_business_audit !== true).length > 0 && (
                   <span className="text-amber-600 dark:text-amber-400">
-                    {' '}· {promoteSelected.size - promoteEntries.filter((e) => promoteSelected.has(e.id) && e.campaign_has_business_audit === true).length} selected without audit (thinner seed data)
+                    {' '}· {promoteEntries.filter((e) => promoteSelected.has(e.id) && !e.seed_id && e.campaign_has_business_audit !== true).length} selected without audit (thinner seed data)
                   </span>
                 )}
               </p>
               <ul className="space-y-1">
                 {promoteEntries.map((e) => {
                   const isHold = e.business_seek_priority === 'hold';
+                  // Draft-seeded rows must be selectable so "Publish drafts" has
+                  // a real selection; live published/invited rows can still be
+                  // selected for shelf sweep, but never count as publishable.
                   const promoted = !!e.seed_id;
-                  // The checkbox mirrors promoteSelected exactly — seeded rows
-                  // must be selectable so "Publish drafts" has a real selection,
-                  // and a seeded row the operator unticks is genuinely excluded.
-                  // The green row + "promoted" chip carry the seeded state.
+                  // The green row + chip carry the seed lifecycle state.
                   const checked = promoteSelected.has(e.id);
                   return (
                     <li
@@ -1850,7 +1851,7 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                         )}
                         {promoted && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 flex-shrink-0">
-                            promoted
+                            {e.seed_status === 'draft' ? 'draft' : e.seed_status ? 'live' : 'promoted'}
                           </span>
                         )}
                       </label>
