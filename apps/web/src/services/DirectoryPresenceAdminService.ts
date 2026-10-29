@@ -1545,6 +1545,34 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     await directoryListingService.invalidateDirectoryPhotosCache();
   }
 
+  /**
+   * PUT /api/directory/:listingId/photos/:photoId — patch alt, caption, or
+   * position. The server swaps positions with whatever occupies the target
+   * slot, so passing a neighbor's position performs an adjacent move and
+   * position 0 is "set primary".
+   */
+  async updateSeedListingPhoto(
+    listingId: string,
+    photoId: string,
+    patch: { alt?: string | null; caption?: string | null; position?: number },
+  ): Promise<DirectoryListingPhoto | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${encodeURIComponent(listingId)}/photos/${encodeURIComponent(photoId)}`,
+      { method: 'PUT', body: JSON.stringify(patch) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message || 'Photo update failed';
+      throw new Error(message);
+    }
+    await directoryListingService.invalidateDirectoryPhotosCache();
+    return result.data ?? null;
+  }
+
   async inviteSeed(id: string, expiresInDays?: number): Promise<InviteResult> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/invite`,

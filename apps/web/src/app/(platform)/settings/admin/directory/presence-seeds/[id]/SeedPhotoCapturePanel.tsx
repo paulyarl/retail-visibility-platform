@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, CheckCircle2, Loader2, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, Camera, CheckCircle2, Loader2, Pencil, Star, Trash2, Upload } from 'lucide-react';
 
 import directoryPresenceAdminService, {
   type DirectoryListingPhoto,
@@ -91,6 +91,9 @@ export default function SeedPhotoCapturePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAlt, setEditAlt] = useState('');
+  const [editCaption, setEditCaption] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -197,6 +200,66 @@ export default function SeedPhotoCapturePanel({
     }
   }
 
+  async function move(photoId: string, direction: -1 | 1) {
+    if (!listingId) return;
+    const sorted = [...photos].sort((a, b) => a.position - b.position);
+    const index = sorted.findIndex((p) => p.id === photoId);
+    const neighbor = sorted[index + direction];
+    if (!neighbor) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await directoryPresenceAdminService.updateSeedListingPhoto(listingId, photoId, {
+        position: neighbor.position,
+      });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Reorder failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setPrimary(photoId: string) {
+    if (!listingId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await directoryPresenceAdminService.updateSeedListingPhoto(listingId, photoId, { position: 0 });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Set primary failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startEdit(photo: DirectoryListingPhoto) {
+    setEditingId(photo.id);
+    setEditAlt(photo.alt || '');
+    setEditCaption(photo.caption || '');
+  }
+
+  async function saveEdit(photoId: string) {
+    if (!listingId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await directoryPresenceAdminService.updateSeedListingPhoto(listingId, photoId, {
+        alt: editAlt.trim() || null,
+        caption: editCaption.trim() || null,
+      });
+      setEditingId(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const remaining = Math.max(0, MAX_SEED_PHOTOS - photos.length - pending.length);
 
   return (
@@ -243,7 +306,7 @@ export default function SeedPhotoCapturePanel({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {[...photos]
               .sort((a, b) => a.position - b.position)
-              .map((photo) => (
+              .map((photo, index, sorted) => (
                 <div key={photo.id} className="relative rounded-lg overflow-hidden border border-gray-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photo.url} alt={photo.alt || ''} className="w-full aspect-square object-cover" />
@@ -265,6 +328,86 @@ export default function SeedPhotoCapturePanel({
                   )}
                   {photo.caption && (
                     <p className="text-xs text-gray-600 px-2 py-1 truncate">{photo.caption}</p>
+                  )}
+                  {canEdit && (
+                    <div className="flex items-center gap-1 px-1.5 py-1 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => move(photo.id, -1)}
+                        disabled={busy || index === 0}
+                        aria-label="Move photo earlier"
+                        title="Move earlier"
+                        className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(photo.id, 1)}
+                        disabled={busy || index === sorted.length - 1}
+                        aria-label="Move photo later"
+                        title="Move later"
+                        className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      {photo.position !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPrimary(photo.id)}
+                          disabled={busy}
+                          aria-label="Set as primary photo"
+                          title="Set as primary"
+                          className="p-1 text-gray-500 hover:text-amber-600 disabled:opacity-30"
+                        >
+                          <Star className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => startEdit(photo)}
+                        disabled={busy}
+                        aria-label="Edit alt text and caption"
+                        title="Edit alt/caption"
+                        className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30 ml-auto"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  {canEdit && editingId === photo.id && (
+                    <div className="absolute inset-0 bg-white p-2 flex flex-col gap-1.5 z-10 overflow-y-auto">
+                      <input
+                        value={editAlt}
+                        onChange={(e) => setEditAlt(e.target.value)}
+                        placeholder="Alt text"
+                        className="w-full text-xs border border-gray-300 rounded px-1.5 py-1"
+                      />
+                      <input
+                        value={editCaption}
+                        onChange={(e) => setEditCaption(e.target.value)}
+                        placeholder="Caption"
+                        className="w-full text-xs border border-gray-300 rounded px-1.5 py-1"
+                      />
+                      <div className="flex gap-1.5 mt-auto">
+                        <button
+                          type="button"
+                          onClick={() => saveEdit(photo.id)}
+                          disabled={busy}
+                          className="px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          disabled={busy}
+                          className="px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
