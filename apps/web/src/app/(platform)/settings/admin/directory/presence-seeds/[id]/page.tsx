@@ -74,6 +74,7 @@ import SeedPhotoCapturePanel from './SeedPhotoCapturePanel';
 import SeedLogoUploadPanel from './SeedLogoUploadPanel';
 import DemoWindowPanel from './DemoWindowPanel';
 import SeedCascadeCard from '@/components/marketing-ops/SeedCascadeCard';
+import ResolveVerificationModal from '@/components/marketing-ops/ResolveVerificationModal';
 import OwnerRequestsPanel from './OwnerRequestsPanel';
 import { slugify, getPlaceCityShelfUrl } from '@/utils/slug';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
@@ -459,6 +460,9 @@ function PresenceSeedDetailClient() {
   const [editOwnerName, setEditOwnerName] = useState('');
   const [editOwnerEmail, setEditOwnerEmail] = useState('');
   const [editOwnerPhone, setEditOwnerPhone] = useState('');
+
+  // Producing queue entry pending verification — shared resolve modal.
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   // Platform category vocabulary — resolves canonical shelf slugs for the
   // public category-page links rendered in the Listing summary.
@@ -3910,6 +3914,33 @@ function PresenceSeedDetailClient() {
           </div>
         )}
 
+        {/* Producing queue entry pending verification — resolve it here via
+            the shared modal instead of leaving for the queue board. */}
+        {detail?.producingQueueEntry?.status === 'verify_then_outreach' && (
+          <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-amber-800">
+              Producing queue entry{' '}
+              <code className="text-amber-900">{detail.producingQueueEntry.id}</code>{' '}
+              is pending verification (verify_then_outreach).
+            </p>
+            <button
+              onClick={() => setShowVerifyModal(true)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 shrink-0"
+            >
+              Resolve verification
+            </button>
+          </div>
+        )}
+        {detail?.producingQueueEntry?.status !== 'verify_then_outreach' &&
+          (detail?.producingQueueEntry?.verification as any)?.outcome && (
+          <p className="text-xs text-gray-500">
+            Queue verification resolved:{' '}
+            <span className="font-medium text-gray-700">
+              {String((detail!.producingQueueEntry!.verification as any).outcome).replace(/_/g, ' ')}
+            </span>
+          </p>
+        )}
+
         {/* Quick status actions */}
         <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
           <button
@@ -4752,6 +4783,20 @@ function PresenceSeedDetailClient() {
           Use “Edit Fields” above to update phone, website, SNAP/EBT, and
           provenance. Once claimed, the owner manages these fields.
         </div>
+      )}
+
+      {/* Queue-mode resolve — same modal the queue board / PG cockpit use;
+          verifiedEmail etc. land on the queue entry's snapshot and follow the
+          prospect into its campaign on promotion. */}
+      {showVerifyModal && detail?.producingQueueEntry && (
+        <ResolveVerificationModal
+          entry={detail.producingQueueEntry}
+          onClose={() => setShowVerifyModal(false)}
+          onResolved={async () => {
+            setShowVerifyModal(false);
+            await fetchDetail();
+          }}
+        />
       )}
     </div>
   );
