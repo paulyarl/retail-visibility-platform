@@ -118,6 +118,21 @@ describe('getSeedPublishReadiness', () => {
     expect(readiness.publishable).toBe(true);
     expect(readiness.blockers).toEqual([]);
   });
+
+  it('scopes the duplicate check to the seed listing (regression: missing dll alias)', async () => {
+    mockQueryRaw
+      .mockResolvedValueOnce([enrichedSeed])
+      .mockResolvedValueOnce([]);
+
+    await DirectoryPresenceSeedService.getSeedPublishReadiness('seed-4');
+
+    const duplicateSql = String(mockQueryRaw.mock.calls[1][0]);
+    expect(duplicateSql).toContain('WITH self AS');
+    expect(duplicateSql).toContain('CROSS JOIN self');
+    expect(duplicateSql).toContain('self.phone');
+    expect(duplicateSql).toContain('self.address');
+    expect(duplicateSql).toContain('self.city');
+  });
 });
 
 describe('publishSeed', () => {

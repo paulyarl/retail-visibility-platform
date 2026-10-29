@@ -828,23 +828,31 @@ class DirectoryPresenceSeedService {
     if (!result.publishable) return result;
 
     const duplicates = await prisma.$queryRaw<any[]>`
+      WITH self AS (
+        SELECT dll.phone, dll.address, dll.city
+        FROM directory_presence_seeds dps
+        JOIN directory_listings_list dll ON dll.id = dps.listing_id
+        WHERE dps.id = ${seedId}
+        LIMIT 1
+      )
       SELECT dll2.slug
       FROM directory_presence_seeds dps2
       JOIN directory_listings_list dll2 ON dll2.id = dps2.listing_id
+      CROSS JOIN self
       WHERE dps2.id <> ${seedId}
         AND dps2.status <> 'suppressed'
         AND dll2.is_published = true
         AND (
           (
-            length(right(regexp_replace(coalesce(dll.phone, ''), '[^0-9]', '', 'g'), 10)) = 10
-            AND right(regexp_replace(coalesce(dll.phone, ''), '[^0-9]', '', 'g'), 10)
+            length(right(regexp_replace(coalesce(self.phone, ''), '[^0-9]', '', 'g'), 10)) = 10
+            AND right(regexp_replace(coalesce(self.phone, ''), '[^0-9]', '', 'g'), 10)
                 = right(regexp_replace(coalesce(dll2.phone, ''), '[^0-9]', '', 'g'), 10)
           )
           OR (
-            length(regexp_replace(coalesce(dll.address, ''), '[^a-zA-Z0-9]', '', 'g')) > 5
-            AND regexp_replace(coalesce(dll.address, ''), '[^a-zA-Z0-9]', '', 'g')
+            length(regexp_replace(coalesce(self.address, ''), '[^a-zA-Z0-9]', '', 'g')) > 5
+            AND regexp_replace(coalesce(self.address, ''), '[^a-zA-Z0-9]', '', 'g')
                 = regexp_replace(coalesce(dll2.address, ''), '[^a-zA-Z0-9]', '', 'g')
-            AND lower(coalesce(dll.city, '')) = lower(coalesce(dll2.city, ''))
+            AND lower(coalesce(self.city, '')) = lower(coalesce(dll2.city, ''))
           )
         )
       LIMIT 1
