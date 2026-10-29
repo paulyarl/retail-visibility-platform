@@ -397,7 +397,7 @@ class MarketingProspectQueueServiceClass extends BaseService {
         // §8): a prospect found in both discovery lanes accumulates
         // attribution rather than last-write-win — union-merge the incoming
         // lane's attribution into the existing entry.
-        await this.mergeAttributionOnDedup(existingQueued, snapshot, input.discovery_provenance, ctx);
+        await this.mergeAttributionOnDedup(existingQueued, snapshot, input.discovery_provenance, ctx, input);
         return { kind: 'already_queued', entry: existingQueued, created: false };
       }
 
@@ -1038,12 +1038,20 @@ class MarketingProspectQueueServiceClass extends BaseService {
    * entry with a non-empty `basis` wins. Attribution fields live on
    * `business_snapshot`; provenance lives on its own column. No-op when the
    * incoming payload contributes nothing new.
+   *
+   * Unseeded rows also refresh their descriptive snapshot and source scan.
+   * That is the drop → re-queue → promote cycle: the old seed is deleted
+   * (`seed_id` cleared), the PG attaches a newer discovery twin, and the
+   * operator re-queues the same business. Without this fill, the row keeps
+   * its empty/template snapshot and the new seed is born thin again. Seeded
+   * rows are live — never rewrite their source or copy here.
    */
   private async mergeAttributionOnDedup(
     existing: any,
     incomingSnapshot: Record<string, any>,
     incomingProvenance: Record<string, any>[] | undefined,
     ctx?: RequestCtx,
+    incoming?: ProspectQueueAddInput,
   ): Promise<void> {
     const existingSnapshot = (existing.business_snapshot as Record<string, any>) ?? {};
 
@@ -1092,28 +1100,70 @@ class MarketingProspectQueueServiceClass extends BaseService {
       (e) => (e?.source ? `${e.source}|${e.url ?? ''}` : null),
     );
 
-    if (!mergedBronze && !mergedWeaknesses && !mergedProvenance) return;
-
-    const data: any = {};
+    let nextSnapshot = existingSnapshot;
     if (mergedBronze || mergedWeaknesses) {
-      data.business_snapshot = {
-        ...existingSnapshot,
+      nextSnapshot = {
+        ...nextSnapshot,
         ...(mergedBronze ? { bronze_attribution: mergedBronze } : {}),
         ...(mergedWeaknesses ? { competitive_weaknesses: mergedWeaknesses } : {}),
       };
-      existing.business_snapshot = data.business_snapshot;
+    }
+
+    // Descriptive fill for re-promotable rows (fill-missing only — never
+    // overwrite a verified NAP, operator edit, or already-good copy).
+    const fillKeys = [
+      'description', 'hours', 'address', 'phone', 'email', 'website',
+      'gbp_url', 'rating', 'review_count', 'ownership_type', 'location',
+    ] as const;
+    let filledSnapshot = false;
+    if (!existing.seed_id) {
+      const filled: Record<string, any> = {};
+      for (const key of fillKeys) {
+        const current = nextSnapshot[key];
+        const incomingValue = incomingSnapshot[key];
+        const empty = current === null || current === undefined || current === '';
+        if (empty && incomingValue !== null && incomingValue !== undefined && incomingValue !== '') {
+          filled[key] = incomingValue;
+        }
+      }
+      if (Object.keys(filled).length > 0) {
+        nextSnapshot = { ...nextSnapshot, ...filled };
+        filledSnapshot = true;
+      }
+    }
+
+    const data: any = {};
+    if (nextSnapshot !== existingSnapshot) {
+      data.business_snapshot = nextSnapshot;
+      existing.business_snapshot = nextSnapshot;
     }
     if (mergedProvenance) {
       data.discovery_provenance = mergedProvenance;
       existing.discovery_provenance = mergedProvenance;
     }
+    // Unseeded rows follow the newer twin; seeded rows keep their producing
+    // campaign so funnel attribution and primary-link reads stay stable.
+    if (
+      !existing.seed_id &&
+      incoming?.source_campaign_id &&
+      incoming.source_campaign_id !== existing.source_campaign_id
+    ) {
+      data.source_campaign_id = incoming.source_campaign_id;
+      if (incoming.source_audit_id) data.source_audit_id = incoming.source_audit_id;
+      if (incoming.audit_date) data.audit_date = incoming.audit_date;
+      existing.source_campaign_id = incoming.source_campaign_id;
+    }
+
+    if (Object.keys(data).length === 0) return;
 
     await this.prisma.mkt_prospect_queue.update({ where: { id: existing.id }, data });
-    logger.info('addToQueue: merged dual-lane attribution into existing queue entry', ctx, {
+    logger.info('addToQueue: merged into existing queue entry', ctx, {
       existingId: existing.id,
       bronze: mergedBronze?.length ?? 0,
       weaknesses: mergedWeaknesses?.length ?? 0,
       provenance: mergedProvenance?.length ?? 0,
+      descriptiveFill: filledSnapshot,
+      sourceCampaignUpdated: !!data.source_campaign_id,
     });
   }
 

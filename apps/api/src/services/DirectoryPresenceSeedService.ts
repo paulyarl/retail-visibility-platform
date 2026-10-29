@@ -2361,51 +2361,6 @@ class DirectoryPresenceSeedService {
     const tenantId = seed[0].tenant_id;
     const listingId = seed[0].listing_id;
 
-    // directory_presence_suggestions.seed_id has no ON DELETE cascade — null
-    // it out so the suggestion rows survive (they keep their own identity).
-    await prisma.$executeRaw`
-      UPDATE directory_presence_suggestions SET seed_id = NULL, updated_at = now()
-      WHERE seed_id = ${seedId}
-    `;
-
-    // Seed-scoped children (cascades exist on most, but delete explicitly for
-    // safety — mirrors the DemoTenantService tenant-delete pattern).
-    await prisma.$executeRaw`DELETE FROM directory_claim_tokens WHERE seed_id = ${seedId}`;
-    await prisma.$executeRaw`DELETE FROM directory_enrichment_tokens WHERE seed_id = ${seedId}`;
-    await prisma.$executeRaw`DELETE FROM directory_field_provenance WHERE seed_id = ${seedId}`;
-    await prisma.$executeRaw`DELETE FROM directory_seed_campaign_links WHERE seed_id = ${seedId}`;
-    // claim_requests cascade from seed (fk_dcr_seed) and from tokens
-    // (fk_dcr_token); deleting the tokens above already cascades their
-    // claim_requests, but delete explicitly in case a request references a
-    // already-consumed token that was not removed.
-    await prisma.$executeRaw`DELETE FROM directory_claim_requests WHERE seed_id = ${seedId}`;
-
-    // Proving-ground stamp cleanup: any queue entry seeded from this seed
-    // returns to unseeded so it can be promoted again — the cockpit's
-    // promote panel keys on mkt_prospect_queue.seed_id.
-    await prisma.$executeRaw`
-      UPDATE mkt_prospect_queue SET seed_id = NULL, updated_at = now()
-      WHERE seed_id = ${seedId}
-    `;
-
-    // Deleting an owner-submitted seed is a rejection decision — close its
-    // intake ticket in the Requests Hub.
-    await this.resolveIntakeTickets(seedId);
-
-    // The seed row itself.
-    await prisma.$executeRaw`DELETE FROM directory_presence_seeds WHERE id = ${seedId}`;
-
-    // The listing — directory_listings_list has no tenant FK cascade in the
-    // schema, so delete it directly. Cascades directory_photos.
-    await prisma.$executeRaw`DELETE FROM directory_listings_list WHERE id = ${listingId}`;
-
-    // Tenant-scoped rows (most cascade from tenants, but explicit for safety).
-    await prisma.$executeRaw`DELETE FROM directory_settings_list WHERE tenant_id = ${tenantId}`.catch(() => {});
-    await prisma.$executeRaw`DELETE FROM tenant_business_profiles_list WHERE tenant_id = ${tenantId}`.catch(() => {});
-    await prisma.$executeRaw`DELETE FROM business_hours_list WHERE tenant_id = ${tenantId}`.catch(() => {});
-    await prisma.$executeRaw`DELETE FROM business_hours_special_list WHERE tenant_id = ${tenantId}`.catch(() => {});
-    await prisma.$executeRaw`DELETE FROM user_tenants WHERE tenant_id = ${tenantId}`.catch(() => {});
-
     // Detach any custom domains from Vercel before the tenant row cascades
     // them (sprint plan 1.6/D11 — orphan attachments would keep routing to a
     // gone tenant). Best-effort: a Vercel-side failure must not block delete.
@@ -2419,8 +2374,65 @@ class DirectoryPresenceSeedService {
       });
     }
 
-    // Finally, the tenant row. Cascades any remaining tenant-scoped tables.
-    await prisma.$executeRaw`DELETE FROM tenants WHERE id = ${tenantId}`;
+    // One transaction: a failed step must not leave the seed deleted while its
+    // listing/tenant survive (the 2026-10-29 500s left orphaned seed tenants).
+    // Two FKs are NO ACTION and must be cleared explicitly before the seed row:
+    //   - mkt_prospect_dedup_verdicts.merge_into (a dedupe keeper)
+    //   - directory_chain_group_members.seed_id (a chain member)
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE directory_presence_suggestions SET seed_id = NULL, updated_at = now()
+        WHERE seed_id = ${seedId}
+      `;
+
+      await tx.$executeRaw`
+        DELETE FROM mkt_prospect_dedup_verdicts
+        WHERE merge_into = ${seedId}
+           OR seed_ids && ARRAY[${seedId}]::varchar[]
+      `;
+      await tx.$executeRaw`DELETE FROM directory_chain_group_members WHERE seed_id = ${seedId}`;
+
+      // Seed-scoped children (cascades exist on most, but delete explicitly for
+      // safety — mirrors the DemoTenantService tenant-delete pattern).
+      await tx.$executeRaw`DELETE FROM directory_claim_tokens WHERE seed_id = ${seedId}`;
+      await tx.$executeRaw`DELETE FROM directory_enrichment_tokens WHERE seed_id = ${seedId}`;
+      await tx.$executeRaw`DELETE FROM directory_field_provenance WHERE seed_id = ${seedId}`;
+      await tx.$executeRaw`DELETE FROM directory_seed_campaign_links WHERE seed_id = ${seedId}`;
+      // claim_requests cascade from seed (fk_dcr_seed) and from tokens
+      // (fk_dcr_token); deleting the tokens above already cascades their
+      // claim_requests, but delete explicitly in case a request references a
+      // already-consumed token that was not removed.
+      await tx.$executeRaw`DELETE FROM directory_claim_requests WHERE seed_id = ${seedId}`;
+
+      // Proving-ground stamp cleanup: any queue entry seeded from this seed
+      // returns to unseeded so it can be promoted again — the cockpit's
+      // promote panel keys on mkt_prospect_queue.seed_id.
+      await tx.$executeRaw`
+        UPDATE mkt_prospect_queue SET seed_id = NULL, updated_at = now()
+        WHERE seed_id = ${seedId}
+      `;
+
+      // The seed row itself.
+      await tx.$executeRaw`DELETE FROM directory_presence_seeds WHERE id = ${seedId}`;
+
+      // The listing — directory_listings_list has no tenant FK cascade in the
+      // schema, so delete it directly. Cascades directory_photos.
+      await tx.$executeRaw`DELETE FROM directory_listings_list WHERE id = ${listingId}`;
+
+      // Tenant-scoped rows (most cascade from tenants, but explicit for safety).
+      await tx.$executeRaw`DELETE FROM directory_settings_list WHERE tenant_id = ${tenantId}`;
+      await tx.$executeRaw`DELETE FROM tenant_business_profiles_list WHERE tenant_id = ${tenantId}`;
+      await tx.$executeRaw`DELETE FROM business_hours_list WHERE tenant_id = ${tenantId}`;
+      await tx.$executeRaw`DELETE FROM business_hours_special_list WHERE tenant_id = ${tenantId}`;
+      await tx.$executeRaw`DELETE FROM user_tenants WHERE tenant_id = ${tenantId}`;
+
+      // Finally, the tenant row. Cascades any remaining tenant-scoped tables.
+      await tx.$executeRaw`DELETE FROM tenants WHERE id = ${tenantId}`;
+    }, { timeout: 30000 });
+
+    // Post-commit side effect — the ticket resolution is not part of the DB
+    // transaction and must not roll the delete back if it fails.
+    await this.resolveIntakeTickets(seedId);
 
     audit({
       actor: ctx?.actorId,

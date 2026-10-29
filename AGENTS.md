@@ -2205,3 +2205,27 @@ doppler run --config prd -- npx tsx src/scripts/seed-publish-readiness-report.ts
 ```
 
 It prints current vs post-recompose publishability and a verdict (`already_publishable`, `recompose_would_publish`, `still_thin`, `skip_operator_override`, `skip_claimed`, `skip_suppressed`). Use it before a recompose batch: a seed whose `getComposedEnrichment` still resolves to `linked_campaign`/`seed_seo_composer` will not gain unique copy, so recompose alone cannot rescue it. Tests: `services/directory/__tests__/seedPublishability.test.ts`, `services/__tests__/DirectoryPresenceSeedService.publishGate.test.ts`, `apps/web/src/app/place/[slug]/place-publish-gate.test.ts`, `apps/web/src/app/place/city/[citySlug]/place-city-index-gate.test.ts`.
+
+### Re-promotable queue rows refresh from the newer scan (added 2026-10-29)
+
+`MarketingProspectQueueService.addToQueue` dedupes a prospect on business + city + category. It used to return the existing row untouched, so the PG cycle **drop old discovery twin → delete seed → attach new twin → re-queue → promote to draft** re-created the seed from the old empty/template `business_snapshot.description` and produced another thin page. The dedupe merge now has two modes:
+
+- **Unseeded row (`seed_id` null — re-promotable):** fill-missing descriptive fields from the incoming snapshot (`description`, `hours`, address/phone/email/website/gbp_url, rating/review_count, ownership_type, location) and repoint `source_campaign_id` / `source_audit_id` / `audit_date` to the newer scan. Never overwrites a non-empty value, so verified NAP and operator edits survive.
+- **Seeded row (`seed_id` set — live):** attribution union only (bronze/weaknesses/provenance). Its copy and producing campaign are never rewritten by a later lane.
+
+This is the contract that makes the campaign drop/link + re-promote flow clean at birth. Tests: `apps/api/src/services/__tests__/MarketingProspectQueueService.test.ts` (re-promotable fill + source repoint, seeded no-op, fill-missing no-overwrite).
+
+### Seed delete is transactional; two NO ACTION FKs and a drifted MV log sequence (added 2026-10-29)
+
+`DirectoryPresenceSeedService.deleteSeed` used to run its statements outside a transaction, so a failure after `DELETE FROM directory_presence_seeds` left the seed gone while its listing/tenant survived — the 2026-10-29 500s created orphan seed tenants. It now runs the whole teardown in one `prisma.$transaction` (30s timeout); a failure rolls back and the retry is safe. The custom-domain detach and `resolveIntakeTickets` run outside the transaction (external/best-effort, post-commit).
+
+Two FKs to `directory_presence_seeds` are `NO ACTION` and must be cleared **before** the seed row: `mkt_prospect_dedup_verdicts.merge_into` (a dedupe keeper) and `directory_chain_group_members.seed_id` (a chain member). The delete now removes every verdict whose `seed_ids` contains the seed or whose `merge_into` is the seed, and removes the chain membership. `mkt_prospect_queue.seed_id` is also `NO ACTION` and is nulled first (that is what makes the entry re-promotable).
+
+**Tenant delete triggers `refresh_storefront_products_debounced`**, which inserts into `storefront_mv_refresh_log` without an explicit id. On prod the sequence was at **31** while `max(id)` was **956**, so every tenant delete failed with `duplicate key value violates unique constraint "storefront_mv_refresh_log_pkey"`. Reset it with:
+
+```sql
+SELECT setval('public.storefront_mv_refresh_log_id_seq',
+              (SELECT max(id) FROM storefront_mv_refresh_log), true);
+```
+
+Staging was already in sync (max 6660 / seq 6660). If tenant deletes start 500ing again, check this sequence first — the error surfaces as a generic `PrismaClientKnownRequestError` with `internal_error` in the response, and the route's log context does not carry the message.

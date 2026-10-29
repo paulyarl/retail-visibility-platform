@@ -489,6 +489,75 @@ describe('MarketingProspectQueueService', () => {
       });
     });
 
+    it('re-promotable row: fills an empty description and follows the newer source scan', async () => {
+      const existing = queueRow({
+        id: 'pque-repromote-001',
+        seed_id: null,
+        source_campaign_id: 'mcamp-old-twin',
+        source_audit_id: 'maud-old',
+        business_snapshot: { ...scanSnapshot(), description: '' },
+      });
+      mockQueue.findFirst.mockResolvedValue(existing);
+      mockQueue.update.mockImplementation(({ data }: any) => Promise.resolve({ ...existing, ...data }));
+
+      await MarketingProspectQueueService.addToQueue({
+        business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
+        source_kind: 'intelligence_seek',
+        source_campaign_id: 'mcamp-new-twin',
+        source_audit_id: 'maud-new',
+        business_snapshot: {
+          description: 'The corner pizzeria on East 6th, open 11am–10pm daily.',
+        },
+      });
+
+      const data = mockQueue.update.mock.calls[0][0].data;
+      expect(data.business_snapshot.description).toBe(
+        'The corner pizzeria on East 6th, open 11am–10pm daily.',
+      );
+      expect(data.source_campaign_id).toBe('mcamp-new-twin');
+      expect(data.source_audit_id).toBe('maud-new');
+    });
+
+    it('seeded row: never rewrites its copy or producing campaign', async () => {
+      const existing = queueRow({
+        id: 'pque-seeded-001',
+        seed_id: 'dps-live-seed',
+        source_campaign_id: 'mcamp-old-twin',
+        business_snapshot: { ...scanSnapshot(), description: 'Original good copy.' },
+      });
+      mockQueue.findFirst.mockResolvedValue(existing);
+
+      await MarketingProspectQueueService.addToQueue({
+        business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
+        source_kind: 'intelligence_seek',
+        source_campaign_id: 'mcamp-new-twin',
+        business_snapshot: { description: 'A newer scan description.' },
+      });
+
+      expect(mockQueue.update).not.toHaveBeenCalled();
+    });
+
+    it('re-promotable row: fill-missing never overwrites existing copy', async () => {
+      const existing = queueRow({
+        id: 'pque-repromote-002',
+        seed_id: null,
+        business_snapshot: { ...scanSnapshot(), description: 'Operator-written copy.' },
+      });
+      mockQueue.findFirst.mockResolvedValue(existing);
+
+      await MarketingProspectQueueService.addToQueue({
+        business_name: 'Joe Pizza',
+        title: 'Joe Pizza — Review Recovery',
+        source_kind: 'intelligence_seek',
+        source_campaign_id: PARENT_CAMPAIGN_ID,
+        business_snapshot: { description: 'A newer scan description.' },
+      });
+
+      expect(mockQueue.update).not.toHaveBeenCalled();
+    });
+
     it('dual-lane merge: duplicate keys dedupe and a basis upgrade wins', async () => {
       const existing = queueRow({
         id: 'pque-existing-001',
