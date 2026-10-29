@@ -345,6 +345,7 @@ Queue entry: ${entryId || '—'}`,
         priority: 'medium',
         category: 'directory_lead_gen',
         inquiry_id: entryId || undefined,
+        reply_to_email: typeof email === 'string' && email.includes('@') ? email : undefined,
       });
       await CrmTicketMessageService.getInstance().create({
         ticket_id: ticket.id,

@@ -268,6 +268,7 @@ Review at the seed detail page.`,
         priority: 'medium',
         category: 'directory_owner_submission',
         inquiry_id: seed.id,
+        reply_to_email: input.ownerEmail,
       });
 
       await CrmTicketMessageService.getInstance().create({

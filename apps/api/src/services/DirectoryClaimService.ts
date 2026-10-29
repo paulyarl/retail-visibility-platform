@@ -683,6 +683,7 @@ Review at Settings → Directory → Presence Seeds.`,
         priority: 'high',
         category: 'directory_claim',
         inquiry_id: requestId,
+        reply_to_email: ctx?.customerEmail || undefined,
       });
 
       await CrmTicketMessageService.getInstance().create({
@@ -2374,6 +2375,7 @@ View the seed at Settings → Directory → Presence Seeds.`,
         priority: 'medium',
         category: 'directory_claim',
         inquiry_id: requestId || seedId,
+        reply_to_email: ownerEmail || undefined,
       });
 
       await CrmTicketMessageService.getInstance().create({
