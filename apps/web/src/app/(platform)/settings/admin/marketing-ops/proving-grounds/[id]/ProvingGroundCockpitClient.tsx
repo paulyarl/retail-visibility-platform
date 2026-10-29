@@ -722,9 +722,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
   const handlePublishDrafts = async () => {
     const ids = [...promoteSelected];
     if (ids.length === 0) return;
-    const seeded = promoteEntries
-      .filter((e) => ids.includes(e.id) && e.seed_id)
-      .map((e) => e.seed_id as string);
+    const seeded = [...new Set(
+      promoteEntries
+        .filter((e) => ids.includes(e.id) && e.seed_id)
+        .map((e) => e.seed_id as string),
+    )];
     if (seeded.length === 0) {
       setPromoteResult('Nothing to publish — no selected prospect has a draft seed yet.');
       return;
@@ -1727,10 +1729,10 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleAllPromote}
-                disabled={promoteBusy || promoteEntries.every((e) => e.seed_id)}
+                disabled={promoteBusy || promoteEntries.length === 0}
                 className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50 disabled:no-underline"
               >
-                {promoteEntries.filter((e) => !e.seed_id).length > 0
+                {promoteEntries.some((e) => e.status !== 'dismissed')
                   && promoteEntries.filter((e) => e.status !== 'dismissed').every((e) => promoteSelected.has(e.id))
                   ? 'clear all'
                   : `select all (${promoteEntries.filter((e) => e.status !== 'dismissed').length})`}
@@ -1797,7 +1799,11 @@ export default function ProvingGroundCockpitClient({ campaignId }: Props) {
                 {promoteEntries.map((e) => {
                   const isHold = e.business_seek_priority === 'hold';
                   const promoted = !!e.seed_id;
-                  const checked = promoted || promoteSelected.has(e.id);
+                  // The checkbox mirrors promoteSelected exactly — seeded rows
+                  // must be selectable so "Publish drafts" has a real selection,
+                  // and a seeded row the operator unticks is genuinely excluded.
+                  // The green row + "promoted" chip carry the seeded state.
+                  const checked = promoteSelected.has(e.id);
                   return (
                     <li
                       key={e.id}
