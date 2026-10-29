@@ -487,6 +487,20 @@ class DirectorySeedCleanupService {
           SET status = 'suppressed', updated_at = now()
           WHERE id = ${loserId}
         `;
+        // Suppressed is terminal — the loser listing must go dark on every
+        // surface, not just the status-gated reads. Same is_published
+        // coupling updateStatus enforces, written inside this transaction
+        // so a suppressed seed can't leave a live listing remnant.
+        await tx.$executeRaw`
+          UPDATE directory_listings_list
+          SET is_published = false, updated_at = now()
+          WHERE id = (SELECT listing_id FROM directory_presence_seeds WHERE id = ${loserId})
+        `;
+        await tx.$executeRaw`
+          UPDATE directory_settings_list
+          SET is_published = false, updated_at = now()
+          WHERE tenant_id = (SELECT tenant_id FROM directory_presence_seeds WHERE id = ${loserId})
+        `;
         revoked += await tx.$executeRaw`
           UPDATE directory_claim_tokens
           SET consumed_at = now(),

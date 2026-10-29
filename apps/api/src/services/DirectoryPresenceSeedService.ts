@@ -2548,8 +2548,17 @@ class DirectoryPresenceSeedService {
       throw new Error('invalid_status');
     }
 
+    // 'published' is a publish, not a bare status write — it flips the
+    // listing row public, stamps published_at, syncs directory_settings, and
+    // passes the §4.8 readiness gate. Delegating prevents the inconsistent
+    // status='published' + is_published=false state a raw write produces.
+    if (newStatus === 'published') {
+      await this.publishSeed(seedId, ctx);
+      return;
+    }
+
     const seed = await prisma.$queryRaw<any[]>`
-      SELECT tenant_id, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
+      SELECT tenant_id, listing_id, status FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1
     `;
     if (!seed[0]) throw new Error('seed_not_found');
 
@@ -2560,6 +2569,28 @@ class DirectoryPresenceSeedService {
       SET status = ${newStatus}, updated_at = now()
       WHERE id = ${seedId}
     `;
+
+    // Seed status is the listing's visibility contract — the same coupling
+    // the tenant directory unpublish endpoint enforces (settings + listing
+    // flag in lockstep). draft/suppressed take the listing off the direct
+    // URL too, not just the dps.status-gated browse reads. invited/claimed
+    // stay bookkeeping-only — the invite/accept flows manage the flag.
+    if (newStatus === 'draft' || newStatus === 'suppressed') {
+      if (seed[0].listing_id) {
+        await prisma.$executeRaw`
+          UPDATE directory_listings_list
+          SET is_published = false, updated_at = now()
+          WHERE id = ${seed[0].listing_id}
+        `;
+      }
+      if (seed[0].tenant_id) {
+        await prisma.$executeRaw`
+          UPDATE directory_settings_list
+          SET is_published = false, updated_at = now()
+          WHERE tenant_id = ${seed[0].tenant_id}
+        `;
+      }
+    }
 
     audit({
       actor: ctx?.actorId,

@@ -2130,6 +2130,15 @@ router.patch('/presence-seeds/:id/status', requirePlatformAdmin, async (req: Req
   } catch (error: any) {
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'invalid_status') return res.status(400).json({ error: 'invalid_status' });
+    // updateStatus delegates 'published' to publishSeed — surface its errors
+    // the same way the publish endpoint does.
+    if (error?.message === 'seed_already_claimed') return res.status(409).json({ error: 'seed_already_claimed' });
+    if (String(error?.message).startsWith('seed_not_publishable:')) {
+      return res.status(409).json({
+        error: 'seed_not_publishable',
+        blockers: String(error.message).split(':')[1]?.split(',') ?? [],
+      });
+    }
     logger.error('[PATCH /api/admin/directory/presence-seeds/:id/status] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });

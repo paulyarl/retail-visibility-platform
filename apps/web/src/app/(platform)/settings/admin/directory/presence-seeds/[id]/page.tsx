@@ -1185,11 +1185,13 @@ function PresenceSeedDetailClient() {
   // the normal promote state, and an 'invited' seed that was never published
   // is the 2026-10-28 defect (promote minted a claim token, which flipped the
   // status to invited while published_at stayed null — the page then showed no
-  // public affordance at all). Any non-terminal seed without a published_at is
-  // publishable, including the stuck 'published'-without-listing state that the
-  // raw status dropdown could produce.
+  // public affordance at all). Keyed on the listing's live flag, not the
+  // published_at stamp — the stamp is history, and a seed moved back to draft
+  // must offer Publish again (status writes now unpublish the listing too, but
+  // rows flipped before the coupling can still carry draft + is_published).
   const canPublish =
-    status !== 'claimed' && status !== 'suppressed' && !seed?.published_at;
+    status !== 'claimed' && status !== 'suppressed' &&
+    (status === 'draft' || listing?.is_published !== true);
   const canInvite =
     (status === 'published' || status === 'invited') &&
     !claimTokens.some(
