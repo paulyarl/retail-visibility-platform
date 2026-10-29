@@ -28,6 +28,7 @@ import { emailService } from './email-service';
 import DirectorySeedCampaignLinkService from './DirectorySeedCampaignLinkService';
 import { SeedOutreachTriggerService } from './SeedOutreachTriggerService';
 import { isReservedPlaceSlug } from '../utils/slug';
+import { addressParser } from '../lib/address-parser';
 import {
   generateDirectoryListingId,
   generateDirectoryPresenceSeedId,
@@ -2101,6 +2102,434 @@ class DirectoryPresenceSeedService {
     logger.info('DirectoryPresenceSeedService.updateFields', undefined, {
       seedId,
       napChanged: Object.keys(changedNapFields).length > 0,
+    });
+  }
+
+  /**
+   * Seed verification back-fill — mirror owner-verified facts into the seed's
+   * NAP ledger + provenance so the seed report reflects the same confirmation
+   * the verifying surface just recorded. Shared by two callers:
+   *
+   *   - `MarketingCampaignService.resolveCampaignVerification` (a campaign
+   *     verify back-fills its linked seed, source 'campaign_verification')
+   *   - `DirectoryPresenceSeedService.resolveVerification` (the seed cockpit's
+   *     own Verify record flow, source 'seed_verification')
+   *
+   * Confirmed vs corrected is measured against the seed's current provenance
+   * — same split as the anchor path. Writes: `directory_seed_nap_verifications`
+   * ledger rows, `nap_verified_at`/`nap_owner_corrected` stamps, provenance
+   * upserts with evidence_state (tenant_id-gated), listing write-back for
+   * corrected core fields, seed city/state + name_variants mirrors, then a
+   * report refresh + fidelity recompute (§5.1; both best-effort).
+   *
+   * Connected-contact gate lives at the caller — 'unreachable' /
+   * 'wrong_business' can produce no verified facts.
+   */
+  async applyVerificationBackfill(
+    seedId: string,
+    verified: Array<[value: string, fieldKey: string]>,
+    opts: { sourceName: string; note: string | null; userId: string },
+  ): Promise<void> {
+    if (verified.length === 0) return;
+
+    const seedRows = await prisma.$queryRaw<
+      { tenant_id: string | null; listing_id: string | null }[]
+    >`SELECT tenant_id, listing_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1`;
+    const tenantId = seedRows[0]?.tenant_id ?? null;
+    const listingId = seedRows[0]?.listing_id ?? null;
+    const { sourceName, note, userId } = opts;
+
+    const provRows = await prisma.$queryRaw<{ field_key: string; value: string }[]>`
+      SELECT field_key, value FROM directory_field_provenance
+      WHERE seed_id = ${seedId} AND field_key = ANY(${verified.map(([, k]) => k)})`;
+    const current = new Map(provRows.map((r) => [r.field_key, String(r.value ?? '').trim()]));
+    const confirmed = verified.filter(([v, k]) => current.get(k) === v);
+    const corrected = verified.filter(([v, k]) => current.get(k) !== v);
+
+    if (confirmed.length > 0) {
+      await prisma.$executeRaw`
+        INSERT INTO directory_seed_nap_verifications (
+          id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
+        ) VALUES (
+          ${randomUUID()}, ${seedId}, ${tenantId}, ${sourceName},
+          ${JSON.stringify(Object.fromEntries(confirmed.map(([v, k]) => [k, { confirmed: v }])))}::jsonb,
+          FALSE, now()
+        )`;
+    }
+    if (corrected.length > 0) {
+      await prisma.$executeRaw`
+        INSERT INTO directory_seed_nap_verifications (
+          id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
+        ) VALUES (
+          ${randomUUID()}, ${seedId}, ${tenantId}, ${sourceName},
+          ${JSON.stringify(
+            Object.fromEntries(
+              corrected.map(([v, k]) => [k, { previous: current.get(k) ?? null, corrected: v }]),
+            ),
+          )}::jsonb,
+          TRUE, now()
+        )`;
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET nap_owner_corrected = TRUE, updated_at = now()
+        WHERE id = ${seedId}`;
+    }
+    await prisma.$executeRaw`
+      UPDATE directory_presence_seeds
+      SET nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
+      WHERE id = ${seedId}`;
+
+    // Provenance + listing write-back requires a tenant_id (the provenance ID
+    // generator is tenant-scoped, and the anchor path skips the same write
+    // when the seed has no tenant).
+    if (tenantId) {
+      const { generateDirectoryFieldProvenanceId } = await import('../lib/id-generator');
+      for (const [v, k] of verified) {
+        const evidenceState = current.get(k) === v ? 'owner_confirmed' : 'owner_corrected';
+        await prisma.$executeRaw`
+          INSERT INTO directory_field_provenance (
+            id, seed_id, tenant_id, field_key, value,
+            source_name, accessed_at, confidence, show_on_public,
+            override_by, override_at, evidence_state, notes,
+            created_at, updated_at
+          ) VALUES (
+            ${generateDirectoryFieldProvenanceId(tenantId)},
+            ${seedId}, ${tenantId}, ${k}, ${v},
+            ${sourceName}, CURRENT_DATE, 'high', TRUE,
+            ${userId}, now(), ${evidenceState}, ${note},
+            now(), now()
+          )
+          ON CONFLICT (seed_id, field_key) DO UPDATE SET
+            value = EXCLUDED.value,
+            source_name = EXCLUDED.source_name,
+            accessed_at = EXCLUDED.accessed_at,
+            confidence = EXCLUDED.confidence,
+            show_on_public = EXCLUDED.show_on_public,
+            override_by = EXCLUDED.override_by,
+            override_at = EXCLUDED.override_at,
+            evidence_state = EXCLUDED.evidence_state,
+            notes = EXCLUDED.notes,
+            updated_at = now()`;
+
+        // Keep the public listing in step for corrected core fields —
+        // same write-back the anchor path performs (§11.6).
+        if (evidenceState === 'owner_corrected' && listingId) {
+          const col =
+            k === 'business_name' ? 'business_name'
+            : k === 'address' ? 'address'
+            : k === 'city' ? 'city'
+            : k === 'state' ? 'state'
+            : k === 'zip_code' ? 'zip_code'
+            : k === 'phone' ? 'phone'
+            : k === 'website' ? 'website'
+            : k === 'email' ? 'email'
+            : k === 'primary_category' ? 'primary_category'
+            : null;
+          if (col) {
+            await prisma.$executeRawUnsafe(
+              `UPDATE directory_listings_list SET ${col} = $1, updated_at = now() WHERE id = $2`,
+              v,
+              listingId,
+            );
+          }
+        }
+      }
+    }
+
+    // Seed-row mirrors for corrected identity — the listing UPDATE above
+    // moves the public card; these keep the seed's browse index (dps.city/
+    // state drive /place shelves + seed list filters) and name_variants
+    // ledger in step, matching the mirrors updateFields and syncFromCampaign
+    // perform. city/state only mirror when the listing was writable
+    // (tenantId && listingId) or when no listing exists at all (dps IS the
+    // resolved record then) — otherwise the browse index would diverge from
+    // the listing the report reads.
+    const correctedName = corrected.find(([, k]) => k === 'business_name')?.[0];
+    const correctedCity = corrected.find(([, k]) => k === 'city')?.[0];
+    const correctedState = corrected.find(([, k]) => k === 'state')?.[0];
+    if ((correctedCity || correctedState) && (!listingId || tenantId)) {
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET city = COALESCE(${correctedCity ?? null}, city),
+            state = COALESCE(${correctedState ?? null}, state),
+            updated_at = now()
+        WHERE id = ${seedId}`;
+    }
+    if (correctedName) {
+      await prisma.$executeRaw`
+        UPDATE directory_presence_seeds
+        SET name_variants = array_prepend(
+              ${correctedName},
+              array_remove(COALESCE(name_variants, '{}'::text[]), ${correctedName})
+            ),
+            updated_at = now()
+        WHERE id = ${seedId}`;
+      if (tenantId) {
+        await prisma.$executeRaw`
+          UPDATE tenants SET name = ${correctedName}, updated_at = now() WHERE id = ${tenantId}`;
+        await prisma.$executeRaw`
+          UPDATE tenant_business_profiles_list
+          SET business_name = ${correctedName}, updated_at = now()
+          WHERE tenant_id = ${tenantId}`;
+      }
+    }
+
+    // §5.1: an owner confirmation/correction is a report-version trigger.
+    // Best-effort — the seed ledger write must not fail on it.
+    try {
+      const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService.js');
+      await SeedIntelligenceReportService.getInstance().refreshReport(seedId);
+    } catch (refreshErr) {
+      logger.warn('DirectoryPresenceSeedService.applyVerificationBackfill: report refresh failed', undefined, {
+        seedId,
+        error: (refreshErr as Error).message,
+      });
+    }
+
+    // Wedge fidelity (project-phase spec §4/§6): the verification just
+    // stamped nap_verified_at / nap_owner_corrected, and those are verdict
+    // inputs — evaluateSeedFidelity treats the listing NAP as authoritative
+    // once the owner attested it. The stored verdict is therefore stale, and
+    // a seed verified AFTER its publish-time verdict would stay 'misaligned'
+    // forever, degrading every claim surface (QR kits, claim links, report
+    // CTAs) to the inquiry path. Non-fatal — same precedent as
+    // publish/updateFields.
+    try {
+      const { computeAndStoreSeedFidelity } = await import('./seed-fidelity.js');
+      await computeAndStoreSeedFidelity(seedId);
+    } catch (fidelityErr) {
+      logger.warn('DirectoryPresenceSeedService.applyVerificationBackfill: fidelity recompute failed', undefined, {
+        seedId,
+        error: (fidelityErr as Error).message,
+      });
+    }
+  }
+
+  /**
+   * Resolve a record verification against an EXISTING seed — the seed-scoped
+   * counterpart of `MarketingCampaignService.resolveCampaignVerification`,
+   * called by the cockpit's Verify record modal (same shared modal, mode
+   * 'seed'). The campaign path writes the campaign record + attributed owner
+   * evidence; the seed already IS the record, so the verified facts land on
+   * the seed's NAP ledger + provenance directly via applyVerificationBackfill.
+   *
+   * Beyond the campaign back-fill's NAP pairs, this path also carries the
+   * parts the campaign keeps for itself and a seed needs on its own record:
+   *
+   *   - verifiedHours        → updateFields (listing business_hours +
+   *                            business_hours_list upsert + legacy profile sync)
+   *   - social/directory URLs → merge into directory_listings_list.same_as
+   *                            (the seed's social channel list — the campaign
+   *                            back-fill never touches same_as)
+   *   - owner name/phone/email → dps.owner_* — the invite-token binding and the
+   *                            announce channel picker read these; landing one
+   *                            upgrades contact_status to 'contactable' (same
+   *                            rule as hydrateOwnerPhoneFromGroundTruth)
+   *   - outreach_status      → 'verified_by_call' / 'verified_by_email' for a
+   *                            connected outcome on the matching channel
+   *   - the call itself      → a directory_seed_outreach_touches row carrying
+   *                            the outcome + receptivity in verification_results
+   *
+   * Connected-contact gate (§20.4): 'unreachable' / 'wrong_business' produce
+   * no verified facts — the touch is logged and nothing else writes.
+   */
+  async resolveVerification(
+    seedId: string,
+    input: {
+      outcome: 'operational' | 'closed' | 'closed_temporarily' | 'relocated' | 'unreachable' | 'wrong_business';
+      verifiedName?: string;
+      verifiedPhone?: string;
+      verifiedAddress?: string;
+      verifiedCity?: string;
+      verifiedState?: string;
+      verifiedZip?: string;
+      verifiedWebsite?: string;
+      verifiedEmail?: string;
+      verifiedCategory?: string;
+      verifiedHours?: Record<string, any>;
+      verifiedSocialProfiles?: Array<{ platform: string; url: string }>;
+      verifiedDirectoryProfiles?: Array<{ platform: string; url: string; [k: string]: any }>;
+      verifiedOwnerName?: string;
+      verifiedOwnerPhone?: string;
+      verifiedOwnerEmail?: string;
+      ownerReceptivity?: 'interested' | 'neutral' | 'defensive' | 'no_answer';
+      callNotes?: string;
+      reason?: string;
+      channel?: 'call' | 'email' | 'sms' | 'visit' | 'other';
+    },
+    ctx?: SeedAuditCtx,
+  ): Promise<void> {
+    const seedRows = await prisma.$queryRaw<any[]>`
+      SELECT dps.tenant_id, dps.listing_id, dps.contact_status, dl.same_as
+      FROM directory_presence_seeds dps
+      LEFT JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      WHERE dps.id = ${seedId} LIMIT 1
+    `;
+    if (!seedRows[0]) throw new Error('seed_not_found');
+    const tenantId: string | null = seedRows[0].tenant_id ?? null;
+    const listingId: string | null = seedRows[0].listing_id ?? null;
+    const existingSameAs: string[] = Array.isArray(seedRows[0].same_as) ? seedRows[0].same_as : [];
+
+    const channel = input.channel ?? 'call';
+    const connected = !['unreachable', 'wrong_business'].includes(input.outcome);
+    const userId = ctx?.actorId ?? 'system';
+    const sourceName = 'seed_verification';
+    const note = `Seed verification — outcome: ${input.outcome}${
+      input.reason ? `; reason: ${input.reason}` : ''
+    }${input.callNotes ? `; ${input.callNotes}` : ''}`;
+
+    if (connected) {
+      // A pasted full address ("2605 Independence Ave, Kansas City, MO 64124")
+      // must not land whole as the street while city/state land separately —
+      // same split the campaign write boundary performs. Suite/unit stays on
+      // the street line; explicit verifiedCity/State/Zip still win.
+      const rawAddress = input.verifiedAddress?.trim() || '';
+      const parsed = rawAddress ? addressParser.parseComponents(rawAddress) : null;
+      const addressValue = rawAddress
+        ? [parsed?.address_line1?.trim() || rawAddress, parsed?.address_line2?.trim()]
+            .filter(Boolean)
+            .join(', ')
+        : undefined;
+      const verifiedCity = input.verifiedCity?.trim() || parsed?.city?.trim() || undefined;
+      const verifiedState = input.verifiedState?.trim() || parsed?.state?.trim() || undefined;
+      const verifiedZip = input.verifiedZip?.trim() || parsed?.postal_code?.trim() || undefined;
+
+      // Hours — updateFields owns the listing write + business_hours_list
+      // upsert + legacy profile sync, plus its own report refresh and
+      // fidelity recompute (hours are verdict inputs too).
+      if (input.verifiedHours && listingId) {
+        await this.updateFields(
+          seedId,
+          { businessHours: input.verifiedHours },
+          [
+            {
+              fieldKey: 'hours',
+              value: `Owner-verified (${input.outcome})`,
+              sourceName,
+              confidence: 'high',
+              showOnPublic: true,
+            },
+          ],
+          ctx,
+        );
+      }
+
+      // Social + directory profiles — the "other contact channels" the seed
+      // carries as directory_listings_list.same_as (text[]). Merge, never
+      // replace: audit-seeded URLs the modal didn't surface stay.
+      const profileUrls = [
+        ...(input.verifiedSocialProfiles ?? []).map((p) => p.url?.trim()),
+        ...(input.verifiedDirectoryProfiles ?? []).map((p) => p.url?.trim()),
+      ].filter((u): u is string => !!u);
+      let sameAsMerged: string | undefined;
+      if (profileUrls.length > 0 && listingId) {
+        const merged = [...existingSameAs];
+        for (const url of profileUrls) if (!merged.includes(url)) merged.push(url);
+        if (merged.length !== existingSameAs.length) {
+          await prisma.$executeRaw`
+            UPDATE directory_listings_list
+            SET same_as = ${merged}::text[], updated_at = now()
+            WHERE id = ${listingId}`;
+          sameAsMerged = merged.join(', ');
+        }
+      }
+
+      const verified: Array<[string, string]> = (
+        [
+          [input.verifiedName, 'business_name'],
+          [addressValue, 'address'],
+          [verifiedCity, 'city'],
+          [verifiedState, 'state'],
+          [verifiedZip, 'zip_code'],
+          [input.verifiedPhone, 'phone'],
+          [input.verifiedWebsite, 'website'],
+          [input.verifiedEmail, 'email'],
+          [input.verifiedCategory, 'primary_category'],
+          [sameAsMerged, 'same_as'],
+        ] as Array<[string | undefined, string]>
+      )
+        .filter(([v]) => v?.trim())
+        .map(([v, k]) => [v!.trim(), k]);
+
+      await this.applyVerificationBackfill(seedId, verified, { sourceName, note, userId });
+
+      // Owner contact — the claim-invite binding (inviteSeed reads owner_email
+      // / owner_phone) and the announce channel picker. Verified-on-call wins
+      // over whatever the seed was ingested with; a first landed channel
+      // upgrades contact_status exactly like hydrateOwnerPhoneFromGroundTruth.
+      const ownerName = input.verifiedOwnerName?.trim() || null;
+      const ownerPhone = input.verifiedOwnerPhone?.trim() || null;
+      const ownerEmail = input.verifiedOwnerEmail?.trim() || null;
+      const sets: string[] = ['updated_at = now()'];
+      const params: any[] = [];
+      if (ownerName) {
+        sets.push(`owner_name = $${params.length + 1}`);
+        params.push(ownerName);
+      }
+      if (ownerPhone) {
+        sets.push(`owner_phone = $${params.length + 1}`);
+        params.push(ownerPhone);
+      }
+      if (ownerEmail) {
+        sets.push(`owner_email = $${params.length + 1}`);
+        params.push(ownerEmail);
+      }
+      if ((ownerPhone || ownerEmail) && seedRows[0].contact_status === 'contact_unverified') {
+        sets.push(`contact_status = 'contactable', contact_status_derived_at = now()`);
+      }
+      // A connected verification IS the verified_by_call / verified_by_email
+      // outreach milestone (walk-in / sms / other channels have no verified_*
+      // status, so they leave outreach_status alone).
+      if (channel === 'call' || channel === 'email') {
+        sets.push(`outreach_status = '${channel === 'call' ? 'verified_by_call' : 'verified_by_email'}'`);
+      }
+      if (sets.length > 1) {
+        params.push(seedId);
+        await prisma.$executeRawUnsafe(
+          `UPDATE directory_presence_seeds SET ${sets.join(', ')} WHERE id = $${params.length}`,
+          ...params,
+        );
+      }
+    }
+
+    // The verification contact itself is a touch — logged on every outcome so
+    // 'unreachable' still lands in the cadence ledger. The structured outcome
+    // rides metadata.verification_results, the same carrier the manual-anchor
+    // contact path uses for corrected facts.
+    await this.addOutreachTouch(
+      seedId,
+      {
+        channel,
+        outcome:
+          input.outcome === 'unreachable'
+            ? 'no_answer'
+            : input.outcome === 'wrong_business'
+              ? 'bad_number'
+              : 'connected',
+        notes: note,
+        metadata: {
+          verification_results: [
+            {
+              kind: 'record_verification',
+              outcome: input.outcome,
+              owner_receptivity: input.ownerReceptivity ?? null,
+            },
+          ],
+        },
+      },
+      ctx,
+    );
+
+    audit({
+      actor: ctx?.actorId,
+      actorType: ctx?.actorType,
+      action: 'directory_presence_seed.resolve_verification',
+      payload: { seedId, tenantId, outcome: input.outcome, channel },
+    });
+    logger.info('DirectoryPresenceSeedService.resolveVerification', undefined, {
+      seedId,
+      outcome: input.outcome,
+      channel,
     });
   }
 

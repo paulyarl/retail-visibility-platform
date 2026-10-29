@@ -96,6 +96,22 @@ const PROVENANCE_FIELD_KEYS = [
 const DISCLOSURE_SENTENCE =
   ' Listed on VisibleShelf from public information (address, phone). Claim this listing to verify and update details.';
 
+/**
+ * Infer a platform label from a same_as URL for the Verify record modal's
+ * social-profile rows (facebook.com → 'facebook', maps.google.com → 'google').
+ * The seed doesn't carry platform metadata — the label is a prefill the
+ * operator can correct.
+ */
+function platformFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const parts = host.split('.');
+    return parts.length > 1 ? parts[parts.length - 2] : host;
+  } catch {
+    return '';
+  }
+}
+
 // Display order for attribute picker groups (migration 268). Definitions with
 // a group_key outside this list fall into 'other'.
 const ATTRIBUTE_GROUPS: Array<{ key: string; label: string }> = [
@@ -463,6 +479,8 @@ function PresenceSeedDetailClient() {
 
   // Producing queue entry pending verification — shared resolve modal.
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  // Seed-scoped record verification — the same modal in mode 'seed'.
+  const [showSeedVerifyModal, setShowSeedVerifyModal] = useState(false);
 
   // Platform category vocabulary — resolves canonical shelf slugs for the
   // public category-page links rendered in the Listing summary.
@@ -1128,6 +1146,38 @@ function PresenceSeedDetailClient() {
 
   const seed = detail?.seed as any;
   const listing = detail?.listing as any;
+
+  // The shared Verify record modal prefills from a queue-style
+  // business_snapshot — a seed has none, so the current listing + owner
+  // fields are shaped into the verified_nap / social_profiles / hours keys
+  // the modal reads. same_as URLs prefill the social-profile rows with an
+  // inferred platform label.
+  const seedVerifyEntry = {
+    id: seedId,
+    business_name: listing?.business_name ?? '',
+    category: seed?.category ?? listing?.primary_category ?? null,
+    city: listing?.city ?? seed?.city ?? null,
+    state: listing?.state ?? seed?.state ?? null,
+    business_snapshot: {
+      verified_nap: {
+        name: listing?.business_name ?? '',
+        phone: listing?.phone ?? '',
+        address: listing?.address ?? '',
+        city: listing?.city ?? '',
+        state: listing?.state ?? '',
+        zip: listing?.zip_code ?? '',
+        website: listing?.website ?? '',
+        email: listing?.email ?? '',
+        owner_name: seed?.owner_name ?? '',
+        owner_phone: seed?.owner_phone ?? '',
+        owner_email: seed?.owner_email ?? '',
+      },
+      hours: listing?.business_hours ?? null,
+      social_profiles: (Array.isArray(listing?.same_as) ? listing.same_as : []).map(
+        (url: string) => ({ platform: platformFromUrl(url), url }),
+      ),
+    },
+  };
   const provenance = detail?.provenance ?? [];
   const claimTokens = detail?.claimTokens ?? [];
   const status = seed?.status ?? '—';
@@ -1924,6 +1974,15 @@ function PresenceSeedDetailClient() {
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
             <Pencil className="w-4 h-4" /> Edit Fields
+          </button>
+        )}
+        {canEdit && !editing && (
+          <button
+            onClick={() => setShowSeedVerifyModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50"
+            title="Verify this record on a call or visit — writes provenance, socials, hours, and owner contact to the seed"
+          >
+            <Phone className="w-4 h-4" /> Verify record
           </button>
         )}
         {canDelete && !editing && (
@@ -4794,6 +4853,22 @@ function PresenceSeedDetailClient() {
           onClose={() => setShowVerifyModal(false)}
           onResolved={async () => {
             setShowVerifyModal(false);
+            await fetchDetail();
+          }}
+        />
+      )}
+
+      {/* Seed-mode Verify record — the same shared modal, resolved against
+          the seed itself: verified NAP + socials + hours write the seed's
+          provenance ledger and listing, owner contact feeds the claim-invite
+          binding, and the call logs an outreach touch. */}
+      {showSeedVerifyModal && (
+        <ResolveVerificationModal
+          entry={seedVerifyEntry}
+          mode="seed"
+          onClose={() => setShowSeedVerifyModal(false)}
+          onResolved={async () => {
+            setShowSeedVerifyModal(false);
             await fetchDetail();
           }}
         />

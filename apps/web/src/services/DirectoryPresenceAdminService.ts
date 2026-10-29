@@ -1573,6 +1573,56 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     return result.data ?? null;
   }
 
+  /**
+   * POST /api/admin/directory-presence/presence-seeds/:id/resolve-verification
+   * — the seed-scoped record verification the shared ResolveVerificationModal
+   * submits in mode 'seed'. Verified NAP lands on the seed's provenance ledger
+   * and listing; social/directory profile URLs merge into the listing's
+   * same_as; owner contact feeds the claim-invite binding; the call logs a
+   * touch.
+   */
+  async resolveSeedVerification(
+    seedId: string,
+    input: {
+      outcome:
+        | 'operational' | 'closed' | 'closed_temporarily'
+        | 'relocated' | 'unreachable' | 'wrong_business';
+      verifiedName?: string;
+      verifiedPhone?: string;
+      verifiedAddress?: string;
+      verifiedCity?: string;
+      verifiedState?: string;
+      verifiedZip?: string;
+      verifiedWebsite?: string;
+      verifiedEmail?: string;
+      verifiedCategory?: string;
+      verifiedHours?: Record<string, any>;
+      verifiedSocialProfiles?: Array<{ platform: string; url: string }>;
+      verifiedDirectoryProfiles?: Array<{ platform: string; url: string; [k: string]: any }>;
+      verifiedOwnerName?: string;
+      verifiedOwnerPhone?: string;
+      verifiedOwnerEmail?: string;
+      ownerReceptivity?: 'interested' | 'neutral' | 'defensive' | 'no_answer';
+      callNotes?: string;
+      reason?: string;
+      channel?: 'call' | 'email' | 'sms' | 'visit' | 'other';
+    },
+  ): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(seedId)}/resolve-verification`,
+      { method: 'POST', body: JSON.stringify(input) },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message || 'Verification resolve failed';
+      throw new Error(message);
+    }
+  }
+
   async inviteSeed(id: string, expiresInDays?: number): Promise<InviteResult> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/${encodeURIComponent(id)}/invite`,

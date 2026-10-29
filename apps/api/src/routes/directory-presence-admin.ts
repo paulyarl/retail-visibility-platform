@@ -21,6 +21,7 @@
  *   POST   /api/admin/directory/presence-seeds/:id/invite — mint claim token
  *   POST   /api/admin/directory/presence-seeds/:id/approve — publish + mint + email claim token
  *   PATCH  /api/admin/directory/presence-seeds/:id/fields — update sourced fields
+ *   POST   /api/admin/directory/presence-seeds/:id/resolve-verification — record the shared Verify record modal's outcome against the seed
  *   GET    /api/admin/directory/presence-seeds/:id/banner-qr-style — read the on-page banner QR design
  *   PUT    /api/admin/directory/presence-seeds/:id/banner-qr-style — save the on-page banner QR design
  *   POST   /api/admin/directory/presence-seeds/:id/logo — upload the seed tenant's logo
@@ -2040,6 +2041,70 @@ router.patch('/presence-seeds/:id/fields', requirePlatformAdmin, async (req: Req
     if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
     if (error?.message === 'description_too_long') return res.status(400).json({ error: 'description_too_long' });
     logger.error('[PATCH /api/admin/directory/presence-seeds/:id/fields] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * POST /api/admin/directory/presence-seeds/:id/resolve-verification
+ *
+ * Seed-scoped record verification — the cockpit's Verify record modal (the
+ * same shared modal the campaign Identity tab uses, mode 'seed'). Verified
+ * facts land on the seed's NAP ledger + provenance via
+ * DirectoryPresenceSeedService.resolveVerification (the campaign path
+ * back-fills a linked seed through the same helper); social/directory
+ * profile URLs merge into the listing's same_as; owner contact fields feed
+ * the claim-invite binding; the call itself logs a touch.
+ */
+const resolveSeedVerificationSchema = z.object({
+  outcome: z.enum([
+    'operational', 'closed', 'closed_temporarily', 'relocated', 'unreachable', 'wrong_business',
+  ]),
+  verifiedName: z.string().max(500).optional(),
+  verifiedPhone: z.string().max(100).optional(),
+  verifiedAddress: z.string().max(500).optional(),
+  verifiedCity: z.string().max(255).optional(),
+  verifiedState: z.string().max(100).optional(),
+  verifiedZip: z.string().max(20).optional(),
+  verifiedWebsite: z.string().max(2000).optional(),
+  verifiedEmail: z.string().max(255).optional(),
+  verifiedCategory: z.string().max(255).optional(),
+  verifiedHours: z.record(z.string(), z.any()).optional(),
+  verifiedSocialProfiles: z
+    .array(z.object({ platform: z.string().max(60), url: z.string().max(2000) }))
+    .max(50)
+    .optional(),
+  verifiedDirectoryProfiles: z
+    .array(z.object({ platform: z.string().max(60), url: z.string().max(2000) }).passthrough())
+    .max(50)
+    .optional(),
+  verifiedOwnerName: z.string().max(255).optional(),
+  verifiedOwnerPhone: z.string().max(40).optional(),
+  verifiedOwnerEmail: z.string().max(255).optional(),
+  ownerReceptivity: z.enum(['interested', 'neutral', 'defensive', 'no_answer']).optional(),
+  callNotes: z.string().max(4000).optional(),
+  reason: z.string().max(2000).optional(),
+  channel: z.enum(['call', 'email', 'sms', 'visit', 'other']).optional(),
+});
+
+router.post('/presence-seeds/:id/resolve-verification', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const validation = resolveSeedVerificationSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', details: validation.error.issues });
+    }
+    await DirectoryPresenceSeedService.resolveVerification(req.params.id, validation.data, {
+      actorType: 'user',
+      actorId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    } as any);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === 'seed_not_found') return res.status(404).json({ error: 'seed_not_found' });
+    logger.error('[POST /api/admin/directory/presence-seeds/:id/resolve-verification] Error:', undefined, {
       error: { name: error?.name || 'Error', message: error?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });

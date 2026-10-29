@@ -99,6 +99,7 @@ On claim, `org_standing_mode` flips from `directory_seed` to `independent`. The 
 - `POST /api/admin/directory-presence/presence-seeds/:id/publish` — publish listing
 - `POST /api/admin/directory-presence/presence-seeds/:id/invite` — mint claim token (90-day default)
 - `PATCH /api/admin/directory-presence/presence-seeds/:id/fields` — update sourced fields + provenance
+- `POST /api/admin/directory-presence/presence-seeds/:id/resolve-verification` — record verification against the seed (the cockpit's Verify record modal, `ResolveVerificationModal` mode `'seed'`). Verified NAP → `applyVerificationBackfill` (shared with `resolveCampaignVerification`); social/directory URLs merge into `directory_listings_list.same_as`; owner contact → `dps.owner_*` + `contact_status` upgrade; connected call stamps `outreach_status` + logs a touch
 - `PATCH /api/admin/directory-presence/presence-seeds/:id/status` — directly change seed status (body: `{ status: 'draft' | 'published' | 'invited' | 'claimed' | 'suppressed' }`). Does NOT consume tokens or flip `org_standing_mode`; use `DirectoryClaimService.acceptClaim` for the real claim flow.
 - `POST /api/admin/directory-presence/presence-seeds/:id/tokens/:tokenId/revoke` — revoke a claim token (marks `consumed_at = now()`, `consumed_by = 'platform:revoked:<actorId>'`). If the seed was `invited` and no other active tokens remain, auto-flips the seed back to `published`.
 

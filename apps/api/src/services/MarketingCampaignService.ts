@@ -11,7 +11,6 @@
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError, ValidationError, ConflictError, HttpError } from '../middleware/errorHandler';
@@ -2945,182 +2944,20 @@ export class MarketingCampaignService extends BaseService {
             .map(([v, k]) => [v!.trim(), k]);
 
           if (verified.length > 0) {
-            const seedRows = await this.prisma.$queryRaw<
-              { tenant_id: string | null; listing_id: string | null }[]
-            >`SELECT tenant_id, listing_id FROM directory_presence_seeds WHERE id = ${seedId} LIMIT 1`;
-            const tenantId = seedRows[0]?.tenant_id ?? null;
-            const listingId = seedRows[0]?.listing_id ?? null;
-
-            const provRows = await this.prisma.$queryRaw<{ field_key: string; value: string }[]>`
-              SELECT field_key, value FROM directory_field_provenance
-              WHERE seed_id = ${seedId} AND field_key = ANY(${verified.map(([, k]) => k)})`;
-            const current = new Map(provRows.map((r) => [r.field_key, String(r.value ?? '').trim()]));
-            const confirmed = verified.filter(([v, k]) => current.get(k) === v);
-            const corrected = verified.filter(([v, k]) => current.get(k) !== v);
-
-            const userId = ctx?.userId ?? 'system';
-            const sourceName = 'campaign_verification';
-            const note = `Campaign verification — outcome: ${input.outcome}${
-              input.reason ? `; reason: ${input.reason}` : ''
-            }`;
-
-            if (confirmed.length > 0) {
-              await this.prisma.$executeRaw`
-                INSERT INTO directory_seed_nap_verifications (
-                  id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
-                ) VALUES (
-                  ${randomUUID()}, ${seedId}, ${tenantId}, ${sourceName},
-                  ${JSON.stringify(Object.fromEntries(confirmed.map(([v, k]) => [k, { confirmed: v }])))}::jsonb,
-                  FALSE, now()
-                )`;
-            }
-            if (corrected.length > 0) {
-              await this.prisma.$executeRaw`
-                INSERT INTO directory_seed_nap_verifications (
-                  id, seed_id, tenant_id, source, changed_fields, owner_corrected, created_at
-                ) VALUES (
-                  ${randomUUID()}, ${seedId}, ${tenantId}, ${sourceName},
-                  ${JSON.stringify(
-                    Object.fromEntries(
-                      corrected.map(([v, k]) => [k, { previous: current.get(k) ?? null, corrected: v }]),
-                    ),
-                  )}::jsonb,
-                  TRUE, now()
-                )`;
-              await this.prisma.$executeRaw`
-                UPDATE directory_presence_seeds
-                SET nap_owner_corrected = TRUE, updated_at = now()
-                WHERE id = ${seedId}`;
-            }
-            await this.prisma.$executeRaw`
-              UPDATE directory_presence_seeds
-              SET nap_verified_at = COALESCE(nap_verified_at, now()), updated_at = now()
-              WHERE id = ${seedId}`;
-
-            // Provenance + listing write-back requires a tenant_id (the
-            // provenance ID generator is tenant-scoped, and the anchor path
-            // skips the same write when the seed has no tenant).
-            if (tenantId) {
-              const { generateDirectoryFieldProvenanceId } = await import('../lib/id-generator');
-              for (const [v, k] of verified) {
-                const evidenceState = current.get(k) === v ? 'owner_confirmed' : 'owner_corrected';
-                await this.prisma.$executeRaw`
-                  INSERT INTO directory_field_provenance (
-                    id, seed_id, tenant_id, field_key, value,
-                    source_name, accessed_at, confidence, show_on_public,
-                    override_by, override_at, evidence_state, notes,
-                    created_at, updated_at
-                  ) VALUES (
-                    ${generateDirectoryFieldProvenanceId(tenantId)},
-                    ${seedId}, ${tenantId}, ${k}, ${v},
-                    ${sourceName}, CURRENT_DATE, 'high', TRUE,
-                    ${userId}, now(), ${evidenceState}, ${note},
-                    now(), now()
-                  )
-                  ON CONFLICT (seed_id, field_key) DO UPDATE SET
-                    value = EXCLUDED.value,
-                    source_name = EXCLUDED.source_name,
-                    accessed_at = EXCLUDED.accessed_at,
-                    confidence = EXCLUDED.confidence,
-                    show_on_public = EXCLUDED.show_on_public,
-                    override_by = EXCLUDED.override_by,
-                    override_at = EXCLUDED.override_at,
-                    evidence_state = EXCLUDED.evidence_state,
-                    notes = EXCLUDED.notes,
-                    updated_at = now()`;
-
-                // Keep the public listing in step for corrected core fields —
-                // same write-back the anchor path performs (§11.6).
-                if (evidenceState === 'owner_corrected' && listingId) {
-                  const col =
-                    k === 'business_name' ? 'business_name'
-                    : k === 'address' ? 'address'
-                    : k === 'city' ? 'city'
-                    : k === 'state' ? 'state'
-                    : k === 'zip_code' ? 'zip_code'
-                    : k === 'phone' ? 'phone'
-                    : k === 'website' ? 'website'
-                    : k === 'email' ? 'email'
-                    : k === 'primary_category' ? 'primary_category'
-                    : null;
-                  if (col) {
-                    await this.prisma.$executeRawUnsafe(
-                      `UPDATE directory_listings_list SET ${col} = $1, updated_at = now() WHERE id = $2`,
-                      v,
-                      listingId,
-                    );
-                  }
-                }
-              }
-            }
-
-            // Seed-row mirrors for corrected identity — the listing UPDATE
-            // above moves the public card; these keep the seed's browse index
-            // (dps.city/state drive /place shelves + seed list filters) and
-            // name_variants ledger in step, matching the mirrors updateFields
-            // and syncFromCampaign perform. city/state only mirror when the
-            // listing was writable (tenantId && listingId) or when no listing
-            // exists at all (dps IS the resolved record then) — otherwise the
-            // browse index would diverge from the listing the report reads.
-            const correctedName = corrected.find(([, k]) => k === 'business_name')?.[0];
-            const correctedCity = corrected.find(([, k]) => k === 'city')?.[0];
-            const correctedState = corrected.find(([, k]) => k === 'state')?.[0];
-            if ((correctedCity || correctedState) && (!listingId || tenantId)) {
-              await this.prisma.$executeRaw`
-                UPDATE directory_presence_seeds
-                SET city = COALESCE(${correctedCity ?? null}, city),
-                    state = COALESCE(${correctedState ?? null}, state),
-                    updated_at = now()
-                WHERE id = ${seedId}`;
-            }
-            if (correctedName) {
-              await this.prisma.$executeRaw`
-                UPDATE directory_presence_seeds
-                SET name_variants = array_prepend(
-                      ${correctedName},
-                      array_remove(COALESCE(name_variants, '{}'::text[]), ${correctedName})
-                    ),
-                    updated_at = now()
-                WHERE id = ${seedId}`;
-              if (tenantId) {
-                await this.prisma.$executeRaw`
-                  UPDATE tenants SET name = ${correctedName}, updated_at = now() WHERE id = ${tenantId}`;
-                await this.prisma.$executeRaw`
-                  UPDATE tenant_business_profiles_list
-                  SET business_name = ${correctedName}, updated_at = now()
-                  WHERE tenant_id = ${tenantId}`;
-              }
-            }
-
-            // §5.1: an owner confirmation/correction is a report-version
-            // trigger. Best-effort — the seed ledger write must not fail on it.
-            try {
-              const { SeedIntelligenceReportService } = await import('./intelligence/SeedIntelligenceReportService');
-              await SeedIntelligenceReportService.getInstance().refreshReport(seedId);
-            } catch (refreshErr) {
-              logger.warn('resolveCampaignVerification: post-backfill report refresh failed', ctx, {
-                seedId,
-                error: (refreshErr as Error).message,
-              });
-            }
-
-            // Wedge fidelity (project-phase spec §4/§6): the verification just
-            // stamped nap_verified_at / nap_owner_corrected, and those are
-            // verdict inputs — evaluateSeedFidelity treats the listing NAP as
-            // authoritative once the owner attested it. The stored verdict is
-            // therefore stale, and a seed verified AFTER its publish-time
-            // verdict would stay 'misaligned' forever, degrading every claim
-            // surface (QR kits, claim links, report CTAs) to the inquiry path.
-            // Non-fatal — same precedent as publish/updateFields.
-            try {
-              const { computeAndStoreSeedFidelity } = await import('./seed-fidelity');
-              await computeAndStoreSeedFidelity(seedId);
-            } catch (fidelityErr) {
-              logger.warn('resolveCampaignVerification: fidelity recompute failed (non-fatal)', ctx, {
-                seedId,
-                error: (fidelityErr as Error).message,
-              });
-            }
+            // Shared with the seed cockpit's own Verify record flow — the
+            // back-fill implementation lives on DirectoryPresenceSeedService.
+            // Dynamic import: the seed service's graph reaches back toward
+            // campaign reads, so a static import risks a cycle.
+            const { default: directoryPresenceSeedService } = await import(
+              './DirectoryPresenceSeedService.js'
+            );
+            await directoryPresenceSeedService.applyVerificationBackfill(seedId, verified, {
+              sourceName: 'campaign_verification',
+              note: `Campaign verification — outcome: ${input.outcome}${
+                input.reason ? `; reason: ${input.reason}` : ''
+              }`,
+              userId: ctx?.userId ?? 'system',
+            });
           }
         }
       } catch (error) {

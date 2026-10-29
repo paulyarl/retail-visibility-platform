@@ -22,6 +22,7 @@ import marketingOpsService, {
   VerificationResolutionInput, VerificationOutcome, OwnerReceptivity, VerificationNextAction,
   VerifiedSocialProfile, VerifiedDirectoryProfile, verificationClearsCampaign,
 } from '@/services/MarketingOpsService';
+import directoryPresenceAdminService from '@/services/DirectoryPresenceAdminService';
 import BusinessHoursEditor from '@/components/business-hours/BusinessHoursEditor';
 import {
   EMPTY_HOURS,
@@ -59,8 +60,13 @@ interface ResolveVerificationModalProps {
    * counterpart): the verified NAP lands on the campaign, the capture is
    * recorded as attributed owner evidence, and the queue-only "next action"
    * is hidden — the campaign already exists, so the call outcome is provenance.
+   * 'seed' writes the directory presence seed directly (the seed cockpit's
+   * Verify record): verified NAP lands on the seed's provenance ledger +
+   * listing, social/directory profile URLs merge into same_as, owner contact
+   * feeds the claim-invite binding, and the call logs an outreach touch —
+   * the seed already exists, so outcome is provenance here too.
    */
-  mode?: 'queue' | 'campaign';
+  mode?: 'queue' | 'campaign' | 'seed';
   /**
    * Campaign mode only — field keys currently in conflict on the packet. When
    * the operator CHANGES one of these, a reason becomes required (the edit is
@@ -106,6 +112,10 @@ export default function ResolveVerificationModal({
   initialOutcome = 'operational',
 }: ResolveVerificationModalProps) {
   const isCampaign = mode === 'campaign';
+  // A record-mode modal (campaign or seed): the record already exists, so the
+  // queue-only "next action" gate is hidden and the title/button read 'record'.
+  const isSeed = mode === 'seed';
+  const isRecord = isCampaign || isSeed;
   const snap = entry.business_snapshot ?? {};
   const nap = snap.verified_nap ?? snap.nap ?? {};
 
@@ -268,6 +278,17 @@ export default function ResolveVerificationModal({
           verifiedOwnerEmail: form.verifiedOwnerEmail || undefined,
           reason: reason.trim() || undefined,
         });
+      } else if (isSeed) {
+        // Seed target — the seed cockpit's Verify record. Same provenance
+        // semantics as the campaign path, plus owner contact lands on the
+        // seed's invite-binding fields and social URLs merge into same_as.
+        await directoryPresenceAdminService.resolveSeedVerification(entry.id, {
+          ...baseInput,
+          verifiedOwnerPhone: form.verifiedOwnerPhone || undefined,
+          verifiedOwnerEmail: form.verifiedOwnerEmail || undefined,
+          reason: reason.trim() || undefined,
+          channel: 'call',
+        });
       } else {
         const input: VerificationResolutionInput = { ...baseInput, nextAction: form.nextAction };
         await marketingOpsService.resolveVerification(entry.id, input);
@@ -294,13 +315,15 @@ export default function ResolveVerificationModal({
           <Phone className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              {isCampaign ? 'Verify record' : 'Resolve verification'}
+              {isRecord ? 'Verify record' : 'Resolve verification'}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {entry.business_name ?? entry.title}
               {isCampaign
                 ? ' · writes the campaign record (canonical NAP + attributed owner evidence)'
-                : ` · ${entry.city ?? '—'}`}
+                : isSeed
+                  ? ' · writes the seed listing + provenance (verified on the call)'
+                  : ` · ${entry.city ?? '—'}`}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -424,7 +447,7 @@ export default function ResolveVerificationModal({
             {napApplicable ? (
               <>
                 <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                  Flows into the campaign record
+                  {isSeed ? 'Flows into the seed listing + provenance' : 'Flows into the campaign record'}
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -579,7 +602,7 @@ export default function ResolveVerificationModal({
                   <p className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400">
                     <Check className="w-3 h-3 flex-shrink-0" />
                     <span className="flex-1">
-                      Captured — will be written to the campaign record.
+                      Captured — will be written to the {isSeed ? 'seed listing' : 'campaign record'}.
                       <button
                         type="button"
                         onClick={() => setHours(null)}
@@ -624,9 +647,9 @@ export default function ResolveVerificationModal({
         </Tabs>
 
         {/* Next action — workflow-critical, kept outside the tab panels. Queue
-            target only: in campaign mode the campaign already exists, so there
-            is nothing to graduate. */}
-        {!isCampaign && (
+            target only: in record modes (campaign / seed) the record already
+            exists, so there is nothing to graduate. */}
+        {!isRecord && (
           <>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">Next action</label>
             <select
@@ -648,7 +671,7 @@ export default function ResolveVerificationModal({
             )}
           </>
         )}
-        {isCampaign && (
+        {isRecord && (
           <>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">
               Reason {reasonRequired && <span className="text-red-500">*</span>}
@@ -677,7 +700,7 @@ export default function ResolveVerificationModal({
             disabled={resolving || (reasonRequired && !reason.trim())}
             className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
           >
-            {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isCampaign ? 'Save record' : 'Resolve'}
+            {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isRecord ? 'Save record' : 'Resolve'}
           </button>
         </div>
       </div>
