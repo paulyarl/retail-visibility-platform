@@ -1902,12 +1902,14 @@ function PresenceSeedDetailClient() {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-3">
+      {/* Actions — wrap on small screens; controls go full-width on phones
+          (this cockpit runs the walk-in workflow) and labels never wrap inside
+          a button. */}
+      <div className="flex flex-wrap gap-2 sm:gap-3">
         {canPublish && (
           <button
             onClick={handlePublish}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
           >
             <CheckCircle className="w-4 h-4" /> Publish Listing
           </button>
@@ -1915,7 +1917,7 @@ function PresenceSeedDetailClient() {
         {canInvite && (
           <button
             onClick={handleInvite}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
           >
             <Send className="w-4 h-4" /> Generate Claim Invite
           </button>
@@ -1924,13 +1926,13 @@ function PresenceSeedDetailClient() {
           <Link
             href={status === 'claimed' ? `/directory/${listing.slug}` : `/place/${listing.slug}`}
             target="_blank"
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
             <ExternalLink className="w-4 h-4" /> View Public Listing
           </Link>
         ) : listing?.slug ? (
           <span
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 border border-gray-200 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
             title="Publish the listing before viewing the public page"
           >
             <ExternalLink className="w-4 h-4" /> View Public Listing
@@ -1939,18 +1941,18 @@ function PresenceSeedDetailClient() {
         {listing?.slug && (
           <Link
             href={`/settings/admin/directory/presence-seeds/${seedId}/retail-preview`}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
             <Sparkles className="w-4 h-4" /> Customize Retail Preview
           </Link>
         )}
-        {/* Status changer */}
-        <div className="inline-flex items-center gap-2">
+        {/* Status changer — select + button travel as one pair */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <select
             value={statusDraft || status}
             onChange={(e) => setStatusDraft(e.target.value)}
             disabled={savingStatus}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+            className="flex-1 sm:flex-none min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
             title="Change seed status"
           >
             <option value="draft">draft</option>
@@ -1962,7 +1964,7 @@ function PresenceSeedDetailClient() {
           <button
             onClick={handleStatusChange}
             disabled={savingStatus || !statusDraft || statusDraft === status}
-            className="inline-flex items-center gap-1 px-3 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+            className="inline-flex items-center gap-1 whitespace-nowrap px-3 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
             title="Apply status change"
           >
             {savingStatus ? 'Saving...' : 'Set Status'}
@@ -1971,7 +1973,7 @@ function PresenceSeedDetailClient() {
         {canEdit && !editing && (
           <button
             onClick={startEditing}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
           >
             <Pencil className="w-4 h-4" /> Edit Fields
           </button>
@@ -1979,7 +1981,7 @@ function PresenceSeedDetailClient() {
         {canEdit && !editing && (
           <button
             onClick={() => setShowSeedVerifyModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 border border-amber-300 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50"
             title="Verify this record on a call or visit — writes provenance, socials, hours, and owner contact to the seed"
           >
             <Phone className="w-4 h-4" /> Verify record
@@ -1989,7 +1991,7 @@ function PresenceSeedDetailClient() {
           <button
             onClick={() => setConfirmingDelete(true)}
             disabled={deleting}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50"
             title="Permanently delete this seed and its tenant"
           >
             <Trash2 className="w-4 h-4" /> Delete Seed
