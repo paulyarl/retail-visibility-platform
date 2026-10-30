@@ -27,6 +27,8 @@ import { OwnerVoiceService } from './deliverable/OwnerVoiceService';
 import { MarketingCategoryToneService } from './MarketingCategoryToneService';
 import { buildGbpReviewReplyPrompt, buildGbpReviewReplyPreviewPrompt } from './gbp/prompts';
 import { replyToReview } from './GBPAdvancedSync';
+import { resolveGbpLocation } from '../lib/google/gbp-target';
+import { emitGbpActivity } from '../lib/google/gbp-activity';
 import { unifiedConfig } from '../config/unifiedConfig';
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -46,7 +48,7 @@ export interface GenerateDraftsResult {
 export interface AutopilotResult {
   /** False when a gate blocked the pass (see `reason`). */
   activated: boolean;
-  reason?: 'not_activated' | 'not_entitled' | 'merchant_opt_out';
+  reason?: 'not_activated' | 'not_entitled' | 'merchant_opt_out' | 'daily_cap';
   scanned: number;
   published: number;
   skipped: number;
@@ -349,14 +351,49 @@ export class GBPReviewReplyService extends BaseService {
       where: { tenant_id: tenantId },
       select: { gbp_autopilot_enabled: true, gbp_autopilot_min_rating: true },
     });
-    if (prefs?.gbp_autopilot_enabled !== true) {
-      logger.info('[GBPReviewReply] runAutopilot skipped — merchant has not opted in', ctx, { tenantId });
+
+    // Consent precedence (DFY spec §4.3, Q8):
+    //   managed_by='platform' + delegated_surfaces.reviews → default-on; only
+    //     an explicit merchant veto (gbp_autopilot_enabled === false) blocks.
+    //   DIY (managed_by='self') → requires merchant opt-in (=== true).
+    const location = await resolveGbpLocation({ tenantId });
+    const delegated =
+      location?.managed_by === 'platform' &&
+      (location.delegated_surfaces as any)?.reviews !== false;
+
+    const vetoed = prefs?.gbp_autopilot_enabled === false;
+    const optedIn = prefs?.gbp_autopilot_enabled === true;
+    if (delegated ? vetoed : !optedIn) {
+      logger.info('[GBPReviewReply] runAutopilot skipped — merchant consent gate', ctx, {
+        tenantId,
+        delegated,
+        optedIn,
+        vetoed,
+      });
       return blocked('merchant_opt_out');
     }
 
     const minRating = prefs?.gbp_autopilot_min_rating ?? 5;
     const limit = unifiedConfig.gbpAutopilotBatchLimit;
 
+    // Daily cap — autopilot_status='PUBLISHED' rows stamped today count
+    // against the same batch limit so bursts can't exceed it across passes.
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayPublished = await this.prisma.gbp_reviews.count({
+      where: {
+        tenant_id: tenantId,
+        autopilot_status: 'PUBLISHED',
+        reply_update_time: { gte: todayStart },
+      },
+    });
+    const remaining = limit - todayPublished;
+    if (remaining <= 0) {
+      logger.info('[GBPReviewReply] runAutopilot skipped — daily cap reached', ctx, { tenantId, todayPublished });
+      return blocked('daily_cap');
+    }
+
+    const now = new Date();
     const pending = await this.prisma.gbp_reviews.findMany({
       where: {
         tenant_id: tenantId,
@@ -364,9 +401,12 @@ export class GBPReviewReplyService extends BaseService {
         review_reply: null,
         google_review_id: { not: null },
         star_rating: { gte: minRating },
+        // Due-filter: rows stamped QUEUED publish only once due; pre-stamp
+        // rows (null) are treated as due for backward compatibility.
+        OR: [{ autopilot_due_at: { lte: now } }, { autopilot_due_at: null }],
       },
       orderBy: { google_create_time: 'asc' },
-      take: limit,
+      take: remaining,
     });
 
     let published = 0;
@@ -401,8 +441,16 @@ export class GBPReviewReplyService extends BaseService {
             reply_status: 'PUBLISHED',
             is_replied: true,
             reply_update_time: new Date(),
+            autopilot_status: 'PUBLISHED',
             updated_at: new Date(),
           },
+        });
+        await emitGbpActivity({
+          tenantId,
+          gbpLocationId: review.location_id ?? null,
+          action: 'review_auto_replied',
+          actor: 'autopilot',
+          detail: { reviewId: review.id, starRating: review.star_rating },
         });
         published++;
       } catch (error) {

@@ -19,6 +19,8 @@ import { logger } from '../logger';
 import { CrmAlertService } from '../services/CrmAlertService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { listReviews } from '../services/GBPAdvancedSync';
+import { resolveGbpLocation } from '../lib/google/gbp-target';
+import { computeAutopilotDue } from '../lib/google/gbp-autopilot-schedule';
 import { scheduleJob, stopJob } from './registry';
 
 const JOB_NAME = 'gbp-review-ingestion';
@@ -80,6 +82,36 @@ async function ingestReviewsForTenant(tenantId: string): Promise<number> {
   // Resolve linked customers once per tenant for mkt_direct alert targeting
   const linkedCustomerIds = await getLinkedCustomerIds(tenantId);
 
+  // D3: autopilot due-stamp inputs — resolved once per tenant.
+  //   delegated (platform-managed + reviews surface on) → eligible unless the
+  //   merchant vetoed (gbp_autopilot_enabled === false); DIY → opt-in only.
+  let autoLocation: Awaited<ReturnType<typeof resolveGbpLocation>> = null;
+  let autoPrefs: { gbp_autopilot_enabled: boolean | null } | null = null;
+  let autoHours: { periods: unknown } | null = null;
+  try {
+    [autoLocation, autoPrefs, autoHours] = await Promise.all([
+      resolveGbpLocation({ tenantId }),
+      (prisma as any).tenant_gbp_options_settings.findUnique({
+        where: { tenant_id: tenantId },
+        select: { gbp_autopilot_enabled: true },
+      }),
+      prisma.business_hours_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: { periods: true },
+      }),
+    ]);
+  } catch {
+    // Eligibility inputs unavailable → no stamping this pass; ingestion
+    // itself must not fail over an advisory feature.
+  }
+  const autopilotDelegated =
+    autoLocation?.managed_by === 'platform' &&
+    (autoLocation.delegated_surfaces as any)?.reviews !== false;
+  const autopilotEligible = autopilotDelegated
+    ? autoPrefs?.gbp_autopilot_enabled !== false
+    : autoPrefs?.gbp_autopilot_enabled === true;
+  const autopilotPeriods = (autoHours?.periods as any[]) ?? null;
+
   // Collect all reviews across pages (single-location v1 — typically 1 page)
   do {
     const result = await listReviews(tenantId, PAGE_SIZE, pageToken);
@@ -119,12 +151,22 @@ async function ingestReviewsForTenant(tenantId: string): Promise<number> {
         if (row) {
           const isReplied = !!review.reviewReply;
           const replyStatusNeedsUpdate = isReplied && row.reply_status === 'NONE';
-          if (sentiment || replyStatusNeedsUpdate) {
+          // D3: stamp newly detected, unanswered, eligible reviews into the
+          // autopilot queue (due = now + jitter, clamped to business hours).
+          const autopilotStamp =
+            isNew && autopilotEligible && !isReplied
+              ? {
+                  autopilot_due_at: computeAutopilotDue(new Date(), autopilotPeriods),
+                  autopilot_status: 'QUEUED',
+                }
+              : {};
+          if (sentiment || replyStatusNeedsUpdate || autopilotStamp.autopilot_due_at) {
             await prisma.gbp_reviews.update({
               where: { google_review_id: review.name },
               data: {
                 ...(sentiment ? { sentiment } : {}),
                 ...(replyStatusNeedsUpdate ? { reply_status: 'PUBLISHED' } : {}),
+                ...autopilotStamp,
               },
             });
           }

@@ -37,6 +37,8 @@ router.get('/overview', async (req: any, res: Response) => {
       failedPosts,
       recentReviews,
       merchantGateStats,
+      managedBySplit,
+      unrepliedQueueDepth,
     ] = await Promise.all([
       prisma.google_oauth_tokens_list.count({ where: { provider: 'gbp' } }),
       prisma.gbp_locations_list.count({ where: { verification_state: 'COMPLETED' } }),
@@ -57,6 +59,15 @@ router.get('/overview', async (req: any, res: Response) => {
       prisma.tenant_gbp_options_settings.groupBy({
         by: ['gbp_reviews_display', 'gbp_content_display'],
         _count: true,
+      }),
+      // D3: platform-managed vs self-serve split across all linked locations
+      prisma.gbp_locations_list.groupBy({
+        by: ['managed_by'],
+        _count: true,
+      }),
+      // D3: ops review queue — total unreplied reviews awaiting the platform
+      prisma.gbp_reviews.count({
+        where: { reply_status: 'NONE', review_reply: null },
       }),
     ]);
 
@@ -86,6 +97,13 @@ router.get('/overview', async (req: any, res: Response) => {
           contentDisplay: g.gbp_content_display,
           count: g._count,
         })),
+        managedBy: managedBySplit.map((g) => ({
+          managedBy: g.managed_by,
+          count: g._count,
+        })),
+        reviewQueue: {
+          unreplied: unrepliedQueueDepth,
+        },
       },
     });
   } catch (error: any) {
@@ -122,7 +140,7 @@ router.get('/tenants', async (req: any, res: Response) => {
     const tenantIds = links.map((l) => l.tenant_id);
 
     // Fetch tenants, locations, counts, and settings in parallel
-    const [tenants, locations, reviewCounts, postCounts, mediaCounts, merchantSettings] =
+    const [tenants, locations, reviewCounts, postCounts, mediaCounts, merchantSettings, unrepliedCounts] =
       await Promise.all([
         prisma.tenants.findMany({
           where: { id: { in: tenantIds } },
@@ -136,6 +154,10 @@ router.get('/tenants', async (req: any, res: Response) => {
             cached_average_rating: true,
             cached_review_count: true,
             business_name: true,
+            managed_by: true,
+            granted_via: true,
+            delegated_surfaces: true,
+            platform_account_id: true,
           },
         }),
         prisma.gbp_reviews.groupBy({
@@ -151,6 +173,16 @@ router.get('/tenants', async (req: any, res: Response) => {
         prisma.gbp_media.groupBy({
           by: ['tenant_id'],
           where: { tenant_id: { in: tenantIds } },
+          _count: true,
+        }),
+        // D3: ops review queue depth — unreplied reviews per tenant
+        prisma.gbp_reviews.groupBy({
+          by: ['tenant_id'],
+          where: {
+            tenant_id: { in: tenantIds },
+            reply_status: 'NONE',
+            review_reply: null,
+          },
           _count: true,
         }),
         prisma.tenant_gbp_options_settings.findMany({
@@ -170,6 +202,7 @@ router.get('/tenants', async (req: any, res: Response) => {
     const postMap = new Map(postCounts.map((p) => [p.tenant_id, p._count]));
     const mediaMap = new Map(mediaCounts.map((m) => [m.tenant_id, m._count]));
     const settingsMap = new Map(merchantSettings.map((s) => [s.tenant_id, s]));
+    const unrepliedMap = new Map(unrepliedCounts.map((r) => [r.tenant_id, r._count]));
 
     // Assemble tenant rows
     let tenantRows = links.map((link) => {
@@ -188,8 +221,15 @@ router.get('/tenants', async (req: any, res: Response) => {
         cachedRating: loc?.cached_average_rating || null,
         cachedReviewCount: loc?.cached_review_count || 0,
         reviewCount: reviewMap.get(link.tenant_id) || 0,
+        unrepliedReviews: unrepliedMap.get(link.tenant_id) || 0,
         postCount: postMap.get(link.tenant_id) || 0,
         mediaCount: mediaMap.get(link.tenant_id) || 0,
+        managed: {
+          by: loc?.managed_by || 'self',
+          grantedVia: loc?.granted_via || null,
+          delegatedSurfaces: loc?.delegated_surfaces || null,
+          platformAccountId: loc?.platform_account_id || null,
+        },
         merchantGate: {
           reviewsDisplay: settings?.gbp_reviews_display ?? true,
           contentDisplay: settings?.gbp_content_display ?? true,
@@ -217,6 +257,93 @@ router.get('/tenants', async (req: any, res: Response) => {
   } catch (error: any) {
     logger.error('[gbp-monitor] tenants error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch GBP tenants' });
+  }
+});
+
+// ── Ops Review Queue ──────────────────────────────────────────────────────
+// D3: unreplied reviews across platform-managed locations — the DFY work
+// surface. Reply drafting/approve-and-send goes through the existing
+// GBPReviewReplyService (generateDrafts / replyToReview) — this endpoint
+// only lists what needs attention.
+router.get('/review-queue', async (req: any, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const skip = (page - 1) * limit;
+    const tenantId = (req.query.tenantId as string) || undefined;
+    const minRating = req.query.minRating ? Number(req.query.minRating) : undefined;
+
+    const where: any = {
+      reply_status: 'NONE',
+      review_reply: null,
+      gbp_locations_list: { managed_by: 'platform' },
+    };
+    if (tenantId) where.tenant_id = tenantId;
+    if (minRating) where.star_rating = { gte: minRating };
+
+    const [reviews, total] = await Promise.all([
+      prisma.gbp_reviews.findMany({
+        where,
+        select: {
+          id: true,
+          tenant_id: true,
+          google_review_id: true,
+          reviewer_name: true,
+          star_rating: true,
+          comment: true,
+          google_create_time: true,
+          sentiment: true,
+          ai_drafts: true,
+          autopilot_due_at: true,
+          autopilot_status: true,
+          gbp_locations_list: {
+            select: { id: true, location_name: true, business_name: true, granted_via: true },
+          },
+        },
+        orderBy: { google_create_time: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.gbp_reviews.count({ where }),
+    ]);
+
+    const tenantIds = [...new Set(reviews.map((r) => r.tenant_id))];
+    const tenants = await prisma.tenants.findMany({
+      where: { id: { in: tenantIds } },
+      select: { id: true, name: true },
+    });
+    const tenantMap = new Map(tenants.map((t) => [t.id, t.name]));
+
+    res.json({
+      success: true,
+      data: {
+        reviews: reviews.map((r) => ({
+          id: r.id,
+          tenantId: r.tenant_id,
+          tenantName: tenantMap.get(r.tenant_id) || r.tenant_id,
+          googleReviewId: r.google_review_id,
+          reviewerName: r.reviewer_name,
+          starRating: r.star_rating,
+          comment: r.comment,
+          createdAt: r.google_create_time,
+          sentiment: r.sentiment,
+          hasDraft: !!(r.ai_drafts as any[])?.length,
+          autopilotDueAt: r.autopilot_due_at,
+          autopilotStatus: r.autopilot_status,
+          location: r.gbp_locations_list
+            ? {
+                id: r.gbp_locations_list.id,
+                name: r.gbp_locations_list.location_name || r.gbp_locations_list.business_name,
+                grantedVia: r.gbp_locations_list.granted_via,
+              }
+            : null,
+        })),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      },
+    });
+  } catch (error: any) {
+    logger.error('[gbp-monitor] review-queue error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch review queue' });
   }
 });
 
