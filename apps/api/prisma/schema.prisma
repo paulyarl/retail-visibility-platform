@@ -2630,6 +2630,21 @@ model gbp_posts {
   @@index([topic_type], map: "idx_gbp_posts_topic_type")
 }
 
+model gbp_post_batches {
+  id              String    @id @db.VarChar(64)
+  actor_user_id   String?   @db.VarChar
+  audience        Json
+  template        Json
+  recurrence      Json?
+  scheduled_for   DateTime  @db.Timestamptz(6)
+  status          String    @default("draft") @db.VarChar(16)
+  materialized_at DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([status, created_at(sort: Desc)], map: "idx_gbp_post_batches_status")
+}
+
 model gbp_reviews {
   id                 String              @id @db.VarChar(50)
   tenant_id          String              @db.VarChar(50)

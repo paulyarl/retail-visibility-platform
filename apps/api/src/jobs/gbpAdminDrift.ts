@@ -83,16 +83,16 @@ export async function runGbpAdminDriftCheck(): Promise<{ checked: number; revoke
   return { checked: results.length, revoked, failed };
 }
 
-export function initializeGbpAdminDriftJob(): void {
-  if (process.env.DISABLE_GBP_ADMIN_DRIFT === '1' || process.env.DISABLE_GBP_ADMIN_DRIFT === 'true') {
-    logger.info('[GbpAdminDrift] disabled via DISABLE_GBP_ADMIN_DRIFT');
-    return;
-  }
+let firstRun = true;
 
-  scheduleJob(JOB_NAME, runGbpAdminDriftCheck, {
-    intervalMs: SCHEDULE_INTERVAL_MS,
-    startDelayMs: STARTUP_DELAY_MS,
-    maxRunMs: 10 * 60 * 1000,
+export function initializeGbpAdminDriftJob(): void {
+  scheduleJob({
+    name: JOB_NAME,
+    description: 'Detects revoked platform GBP admin access on managed locations',
+    scheduleLabel: 'daily',
+    envDisableVar: 'DISABLE_GBP_ADMIN_DRIFT',
+    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SCHEDULE_INTERVAL_MS),
+    handler: async () => runGbpAdminDriftCheck(),
   });
 }
 

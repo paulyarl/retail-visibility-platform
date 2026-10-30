@@ -82,7 +82,7 @@ async function planMaterialization(
   locations: LocationRow[],
   template: BatchTemplate,
   baseTime: Date
-): Promise<Array<{ loc: LocationRow; decision: Omit<MaterializeDecision, 'gbpLocationId' | 'tenantId'> & { scheduledFor?: Date } }>> {
+): Promise<Array<{ loc: LocationRow; decision: Omit<MaterializeDecision, 'gbpLocationId' | 'tenantId' | 'scheduledFor'> & { scheduledFor?: Date } }>> {
   const out: Array<{ loc: LocationRow; decision: any }> = [];
 
   for (let i = 0; i < locations.length; i++) {
@@ -211,11 +211,12 @@ export async function createAndMaterializeBatch(
           ...templateToPostColumns(template),
         },
       });
+      const when = (decision.scheduledFor ?? scheduledFor).toISOString();
       decisions.push({
         gbpLocationId: loc.id,
         tenantId: loc.tenant_id!,
         outcome: 'created',
-        scheduledFor: decision.scheduledFor.toISOString(),
+        scheduledFor: when,
       });
       // Merchant-visible feed entry — "we scheduled a post for you".
       await emitGbpActivity({
@@ -224,7 +225,7 @@ export async function createAndMaterializeBatch(
         action: 'post_scheduled',
         actor: 'admin',
         actorUserId,
-        detail: { batchId, scheduledFor: decision.scheduledFor.toISOString(), summary: template.summary.slice(0, 80) },
+        detail: { batchId, scheduledFor: when, summary: template.summary.slice(0, 80) },
       });
     } catch (error: any) {
       logger.error('[GbpBatch] materialize row failed', undefined, {

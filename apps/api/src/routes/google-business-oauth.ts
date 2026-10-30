@@ -1352,9 +1352,8 @@ router.post('/google/business/posts/schedule', async (req, res) => {
         offer_coupon_code: offer?.couponCode ?? null,
         offer_redeem_url: offer?.redeemUrl ?? null,
         offer_terms: offer?.terms ?? null,
-        cta_type: callToAction?.type ?? null,
-        cta_url: callToAction?.url ?? null,
-        media_type: media?.type ?? null,
+        call_to_action_type: callToAction?.type ?? null,
+        call_to_action_url: callToAction?.url ?? null,
         media_url: media?.url ?? null,
       },
     });

@@ -8,6 +8,7 @@
  * op that produced it.
  */
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma';
 import { logger } from '../../logger';
 import { generateQuickStart } from '../id-generator';
@@ -36,7 +37,7 @@ export async function emitGbpActivity(evt: GbpActivityInput): Promise<void> {
         action: evt.action,
         actor: evt.actor,
         actor_user_id: evt.actorUserId ?? null,
-        detail: evt.detail ?? {},
+        detail: (evt.detail ?? {}) as Prisma.InputJsonValue,
         visible_to_merchant: evt.visibleToMerchant !== false,
       },
     });

@@ -109,7 +109,7 @@ router.get('/:tenantId/gbp-managed', authenticateToken, checkTenantAccess, async
 const requestChangeSchema = z.object({
   surface: z.enum(['info', 'hours', 'posts', 'media', 'reviews', 'attributes']),
   note: z.string().min(1).max(2000),
-  payload: z.record(z.unknown()).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
 });
 
 router.post('/:tenantId/gbp-managed/request-change', authenticateToken, checkTenantAccess, async (req: any, res: Response) => {

@@ -174,7 +174,10 @@ export default function GBPAdvancedFeaturesPage() {
   function selectTab(id: TabId) {
     setActiveTab(id);
     if (id === 'photos') fetchMedia();
-    if (id === 'posts') fetchPosts();
+    if (id === 'posts') {
+      fetchPosts();
+      if (canUsePostsScheduler) fetchScheduledPosts();
+    }
     if (id === 'reviews') fetchReviews();
   }
 
@@ -294,14 +297,32 @@ export default function GBPAdvancedFeaturesPage() {
               className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
               rows={3}
             />
-            <div className="flex items-center justify-end gap-3 mt-3">
-              {!canUsePostsScheduler && (
+            <div className="flex flex-wrap items-center justify-end gap-3 mt-3">
+              {!canUsePostsScheduler ? (
                 <Link
                   href={`/t/${tenantId}/settings/feature-store?feature=gbp_posts_scheduler`}
                   className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
                 >
                   Scheduling is part of GBP Pro
                 </Link>
+              ) : (
+                <>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 text-sm"
+                  />
+                  <button
+                    onClick={handleSchedulePost}
+                    disabled={schedulingPost || !newPostSummary || !scheduledAt}
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 font-medium rounded-lg disabled:opacity-50"
+                  >
+                    {schedulingPost ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    Schedule
+                  </button>
+                </>
               )}
               <button
                 onClick={handleCreatePost}
@@ -313,6 +334,32 @@ export default function GBPAdvancedFeaturesPage() {
               </button>
             </div>
           </div>
+
+          {canUsePostsScheduler && scheduledPosts.length > 0 && (
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 space-y-3">
+              <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Scheduled</h3>
+              {scheduledPosts.map((post) => (
+                <div
+                  key={post.id}
+                  className="flex items-center justify-between border border-neutral-200 dark:border-neutral-700 rounded-lg p-3"
+                >
+                  <div>
+                    <p className="text-sm text-neutral-700 dark:text-neutral-300">{post.summary}</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      {post.scheduled_for && new Date(post.scheduled_for).toLocaleString()}
+                      {post.status && ` · ${post.status.toLowerCase()}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleCancelScheduled(post.id)}
+                    className="text-sm text-red-600 hover:text-red-700 dark:text-red-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-3">
             {posts.map((post, idx) => (

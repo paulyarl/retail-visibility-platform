@@ -154,7 +154,7 @@ router.get('/tenants', async (req: any, res: Response) => {
     const tenantIds = links.map((l) => l.tenant_id);
 
     // Fetch tenants, locations, counts, and settings in parallel
-    const [tenants, locations, reviewCounts, postCounts, mediaCounts, merchantSettings, unrepliedCounts] =
+    const [tenants, locations, reviewCounts, postCounts, mediaCounts, unrepliedCounts, merchantSettings] =
       await Promise.all([
         prisma.tenants.findMany({
           where: { id: { in: tenantIds } },
@@ -519,7 +519,7 @@ const accessIntakeSchema = z.object({
     websiteUri: z.string().optional(),
   }).optional(),
   locationName: z.string().optional(),
-  delegatedSurfaces: z.record(z.boolean()).optional(),
+  delegatedSurfaces: z.record(z.string(), z.boolean()).optional(),
 });
 
 router.post('/access/intake', async (req: any, res: Response) => {
