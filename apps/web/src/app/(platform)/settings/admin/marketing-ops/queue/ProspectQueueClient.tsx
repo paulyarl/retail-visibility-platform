@@ -41,6 +41,7 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
   public_suggestion: 'Public Suggestion',
   owner_submission: 'Owner Submission',
   gold_standard_candidate: 'Gold Standard Discovery',
+  search_batch: 'Search Demand',
 };
 
 const DISMISS_REASONS: ProspectDismissReason[] = ['already_customer', 'bad_fit', 'duplicate', 'unverified_closed', 'other'];

@@ -15,6 +15,7 @@ import type { PoolClient } from 'pg';
 import { getDirectPool } from '../utils/db-pool';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
+import { classifyQuerySignals } from './SeoDemandMatchService';
 
 const GSC_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const ROW_LIMIT = 25000;
@@ -32,6 +33,7 @@ export interface GscIngestResult {
   queryRows?: number;
   pageRows?: number;
   signals?: number;
+  classified?: number;
 }
 
 const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
@@ -211,10 +213,11 @@ export async function ingestSearchConsole(opts: { days?: number } = {}): Promise
   }
 
   const signals = await refreshQuerySignals();
+  const classified = await classifyQuerySignals();
 
   const result: GscIngestResult = {
     siteUrl, startDate, endDate, backfill,
-    queryRows: queryRows.length, pageRows: pageRows.length, signals,
+    queryRows: queryRows.length, pageRows: pageRows.length, signals, classified,
   };
   logger.info('[GscSearchDemand] Ingest complete', undefined, result);
   return result;

@@ -6218,7 +6218,7 @@ const prospectQueueAddSchema = z.object({
   category: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
   state: z.string().max(255).optional(),
-  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion', 'owner_submission', 'gold_standard_candidate']),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual', 'intelligence_seek', 'category_identification', 'public_suggestion', 'owner_submission', 'gold_standard_candidate', 'search_batch']),
   // source_campaign_id is required for audit-derived entries; optional for
   // manual + public_suggestion + owner_submission + gold_standard_candidate
   // entries (no parent campaign — the originating surface is a
@@ -6254,7 +6254,7 @@ const prospectQueueAddSchema = z.object({
 }).superRefine((data, ctx) => {
   // manual + public_suggestion + owner_submission + gold_standard_candidate
   // are parentless kinds — no source campaign.
-  if (!['manual', 'public_suggestion', 'owner_submission', 'gold_standard_candidate'].includes(data.source_kind) && !data.source_campaign_id) {
+  if (!['manual', 'public_suggestion', 'owner_submission', 'gold_standard_candidate', 'search_batch'].includes(data.source_kind) && !data.source_campaign_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['source_campaign_id'],

@@ -4437,6 +4437,7 @@ model mkt_seek_batch_entries {
   intelligence_focus String           @default("emerging") @db.VarChar(20)
   sort_order         Int              @default(0)
   created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  proving_ground_id  String?
   mkt_seek_batches   mkt_seek_batches @relation(fields: [batch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([batch_id], map: "idx_msbe_batch")
@@ -8500,6 +8501,92 @@ model mkt_ground_truth_packets {
   mkt_campaigns_list mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([campaign_id, level], map: "idx_ground_truth_packets_campaign_level")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model seo_demand_reports {
+  report_date DateTime  @db.Date
+  period      String    @db.VarChar(8)
+  summary     Json      @default("{}")
+  sections    Json      @default("{}")
+  emailed_at  DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([report_date, period])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model seo_gsc_page_daily {
+  date        DateTime @db.Date
+  page        String
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  position    Float    @default(0)
+  fetched_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([date, page])
+  @@index([date(sort: Desc)], map: "idx_seo_gpd_date")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model seo_gsc_query_daily {
+  date        DateTime @db.Date
+  query       String
+  page        String
+  country     String   @db.VarChar(8)
+  device      String   @db.VarChar(16)
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  position    Float    @default(0)
+  fetched_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([date, query, page, country, device])
+  @@index([date(sort: Desc)], map: "idx_seo_gqd_date")
+  @@index([page], map: "idx_seo_gqd_page")
+  @@index([query], map: "idx_seo_gqd_query")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model seo_query_signals {
+  query_norm         String    @id
+  sample_query       String
+  intent             String    @default("unclassified") @db.VarChar(24)
+  route              String?   @db.VarChar(24)
+  match_kind         String?   @db.VarChar(24)
+  match_id           String?   @db.VarChar(64)
+  match_name         String?
+  match_confidence   Decimal?  @db.Decimal(4, 3)
+  seed_id            String?   @db.VarChar(64)
+  campaign_id        String?   @db.VarChar(64)
+  category           String?   @db.VarChar(100)
+  city               String?   @db.VarChar(100)
+  state              String?   @db.VarChar(50)
+  top_page           String?
+  impressions_7d     Int       @default(0)
+  impressions_28d    Int       @default(0)
+  impressions_90d    Int       @default(0)
+  clicks_28d         Int       @default(0)
+  position_28d       Float?
+  first_seen         DateTime? @db.Date
+  last_seen          DateTime? @db.Date
+  review_status      String    @default("open") @db.VarChar(16)
+  reviewed_by        String?   @db.VarChar(255)
+  reviewed_at        DateTime? @db.Timestamptz(6)
+  queued_prospect_id String?   @db.VarChar(64)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([category], map: "idx_seo_qs_category")
+  @@index([city, state], map: "idx_seo_qs_city")
+  @@index([impressions_28d(sort: Desc)], map: "idx_seo_qs_impr28")
+  @@index([intent, route], map: "idx_seo_qs_intent_route")
 }
 
 enum action {
