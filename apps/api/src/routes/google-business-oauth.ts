@@ -34,13 +34,16 @@ const mediaUpload = multer({
 // until multer runs; it applies checkTenantAccess itself after mediaUpload.
 // The callback is exempt — it's Google's redirect, no JWT; the signed state
 // parameter below is its tenant binding.
-router.use((req, res, next) => {
-  if (req.path === '/google/business/callback') return next();
+// Scoped to /google/business — this router is mounted at '/api' (and '/',
+// '/auth'), so an unscoped router.use would gate every downstream public
+// route incl. /api/health (2026-10-30 outage pattern).
+router.use('/google/business', (req, res, next) => {
+  if (req.path === '/callback') return next();
   return authenticateToken(req, res, next);
 });
-router.use((req, res, next) => {
-  if (req.path === '/google/business/callback') return next();
-  if (req.method === 'POST' && req.path === '/google/business/media') return next();
+router.use('/google/business', (req, res, next) => {
+  if (req.path === '/callback') return next();
+  if (req.method === 'POST' && req.path === '/media') return next();
   return checkTenantAccess(req, res, next);
 });
 
@@ -50,10 +53,10 @@ router.use((req, res, next) => {
 // managed_by='platform'. Platform users pass (the ops console writes through
 // the same endpoints). Reads are unaffected. POST /media is exempt here for
 // the same multer reason as above and applies the check itself.
-router.use(async (req, res, next) => {
+router.use('/google/business', async (req, res, next) => {
   try {
-    if (req.method === 'GET' || req.path === '/google/business/callback') return next();
-    if (req.method === 'POST' && req.path === '/google/business/media') return next();
+    if (req.method === 'GET' || req.path === '/callback') return next();
+    if (req.method === 'POST' && req.path === '/media') return next();
     if (isPlatformUser(req.user)) return next();
 
     const tenantId = getTenantId(req);

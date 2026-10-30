@@ -266,9 +266,17 @@ describe('Route Registry Coverage', () => {
     ]);
     const AUTH_NAME =
       /^(authenticateToken|requireAuth|authorize|requirePlatformAdmin|requireAdmin|requirePlatformUser|checkTenantAccess|requireTenantOwner|requirePlatformStaffOrAdmin|authenticateCustomer|requireCustomerAuth|requireTenantAdmin)$/;
+    // Wrappers like `(req,res,next) => { if (…exempt…) return next();
+    // return authenticateToken(req,res,next) }` hide the gate behind an
+    // anonymous fn — scan the function source for calls to auth fns.
+    const AUTH_CALL =
+      /\b(authenticateToken|requireAuth|authorize|requirePlatformAdmin|requireAdmin|requirePlatformUser|checkTenantAccess|requireTenantOwner|requirePlatformStaffOrAdmin|authenticateCustomer|requireCustomerAuth|requireTenantAdmin)\s*\(/;
 
     const isAuthMiddleware = (fn: unknown) =>
-      typeof fn === 'function' && (authFns.has(fn) || AUTH_NAME.test((fn as any).name || ''));
+      typeof fn === 'function' &&
+      (authFns.has(fn) ||
+        AUTH_NAME.test((fn as any).name || '') ||
+        AUTH_CALL.test(Function.prototype.toString.call(fn)));
 
     // Express 5: a use-layer matches a mount prefix; matchers[0]('/') truthy
     // means the middleware applies to every path that enters this router.

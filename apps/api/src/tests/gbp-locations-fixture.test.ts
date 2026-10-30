@@ -68,6 +68,26 @@ vi.mock('../lib/google/capability-gate', () => ({
   isGbpManagementFeatureAllowed: vi.fn().mockResolvedValue(true),
 }));
 
+// The router's /google/business-scoped auth chain (authenticateToken +
+// checkTenantAccess) is real code — these tests exercise the routes as an
+// authenticated member of TENANT_ID, so the gate passes and the route's own
+// guards (missing_tenantId, not_connected, …) are what get asserted.
+vi.mock('../middleware/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../middleware/auth')>()),
+  authenticateToken: (req: any, _res: any, next: any) => {
+    req.user = {
+      id: 'u-fixture',
+      userId: 'u-fixture',
+      user_id: 'u-fixture',
+      email: 'fixture@test.dev',
+      role: 'owner',
+      tenantIds: ['tid-m8ijkrnk'],
+    };
+    next();
+  },
+  checkTenantAccess: (_req: any, _res: any, next: any) => next(),
+}));
+
 vi.mock('../config/unifiedConfig', () => ({
   unifiedConfig: {
     googleBusinessClientId: 'test-client-id',
