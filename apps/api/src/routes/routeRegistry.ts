@@ -131,6 +131,7 @@ import taxonomySyncSingletonRoutes from '../routes/taxonomy-sync-singleton';
 import gbpSyncTrackingSingletonRoutes from '../routes/gbp-sync-tracking-singleton';
 import recommendationSingletonRoutes from '../routes/recommendation-singleton';
 import gbpCategorySyncSingletonRoutes from '../routes/gbp-category-sync-singleton';
+import gbpManagedRoutes from '../routes/gbp-managed';
 import barcodeEnrichmentSingletonRoutes from '../routes/barcode-enrichment-singleton';
 import digitalAssetSingletonRoutes from '../routes/digital-asset-singleton';
 import aiImageSingletonRoutes from '../routes/ai-image-singleton';
@@ -1336,6 +1337,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'tenant',
     comment: 'GBP options settings (merchant gate toggles) at /api/tenants/:tenantId/gbp-options',
+  },
+  {
+    path: '/api',
+    router: gbpManagedRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'GBP managed view (DFY merchant surface) at /api/tenants/:tenantId/gbp-managed',
   },
   {
     path: '/api/public/directory',

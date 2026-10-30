@@ -14,7 +14,9 @@ import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
 import { requestContextStorage } from '../context';
 import crypto from 'crypto';
-import { authenticateToken, checkTenantAccess } from '../middleware/auth';
+import { authenticateToken, checkTenantAccess, getTenantId } from '../middleware/auth';
+import { isPlatformUser } from '../utils/platform-admin';
+import { resolveGbpLocation } from '../lib/google/gbp-target';
 
 const router = Router();
 
@@ -40,6 +42,38 @@ router.use((req, res, next) => {
   if (req.path === '/google/business/callback') return next();
   if (req.method === 'POST' && req.path === '/google/business/media') return next();
   return checkTenantAccess(req, res, next);
+});
+
+// ── Managed-location write gate (DFY spec §5, Sprint D5) ─────────────────
+// Platform-managed locations are worked by ops, not by the merchant — every
+// write endpoint 403s for tenant users when the resolved location is
+// managed_by='platform'. Platform users pass (the ops console writes through
+// the same endpoints). Reads are unaffected. POST /media is exempt here for
+// the same multer reason as above and applies the check itself.
+router.use(async (req, res, next) => {
+  try {
+    if (req.method === 'GET' || req.path === '/google/business/callback') return next();
+    if (req.method === 'POST' && req.path === '/google/business/media') return next();
+    if (isPlatformUser(req.user)) return next();
+
+    const tenantId = getTenantId(req);
+    if (!tenantId) return next();
+
+    const location = await resolveGbpLocation({ tenantId });
+    if (location?.managed_by === 'platform') {
+      return res.status(403).json({
+        success: false,
+        error: 'managed_by_platform',
+        message: 'This location is managed by VisibleShelf. Request changes from the Managed view.',
+      });
+    }
+    next();
+  } catch (error) {
+    logger.error('[GBP] managed-location write gate error', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    return res.status(500).json({ success: false, error: 'gate_error' });
+  }
 });
 
 // ── Signed OAuth state ──────────────────────────────────────────────────
@@ -1171,6 +1205,19 @@ router.post('/google/business/media', mediaUpload.single('file'), checkTenantAcc
         error: 'capability_required',
         message: 'GBP photo upload requires the gbp_media_upload capability.',
       });
+    }
+
+    // Managed-location write gate — checked here too because multipart
+    // req.body isn't populated at router level (see router.use chain).
+    if (!isPlatformUser(req.user)) {
+      const loc = await resolveGbpLocation({ tenantId });
+      if (loc?.managed_by === 'platform') {
+        return res.status(403).json({
+          success: false,
+          error: 'managed_by_platform',
+          message: 'This location is managed by VisibleShelf. Request changes from the Managed view.',
+        });
+      }
     }
 
     const { uploadPhoto, uploadPhotoBinary } = await import('../services/GBPAdvancedSync');
