@@ -250,7 +250,7 @@ export async function isGBPHoursSyncAllowed(tenantId: string): Promise<boolean> 
 }
 
 /** GBP Management module features gated through `gbp_management` (migration 243/342). */
-export type GbpManagementFeature = 'ai_response' | 'posts_scheduler' | 'media_upload' | 'attributes';
+export type GbpManagementFeature = 'ai_response' | 'posts_scheduler' | 'media_upload' | 'attributes' | 'managed_service';
 
 /**
  * Check whether the tenant is entitled to a `gbp_management` feature.
@@ -276,6 +276,8 @@ export async function isGbpManagementFeatureAllowed(
         return !!gbp.can_use_media_upload;
       case 'attributes':
         return !!gbp.can_use_attributes;
+      case 'managed_service':
+        return !!gbp.can_use_managed_service;
       default:
         return false;
     }

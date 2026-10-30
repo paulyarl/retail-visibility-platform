@@ -1211,6 +1211,7 @@ interface BackendEffectiveGbpManagement {
   can_use_posts_scheduler: boolean;
   can_use_media_upload: boolean;
   can_use_attributes: boolean;
+  can_use_managed_service: boolean;
   reviews_enabled: boolean;
   content_enabled: boolean;
   autopilot_enabled: boolean;
@@ -1297,6 +1298,7 @@ function mapGbpManagement(b: BackendEffectiveGbpManagement): GbpManagementState 
     canUsePostsScheduler: b.can_use_posts_scheduler,
     canUseMediaUpload: b.can_use_media_upload,
     canUseAttributes: b.can_use_attributes,
+    canUseManagedService: b.can_use_managed_service,
     reviewsEnabled: b.reviews_enabled,
     contentEnabled: b.content_enabled,
     autopilotEnabled: b.autopilot_enabled,

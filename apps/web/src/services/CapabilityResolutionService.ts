@@ -879,6 +879,7 @@ export interface GbpManagementState {
   canUsePostsScheduler: boolean;
   canUseMediaUpload: boolean;
   canUseAttributes: boolean;
+  canUseManagedService: boolean;
   reviewsEnabled: boolean;
   contentEnabled: boolean;
   autopilotEnabled: boolean;

@@ -34,11 +34,15 @@ const {
   mockAiGenerateChatCompletion,
   mockReplyToReview,
   mockTenantGbpOptionsFindUnique,
+  mockGbpReviewsCount,
+  mockEmitGbpActivity,
 } = vi.hoisted(() => ({
   mockHasFeature: vi.fn(),
   mockGbpReviewsFindFirst: vi.fn(),
   mockGbpReviewsFindMany: vi.fn(),
   mockGbpReviewsUpdate: vi.fn(),
+  mockGbpReviewsCount: vi.fn(),
+  mockEmitGbpActivity: vi.fn(),
   mockGbpLocationsFindFirst: vi.fn(),
   mockMktCampaignsFindFirst: vi.fn(),
   mockOwnerVoiceGetProfile: vi.fn(),
@@ -54,6 +58,7 @@ vi.mock('../../prisma', () => ({
       findFirst: mockGbpReviewsFindFirst,
       findMany: mockGbpReviewsFindMany,
       update: mockGbpReviewsUpdate,
+      count: mockGbpReviewsCount,
     },
     gbp_locations_list: {
       findFirst: mockGbpLocationsFindFirst,
@@ -69,6 +74,10 @@ vi.mock('../../prisma', () => ({
 
 vi.mock('../GBPAdvancedSync', () => ({
   replyToReview: mockReplyToReview,
+}));
+
+vi.mock('../../lib/google/gbp-activity', () => ({
+  emitGbpActivity: mockEmitGbpActivity,
 }));
 
 // Mutable config double — the autopilot activation flag is flipped per test.
@@ -391,6 +400,10 @@ describe('runAutopilot gates', () => {
     mockGbpReviewsFindMany.mockReset();
     mockTenantGbpOptionsFindUnique.mockReset();
     mockGbpReviewsUpdate.mockReset();
+    mockGbpReviewsCount.mockReset();
+    mockEmitGbpActivity.mockReset();
+    // Daily cap: no autopilot replies published today by default.
+    mockGbpReviewsCount.mockResolvedValue(0);
     unifiedConfig.gbpAutopilotEnabled = false;
   });
 

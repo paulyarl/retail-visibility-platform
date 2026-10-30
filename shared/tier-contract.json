@@ -748,6 +748,7 @@
       "gbp_attributes",
       "gbp_directory_content",
       "gbp_directory_reviews",
+      "gbp_managed_service",
       "gbp_management_flexible",
       "gbp_media_upload",
       "gbp_posts_scheduler"

@@ -199,6 +199,45 @@ router.post('/grant-complimentary', async (req: Request, res: Response) => {
       },
     });
 
+    // Q10: feature→companion grants — a gbp_managed_service grant also
+    // issues gbp_management_flexible so per-feature gates can't block the
+    // managed work it buys (mirrors ensureCompanionPurchase in
+    // bsaas-purchases.ts, which this admin path doesn't go through).
+    if (feature_key === 'gbp_managed_service') {
+      const companionKey = 'gbp_management_flexible';
+      const existing = await prisma.tenant_feature_purchases.findUnique({
+        where: { tenant_id_feature_key: { tenant_id, feature_key: companionKey } },
+      });
+      if (!existing || !['active', 'past_due', 'trial'].includes(existing.status)) {
+        await prisma.tenant_feature_purchases.upsert({
+          where: { tenant_id_feature_key: { tenant_id, feature_key: companionKey } },
+          update: {
+            source: 'companion',
+            status: 'active',
+            expires_at: null,
+            metadata: {
+              companion_for: 'gbp_managed_service',
+              price_cents: 0,
+              created_reason: 'auto_companion_managed_service',
+            },
+            updated_at: new Date(),
+          },
+          create: {
+            tenant_id,
+            feature_key: companionKey,
+            source: 'companion',
+            status: 'active',
+            expires_at: null,
+            metadata: {
+              companion_for: 'gbp_managed_service',
+              price_cents: 0,
+              created_reason: 'auto_companion_managed_service',
+            },
+          },
+        });
+      }
+    }
+
     invalidateEffectiveCapabilities(tenant_id);
 
     await audit({

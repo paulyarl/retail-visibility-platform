@@ -22,6 +22,7 @@ const gbpOptionsSettingsSchema = z.object({
   gbp_content_display: z.boolean().optional(),
   gbp_autopilot_enabled: z.boolean().optional(),
   gbp_autopilot_min_rating: z.number().int().min(1).max(5).optional(),
+  gbp_approval_mode: z.enum(['auto_publish', 'approve_posts', 'approve_all']).optional(),
 });
 
 const DEFAULT_SETTINGS = {
@@ -29,6 +30,7 @@ const DEFAULT_SETTINGS = {
   gbp_content_display: true,
   gbp_autopilot_enabled: false,
   gbp_autopilot_min_rating: 5,
+  gbp_approval_mode: 'auto_publish',
 };
 
 function serializeSettings(settings: any) {
@@ -37,6 +39,7 @@ function serializeSettings(settings: any) {
     gbp_content_display: settings?.gbp_content_display ?? DEFAULT_SETTINGS.gbp_content_display,
     gbp_autopilot_enabled: settings?.gbp_autopilot_enabled ?? DEFAULT_SETTINGS.gbp_autopilot_enabled,
     gbp_autopilot_min_rating: settings?.gbp_autopilot_min_rating ?? DEFAULT_SETTINGS.gbp_autopilot_min_rating,
+    gbp_approval_mode: settings?.gbp_approval_mode ?? DEFAULT_SETTINGS.gbp_approval_mode,
   };
 }
 

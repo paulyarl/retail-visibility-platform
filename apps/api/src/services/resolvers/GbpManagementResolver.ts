@@ -28,6 +28,7 @@ export interface EffectiveGbpManagement {
   can_use_posts_scheduler: boolean;
   can_use_media_upload: boolean;
   can_use_attributes: boolean;
+  can_use_managed_service: boolean;
   // Effective state (hard gate AND soft gate)
   reviews_enabled: boolean;
   content_enabled: boolean;
@@ -55,6 +56,9 @@ export function resolveGbpManagement(
   const canUsePostsScheduler = flexible || !!features.gbp_posts_scheduler;
   const canUseMediaUpload = flexible || !!features.gbp_media_upload;
   const canUseAttributes = flexible || !!features.gbp_attributes;
+  // Q6/Q10: the DFY SKU — its companion flexible grant makes `flexible`
+  // true too, so this is true for both the key itself and managed tenants.
+  const canUseManagedService = flexible || !!features.gbp_managed_service;
 
   // Soft gate (merchant-gated fields: tier AND merchant)
   const reviewsDisplayEnabled = merchantPrefs?.gbp_reviews_display !== false;
@@ -83,6 +87,7 @@ export function resolveGbpManagement(
     can_use_posts_scheduler: canUsePostsScheduler,
     can_use_media_upload: canUseMediaUpload,
     can_use_attributes: canUseAttributes,
+    can_use_managed_service: canUseManagedService,
     reviews_enabled: reviewsEnabled,
     content_enabled: contentEnabled,
     autopilot_enabled: autopilotEnabled,

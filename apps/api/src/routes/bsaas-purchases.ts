@@ -180,6 +180,56 @@ const PARENT_GATE_FEATURES: Record<string, string> = {
 };
 
 /**
+ * Feature→companion grants (DFY spec §2, Q10): purchasing a managed-service
+ * SKU also issues the bundle key it operates under. A `gbp_managed_service`
+ * purchase means the platform manages the profile — per-feature gates must
+ * not block that work, so the flexible key rides along as a zero-cost
+ * companion (source='companion', cancelled with the parent).
+ */
+const FEATURE_COMPANIONS: Record<string, string> = {
+  gbp_managed_service: 'gbp_management_flexible',
+};
+
+async function upsertCompanionPurchase(
+  tenantId: string,
+  featureKey: string,
+  purchasedFeatureKey: string,
+  reason: string
+): Promise<void> {
+  const existing = await prisma.tenant_feature_purchases.findUnique({
+    where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+  });
+  if (existing && ['active', 'past_due', 'trial'].includes(existing.status)) return;
+
+  await prisma.tenant_feature_purchases.upsert({
+    where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+    update: {
+      source: 'companion',
+      status: 'active',
+      expires_at: null,
+      metadata: {
+        companion_for: purchasedFeatureKey,
+        price_cents: 0,
+        created_reason: reason,
+      },
+      updated_at: new Date(),
+    },
+    create: {
+      tenant_id: tenantId,
+      feature_key: featureKey,
+      source: 'companion',
+      status: 'active',
+      expires_at: null,
+      metadata: {
+        companion_for: purchasedFeatureKey,
+        price_cents: 0,
+        created_reason: reason,
+      },
+    },
+  });
+}
+
+/**
  * Ensure the parent-gate feature for a capability type is active for the tenant.
  * If the tier already includes it, no companion is needed.
  * If not, creates a zero-cost companion purchase (source='companion', no expiry).
@@ -189,6 +239,14 @@ async function ensureCompanionPurchase(
   capabilityKey: string | null,
   purchasedFeatureKey: string
 ): Promise<void> {
+  // Q10: feature→companion grants ride along regardless of the capability
+  // parent-gate outcome — checked first so a skipped parent gate never
+  // suppresses a managed-service companion.
+  const featureCompanion = FEATURE_COMPANIONS[purchasedFeatureKey];
+  if (featureCompanion) {
+    await upsertCompanionPurchase(tenantId, featureCompanion, purchasedFeatureKey, 'auto_companion_managed_service');
+  }
+
   if (!capabilityKey) return;
   const parentFeatureKey = PARENT_GATE_FEATURES[capabilityKey];
   if (!parentFeatureKey) return;
@@ -249,6 +307,44 @@ async function maybeCancelCompanion(
     select: { id: true },
   });
   if (!cancelledFeature) return;
+
+  // Q10: feature→companion grants — when the granter is cancelled, its
+  // companion goes too unless another feature that would grant the same
+  // companion still has an active real purchase. Runs before the
+  // parent-gate path below because that path early-returns for capability
+  // types without a gate (gbp_management has none).
+  const featureCompanion = FEATURE_COMPANIONS[cancelledFeatureKey];
+  if (featureCompanion) {
+    const granters = Object.entries(FEATURE_COMPANIONS)
+      .filter(([key, companion]) => companion === featureCompanion && key !== cancelledFeatureKey)
+      .map(([key]) => key);
+    const activeGranters = granters.length
+      ? await prisma.tenant_feature_purchases.findMany({
+          where: {
+            tenant_id: tenantId,
+            feature_key: { in: granters },
+            status: { in: ['active', 'past_due', 'trial'] },
+            source: { not: 'companion' },
+          },
+        })
+      : [];
+
+    if (activeGranters.length === 0) {
+      await prisma.tenant_feature_purchases.updateMany({
+        where: {
+          tenant_id: tenantId,
+          feature_key: featureCompanion,
+          source: 'companion',
+          status: { in: ['active', 'past_due'] },
+        },
+        data: {
+          status: 'cancelled',
+          updated_at: new Date(),
+        },
+      });
+      console.log(`[BSaaS] Cancelled companion purchase for ${featureCompanion} (granter ${cancelledFeatureKey} cancelled) for tenant ${tenantId}`);
+    }
+  }
 
   const capLink = await prisma.capability_features_list.findFirst({
     where: { feature_id: cancelledFeature.id },
