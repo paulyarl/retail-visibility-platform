@@ -16,7 +16,7 @@ import { requestContextStorage } from '../context';
 import crypto from 'crypto';
 import { authenticateToken, checkTenantAccess, getTenantId } from '../middleware/auth';
 import { isPlatformUser } from '../utils/platform-admin';
-import { resolveGbpLocation } from '../lib/google/gbp-target';
+import { resolveGbpLocation, resolveGbpTarget } from '../lib/google/gbp-target';
 
 const router = Router();
 
@@ -1302,6 +1302,123 @@ router.post('/google/business/posts', async (req, res) => {
     res.json({ success: result.success, data: { postId: result.postId }, error: result.error });
   } catch (error) {
     res.status(500).json({ success: false, error: 'create_post_failed' });
+  }
+});
+
+/**
+ * Schedule a GBP post — writes the SCHEDULED row the gbp-post-scheduler job
+ * publishes when it comes due.
+ * POST /google/business/posts/schedule
+ */
+router.post('/google/business/posts/schedule', async (req, res) => {
+  try {
+    const { tenantId, summary, topicType, scheduledFor, event, offer, callToAction, media } = req.body;
+    if (!tenantId || !summary || !scheduledFor) {
+      return res.status(400).json({ success: false, error: 'missing_required_fields' });
+    }
+
+    const when = new Date(scheduledFor);
+    if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      return res.status(400).json({ success: false, error: 'scheduled_for_must_be_future' });
+    }
+
+    if (!(await isGbpManagementFeatureAllowed(tenantId, 'posts_scheduler'))) {
+      return res.status(403).json({
+        success: false,
+        error: 'capability_required',
+        message: 'Scheduled posts require the gbp_posts_scheduler capability.',
+      });
+    }
+
+    const target = await resolveGbpTarget({ tenantId });
+    if (!target) {
+      return res.status(404).json({ success: false, error: 'not_connected', message: 'No GBP location linked' });
+    }
+
+    const { generateQuickStart } = await import('../lib/id-generator');
+    const post = await prisma.gbp_posts.create({
+      data: {
+        id: generateQuickStart('gbpp'),
+        tenant_id: tenantId,
+        location_id: target.location.id,
+        summary,
+        topic_type: (topicType || 'STANDARD').toUpperCase(),
+        status: 'SCHEDULED',
+        scheduled_for: when,
+        created_by: 'tenant',
+        event_title: event?.title ?? null,
+        event_start_date: event?.startDate ? new Date(event.startDate) : null,
+        event_end_date: event?.endDate ? new Date(event.endDate) : null,
+        offer_coupon_code: offer?.couponCode ?? null,
+        offer_redeem_url: offer?.redeemUrl ?? null,
+        offer_terms: offer?.terms ?? null,
+        cta_type: callToAction?.type ?? null,
+        cta_url: callToAction?.url ?? null,
+        media_type: media?.type ?? null,
+        media_url: media?.url ?? null,
+      },
+    });
+
+    res.json({ success: true, data: { id: post.id, scheduledFor: post.scheduled_for } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'schedule_post_failed' });
+  }
+});
+
+/**
+ * List scheduled (unpublished) posts
+ * GET /google/business/posts/scheduled?tenantId=
+ */
+router.get('/google/business/posts/scheduled', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ success: false, error: 'missing_tenantId' });
+    }
+
+    const posts = await prisma.gbp_posts.findMany({
+      where: { tenant_id: tenantId, status: 'SCHEDULED' },
+      orderBy: { scheduled_for: 'asc' },
+      take: 50,
+      select: {
+        id: true,
+        summary: true,
+        topic_type: true,
+        scheduled_for: true,
+        created_by: true,
+        batch_id: true,
+        approved_at: true,
+      },
+    });
+
+    res.json({ success: true, data: { posts } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'list_scheduled_failed' });
+  }
+});
+
+/**
+ * Cancel a scheduled post
+ * POST /google/business/posts/:postId/cancel
+ */
+router.post('/google/business/posts/:postId/cancel', async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { tenantId } = req.body;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenantId' });
+    }
+
+    const result = await prisma.gbp_posts.updateMany({
+      where: { id: postId, tenant_id: tenantId, status: 'SCHEDULED' },
+      data: { status: 'CANCELLED', updated_at: new Date() },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ success: false, error: 'post_not_found_or_not_scheduled' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'cancel_post_failed' });
   }
 });
 

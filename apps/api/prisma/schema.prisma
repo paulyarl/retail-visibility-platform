@@ -2508,7 +2508,7 @@ model gbp_listing_categories {
 model gbp_locations_list {
   id                         String                     @id
   account_id                 String
-  location_id                String
+  location_id                String                     @unique(map: "uq_gbp_locations_location_id")
   location_name              String
   store_code                 String?
   address                    String?
@@ -2543,35 +2543,21 @@ model gbp_locations_list {
 
   @@unique([account_id, location_id])
   @@index([tenant_id], map: "idx_gbp_locations_tenant")
-}
-
-model gbp_post_batches {
-  id              String    @id @db.VarChar(64)
-  actor_user_id   String?   @db.VarChar
-  audience        Json
-  template        Json
-  recurrence      Json?
-  scheduled_for   DateTime  @db.Timestamptz(6)
-  status          String    @default("draft") @db.VarChar(16)
-  materialized_at DateTime? @db.Timestamptz(6)
-  created_at      DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
-
-  @@index([status, created_at(sort: Desc)], map: "idx_gbp_post_batches_status")
+  @@index([claim_state], map: "idx_gbp_locations_claim_state")
 }
 
 model gbp_activity_events {
-  id                  String             @id
-  tenant_id           String             @db.VarChar
-  gbp_location_id     String?            @db.VarChar
-  action              String             @db.VarChar(40)
-  actor               String             @db.VarChar(12)
-  actor_user_id       String?            @db.VarChar
-  detail              Json               @default("{}")
-  visible_to_merchant Boolean            @default(true)
-  created_at          DateTime           @default(now()) @db.Timestamptz(6)
-  tenants             tenants            @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  gbp_locations_list  gbp_locations_list? @relation(fields: [gbp_location_id], references: [id])
+  id                  String              @id
+  tenant_id           String              @db.VarChar
+  gbp_location_id     String?             @db.VarChar
+  action              String              @db.VarChar(40)
+  actor               String              @db.VarChar(12)
+  actor_user_id       String?             @db.VarChar
+  detail              Json                @default("{}")
+  visible_to_merchant Boolean             @default(true)
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  gbp_locations_list  gbp_locations_list? @relation(fields: [gbp_location_id], references: [id], onUpdate: NoAction)
+  tenants             tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id, created_at(sort: Desc)], map: "idx_gbp_activity_events_tenant")
   @@index([gbp_location_id, created_at(sort: Desc)], map: "idx_gbp_activity_events_location")
@@ -2601,40 +2587,40 @@ model gbp_media {
 }
 
 model gbp_posts {
-  id                  String              @id @db.VarChar(50)
-  tenant_id           String              @db.VarChar(50)
-  google_post_id      String?             @db.VarChar(255)
-  summary             String
-  topic_type          String?             @default("standard") @db.VarChar(50)
-  call_to_action_type String?             @db.VarChar(50)
-  call_to_action_url  String?
-  media_url           String?
-  event_title         String?             @db.VarChar(255)
-  event_start_date    DateTime?           @db.Timestamp(6)
-  event_end_date      DateTime?           @db.Timestamp(6)
-  offer_coupon_code   String?             @db.VarChar(100)
-  offer_redeem_url    String?
-  offer_terms         String?
-  state               String?             @default("live") @db.VarChar(50)
-  google_create_time  DateTime?           @db.Timestamp(6)
-  google_update_time  DateTime?           @db.Timestamp(6)
-  created_at          DateTime?           @default(now()) @db.Timestamp(6)
-  updated_at          DateTime?           @default(now()) @db.Timestamp(6)
-  location_id         String?             @db.VarChar
-  post_name           String?             @db.VarChar
-  status              String              @default("PUBLISHED") @db.VarChar(16)
-  scheduled_for       DateTime?           @db.Timestamptz(6)
-  published_at        DateTime?           @db.Timestamptz(6)
-  batch_id            String?             @db.VarChar(64)
-  created_by          String              @default("tenant") @db.VarChar(12)
-  recurrence          Json?
-  approved_by         String?             @db.VarChar
-  approved_at         DateTime?           @db.Timestamptz(6)
-  attempts            Int                 @default(0)
-  last_error          String?
-  publishing_started_at DateTime?         @db.Timestamptz(6)
-  tenants             tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_posts_tenant_id")
-  gbp_locations_list  gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                    String              @id @db.VarChar(50)
+  tenant_id             String              @db.VarChar(50)
+  google_post_id        String?             @db.VarChar(255)
+  summary               String
+  topic_type            String?             @default("standard") @db.VarChar(50)
+  call_to_action_type   String?             @db.VarChar(50)
+  call_to_action_url    String?
+  media_url             String?
+  event_title           String?             @db.VarChar(255)
+  event_start_date      DateTime?           @db.Timestamp(6)
+  event_end_date        DateTime?           @db.Timestamp(6)
+  offer_coupon_code     String?             @db.VarChar(100)
+  offer_redeem_url      String?
+  offer_terms           String?
+  state                 String?             @default("live") @db.VarChar(50)
+  google_create_time    DateTime?           @db.Timestamp(6)
+  google_update_time    DateTime?           @db.Timestamp(6)
+  created_at            DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?           @default(now()) @db.Timestamp(6)
+  location_id           String?             @db.VarChar
+  post_name             String?             @db.VarChar
+  status                String              @default("PUBLISHED") @db.VarChar(16)
+  scheduled_for         DateTime?           @db.Timestamptz(6)
+  published_at          DateTime?           @db.Timestamptz(6)
+  batch_id              String?             @db.VarChar(64)
+  created_by            String              @default("tenant") @db.VarChar(12)
+  recurrence            Json?
+  approved_by           String?             @db.VarChar
+  approved_at           DateTime?           @db.Timestamptz(6)
+  attempts              Int                 @default(0)
+  last_error            String?
+  publishing_started_at DateTime?           @db.Timestamptz(6)
+  tenants               tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_posts_tenant_id")
+  gbp_locations_list    gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([batch_id], map: "idx_gbp_posts_batch")
   @@index([status, scheduled_for], map: "idx_gbp_posts_due")

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { apiRequest } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import {
@@ -51,6 +52,9 @@ export default function GBPAdvancedFeaturesPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [creatingPost, setCreatingPost] = useState(false);
   const [newPostSummary, setNewPostSummary] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
+  const [schedulingPost, setSchedulingPost] = useState(false);
 
   // Reviews state
   const [reviews, setReviews] = useState<GbpReview[]>([]);
@@ -73,6 +77,51 @@ export default function GBPAdvancedFeaturesPage() {
       clientLogger.error('Failed to fetch posts:', { detail: error });
     }
   }, [tenantId]);
+
+  const fetchScheduledPosts = useCallback(async () => {
+    try {
+      const res = await apiRequest(`/api/google/business/posts/scheduled?tenantId=${tenantId}`);
+      const body = await res.json();
+      if (body?.success) setScheduledPosts(body.data.posts || []);
+    } catch (error) {
+      clientLogger.error('Failed to fetch scheduled posts:', { detail: error });
+    }
+  }, [tenantId]);
+
+  async function handleSchedulePost() {
+    if (!newPostSummary || !scheduledAt) return;
+    try {
+      setSchedulingPost(true);
+      await apiRequest(`/api/google/business/posts/schedule`, {
+        method: 'POST',
+        body: JSON.stringify({
+          tenantId,
+          summary: newPostSummary,
+          topicType: 'STANDARD',
+          scheduledFor: new Date(scheduledAt).toISOString(),
+        }),
+      });
+      setNewPostSummary('');
+      setScheduledAt('');
+      await fetchScheduledPosts();
+    } catch (error) {
+      clientLogger.error('Failed to schedule post:', { detail: error });
+    } finally {
+      setSchedulingPost(false);
+    }
+  }
+
+  async function handleCancelScheduled(postId: string) {
+    try {
+      await apiRequest(`/api/google/business/posts/${postId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ tenantId }),
+      });
+      await fetchScheduledPosts();
+    } catch (error) {
+      clientLogger.error('Failed to cancel scheduled post:', { detail: error });
+    }
+  }
 
   const fetchReviews = useCallback(async () => {
     try {
