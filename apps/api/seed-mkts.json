@@ -1,0 +1,245 @@
+[
+  {
+    "state": "IN",
+    "city": "Indianapolis",
+    "status": "published",
+    "n": "61",
+    "batches": "7",
+    "first_created": "2026-10-21T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Fort Wayne",
+    "status": "published",
+    "n": "26",
+    "batches": "2",
+    "first_created": "2026-10-24T04:00:00.000Z",
+    "last_published": "2026-10-29T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Indianapolis",
+    "status": "suppressed",
+    "n": "5",
+    "batches": "2",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Indianapolis",
+    "status": "invited",
+    "n": "4",
+    "batches": "1",
+    "first_created": "2026-10-28T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Indianapolis",
+    "status": "draft",
+    "n": "3",
+    "batches": "1",
+    "first_created": "2026-10-28T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Fishers",
+    "status": "published",
+    "n": "2",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Plainfield",
+    "status": "published",
+    "n": "2",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Fort Wayne",
+    "status": "draft",
+    "n": "2",
+    "batches": "1",
+    "first_created": "2026-10-29T04:00:00.000Z",
+    "last_published": null
+  },
+  {
+    "state": "IN",
+    "city": "Avon",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Brownsburg",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-28T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Camby",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Columbus",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Danville",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-28T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Greenwood",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "IN",
+    "city": "Whitestown",
+    "status": "published",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-23T04:00:00.000Z",
+    "last_published": "2026-10-28T04:00:00.000Z"
+  },
+  {
+    "state": "KS",
+    "city": "Olathe",
+    "status": "invited",
+    "n": "4",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "KS",
+    "city": "Kansas City",
+    "status": "invited",
+    "n": "2",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "KS",
+    "city": "Shawnee",
+    "status": "invited",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "KS",
+    "city": "Lawrence",
+    "status": "invited",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Kansas City",
+    "status": "invited",
+    "n": "26",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Gladstone",
+    "status": "invited",
+    "n": "2",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Kansas City",
+    "status": "suppressed",
+    "n": "2",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Independence",
+    "status": "invited",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Grandview",
+    "status": "invited",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Raytown",
+    "status": "invited",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "MO",
+    "city": "Riverside",
+    "status": "invited",
+    "n": "1",
+    "batches": "1",
+    "first_created": "2026-10-26T04:00:00.000Z",
+    "last_published": "2026-10-26T04:00:00.000Z"
+  },
+  {
+    "state": "WI",
+    "city": "Milwaukee",
+    "status": "draft",
+    "n": "10",
+    "batches": "1",
+    "first_created": "2026-10-28T04:00:00.000Z",
+    "last_published": null
+  }
+]
