@@ -25,12 +25,9 @@ import { generateQuickStart } from '../lib/id-generator';
 
 const router = Router();
 
-router.use(authenticateToken);
-router.use(checkTenantAccess);
-
 // ── Managed-state summary ─────────────────────────────────────────────────
 
-router.get('/:tenantId/gbp-managed', async (req: any, res: Response) => {
+router.get('/:tenantId/gbp-managed', authenticateToken, checkTenantAccess, async (req: any, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
 
@@ -115,7 +112,7 @@ const requestChangeSchema = z.object({
   payload: z.record(z.unknown()).optional(),
 });
 
-router.post('/:tenantId/gbp-managed/request-change', async (req: any, res: Response) => {
+router.post('/:tenantId/gbp-managed/request-change', authenticateToken, checkTenantAccess, async (req: any, res: Response) => {
   try {
     const tenantId = req.params.tenantId;
     const parsed = requestChangeSchema.safeParse(req.body);
