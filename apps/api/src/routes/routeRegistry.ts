@@ -312,6 +312,7 @@ import seedReportQrRoutes from '../routes/seed-report-qr';
 import seedReportPublicRoutes from '../routes/seed-report-public';
 import prospectReportPublicRoutes from '../routes/prospect-report-public';
 import growthEngineAdminRoutes from '../routes/growth-engine-admin';
+import seoDemandAdminRoutes from '../routes/seo-demand-admin';
 import marketIntelPublicRoutes from '../routes/market-intel-public';
 import marketIntelCustomerRoutes from '../routes/market-intel-customer';
 import marketIntelSurfacePublicRoutes from '../routes/market-intel-surface-public';
@@ -2123,6 +2124,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'directory',
     authLevel: 'admin',
     comment: 'Admin growth engine analytics (funnel, niche, city, time series, recommendations)',
+  },
+  {
+    path: '/api/admin/seo-demand',
+    router: seoDemandAdminRoutes,
+    domain: 'directory',
+    authLevel: 'admin',
+    comment: 'Search Console demand signals, gaps, click-to-queue (search_batch)',
   },
   {
     path: '/api/public/directory',

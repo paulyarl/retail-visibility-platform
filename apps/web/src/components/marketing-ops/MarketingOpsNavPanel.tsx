@@ -28,6 +28,7 @@ import {
   IconTrendingUp,
   IconSeedling,
   IconPackages,
+  IconSearch,
 } from '@tabler/icons-react';
 
 /**
@@ -39,6 +40,7 @@ export const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops', label: 'Dashboard', icon: IconLayoutDashboard, emoji: '📊' },
   { href: '/settings/admin/marketing-ops/coverage', label: 'Coverage', icon: IconMap2, emoji: '🗺️' },
   { href: '/settings/admin/marketing-ops/queue', label: 'Queue', icon: IconListCheck, emoji: '📥' },
+  { href: '/settings/admin/marketing-ops/search-demand', label: 'Search Demand', icon: IconSearch, emoji: '🔎' },
   { href: '/settings/admin/marketing-ops/communications', label: 'Communications', icon: IconMessages, emoji: '📞' },
   { href: '/settings/admin/marketing-ops/proving-grounds', label: 'Proving Grounds', icon: IconFlask2, emoji: '⚗️' },
   { href: '/settings/admin/marketing-ops/campaigns', label: 'Campaigns', icon: IconTarget, emoji: '🎯' },
