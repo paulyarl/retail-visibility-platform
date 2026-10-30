@@ -24,11 +24,14 @@ import { permissionServiceFactory } from '../services/permissions/PermissionServ
 import { createPost, type GBPPost } from '../services/GBPAdvancedSync';
 import { CrmAlertService } from '../services/CrmAlertService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
+import { emitGbpActivity } from '../lib/google/gbp-activity';
 import { scheduleJob, stopJob } from './registry';
 
 const JOB_NAME = 'gbp-post-scheduler';
 const SCHEDULER_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes
+const CLAIM_LEASE_MS = 15 * 60 * 1000; // PUBLISHING rows older than this are reclaimed
+const MAX_ATTEMPTS = 3;
 
 let firstRun = true;
 
@@ -129,10 +132,93 @@ async function emitPostExpirationTriggers(): Promise<void> {
 /**
  * Process all due SCHEDULED posts. Runs every 5 minutes.
  */
+/**
+ * Publish-failure bookkeeping (Sprint D2, spec §6.3):
+ *  - 429 / Retry-After → reschedule, no attempt burned
+ *  - attempts < MAX_ATTEMPTS → back to SCHEDULED with exponential backoff + jitter
+ *  - attempts >= MAX_ATTEMPTS → FAILED + last_error + ops-internal activity event
+ */
+async function handlePublishFailure(
+  post: { id: string; tenant_id: string; location_id?: string | null; batch_id?: string | null; attempts: number },
+  error: string,
+  status?: number,
+  retryAfterMs?: number
+): Promise<void> {
+  const attempts = (post.attempts ?? 0) + 1;
+
+  if (status === 429) {
+    await prisma.gbp_posts.update({
+      where: { id: post.id },
+      data: {
+        status: 'SCHEDULED',
+        publishing_started_at: null,
+        scheduled_for: new Date(Date.now() + (retryAfterMs ?? 60_000)),
+        last_error: error,
+        updated_at: new Date(),
+      },
+    });
+    logger.warn('[GbpPostScheduler] Rate-limited — rescheduling post', undefined, {
+      postId: post.id,
+      retryAfterMs,
+    });
+    return;
+  }
+
+  if (attempts >= MAX_ATTEMPTS) {
+    await prisma.gbp_posts.update({
+      where: { id: post.id },
+      data: {
+        status: 'FAILED',
+        publishing_started_at: null,
+        attempts,
+        last_error: error,
+        updated_at: new Date(),
+      },
+    });
+    await emitGbpActivity({
+      tenantId: post.tenant_id,
+      gbpLocationId: post.location_id ?? null,
+      action: 'post_failed',
+      actor: 'system',
+      detail: { postId: post.id, error, attempts, batchId: post.batch_id ?? null },
+      visibleToMerchant: false,
+    });
+    logger.warn('[GbpPostScheduler] Post failed after max attempts', undefined, {
+      postId: post.id,
+      attempts,
+      error,
+    });
+    return;
+  }
+
+  const backoffMs = Math.pow(2, attempts) * 5 * 60 * 1000 + Math.floor(Math.random() * 60_000);
+  await prisma.gbp_posts.update({
+    where: { id: post.id },
+    data: {
+      status: 'SCHEDULED',
+      publishing_started_at: null,
+      attempts,
+      last_error: error,
+      scheduled_for: new Date(Date.now() + backoffMs),
+      updated_at: new Date(),
+    },
+  });
+}
+
 async function runPostScheduler(): Promise<void> {
   logger.info('[GbpPostScheduler] Starting scheduled post processing...');
 
   try {
+    // Reclaim stale claims — a row left PUBLISHING past the lease means its
+    // worker died mid-publish; put it back so this pass can take it.
+    await prisma.gbp_posts.updateMany({
+      where: {
+        status: 'PUBLISHING',
+        publishing_started_at: { lt: new Date(Date.now() - CLAIM_LEASE_MS) },
+      },
+      data: { status: 'SCHEDULED', publishing_started_at: null },
+    });
+
     const duePosts = await prisma.gbp_posts.findMany({
       where: {
         status: 'SCHEDULED',
@@ -211,16 +297,28 @@ async function runPostScheduler(): Promise<void> {
             : {}),
         };
 
-        // Publish to Google
-        const result = await createPost(post.tenant_id, gbpPost);
+        // Atomic claim — SCHEDULED → PUBLISHING. count===0 means another
+        // worker took it; never publish the same row twice.
+        const claim = await prisma.gbp_posts.updateMany({
+          where: { id: post.id, status: 'SCHEDULED' },
+          data: { status: 'PUBLISHING', publishing_started_at: new Date() },
+        });
+        if (claim.count === 0) {
+          skipped++;
+          continue;
+        }
+
+        // Publish to Google — persist:false because this row IS the record.
+        const result = await createPost(post.tenant_id, gbpPost, { persist: false });
 
         if (result.success) {
-          // Mark as PUBLISHED
           await prisma.gbp_posts.update({
             where: { id: post.id },
             data: {
               status: 'PUBLISHED',
               published_at: new Date(),
+              publishing_started_at: null,
+              last_error: null,
               post_name: result.postId || null,
               google_post_id: result.postId || null,
               updated_at: new Date(),
@@ -232,39 +330,27 @@ async function runPostScheduler(): Promise<void> {
             tenantId: post.tenant_id,
             googlePostId: result.postId,
           });
-        } else {
-          // Mark as FAILED — will not be retried automatically (merchant can re-create)
-          await prisma.gbp_posts.update({
-            where: { id: post.id },
-            data: {
-              status: 'FAILED',
-              updated_at: new Date(),
+          await emitGbpActivity({
+            tenantId: post.tenant_id,
+            gbpLocationId: (post as any).location_id ?? null,
+            action: 'post_published',
+            actor: post.created_by === 'admin' ? 'admin' : post.created_by === 'autopilot' ? 'autopilot' : 'system',
+            detail: {
+              postId: post.id,
+              remotePostName: result.postId,
+              batchId: (post as any).batch_id ?? null,
+              summary: post.summary?.slice(0, 80),
             },
           });
-          failed++;
-          logger.warn('[GbpPostScheduler] Failed to publish post', undefined, {
-            postId: post.id,
-            tenantId: post.tenant_id,
-            error: result.error,
-          });
+        } else {
+          await handlePublishFailure(post, result.error || 'publish_failed', result.status, result.retryAfterMs);
+          if (result.status === 429 || post.attempts + 1 < MAX_ATTEMPTS) skipped++;
+          else failed++;
         }
       } catch (error) {
-        // Mark as FAILED on unexpected error
-        try {
-          await prisma.gbp_posts.update({
-            where: { id: post.id },
-            data: {
-              status: 'FAILED',
-              updated_at: new Date(),
-            },
-          });
-        } catch (updateError) {
-          logger.error('[GbpPostScheduler] Failed to mark post as FAILED', undefined, {
-            postId: post.id,
-            error: (updateError as Error).message,
-          });
-        }
-        failed++;
+        await handlePublishFailure(post, (error as Error).message);
+        if (post.attempts + 1 < MAX_ATTEMPTS) skipped++;
+        else failed++;
         logger.error('[GbpPostScheduler] Error processing post', undefined, {
           postId: post.id,
           tenantId: post.tenant_id,

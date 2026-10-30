@@ -386,14 +386,23 @@ export interface PostResult {
   success: boolean;
   postId?: string;
   error?: string;
+  /** HTTP status when the call failed at Google (e.g. 429). */
+  status?: number;
+  /** Retry-After header value in ms when the call was rate-limited. */
+  retryAfterMs?: number;
 }
 
 /**
  * Create a standard post (update)
+ *
+ * `persist: false` (used by the publisher job) skips storePost — the caller
+ * owns persistence and the scheduler row is the record of truth, so an
+ * implicit write here would duplicate it.
  */
 export async function createPost(
   tenantId: string,
-  post: GBPPost
+  post: GBPPost,
+  opts?: { persist?: boolean }
 ): Promise<PostResult> {
   try {
     const accessToken = await getValidAccessToken(tenantId);
@@ -443,15 +452,23 @@ export async function createPost(
     if (!response.ok) {
       const error = await response.text();
       logger.error(`[GBPAdvanced] Failed to create post:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-      return { success: false, error: `API error: ${response.status}` };
+      const retryAfter = response.headers.get('Retry-After');
+      return {
+        success: false,
+        error: `API error: ${response.status}`,
+        status: response.status,
+        retryAfterMs: retryAfter ? Number(retryAfter) * 1000 : undefined,
+      };
     }
 
     const result = await response.json() as { name?: string };
     console.log(`[GBPAdvanced] Created post for tenant ${tenantId}`);
-    
+
     // Store post in database — location row id lets portfolio queries and
     // the DFY publisher target the row's location (Sprint D1/D2).
-    await storePost(tenantId, result, target.location.id);
+    if (opts?.persist !== false) {
+      await storePost(tenantId, result, target.location.id);
+    }
     
     return { success: true, postId: result.name };
   } catch (error: any) {

@@ -2607,9 +2607,19 @@ model gbp_posts {
   status              String              @default("PUBLISHED") @db.VarChar(16)
   scheduled_for       DateTime?           @db.Timestamptz(6)
   published_at        DateTime?           @db.Timestamptz(6)
+  batch_id            String?             @db.VarChar(64)
+  created_by          String              @default("tenant") @db.VarChar(12)
+  recurrence          Json?
+  approved_by         String?             @db.VarChar
+  approved_at         DateTime?           @db.Timestamptz(6)
+  attempts            Int                 @default(0)
+  last_error          String?
+  publishing_started_at DateTime?         @db.Timestamptz(6)
   tenants             tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_posts_tenant_id")
   gbp_locations_list  gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@index([batch_id], map: "idx_gbp_posts_batch")
+  @@index([status, scheduled_for], map: "idx_gbp_posts_due")
   @@index([google_post_id], map: "idx_gbp_posts_google_post_id")
   @@index([tenant_id], map: "idx_gbp_posts_tenant_id")
   @@index([tenant_id, status], map: "idx_gbp_posts_tenant_status")
@@ -2635,6 +2645,8 @@ model gbp_reviews {
   reply_status       String              @default("NONE") @db.VarChar(16)
   ai_drafts          Json?
   sentiment          String?             @db.VarChar(12)
+  autopilot_due_at   DateTime?           @db.Timestamptz(6)
+  autopilot_status   String              @default("NONE") @db.VarChar(16)
   tenants            tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_reviews_tenant_id")
   gbp_locations_list gbp_locations_list? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 

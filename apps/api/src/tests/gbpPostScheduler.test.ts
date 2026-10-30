@@ -19,7 +19,9 @@ const {
   mockHasFeature,
   mockGbpPostsFindMany,
   mockGbpPostsUpdate,
+  mockGbpPostsUpdateMany,
   mockCreatePost,
+  mockEmitGbpActivity,
   mockCrmAlertsFindFirst,
   mockGbpLinksFindMany,
   mockCrmAlertCreate,
@@ -27,7 +29,9 @@ const {
   mockHasFeature: vi.fn(),
   mockGbpPostsFindMany: vi.fn(),
   mockGbpPostsUpdate: vi.fn(),
+  mockGbpPostsUpdateMany: vi.fn(),
   mockCreatePost: vi.fn(),
+  mockEmitGbpActivity: vi.fn(),
   mockCrmAlertsFindFirst: vi.fn(),
   mockGbpLinksFindMany: vi.fn(),
   mockCrmAlertCreate: vi.fn(),
@@ -38,6 +42,7 @@ vi.mock('../prisma', () => ({
     gbp_posts: {
       findMany: mockGbpPostsFindMany,
       update: mockGbpPostsUpdate,
+      updateMany: mockGbpPostsUpdateMany,
     },
     crm_alerts: {
       findFirst: mockCrmAlertsFindFirst,
@@ -54,6 +59,10 @@ vi.mock('../logger', () => ({
 
 vi.mock('../lib/platform-scope', () => ({
   PLATFORM_SCOPE: 'platform',
+}));
+
+vi.mock('../lib/google/gbp-activity', () => ({
+  emitGbpActivity: mockEmitGbpActivity,
 }));
 
 vi.mock('../services/CrmAlertService', () => ({
@@ -101,6 +110,9 @@ const BASE_POST = {
   scheduled_for: PAST_DATE,
   post_name: null,
   google_post_id: null,
+  attempts: 0,
+  created_by: 'tenant',
+  batch_id: null,
 };
 
 // ── Setup ────────────────────────────────────────────────────────────────
@@ -110,6 +122,10 @@ beforeEach(() => {
   // Default: entitled
   mockHasFeature.mockResolvedValue(true);
   mockGbpPostsUpdate.mockResolvedValue({});
+  // Claim-by-update succeeds by default (count: 1); set {count: 0} in tests
+  // to simulate another worker taking the row.
+  mockGbpPostsUpdateMany.mockResolvedValue({ count: 1 });
+  mockEmitGbpActivity.mockResolvedValue(undefined);
   mockCreatePost.mockResolvedValue({ success: true, postId: 'google_post_123' });
   // Default: no expired posts (findMany returns [] for the expiry scan)
   mockCrmAlertsFindFirst.mockResolvedValue(null);
@@ -129,7 +145,7 @@ describe('gbpPostScheduler', () => {
 
     expect(mockCreatePost).toHaveBeenCalledWith(TENANT_ID, expect.objectContaining({
       summary: 'Check out our new menu!',
-    }));
+    }), { persist: false });
     expect(mockGbpPostsUpdate).toHaveBeenCalledWith({
       where: { id: 'post_001' },
       data: expect.objectContaining({
@@ -151,7 +167,7 @@ describe('gbpPostScheduler', () => {
     expect(mockGbpPostsUpdate).not.toHaveBeenCalled();
   });
 
-  it('3. Marks FAILED on Google API error', async () => {
+  it('3. Retries with backoff on Google API error (attempts < 3 → SCHEDULED)', async () => {
     mockGbpPostsFindMany.mockResolvedValue([
       { ...BASE_POST, id: 'post_002' },
     ]);
@@ -162,9 +178,93 @@ describe('gbpPostScheduler', () => {
     expect(mockGbpPostsUpdate).toHaveBeenCalledWith({
       where: { id: 'post_002' },
       data: expect.objectContaining({
-        status: 'FAILED',
+        status: 'SCHEDULED',
+        attempts: 1,
+        last_error: 'API error: 500',
+        publishing_started_at: null,
+        scheduled_for: expect.any(Date),
       }),
     });
+  });
+
+  it('3b. Skips when another worker already claimed the row (claim lease)', async () => {
+    mockGbpPostsFindMany.mockResolvedValue([
+      { ...BASE_POST, id: 'post_claimed' },
+    ]);
+    // claim updateMany → 0 rows matched (status no longer SCHEDULED)
+    mockGbpPostsUpdateMany
+      .mockResolvedValueOnce({ count: 1 }) // stale reclaim sweep
+      .mockResolvedValueOnce({ count: 0 }); // per-post claim fails
+
+    await runSchedulerPass();
+
+    expect(mockCreatePost).not.toHaveBeenCalled();
+    expect(mockGbpPostsUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'post_claimed' }, data: expect.objectContaining({ status: 'PUBLISHED' }) })
+    );
+  });
+
+  it('3c. Terminal failure at max attempts → FAILED + ops activity event', async () => {
+    mockGbpPostsFindMany.mockResolvedValue([
+      { ...BASE_POST, id: 'post_003', attempts: 2 },
+    ]);
+    mockCreatePost.mockResolvedValue({ success: false, error: 'API error: 500' });
+
+    await runSchedulerPass();
+
+    expect(mockGbpPostsUpdate).toHaveBeenCalledWith({
+      where: { id: 'post_003' },
+      data: expect.objectContaining({
+        status: 'FAILED',
+        attempts: 3,
+        last_error: 'API error: 500',
+      }),
+    });
+    expect(mockEmitGbpActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'post_failed',
+        tenantId: TENANT_ID,
+        visibleToMerchant: false,
+      })
+    );
+  });
+
+  it('3d. 429 reschedules without burning an attempt (Retry-After)', async () => {
+    mockGbpPostsFindMany.mockResolvedValue([
+      { ...BASE_POST, id: 'post_429' },
+    ]);
+    mockCreatePost.mockResolvedValue({ success: false, error: 'API error: 429', status: 429, retryAfterMs: 120_000 });
+
+    await runSchedulerPass();
+
+    expect(mockGbpPostsUpdate).toHaveBeenCalledWith({
+      where: { id: 'post_429' },
+      data: expect.objectContaining({
+        status: 'SCHEDULED',
+        scheduled_for: expect.any(Date),
+        publishing_started_at: null,
+      }),
+    });
+    // attempts stays untouched on 429
+    expect(mockGbpPostsUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ attempts: 1 }) })
+    );
+  });
+
+  it('3e. Emits a merchant-visible post_published activity on success', async () => {
+    mockGbpPostsFindMany.mockResolvedValue([
+      { ...BASE_POST, id: 'post_evt', created_by: 'admin' },
+    ]);
+
+    await runSchedulerPass();
+
+    expect(mockEmitGbpActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'post_published',
+        actor: 'admin',
+        tenantId: TENANT_ID,
+      })
+    );
   });
 
   it('4. Never double-publishes (once PUBLISHED, the row is skipped)', async () => {
