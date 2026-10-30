@@ -240,6 +240,19 @@ async function runPostScheduler(): Promise<void> {
     let failed = 0;
     let skipped = 0;
 
+    // Approval-mode cache (Q3): one lookup per tenant per pass.
+    const approvalModeCache = new Map<string, string>();
+    const getApprovalMode = async (tenantId: string): Promise<string> => {
+      if (!approvalModeCache.has(tenantId)) {
+        const s = await prisma.tenant_gbp_options_settings.findUnique({
+          where: { tenant_id: tenantId },
+          select: { gbp_approval_mode: true },
+        });
+        approvalModeCache.set(tenantId, (s as any)?.gbp_approval_mode ?? 'auto_publish');
+      }
+      return approvalModeCache.get(tenantId)!;
+    };
+
     for (const post of duePosts) {
       try {
         // Entitlement gate — only process for tenants with gbp_posts_scheduler
@@ -296,6 +309,14 @@ async function runPostScheduler(): Promise<void> {
               }
             : {}),
         };
+
+        // Approval mode (Q3): non-auto_publish modes hold rows until the
+        // merchant approves them from the managed view (approved_at set).
+        const approvalMode = await getApprovalMode(post.tenant_id);
+        if (approvalMode !== 'auto_publish' && !(post as any).approved_at) {
+          skipped++;
+          continue;
+        }
 
         // Atomic claim — SCHEDULED → PUBLISHING. count===0 means another
         // worker took it; never publish the same row twice.

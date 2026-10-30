@@ -20,6 +20,7 @@ const {
   mockGbpPostsFindMany,
   mockGbpPostsUpdate,
   mockGbpPostsUpdateMany,
+  mockTenantGbpOptionsFindUnique,
   mockCreatePost,
   mockEmitGbpActivity,
   mockCrmAlertsFindFirst,
@@ -30,6 +31,7 @@ const {
   mockGbpPostsFindMany: vi.fn(),
   mockGbpPostsUpdate: vi.fn(),
   mockGbpPostsUpdateMany: vi.fn(),
+  mockTenantGbpOptionsFindUnique: vi.fn(),
   mockCreatePost: vi.fn(),
   mockEmitGbpActivity: vi.fn(),
   mockCrmAlertsFindFirst: vi.fn(),
@@ -43,6 +45,10 @@ vi.mock('../prisma', () => ({
       findMany: mockGbpPostsFindMany,
       update: mockGbpPostsUpdate,
       updateMany: mockGbpPostsUpdateMany,
+    },
+    tenant_gbp_options_settings: {
+      // null → 'auto_publish' default; set a row in tests to exercise the gate
+      findUnique: mockTenantGbpOptionsFindUnique,
     },
     crm_alerts: {
       findFirst: mockCrmAlertsFindFirst,
@@ -126,6 +132,7 @@ beforeEach(() => {
   // to simulate another worker taking the row.
   mockGbpPostsUpdateMany.mockResolvedValue({ count: 1 });
   mockEmitGbpActivity.mockResolvedValue(undefined);
+  mockTenantGbpOptionsFindUnique.mockResolvedValue(null);
   mockCreatePost.mockResolvedValue({ success: true, postId: 'google_post_123' });
   // Default: no expired posts (findMany returns [] for the expiry scan)
   mockCrmAlertsFindFirst.mockResolvedValue(null);

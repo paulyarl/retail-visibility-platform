@@ -13,9 +13,11 @@
  * Auth: authenticateToken + requirePlatformAdmin
  */
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { previewBatch, createAndMaterializeBatch } from '../services/GbpBatchService';
 
 const router = Router();
 
@@ -344,6 +346,108 @@ router.get('/review-queue', async (req: any, res: Response) => {
   } catch (error: any) {
     logger.error('[gbp-monitor] review-queue error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch review queue' });
+  }
+});
+
+// ── Post Batches (DFY fan-out, spec §6.2) ────────────────────────────────
+
+const batchSchema = z.object({
+  audience: z.object({
+    type: z.enum(['all_managed', 'explicit']),
+    gbpLocationIds: z.array(z.string()).max(500).optional(),
+  }),
+  template: z.object({
+    summary: z.string().min(1).max(1500),
+    topicType: z.enum(['STANDARD', 'EVENT', 'OFFER']).optional(),
+    event: z.object({
+      title: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }).optional(),
+    offer: z.object({
+      couponCode: z.string().optional(),
+      redeemUrl: z.string().optional(),
+      terms: z.string().optional(),
+    }).optional(),
+    callToAction: z.object({ type: z.string().optional(), url: z.string().optional() }).optional(),
+    media: z.object({ type: z.string().optional(), url: z.string().optional() }).optional(),
+  }),
+  scheduledFor: z.string().datetime(),
+  recurrence: z.unknown().optional(),
+});
+
+router.get('/batches', async (req: any, res: Response) => {
+  try {
+    const batches = await prisma.gbp_post_batches.findMany({
+      orderBy: { created_at: 'desc' },
+      take: 100,
+    });
+    const ids = batches.map((b) => b.id);
+    const counts = ids.length
+      ? await prisma.gbp_posts.groupBy({ by: ['batch_id', 'status'], where: { batch_id: { in: ids } }, _count: true })
+      : [];
+    const countMap = new Map<string, Record<string, number>>();
+    for (const c of counts) {
+      const m = countMap.get(c.batch_id!) ?? {};
+      m[c.status] = c._count;
+      countMap.set(c.batch_id!, m);
+    }
+    res.json({
+      success: true,
+      data: batches.map((b) => ({
+        ...b,
+        postCounts: countMap.get(b.id) ?? {},
+      })),
+    });
+  } catch (error: any) {
+    logger.error('[gbp-monitor] batches list error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch batches' });
+  }
+});
+
+router.post('/batches/preview', async (req: any, res: Response) => {
+  try {
+    const parsed = batchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const { audience, template, scheduledFor } = parsed.data;
+    const plans = await previewBatch(audience, template, new Date(scheduledFor));
+    res.json({
+      success: true,
+      data: plans.map(({ loc, decision }) => ({
+        gbpLocationId: loc.id,
+        tenantId: loc.tenant_id,
+        outcome: decision.outcome,
+        scheduledFor: decision.scheduledFor instanceof Date ? decision.scheduledFor.toISOString() : decision.scheduledFor,
+        reason: decision.reason,
+      })),
+    });
+  } catch (error: any) {
+    logger.error('[gbp-monitor] batch preview error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to preview batch' });
+  }
+});
+
+router.post('/batches', async (req: any, res: Response) => {
+  try {
+    const parsed = batchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const { audience, template, scheduledFor, recurrence } = parsed.data;
+    const actorUserId = req.user?.userId || req.user?.id || null;
+    const { batchId, decisions } = await createAndMaterializeBatch(
+      audience,
+      template,
+      new Date(scheduledFor),
+      actorUserId,
+      recurrence
+    );
+    res.json({ success: true, data: { batchId, decisions } });
+  } catch (error: any) {
+    logger.error('[gbp-monitor] batch create error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to create batch' });
   }
 });
 

@@ -2542,6 +2542,21 @@ model gbp_locations_list {
   @@index([tenant_id], map: "idx_gbp_locations_tenant")
 }
 
+model gbp_post_batches {
+  id              String    @id @db.VarChar(64)
+  actor_user_id   String?   @db.VarChar
+  audience        Json
+  template        Json
+  recurrence      Json?
+  scheduled_for   DateTime  @db.Timestamptz(6)
+  status          String    @default("draft") @db.VarChar(16)
+  materialized_at DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([status, created_at(sort: Desc)], map: "idx_gbp_post_batches_status")
+}
+
 model gbp_activity_events {
   id                  String             @id
   tenant_id           String             @db.VarChar
