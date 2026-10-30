@@ -3256,23 +3256,94 @@ model merchant_stripe_connections {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model meta_oauth_accounts_list {
-  id                     String                  @id
-  tenant_id              String
-  meta_account_id        String
-  email                  String?
-  display_name           String?
-  profile_picture_url    String?
-  business_id            String?
-  catalog_id             String?
-  instagram_account_id   String?
-  scopes                 String[]                @default([])
-  created_at             DateTime                @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime                @default(now()) @db.Timestamptz(6)
-  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_meta_oauth_tenant")
-  meta_oauth_tokens_list meta_oauth_tokens_list?
+  id                        String                     @id
+  tenant_id                 String
+  meta_account_id           String
+  email                     String?
+  display_name              String?
+  profile_picture_url       String?
+  business_id               String?
+  catalog_id                String?
+  instagram_account_id      String?
+  scopes                    String[]                   @default([])
+  created_at                DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                   @default(now()) @db.Timestamptz(6)
+  posting_scopes_granted_at DateTime?                  @db.Timestamptz(6)
+  reauthorization_required  Boolean                    @default(false)
+  tenants                   tenants                    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_meta_oauth_tenant")
+  meta_oauth_tokens_list    meta_oauth_tokens_list?
+  meta_surface_connections  meta_surface_connections[]
 
   @@unique([tenant_id, meta_account_id], map: "idx_meta_oauth_accounts_tenant_meta")
   @@index([tenant_id], map: "idx_meta_oauth_accounts_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model meta_surface_connections {
+  id                       String                   @id @db.VarChar(50)
+  meta_oauth_account_id    String
+  surface                  String                   @db.VarChar(20)
+  target_ref               String                   @db.VarChar(64)
+  display_name             String?                  @db.VarChar(255)
+  access_token_enc         String
+  token_expires_at         DateTime?                @db.Timestamptz(6)
+  scopes                   String[]                 @default([]) @db.VarChar
+  connected_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  meta_oauth_accounts_list meta_oauth_accounts_list @relation(fields: [meta_oauth_account_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  social_posts             social_posts[]
+
+  @@unique([meta_oauth_account_id, surface, target_ref])
+  @@index([meta_oauth_account_id], map: "idx_meta_surfaces_account")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model social_posts {
+  id                       String                    @id @db.VarChar(50)
+  tenant_id                String                    @db.VarChar(50)
+  platform                 String                    @db.VarChar(24)
+  target_ref               String?                   @db.VarChar(255)
+  surface_connection_id    String?                   @db.VarChar(50)
+  body                     String
+  link_url                 String?
+  media                    Json?
+  platform_payload         Json?
+  status                   String                    @default("DRAFT") @db.VarChar(16)
+  scheduled_for            DateTime?                 @db.Timestamptz(6)
+  published_at             DateTime?                 @db.Timestamptz(6)
+  remote_post_id           String?                   @db.VarChar(255)
+  permalink                String?
+  attempts                 Int                       @default(0)
+  last_error               String?
+  publishing_started_at    DateTime?                 @db.Timestamptz(6)
+  batch_id                 String?                   @db.VarChar(64)
+  recurrence               Json?
+  created_by               String                    @default("tenant") @db.VarChar(12)
+  approved_by              String?                   @db.VarChar(50)
+  approved_at              DateTime?                 @db.Timestamptz(6)
+  created_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  meta_surface_connections meta_surface_connections? @relation(fields: [surface_connection_id], references: [id], onUpdate: NoAction)
+  tenants                  tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status, scheduled_for], map: "idx_social_posts_due")
+  @@index([tenant_id, status], map: "idx_social_posts_tenant")
+  @@index([platform], map: "idx_social_posts_platform")
+  @@index([batch_id], map: "idx_social_posts_batch")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model social_media {
+  id           String   @id @db.VarChar(50)
+  tenant_id    String   @db.VarChar(50)
+  storage_path String   @db.VarChar(500)
+  public_url   String
+  mime_type    String?  @db.VarChar(100)
+  bytes        Int?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  tenants      tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_social_media_tenant")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -7059,6 +7130,22 @@ model tenant_social_commerce_options_settings {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_social_posting_settings {
+  id                        String   @id @db.VarChar(255)
+  tenant_id                 String   @unique @db.VarChar(255)
+  social_posting_enabled    Boolean  @default(true)
+  social_posting_meta_on    Boolean  @default(true)
+  social_posting_ig_on      Boolean  @default(true)
+  social_posting_threads_on Boolean  @default(true)
+  default_publish_time      String?  @db.VarChar(5)
+  created_at                DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+  tenants                   tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_social_posting_settings_tenant")
+
+  @@index([tenant_id], map: "idx_social_posting_settings_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_social_pixels {
   id                  String    @id @db.VarChar(100)
   tenant_id           String    @unique(map: "uq_social_pixels_tenant") @db.VarChar(100)
@@ -7426,7 +7513,9 @@ model tenants {
   service_bookings                                                                       service_bookings[]
   shipments                                                                              shipments[]
   shopping_carts                                                                         shopping_carts[]
+  social_media                                                                           social_media[]
   social_mentions                                                                        social_mentions[]
+  social_posts                                                                           social_posts[]
   subscription_invoices                                                                  subscription_invoices[]
   sync_jobs                                                                              sync_jobs[]
   tenant_barcode_scan_settings                                                           tenant_barcode_scan_settings?
@@ -7460,6 +7549,7 @@ model tenants {
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
   tenant_social_commerce_options_settings                                                tenant_social_commerce_options_settings?
   tenant_social_pixels                                                                   tenant_social_pixels?
+  tenant_social_posting_settings                                                         tenant_social_posting_settings?
   tenant_storefront_gallery_settings                                                     tenant_storefront_gallery_settings?
   tenant_storefront_hours_settings                                                       tenant_storefront_hours_settings?
   tenant_storefront_layouts_settings                                                     tenant_storefront_layouts_settings?

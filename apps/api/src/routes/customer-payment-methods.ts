@@ -12,46 +12,15 @@
 
 import { Router, Request, Response } from 'express';
 import { CustomerPaymentMethodsService } from '../services/CustomerPaymentMethodsService';
-import { CustomerTokenService } from '../services/CustomerTokenService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { requireCustomerAuth } from '../middleware/customer-auth';
 
 const router = Router();
 const paymentMethodsService = CustomerPaymentMethodsService.getInstance();
-const customerTokenService = CustomerTokenService.getInstance();
 
 // Middleware to extract customer from JWT token or session cookie
-const getCustomerId = (req: Request): string | null => {
-  // Try JWT token first
-  const token = CustomerTokenService.extractBearerToken(req);
-  if (token) {
-    const payload = customerTokenService.verifyAccessToken(token);
-    if (payload) {
-      return payload.customerId;
-    }
-  }
-
-  // Fallback to session cookie
-  return req.cookies?.customer_session_id || null;
-};
-
 // Middleware to require authentication
-const requireCustomerAuth = (req: Request, res: Response, next: Function) => {
-  const customerId = getCustomerId(req);
-
-  if (!customerId) {
-    console.log('[Customer Payment Methods] Authentication failed');
-    return res.status(401).json({
-      success: false,
-      error: 'unauthorized',
-      message: 'Authentication required',
-    });
-  }
-
-  (req as any).customerId = customerId;
-  next();
-};
-
 /**
  * GET /api/customer-payment-methods
  * 

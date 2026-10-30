@@ -20,41 +20,19 @@ import { MarketIntelService } from '../services/MarketIntelService';
 import { MarketIntelAccessService, AccessTier } from '../services/MarketIntelAccessService';
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
-import { CustomerTokenService } from '../services/CustomerTokenService';
 import { MarketIntelReportPdfService } from '../services/marketing/MarketIntelReportPdfService';
 import { logger } from '../logger';
+import { requireCustomerAuth } from '../middleware/customer-auth';
 
 const router = Router();
 const service = MarketIntelService.getInstance();
 const accessService = MarketIntelAccessService.getInstance();
-const customerTokenService = CustomerTokenService.getInstance();
 
 // Demo default price per spec §6.3 — $29 single-report, permanent, per business.
 // Operator-overridable via platform_settings_list (unifiedConfig fallback).
 const DEFAULT_UNLOCK_PRICE_CENTS = 2900;
 
 // ── Auth middleware (requireCustomerAuth only — no requirePlatformContext) ─
-
-const getCustomerId = (req: Request): string | null => {
-  const token = CustomerTokenService.extractBearerToken(req);
-  if (token) {
-    const payload = customerTokenService.verifyAccessToken(token);
-    if (payload) return payload.customerId;
-  }
-  if (req.cookies?.customer_session_id) {
-    return req.cookies.customer_session_id;
-  }
-  return null;
-};
-
-const requireCustomerAuth = (req: Request, res: Response, next: Function) => {
-  const customerId = getCustomerId(req);
-  if (!customerId) {
-    return res.status(401).json({ success: false, error: 'unauthorized', message: 'Not authenticated' });
-  }
-  (req as any).customerId = customerId;
-  next();
-};
 
 /**
  * GET /api/customer/place/:slug/market-intel/partial

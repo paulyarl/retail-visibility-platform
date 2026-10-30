@@ -139,6 +139,8 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'gallery-events-purge', scheduleLabel: 'daily at 2:30 AM UTC', description: 'Purges gallery events past 90-day retention' },
           { name: 'abandoned-cart-recovery', scheduleLabel: 'every 30 minutes', description: 'Sends abandoned cart recovery emails' },
           { name: 'meta-catalog-sync', scheduleLabel: 'every 6 hours', description: 'Meta/Facebook catalog sync' },
+          { name: 'meta-token-refresh', scheduleLabel: 'every 6 hours', description: 'Meta user + Threads surface token refresh' },
+          { name: 'social-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled social posts' },
           { name: 'tiktok-catalog-sync', scheduleLabel: 'every 6 hours', description: 'TikTok catalog sync' },
           { name: 'supplier-csv-sync', scheduleLabel: 'every 6 hours', description: 'Supplier CSV feed sync' },
           { name: 'supplier-opensource-sync', scheduleLabel: 'hourly incremental + nightly backfill', description: 'Open-source supplier data sync' },
@@ -575,6 +577,15 @@ if (process.env.NODE_ENV !== "test") {
       try {
         const { startGbpPostScheduler } = await import('./jobs/gbpPostScheduler');
         startGbpPostScheduler();
+
+        // Social post scheduler (every 5min) — publishes due SCHEDULED rows
+        // to connected social surfaces via the adapter registry.
+        const { startSocialPostScheduler } = await import('./jobs/socialPostScheduler');
+        startSocialPostScheduler();
+
+        // Meta token refresh (every 6h) — user token + Threads surface tokens
+        const { startMetaTokenRefresh } = await import('./jobs/metaTokenRefresh');
+        startMetaTokenRefresh();
 
         // Model-B access drift — daily admins.list sweep on managed locations
         const { initializeGbpAdminDriftJob } = await import('./jobs/gbpAdminDrift');

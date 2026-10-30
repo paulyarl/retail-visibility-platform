@@ -223,6 +223,7 @@ import adminCustomDomainsRoutes from '../routes/admin-custom-domains';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
 import marketingCustomerRoutes from '../routes/marketing-customer';
 import gbpCustomerRoutes from '../routes/gbp-customer';
+import socialCustomerRoutes from '../routes/social-customer';
 import gbpOptionsSettingsRoutes from '../routes/gbp-options-settings';
 import gbpMonitorRoutes from '../routes/gbp-monitor';
 import directoryGbpPublicRoutes from '../routes/directory-gbp-public';
@@ -1108,6 +1109,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
     comment: 'GBP Management Suite customer portal routes — authenticated, platform-context-gated (Phase 0 scaffold)',
+  },
+  {
+    path: '/api/customer/marketing/social',
+    router: socialCustomerRoutes,
+    domain: 'customer',
+    authLevel: 'public', // auth handled by requireCustomerAuth middleware inside
+    comment: 'Social Posting Suite customer portal routes — authenticated, platform-context-gated',
   },
   {
     path: '/api/customer/place',

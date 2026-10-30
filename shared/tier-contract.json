@@ -896,6 +896,14 @@
       "social_commerce_tiktok_pixel",
       "social_commerce_tiktok_shop"
     ],
+    "social_posting": [
+      "social_posting_enabled",
+      "social_posting_flexible",
+      "social_posting_instagram",
+      "social_posting_meta",
+      "social_posting_scheduler",
+      "social_posting_threads"
+    ],
     "storefront_domains": [
       "storefront_domains_custom_domain",
       "storefront_domains_disabled",

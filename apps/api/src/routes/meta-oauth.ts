@@ -25,6 +25,8 @@ import {
   encryptToken,
   decryptToken,
   revokeToken,
+  META_SCOPES,
+  META_POSTING_SCOPES,
 } from '../lib/meta/oauth';
 import { fullCatalogSync } from '../services/MetaCatalogSyncService';
 import { generateMetaOAuthAccountId, generateMetaOAuthTokenId } from '../lib/id-generator';
@@ -82,6 +84,11 @@ router.get('/meta/oauth/status', async (req, res) => {
         catalogId: account?.catalog_id || null,
         instagramAccountId: account?.instagram_account_id || null,
         scopes: tokenRecord?.scopes || null,
+        postingScopes: {
+          granted: META_POSTING_SCOPES.filter((s) => tokenRecord?.scopes?.includes(s)),
+          missing: META_POSTING_SCOPES.filter((s) => !tokenRecord?.scopes?.includes(s)),
+        },
+        reauthorizationRequired: account?.reauthorization_required || META_POSTING_SCOPES.some((s) => !tokenRecord?.scopes?.includes(s)),
         tokenExpiry: tokenRecord?.expires_at || null,
         message: isConnected
           ? (isExpired ? 'Connected but token expired - re-authorization required' : 'Connected to Meta Commerce')
@@ -207,13 +214,18 @@ router.get('/meta/oauth/callback', async (req, res) => {
         email: userInfo.email || null,
         display_name: userInfo.name || null,
         profile_picture_url: userInfo.picture?.data?.url || null,
-        scopes: [],
+        scopes: META_SCOPES,
+        posting_scopes_granted_at: now,
+        reauthorization_required: false,
         updated_at: now,
       },
       update: {
         email: userInfo.email || null,
         display_name: userInfo.name || null,
         profile_picture_url: userInfo.picture?.data?.url || null,
+        scopes: META_SCOPES,
+        posting_scopes_granted_at: now,
+        reauthorization_required: false,
         updated_at: now,
       },
     });
@@ -227,12 +239,13 @@ router.get('/meta/oauth/callback', async (req, res) => {
         account_id: account.id,
         access_token_encrypted: encryptedAccessToken,
         expires_at: expiresAt,
-        scopes: [],
+        scopes: META_SCOPES,
         updated_at: now,
       },
       update: {
         access_token_encrypted: encryptedAccessToken,
         expires_at: expiresAt,
+        scopes: META_SCOPES,
         updated_at: now,
       },
     });

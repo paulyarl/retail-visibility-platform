@@ -33,6 +33,7 @@ export { resolveFunnelOptions } from './FunnelResolver';
 export { resolveCouponOptions } from './CouponResolver';
 export { resolveMarketingOps } from './MarketingOpsResolver';
 export { resolveGbpManagement } from './GbpManagementResolver';
+export { resolveSocialPosting } from './SocialPostingResolver';
 export { resolveFlyer } from './FlyerResolver';
 export { applyCrossCapabilityConstraints, validateProposedChange } from './CapabilityConstraintResolver';
 export { CAPABILITY_CONSTRAINTS, getConstraintsForSource, getConstraintsForTarget, getConstraintsInvolving } from './CapabilityConstraintRegistry';

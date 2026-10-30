@@ -62,6 +62,7 @@ export interface MerchantSettingsBundle {
   couponOptions: CouponOptionsMerchantSettings | null;
   funnelOptions: FunnelOptionsMerchantSettings | null;
   gbpManagement: GbpManagementMerchantSettings | null;
+  socialPosting: SocialPostingMerchantSettings | null;
   flyerOptions: FlyerMerchantSettings | null;
 }
 
@@ -1118,6 +1119,32 @@ export interface EffectiveGbpManagement {
   features: Record<string, boolean>;
 }
 
+export interface SocialPostingMerchantSettings {
+  social_posting_enabled?: boolean | null;
+  social_posting_meta_on?: boolean | null;
+  social_posting_ig_on?: boolean | null;
+  social_posting_threads_on?: boolean | null;
+}
+
+export interface EffectiveSocialPosting {
+  enabled: boolean;
+  is_flexible: boolean;
+  can_post_facebook: boolean;
+  can_post_instagram: boolean;
+  can_post_threads: boolean;
+  can_use_scheduler: boolean;
+  facebook_enabled: boolean;
+  instagram_enabled: boolean;
+  threads_enabled: boolean;
+  merchant_preferences: {
+    social_posting_enabled: boolean;
+    social_posting_meta_on: boolean;
+    social_posting_ig_on: boolean;
+    social_posting_threads_on: boolean;
+  };
+  features: Record<string, boolean>;
+}
+
 // ====================
 // SUBSCRIPTION CONTEXT
 // ====================
@@ -1169,6 +1196,7 @@ export interface EffectiveCapabilities {
     coupon_options: EffectiveCouponOptions;
     marketing_ops: EffectiveMarketingOps;
     gbp_management: EffectiveGbpManagement;
+    social_posting: EffectiveSocialPosting;
     flyer: EffectiveFlyer;
   };
   constraint_violations: ConstraintViolation[];

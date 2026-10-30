@@ -7,38 +7,13 @@
 
 import { Router, Request, Response } from 'express';
 import { CustomerCouponWalletService } from '../services/CustomerCouponWalletService';
-import { CustomerTokenService } from '../services/CustomerTokenService';
 import { CouponService } from '../services/CouponService';
 import { logger } from '../logger';
+import { requireCustomerAuth } from '../middleware/customer-auth';
 
 const router = Router();
 const walletService = CustomerCouponWalletService.getInstance();
-const customerTokenService = CustomerTokenService.getInstance();
 const couponService = CouponService.getInstance();
-
-const getCustomerId = (req: Request): string | null => {
-  const token = CustomerTokenService.extractBearerToken(req);
-  if (token) {
-    const payload = customerTokenService.verifyAccessToken(token);
-    if (payload) {
-      return payload.customerId;
-    }
-  }
-  return req.cookies?.customer_session_id || null;
-};
-
-const requireCustomerAuth = (req: Request, res: Response, next: Function) => {
-  const customerId = getCustomerId(req);
-  if (!customerId) {
-    return res.status(401).json({
-      success: false,
-      error: 'unauthorized',
-      message: 'Authentication required',
-    });
-  }
-  (req as any).customerId = customerId;
-  next();
-};
 
 // POST /api/customer-coupons/save
 router.post('/save', requireCustomerAuth, async (req: Request, res: Response) => {

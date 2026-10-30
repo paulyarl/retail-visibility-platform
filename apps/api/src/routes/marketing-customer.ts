@@ -29,7 +29,6 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
-import { CustomerTokenService } from '../services/CustomerTokenService';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerPaymentMethodsService } from '../services/CustomerPaymentMethodsService';
 import { CouponService } from '../services/CouponService';
@@ -47,52 +46,17 @@ import { MarketingReceiptPdfService } from '../services/marketing/MarketingRecei
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { generateTenantAutoId } from '../middleware/tenantAutoId';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { requireCustomerAuth, requirePlatformContext } from '../middleware/customer-auth';
 
 const router = Router();
-const customerTokenService = CustomerTokenService.getInstance();
 const customerAuthService = CustomerAuthService.getInstance();
 
 // ── Auth middleware (same pattern as customer-coupons.ts) ───────────────
-
-const getCustomerId = (req: Request): string | null => {
-  const token = CustomerTokenService.extractBearerToken(req);
-  if (token) {
-    const payload = customerTokenService.verifyAccessToken(token);
-    if (payload) return payload.customerId;
-  }
-  // Fallback to cookie
-  if (req.cookies?.customer_session_id) {
-    return req.cookies.customer_session_id;
-  }
-  return null;
-};
-
-const requireCustomerAuth = (req: Request, res: Response, next: Function) => {
-  const customerId = getCustomerId(req);
-  if (!customerId) {
-    return res.status(401).json({ success: false, error: 'unauthorized', message: 'Not authenticated' });
-  }
-  (req as any).customerId = customerId;
-  next();
-};
 
 /**
  * Context gate middleware (§4.2): requires hasPlatformContext.
  * Returns 403 context_required if the customer has no platform relationships.
  */
-const requirePlatformContext = async (req: Request, res: Response, next: Function) => {
-  const customerId = (req as any).customerId;
-  const contexts = await customerAuthService.computeContexts(customerId);
-  if (!contexts.platform) {
-    return res.status(403).json({
-      success: false,
-      error: 'context_required',
-      message: 'Marketing portal access requires a linked marketing purchase.',
-    });
-  }
-  next();
-};
-
 // ── Portal overview (§7.2) ──────────────────────────────────────────────
 
 router.get('/overview', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {

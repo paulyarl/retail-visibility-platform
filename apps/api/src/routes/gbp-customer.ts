@@ -33,7 +33,6 @@ import { z } from 'zod';
 import multer from 'multer';
 import { logger } from '../logger';
 import { prisma } from '../prisma';
-import { CustomerTokenService } from '../services/CustomerTokenService';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerGBPAccessService } from '../services/CustomerGBPAccessService';
 import { GBPVerificationService } from '../services/GBPVerificationService';
@@ -45,9 +44,9 @@ import { permissionServiceFactory } from '../services/permissions/PermissionServ
 import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
 import { isGBPSyncAllowed, isGMCSyncAllowed } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { requireCustomerAuth, requirePlatformContext } from '../middleware/customer-auth';
 
 const router = Router();
-const customerTokenService = CustomerTokenService.getInstance();
 const customerAuthService = CustomerAuthService.getInstance();
 const customerGbpAccessService = CustomerGBPAccessService.getInstance();
 const gbpVerificationService = GBPVerificationService.getInstance();
@@ -62,40 +61,6 @@ const mediaUpload = multer({
 });
 
 // ── Auth middleware (same pattern as marketing-customer.ts) ───────────────
-
-const getCustomerId = (req: Request): string | null => {
-  const token = CustomerTokenService.extractBearerToken(req);
-  if (token) {
-    const payload = customerTokenService.verifyAccessToken(token);
-    if (payload) return payload.customerId;
-  }
-  if (req.cookies?.customer_session_id) {
-    return req.cookies.customer_session_id;
-  }
-  return null;
-};
-
-const requireCustomerAuth = (req: Request, res: Response, next: Function) => {
-  const customerId = getCustomerId(req);
-  if (!customerId) {
-    return res.status(401).json({ success: false, error: 'unauthorized', message: 'Not authenticated' });
-  }
-  (req as any).customerId = customerId;
-  next();
-};
-
-const requirePlatformContext = async (req: Request, res: Response, next: Function) => {
-  const customerId = (req as any).customerId;
-  const contexts = await customerAuthService.computeContexts(customerId);
-  if (!contexts.platform) {
-    return res.status(403).json({
-      success: false,
-      error: 'context_required',
-      message: 'Marketing portal access requires a linked marketing purchase.',
-    });
-  }
-  next();
-};
 
 // ── Helper: 501 stub for Phase 1+ endpoints ───────────────────────────────
 

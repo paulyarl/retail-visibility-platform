@@ -20,7 +20,9 @@ const META_AUTH_URL = 'https://www.facebook.com/v21.0/dialog/oauth';
 const META_TOKEN_URL = 'https://graph.facebook.com/v21.0/oauth/access_token';
 const META_GRAPH_URL = 'https://graph.facebook.com/v21.0';
 
-// Required scopes for Meta Commerce
+// Required scopes for Meta Commerce + Social Posting
+// (SOCIAL_POSTING_SUITE_SPEC.md §4.0 — posting scopes need Meta App Review
+// Advanced Access; commerce scopes already approved)
 export const META_SCOPES = [
   'catalog_management',
   'instagram_basic',
@@ -28,6 +30,21 @@ export const META_SCOPES = [
   'pages_read_engagement',
   'pages_show_list',
   'business_management',
+  'pages_manage_posts',
+  'publish_video',
+  'instagram_content_publish',
+  'threads_basic',
+  'threads_content_publish',
+];
+
+// Scopes the posting suite needs beyond the commerce baseline — used to diff
+// existing connections and flag reauthorization_required.
+export const META_POSTING_SCOPES = [
+  'pages_manage_posts',
+  'publish_video',
+  'instagram_content_publish',
+  'threads_basic',
+  'threads_content_publish',
 ];
 
 /**

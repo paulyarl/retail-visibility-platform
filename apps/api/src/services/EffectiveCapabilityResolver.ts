@@ -48,6 +48,7 @@ import {
   resolveCouponOptions,
   resolveMarketingOps,
   resolveGbpManagement,
+  resolveSocialPosting,
   resolveFlyer,
   applyCrossCapabilityConstraints,
 } from './resolvers';
@@ -282,6 +283,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.flyer_gbp?.features || {},
       merchantBundle.flyerOptions
     ),
+    resolveSocialPosting(
+      rawCaps.capabilities.social_posting?.features || {},
+      merchantBundle.socialPosting
+    ),
   ]);
 
   // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
@@ -331,6 +336,7 @@ export async function resolveEffectiveCapabilities(
       gbp_management: effective[28],
       storefront_domains: effective[29],
       flyer: effective[30],
+      social_posting: effective[31],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -808,6 +814,10 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.flyer_gbp?.features || {},
       merchantBundle.flyerOptions
     ),
+    resolveSocialPosting(
+      rawCaps.capabilities.social_posting?.features || {},
+      merchantBundle.socialPosting
+    ),
   ]);
 
   // Directory WhatsApp CTA (flavor A): resolve the wa.me destination only when
@@ -857,6 +867,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       gbp_management: effective[28],
       storefront_domains: effective[29],
       flyer: effective[30],
+      social_posting: effective[31],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -1222,6 +1233,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     couponOptions,
     funnelOptions,
     gbpManagement,
+    socialPosting,
     flyerOptions,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1249,6 +1261,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_coupon_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_funnel_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => (prisma as any).tenant_gbp_options_settings?.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_social_posting_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_flyer_options_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
@@ -1278,6 +1291,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     couponOptions: couponOptions as any,
     funnelOptions: funnelOptions as any,
     gbpManagement: gbpManagement as any,
+    socialPosting: socialPosting as any,
     flyerOptions: flyerOptions as any,
   };
 }
