@@ -86,6 +86,7 @@ export default function GoogleIntegrationsPage() {
   const [linkingMerchantId, setLinkingMerchantId] = useState<string | null>(null);
   const [merchantLinkError, setMerchantLinkError] = useState<string | null>(null);
   const [merchantNeedsReconnect, setMerchantNeedsReconnect] = useState(false);
+  const [merchantNeedsConnect, setMerchantNeedsConnect] = useState(false);
 
   async function fetchSetupStatus() {
     try {
@@ -220,6 +221,7 @@ export default function GoogleIntegrationsPage() {
   async function handleLoadMerchants() {
     setMerchantLinkError(null);
     setMerchantNeedsReconnect(false);
+    setMerchantNeedsConnect(false);
     setShowMerchantSelector(true);
     setLoadingMerchants(true);
     try {
@@ -227,6 +229,7 @@ export default function GoogleIntegrationsPage() {
       if (data.unavailable) {
         setMerchantLinkError(data.unavailable.message);
         setMerchantNeedsReconnect(data.unavailable.code === 'gmc_reconnect_required');
+        setMerchantNeedsConnect(data.unavailable.code === 'gmc_reconnect_required' || data.unavailable.code === 'gmc_not_connected');
         setMerchants([]);
       } else {
         setMerchants(data.merchants);
@@ -416,6 +419,7 @@ export default function GoogleIntegrationsPage() {
           linkingMerchantId={linkingMerchantId}
           merchantLinkError={merchantLinkError}
           merchantNeedsReconnect={merchantNeedsReconnect}
+          merchantNeedsConnect={merchantNeedsConnect}
           onLoadMerchants={handleLoadMerchants}
           onLinkMerchant={handleLinkMerchant}
           onCancelMerchantSelector={() => setShowMerchantSelector(false)}

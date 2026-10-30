@@ -11,7 +11,7 @@
 
 A platform-internal tenant that is our own best customer — "eat our own cooking" at full fidelity:
 
-- **GBP Management Suite playground** — connects to the platform's own verified Google Business Profile (`VisibleShelf`), giving a real, 60+-day profile to exercise posts, reviews, photos, hours/NAP guardian against once Gate B (project allowlisting, case `5-5364000041203`) lands.
+- **GBP Management Suite playground** — connects to the platform's own verified Google Business Profile (`VisibleShelf`), giving a real, 60+-day profile to exercise posts, reviews, photos, hours/NAP guardian against — Gate B (project allowlisting, case `5-5364000041203`) approved 2026-10-29 at 300 QPM.
 - **GMC-aware storefront** — carries real products through the Merchant Center sync + `GMCValidationService` pipeline so feed quality, taxonomy, and validation surfaces are dogfooded end-to-end.
 - **Living demo** — a real storefront on a real tier, viewable like any merchant's, without `is_demo` exclusions (indexable, directory-eligible).
 - **Fixture donor** — once GBP access lands, `GBP_TRANSPORT=record` can refresh `apps/api/fixtures/gbp/approved/` from real responses (see `AGENTS.md` "GBP transport seam").
@@ -50,7 +50,7 @@ A platform-internal tenant that is our own best customer — "eat our own cookin
 
 | Connection | Target | Mechanism | Status |
 |---|---|---|---|
-| Google Business Profile | The platform's own `VisibleShelf` GBP (verified 60+ days) | Normal tenant OAuth connect (`business.manage`), from an account that is owner/manager on that GBP | **Blocked on Gate B** — project `407743626849` allowlist pending (case `5-5364000041203`, ~Nov 7–10). `GET /api/google/business/locations` returns `503 api_not_approved` until quota flips to 300 QPM. |
+| Google Business Profile | The platform's own `VisibleShelf` GBP (verified 60+ days) | Normal tenant OAuth connect (`business.manage`), from an account that is owner/manager on that GBP | **Unblocked 2026-10-29** — Gate B approved (case `5-5364000041203`), project `407743626849` granted 300 QPM. Verify `GET /api/google/business/locations` returns locations instead of `503 api_not_approved`, then connect. |
 | Google Merchant Center | The platform's existing MC — `visibleshelf.com` verified + claimed, `google_merchant_links_list` row for this tenant | Tenant-scoped MC connect | Ready when products exist |
 | Clover/Square/Meta/Pinterest | — | Optional later | Not connected at create |
 
@@ -136,7 +136,7 @@ doppler run --config prd -- node scripts/create-tenant.cjs \
 - [ ] Business profile seeded (`tenant_business_profiles_list`) with platform NAP — phone `+1 913-703-6157`, `contact@visibleshelf.com`, `visibleshelf.com`
 - [ ] Products added per §5
 - [ ] Store categories set — inventory-driven pick, after catalog load (§5 category note)
-- [ ] GBP connect — **after** case `5-5364000041203` approval (quota 300 QPM)
+- [ ] GBP connect — Gate B approved 2026-10-29 (case `5-5364000041203`, 300 QPM); ready to run
 - [ ] MC link — the existing platform MC row
 - [ ] `GBP_TRANSPORT=record` fixture refresh once live GBP calls work
 

@@ -120,6 +120,7 @@ vi.mock('../services/StorefrontPolicyService', () => ({
 }));
 vi.mock('../services/EffectiveCapabilityResolver', () => ({
   resolveEffectiveCapabilities: mockResolveEffectiveCapabilities,
+  resolveEffectiveCapabilitiesFromMV: mockResolveEffectiveCapabilities,
 }));
 vi.mock('../middleware/embed-key-validation', () => ({
   resolveEmbedKey: (_req: any, _res: any, next: any) => next(),

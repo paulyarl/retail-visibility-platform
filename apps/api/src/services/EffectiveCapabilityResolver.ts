@@ -71,7 +71,11 @@ const MEMORY_CACHE = new Map<string, CacheEntry>();
 const MEMORY_TTL_MS = 60_000; // 60 seconds
 
 const MV_CACHE = new Map<string, CacheEntry>();
-const MV_TTL_MS = 60_000; // 60 seconds
+// The MV itself is refreshed on a ~10-minute cadence, so a short server-side
+// TTL buys nothing but refetches. 5 minutes stays strictly fresher than both
+// the MV and the 15-minute web client cache while cutting redundant
+// feature-key lookups on hot public endpoints (Supabase egress).
+const MV_TTL_MS = 300_000; // 5 minutes
 
 /**
  * Invalidate the in-memory cache for a tenant.
@@ -565,7 +569,10 @@ async function fetchRawCapabilitiesFromMV(tenantId: string): Promise<RawCapabili
     if (unmappedKeys.length > 0) {
       const tierFeatureLinks = await prisma.tier_features_list.findMany({
         where: { feature_key: { in: unmappedKeys }, is_enabled: true },
-        include: { capability_type_list: { select: { key: true } } },
+        select: {
+          feature_key: true,
+          capability_type_list: { select: { key: true } },
+        },
       });
 
       for (const tfl of tierFeatureLinks) {
@@ -1029,9 +1036,15 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
 
   let tierFeatures: any[] = [];
   if (allTierIds.length > 0) {
+    // Select only the fields mergeCapabilitySources consumes (TierFeatureRow).
+    // The full row carries two JSON columns + marketing/description text that
+    // inflate Supabase pooler egress ~2-3x on every cache miss.
     tierFeatures = await prisma.tier_features_list.findMany({
       where: { tier_id: { in: allTierIds }, is_enabled: true },
-      include: {
+      select: {
+        feature_key: true,
+        is_enabled: true,
+        is_highlighted: true,
         capability_type_list: { select: { key: true, name: true, category: true } },
       },
       orderBy: { capability_type_id: 'asc' },

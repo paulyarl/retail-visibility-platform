@@ -14,7 +14,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
 import { deriveInternalStatus } from '../utils/subscription-status';
 import { logger } from '../logger';
 
@@ -702,7 +702,10 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
     if (allTierIds.length > 0) {
       tierFeatures = await prisma.tier_features_list.findMany({
         where: { tier_id: { in: allTierIds }, is_enabled: true },
-        include: {
+        select: {
+          feature_key: true,
+          is_enabled: true,
+          is_highlighted: true,
           capability_type_list: { select: { key: true, name: true, category: true } },
         },
         orderBy: { capability_type_id: 'asc' },
@@ -795,7 +798,10 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
   try {
     const { tenantId } = req.params;
 
-    const result = await resolveEffectiveCapabilities(tenantId, { detail: 'summary' });
+    // MV path (sanctioned for public/read-only surfaces, ~10min staleness):
+    // a single pre-resolved feature-key lookup instead of the ~2,500-row
+    // tier_features_list closure fetch — the dominant Supabase egress line.
+    const result = await resolveEffectiveCapabilitiesFromMV(tenantId, { detail: 'summary' });
 
     if (!result) {
       // Tenant not resolved by the service — check if it exists but has no resolvable

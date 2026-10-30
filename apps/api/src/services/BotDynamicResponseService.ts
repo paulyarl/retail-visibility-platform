@@ -18,7 +18,7 @@ import BotCrmAssistantService from './BotCrmAssistantService';
 import { StorefrontPolicyService } from './StorefrontPolicyService';
 import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
 import BotChannelSteeringService, { type SteeringChannel } from './BotChannelSteeringService';
-import { resolveEffectiveCapabilities } from './EffectiveCapabilityResolver';
+import { resolveEffectiveCapabilitiesFromMV } from './EffectiveCapabilityResolver';
 import type { BotMessage } from './BotConversationService';
 import type { BotConfig } from './BotConfigurationService';
 import type { PlatformContextSurface } from './BotPlatformGuideService';
@@ -260,7 +260,7 @@ class BotDynamicResponseService {
     let effectiveProductTypes: string[] | undefined;
     let flyerEnabled = false;
     try {
-      const caps = await resolveEffectiveCapabilities(tenantId);
+      const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
       if (caps?.effective?.chatbot) {
         allowedSkills = caps.effective.chatbot.allowed_skill_types || [];
       }

@@ -83,6 +83,7 @@ interface OverviewTabProps {
   linkingMerchantId: string | null;
   merchantLinkError: string | null;
   merchantNeedsReconnect: boolean;
+  merchantNeedsConnect: boolean;
   onLoadMerchants: () => void;
   onLinkMerchant: (merchant: MerchantAccount) => void;
   onCancelMerchantSelector: () => void;
@@ -108,6 +109,7 @@ export default function OverviewTab({
   linkingMerchantId,
   merchantLinkError,
   merchantNeedsReconnect,
+  merchantNeedsConnect,
   onLoadMerchants,
   onLinkMerchant,
   onCancelMerchantSelector,
@@ -301,7 +303,7 @@ export default function OverviewTab({
                         Connect
                       </Button>
                     )}
-                    {step.id === 'merchant_center' && setupStatus?.hasGoogleAccount && (
+                    {step.id === 'merchant_center' && setupStatus?.hasOAuthTokens && (
                       <Button
                         onClick={onLoadMerchants}
                         loading={loadingMerchants}
@@ -340,14 +342,14 @@ export default function OverviewTab({
           {merchantLinkError && (
             <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-700 dark:text-red-300">{merchantLinkError}</p>
-              {merchantNeedsReconnect && (
+              {merchantNeedsConnect && (
                 <Button
                   onClick={onConnectGoogle}
                   loading={connecting}
                   className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
                 >
                   <LinkIcon className="w-4 h-4" />
-                  Reconnect Google Account
+                  {merchantNeedsReconnect ? 'Reconnect Google Account' : 'Connect Google Account'}
                 </Button>
               )}
             </div>
@@ -422,7 +424,7 @@ export default function OverviewTab({
             <RefreshCw className="w-4 h-4" />
             Refresh Status
           </Button>
-          {!setupStatus?.hasGoogleAccount && (
+          {!setupStatus?.hasOAuthTokens && (
             <Button
               onClick={onConnectGoogle}
               loading={connecting}
@@ -432,7 +434,7 @@ export default function OverviewTab({
               Connect Google Account
             </Button>
           )}
-          {setupStatus?.hasGoogleAccount && !setupStatus?.hasMerchantLink && (
+          {setupStatus?.hasOAuthTokens && !setupStatus?.hasMerchantLink && (
             <Button
               onClick={onLoadMerchants}
               loading={loadingMerchants}

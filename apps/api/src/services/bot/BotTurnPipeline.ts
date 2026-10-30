@@ -23,7 +23,7 @@ import BotChannelSteeringService from '../BotChannelSteeringService';
 import BotCrmIntegrationService from '../BotCrmIntegrationService';
 import BotBertGuardrailService from '../BotBertGuardrailService';
 import BotBertIntentService from '../BotBertIntentService';
-import { resolveEffectiveCapabilities } from '../EffectiveCapabilityResolver';
+import { resolveEffectiveCapabilitiesFromMV } from '../EffectiveCapabilityResolver';
 import type { BotConfig } from '../BotConfigurationService';
 import { logger } from '../../logger';
 
@@ -256,7 +256,7 @@ export async function completeTurn(
   config: BotConfig,
   opts: { enforceChatbotEnabled?: boolean } = {},
 ): Promise<TurnResult> {
-  const caps = await resolveEffectiveCapabilities(conversation.tenantId);
+  const caps = await resolveEffectiveCapabilitiesFromMV(conversation.tenantId);
 
   if (opts.enforceChatbotEnabled && (!caps || !caps.effective.chatbot.enabled)) {
     return {

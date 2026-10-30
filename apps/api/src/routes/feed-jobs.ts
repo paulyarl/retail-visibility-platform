@@ -52,7 +52,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
         id: 'google_account',
         label: 'Connect Google Account',
         description: 'Sign in with your Google account to authorize access',
-        completed: hasGoogleAccount || hasDirectBusinessTokens,
+        completed: hasOAuthTokens || hasDirectBusinessTokens,
         action: '/settings/integrations',
       },
       {

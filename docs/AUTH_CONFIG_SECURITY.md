@@ -293,8 +293,22 @@ was accepted (`401` would mean a bad token) and *after* the API was found enable
 SERVICE_DISABLED` would mean it wasn't). `apps/api/src/routes/google-business-oauth.ts` maps that
 shape to the user-facing `503 api_not_approved`.
 
-**Status: resubmitted 2026-10-27, pending.** Case ID **`5-5364000041203`**, project
-`407743626849`, quoted review window **7–10 business days** (~Nov 7–10).
+**Status: APPROVED 2026-10-29, quota verified in console same-day.** Case ID
+**`5-5364000041203`**, project `407743626849` — Google's approval email grants the default
+**300 QPM** quota, landing ~a week ahead of the quoted 7–10 business-day window (~Nov 7–10).
+Verified 2026-10-29 in console: `mybusinessaccountmanagement.googleapis.com` reads
+**Requests per minute = 300**, and `mybusinessbusinessinformation.googleapis.com` reads
+**Requests per minute = 300** plus per-day limits (Create Location 100/day,
+SearchGoogleLocation 200/day, Update Location 10,000/day) — both Enabled, 0 usage. The
+connect→list→link flow only needs these two, so `GET /api/google/business/locations` is the
+smoke test: it should return locations instead of `503 api_not_approved`. One API still to
+check in the Library: the legacy `mybusiness.googleapis.com` v4 surface
+(reviews/posts/media/insights/verifications — the v1 "migration" only moved the
+business-info slice; these were never replaced) is absent from console Library search but
+appeared in `gcloud services list --available` — the documented approval tell — and was
+**enabled via Cloud Shell `gcloud services enable mybusiness.googleapis.com` 2026-10-29**.
+All three transport hosts are now enabled — connect→list→link (v1) and the Management Suite
+surfaces (v4: posts/reviews/photos/hours guardian) are both unblocked.
 
 History: first application **2026-10-17**, case `3-3112000041953` — rejected during review
 (reported 2026-10-27) because the website URL on the request form did not match the URL in the

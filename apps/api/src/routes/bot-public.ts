@@ -24,7 +24,7 @@ import BotBusinessHoursService from '../services/BotBusinessHoursService';
 import BotProductCatalogService from '../services/BotProductCatalogService';
 import BotCrmAssistantService from '../services/BotCrmAssistantService';
 import { StorefrontPolicyService } from '../services/StorefrontPolicyService';
-import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
 import { preprocessTurn, completeTurn, persistUserTurn, persistAssistantTurn } from '../services/bot/BotTurnPipeline';
 import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
 import { logger } from '../logger';
@@ -90,7 +90,7 @@ router.get('/config', resolveEmbedKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.widget_enabled) {
       return res.json({ success: true, config: null, message: 'Chatbot is not enabled for this tenant' });
     }
@@ -116,7 +116,7 @@ router.post('/conversations', resolveEmbedKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
     const { customerEmail, customerPhone, pageContext, contextEntityName } = validation.data;
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
     }
@@ -220,7 +220,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
 
     // Message passed guardrails — lazy conversation creation on first turn
     if (!conversation) {
-      const caps = await resolveEffectiveCapabilities(tenantId);
+      const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
       if (!caps || !caps.effective.chatbot.enabled) {
         return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
       }
@@ -359,7 +359,7 @@ router.get('/products/search', resolveEmbedKey, async (req, res) => {
     }
     const { query, badge, limit } = validation.data;
 
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({
         success: false,
@@ -412,7 +412,7 @@ router.get('/policies', resolveEmbedKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({
         success: false,
@@ -453,7 +453,7 @@ router.post('/preview', resolveEmbedKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId (or embedKey) and message are required' });
     }
 
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot is not enabled for this tenant' });
     }
@@ -507,7 +507,7 @@ router.get('/crm/ticket-status', resolveEmbedKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_params', message: 'tenantId (or embedKey) and customerEmail are required' });
     }
 
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.skills_enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot skills are not enabled for this tenant' });
     }
@@ -545,7 +545,7 @@ router.post('/crm/create-ticket', resolveEmbedKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'missing_tenant_id', message: 'tenantId or embedKey is required' });
     }
 
-    const caps = await resolveEffectiveCapabilities(tenantId);
+    const caps = await resolveEffectiveCapabilitiesFromMV(tenantId);
     if (!caps || !caps.effective.chatbot.enabled || !caps.effective.chatbot.skills_enabled) {
       return res.status(403).json({ success: false, error: 'capability_disabled', message: 'Chatbot skills are not enabled for this tenant' });
     }

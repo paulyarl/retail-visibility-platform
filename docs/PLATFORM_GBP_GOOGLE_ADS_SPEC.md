@@ -216,6 +216,7 @@ GBP supports linking social profiles directly on the listing — every linked pr
 
 - NAP canonical record kept in one internal doc; every directory citation (Yelp, Bing Places, Apple Business Connect, Facebook) must match GBP exactly — citation inconsistency is a failure mode we scan merchants for.
 - Quarterly GBP audit run **through our own audit pipeline** (eat-the-product loop; also a marketing artifact: "we score our own profile").
+- **GBP API usage policy (binds since allowlist approval 2026-10-29):** no public statements, press, or ad copy may suggest a partnership with, sponsorship by, or endorsement by Google without prior written approval. "We manage your Google Business Profile" / "Google Business Profile management" is a capability claim and fine; "Google partner", "Google-endorsed", Google badges, or implied affiliation are not. Applies to every ad group in §4 and any GBP-Suite marketing surface.
 
 ---
 
