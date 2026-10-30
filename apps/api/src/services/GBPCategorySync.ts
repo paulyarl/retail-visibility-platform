@@ -204,44 +204,54 @@ export class GBPCategorySyncService {
       const unmappedCategories: string[] = [];
       const mappedCategoryIds: string[] = [];
 
-      // 3. Get or create directory listing
-      const listingId = await this.getOrCreateDirectoryListing(tenantId, client);
-
-      // 4. Clear existing category assignments
-      await client.query(
-        'DELETE FROM directory_listing_categories WHERE listing_id = $1',
-        [listingId]
-      );
-
-      // 5. Assign primary category
+      // 3. Resolve mappings BEFORE touching the DB — a fully unmapped pick
+      // must not wipe the listing's existing category assignments.
       const primaryMapping = mappings.find(m => m.gbp_category_id === gbpCategories.primary.id);
-      
-      if (primaryMapping?.platform_category_id) {
+      const resolvedSecondary = gbpCategories.secondary
+        .map(s => ({
+          name: s.name,
+          platformCategoryId: mappings.find(m => m.gbp_category_id === s.id)?.platform_category_id,
+        }))
+        .filter(s => s.platformCategoryId) as Array<{ name: string; platformCategoryId: string }>;
+
+      const mappableCount = (primaryMapping?.platform_category_id ? 1 : 0) + resolvedSecondary.length;
+
+      // 4. Clear + rewrite only when at least one category maps
+      if (mappableCount > 0) {
+        const listingId = await this.getOrCreateDirectoryListing(tenantId, client);
         await client.query(
-          `INSERT INTO directory_listing_categories (listing_id, category_id, is_primary) 
-           VALUES ($1, $2, true)`,
-          [listingId, primaryMapping.platform_category_id]
+          'DELETE FROM directory_listing_categories WHERE listing_id = $1',
+          [listingId]
         );
-        mappedCategoryIds.push(primaryMapping.platform_category_id);
-      } else {
-        unmappedCategories.push(gbpCategories.primary.name);
+
+        if (primaryMapping?.platform_category_id) {
+          await client.query(
+            `INSERT INTO directory_listing_categories (listing_id, category_id, is_primary)
+             VALUES ($1, $2, true)`,
+            [listingId, primaryMapping.platform_category_id]
+          );
+          mappedCategoryIds.push(primaryMapping.platform_category_id);
+        }
+
+        for (const secondary of resolvedSecondary) {
+          if (!mappedCategoryIds.includes(secondary.platformCategoryId)) {
+            await client.query(
+              `INSERT INTO directory_listing_categories (listing_id, category_id, is_primary)
+               VALUES ($1, $2, false)`,
+              [listingId, secondary.platformCategoryId]
+            );
+            mappedCategoryIds.push(secondary.platformCategoryId);
+          }
+        }
       }
 
-      // 6. Assign secondary categories
+      // 5. Track everything that didn't map
+      if (!primaryMapping?.platform_category_id) {
+        unmappedCategories.push(gbpCategories.primary.name);
+      }
       for (const secondary of gbpCategories.secondary) {
         const mapping = mappings.find(m => m.gbp_category_id === secondary.id);
-        
-        if (mapping?.platform_category_id) {
-          // Avoid duplicates
-          if (!mappedCategoryIds.includes(mapping.platform_category_id)) {
-            await client.query(
-              `INSERT INTO directory_listing_categories (listing_id, category_id, is_primary) 
-               VALUES ($1, $2, false)`,
-              [listingId, mapping.platform_category_id]
-            );
-            mappedCategoryIds.push(mapping.platform_category_id);
-          }
-        } else {
+        if (!mapping?.platform_category_id) {
           unmappedCategories.push(secondary.name);
         }
       }

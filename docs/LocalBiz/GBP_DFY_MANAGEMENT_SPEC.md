@@ -36,7 +36,8 @@ The platform operates the merchant's GBP on their behalf. Two connect models:
 
 - The current integration pages/routes gate on tenant access (`AccessPresets.SUPPORT_OR_TENANT_ADMIN`, `isGBPSyncAllowed`). For DFY, routes gain an admin-only layer on top of tenant identity — admin may act on behalf of any tenant.
 - `gbp_management` becomes a **platform-admin capability** (already a per-tenant grant via the Feature Overrides admin UI — proven 2026-10-29).
-- DFY is a **service SKU** on top: new grant class `gbp_managed_service`, slotted into `platform_services` (module exists, currently `enabled:false`, with store_setup/profile_setup/seo_optimization already typed).
+- DFY is a **recurring managed-service subscription** — the fit narrative: *"We run your Google profile for you."* A monthly fee buys delegated operations across the surfaces the ops console manages: **review management** (monitor + AI-drafted replies, approved or autopilot), **profile maintenance** (NAP/hours guardian, attributes, categories kept in sync), **content cadence** (scheduled posts + media pipeline), and **verification assistance** when needed. The delegation model above is what makes it sellable — the merchant never touches Google; the platform's access (invitation or assisted OAuth) is the service.
+- Commercial home: the existing **BSaaS Catalog → Services tab** (`/settings/admin/bsaas-catalog`) — same machinery as `platform_service_store_setup`/`profile_setup`/`seo_optimization`: feature key `platform_service_gbp_managed`, name/description/price/billing/order columns, demo-eligible flag, purchasable via "Create Grant QR". Difference vs the existing six entries: they're `one_time` deliverables; this is `recurring` (monthly) — the `billing` column already types both, so the catalog covers it without schema change. Granting the key flips `platform_services.enabled` + `can_use_gbp_managed` for the tenant and gates the merchant-facing "Managed by VisibleShelf" view. Scope can tier by delegated surface — reviews-only vs full-management (posts + media + NAP guardian) — as separate keys or one key plus `delegated_surfaces` recording what was actually sold.
 
 ---
 
@@ -84,6 +85,7 @@ One row per tenant: OAuth state (provider `gbp` present, expiry), linked locatio
 ### 4.3 Action queues (the DFY work surface)
 
 - **Review queue** — unreplied reviews across managed locations, AI-drafted responses, approve/send
+  - **Autopilot reply scheduling** (`gbp_review_replies` — same due-claim/idempotency pattern as `gbp_scheduled_posts`): `respond_after = detected_at + jitter(2–72h)`, then clamped to the **merchant's own business-hours window** (hours already canonical via `gbpHoursSync` — a reply landing while the store is open reads as the owner at work, not a bot). Per-rating policy rides `gbp_autopilot_min_rating` (5★ fast-path, lower ratings held for human review), daily reply cap so bursts don't all answer at once, skip-if-already-replied idempotency. Timing is merchant-optics, not an algorithm requirement — the real risk gate is never auto-replying to a bad review.
 - **Post calendar** — scheduled `localPosts` per location (§6)
 - **Media pipeline** — upload/curate across locations
 - **NAP/hours guardian** — drift alerts + auto-fix
@@ -174,7 +176,7 @@ New scheduled job `gbp-post-publisher` (pg_cron, e.g. every 5 min — the codeba
 | 7.2 | `gbp_scheduled_posts` + publisher job + DIY schedule picker | 7.1 |
 | 7.3 | Integration-aware stats on GBP Monitor (connections/verifications/object counts/drift) | 7.1 |
 | 7.4 | DFY ops queues (reviews, posts calendar, media, NAP) | 7.3 |
-| 7.5 | `gbp_managed_service` capability + `platform_services` SKU | — |
+| 7.5 | `platform_service_gbp_managed` key in BSaaS Services catalog + `platform_services.can_use_gbp_managed` | — |
 | 7.6 | Managed-by-VisibleShelf merchant view (activity feed, autopilot, request-changes) | 7.4 |
 | 7.7 | `gbp_post_batches` + audience selector + materialization rules | 7.2, 7.4 |
 | 7.8 | Platform-token provider scope + admin-invitation flow (model B) | 3.2 |
@@ -182,6 +184,6 @@ New scheduled job `gbp-post-publisher` (pg_cron, e.g. every 5 min — the codeba
 ## 8. Open questions
 
 - **Q1:** Does model B need Google's *agency* relationship (`locationGroup` accounts) vs per-location `manager`? Per-location manager invitations are simpler and don't require the platform to be an org account — verify the API supports agency-wide grant if we want portfolio ops.
-- **Q2:** Billing — DFY as recurring service SKU vs per-location managed fee? `platform_services` module was designed for service-type offerings; likely the home.
+- **Q2 — resolved:** billing lands in the **BSaaS Catalog → Services tab** as `platform_service_gbp_managed` (recurring billing). Remaining sub-question: flat per-tenant fee vs per-managed-location pricing — per-location likely needs a price-quantity field or a bundle of per-location keys; check whether the Grants tab supports quantity.
 - **Q3:** Approval mode default — do DFY posts/replies auto-publish, or queue for merchant approval? Suggest auto-publish with `autopilot_min_rating` for reviews, optional approval for posts.
 - **Q4 — resolved 2026-10-30:** the "Verified Locations 0/1" gap was `gbp_locations_list.is_verified` only ever being written by the platform's PIN `complete()` flow — locations verified directly in Google's dashboard never got marked. `GBPVerificationService.syncVerificationState(tenantId)` now re-truths the flag from the v4 `verifications` list (a `COMPLETED` entry = Google-verified), called on `GET /google/business/linked-location` so every integrations-page load self-heals the row. Errors swallowed — best-effort, never a blocker. Cross-tenant monitor-level backfill (one call per linked tenant) still belongs in 7.3.
