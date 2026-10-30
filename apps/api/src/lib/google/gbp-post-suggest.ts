@@ -84,3 +84,65 @@ export function featureKeyToTopic(featureKey: string, marketingName?: string | n
     .replace(/_/g, ' ')
     .trim();
 }
+
+// ---------------------------------------------------------------------------
+// External import (the "external" half of the dual pattern, mirroring
+// POST /prompts/executions/external): the merchant ran the rendered prompt in
+// their own LLM and pastes the output here. We sanitize markdown/LLM artifacts
+// and report warnings rather than rejecting — the composer still shows the
+// result for human review before it is scheduled.
+// ---------------------------------------------------------------------------
+
+export const GBP_POST_MAX_CHARS = 1500;
+export const GBP_POST_IDEAL_CHARS = 500;
+
+export interface ExternalPostImport {
+  summary: string;
+  warnings: string[];
+}
+
+export function sanitizeExternalPostCopy(raw: string): ExternalPostImport {
+  const warnings: string[] = [];
+  let text = raw.trim();
+
+  // Code fences — LLMs love wrapping the answer in ```...```.
+  text = text.replace(/```[a-z]*\n?/gi, '').trim();
+
+  // Markdown artifacts that render literally on GBP.
+  if (/\*\*|__|~~|##|^\s*[-*•]\s/m.test(text)) {
+    warnings.push('Removed markdown formatting — GBP posts render it as literal characters.');
+    text = text
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/__(.+?)__/g, '$1')
+      .replace(/~~(.+?)~~/g, '$1')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/^\s*[-*•]\s+/gm, '');
+  }
+
+  // Inline links — GBP has a real CTA field; a pasted URL should live there.
+  if (/\[([^\]]+)\]\(([^)]+)\)/.test(text)) {
+    warnings.push('Converted markdown links to plain text — use the post CTA field for the URL.');
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
+  }
+
+  const hashtags = text.match(/#\w+/g);
+  if (hashtags && hashtags.length > 0) {
+    warnings.push(`Removed ${hashtags.length} hashtag${hashtags.length > 1 ? 's' : ''} — they do nothing on GBP.`);
+    text = text.replace(/#\w+\s*/g, '');
+  }
+
+  if (/^["'].*["']$/s.test(text)) {
+    text = text.replace(/^["']+|["']+$/g, '');
+  }
+
+  text = text.replace(/\n{3,}/g, '\n\n').trim();
+
+  if (text.length > GBP_POST_MAX_CHARS) {
+    warnings.push(`Trimmed to ${GBP_POST_MAX_CHARS} characters (GBP limit).`);
+    text = text.slice(0, GBP_POST_MAX_CHARS).trimEnd();
+  } else if (text.length > GBP_POST_IDEAL_CHARS) {
+    warnings.push(`Over ${GBP_POST_IDEAL_CHARS} characters — GBP truncates long posts in the card view.`);
+  }
+
+  return { summary: text, warnings };
+}

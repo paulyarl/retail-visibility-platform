@@ -20,6 +20,7 @@ import { resolveGbpLocation, resolveGbpTarget } from '../lib/google/gbp-target';
 import {
   buildGbpPostSuggestPrompt,
   featureKeyToTopic,
+  sanitizeExternalPostCopy,
   GBP_POST_SUGGEST_SYSTEM,
 } from '../lib/google/gbp-post-suggest';
 
@@ -1424,23 +1425,32 @@ router.post('/google/business/posts/suggest', async (req, res) => {
       }
     }
 
+    const prompt = buildGbpPostSuggestPrompt({
+      businessName,
+      category,
+      photoDescription,
+      tone,
+      cta,
+      theme,
+      topic: resolvedTopic,
+    });
+
+    // Dual pattern (mirrors marketing-ops briefings): renderOnly returns the
+    // built prompt for the merchant to run in their own LLM and paste back;
+    // otherwise the platform resolves it internally in one click.
+    if (req.body.renderOnly) {
+      return res.json({
+        success: true,
+        data: { prompt, system: GBP_POST_SUGGEST_SYSTEM, topic: resolvedTopic },
+      });
+    }
+
     const { default: aiProviderFactory } = await import('../services/ai-providers');
     const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0.7;
     const result = await aiProviderFactory.generateChatCompletion({
       messages: [
         { role: 'system', content: GBP_POST_SUGGEST_SYSTEM },
-        {
-          role: 'user',
-          content: buildGbpPostSuggestPrompt({
-            businessName,
-            category,
-            photoDescription,
-            tone,
-            cta,
-            theme,
-            topic: resolvedTopic,
-          }),
-        },
+        { role: 'user', content: prompt },
       ],
       maxTokens: 220,
       temperature: temp,
@@ -1449,6 +1459,39 @@ router.post('/google/business/posts/suggest', async (req, res) => {
     res.json({ success: true, data: { summary: result.content.trim(), topic: resolvedTopic } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'suggest_failed' });
+  }
+});
+
+const externalPostImportSchema = z.object({
+  tenantId: z.string().min(1),
+  text: z.string().min(1).max(4000),
+});
+
+/**
+ * External import — the merchant ran the rendered prompt in their own LLM.
+ * Sanitizes markdown/LLM artifacts and returns the copy + warnings; the
+ * composer shows it for human review before anything is scheduled.
+ * POST /google/business/posts/suggest/external
+ */
+router.post('/google/business/posts/suggest/external', async (req, res) => {
+  try {
+    const parsed = externalPostImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const { tenantId, text } = parsed.data;
+
+    if (!(await isGbpManagementFeatureAllowed(tenantId, 'posts_scheduler'))) {
+      return res.status(403).json({ success: false, error: 'capability_required' });
+    }
+
+    const result = sanitizeExternalPostCopy(text);
+    if (!result.summary) {
+      return res.status(400).json({ success: false, error: 'empty_after_sanitize' });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'import_failed' });
   }
 });
 

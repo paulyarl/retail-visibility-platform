@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   Sparkles,
   X,
+  Copy,
+  ClipboardPaste,
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 import { GbpReviewsTab, type GbpReview } from './GbpReviewsTab';
@@ -64,6 +66,13 @@ export default function GBPAdvancedFeaturesPage() {
   const [suggestTheme, setSuggestTheme] = useState('announcement');
   const [suggestCta, setSuggestCta] = useState('visit');
   const [postRecurrence, setPostRecurrence] = useState('');
+  const [renderedPrompt, setRenderedPrompt] = useState('');
+  const [renderingPrompt, setRenderingPrompt] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
 
   // Reviews state
   const [reviews, setReviews] = useState<GbpReview[]>([]);
@@ -129,14 +138,7 @@ export default function GBPAdvancedFeaturesPage() {
       setSuggesting(true);
       const res = await apiRequest(`/api/google/business/posts/suggest`, {
         method: 'POST',
-        body: JSON.stringify({
-          tenantId,
-          photoDescription:
-            attachedPhoto?.description || attachedPhoto?.locationAssociation?.category || null,
-          tone: suggestTone,
-          theme: suggestTheme,
-          cta: suggestCta,
-        }),
+        body: JSON.stringify(suggestRequestBody()),
       });
       const body = await res.json();
       if (body?.success && body.data?.summary) setNewPostSummary(body.data.summary);
@@ -151,6 +153,67 @@ export default function GBPAdvancedFeaturesPage() {
     const next = !showPhotoPicker;
     setShowPhotoPicker(next);
     if (next && media.length === 0) fetchMedia();
+  }
+
+  // Dual AI pattern (same as marketing-ops briefings): Suggest copy = internal
+  // one-click resolve; Copy prompt = take the built prompt to an external LLM;
+  // Import = paste that output back into the composer.
+  const suggestRequestBody = () => ({
+    tenantId,
+    photoDescription:
+      attachedPhoto?.description || attachedPhoto?.locationAssociation?.category || null,
+    tone: suggestTone,
+    theme: suggestTheme,
+    cta: suggestCta,
+  });
+
+  async function handleRenderPrompt() {
+    try {
+      setRenderingPrompt(true);
+      const res = await apiRequest(`/api/google/business/posts/suggest`, {
+        method: 'POST',
+        body: JSON.stringify({ ...suggestRequestBody(), renderOnly: true }),
+      });
+      const body = await res.json();
+      if (body?.success && body.data?.prompt) {
+        setRenderedPrompt(`${body.data.system}\n\n${body.data.prompt}`);
+      }
+    } catch (error) {
+      clientLogger.error('Failed to render prompt:', { detail: error });
+    } finally {
+      setRenderingPrompt(false);
+    }
+  }
+
+  async function handleCopyPrompt() {
+    if (!renderedPrompt) return;
+    await navigator.clipboard.writeText(renderedPrompt);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 1500);
+  }
+
+  async function handleImportCopy() {
+    const text = importText.trim();
+    if (!text) return;
+    try {
+      setImporting(true);
+      setImportWarnings([]);
+      const res = await apiRequest(`/api/google/business/posts/suggest/external`, {
+        method: 'POST',
+        body: JSON.stringify({ tenantId, text }),
+      });
+      const body = await res.json();
+      if (body?.success && body.data?.summary) {
+        setNewPostSummary(body.data.summary);
+        setImportWarnings(body.data.warnings || []);
+        setImportText('');
+        setShowImport(false);
+      }
+    } catch (error) {
+      clientLogger.error('Failed to import post copy:', { detail: error });
+    } finally {
+      setImporting(false);
+    }
   }
 
   async function handleCancelScheduled(postId: string) {
@@ -412,7 +475,68 @@ export default function GBPAdvancedFeaturesPage() {
                   <option value="book">CTA: Book</option>
                   <option value="none">No CTA</option>
                 </select>
+                <button
+                  onClick={handleRenderPrompt}
+                  disabled={renderingPrompt}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {renderingPrompt ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                  Copy prompt
+                </button>
+                <button
+                  onClick={() => setShowImport((v) => !v)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                >
+                  <ClipboardPaste className="w-4 h-4" /> Import
+                </button>
               </div>
+            )}
+
+            {renderedPrompt && (
+              <div className="mt-3 space-y-2">
+                <textarea
+                  readOnly
+                  value={renderedPrompt}
+                  rows={5}
+                  className="w-full px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 text-xs font-mono"
+                />
+                <button
+                  onClick={handleCopyPrompt}
+                  className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400"
+                >
+                  {copiedPrompt ? 'Copied!' : 'Copy to clipboard — paste it into your AI of choice'}
+                </button>
+              </div>
+            )}
+
+            {showImport && (
+              <div className="mt-3 space-y-2">
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder="Paste your external AI's post copy here..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 text-sm"
+                />
+                <button
+                  onClick={handleImportCopy}
+                  disabled={!importText.trim() || importing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50"
+                >
+                  {importing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ClipboardPaste className="w-4 h-4" />}
+                  Use this copy
+                </button>
+              </div>
+            )}
+
+            {importWarnings.length > 0 && (
+              <ul className="mt-2 space-y-0.5">
+                {importWarnings.map((w, i) => (
+                  <li key={i} className="text-xs text-amber-600 dark:text-amber-400">
+                    {w}
+                  </li>
+                ))}
+              </ul>
             )}
 
             {showPhotoPicker && (
