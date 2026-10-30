@@ -18,6 +18,18 @@ import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { previewBatch, createAndMaterializeBatch } from '../services/GbpBatchService';
+import {
+  resolvePlatformGbpIdentity,
+  searchGoogleLocations,
+  claimLocation,
+  inviteLocationAdmin,
+  removeLocationAdmin,
+  platformHasAccess,
+  checkDrift,
+} from '../lib/google/gbp-platform';
+import { emitGbpActivity } from '../lib/google/gbp-activity';
+import { generateQuickStart } from '../lib/id-generator';
+import { CrmAlertService } from '../services/CrmAlertService';
 
 const router = Router();
 
@@ -448,6 +460,277 @@ router.post('/batches', async (req: any, res: Response) => {
   } catch (error: any) {
     logger.error('[gbp-monitor] batch create error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to create batch' });
+  }
+});
+
+// ── Model B Access (spec §3.3, Sprint D7) ────────────────────────────────
+
+// Platform identity health — is GBP_PLATFORM_TENANT_ID configured and does
+// the platform's GBP token see its account?
+router.get('/access/platform-account', async (req: any, res: Response) => {
+  try {
+    const identity = await resolvePlatformGbpIdentity();
+    res.json({
+      success: true,
+      data: identity
+        ? { configured: true, apiAccountName: identity.apiAccountName, oauthAccountId: identity.oauthAccountId }
+        : { configured: false },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Step 1 — search a business. requestAdminRightsUri present → claimed listing
+// (path A); absent → unclaimed (path B, platform can claim outright).
+const accessSearchSchema = z.object({ query: z.string().min(2).max(500) });
+router.post('/access/search', async (req: any, res: Response) => {
+  try {
+    const identity = await resolvePlatformGbpIdentity();
+    if (!identity) {
+      return res.status(503).json({ success: false, error: 'platform_account_unavailable' });
+    }
+    const parsed = accessSearchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const result = await searchGoogleLocations(identity, parsed.data.query);
+    res.status(result.success ? 200 : 502).json({ success: result.success, data: result.candidates, error: result.error });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Step 2 — intake. 'request': record a pending_request row + return the
+// requestAdminRightsUri for the ops user to submit under the platform
+// session. 'claim': create the listing under the platform account outright.
+const accessIntakeSchema = z.object({
+  tenantId: z.string().min(1),
+  mode: z.enum(['request', 'claim']),
+  // request path (claimed listing)
+  requestAdminRightsUri: z.string().optional(),
+  locationId: z.string().optional(),
+  // claim path (unclaimed listing)
+  claimBody: z.object({
+    title: z.string(),
+    storefrontAddress: z.unknown(),
+    categories: z.unknown().optional(),
+    phoneNumbers: z.unknown().optional(),
+    websiteUri: z.string().optional(),
+  }).optional(),
+  locationName: z.string().optional(),
+  delegatedSurfaces: z.record(z.boolean()).optional(),
+});
+
+router.post('/access/intake', async (req: any, res: Response) => {
+  try {
+    const identity = await resolvePlatformGbpIdentity();
+    if (!identity) {
+      return res.status(503).json({ success: false, error: 'platform_account_unavailable' });
+    }
+    const parsed = accessIntakeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const { tenantId, mode, requestAdminRightsUri, locationId, claimBody, locationName, delegatedSurfaces } = parsed.data;
+
+    if (mode === 'request') {
+      if (!locationId || !requestAdminRightsUri) {
+        return res.status(400).json({ success: false, error: 'location_id_and_uri_required' });
+      }
+      const row = await prisma.gbp_locations_list.create({
+        data: {
+          id: generateQuickStart('gloc'),
+          tenant_id: tenantId,
+          account_id: identity.oauthAccountId,
+          location_id: locationId,
+          location_name: locationName || 'GBP Location',
+          managed_by: 'platform',
+          granted_via: 'invitation',
+          platform_account_id: identity.apiAccountName,
+          delegated_surfaces: delegatedSurfaces ?? null,
+          claim_state: 'pending_request',
+          claim_requested_at: new Date(),
+          updated_at: new Date(),
+        } as any,
+      });
+      return res.json({
+        success: true,
+        data: {
+          gbpLocationId: row.id,
+          claimState: 'pending_request',
+          // The ops user opens this under the platform's GBP session — Google
+          // emails the current owner; approval (or ~7d silence) completes.
+          requestAdminRightsUri,
+        },
+      });
+    }
+
+    // mode === 'claim' — unclaimed listing, platform owns it outright.
+    if (!claimBody) {
+      return res.status(400).json({ success: false, error: 'claim_body_required' });
+    }
+    const claimed = await claimLocation(identity, claimBody);
+    if (!claimed.success || !claimed.locationName) {
+      return res.status(502).json({ success: false, error: claimed.error });
+    }
+    const googleLocationId = claimed.locationName.split('/').pop()!;
+    const row = await prisma.gbp_locations_list.create({
+      data: {
+        id: generateQuickStart('gloc'),
+        tenant_id: tenantId,
+        account_id: identity.oauthAccountId,
+        location_id: googleLocationId,
+        location_name: claimBody.title,
+        managed_by: 'platform',
+        granted_via: 'platform_claim',
+        platform_account_id: identity.apiAccountName,
+        delegated_surfaces: delegatedSurfaces ?? null,
+        claim_state: 'active',
+        updated_at: new Date(),
+      } as any,
+    });
+    await emitGbpActivity({
+      tenantId,
+      gbpLocationId: row.id,
+      action: 'location_claimed',
+      actor: 'admin',
+      actorUserId: req.user?.userId ?? null,
+      detail: { locationName: claimBody.title, mode: 'platform_claim' },
+    });
+    res.json({ success: true, data: { gbpLocationId: row.id, claimState: 'active', locationName: claimed.locationName } });
+  } catch (error: any) {
+    logger.error('[gbp-monitor] access intake error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Onboarding queue — rows not yet fully active (pending/denied/revoked) and
+// recent offboards.
+router.get('/access/queue', async (req: any, res: Response) => {
+  try {
+    const rows = await prisma.gbp_locations_list.findMany({
+      where: { managed_by: 'platform', claim_state: { not: 'active' } },
+      orderBy: { updated_at: 'desc' },
+      take: 200,
+    });
+    res.json({ success: true, data: rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Offboarding step 1 — invite the merchant's Google email as OWNER. They
+// accept via the Google email / GBP sign-in prompt.
+const handoffSchema = z.object({ gbpLocationId: z.string(), merchantEmail: z.string().email() });
+router.post('/access/handoff', async (req: any, res: Response) => {
+  try {
+    const identity = await resolvePlatformGbpIdentity();
+    if (!identity) return res.status(503).json({ success: false, error: 'platform_account_unavailable' });
+    const parsed = handoffSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+
+    const loc = await prisma.gbp_locations_list.findUnique({ where: { id: parsed.data.gbpLocationId } });
+    if (!loc) return res.status(404).json({ success: false, error: 'location_not_found' });
+
+    const invited = await inviteLocationAdmin(identity, loc.location_id, parsed.data.merchantEmail, 'OWNER');
+    if (!invited.success) return res.status(502).json({ success: false, error: invited.error });
+
+    await prisma.gbp_locations_list.update({
+      where: { id: loc.id },
+      data: { claim_state: 'handoff_pending', updated_at: new Date() },
+    });
+    res.json({ success: true, data: { claimState: 'handoff_pending' } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Offboarding step 2 — after the merchant accepts (and, if the API allows,
+// is promoted to PRIMARY_OWNER), remove the platform's admin row and flip
+// the location back to self-managed.
+router.post('/access/handoff/complete', async (req: any, res: Response) => {
+  try {
+    const identity = await resolvePlatformGbpIdentity();
+    if (!identity) return res.status(503).json({ success: false, error: 'platform_account_unavailable' });
+    const gbpLocationId = req.body?.gbpLocationId;
+    if (!gbpLocationId) return res.status(400).json({ success: false, error: 'gbpLocationId_required' });
+
+    const loc = await prisma.gbp_locations_list.findUnique({ where: { id: gbpLocationId } });
+    if (!loc) return res.status(404).json({ success: false, error: 'location_not_found' });
+
+    // Find and remove the platform's own admin row.
+    const { listLocationAdmins } = await import('../lib/google/gbp-platform');
+    const { admins } = await listLocationAdmins(identity, loc.location_id);
+    const platformRow = admins.find((a) => a.account === identity.apiAccountName);
+    if (!platformRow) {
+      return res.status(409).json({
+        success: false,
+        error: 'platform_admin_not_found',
+        message: 'Platform is not an admin on this location (already removed, or never held access).',
+      });
+    }
+    const removed = await removeLocationAdmin(identity, platformRow.name);
+    if (!removed.success) return res.status(502).json({ success: false, error: removed.error });
+
+    await prisma.gbp_locations_list.update({
+      where: { id: loc.id },
+      data: {
+        managed_by: 'self',
+        claim_state: 'offboarded',
+        offboarded_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+    await emitGbpActivity({
+      tenantId: loc.tenant_id!,
+      gbpLocationId: loc.id,
+      action: 'location_offboarded',
+      actor: 'admin',
+      actorUserId: req.user?.userId ?? null,
+      detail: { locationId: loc.location_id },
+    });
+    res.json({ success: true, data: { claimState: 'offboarded' } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// On-demand drift sweep — same logic the gbp-admin-drift job runs daily.
+router.post('/access/drift-check', async (req: any, res: Response) => {
+  try {
+    const identity = await resolvePlatformGbpIdentity();
+    if (!identity) return res.status(503).json({ success: false, error: 'platform_account_unavailable' });
+
+    const managed = await prisma.gbp_locations_list.findMany({
+      where: { managed_by: 'platform', claim_state: 'active' },
+      select: { id: true, tenant_id: true, location_id: true, granted_via: true },
+    });
+    const results = await checkDrift(identity, managed as any);
+
+    for (const r of results.filter((x) => x.outcome === 'revoked')) {
+      await prisma.gbp_locations_list.update({
+        where: { id: r.gbpLocationId },
+        data: { claim_state: 'revoked', updated_at: new Date() },
+      });
+      try {
+        await CrmAlertService.getInstance().create({
+          id: generateQuickStart('cra'),
+          tenant_id: r.tenantId!,
+          type: 'gbp_access_revoked',
+          severity: 'critical',
+          title: 'GBP platform access revoked',
+          message: `Platform admin row removed from location ${r.gbpLocationId} — managed work is blocked.`,
+          dedupe_key: `gbp-revoked-${r.gbpLocationId}`,
+        } as any);
+      } catch (alertErr) {
+        logger.warn('[gbp-monitor] revoke alert failed', undefined, { error: (alertErr as Error).message });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

@@ -2531,6 +2531,9 @@ model gbp_locations_list {
   granted_via                String                     @default("oauth") @db.VarChar(16)
   delegated_surfaces         Json?
   platform_account_id        String?                    @db.VarChar
+  claim_state                String                     @default("active") @db.VarChar(20)
+  claim_requested_at         DateTime?                  @db.Timestamptz(6)
+  offboarded_at              DateTime?                  @db.Timestamptz(6)
   gbp_activity_events        gbp_activity_events[]
   gbp_insights_daily_list    gbp_insights_daily_list[]
   google_oauth_accounts_list google_oauth_accounts_list @relation(fields: [account_id], references: [id], onDelete: Cascade)

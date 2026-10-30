@@ -77,6 +77,16 @@ class UnifiedConfig {
     return this.env.GOOGLE_BUSINESS_REDIRECT_URI;
   }
 
+  /**
+   * Tenant id of the platform's own internal tenant (VisibleShelf dogfood
+   * tenant) whose google_oauth_accounts_list row holds the PLATFORM's GBP
+   * OAuth token — the identity used for model-B managed locations
+   * (invitation / platform_claim). Required for the DFY ops surface.
+   */
+  get gbpPlatformTenantId(): string | undefined {
+    return this.env.GBP_PLATFORM_TENANT_ID;
+  }
+
   // ─── Google Maps ──────────────────────────────────────────────────────
 
   get googleMapsApiKey(): string | undefined {

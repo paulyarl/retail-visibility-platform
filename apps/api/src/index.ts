@@ -575,6 +575,10 @@ if (process.env.NODE_ENV !== "test") {
       try {
         const { startGbpPostScheduler } = await import('./jobs/gbpPostScheduler');
         startGbpPostScheduler();
+
+        // Model-B access drift — daily admins.list sweep on managed locations
+        const { initializeGbpAdminDriftJob } = await import('./jobs/gbpAdminDrift');
+        initializeGbpAdminDriftJob();
         logger.info('GBP post scheduler started (every 5min)');
       } catch (err) {
         logger.error('Failed to start GBP post scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
