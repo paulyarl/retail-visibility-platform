@@ -152,6 +152,7 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'proving-ground-hold-release', scheduleLabel: 'hourly', description: 'Re-enters hold prospects into the queued worklist' },
           { name: 'seed-outreach-no-response', scheduleLabel: 'daily', description: 'Marks stale outreach seeds as no_response' },
           { name: 'seed-report-backfill', scheduleLabel: 'daily', description: 'Generates first report version for live seeds' },
+          { name: 'gsc-search-demand-ingest', scheduleLabel: 'daily at 9:15 AM UTC', description: 'Pulls Search Console demand into seo_gsc_* and seo_query_signals' },
           { name: 'review-response-scheduler', scheduleLabel: 'every 6 hours', description: 'Review pipeline gates, auto-advance, thread closing' },
           { name: 'recovery-resolution', scheduleLabel: 'every 5 minutes', description: 'Runs pending recovery_resolution prompt executions' },
           { name: 'recovery-orphan-purge', scheduleLabel: 'every hour', description: 'Purges orphaned recovery attachments older than 7 days' },
@@ -502,6 +503,16 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Seed outreach no-response job started');
       } catch (err) {
         logger.error('Failed to start seed outreach no-response job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start Search Console demand ingest job (daily) — feeds the
+      // data-driven seeding report (seo_gsc_* / seo_query_signals)
+      try {
+        const { startGscSearchDemandIngestJob } = await import('./jobs/gsc-search-demand-ingest');
+        startGscSearchDemandIngestJob();
+        logger.info('Search Console demand ingest job started');
+      } catch (err) {
+        logger.error('Failed to start Search Console demand ingest job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start seed report backfill job (daily) — generates a first report

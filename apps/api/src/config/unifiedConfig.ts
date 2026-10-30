@@ -275,6 +275,21 @@ class UnifiedConfig {
     const parsed = parseInt(this.env.SEED_OUTREACH_NO_RESPONSE_DAYS || '', 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 14;
   }
+  // ─── Search Console demand (data-driven seeding) ─────────────────────
+  get gscServiceAccountJsonB64(): string | undefined {
+    return this.env.GSC_SERVICE_ACCOUNT_JSON_B64 || undefined;
+  }
+  get gscSiteUrl(): string {
+    return this.env.GSC_SITE_URL || 'sc-domain:visibleshelf.com';
+  }
+  get gscLookbackDays(): number {
+    const parsed = parseInt(this.env.GSC_LOOKBACK_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+  }
+  get gscBackfillDays(): number {
+    const parsed = parseInt(this.env.GSC_BACKFILL_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 90;
+  }
   get disableSeedOutreachTrigger(): boolean {
     const v = (this.env.DISABLE_SEED_OUTREACH_TRIGGER || '').toLowerCase();
     return v === 'true' || v === '1';
