@@ -206,6 +206,48 @@ export class GBPVerificationService extends BaseService {
   }
 
   /**
+   * Re-truth the platform's verification flags from Google's own verifications
+   * list. Locations verified outside the platform's PIN flow — e.g. verified
+   * directly in Google's dashboard, like the platform's own 60+-day profile —
+   * never run through complete(), so is_verified stays false forever and the
+   * GBP Monitor reports the location unverified. A COMPLETED entry in the v4
+   * verifications list means Google considers the location verified.
+   * Errors are swallowed — this is a best-effort self-heal, never a blocker.
+   */
+  async syncVerificationState(tenantId: string): Promise<void> {
+    try {
+      const accessToken = await getValidAccessToken(tenantId);
+      if (!accessToken) return;
+
+      const location = await getLinkedLocation(tenantId);
+      if (!location) return;
+
+      const response = await gbpFetch(
+        `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/verifications`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!response.ok) return;
+
+      const data = await response.json() as { verifications?: Array<{ state?: string }> };
+      const verified = (data.verifications ?? []).some((v) => v.state === 'COMPLETED');
+
+      await prisma.gbp_locations_list.updateMany({
+        where: { tenant_id: tenantId },
+        data: {
+          is_verified: verified,
+          verification_state: verified ? 'COMPLETED' : 'UNVERIFIED',
+          updated_at: new Date(),
+        },
+      });
+    } catch (error: any) {
+      logger.error('[GBPVerification] syncVerificationState error', undefined, {
+        tenantId,
+        error: error?.message || String(error),
+      });
+    }
+  }
+
+  /**
    * Submit PIN code to complete verification. Transitions PENDING → COMPLETED or FAILED.
    * On COMPLETED:
    *   1. Updates gbp_locations_list.verification_state

@@ -694,6 +694,11 @@ router.get('/google/business/linked-location', async (req, res) => {
       });
     }
 
+    // Re-truth the platform's verification flag from Google before answering —
+    // locations verified outside our PIN flow never get marked otherwise.
+    const { GBPVerificationService } = await import('../services/GBPVerificationService');
+    await GBPVerificationService.getInstance().syncVerificationState(tenantId);
+
     // Get OAuth account and linked location
     const account = await prisma.google_oauth_accounts_list.findFirst({
       where: { tenant_id: tenantId },

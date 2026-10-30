@@ -51,7 +51,7 @@ A platform-internal tenant that is our own best customer — "eat our own cookin
 | Connection | Target | Mechanism | Status |
 |---|---|---|---|
 | Google Business Profile | The platform's own `VisibleShelf` GBP (verified 60+ days) | Normal tenant OAuth connect (`business.manage`), from an account that is owner/manager on that GBP | **Connected + linked 2026-10-29** — Gate B approved same-day (case `5-5364000041203`, project `407743626849`, 300 QPM). `GET /api/google/business/locations` returned the real `VisibleShelf` location `10191785970742504478` (the `503 api_not_approved` era is over); linked via Sync Status → Link Location; live local-vs-Google comparison fetching real profile data. |
-| Google Merchant Center | The platform's existing MC — `visibleshelf.com` verified + claimed, `google_merchant_links_list` row for this tenant | Tenant-scoped MC connect | Ready when products exist |
+| Google Merchant Center | The platform's existing MC — `visibleshelf.com` verified + claimed, `google_merchant_links_list` row for this tenant | Tenant-scoped MC connect | **Linked 2026-10-29** — Merchant Account `6311349` (`gmc` token on the shared OAuth account row; account-reuse fix + reparent shipped same day) |
 | Clover/Square/Meta/Pinterest | — | Optional later | Not connected at create |
 
 **Why the platform MC is correct here** (amends `PLATFORM_GBP_GOOGLE_ADS_SPEC.md` §3.3's "tenant products never enter the platform MC"):
@@ -137,7 +137,7 @@ doppler run --config prd -- node scripts/create-tenant.cjs \
 - [ ] Products added per §5
 - [ ] Store categories set — inventory-driven pick, after catalog load (§5 category note)
 - [x] GBP connect + location link — done 2026-10-29; location `10191785970742504478` (`VisibleShelf`)
-- [ ] MC link — the existing platform MC row
+- [x] MC link — Merchant Account `6311349` (`VisibleShelf`) linked 2026-10-29
 - [ ] `GBP_TRANSPORT=record` fixture refresh once live GBP calls work
 
 ## 9. As-built record
