@@ -1179,8 +1179,8 @@ export const routeRegistry: RouteEntry[] = [
     path: '/api',
     router: googleBusinessOAuthRoutes,
     domain: 'integration',
-    authLevel: 'public',
-    comment: 'Google Business Profile OAuth at /api/google/business',
+    authLevel: 'tenant',
+    comment: 'Google Business Profile OAuth at /api/google/business (callback exempt — signed state)',
   },
   {
     path: '/auth',
@@ -2064,8 +2064,8 @@ export const routeRegistry: RouteEntry[] = [
     path: '/api/google-business',
     router: googleBusinessOAuthRoutes,
     domain: 'integration',
-    authLevel: 'public',
-    comment: 'Google Business Profile OAuth at /api/google-business',
+    authLevel: 'tenant',
+    comment: 'Google Business Profile OAuth at /api/google-business (callback exempt — signed state)',
   },
   {
     path: '/',

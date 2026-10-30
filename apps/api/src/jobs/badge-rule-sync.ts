@@ -18,11 +18,13 @@ import { evaluateBadgeRulesForTenant } from '../services/BadgeRuleEngine';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
 import { logger } from '../logger';
 import { scheduleJob, stopJob } from './registry';
+import { dripPaceMs, sleep } from './pacing';
 
 const JOB_NAME = 'badge-rule-sync';
 const SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes (before platform badge sync at 5 min)
 let firstRun = true;
+let cycleStartAt = 0;
 
 export interface BadgeRuleSyncResult {
   tenantsProcessed: number;
@@ -62,6 +64,7 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
 
   console.log('[BadgeRuleSync] Starting scheduled badge rule sync...');
   const startTime = Date.now();
+  cycleStartAt = startTime;
 
   try {
     const tenantIds = await getAllTenantIds();
@@ -71,6 +74,10 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
       console.log('[BadgeRuleSync] No tenants, skipping');
       return result;
     }
+
+    // Drip: spread the sweep across most of the interval instead of bursting —
+    // smooths DB reads (Supabase pooler egress) into a low-rate stream.
+    const paceMs = dripPaceMs(tenantIds.length, SYNC_INTERVAL_MS);
 
     for (const tenantId of tenantIds) {
       try {
@@ -130,8 +137,8 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
         result.errors.push(`Tenant ${tenantId}: ${error.message}`);
       }
 
-      // Small delay between tenants
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Drip-paced delay between tenants (see dripPaceMs)
+      await sleep(paceMs);
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -156,7 +163,14 @@ export async function startBadgeRuleSync(): Promise<void> {
     description: 'Evaluates sale/new_arrival/clearance badge rules',
     scheduleLabel: 'every 4 hours',
     envDisableVar: 'DISABLE_BADGE_RULE_SYNC',
-    computeNextDelay: () => (firstRun ? ((firstRun = false), STARTUP_DELAY_MS) : SYNC_INTERVAL_MS),
+    // Cadence measured from cycle start so a drip-paced sweep doesn't dilate
+    // the schedule (run ~70% of interval, then idle until the next tick).
+    computeNextDelay: () => {
+      if (firstRun) { firstRun = false; return STARTUP_DELAY_MS; }
+      if (!cycleStartAt) return SYNC_INTERVAL_MS;
+      return Math.max(60_000, SYNC_INTERVAL_MS - (Date.now() - cycleStartAt));
+    },
+    maxRunMs: SYNC_INTERVAL_MS,
     handler: async () => runScheduledSync(),
   });
 }

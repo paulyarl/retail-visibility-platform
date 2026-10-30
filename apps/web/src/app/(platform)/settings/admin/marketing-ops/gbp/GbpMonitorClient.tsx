@@ -422,7 +422,7 @@ export default function GbpMonitorClient() {
                             </td>
                             <td className="p-3">
                               <Badge
-                                variant={t.verificationState === 'VERIFIED' ? 'default' : 'secondary'}
+                                variant={t.verificationState === 'COMPLETED' ? 'default' : 'secondary'}
                               >
                                 {t.verificationState}
                               </Badge>

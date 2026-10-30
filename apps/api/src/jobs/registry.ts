@@ -50,6 +50,10 @@ export interface ScheduleJobOptions {
   handler: JobHandler;
   /** env var that disables scheduling entirely (existing DISABLE_* convention) */
   envDisableVar?: string;
+  /** Max ms a run may occupy its lease before another instance may reclaim it
+   *  as stale ('instance_lost'). Bounds how long a crashed worker can wedge a
+   *  job — set it above the longest legitimate run. Default JOB_LOCK_TTL_MS. */
+  maxRunMs?: number;
 }
 
 type ScheduleOverrideKind = 'interval' | 'cron';
@@ -69,6 +73,8 @@ interface RegisteredJob {
   /** DB-backed schedule override — null/null = use computeNextDelay */
   overrideKind: ScheduleOverrideKind | null;
   overrideValue: string | null;
+  /** Stale-lease bound for the run-row lease (see acquireRunLease). */
+  maxRunMs: number;
 }
 
 type RunStatus = 'running' | 'success' | 'failed' | 'skipped';
@@ -120,26 +126,40 @@ let dbAvailable: boolean | null = null;
 let dbDownSince: number | null = null;
 const DB_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
 
+function markJobDbUp(): void {
+  if (dbAvailable === false) {
+    logger.info('[JobRegistry] scheduled_jobs tables reachable again — run persistence resumed');
+  }
+  dbAvailable = true;
+  dbDownSince = null;
+}
+
+function markJobDbDown(error: unknown): void {
+  if (dbAvailable !== false) {
+    logger.warn('[JobRegistry] scheduled_jobs tables unavailable — running in memory-only mode', undefined, {
+      error: (error as any)?.message || String(error),
+    });
+  }
+  dbAvailable = false;
+  dbDownSince = Date.now();
+}
+
+/** True while we're inside the post-outage cooldown — callers should take
+ *  the degraded path instead of attempting DB I/O. */
+function jobDbInCooldown(): boolean {
+  return dbAvailable === false && dbDownSince !== null && Date.now() - dbDownSince < DB_RETRY_COOLDOWN_MS;
+}
+
 async function withJobDb<T>(fn: () => Promise<T>): Promise<T | null> {
-  if (dbAvailable === false && dbDownSince && Date.now() - dbDownSince < DB_RETRY_COOLDOWN_MS) {
+  if (jobDbInCooldown()) {
     return null;
   }
   try {
     const result = await fn();
-    if (dbAvailable === false) {
-      logger.info('[JobRegistry] scheduled_jobs tables reachable again — run persistence resumed');
-    }
-    dbAvailable = true;
-    dbDownSince = null;
+    markJobDbUp();
     return result;
   } catch (error: any) {
-    if (dbAvailable !== false) {
-      logger.warn('[JobRegistry] scheduled_jobs tables unavailable — running in memory-only mode', undefined, {
-        error: error?.message || String(error),
-      });
-    }
-    dbAvailable = false;
-    dbDownSince = Date.now();
+    markJobDbDown(error);
     return null;
   }
 }
@@ -201,6 +221,7 @@ export function declareJob(name: string, meta: { description?: string; scheduleL
     timer: null,
     overrideKind: null,
     overrideValue: null,
+    maxRunMs: JOB_LOCK_TTL_MS,
   });
 }
 
@@ -291,6 +312,7 @@ export function scheduleJob(opts: ScheduleJobOptions): void {
     handler: opts.handler,
     overrideKind: null,
     overrideValue: null,
+    maxRunMs: opts.maxRunMs ?? JOB_LOCK_TTL_MS,
   };
   jobs.set(opts.name, job);
 
@@ -314,6 +336,89 @@ export function stopJob(name: string): void {
 }
 
 // ── Execution ─────────────────────────────────────────────────────────────
+
+/** Prisma unique-violation (P2002) or raw Postgres 23505. */
+function isUniqueViolation(error: any): boolean {
+  return error?.code === 'P2002' || error?.code === '23505';
+}
+
+interface RunLease {
+  acquired: boolean;
+  runId?: string;
+  release: () => Promise<void>;
+}
+
+/**
+ * Acquire the cross-instance run lease for a job.
+ *
+ * Primary mechanism (migration 318): INSERT the 'running' run-row — the
+ * partial unique index uq_sjr_running_job makes it atomic, so exactly one
+ * replica wins each tick and the row doubles as the run record. A conflicting
+ * holder is reclaimed once its run exceeds job.maxRunMs ('instance_lost') —
+ * bounds how long a crashed worker can wedge a job, and is why long-running
+ * drip-paced jobs must pass a maxRunMs above their longest legitimate sweep.
+ *
+ * Fallback (scheduled_jobs unreachable): the legacy Redis tryLock, which
+ * itself degrades to unlocked when Redis is absent — the same fail-open
+ * behavior the single-instance era had.
+ */
+async function acquireRunLease(job: RegisteredJob, trigger: JobTrigger): Promise<RunLease> {
+  const noop = async () => {};
+
+  const insertRun = async (): Promise<string | 'conflict' | null> => {
+    try {
+      const run = await prisma.scheduled_job_runs.create({
+        data: { job_name: job.name, trigger_source: trigger, started_at: new Date(), hostname: HOSTNAME },
+        select: { id: true },
+      });
+      markJobDbUp();
+      return run.id;
+    } catch (error: any) {
+      if (isUniqueViolation(error)) return 'conflict';
+      markJobDbDown(error);
+      return null;
+    }
+  };
+
+  if (!jobDbInCooldown()) {
+    let runId = await insertRun();
+    if (runId === 'conflict' && (await tryReclaimStaleRun(job))) {
+      runId = await insertRun();
+    }
+    if (runId && runId !== 'conflict') {
+      // Release is implicit: the finalize UPDATE flips status to a terminal
+      // state, which frees the lease for the next tick.
+      return { acquired: true, runId, release: noop };
+    }
+    if (runId === 'conflict') {
+      return { acquired: false, release: noop };
+    }
+    // null — the insert failed non-conflict (DB just went down): degrade.
+  }
+
+  const release = await tryLock(`job:${job.name}`, JOB_LOCK_TTL_MS);
+  return release ? { acquired: true, release } : { acquired: false, release: noop };
+}
+
+/** Close out a 'running' row older than job.maxRunMs as 'instance_lost' so the
+ *  lease frees. Returns true when a stale holder was actually reclaimed. */
+async function tryReclaimStaleRun(job: RegisteredJob): Promise<boolean> {
+  const reclaimed = await withJobDb(() =>
+    prisma.scheduled_job_runs.updateMany({
+      where: {
+        job_name: job.name,
+        status: 'running',
+        started_at: { lt: new Date(Date.now() - job.maxRunMs) },
+      },
+      data: { status: 'failed', finished_at: new Date(), error: 'instance_lost' },
+    })
+  );
+  if ((reclaimed?.count ?? 0) > 0) {
+    logger.warn(`[JobRegistry] ${job.name} reclaimed stale run lease (holder exceeded maxRunMs)`, undefined, { hostname: HOSTNAME });
+    return true;
+  }
+  return false;
+}
 
 async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ skipped?: string; runId?: string; result?: unknown }> {
   if (!job.handler) return { skipped: 'not_instrumented' };
@@ -340,13 +445,11 @@ async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ sk
     return { skipped: job.envDisabled ? 'disabled_by_env' : 'disabled_by_admin' };
   }
 
-  // Cross-instance guard (multi-machine deployments): only one host may run
-  // a job at a time. tryLock degrades to unlocked when Redis is unavailable —
-  // same behavior as the single-instance era. Losers skip silently on
-  // 'schedule' triggers (every replica's timer fires each cycle); manual/api
-  // triggers record the skip so the operator sees it.
-  const releaseLock = await tryLock(`job:${job.name}`, JOB_LOCK_TTL_MS);
-  if (!releaseLock) {
+  // Cross-instance lease: only one instance may run a job at a time (see
+  // acquireRunLease). Losers skip silently on 'schedule' triggers (every
+  // replica's timer fires each cycle); manual/api triggers record the skip.
+  const lease = await acquireRunLease(job, trigger);
+  if (!lease.acquired) {
     if (trigger !== 'schedule') {
       await withJobDb(() =>
         prisma.scheduled_job_runs.create({
@@ -367,14 +470,7 @@ async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ sk
 
   job.running = true;
   const startedAt = new Date();
-
-  const run = await withJobDb(() =>
-    prisma.scheduled_job_runs.create({
-      data: { job_name: job.name, trigger_source: trigger, started_at: startedAt, hostname: HOSTNAME },
-      select: { id: true },
-    })
-  );
-  const runId = run?.id ?? `mem-${Date.now()}`;
+  const runId = lease.runId ?? `mem-${Date.now()}`;
 
   const sink: RunLogSink = { lines: [], truncated: false };
   let status: RunStatus = 'success';
@@ -397,23 +493,29 @@ async function executeRun(job: RegisteredJob, trigger: JobTrigger): Promise<{ sk
     errorText = error?.stack || error?.message || String(error);
   } finally {
     job.running = false;
-    await releaseLock();
+    await lease.release();
   }
 
   const finishedAt = new Date();
-  await withJobDb(() =>
-    prisma.scheduled_job_runs.update({
-      where: { id: runId },
-      data: {
-        status,
-        finished_at: finishedAt,
-        duration_ms: finishedAt.getTime() - startedAt.getTime(),
-        error: errorText,
-        result: resultJson === null || resultJson === undefined ? undefined : (resultJson as any),
-        logs: sink.lines.length ? sink.lines.join('\n') : null,
-      },
-    })
-  );
+  // The finalize UPDATE is also the lease release for DB-lease runs — status
+  // flips to a terminal state, freeing the slot for the next tick. A missed
+  // update leaves the lease held until maxRunMs reclaim, which is acceptable.
+  // mem- ids have no row (DB was down at acquire time) — skip the write.
+  if (!runId.startsWith('mem-')) {
+    await withJobDb(() =>
+      prisma.scheduled_job_runs.update({
+        where: { id: runId },
+        data: {
+          status,
+          finished_at: finishedAt,
+          duration_ms: finishedAt.getTime() - startedAt.getTime(),
+          error: errorText,
+          result: resultJson === null || resultJson === undefined ? undefined : (resultJson as any),
+          logs: sink.lines.length ? sink.lines.join('\n') : null,
+        },
+      })
+    );
+  }
 
   if (status === 'failed') {
     throw new Error((errorText || 'job failed').split('\n')[0]);

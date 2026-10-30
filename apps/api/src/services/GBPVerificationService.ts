@@ -23,6 +23,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { getValidAccessToken, getLinkedLocation } from './GBPAdvancedSync';
+import { resolveGbpTarget } from '../lib/google/gbp-target';
 import { gbpFetch, GBP_V4_BASE } from '../lib/google/gbp-transport';
 import { CrmAlertService } from './CrmAlertService';
 
@@ -219,11 +220,11 @@ export class GBPVerificationService extends BaseService {
       const accessToken = await getValidAccessToken(tenantId);
       if (!accessToken) return;
 
-      const location = await getLinkedLocation(tenantId);
-      if (!location) return;
+      const target = await resolveGbpTarget({ tenantId });
+      if (!target) return;
 
       const response = await gbpFetch(
-        `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/verifications`,
+        `${GBP_V4_BASE}/accounts/${target.apiAccountId}/locations/${target.locationId}/verifications`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (!response.ok) return;
@@ -231,8 +232,10 @@ export class GBPVerificationService extends BaseService {
       const data = await response.json() as { verifications?: Array<{ state?: string }> };
       const verified = (data.verifications ?? []).some((v) => v.state === 'COMPLETED');
 
-      await prisma.gbp_locations_list.updateMany({
-        where: { tenant_id: tenantId },
+      // Write the verdict to the checked row only — the old updateMany smeared
+      // one location's state across every location row the tenant owned.
+      await prisma.gbp_locations_list.update({
+        where: { id: target.location.id },
         data: {
           is_verified: verified,
           verification_state: verified ? 'COMPLETED' : 'UNVERIFIED',

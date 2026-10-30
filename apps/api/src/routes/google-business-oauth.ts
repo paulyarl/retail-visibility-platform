@@ -13,6 +13,8 @@ import {
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
 import { requestContextStorage } from '../context';
+import crypto from 'crypto';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 
 const router = Router();
 
@@ -21,6 +23,56 @@ const mediaUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
 });
+
+// ── Auth ─────────────────────────────────────────────────────────────────
+// Every route except the OAuth callback requires a session and tenant
+// membership (checkTenantAccess resolves tenantId from params/query/body and
+// passes platform users automatically — that is the admin act-on-behalf path).
+// POST /google/business/media is exempt here because req.body isn't populated
+// until multer runs; it applies checkTenantAccess itself after mediaUpload.
+// The callback is exempt — it's Google's redirect, no JWT; the signed state
+// parameter below is its tenant binding.
+router.use((req, res, next) => {
+  if (req.path === '/google/business/callback') return next();
+  return authenticateToken(req, res, next);
+});
+router.use((req, res, next) => {
+  if (req.path === '/google/business/callback') return next();
+  if (req.method === 'POST' && req.path === '/google/business/media') return next();
+  return checkTenantAccess(req, res, next);
+});
+
+// ── Signed OAuth state ──────────────────────────────────────────────────
+// `state` binds the callback to a tenant. Plain JSON was forgeable — an
+// attacker could land a callback with code={their code} and
+// state={victim tenant}, linking *their* GBP account onto the victim's row.
+// HMAC it with the GBP client secret so state can only be minted by
+// GET /google/business, which is itself tenant-gated above.
+const gbpStateSecret = () => unifiedConfig.googleBusinessClientSecret || 'gbp-state';
+
+export function signGbpOAuthState(tenantId: string): string {
+  const nonce = crypto.randomBytes(8).toString('hex');
+  const sig = crypto
+    .createHmac('sha256', gbpStateSecret())
+    .update(`${tenantId}.${nonce}`)
+    .digest('hex');
+  return JSON.stringify({ tenantId, nonce, sig });
+}
+
+export function verifyGbpOAuthState(raw: unknown): string | null {
+  try {
+    const { tenantId, nonce, sig } = JSON.parse(String(raw));
+    if (!tenantId || !nonce || !sig) return null;
+    const expected = crypto
+      .createHmac('sha256', gbpStateSecret())
+      .update(`${tenantId}.${nonce}`)
+      .digest('hex');
+    if (sig.length !== expected.length) return null;
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)) ? tenantId : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Get a valid GBP access token from the unified OAuth token store.
@@ -202,7 +254,7 @@ router.get('/google/business', async (req, res) => {
       access_type: 'offline',
       scope: ['https://www.googleapis.com/auth/business.manage'],
       prompt: 'consent',
-      state: JSON.stringify({ tenantId }),
+      state: signGbpOAuthState(String(tenantId)),
     });
 
     // Return URL as JSON — frontend navigates browser to it
@@ -242,12 +294,10 @@ router.get('/google/business/callback', async (req, res) => {
       });
     }
 
-    // Parse state to get tenantId
-    let tenantId: string;
-    try {
-      const stateData = JSON.parse(state as string);
-      tenantId = stateData.tenantId;
-    } catch {
+    // Parse + verify state to get tenantId — signature check rejects forged
+    // state (see signGbpOAuthState above).
+    const tenantId = verifyGbpOAuthState(state);
+    if (!tenantId) {
       return res.status(400).json({
         success: false,
         error: 'invalid_state',
@@ -1105,7 +1155,10 @@ router.get('/google/business/media', async (req, res) => {
  * or a multipart/form-data body (fields + `file`) for direct device uploads.
  * Gated by the `gbp_media_upload` capability.
  */
-router.post('/google/business/media', mediaUpload.single('file'), async (req, res) => {
+// checkTenantAccess runs after multer — multipart req.body isn't populated
+// before route-level middleware, so this route is exempted from the router.use
+// chain above and checks tenant membership here.
+router.post('/google/business/media', mediaUpload.single('file'), checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.body;
     if (!tenantId) {

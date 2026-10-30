@@ -38,9 +38,9 @@ router.get('/overview', async (req: any, res: Response) => {
       recentReviews,
       merchantGateStats,
     ] = await Promise.all([
-      prisma.mkt_customer_gbp_links.count(),
-      prisma.gbp_locations_list.count({ where: { verification_state: 'VERIFIED' } }),
-      prisma.gbp_locations_list.count({ where: { verification_state: { not: 'VERIFIED' } } }),
+      prisma.google_oauth_tokens_list.count({ where: { provider: 'gbp' } }),
+      prisma.gbp_locations_list.count({ where: { verification_state: 'COMPLETED' } }),
+      prisma.gbp_locations_list.count({ where: { verification_state: { not: 'COMPLETED' } } }),
       prisma.gbp_reviews.count(),
       prisma.gbp_posts.count(),
       prisma.gbp_media.count(),
@@ -202,8 +202,8 @@ router.get('/tenants', async (req: any, res: Response) => {
     if (verificationFilter) {
       tenantRows = tenantRows.filter((t) =>
         verificationFilter === 'verified'
-          ? t.verificationState === 'VERIFIED'
-          : t.verificationState !== 'VERIFIED'
+          ? t.verificationState === 'COMPLETED'
+          : t.verificationState !== 'COMPLETED'
       );
     }
 

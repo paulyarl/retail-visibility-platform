@@ -2527,6 +2527,11 @@ model gbp_locations_list {
   cached_average_rating      Float?
   cached_review_count        Int?
   rating_cache_updated       DateTime?                  @db.Timestamptz(6)
+  managed_by                 String                     @default("self") @db.VarChar(16)
+  granted_via                String                     @default("oauth") @db.VarChar(16)
+  delegated_surfaces         Json?
+  platform_account_id        String?                    @db.VarChar
+  gbp_activity_events        gbp_activity_events[]
   gbp_insights_daily_list    gbp_insights_daily_list[]
   google_oauth_accounts_list google_oauth_accounts_list @relation(fields: [account_id], references: [id], onDelete: Cascade)
   gbp_media                  gbp_media[]
@@ -2535,6 +2540,23 @@ model gbp_locations_list {
 
   @@unique([account_id, location_id])
   @@index([tenant_id], map: "idx_gbp_locations_tenant")
+}
+
+model gbp_activity_events {
+  id                  String             @id
+  tenant_id           String             @db.VarChar
+  gbp_location_id     String?            @db.VarChar
+  action              String             @db.VarChar(40)
+  actor               String             @db.VarChar(12)
+  actor_user_id       String?            @db.VarChar
+  detail              Json               @default("{}")
+  visible_to_merchant Boolean            @default(true)
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  tenants             tenants            @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  gbp_locations_list  gbp_locations_list? @relation(fields: [gbp_location_id], references: [id])
+
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_gbp_activity_events_tenant")
+  @@index([gbp_location_id, created_at(sort: Desc)], map: "idx_gbp_activity_events_location")
 }
 
 model gbp_media {
@@ -7327,6 +7349,7 @@ model tenants {
   fulfillment_notifications                                                              fulfillment_notifications[]
   fulfillment_schedules                                                                  fulfillment_schedules[]
   fulfillment_time_slots                                                                 fulfillment_time_slots[]
+  gbp_activity_events                                                                    gbp_activity_events[]
   gbp_attributes                                                                         gbp_attributes[]
   gbp_media                                                                              gbp_media[]
   gbp_posts                                                                              gbp_posts[]

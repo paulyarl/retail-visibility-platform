@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import { findGoogleToken, resolveGoogleAccessToken } from '../lib/google/token-store';
+import { resolveGbpLocation, resolveGbpTarget, resolveGbpToken } from '../lib/google/gbp-target';
 import {
   gbpFetch,
   GBP_BUSINESS_INFORMATION_BASE,
@@ -25,7 +26,12 @@ import { logger } from '../logger';
 
 export async function getValidAccessToken(tenantId: string): Promise<string | null> {
   try {
-    // First, try the unified OAuth token store (Business Profile client)
+    // Resolve via the location's owning account (safe for DIY and model B —
+    // the token follows gbp_locations_list.account_id, not the tenant).
+    const location = await resolveGbpLocation({ tenantId });
+    if (location) return resolveGbpToken(location);
+
+    // No linked location row — tenant-scoped path (post-OAuth, pre-link).
     const tokenRecord = await findGoogleToken('gbp', { tenantId });
 
     if (tokenRecord) {
@@ -88,27 +94,12 @@ export async function getValidAccessToken(tenantId: string): Promise<string | nu
 }
 
 export async function getLinkedLocation(tenantId: string): Promise<{ locationId: string; accountId: string } | null> {
-  try {
-    const account = await prisma.google_oauth_accounts_list.findFirst({
-      where: { tenant_id: tenantId },
-      include: {
-        gbp_locations_list: {
-          take: 1,
-          orderBy: { updated_at: 'desc' }
-        }
-      }
-    });
-
-    if (!account?.gbp_locations_list[0]) return null;
-
-    return {
-      locationId: account.gbp_locations_list[0].location_id,
-      accountId: account.google_account_id || account.id,
-    };
-  } catch (error) {
-    logger.error(`[GBPAdvanced] Error getting linked location:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return null;
-  }
+  // Delegates to the location/token resolver (lib/google/gbp-target.ts) —
+  // reads gbp_locations_list by tenant_id directly so platform-managed
+  // locations resolve too (the merchant has no oauth account under model B).
+  const target = await resolveGbpTarget({ tenantId });
+  if (!target) return null;
+  return { locationId: target.locationId, accountId: target.apiAccountId };
 }
 
 // ============================================================================
@@ -410,15 +401,15 @@ export async function createPost(
       return { success: false, error: 'No valid access token' };
     }
 
-    const location = await getLinkedLocation(tenantId);
-    if (!location) {
+    const target = await resolveGbpTarget({ tenantId });
+    if (!target) {
       return { success: false, error: 'No GBP location linked' };
     }
 
     const postPayload: any = {
       languageCode: 'en-US',
       summary: post.summary,
-      topicType: post.topicType || 'STANDARD',
+      topicType: (post.topicType || 'STANDARD').toUpperCase(),
     };
 
     if (post.callToAction) {
@@ -438,7 +429,7 @@ export async function createPost(
     }
 
     const response = await gbpFetch(
-      `${GBP_V4_BASE}/accounts/${location.accountId}/locations/${location.locationId}/localPosts`,
+      `${GBP_V4_BASE}/accounts/${target.apiAccountId}/locations/${target.locationId}/localPosts`,
       {
         method: 'POST',
         headers: {
@@ -458,8 +449,9 @@ export async function createPost(
     const result = await response.json() as { name?: string };
     console.log(`[GBPAdvanced] Created post for tenant ${tenantId}`);
     
-    // Store post in database
-    await storePost(tenantId, result);
+    // Store post in database — location row id lets portfolio queries and
+    // the DFY publisher target the row's location (Sprint D1/D2).
+    await storePost(tenantId, result, target.location.id);
     
     return { success: true, postId: result.name };
   } catch (error: any) {
@@ -881,14 +873,22 @@ export async function updateAttributes(
 // DATABASE STORAGE HELPERS
 // ============================================================================
 
-async function storePost(tenantId: string, post: any): Promise<void> {
+async function storePost(tenantId: string, post: any, gbpLocationId?: string): Promise<void> {
   try {
     const { generateQuickStart } = await import('../lib/id-generator');
-    
+
+    // Deduplicate on google_post_id — the old upsert looked up `id = post.name`
+    // (a >50-char resource path that never matches), so every call inserted a
+    // second row for the same Google post.
+    const existing = post.name
+      ? await prisma.gbp_posts.findFirst({ where: { google_post_id: post.name }, select: { id: true } })
+      : null;
+
     await prisma.gbp_posts.upsert({
-      where: { id: post.name || generateQuickStart('gbpp') },
+      where: { id: existing?.id || generateQuickStart('gbpp') },
       create: {
         id: generateQuickStart('gbpp'),
+        location_id: gbpLocationId ?? null,
         tenant_id: tenantId,
         google_post_id: post.name,
         summary: post.summary || '',
