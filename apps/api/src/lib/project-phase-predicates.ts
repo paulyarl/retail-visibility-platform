@@ -1,5 +1,5 @@
 /**
- * project-phase-predicates — the v1 predicate seed data.
+ * project-phase-predicates — the versioned predicate seed data.
  *
  * Marketing Ops project-phase spec §5/§13: phase selection predicates are
  * versioned DATA in `mkt_project_phase_predicates`, not hardcoded per
@@ -15,9 +15,9 @@
  * signal triggers its phase. Floors are a seed bump, not a code change.
  */
 
-export const PROJECT_PHASE_PREDICATES_VERSION = 2;
+export const PROJECT_PHASE_PREDICATES_VERSION = 3;
 export const PROJECT_PHASE_PREDICATES_SEED_MARKER =
-  'project-phase-predicates-v2-presence-integrity';
+  'project-phase-predicates-v3-platform-category-mismatch';
 
 export type ProjectPhaseKey =
   | 'foundation'
@@ -189,8 +189,23 @@ export const PROJECT_PHASE_PREDICATES_V2: readonly ProjectPhasePredicateSeed[] =
     signals: [...row.signals, ...(V2_ADDITIONS[row.phaseKey] ?? [])],
   }));
 
+/**
+ * Seed v3 — migration 364 split platform-category mislabeling out of
+ * WC_CATEGORY_MISMATCH. The new DS code is profile/listing drift (PB-01), so
+ * it belongs to Foundation, not Expansion's owned-website defect set.
+ */
+const V3_ADDITIONS: Partial<Record<ProjectPhaseKey, string[]>> = {
+  foundation: ['DS_CATEGORY_MISMATCH'],
+};
+
+export const PROJECT_PHASE_PREDICATES_V3: readonly ProjectPhasePredicateSeed[] =
+  PROJECT_PHASE_PREDICATES_V2.map((row) => ({
+    ...row,
+    signals: [...row.signals, ...(V3_ADDITIONS[row.phaseKey] ?? [])],
+  }));
+
 /** The version currently in force — what an unseeded environment falls back to. */
-export const PROJECT_PHASE_PREDICATES_CURRENT = PROJECT_PHASE_PREDICATES_V2;
+export const PROJECT_PHASE_PREDICATES_CURRENT = PROJECT_PHASE_PREDICATES_V3;
 
 /**
  * Explicitly unmapped codes — never trigger a phase (spec §5):

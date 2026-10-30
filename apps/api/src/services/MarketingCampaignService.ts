@@ -348,6 +348,7 @@ function assertChildMarketMatchesParent(parent: any, child: any): void {
   }
 
   const childCity = normalizeMarketPart(child?.city);
+  if (!childCity) return; // child carries no market — nothing to compare
   const childState = normalizeMarketPart(child?.state);
   const geos = [
     { city: parentCity, state: normalizeMarketPart(parent?.state) },

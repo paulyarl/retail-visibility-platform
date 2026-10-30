@@ -107,6 +107,7 @@ const DEFAULT_SEVERITY: Record<string, SignalSeverity> = {
   DS_MISSING_SERVICE_MENU: 'material',
   WC_MISSING_SERVICE_PAGES: 'material',
   WC_URL_MISMATCH: 'material',
+  DS_CATEGORY_MISMATCH: 'material',
   VP_MISSING_PROJECT_PHOTOS: 'material',
   VP_MISSING_PRODUCT_PHOTOS: 'material',
   VP_MISSING_STOREFRONT_PHOTOS: 'material',

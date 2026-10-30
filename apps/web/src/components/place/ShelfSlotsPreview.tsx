@@ -52,6 +52,11 @@ export default function ShelfSlotsPreview({ className = '', items }: ShelfSlotsP
     return <div className={`min-h-[280px] ${className}`} aria-hidden="true" />;
   }
 
+  return <ShelfSlotsContent items={items} className={className} />;
+}
+
+/** The post-mount shelf body — exported so tests can render it without effects. */
+export function ShelfSlotsContent({ className = '', items }: ShelfSlotsPreviewProps) {
   const sourced = items && items.length > 0;
   const display = sourced ? items!.slice(0, 5) : SAMPLE_SHELF_ITEMS;
 

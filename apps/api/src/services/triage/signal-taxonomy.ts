@@ -169,6 +169,7 @@ export function isRepairSignal(code: SignalCode): boolean {
     code === 'WC_CATEGORY_MISMATCH' ||
     code === 'DS_BROKEN_PROFILE_LINK' ||
     code === 'DS_OUTDATED_HOLIDAY_HOURS' ||
+    code === 'DS_CATEGORY_MISMATCH' ||
     code === 'DS_MISSING_PROFILE' ||
     code === 'DS_CLAIMED_STATUS' ||
     code === 'DS_ZERO_INDEXED_PRESENCE' ||
@@ -314,6 +315,7 @@ export const SIGNAL_LABELS: Record<string, string> = {
   DS_OUTDATED_HOURS: 'Outdated Hours of Operation',
   DS_OUTDATED_HOLIDAY_HOURS: 'Missing Holiday Hours',
   DS_PHOTO_DEFICIT: 'Photo Deficit (<5 photos)',
+  DS_CATEGORY_MISMATCH: 'Platform Category Mismatch',
   DS_ZERO_INDEXED_PRESENCE: 'Zero Indexed Presence',
   DS_PROFILE_SUSPENDED: 'Suspended Profile',
   DS_DUPLICATE_LISTING: 'Duplicate Listing',

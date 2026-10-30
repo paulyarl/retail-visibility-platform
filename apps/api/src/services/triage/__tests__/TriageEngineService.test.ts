@@ -95,14 +95,14 @@ function seededCascade(): PlaybookCatalogRow[] {
     playbook('PB-05', 2, 'A5', 'triage_management', rules({
       none: ['RA_BBB_GRADE_SUPPRESSION', 'RA_UNANSWERED_COMPLAINTS'],
       dual: {
-        groupA: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'WC_URL_MISMATCH', 'WC_BROKEN_WEBSITE', 'DS_BROKEN_PROFILE_LINK'],
+        groupA: ['CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'WC_URL_MISMATCH', 'WC_BROKEN_WEBSITE', 'DS_BROKEN_PROFILE_LINK', 'DS_CATEGORY_MISMATCH'],
         groupB: ['RA_REVIEW_DROUGHT', 'RA_LOW_REVIEW_VOLUME', 'RA_UNADDRESSED_NEGATIVE_BACKLOG', 'RA_UNADDRESSED_POSITIVE_BACKLOG'],
       },
       confidence: 0.90,
     })),
     // PB-01 — pure profile repair (rank 3)
     playbook('PB-01', 3, 'A3', 'review_management', rules({
-      any: ['WC_URL_MISMATCH', 'CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT'],
+      any: ['WC_URL_MISMATCH', 'CP_NAP_NAME_DRIFT', 'CP_NAP_ADDRESS_DRIFT', 'CP_NAP_PHONE_DRIFT', 'DS_CATEGORY_MISMATCH'],
       none: ['RA_BBB_GRADE_SUPPRESSION', 'RA_UNANSWERED_COMPLAINTS', 'RA_REVIEW_DROUGHT', 'RA_LOW_REVIEW_VOLUME', 'RA_UNADDRESSED_NEGATIVE_BACKLOG', 'RA_UNADDRESSED_POSITIVE_BACKLOG'],
       confidence: 0.85,
     })),
@@ -299,6 +299,18 @@ describe('evaluateTriage — 6 cascade branches in priority_rank order', () => {
     expect(result!.playbookCode).toBe('PB-01');
   });
 
+  it('Rule 3: PB-01 platform category mismatch only', () => {
+    const signals: SignalCode[] = ['DS_CATEGORY_MISMATCH'];
+    const result = evaluateTriage(signals, playbooks);
+    expect(result!.playbookCode).toBe('PB-01');
+  });
+
+  it('PB-05 wins when platform category mismatch co-occurs with review gap', () => {
+    const signals: SignalCode[] = ['DS_CATEGORY_MISMATCH', 'RA_REVIEW_DROUGHT'];
+    const result = evaluateTriage(signals, playbooks);
+    expect(result!.playbookCode).toBe('PB-05');
+  });
+
   it('Rule 4: PB-02 pure review gap — drought only', () => {
     const signals: SignalCode[] = ['RA_REVIEW_DROUGHT'];
     const result = evaluateTriage(signals, playbooks);
@@ -475,6 +487,7 @@ describe('signal taxonomy — family predicates', () => {
     expect(isRepairSignal('WC_URL_MISMATCH')).toBe(true);
     expect(isRepairSignal('WC_BROKEN_WEBSITE')).toBe(true);
     expect(isRepairSignal('DS_BROKEN_PROFILE_LINK')).toBe(true);
+    expect(isRepairSignal('DS_CATEGORY_MISMATCH')).toBe(true);
     expect(isRepairSignal('RA_REVIEW_DROUGHT')).toBe(false);
     expect(isRepairSignal('WC_MISSING_CTA')).toBe(false); // not a repair signal
   });
@@ -506,11 +519,11 @@ describe('signal taxonomy — family predicates', () => {
 // ─── Signal taxonomy: known codes + labels ───────────────────────────────
 
 describe('signal taxonomy — known codes + labels', () => {
-  it('KNOWN_SIGNAL_CODES has 54 codes across 6 families', () => {
+  it('KNOWN_SIGNAL_CODES has 57 codes across 6 families', () => {
     // 24 original + 7 sprint-1 product-visibility + 6 OX outreach-state
-    // + 2 QR + 9 PB-08 website-gap (WC_*) + 6 PB-09 presence/integrity
-    // (zero-indexed + 5 integrity codes) + 1 WC_DOMAIN_HIJACKED = 56
-    expect(KNOWN_SIGNAL_CODES.length).toBe(56);
+    // + 2 QR + 9 PB-08 website-gap (WC_*) + 7 PB-09 presence/integrity
+    // + 1 WC_DOMAIN_HIJACKED + 1 DS_CATEGORY_MISMATCH = 57
+    expect(KNOWN_SIGNAL_CODES.length).toBe(57);
     const families = new Set(KNOWN_SIGNAL_CODES.map((c) => c.split('_')[0]));
     expect(families.size).toBe(6);
     expect(Array.from(families).sort()).toEqual(['CP', 'DS', 'OX', 'RA', 'VP', 'WC']);
@@ -524,6 +537,7 @@ describe('signal taxonomy — known codes + labels', () => {
   it('signalLabel returns the label for known codes', () => {
     expect(signalLabel('RA_REVIEW_DROUGHT')).toBe('Review Drought (>180 days)');
     expect(signalLabel('WC_MISSING_CTA')).toBe('Missing Call-to-Action');
+    expect(signalLabel('DS_CATEGORY_MISMATCH')).toBe('Platform Category Mismatch');
   });
 
   it('signalLabel falls back to the code for unknown codes', () => {

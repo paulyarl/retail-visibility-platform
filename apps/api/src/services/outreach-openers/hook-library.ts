@@ -135,7 +135,7 @@ export const HOOK_LIBRARY: HookTemplate[] = [
     angle: 'gbp_verification',
     label: 'Google Business Profile verification & optimization',
     archetypes: ['A3', 'A4'],
-    signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_SERVICE_MENU', 'DS_OUTDATED_HOURS', 'DS_PHOTO_DEFICIT', 'DS_BROKEN_PROFILE_LINK', 'DS_OUTDATED_HOLIDAY_HOURS'],
+    signals: ['DS_CLAIMED_STATUS', 'DS_MISSING_SERVICE_MENU', 'DS_OUTDATED_HOURS', 'DS_PHOTO_DEFICIT', 'DS_BROKEN_PROFILE_LINK', 'DS_OUTDATED_HOLIDAY_HOURS', 'DS_CATEGORY_MISMATCH'],
     platforms: ['google'],
     subject: 'quick question about your Google listing',
     body: `{{salutation}} I was looking up {{category}} in {{city}} earlier and noticed your Google listing is probably sitting around a C-minus for completeness — hours, categories, photos, that kind of thing.

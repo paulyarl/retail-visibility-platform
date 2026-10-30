@@ -88,6 +88,8 @@ const REGISTERED_SIGNALS = new Set([
   // WC domain-hijack code (migration 353) — the domain_hijacked angle's
   // single governing signal.
   'WC_DOMAIN_HIJACKED',
+  // Platform-category mislabel (migration 364) — covered by gbp_verification.
+  'DS_CATEGORY_MISMATCH',
 ]);
 
 describe('Hook Library catalog', () => {

@@ -13,6 +13,7 @@ import {
   PROJECT_PHASE_CATALOG_ORDER,
   PROJECT_PHASE_PREDICATES_CURRENT,
   PROJECT_PHASE_PREDICATES_V1,
+  PROJECT_PHASE_PREDICATES_V2,
   PROJECT_PHASE_PREDICATES_VERSION,
 } from '../project-phase-predicates';
 import { assertSignalCoverage } from '../../scripts/seed-project-phase-predicates';
@@ -31,7 +32,7 @@ describe('project-phase predicate seed (current)', () => {
     expect(uncovered).toEqual([]);
   });
 
-  it('assertSignalCoverage passes for the v1 data', () => {
+  it('assertSignalCoverage passes for the current seed', () => {
     expect(() => assertSignalCoverage()).not.toThrow();
   });
 
@@ -86,7 +87,7 @@ describe('project-phase predicate seed (current)', () => {
 
   it('current seed ships no min_severity floors (D10)', () => {
     expect(PROJECT_PHASE_PREDICATES_CURRENT.every((r) => r.minSeverity === null)).toBe(true);
-    expect(PROJECT_PHASE_PREDICATES_VERSION).toBe(2);
+    expect(PROJECT_PHASE_PREDICATES_VERSION).toBe(3);
   });
 
   it('v2 places the PB-09 presence/integrity family on its phases', () => {
@@ -112,12 +113,17 @@ describe('project-phase predicate seed (current)', () => {
     );
   });
 
-  it('v2 is v1 plus the additions — no v1 trigger was dropped', () => {
-    for (const v1Row of PROJECT_PHASE_PREDICATES_V1) {
-      const v2Row = PROJECT_PHASE_PREDICATES_CURRENT.find((r) => r.phaseKey === v1Row.phaseKey);
-      expect(v2Row).toBeTruthy();
-      for (const code of v1Row.signals) {
-        expect(v2Row!.signals).toContain(code);
+  it('v3 places the platform-category mismatch on Foundation', () => {
+    const foundation = PROJECT_PHASE_PREDICATES_CURRENT.find((r) => r.phaseKey === 'foundation');
+    expect(foundation?.signals).toContain('DS_CATEGORY_MISMATCH');
+  });
+
+  it('v3 is v2 plus the additions — no v2 trigger was dropped', () => {
+    for (const v2Row of PROJECT_PHASE_PREDICATES_V2) {
+      const v3Row = PROJECT_PHASE_PREDICATES_CURRENT.find((r) => r.phaseKey === v2Row.phaseKey);
+      expect(v3Row).toBeTruthy();
+      for (const code of v2Row.signals) {
+        expect(v3Row!.signals).toContain(code);
       }
     }
   });
