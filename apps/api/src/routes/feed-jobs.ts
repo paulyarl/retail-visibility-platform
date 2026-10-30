@@ -52,7 +52,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
         id: 'google_account',
         label: 'Connect Google Account',
         description: 'Sign in with your Google account to authorize access',
-        completed: hasOAuthTokens || hasDirectBusinessTokens,
+        completed: hasOAuthTokens,
         action: '/settings/integrations',
       },
       {
@@ -67,7 +67,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
         id: 'oauth_tokens',
         label: 'Authorization Active',
         description: 'OAuth tokens are valid and not expired',
-        completed: hasOAuthTokens || hasDirectBusinessTokens,
+        completed: hasOAuthTokens,
         action: '/settings/integrations',
         requires: 'google_account',
       },
@@ -87,7 +87,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
         isReady,
         hasGoogleAccount: hasGoogleAccount || hasDirectBusinessTokens,
         hasMerchantLink,
-        hasOAuthTokens: hasOAuthTokens || hasDirectBusinessTokens,
+        hasOAuthTokens,
         setupSteps,
         message: isReady 
           ? 'Ready to push feeds to Google Merchant Center'

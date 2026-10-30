@@ -29,6 +29,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
+import EditBusinessProfileModal from '@/components/settings/EditBusinessProfileModal';
 
 interface SyncField {
   name: string;
@@ -85,6 +86,7 @@ export default function GBPSyncStatusPage() {
   const [gmcSettingsResult, setGmcSettingsResult] = useState<any>(null);
   const [validationReport, setValidationReport] = useState<BulkValidationReport | null>(null);
   const [loadingValidation, setLoadingValidation] = useState(false);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   useEffect(() => {
     async function fetchSyncStatus() {
@@ -269,6 +271,14 @@ export default function GBPSyncStatusPage() {
     }
   }
 
+  // Save local profile edits from the inline modal through the same route the
+  // /settings/tenant editor uses, then refresh the comparison table.
+  async function handleProfileSaved(updated: any) {
+    const saved = await platformHomeService.updateTenantProfile(tenantId, updated);
+    if (saved) setTenantData(saved);
+    await fetchComparison();
+  }
+
   // Auto-fetch comparison when location is linked
   useEffect(() => {
     if (linkedLocation && gbpConnected && !loading) {
@@ -443,13 +453,13 @@ export default function GBPSyncStatusPage() {
               Edit your business profile to ensure accurate data syncs to Google
             </p>
           </div>
-          <Link
-            href={`/t/${tenantId}/settings/tenant`}
+          <button
+            onClick={() => setEditProfileOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
           >
             <Building2 className="w-4 h-4" />
             Edit Business Profile
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -1290,6 +1300,14 @@ export default function GBPSyncStatusPage() {
           <li>• View detailed sync history and audit logs</li>
         </ul>
       </div>
+
+      <EditBusinessProfileModal
+        isOpen={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        profile={tenantData}
+        onSave={handleProfileSaved}
+        tenantId={tenantId}
+      />
     </div>
   );
 }

@@ -50,7 +50,7 @@ A platform-internal tenant that is our own best customer — "eat our own cookin
 
 | Connection | Target | Mechanism | Status |
 |---|---|---|---|
-| Google Business Profile | The platform's own `VisibleShelf` GBP (verified 60+ days) | Normal tenant OAuth connect (`business.manage`), from an account that is owner/manager on that GBP | **Unblocked 2026-10-29** — Gate B approved (case `5-5364000041203`), project `407743626849` granted 300 QPM. Verify `GET /api/google/business/locations` returns locations instead of `503 api_not_approved`, then connect. |
+| Google Business Profile | The platform's own `VisibleShelf` GBP (verified 60+ days) | Normal tenant OAuth connect (`business.manage`), from an account that is owner/manager on that GBP | **Connected + linked 2026-10-29** — Gate B approved same-day (case `5-5364000041203`, project `407743626849`, 300 QPM). `GET /api/google/business/locations` returned the real `VisibleShelf` location `10191785970742504478` (the `503 api_not_approved` era is over); linked via Sync Status → Link Location; live local-vs-Google comparison fetching real profile data. |
 | Google Merchant Center | The platform's existing MC — `visibleshelf.com` verified + claimed, `google_merchant_links_list` row for this tenant | Tenant-scoped MC connect | Ready when products exist |
 | Clover/Square/Meta/Pinterest | — | Optional later | Not connected at create |
 
@@ -136,7 +136,7 @@ doppler run --config prd -- node scripts/create-tenant.cjs \
 - [ ] Business profile seeded (`tenant_business_profiles_list`) with platform NAP — phone `+1 913-703-6157`, `contact@visibleshelf.com`, `visibleshelf.com`
 - [ ] Products added per §5
 - [ ] Store categories set — inventory-driven pick, after catalog load (§5 category note)
-- [ ] GBP connect — Gate B approved 2026-10-29 (case `5-5364000041203`, 300 QPM); ready to run
+- [x] GBP connect + location link — done 2026-10-29; location `10191785970742504478` (`VisibleShelf`)
 - [ ] MC link — the existing platform MC row
 - [ ] `GBP_TRANSPORT=record` fixture refresh once live GBP calls work
 
