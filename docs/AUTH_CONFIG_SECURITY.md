@@ -207,6 +207,23 @@ Its `redirect_uri` is `GOOGLE_REDIRECT_URI` — the **platform's own** callback.
 involved at any point. This is the platform's own OAuth client, registered in its own
 Google Cloud project.
 
+> **`GOOGLE_REDIRECT_URI` lives in four places and they drifted apart (fixed 2026-10-29).**
+> The var must (a) be byte-identical to an Authorized redirect URI on the `l1na…`
+> Merchant Center OAuth client and (b) point at a *mounted* route —
+> `https://api.visibleshelf.com/api/google/oauth/callback` (the merchant router is only
+> mounted at `/api`; the GBP router gets a second `/auth` mount so
+> `GOOGLE_BUSINESS_REDIRECT_URI=…/auth/google/business/callback` also resolves). Where each
+> copy lives: **Railway** service variables (API's primary home per `fly.toml`'s
+> "hot backup for Railway"), **fly secrets** on `visibleshelf-api` (the standby that was
+> actually serving `api.visibleshelf.com` traffic — plain `npm start`, no `doppler run`, so
+> Doppler is NOT read at runtime), **Vercel** env (web only — never reaches the API; its
+> stale `https://aps.visibleshelf.store/google/callback` value was a legacy-domain leftover),
+> **Doppler `prd`** (source of truth for local `doppler run` + the `....fly-secrets.env`
+> export — gitignored, regenerate after edits or `fly secrets import` regresses the fix).
+> Google validates `redirect_uri` at consent time, so a drifted value surfaces as
+> `Error 400: invalid_request` before the flow even starts — which is exactly what
+> happened 2026-10-29 when the env sent the unmounted `/google/callback` path.
+
 **The Google Cloud project is shared — confirmed 2026-10-16.** It is the "Visible Shelf" project
 (project number `407743626849`) and it already holds **two** OAuth clients:
 
@@ -269,6 +286,17 @@ That has two consequences:
    **Open question, cheap to settle:** have a merchant who is **not** a test user attempt a Google
    Business Profile connect and watch for an "unverified app" warning. Zero connections exist, so
    there is nothing to disturb. A clean connect closes this out.
+
+   **Settled 2026-10-29 — the warning fires for the `content` scope, not `business.manage`.**
+   The platform's own GBP connect (`14md…` client, `business.manage` only) completed with no
+   warning, but the unified GMC flow (`l1na…` client — `content` + `business.manage` +
+   openid/userinfo) shows the **"Google hasn't verified this app"** interstitial followed by the
+   consent screen's unverified banner. Verification approves *listed* scopes: `content` is
+   sensitive and is evidently not on the consent screen's approved list, so any request carrying
+   it re-shows the warning — clicking Advanced → Continue completes the flow anyway (that's how
+   the `gmc` token landed). **Merchant-facing follow-up:** every tenant connecting Merchant
+   Center hits this wall until `…/auth/content` is added to the consent screen's scopes and
+   submitted for incremental verification (additions re-verify without re-reviewing the app).
 
    Google's wording on the Audience page is precise about the cap
    and worth keeping: *"The user cap limits the number of users that can grant permission to your

@@ -312,6 +312,8 @@ router.get('/google/business/callback', async (req, res) => {
       });
     }
 
+    console.log(`[Google Business OAuth] ${existingAccount ? 'Reusing' : 'Creating'} OAuth account for tenant ${tenantId}: ${accountId}`);
+
     // Upsert tokens (encrypted) — Business Profile client, its own row
     const expiresAt = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
 

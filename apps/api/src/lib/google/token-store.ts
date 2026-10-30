@@ -120,7 +120,13 @@ export async function resolveGoogleTokenState(
 ): Promise<{ token: string | null; failure: GoogleTokenFailure | null }> {
   try {
     const tokenRecord = await findGoogleToken(provider, scope);
-    if (!tokenRecord) return { token: null, failure: 'not_connected' };
+    if (!tokenRecord) {
+      // Worth a log line — a missing provider row while a sibling provider is
+      // connected is exactly how the split-account bug presented (findFirst
+      // returns the other provider's account, this resolves nothing).
+      logger.warn(`[GoogleTokenStore] no '${provider}' token row for scope ${JSON.stringify(scope)}`, undefined);
+      return { token: null, failure: 'not_connected' };
+    }
 
     const token = await resolveGoogleAccessToken(provider, tokenRecord);
     return token ? { token, failure: null } : { token: null, failure: 'refresh_failed' };

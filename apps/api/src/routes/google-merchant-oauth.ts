@@ -195,35 +195,43 @@ router.get('/google/oauth/callback', async (req, res) => {
     const scopes = tokens.scope.split(' ');
     const now = new Date();
 
-    // Create or update Google OAuth account record
-    const accountId = generateQuickStart('goa'); // google_oauth_account
-    
-    // Upsert account record
-    const account = await prisma.google_oauth_accounts_list.upsert({
-      where: {
-        tenant_id_google_account_id: {
-          tenant_id: tenantId,
-          google_account_id: userInfo.id
-        }
-      },
-      create: {
-        id: accountId,
-        tenant_id: tenantId,
-        google_account_id: userInfo.id,
-        email: userInfo.email,
-        display_name: userInfo.name || null,
-        profile_picture_url: userInfo.picture || null,
-        scopes,
-        updated_at: now,
-      },
-      update: {
-        email: userInfo.email,
-        display_name: userInfo.name || null,
-        profile_picture_url: userInfo.picture || null,
-        scopes,
-        updated_at: now,
-      }
+    // Attach to the tenant's existing OAuth account row when one exists — the
+    // GBP callback creates a placeholder row (google_account_id='gbp_oauth'), and
+    // upserting on (tenant_id, google_account_id) would create a sibling row that
+    // orphans the 'gmc' token from every findFirst({ tenant_id }) lookup
+    // (setup-status, /merchants, sync paths all read the first row).
+    const existingAccount = await prisma.google_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
     });
+
+    const accountId = generateQuickStart('goa'); // google_oauth_account
+
+    console.log(`[Google Merchant OAuth] ${existingAccount ? 'Reusing' : 'Creating'} Google OAuth account for tenant ${tenantId}: ${existingAccount ? existingAccount.id : accountId}`);
+
+    const account = existingAccount
+      ? await prisma.google_oauth_accounts_list.update({
+          where: { id: existingAccount.id },
+          data: {
+            google_account_id: userInfo.id,
+            email: userInfo.email,
+            display_name: userInfo.name || null,
+            profile_picture_url: userInfo.picture || null,
+            scopes,
+            updated_at: now,
+          }
+        })
+      : await prisma.google_oauth_accounts_list.create({
+          data: {
+            id: accountId,
+            tenant_id: tenantId,
+            google_account_id: userInfo.id,
+            email: userInfo.email,
+            display_name: userInfo.name || null,
+            profile_picture_url: userInfo.picture || null,
+            scopes,
+            updated_at: now,
+          }
+        });
 
     // Create or update token record — Merchant Center client, its own row
     await upsertGoogleToken(account.id, 'gmc', {
@@ -233,7 +241,7 @@ router.get('/google/oauth/callback', async (req, res) => {
       scopes,
     });
 
-    console.log(`[Google Merchant OAuth] Successfully stored tokens for tenant ${tenantId}, email: ${userInfo.email}`);
+    console.log(`[Google Merchant OAuth] Successfully stored 'gmc' token on account ${account.id} for tenant ${tenantId}, email: ${userInfo.email}`);
 
     // Redirect back to integrations page with success
     res.redirect(`${WEB_URL}/t/${tenantId}/settings/integrations/google?success=connected`);
