@@ -10,6 +10,17 @@
 
 import { describe, test, expect } from 'vitest';
 import { routeRegistry, getRouteRegistrySummary } from '../routes/routeRegistry';
+import {
+  authenticateToken,
+  requirePlatformAdmin,
+  requireAdmin,
+  requirePlatformUser,
+  checkTenantAccess,
+  requireTenantOwner,
+  requirePlatformStaffOrAdmin,
+  authenticateCustomer,
+  requireTenantAdmin,
+} from '../middleware/auth';
 
 describe('Route Registry Coverage', () => {
   test('every registry entry has a valid router or middleware', () => {
@@ -223,5 +234,94 @@ describe('Route Registry Coverage', () => {
         violations.map(v => `  ⚠ ${v}`).join('\n'),
       );
     }
+  });
+
+  // ─── Health-check critical-path guard ─────────────────────────────────
+  // 2026-10-30 outage: gbpManagedRoutes was mounted at bare '/api' with a
+  // router-level `router.use(authenticateToken)`. Every /api/* request that
+  // reached it without an Auth0 session got 401 — including /api/health —
+  // plus every public mount registered after it. Fly health checks failed on
+  // both machines → proxy "could not find a good candidate" → site-wide 503.
+  //
+  // Invariant: no mount whose path is a prefix of '/api/health' ('/', '/api',
+  // '/api/health') may unconditionally gate requests with auth middleware —
+  // not via the entry's middleware array, not via a bare mounted fn, and not
+  // via an unscoped router.use(authFn) anywhere in its stack (checked
+  // recursively, since orchestrators nest sub-routers). Auth belongs on the
+  // individual routes.
+  test('no broad mount unconditionally gates requests with auth middleware', () => {
+    const HEALTH_PATH = '/api/health';
+    const BROAD_MOUNTS = new Set(['/', '/api', '/api/health']);
+
+    const authFns = new Set<unknown>([
+      authenticateToken, // also covers the requireAuth alias (same reference)
+      requirePlatformAdmin,
+      requireAdmin,
+      requirePlatformUser,
+      checkTenantAccess,
+      requireTenantOwner,
+      requirePlatformStaffOrAdmin,
+      authenticateCustomer,
+      requireTenantAdmin,
+    ]);
+    const AUTH_NAME =
+      /^(authenticateToken|requireAuth|authorize|requirePlatformAdmin|requireAdmin|requirePlatformUser|checkTenantAccess|requireTenantOwner|requirePlatformStaffOrAdmin|authenticateCustomer|requireCustomerAuth|requireTenantAdmin)$/;
+
+    const isAuthMiddleware = (fn: unknown) =>
+      typeof fn === 'function' && (authFns.has(fn) || AUTH_NAME.test((fn as any).name || ''));
+
+    // Express 5: a use-layer matches a mount prefix; matchers[0]('/') truthy
+    // means the middleware applies to every path that enters this router.
+    // Express 4 fallback: unscoped use sets regexp.fast_slash.
+    const layerAppliesToAll = (layer: any) => {
+      if (Array.isArray(layer.matchers)) return !!layer.matchers[0]?.('/');
+      return layer.regexp?.fast_slash === true;
+    };
+
+    const violations: string[] = [];
+
+    const checkHandle = (h: any, where: string, subPath: string) => {
+      if (isAuthMiddleware(h)) {
+        violations.push(`${where}: unscoped ${h?.name || 'middleware'} 401s every request reaching this mount`);
+      } else if (h?.stack && Array.isArray(h.stack)) {
+        inspectRouter(h, `${where} -> ${h.name || 'sub-router'}`, subPath);
+      }
+    };
+
+    const inspectRouter = (router: any, where: string, subPath: string) => {
+      for (const layer of router?.stack ?? []) {
+        if (!layer.route) {
+          if (layerAppliesToAll(layer)) {
+            for (const h of [layer.handle].flat()) checkHandle(h, where, subPath);
+          }
+          continue;
+        }
+        // Route layer: does it serve the health request with auth in its stack?
+        const matcher = layer.matchers?.[0];
+        if (matcher && matcher(subPath)) {
+          for (const sl of layer.route.stack ?? []) checkHandle(sl.handle, where, subPath);
+        }
+      }
+    };
+
+    for (const entry of routeRegistry) {
+      if (!BROAD_MOUNTS.has(entry.path) || entry.preMiddleware) continue;
+      const subPath = HEALTH_PATH.slice(entry.path === '/' ? 0 : entry.path.length) || '/';
+      const where = `Mount '${entry.path}' (domain: ${entry.domain})`;
+
+      for (const mw of entry.middleware ?? []) {
+        if (isAuthMiddleware(mw)) {
+          violations.push(`${where}: mount-level ${(mw as any).name || 'middleware'} gates every request`);
+        }
+      }
+
+      if (typeof entry.router === 'function' && !entry.router.stack) {
+        checkHandle(entry.router, where, subPath); // bare middleware mounted directly
+      } else {
+        inspectRouter(entry.router, where, subPath);
+      }
+    }
+
+    expect(violations, violations.join('\n')).toEqual([]);
   });
 });
