@@ -17,6 +17,11 @@ import crypto from 'crypto';
 import { authenticateToken, checkTenantAccess, getTenantId } from '../middleware/auth';
 import { isPlatformUser } from '../utils/platform-admin';
 import { resolveGbpLocation, resolveGbpTarget } from '../lib/google/gbp-target';
+import {
+  buildGbpPostSuggestPrompt,
+  featureKeyToTopic,
+  GBP_POST_SUGGEST_SYSTEM,
+} from '../lib/google/gbp-post-suggest';
 
 const router = Router();
 
@@ -1312,9 +1317,22 @@ router.post('/google/business/posts', async (req, res) => {
  */
 router.post('/google/business/posts/schedule', async (req, res) => {
   try {
-    const { tenantId, summary, topicType, scheduledFor, event, offer, callToAction, media } = req.body;
+    const { tenantId, summary, topicType, scheduledFor, recurrence, event, offer, callToAction, media } = req.body;
     if (!tenantId || !summary || !scheduledFor) {
       return res.status(400).json({ success: false, error: 'missing_required_fields' });
+    }
+
+    // Repeat is platform-side: the scheduler spawns the next occurrence row
+    // after each publish. Google never sees a recurring post.
+    let recurrenceData: { freq: 'weekly' | 'monthly'; remaining?: number } | null = null;
+    if (recurrence?.freq) {
+      if (!['weekly', 'monthly'].includes(recurrence.freq)) {
+        return res.status(400).json({ success: false, error: 'invalid_recurrence' });
+      }
+      recurrenceData = {
+        freq: recurrence.freq,
+        ...(typeof recurrence.remaining === 'number' ? { remaining: recurrence.remaining } : {}),
+      };
     }
 
     const when = new Date(scheduledFor);
@@ -1346,6 +1364,7 @@ router.post('/google/business/posts/schedule', async (req, res) => {
         status: 'SCHEDULED',
         scheduled_for: when,
         created_by: 'tenant',
+        ...(recurrenceData ? { recurrence: recurrenceData } : {}),
         event_title: event?.title ?? null,
         event_start_date: event?.startDate ? new Date(event.startDate) : null,
         event_end_date: event?.endDate ? new Date(event.endDate) : null,
@@ -1361,6 +1380,75 @@ router.post('/google/business/posts/schedule', async (req, res) => {
     res.json({ success: true, data: { id: post.id, scheduledFor: post.scheduled_for } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'schedule_post_failed' });
+  }
+});
+
+/**
+ * Suggest post copy — drafts a GBP update aligned to an attached photo and
+ * the business's name/category. Writes nothing; the composer fills its textarea.
+ * POST /google/business/posts/suggest
+ */
+router.post('/google/business/posts/suggest', async (req, res) => {
+  try {
+    const { tenantId, photoDescription, tone, temperature, cta, theme, topic } = req.body;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenantId' });
+    }
+
+    if (!(await isGbpManagementFeatureAllowed(tenantId, 'posts_scheduler'))) {
+      return res.status(403).json({ success: false, error: 'capability_required' });
+    }
+
+    const target = await resolveGbpTarget({ tenantId });
+    const businessName = target?.location.business_name || 'this business';
+    const category = target?.location.category || 'local business';
+
+    // Topic bank: the tenant's active feature purchases double as content
+    // seeds — feature_highlight posts pick one at random when no topic given.
+    let resolvedTopic = typeof topic === 'string' && topic.trim() ? topic.trim() : null;
+    if (!resolvedTopic) {
+      const purchases = await prisma.tenant_feature_purchases.findMany({
+        where: { tenant_id: tenantId, status: { in: ['active', 'trial'] } },
+        select: { feature_key: true },
+        take: 25,
+      });
+      if (purchases.length > 0) {
+        const keys = purchases.map((p) => p.feature_key);
+        const names = await prisma.bsaas_catalog.findMany({
+          where: { feature_key: { in: keys } },
+          select: { feature_key: true, marketing_name: true },
+        });
+        const nameMap = new Map(names.map((n) => [n.feature_key, n.marketing_name]));
+        const pick = keys[Math.floor(Math.random() * keys.length)];
+        resolvedTopic = featureKeyToTopic(pick, nameMap.get(pick));
+      }
+    }
+
+    const { default: aiProviderFactory } = await import('../services/ai-providers');
+    const temp = typeof temperature === 'number' && temperature >= 0 && temperature <= 1 ? temperature : 0.7;
+    const result = await aiProviderFactory.generateChatCompletion({
+      messages: [
+        { role: 'system', content: GBP_POST_SUGGEST_SYSTEM },
+        {
+          role: 'user',
+          content: buildGbpPostSuggestPrompt({
+            businessName,
+            category,
+            photoDescription,
+            tone,
+            cta,
+            theme,
+            topic: resolvedTopic,
+          }),
+        },
+      ],
+      maxTokens: 220,
+      temperature: temp,
+    });
+
+    res.json({ success: true, data: { summary: result.content.trim(), topic: resolvedTopic } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'suggest_failed' });
   }
 });
 

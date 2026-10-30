@@ -2942,7 +2942,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   /**
    * Create Google Business post
    */
-  async createGoogleBusinessPost(tenantId: string, summary: string, topicType: string = 'STANDARD'): Promise<any> {
+  async createGoogleBusinessPost(tenantId: string, summary: string, topicType: string = 'STANDARD', media?: { url: string }): Promise<any> {
     try {
       if (!tenantId) {
         throw new Error('Tenant ID is required');
@@ -2952,7 +2952,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `/api/google/business/posts`,
         { 
           method: 'POST',
-          body: JSON.stringify({ tenantId, summary, topicType })
+          body: JSON.stringify({ tenantId, summary, topicType, ...(media ? { media } : {}) })
         },
         `platform-google-business-create-post-${tenantId}`
       );

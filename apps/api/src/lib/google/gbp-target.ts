@@ -35,6 +35,8 @@ export interface GbpLocation {
   location_id: string;
   location_name: string;
   tenant_id: string | null;
+  business_name: string | null;
+  category: string | null;
   managed_by: GbpManagedBy;
   granted_via: GbpGrantedVia;
   delegated_surfaces: unknown;

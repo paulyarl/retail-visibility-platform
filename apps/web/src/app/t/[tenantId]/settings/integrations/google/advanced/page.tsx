@@ -17,6 +17,8 @@ import {
   Plus,
   RefreshCw,
   AlertTriangle,
+  Sparkles,
+  X,
 } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 import { GbpReviewsTab, type GbpReview } from './GbpReviewsTab';
@@ -55,6 +57,13 @@ export default function GBPAdvancedFeaturesPage() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
   const [schedulingPost, setSchedulingPost] = useState(false);
+  const [attachedPhoto, setAttachedPhoto] = useState<any | null>(null);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestTone, setSuggestTone] = useState('friendly');
+  const [suggestTheme, setSuggestTheme] = useState('announcement');
+  const [suggestCta, setSuggestCta] = useState('visit');
+  const [postRecurrence, setPostRecurrence] = useState('');
 
   // Reviews state
   const [reviews, setReviews] = useState<GbpReview[]>([]);
@@ -99,16 +108,49 @@ export default function GBPAdvancedFeaturesPage() {
           summary: newPostSummary,
           topicType: 'STANDARD',
           scheduledFor: new Date(scheduledAt).toISOString(),
+          ...(postRecurrence ? { recurrence: { freq: postRecurrence } } : {}),
+          ...(attachedPhoto?.googleUrl ? { media: { url: attachedPhoto.googleUrl } } : {}),
         }),
       });
       setNewPostSummary('');
       setScheduledAt('');
+      setAttachedPhoto(null);
+      setPostRecurrence('');
       await fetchScheduledPosts();
     } catch (error) {
       clientLogger.error('Failed to schedule post:', { detail: error });
     } finally {
       setSchedulingPost(false);
     }
+  }
+
+  async function handleSuggestCopy() {
+    try {
+      setSuggesting(true);
+      const res = await apiRequest(`/api/google/business/posts/suggest`, {
+        method: 'POST',
+        body: JSON.stringify({
+          tenantId,
+          photoDescription:
+            attachedPhoto?.description || attachedPhoto?.locationAssociation?.category || null,
+          tone: suggestTone,
+          theme: suggestTheme,
+          cta: suggestCta,
+        }),
+      });
+      const body = await res.json();
+      if (body?.success && body.data?.summary) setNewPostSummary(body.data.summary);
+    } catch (error) {
+      clientLogger.error('Failed to suggest post copy:', { detail: error });
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function togglePhotoPicker() {
+    const next = !showPhotoPicker;
+    setShowPhotoPicker(next);
+    if (next && media.length === 0) fetchMedia();
   }
 
   async function handleCancelScheduled(postId: string) {
@@ -161,8 +203,14 @@ export default function GBPAdvancedFeaturesPage() {
     if (!newPostSummary) return;
     try {
       setCreatingPost(true);
-      await platformHomeService.createGoogleBusinessPost(tenantId, newPostSummary, 'STANDARD');
+      await platformHomeService.createGoogleBusinessPost(
+        tenantId,
+        newPostSummary,
+        'STANDARD',
+        attachedPhoto?.googleUrl ? { url: attachedPhoto.googleUrl } : undefined
+      );
       setNewPostSummary('');
+      setAttachedPhoto(null);
       await fetchPosts();
     } catch (error) {
       clientLogger.error('Failed to create post:', { detail: error });
@@ -297,6 +345,103 @@ export default function GBPAdvancedFeaturesPage() {
               className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
               rows={3}
             />
+            {attachedPhoto && (
+              <div className="flex items-center gap-3 mt-3">
+                <img
+                  src={attachedPhoto.googleUrl}
+                  alt=""
+                  className="w-14 h-14 rounded-lg object-cover border border-neutral-200 dark:border-neutral-600"
+                />
+                <button
+                  onClick={() => setAttachedPhoto(null)}
+                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 dark:text-red-400"
+                >
+                  <X className="w-3 h-3" /> Remove photo
+                </button>
+              </div>
+            )}
+
+            {canUsePostsScheduler && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <button
+                  onClick={togglePhotoPicker}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                >
+                  <ImageIcon className="w-4 h-4" /> Photo
+                </button>
+                <button
+                  onClick={handleSuggestCopy}
+                  disabled={suggesting}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-purple-300 dark:border-purple-700 rounded-lg text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30 disabled:opacity-50"
+                >
+                  {suggesting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Suggest copy
+                </button>
+                <select
+                  value={suggestTone}
+                  onChange={(e) => setSuggestTone(e.target.value)}
+                  className="px-2 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300"
+                >
+                  <option value="friendly">Friendly</option>
+                  <option value="professional">Professional</option>
+                  <option value="playful">Playful</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="informative">Informative</option>
+                </select>
+                <select
+                  value={suggestTheme}
+                  onChange={(e) => setSuggestTheme(e.target.value)}
+                  className="px-2 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300"
+                >
+                  <option value="announcement">Announcement</option>
+                  <option value="problem_solution">Problem → Solution</option>
+                  <option value="offer">Offer</option>
+                  <option value="tip">Tip</option>
+                  <option value="seasonal">Seasonal</option>
+                  <option value="feature_highlight">Feature highlight</option>
+                </select>
+                <select
+                  value={suggestCta}
+                  onChange={(e) => setSuggestCta(e.target.value)}
+                  className="px-2 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300"
+                >
+                  <option value="visit">CTA: Visit</option>
+                  <option value="call">CTA: Call</option>
+                  <option value="learn_more">CTA: Learn more</option>
+                  <option value="order">CTA: Order</option>
+                  <option value="book">CTA: Book</option>
+                  <option value="none">No CTA</option>
+                </select>
+              </div>
+            )}
+
+            {showPhotoPicker && (
+              <div className="mt-3">
+                {media.length === 0 ? (
+                  <p className="text-sm text-neutral-500 py-4 text-center">
+                    No photos on your profile yet — upload one in the Photos tab first.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto">
+                    {media.map((item, idx) => (
+                      <button
+                        key={item.name || item.googleUrl || idx}
+                        onClick={() => {
+                          setAttachedPhoto(item);
+                          setShowPhotoPicker(false);
+                        }}
+                        className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500"
+                      >
+                        {item.googleUrl && (
+                          <img src={item.googleUrl} alt="" className="w-full h-full object-cover" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center justify-end gap-3 mt-3">
               {!canUsePostsScheduler ? (
                 <Link
@@ -314,6 +459,15 @@ export default function GBPAdvancedFeaturesPage() {
                     onChange={(e) => setScheduledAt(e.target.value)}
                     className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 text-sm"
                   />
+                  <select
+                    value={postRecurrence}
+                    onChange={(e) => setPostRecurrence(e.target.value)}
+                    className="px-2 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300"
+                  >
+                    <option value="">Once</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
                   <button
                     onClick={handleSchedulePost}
                     disabled={schedulingPost || !newPostSummary || !scheduledAt}

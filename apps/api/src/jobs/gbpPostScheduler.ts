@@ -25,6 +25,7 @@ import { createPost, type GBPPost } from '../services/GBPAdvancedSync';
 import { CrmAlertService } from '../services/CrmAlertService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import { emitGbpActivity } from '../lib/google/gbp-activity';
+import { generateQuickStart } from '../lib/id-generator';
 import { scheduleJob, stopJob } from './registry';
 
 const JOB_NAME = 'gbp-post-scheduler';
@@ -132,6 +133,59 @@ async function emitPostExpirationTriggers(): Promise<void> {
 /**
  * Process all due SCHEDULED posts. Runs every 5 minutes.
  */
+/**
+ * Recurrence — after a post with `recurrence` publishes, spawn the next
+ * SCHEDULED row carrying the same content. Repeat is entirely platform-side:
+ * Google only ever sees individual posts. `remaining` counts down when set;
+ * absent means repeat until cancelled.
+ */
+async function spawnRecurrence(post: any): Promise<void> {
+  const rec = post.recurrence as { freq?: 'weekly' | 'monthly'; remaining?: number } | null;
+  if (!rec?.freq) return;
+  if (typeof rec.remaining === 'number' && rec.remaining <= 1) return;
+
+  const next = new Date((post.scheduled_for ?? new Date()).getTime());
+  if (rec.freq === 'weekly') next.setDate(next.getDate() + 7);
+  else next.setMonth(next.getMonth() + 1);
+
+  try {
+    await prisma.gbp_posts.create({
+      data: {
+        id: generateQuickStart('gbpp'),
+        tenant_id: post.tenant_id,
+        location_id: post.location_id ?? null,
+        batch_id: post.batch_id ?? null,
+        summary: post.summary,
+        topic_type: post.topic_type,
+        call_to_action_type: post.call_to_action_type,
+        call_to_action_url: post.call_to_action_url,
+        media_url: post.media_url,
+        event_title: post.event_title,
+        event_start_date: post.event_start_date,
+        event_end_date: post.event_end_date,
+        offer_coupon_code: post.offer_coupon_code,
+        offer_redeem_url: post.offer_redeem_url,
+        offer_terms: post.offer_terms,
+        status: 'SCHEDULED',
+        scheduled_for: next,
+        created_by: post.created_by,
+        recurrence: typeof rec.remaining === 'number' ? { ...rec, remaining: rec.remaining - 1 } : rec,
+      },
+    });
+    logger.info('[GbpPostScheduler] Spawned next recurrence', undefined, {
+      sourcePostId: post.id,
+      scheduledFor: next.toISOString(),
+      freq: rec.freq,
+    });
+  } catch (error: any) {
+    // A failed spawn must never break the publish pass — the row already went out.
+    logger.warn('[GbpPostScheduler] recurrence spawn failed', undefined, {
+      postId: post.id,
+      error: error?.message,
+    });
+  }
+}
+
 /**
  * Publish-failure bookkeeping (Sprint D2, spec §6.3):
  *  - 429 / Retry-After → reschedule, no attempt burned
@@ -363,6 +417,7 @@ async function runPostScheduler(): Promise<void> {
               summary: post.summary?.slice(0, 80),
             },
           });
+          await spawnRecurrence(post);
         } else {
           await handlePublishFailure(post, result.error || 'publish_failed', result.status, result.retryAfterMs);
           if (result.status === 429 || post.attempts + 1 < MAX_ATTEMPTS) skipped++;
