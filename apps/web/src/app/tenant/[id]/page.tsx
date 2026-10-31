@@ -52,7 +52,8 @@ import SeedPreviewOwnerContact from '@/components/storefront/SeedPreviewOwnerCon
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
 import { clientLogger } from '@/lib/client-logger';
-import { canonicalStorefrontHome } from '@/lib/storefront-routing';
+import { canonicalStorefrontHome, isTenantHostName } from '@/lib/storefront-routing';
+import { headers } from 'next/headers';
 import { buildStorefrontSchema, storefrontTypeLabel } from '@/lib/storefront-seo';
 
 export const dynamic = 'force-dynamic';
@@ -714,13 +715,25 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   // Location status check: Show closed banner if location is not active
   if (tenant.storefrontMessage) {
+    // Owner portal entry — the pending/closed screen is exactly where a
+    // setting-up owner lands; /manage resolves on tenant hosts, /t/{id}
+    // on the platform app (tenant-scope roots are refused on tenant hosts).
+    const requestHost = (await headers()).get('host') ?? '';
+    const manageHref = isTenantHostName(requestHost) ? '/manage' : `/t/${id}`;
     return (
-      <LocationClosedBanner
-        title={tenant.storefrontMessage.title}
-        message={tenant.storefrontMessage.message}
-        tenantId={id}
-        businessName={businessName}
-      />
+      <>
+        <LocationClosedBanner
+          title={tenant.storefrontMessage.title}
+          message={tenant.storefrontMessage.message}
+          tenantId={id}
+          businessName={businessName}
+        />
+        <div className="pb-10 text-center text-xs">
+          <a href={manageHref} className="text-neutral-500 hover:text-neutral-900 transition-colors">
+            Store owner? Manage →
+          </a>
+        </div>
+      </>
     );
   }
 
