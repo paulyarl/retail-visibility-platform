@@ -39,6 +39,8 @@ describe('FeaturesShowcase', () => {
     expect(html).toContain('Pick the surface that fits');
     expect(html).toContain('Recommended');
     expect(html).toContain('Clover POS');
+    expect(html).toContain('Google Shopping feed');
+    expect(html).toContain('Add-ons that run on what you already have');
     for (const { id, surface } of TRIAD) {
       expect(html).toContain(surface);
       expect(html).toContain(`$${TIER_PRICING[id]}/mo`);

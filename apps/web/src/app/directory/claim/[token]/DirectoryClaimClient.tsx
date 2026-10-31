@@ -50,7 +50,8 @@ import directoryClaimPublicService, {
 } from '@/services/DirectoryClaimPublicService';
 import directoryPresenceUpgradeService from '@/services/DirectoryPresenceUpgradeService';
 import type { UpgradeSolution, UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
-import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, PRESENCE_SOLUTIONS, sortPresenceModes } from '@/lib/presence-modes';
+import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, PRESENCE_ADDONS, SOLUTION_SETTINGS_PATH, sortPresenceModes } from '@/lib/presence-modes';
+import AddonsStrip from '@/components/AddonsStrip';
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 
@@ -766,6 +767,13 @@ export default function DirectoryClaimClient() {
       ? (hasPlatformSession ? upgradePath : withReturnTo(upgradePath))
       : null;
     const dashboardHref = hasPlatformSession ? dashboardPath : withReturnTo(dashboardPath);
+    // Same session-aware routing for the POS connect links — a freshly
+    // claimed owner usually has no platform session yet.
+    const solutionHref = (key: string) => {
+      if (!tenantId) return null;
+      const p = `/t/${tenantId}${SOLUTION_SETTINGS_PATH[key] ?? '/settings/integrations'}`;
+      return hasPlatformSession ? p : withReturnTo(p);
+    };
 
     return (
       <Container size="lg" className="py-12">
@@ -834,7 +842,7 @@ export default function DirectoryClaimClient() {
                 )}
 
                 {/* Entry Presence mode teaser (claim handoff spec §2/§4) */}
-                <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} solutions={claimResult?.solutions} />
+                <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} solutions={claimResult?.solutions} solutionHref={solutionHref} />
 
                 {/* Directory Presence product allowance + entry step (E5, spec B-4) */}
                 <Alert color="blue" variant="light" icon={<IconShoppingCart size={16} />} w="100%">
@@ -1267,10 +1275,9 @@ export default function DirectoryClaimClient() {
 // Live values come from the upgradeOptions embedded in the claim accept
 // response (or the authenticated refresh when a platform session exists);
 // the shared static fallback renders only when no options are available.
-function ClaimUpgradeTeaser({ options, solutions }: { options?: UpgradeTierOption[]; solutions?: UpgradeSolution[] }) {
+function ClaimUpgradeTeaser({ options, solutions, solutionHref }: { options?: UpgradeTierOption[]; solutions?: UpgradeSolution[]; solutionHref?: (key: string) => string | null }) {
   const isFallback = !options || options.length === 0;
   const sorted = sortPresenceModes(isFallback ? FALLBACK_PRESENCE_MODES : options);
-  const solutionList = solutions?.length ? solutions : PRESENCE_SOLUTIONS;
 
   return (
     <Stack gap="xs">
@@ -1311,17 +1318,11 @@ function ClaimUpgradeTeaser({ options, solutions }: { options?: UpgradeTierOptio
       </Grid>
       <Card withBorder radius="md" padding="sm" bg="gray.0">
         <Text size="sm" ta="center" fw={600}>
-          Runs on the register you already have
+          Add-ons that run on what you already have
         </Text>
-        <Group gap="xs" justify="center" mt={6}>
-          {solutionList.map((s) => (
-            <Badge key={s.key} variant="light" color="teal" size="lg">
-              {s.label}
-            </Badge>
-          ))}
-        </Group>
+        <AddonsStrip items={PRESENCE_ADDONS} hrefFor={solutionHref} className="mt-2" />
         <Text size="xs" c="dimmed" ta="center" mt={6}>
-          {solutionList[0]?.tagline} — available on every option as an add-on.
+          {PRESENCE_ADDONS[0]?.tagline} — every option can add these as add-ons.
         </Text>
       </Card>
       <Text size="xs" c="dimmed" ta="center">

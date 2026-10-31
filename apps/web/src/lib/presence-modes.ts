@@ -77,6 +77,31 @@ export const PRESENCE_SOLUTIONS: UpgradeSolution[] = [
   { key: 'square_pos', label: 'Square POS', tagline: 'Same catalog sync if your register is Square' },
 ];
 
+// The à-la-carte add-on catalog (NRS "Premium Feature Add-Ons" parity) —
+// every entry is a real capability surface, sold as an outcome, not a tier
+// feature. Add new entries here; the strip renders on the claim teaser,
+// the upgrade page, and the public features triad.
+export const PRESENCE_ADDONS: UpgradeSolution[] = [
+  { key: 'clover_pos', label: 'Clover POS', tagline: 'Sync your real catalog from the register you already run' },
+  { key: 'square_pos', label: 'Square POS', tagline: 'Same catalog sync if your register is Square' },
+  { key: 'gbp_sync', label: 'Google Business Profile', tagline: 'Hours, photos & reviews synced to Google' },
+  { key: 'gmc_feed', label: 'Google Shopping feed', tagline: 'Products on Search, Shopping & Maps' },
+  { key: 'reviews', label: 'Review management', tagline: 'Monitor and respond to customer reviews' },
+  { key: 'coupons', label: 'Coupons & QR deals', tagline: 'Print-ready offers that track redemptions' },
+  { key: 'flyers', label: 'Weekly flyer', tagline: 'Publish specials as a shareable flyer' },
+  { key: 'social', label: 'Social posting', tagline: 'Post products and specials to social channels' },
+];
+
+// Workspace path where each solution is connected — appended to
+// /t/{tenantId} to deep-link the benefit (claim teaser, upgrade page).
+export const SOLUTION_SETTINGS_PATH: Record<string, string> = {
+  clover_pos: '/settings/integrations/clover',
+  square_pos: '/settings/integrations',
+  gbp_sync: '/settings/integrations/google',
+  gmc_feed: '/settings/integrations/google',
+  flyers: '/settings/flyers',
+};
+
 /** Primary (recommended) mode first — mirrors the upgrade page's gateway sort. */
 export function sortPresenceModes(modes: UpgradeTierOption[]): UpgradeTierOption[] {
   return [...modes].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));

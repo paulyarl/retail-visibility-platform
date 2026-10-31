@@ -10,7 +10,8 @@ import directoryPresenceUpgradeService, {
   UpgradeTierOption,
 } from '@/services/DirectoryPresenceUpgradeService';
 import customerPaymentMethodsService from '@/services/CustomerPaymentMethodsService';
-import { PRESENCE_SOLUTIONS } from '@/lib/presence-modes';
+import { PRESENCE_ADDONS, SOLUTION_SETTINGS_PATH } from '@/lib/presence-modes';
+import AddonsStrip from '@/components/AddonsStrip';
 import { ArrowLeft, Check, Loader2, Sparkles, CreditCard, AlertCircle } from 'lucide-react';
 
 // --- Stripe init (lazy, guarded) ---
@@ -447,14 +448,13 @@ export default function TierUpgradePage() {
         {isGateway && (
           <div className="mt-6 bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
             <p className="text-sm font-semibold text-teal-900">
-              Runs on the register you already have
+              Add-ons that run on what you already have
             </p>
-            <p className="text-sm text-teal-800 mt-1">
-              {(options?.solutions?.length ? options.solutions : PRESENCE_SOLUTIONS)
-                .map((s) => s.label)
-                .join(' and ')}{' '}
-              sync your real catalog — add POS integration on any option.
-            </p>
+            <AddonsStrip
+              items={options?.solutions?.length ? [...options.solutions, ...PRESENCE_ADDONS.slice(2)] : PRESENCE_ADDONS}
+              hrefFor={(key) => `/t/${tenantId}${SOLUTION_SETTINGS_PATH[key] ?? '/settings/integrations'}`}
+              className="mt-2"
+            />
           </div>
         )}
 

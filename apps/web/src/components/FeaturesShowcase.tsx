@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { TIER_PRICING } from '@/lib/tiers/tier-features';
+import { PRESENCE_ADDONS } from '@/lib/presence-modes';
+import AddonsStrip from '@/components/AddonsStrip';
 
 // Prices are read off the tier ladder rather than hand-typed, so the
 // showcase can't drift from TIER_PRICING when a price changes.
@@ -569,6 +571,12 @@ function TriadSection({ stages }: { stages: any[] }) {
         {stages.map((stage: any) => (
           <TriadCard key={stage.id} feature={stage} />
         ))}
+      </div>
+      <div className="text-center mt-6">
+        <p className="text-sm font-semibold text-neutral-900 mb-2">
+          Add-ons that run on what you already have
+        </p>
+        <AddonsStrip items={PRESENCE_ADDONS} className="max-w-4xl mx-auto" />
       </div>
     </div>
   );
