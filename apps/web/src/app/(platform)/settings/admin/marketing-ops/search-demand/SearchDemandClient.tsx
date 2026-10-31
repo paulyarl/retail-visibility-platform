@@ -73,6 +73,7 @@ export default function SearchDemandClient() {
 
   const [summary, setSummary] = useState<SeoDemandSummary | null>(null);
   const [data, setData] = useState<Paged<any> | null>(null);
+  const [dataTab, setDataTab] = useState<Tab | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -104,6 +105,7 @@ export default function SearchDemandClient() {
           : seoDemandAdminService.listSignals(apiParams);
       const [res, sum] = await Promise.all([fetcher, seoDemandAdminService.getSummary()]);
       setData(res);
+      setDataTab(tab);
       setSummary(sum);
     } catch (e: any) {
       setError(e?.message || 'failed_to_load');
@@ -118,7 +120,8 @@ export default function SearchDemandClient() {
   const dir = param('dir', sort === 'priority' ? 'asc' : 'desc');
   const page = Number(param('page', '1'));
   const pageSize = param('pageSize', '25');
-  const total = data?.total ?? 0;
+  const rows = dataTab === tab ? data?.rows : undefined;
+  const total = dataTab === tab ? data?.total ?? 0 : 0;
   const pages = Math.max(1, Math.ceil(total / Number(pageSize)));
 
   const toggleSort = (key: string) => {
@@ -195,6 +198,62 @@ export default function SearchDemandClient() {
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
       />
     </label>
+  );
+
+  const signalImp = (s: SeoQuerySignal) =>
+    param('window') === '7' ? s.impressions_7d : param('window') === '90' ? s.impressions_90d : s.impressions_28d;
+
+  const signalLinks = (s: SeoQuerySignal) => (
+    <>
+      {s.seed_id && (
+        <Link href={`/settings/admin/directory/presence-seeds/${s.seed_id}`} className="inline-flex items-center gap-1 text-blue-600 hover:underline">
+          Seed{s.seed_status ? ` (${s.seed_status})` : ''} <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+      {s.campaign_id && (
+        <Link href={`/settings/admin/marketing-ops/campaigns/${s.campaign_id}`} className="ml-2 inline-flex items-center gap-1 text-blue-600 hover:underline">
+          Campaign{s.campaign_stage ? ` (${s.campaign_stage})` : ''} <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+      {s.queued_prospect_id && (
+        <Link href="/settings/admin/marketing-ops/queue" className="ml-2 text-blue-600 hover:underline">Queued</Link>
+      )}
+      {!s.seed_id && !s.campaign_id && !s.queued_prospect_id && <span className="text-gray-400">—</span>}
+    </>
+  );
+
+  const signalActions = (s: SeoQuerySignal) => (
+    <div className="flex flex-wrap items-center gap-1">
+      {s.intent === 'store' && s.route && QUEUEABLE_ROUTES.has(s.route) && s.review_status !== 'queued' && s.review_status !== 'rejected' && (
+        <button
+          type="button"
+          disabled={busy === `q:${s.query_norm}`}
+          onClick={() => queue(s)}
+          className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          title={s.route === 'seed_signal' ? 'Queue a seed signal (search_batch)' : 'Queue for audit → triage (search_batch)'}
+        >
+          {busy === `q:${s.query_norm}` ? '…' : s.route === 'seed_signal' ? 'Queue seed' : 'Queue audit'}
+        </button>
+      )}
+      {(s.route === 'seek_batch' || s.route === 'category') && s.category && (
+        <Link href={seekHref(s.category, s.city)} className="rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700">
+          Start seek batch
+        </Link>
+      )}
+      {s.review_status === 'open' && s.match_kind && s.match_kind !== 'unmatched' && (
+        <button type="button" title="Confirm match" onClick={() => review(s, 'confirmed')} className="rounded border border-gray-300 p-1 text-green-700 hover:bg-green-50">
+          <Check className="h-3 w-3" />
+        </button>
+      )}
+      {s.review_status === 'open' && (
+        <button type="button" title="Reject" onClick={() => review(s, 'rejected')} className="rounded border border-gray-300 p-1 text-red-700 hover:bg-red-50">
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {(s.review_status === 'confirmed' || s.review_status === 'rejected') && (
+        <button type="button" onClick={() => review(s, 'open')} className="text-xs text-gray-500 hover:underline">Reopen</button>
+      )}
+    </div>
   );
 
   return (
@@ -301,10 +360,10 @@ export default function SearchDemandClient() {
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
       <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
+        <table className="block min-w-full divide-y divide-gray-200 text-sm md:table">
           {tab === 'signals' && (
             <>
-              <thead className="bg-gray-50">
+              <thead className="hidden bg-gray-50 md:table-header-group">
                 <tr>
                   <Th k="query">Query</Th>
                   <Th k="route">Route</Th>
@@ -321,11 +380,11 @@ export default function SearchDemandClient() {
                   <Th>Actions</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {(data?.rows as SeoQuerySignal[] | undefined)?.map((s) => {
-                  const imp = param('window') === '7' ? s.impressions_7d : param('window') === '90' ? s.impressions_90d : s.impressions_28d;
+              <tbody className="block divide-y divide-gray-100 md:table-row-group">
+                {(rows as SeoQuerySignal[] | undefined)?.map((s) => {
+                  const imp = signalImp(s);
                   return (
-                    <tr key={s.query_norm} className={s.review_status === 'rejected' ? 'opacity-50' : ''}>
+                    <tr key={s.query_norm} className={`flex flex-wrap items-baseline md:table-row ${s.review_status === 'rejected' ? 'opacity-50' : ''}`}>
                       <td className="px-3 py-2 font-medium text-gray-900">{s.sample_query}</td>
                       <td className="px-3 py-2">
                         {s.route && (
@@ -352,56 +411,9 @@ export default function SearchDemandClient() {
                       <td className="max-w-[14rem] truncate px-3 py-2 text-xs text-gray-500" title={s.top_page || ''}>
                         {s.top_page ? <a href={s.top_page} target="_blank" rel="noreferrer" className="hover:underline">{pathOf(s.top_page)}</a> : '—'}
                       </td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">
-                        {s.seed_id && (
-                          <Link href={`/settings/admin/directory/presence-seeds/${s.seed_id}`} className="inline-flex items-center gap-1 text-blue-600 hover:underline">
-                            Seed{s.seed_status ? ` (${s.seed_status})` : ''} <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        )}
-                        {s.campaign_id && (
-                          <Link href={`/settings/admin/marketing-ops/campaigns/${s.campaign_id}`} className="ml-2 inline-flex items-center gap-1 text-blue-600 hover:underline">
-                            Campaign{s.campaign_stage ? ` (${s.campaign_stage})` : ''} <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        )}
-                        {s.queued_prospect_id && (
-                          <Link href="/settings/admin/marketing-ops/queue" className="ml-2 text-blue-600 hover:underline">Queued</Link>
-                        )}
-                        {!s.seed_id && !s.campaign_id && !s.queued_prospect_id && <span className="text-gray-400">—</span>}
-                      </td>
+                      <td className="px-3 py-2 text-xs md:whitespace-nowrap">{signalLinks(s)}</td>
                       <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{s.last_seen ? String(s.last_seen).slice(0, 10) : '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          {s.intent === 'store' && s.route && QUEUEABLE_ROUTES.has(s.route) && s.review_status !== 'queued' && s.review_status !== 'rejected' && (
-                            <button
-                              type="button"
-                              disabled={busy === `q:${s.query_norm}`}
-                              onClick={() => queue(s)}
-                              className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                              title={s.route === 'seed_signal' ? 'Queue a seed signal (search_batch)' : 'Queue for audit → triage (search_batch)'}
-                            >
-                              {busy === `q:${s.query_norm}` ? '…' : s.route === 'seed_signal' ? 'Queue seed' : 'Queue audit'}
-                            </button>
-                          )}
-                          {(s.route === 'seek_batch' || s.route === 'category') && s.category && (
-                            <Link href={seekHref(s.category, s.city)} className="rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700">
-                              Start seek batch
-                            </Link>
-                          )}
-                          {s.review_status === 'open' && s.match_kind && s.match_kind !== 'unmatched' && (
-                            <button type="button" title="Confirm match" onClick={() => review(s, 'confirmed')} className="rounded border border-gray-300 p-1 text-green-700 hover:bg-green-50">
-                              <Check className="h-3 w-3" />
-                            </button>
-                          )}
-                          {s.review_status === 'open' && (
-                            <button type="button" title="Reject" onClick={() => review(s, 'rejected')} className="rounded border border-gray-300 p-1 text-red-700 hover:bg-red-50">
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                          {(s.review_status === 'confirmed' || s.review_status === 'rejected') && (
-                            <button type="button" onClick={() => review(s, 'open')} className="text-xs text-gray-500 hover:underline">Reopen</button>
-                          )}
-                        </div>
-                      </td>
+                      <td className="px-3 py-2 md:whitespace-nowrap">{signalActions(s)}</td>
                     </tr>
                   );
                 })}
@@ -411,7 +423,7 @@ export default function SearchDemandClient() {
 
           {tab === 'gaps' && (
             <>
-              <thead className="bg-gray-50">
+              <thead className="hidden bg-gray-50 md:table-header-group">
                 <tr>
                   <Th k="category">Category</Th>
                   <Th k="city">Market</Th>
@@ -426,9 +438,9 @@ export default function SearchDemandClient() {
                   <Th>Action</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {(data?.rows as SeoDemandGap[] | undefined)?.map((g) => (
-                  <tr key={`${g.category}|${g.city}|${g.state}`}>
+              <tbody className="block divide-y divide-gray-100 md:table-row-group">
+                {(rows as SeoDemandGap[] | undefined)?.map((g) => (
+                  <tr key={`${g.category}|${g.city}|${g.state}`} className="flex flex-wrap items-baseline md:table-row">
                     <td className="px-3 py-2 font-medium text-gray-900">{g.category}</td>
                     <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{g.city ? `${g.city}, ${g.state}` : <span className="text-gray-400">No market in query</span>}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{g.impressions}</td>
@@ -437,7 +449,7 @@ export default function SearchDemandClient() {
                     <td className="px-3 py-2 text-right tabular-nums">{fmtPos(g.position)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{g.seeds}</td>
                     <td className={`px-3 py-2 text-right tabular-nums ${g.published <= 2 ? 'font-semibold text-orange-700' : ''}`}>{g.published}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{g.gap_score.toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{g.gap_score == null ? '—' : g.gap_score.toFixed(1)}</td>
                     <td className="max-w-[18rem] truncate px-3 py-2 text-xs text-gray-500" title={(g.top_queries || []).join(', ')}>
                       {(g.top_queries || []).join(', ')}
                     </td>
@@ -454,7 +466,7 @@ export default function SearchDemandClient() {
 
           {tab === 'markets' && (
             <>
-              <thead className="bg-gray-50">
+              <thead className="hidden bg-gray-50 md:table-header-group">
                 <tr>
                   <Th k="city">Market</Th>
                   <Th k="impressions">Impr.</Th>
@@ -469,9 +481,9 @@ export default function SearchDemandClient() {
                   <Th>Drill in</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {(data?.rows as SeoDemandMarket[] | undefined)?.map((m) => (
-                  <tr key={`${m.city}|${m.state}`}>
+              <tbody className="block divide-y divide-gray-100 md:table-row-group">
+                {(rows as SeoDemandMarket[] | undefined)?.map((m) => (
+                  <tr key={`${m.city}|${m.state}`} className="flex flex-wrap items-baseline md:table-row">
                     <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">{m.city}, {m.state}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{m.impressions}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{m.clicks}</td>
