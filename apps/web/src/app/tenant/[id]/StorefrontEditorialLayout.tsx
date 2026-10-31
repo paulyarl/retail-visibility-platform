@@ -239,12 +239,16 @@ export default function StorefrontEditorialLayout({
   const socialLinks = useMemo(() => {
     const links: { platform: string; url: string; icon: string }[] = [];
     const meta = tenant?.metadata || {};
-    if (meta.instagram) links.push({ platform: 'Instagram', url: meta.instagram, icon: 'instagram' });
-    if (meta.facebook) links.push({ platform: 'Facebook', url: meta.facebook, icon: 'facebook' });
-    if (meta.twitter || meta.x) links.push({ platform: 'X', url: meta.twitter || meta.x, icon: 'x' });
-    if (meta.tiktok) links.push({ platform: 'TikTok', url: meta.tiktok, icon: 'tiktok' });
-    if (meta.linkedin) links.push({ platform: 'LinkedIn', url: meta.linkedin, icon: 'linkedin' });
-    if (meta.youtube) links.push({ platform: 'YouTube', url: meta.youtube, icon: 'youtube' });
+    // Social URLs arrive via three payloads depending on the save path:
+    // top-level tenant.socialLinks, metadata.social_links, and flat
+    // metadata keys — merge all three so no saved profile is dropped.
+    const social = { ...(tenant?.socialLinks || {}), ...(meta.social_links || {}), ...meta };
+    if (social.instagram) links.push({ platform: 'Instagram', url: social.instagram, icon: 'instagram' });
+    if (social.facebook) links.push({ platform: 'Facebook', url: social.facebook, icon: 'facebook' });
+    if (social.twitter || social.x) links.push({ platform: 'X', url: social.twitter || social.x, icon: 'x' });
+    if (social.tiktok) links.push({ platform: 'TikTok', url: social.tiktok, icon: 'tiktok' });
+    if (social.linkedin) links.push({ platform: 'LinkedIn', url: social.linkedin, icon: 'linkedin' });
+    if (social.youtube) links.push({ platform: 'YouTube', url: social.youtube, icon: 'youtube' });
     return links;
   }, [tenant]);
 
