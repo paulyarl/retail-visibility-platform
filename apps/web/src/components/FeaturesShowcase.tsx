@@ -561,7 +561,8 @@ function TriadSection({ stages }: { stages: any[] }) {
         </h4>
         <p className="text-sm sm:text-base text-neutral-600 max-w-2xl mx-auto">
           Three ways to show up. Choose the one where your customers already look — the rest is a step
-          up from here, not a replacement.
+          up from here, not a replacement. Every option runs on the register you already have — Clover
+          POS and Square sync your real catalog.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">

@@ -3,7 +3,7 @@ import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 import { clientLogger } from '@/lib/client-logger';
-import { isPlatformSubdomain, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, STOREFRONT_PREFIX_ROOTS, tenantHostCanonicalPath, canonicalSurfaceUrl, type StorefrontCanonical } from '@/lib/storefront-routing';
+import { isPlatformSubdomain, isPortalSubdomainHost, isStorefrontPath, isCandidateCustomHost, managePathSuffix, platformOrigin, surfaceClassForPath, STOREFRONT_PREFIX_ROOTS, tenantHostCanonicalPath, canonicalSurfaceUrl, type StorefrontCanonical } from '@/lib/storefront-routing';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
@@ -153,6 +153,33 @@ export async function proxy(req: NextRequest) {
   // Continue with existing proxy logic for non-auth routes
   const { hostname, searchParams } = new URL(req.url);
 
+  // Portal host (mystore.{apex}) — the shared merchant workspace surface
+  // (NRS mystore.nrsplus.com parity). A platform host, not a tenant host:
+  // workspace/auth paths render here, '/' is the workspace entry, and
+  // everything else canonicalizes to the apex (marketing, directory, and
+  // storefronts never render under the portal host). Runs before the
+  // tenant-subdomain and custom-domain branches — portal names are carved
+  // out of both candidate checks in storefront-routing.
+  if (isPortalSubdomainHost(hostname)) {
+    if (pathname === '/') {
+      const dest = new URL('/tenants', req.url);
+      console.log(`[Proxy] Portal home: ${hostname}/ → ${dest.toString()}`);
+      return NextResponse.redirect(dest, { status: 302 });
+    }
+    if (pathname.startsWith('/api/') ||
+        pathname.startsWith('/_next/') ||
+        pathname.startsWith('/favicon') ||
+        pathname.includes('.')) {
+      return NextResponse.next();
+    }
+    if (surfaceClassForPath(pathname) === 'tenant-scope') {
+      return NextResponse.next();
+    }
+    const dest = new URL(`${pathname}${req.nextUrl.search}`, platformOrigin());
+    console.log(`[Proxy] Portal canonicalize to apex: ${hostname}${pathname} → ${dest.toString()}`);
+    return NextResponse.redirect(dest, { status: 301 });
+  }
+
   // Handle subdomain storefront routing
   const subdomainInfo = isPlatformSubdomain(hostname);
   if (subdomainInfo) {
@@ -166,10 +193,15 @@ export async function proxy(req: NextRequest) {
       return NextResponse.next();
     }
 
+    // D13 branded workspace entry: /manage[/rest] → platform /t/{id}[/rest].
+    // Same rule as custom hosts — computed before the storefront-path gate
+    // so the portal door isn't refused as a non-storefront path.
+    const manageSuffix = managePathSuffix(pathname);
+
     // Non-storefront paths never serve on a tenant host — this branch returns
     // before the /admin and /settings auth gates, so anything off the
     // storefront allowlist is refused rather than rendered unauthenticated.
-    if (!isStorefrontPath(pathname)) {
+    if (!isStorefrontPath(pathname) && manageSuffix === null) {
       return NextResponse.rewrite(new URL('/404', req.url));
     }
 
@@ -187,6 +219,16 @@ export async function proxy(req: NextRequest) {
           // Subdomain exists, rewrite to the public storefront at /tenant/{id}.
           // Rewrite (never redirect) so the subdomain stays canonical in the URL.
           const tenantId = subdomainData.tenantId;
+
+          // D13 branded workspace entry on subdomains: {slug}.{apex}/manage
+          // is the merchant portal door — absolute platform origin so the
+          // workspace never renders under the tenant host, and the redirect
+          // can't become open. Mirrors the custom-host block below.
+          if (manageSuffix !== null) {
+            const dest = new URL(`${PLATFORM_APP_ORIGIN}/t/${tenantId}${manageSuffix}${req.nextUrl.search}`);
+            console.log(`[Proxy] Subdomain /manage: ${hostname}${pathname} → ${dest.toString()}`);
+            return NextResponse.redirect(dest, { status: 302 });
+          }
 
           // Paths already under /tenant/ are canonicalized, not passed through:
           // on a tenant host "/" IS the storefront — /tenant/{id} is the

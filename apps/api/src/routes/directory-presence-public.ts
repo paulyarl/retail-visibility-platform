@@ -764,6 +764,7 @@ router.post('/claim/:token/accept', optionalAuth, optionalCustomerAuth, async (r
       currentTier: result.currentTier,
       isGatewayUpgrade: result.isGatewayUpgrade,
       upgradeOptions: result.upgradeOptions,
+      solutions: result.solutions,
     });
   } catch (error) {
     logger.error('[POST /api/public/directory/claim/:token/accept] Error:', undefined, {

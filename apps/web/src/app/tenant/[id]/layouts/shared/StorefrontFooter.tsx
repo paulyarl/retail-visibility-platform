@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { publicStorefrontPolicyService } from '@/services/PublicStorefrontPolicyService';
 import { platformOrigin } from '@/lib/storefront-routing';
-import { useStorefrontPath, useStorefrontUrl } from '@/components/storefront/StorefrontUrlContext';
+import { useStorefrontPath, useStorefrontUrl, useIsTenantHost } from '@/components/storefront/StorefrontUrlContext';
 
 interface SocialLink {
   platform: string;
@@ -114,6 +114,12 @@ export default function StorefrontFooter({
   // hosts and /tenant/{id}/policies/* on the platform app.
   const sp = useStorefrontPath(tenantId);
   const storefrontUrl = useStorefrontUrl(tenantId);
+  // Owner portal door: /manage on a tenant host (subdomain/custom domain)
+  // bounces to the platform workspace /t/{id}; on the platform app the
+  // workspace path is direct. Discreet footer entry, always rendered —
+  // it's owner affordance, not platform branding.
+  const isTenantHost = useIsTenantHost();
+  const manageHref = isTenantHost ? '/manage' : `${platformBase}/t/${tenantId}`;
 
   // Fetch policies if not passed as prop
   const [policies, setPolicies] = useState(storefrontPolicies);
@@ -277,6 +283,11 @@ export default function StorefrontFooter({
               </Link>
             </div>
           )}
+          <div className={`text-center text-xs ${removeBranding ? 'mt-6 pt-6 border-t border-neutral-700 dark:border-neutral-800' : 'mt-4'}`}>
+            <Link href={manageHref} className="text-neutral-400 dark:text-neutral-500 hover:text-white transition-colors">
+              Store owner? Manage →
+            </Link>
+          </div>
         </div>
       </footer>
     );
@@ -445,6 +456,11 @@ export default function StorefrontFooter({
             </Link>
           </div>
         )}
+        <div className={`text-center text-xs ${removeBranding ? 'mt-10 pt-8 border-t border-neutral-800' : 'mt-4'}`}>
+          <Link href={manageHref} className="text-neutral-500 hover:text-white transition-colors">
+            Store owner? Manage →
+          </Link>
+        </div>
       </div>
     </footer>
   );

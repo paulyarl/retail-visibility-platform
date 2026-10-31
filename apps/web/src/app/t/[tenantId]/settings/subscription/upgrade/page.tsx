@@ -10,6 +10,7 @@ import directoryPresenceUpgradeService, {
   UpgradeTierOption,
 } from '@/services/DirectoryPresenceUpgradeService';
 import customerPaymentMethodsService from '@/services/CustomerPaymentMethodsService';
+import { PRESENCE_SOLUTIONS } from '@/lib/presence-modes';
 import { ArrowLeft, Check, Loader2, Sparkles, CreditCard, AlertCircle } from 'lucide-react';
 
 // --- Stripe init (lazy, guarded) ---
@@ -358,10 +359,10 @@ export default function TierUpgradePage() {
 
                   <div className="mb-4">
                     <h3 className="text-lg font-bold text-gray-900">
-                      {tier.displayName || tier.name}
+                      {isGateway && tier.tagline ? tier.tagline : tier.displayName || tier.name}
                     </h3>
                     {isGateway && tier.tagline && (
-                      <p className="text-sm font-medium text-gray-700 mt-1">{tier.tagline}</p>
+                      <p className="text-xs text-gray-500 mt-1">{tier.displayName || tier.name}</p>
                     )}
                     {tier.description && (
                       <p className="text-sm text-gray-600 mt-1">{tier.description}</p>
@@ -438,6 +439,22 @@ export default function TierUpgradePage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Register-level solutions — merchant outcomes, not tier features.
+            Live list from the options payload; shared fallback otherwise. */}
+        {isGateway && (
+          <div className="mt-6 bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
+            <p className="text-sm font-semibold text-teal-900">
+              Runs on the register you already have
+            </p>
+            <p className="text-sm text-teal-800 mt-1">
+              {(options?.solutions?.length ? options.solutions : PRESENCE_SOLUTIONS)
+                .map((s) => s.label)
+                .join(' and ')}{' '}
+              sync your real catalog — add POS integration on any option.
+            </p>
           </div>
         )}
 

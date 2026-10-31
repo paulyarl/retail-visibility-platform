@@ -7,6 +7,31 @@
 const PLATFORM_DOMAINS = ['visibleshelf.com', 'visibleshelf.store'];
 
 /**
+ * Portal subdomains — platform hosts that serve the merchant WORKSPACE,
+ * never tenant-candidate storefronts. `mystore.{apex}` is the shared
+ * merchant portal door (NRS mystore.nrsplus.com parity): workspace/auth
+ * paths render on the host, everything else canonicalizes to the apex.
+ * The name is also in RESERVED_SUBDOMAINS (apps/api/src/lib/subdomain.ts)
+ * so no tenant can claim it.
+ */
+export const PORTAL_SUBDOMAINS: ReadonlySet<string> = new Set(['mystore']);
+
+/** True when the hostname is a workspace portal host (mystore.{apex}). */
+export function isPortalSubdomainHost(hostname: string): boolean {
+  const h = (hostname || '').split(':')[0].toLowerCase();
+  if (!h) return false;
+  for (const domain of PLATFORM_DOMAINS) {
+    if (h.endsWith(`.${domain}`)) {
+      return PORTAL_SUBDOMAINS.has(h.slice(0, h.length - domain.length - 1));
+    }
+  }
+  if (h.endsWith('.localhost')) {
+    return PORTAL_SUBDOMAINS.has(h.slice(0, -'.localhost'.length));
+  }
+  return false;
+}
+
+/**
  * Surface classes — the shared vocabulary for "what is this path, and where
  * must a link to it point". One table, two consumers: the proxy's B1 allowlist
  * (reachability) and the URL delegate (origin). The class names the surface;
@@ -104,6 +129,7 @@ const SURFACE_ROOTS: Record<string, SurfaceClass> = {
   '/rt': 'public',
   // tenant-scope (never served on a tenant host)
   '/t': 'tenant-scope',
+  '/tenants': 'tenant-scope',
   '/settings': 'tenant-scope',
   '/admin': 'tenant-scope',
   '/dashboard': 'tenant-scope',
@@ -138,8 +164,9 @@ export function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; s
       const subdomain = hostname.replace(`.${domain}`, '');
       // www is a platform host, not a tenant subdomain — it must reach the
       // normal platform routes, never the storefront resolver (which would
-      // 404 it: 'www' is reserved and can never resolve to a tenant).
-      if (subdomain === 'www') return null;
+      // 404 it: 'www' is reserved and can never resolve to a tenant). Portal
+      // names are platform hosts too — they take the workspace branch.
+      if (subdomain === 'www' || PORTAL_SUBDOMAINS.has(subdomain)) return null;
       return { isSubdomain: true, subdomain, domain };
     }
   }
@@ -147,7 +174,7 @@ export function isPlatformSubdomain(hostname: string): { isSubdomain: boolean; s
   // Check localhost for development
   if (hostname.endsWith('.localhost') && hostname !== 'localhost') {
     const subdomain = hostname.replace('.localhost', '');
-    if (subdomain === 'www') return null;
+    if (subdomain === 'www' || PORTAL_SUBDOMAINS.has(subdomain)) return null;
     return { isSubdomain: true, subdomain, domain: 'localhost' };
   }
 
@@ -208,6 +235,7 @@ export function isCandidateCustomHost(hostname: string): boolean {
   if (h === '::1' || h.startsWith('[') || /^\d+\.\d+\.\d+\.\d+$/.test(h)) return false; // IP literals
   if (h.endsWith('.vercel.app')) return false; // deployment/preview hosts
   if (isPlatformSubdomain(h)) return false;
+  if (isPortalSubdomainHost(h)) return false; // portal names are ours, not tenant candidates
   return h.includes('.'); // must at least look like a DNS name
 }
 

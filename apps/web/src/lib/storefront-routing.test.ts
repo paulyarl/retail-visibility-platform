@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isPlatformSubdomain,
+  isPortalSubdomainHost,
   isStorefrontPath,
   isCandidateCustomHost,
   managePathSuffix,
@@ -45,6 +46,31 @@ describe('isPlatformSubdomain', () => {
   it('ignores foreign hosts', () => {
     expect(isPlatformSubdomain('shop.mybrand.com')).toBeNull();
     expect(isPlatformSubdomain('notvisibleshelf.com')).toBeNull();
+  });
+});
+
+describe('portal subdomain hosts (mystore.{apex})', () => {
+  it('portal names are platform hosts, never tenant candidates', () => {
+    expect(isPlatformSubdomain('mystore.visibleshelf.com')).toBeNull();
+    expect(isPlatformSubdomain('mystore.visibleshelf.store')).toBeNull();
+    expect(isPlatformSubdomain('mystore.localhost')).toBeNull();
+    expect(isPortalSubdomainHost('mystore.visibleshelf.com')).toBe(true);
+    expect(isPortalSubdomainHost('joes-market.visibleshelf.com')).toBe(false);
+    expect(isPortalSubdomainHost('visibleshelf.com')).toBe(false);
+    expect(isPortalSubdomainHost('mystore.localhost')).toBe(true);
+  });
+
+  it('portal hosts are never custom-domain candidates', () => {
+    expect(isCandidateCustomHost('mystore.visibleshelf.com')).toBe(false);
+    expect(isCandidateCustomHost('mystore.visibleshelf.store')).toBe(false);
+  });
+
+  it('workspace roots classify as tenant-scope; consumer roots do not', () => {
+    expect(surfaceClassForPath('/tenants')).toBe('tenant-scope');
+    expect(surfaceClassForPath('/t')).toBe('tenant-scope');
+    expect(surfaceClassForPath('/login')).toBe('tenant-scope');
+    expect(surfaceClassForPath('/directory')).toBe('directory');
+    expect(surfaceClassForPath('/tenant')).toBe('storefront');
   });
 });
 

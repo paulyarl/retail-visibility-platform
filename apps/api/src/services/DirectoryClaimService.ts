@@ -28,6 +28,7 @@ import { buildTenantUpgradeOptions, UpgradeOptionsPayload } from './DirectoryPre
 import { MarketIntelAccessService } from './MarketIntelAccessService';
 import { invalidateEffectiveCapabilities } from './EffectiveCapabilityResolver';
 import { slugifyAttributeKey, type DirectoryListingAttribute } from './directory/listingAttributes';
+import { assignSubdomain } from '../lib/subdomain';
 
 /**
  * Seed-claim promo grants — capability features unlocked by the claim event
@@ -191,6 +192,7 @@ export interface ClaimResult {
   currentTier?: UpgradeOptionsPayload['currentTier'];
   isGatewayUpgrade?: boolean;
   upgradeOptions?: UpgradeOptionsPayload['upgradeOptions'];
+  solutions?: UpgradeOptionsPayload['solutions'];
   /** Feature keys unlocked by the claim promo grant (source 'seed_claim'). */
   claimGrants?: string[];
 }
@@ -1415,6 +1417,12 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
       WHERE id = ${r.tenant_id}
     `;
 
+    // Mint the platform subdomain at claim — {slug}.{apex} becomes the
+    // tenant's storefront origin and {slug}.{apex}/manage its merchant
+    // portal door. Best-effort: a reserved/taken slug must never fail the
+    // claim (the workspace stays reachable at /t/{id} regardless).
+    await this.mintClaimedSubdomain(r.tenant_id);
+
     // Populate the tenant business profile from the claimed directory listing
     // so the directory entry has proper initial data (same shape as the
     // Edit Business Profile modal produces via PATCH /api/tenant/profile).
@@ -1558,6 +1566,7 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
         currentTier: upgradePreview.currentTier,
         isGatewayUpgrade: upgradePreview.isGatewayUpgrade,
         upgradeOptions: upgradePreview.upgradeOptions,
+        solutions: upgradePreview.solutions,
       } : {}),
       ...(claimGrants.length ? { claimGrants } : {}),
     };
@@ -1850,6 +1859,12 @@ Accept or reject each proposal at the seed's Owner Verification section.`,
           updated_at = now()
       WHERE id = ${r.tenant_id}
     `;
+
+    // Mint the platform subdomain at claim — {slug}.{apex} becomes the
+    // tenant's storefront origin and {slug}.{apex}/manage its merchant
+    // portal door. Best-effort: a reserved/taken slug must never fail the
+    // claim (the workspace stays reachable at /t/{id} regardless).
+    await this.mintClaimedSubdomain(r.tenant_id);
 
     // Populate the tenant business profile from the claimed directory listing
     // so the directory entry has proper initial data (same shape as the
@@ -2598,6 +2613,38 @@ View the seed at Settings → Directory → Presence Seeds.`,
    *
    * Non-fatal: logs a warning on failure so claim approval still succeeds.
    */
+  /**
+   * Mint the claimed tenant's platform subdomain (subdomain = slug when
+   * unset). Route through `assignSubdomain` so reserved-name, format, and
+   * cross-namespace availability rules apply and the
+   * `metadata.subdomainAssignedAt` stamp records the adoption moment.
+   *
+   * Non-fatal: logs and returns on any failure so claim approval still
+   * succeeds — the workspace stays reachable at /t/{id} regardless.
+   */
+  private async mintClaimedSubdomain(tenantId: string): Promise<void> {
+    try {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { slug: true, subdomain: true },
+      });
+      if (!tenant?.slug || tenant.subdomain) return;
+      const result = await assignSubdomain(tenantId, tenant.slug);
+      if (!result.ok) {
+        logger.warn('[DirectoryClaim] Subdomain mint skipped', undefined, {
+          tenantId,
+          slug: tenant.slug,
+          code: result.code,
+        });
+      }
+    } catch (error: any) {
+      logger.warn('[DirectoryClaim] Subdomain mint failed', undefined, {
+        tenantId,
+        error: { name: error?.name || 'Error', message: error?.message || String(error) },
+      });
+    }
+  }
+
   private async populateTenantProfileFromListing(seedId: string, tenantId: string): Promise<void> {
     try {
       // Fetch the directory listing details

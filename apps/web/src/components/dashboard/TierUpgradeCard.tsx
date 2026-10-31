@@ -6,7 +6,7 @@ import { Sparkles, ArrowRight } from 'lucide-react';
 import directoryPresenceUpgradeService, {
   type UpgradeTierOption,
 } from '@/services/DirectoryPresenceUpgradeService';
-import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, sortPresenceModes } from '@/lib/presence-modes';
+import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, PRESENCE_SOLUTIONS, sortPresenceModes } from '@/lib/presence-modes';
 
 interface TierUpgradeCardProps {
   tenantId: string;
@@ -54,7 +54,7 @@ export default function TierUpgradeCard({ tenantId, isDirectoryPresence }: TierU
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-bold">Choose your Presence Mode</h3>
+          <h3 className="text-lg font-bold">Pick the surface that fits</h3>
           <p className="text-sm text-blue-100 mt-1">
             Your directory listing is live and free forever — upgrade when you&apos;re ready
             to unlock more.
@@ -63,7 +63,7 @@ export default function TierUpgradeCard({ tenantId, isDirectoryPresence }: TierU
             {modes.map((mode) => (
               <div key={mode.tierKey} className="rounded-lg bg-white/10 p-3">
                 <div className="text-sm font-semibold flex items-center gap-1.5 flex-wrap">
-                  {mode.displayName || mode.name}
+                  {mode.tagline || mode.displayName || mode.name}
                   {mode.isPrimary && (
                     <span className="text-[10px] uppercase tracking-wide bg-white/20 rounded px-1.5 py-0.5">
                       Recommended
@@ -71,14 +71,20 @@ export default function TierUpgradeCard({ tenantId, isDirectoryPresence }: TierU
                   )}
                 </div>
                 <div className="text-xs text-blue-100 font-medium mt-0.5">
+                  {mode.displayName || mode.name} ·{' '}
                   {isLive ? `$${mode.priceMonthly}/mo` : `from $${mode.priceMonthly}/mo`}
                 </div>
                 <p className="text-xs text-blue-100/90 mt-1">
-                  {MODE_UNLOCK_COPY[mode.tierKey] ?? mode.tagline ?? ''}
+                  {MODE_UNLOCK_COPY[mode.tierKey] ?? ''}
                 </p>
               </div>
             ))}
           </div>
+          <p className="mt-3 text-xs text-blue-100">
+            Runs on the register you already have —{' '}
+            {PRESENCE_SOLUTIONS.map((s) => s.label).join(' and ')} sync your real catalog
+            as add-ons.
+          </p>
           <div className="mt-3 inline-flex items-center gap-1 text-sm font-medium">
             Compare modes <ArrowRight className="w-4 h-4" />
           </div>

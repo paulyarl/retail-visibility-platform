@@ -97,6 +97,7 @@ export interface DirectoryClaimAcceptResult {
   currentTier?: UpgradeOptions['currentTier'];
   isGatewayUpgrade?: boolean;
   upgradeOptions?: UpgradeTierOption[];
+  solutions?: UpgradeOptions['solutions'];
 }
 
 export interface DirectoryClaimInitiateResult {

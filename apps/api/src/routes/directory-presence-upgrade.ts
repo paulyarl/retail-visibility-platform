@@ -65,6 +65,7 @@ router.get('/:tenantId/upgrade/options', authenticateToken, checkTenantAccess, a
       currentTier: payload.currentTier,
       isGatewayUpgrade: payload.isGatewayUpgrade,
       upgradeOptions: payload.upgradeOptions,
+      solutions: payload.solutions,
     });
   } catch (error) {
     logger.error('[GET /api/tenant/:tenantId/upgrade/options] Error:', undefined, {

@@ -25,6 +25,12 @@ export interface UpgradeTierOption {
   newFeatures: { featureKey: string; featureName: string }[];
 }
 
+export interface UpgradeSolution {
+  key: string;
+  label: string;
+  tagline: string;
+}
+
 export interface UpgradeOptions {
   currentTier: {
     tierKey: string;
@@ -36,6 +42,9 @@ export interface UpgradeOptions {
   // V3.1: when true, frontend renders a mode picker instead of a ladder
   isGatewayUpgrade?: boolean;
   upgradeOptions: UpgradeTierOption[];
+  // Merchant-readable solutions available on every option as add-ons
+  // (POS sync etc.) — populated on gateway upgrades.
+  solutions?: UpgradeSolution[];
 }
 
 export interface UpgradeResult {

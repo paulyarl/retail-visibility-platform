@@ -4,7 +4,7 @@
  * (`TierUpgradeCard`). One copy source keeps both surfaces aligned with the
  * claim handoff spec (docs/LocalBiz/directory_presence_claim_handoff_spec.md).
  */
-import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
+import type { UpgradeSolution, UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
 
 // Static fallback — renders only when no live upgrade options are available
 // (accept-response embed absent and no authenticated refresh). Prices are
@@ -66,6 +66,16 @@ export const MODE_UNLOCK_COPY: Record<string, string> = {
   storefront:
     'A full, branded storefront browse experience with product catalog on your subdomain — add checkout anytime as an à-la-carte add-on.',
 };
+
+// Register-level solutions advertised alongside the triad — mirrors
+// GATEWAY_UPGRADE_SOLUTIONS in DirectoryPresenceUpgradeOptionsService (the
+// API module isn't importable from web, so edit both). Sold as merchant
+// outcomes; the capability itself is tier/flag-gated in the capability
+// layer, so every mode can carry these as add-ons.
+export const PRESENCE_SOLUTIONS: UpgradeSolution[] = [
+  { key: 'clover_pos', label: 'Clover POS', tagline: 'Sync your real catalog from the register you already run' },
+  { key: 'square_pos', label: 'Square POS', tagline: 'Same catalog sync if your register is Square' },
+];
 
 /** Primary (recommended) mode first — mirrors the upgrade page's gateway sort. */
 export function sortPresenceModes(modes: UpgradeTierOption[]): UpgradeTierOption[] {

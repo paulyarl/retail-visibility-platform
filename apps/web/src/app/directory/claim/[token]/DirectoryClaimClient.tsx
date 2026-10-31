@@ -49,8 +49,8 @@ import directoryClaimPublicService, {
   OwnerClaimVerification,
 } from '@/services/DirectoryClaimPublicService';
 import directoryPresenceUpgradeService from '@/services/DirectoryPresenceUpgradeService';
-import type { UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
-import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, sortPresenceModes } from '@/lib/presence-modes';
+import type { UpgradeSolution, UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
+import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, PRESENCE_SOLUTIONS, sortPresenceModes } from '@/lib/presence-modes';
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 
@@ -189,6 +189,7 @@ export default function DirectoryClaimClient() {
           currentTier: opts.currentTier,
           isGatewayUpgrade: opts.isGatewayUpgrade,
           upgradeOptions: opts.upgradeOptions,
+          solutions: opts.solutions,
         } : prev);
       }
     })();
@@ -833,7 +834,7 @@ export default function DirectoryClaimClient() {
                 )}
 
                 {/* Entry Presence mode teaser (claim handoff spec §2/§4) */}
-                <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} />
+                <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} solutions={claimResult?.solutions} />
 
                 {/* Directory Presence product allowance + entry step (E5, spec B-4) */}
                 <Alert color="blue" variant="light" icon={<IconShoppingCart size={16} />} w="100%">
@@ -1266,14 +1267,15 @@ export default function DirectoryClaimClient() {
 // Live values come from the upgradeOptions embedded in the claim accept
 // response (or the authenticated refresh when a platform session exists);
 // the shared static fallback renders only when no options are available.
-function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
+function ClaimUpgradeTeaser({ options, solutions }: { options?: UpgradeTierOption[]; solutions?: UpgradeSolution[] }) {
   const isFallback = !options || options.length === 0;
   const sorted = sortPresenceModes(isFallback ? FALLBACK_PRESENCE_MODES : options);
+  const solutionList = solutions?.length ? solutions : PRESENCE_SOLUTIONS;
 
   return (
     <Stack gap="xs">
       <Text ta="center" fw={500}>
-        Choose your Presence Mode
+        Pick the surface that fits
       </Text>
       <Grid gap="md">
         {sorted.map((mode) => (
@@ -1293,14 +1295,10 @@ function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
                   )}
                 </Group>
                 <Text fw={700} size="lg">
-                  {mode.displayName || mode.name}
+                  {mode.tagline || mode.displayName || mode.name}
                 </Text>
-                {mode.tagline && (
-                  <Text size="sm" fw={500}>
-                    {mode.tagline}
-                  </Text>
-                )}
-                <Text fw={700}>
+                <Text size="sm" c="dimmed">
+                  {mode.displayName || mode.name} ·{' '}
                   {isFallback ? `from $${mode.priceMonthly}/mo` : `$${mode.priceMonthly}/mo`}
                 </Text>
                 <Text size="sm" c="dimmed">
@@ -1311,12 +1309,25 @@ function ClaimUpgradeTeaser({ options }: { options?: UpgradeTierOption[] }) {
           </Grid.Col>
         ))}
       </Grid>
+      <Card withBorder radius="md" padding="sm" bg="gray.0">
+        <Text size="sm" ta="center" fw={600}>
+          Runs on the register you already have
+        </Text>
+        <Group gap="xs" justify="center" mt={6}>
+          {solutionList.map((s) => (
+            <Badge key={s.key} variant="light" color="teal" size="lg">
+              {s.label}
+            </Badge>
+          ))}
+        </Group>
+        <Text size="xs" c="dimmed" ta="center" mt={6}>
+          {solutionList[0]?.tagline} — available on every option as an add-on.
+        </Text>
+      </Card>
       <Text size="xs" c="dimmed" ta="center">
-        Start with a surface — every mode can add the others&apos; capabilities as
-        à-la-carte add-ons without switching plans. Scale to <strong>Commitment</strong>,{' '}
-        <strong>E-commerce</strong>, or <strong>Omnichannel</strong> for coupons, funnels, and
-        social selling, then <strong>Professional</strong>, <strong>Organization</strong>, or{' '}
-        <strong>Enterprise</strong> tools.
+        Start with a surface — every option can add the others&apos; capabilities,
+        POS sync, coupons, funnels, and social selling as add-ons whenever you&apos;re
+        ready. No plan switch, no rebuild.
       </Text>
     </Stack>
   );

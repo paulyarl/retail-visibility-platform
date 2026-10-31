@@ -26,6 +26,26 @@ const ENTRY_PRESENCE_MODES: Record<string, { mode: string; surface: string; tagl
   storefront: { mode: 'platform', surface: 'Platform in-house marketplace',    tagline: 'Showcase your full catalog',  primary: false },
 };
 
+/**
+ * Register-level solutions advertised alongside the Entry Presence modes.
+ * Sold as merchant outcomes ("keep the POS you already run"), not tier
+ * features — the actual capability is tier/flag-gated in the capability
+ * layer (integration_clover / integration_square, payment-gateway flags),
+ * so every mode can carry these as add-ons. Mirrored by PRESENCE_SOLUTIONS
+ * in apps/web/src/lib/presence-modes.ts — the API module isn't importable
+ * from web, so edit both.
+ */
+const GATEWAY_UPGRADE_SOLUTIONS: UpgradeSolutionDto[] = [
+  { key: 'clover_pos', label: 'Clover POS', tagline: 'Sync your real catalog from the register you already run' },
+  { key: 'square_pos', label: 'Square POS', tagline: 'Same catalog sync if your register is Square' },
+];
+
+export interface UpgradeSolutionDto {
+  key: string;
+  label: string;
+  tagline: string;
+}
+
 export interface UpgradeTierOptionDto {
   tierKey: string;
   name: string;
@@ -54,6 +74,9 @@ export interface UpgradeOptionsPayload {
   // V3.1: when true, frontend renders a mode picker instead of a ladder
   isGatewayUpgrade: boolean;
   upgradeOptions: UpgradeTierOptionDto[];
+  // Merchant-readable solutions available on every option as add-ons
+  // (POS sync etc.) — populated on gateway upgrades, [] otherwise.
+  solutions: UpgradeSolutionDto[];
 }
 
 /**
@@ -65,7 +88,7 @@ export interface UpgradeOptionsPayload {
  * payload when the tenant or its tier row is missing.
  */
 export async function buildTenantUpgradeOptions(tenantId: string): Promise<UpgradeOptionsPayload> {
-  const empty: UpgradeOptionsPayload = { currentTier: null, isGatewayUpgrade: false, upgradeOptions: [] };
+  const empty: UpgradeOptionsPayload = { currentTier: null, isGatewayUpgrade: false, upgradeOptions: [], solutions: [] };
 
   const tenant = await prisma.tenants.findUnique({
     where: { id: tenantId },
@@ -183,5 +206,6 @@ export async function buildTenantUpgradeOptions(tenantId: string): Promise<Upgra
     },
     isGatewayUpgrade: isGateway,
     upgradeOptions,
+    solutions: isGateway ? GATEWAY_UPGRADE_SOLUTIONS : [],
   };
 }

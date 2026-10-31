@@ -273,7 +273,8 @@ export default function PlaceAboutClient() {
           </h2>
           <p className="text-neutral-600 dark:text-neutral-400 text-base">
             Your claimed listing is the free gateway. From there you choose where your products show up —
-            the rest is a step up from here, not a replacement.
+            the rest is a step up from here, not a replacement. Every option works with the register you
+            already run — Clover POS and Square sync your real catalog.
           </p>
         </div>
 

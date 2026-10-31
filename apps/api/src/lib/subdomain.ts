@@ -24,6 +24,9 @@ export const RESERVED_SUBDOMAINS: ReadonlySet<string> = new Set([
   'status', 'support', 'help', 'docs', 'blog', 'dashboard', 'account',
   'billing', 'pay', 'checkout', 'store', 'shop', 'dev', 'staging', 'test',
   'ftp', 'smtp', 'ns1', 'ns2', 'localhost', 'internal', 'system', 'visibleshelf',
+  // Portal/auth doors — reserved for the shared merchant-portal surface
+  // (NRS-style mystore.nrsplus.com parity) and the /manage workspace entry.
+  'portal', 'my', 'mystore', 'merchant', 'manage', 'login', 'auth',
 ]);
 
 // Same format the platform already enforces for tenant subdomains.
