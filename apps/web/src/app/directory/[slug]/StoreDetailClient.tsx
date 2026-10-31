@@ -25,6 +25,7 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
+import { useIsTenantHost } from '@/components/storefront/StorefrontUrlContext';
 import { clientLogger } from '@/lib/client-logger';
 
 // Merchant gate helper for client-side filtering
@@ -445,6 +446,10 @@ function DirectoryNotAvailable({ listing, identifier }: { listing: any; identifi
 export function StoreComingSoon({ tenantId }: { tenantId: string }) {
   const { data: storefrontCapability } = usePublicStorefrontCapability(tenantId);
   const storefrontEnabled = storefrontCapability?.enabled ?? false;
+  // Owner portal entry — /manage resolves on tenant hosts, /t/{id} on the
+  // platform app (tenant-scope roots are refused on tenant hosts).
+  const isTenantHost = useIsTenantHost();
+  const manageHref = isTenantHost ? '/manage' : `/t/${tenantId}`;
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">
@@ -485,6 +490,13 @@ export function StoreComingSoon({ tenantId }: { tenantId: string }) {
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
           Browse Directory
+        </Link>
+
+        <Link
+          href={manageHref}
+          className="inline-block mt-6 text-xs text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          Store owner? Manage →
         </Link>
       </div>
     </div>

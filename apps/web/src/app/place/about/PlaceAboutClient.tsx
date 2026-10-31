@@ -21,6 +21,8 @@ import {
   Check,
 } from 'lucide-react';
 import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
+import { PRESENCE_ADDONS } from '@/lib/presence-modes';
+import AddonsStrip from '@/components/AddonsStrip';
 
 function tierPrice(key: string): string {
   const price = TIER_PRICING[key];
@@ -35,6 +37,7 @@ const ENTRY_PRESENCE_MODES = [
   {
     key: 'presence',
     surface: 'Platform storefront + checkout',
+    image: '/assets/place/p03-deposit-commerce-hero-v2.png',
     primary: true,
     badgeColor: 'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800',
     icon: Store,
@@ -52,6 +55,7 @@ const ENTRY_PRESENCE_MODES = [
   {
     key: 'discovery',
     surface: 'Third-party (Google)',
+    image: '/assets/place/p02-google-visibility-hero.png',
     primary: false,
     badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800',
     icon: Search,
@@ -68,6 +72,7 @@ const ENTRY_PRESENCE_MODES = [
   {
     key: 'storefront',
     surface: 'Platform in-house marketplace',
+    image: '/assets/place/p01-clover-storefront-hero.png',
     primary: false,
     badgeColor: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800',
     icon: ShoppingBag,
@@ -278,6 +283,13 @@ export default function PlaceAboutClient() {
           </p>
         </div>
 
+        <div className="max-w-4xl mx-auto mb-14 text-center">
+          <p className="text-sm font-semibold text-neutral-900 dark:text-white mb-2">
+            Add-ons that run on what you already have
+          </p>
+          <AddonsStrip items={PRESENCE_ADDONS} />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {ENTRY_PRESENCE_MODES.map((mode) => {
             const Icon = mode.icon;
@@ -292,6 +304,11 @@ export default function PlaceAboutClient() {
                 }`}
               >
                 <div>
+                  <img
+                    src={mode.image}
+                    alt={`${mode.title} preview`}
+                    className="w-full h-36 object-cover rounded-xl mb-4 border border-neutral-100 dark:border-neutral-800"
+                  />
                   <div className="flex items-start justify-between gap-2 mb-4">
                     <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
                       <Icon className="w-6 h-6" />

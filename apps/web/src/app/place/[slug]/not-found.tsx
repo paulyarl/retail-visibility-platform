@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft, XCircle } from 'lucide-react';
+import { platformApexHost } from '@/lib/storefront-routing';
 
 export default function PlaceNotFound() {
   return (
@@ -21,6 +22,13 @@ export default function PlaceNotFound() {
           <ArrowLeft className="w-5 h-5 mr-2" />
           Browse Directory
         </Link>
+        {/* No tenant context here — the shared portal host is the door. */}
+        <a
+          href={`https://mystore.${platformApexHost()}`}
+          className="inline-block mt-6 text-xs text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          Store owner? Sign in at mystore.{platformApexHost()} →
+        </a>
       </div>
     </div>
   );
