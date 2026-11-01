@@ -68,34 +68,13 @@ The pitch to NRS/IDT:
 - Deposit-pickup model vs their DoorDash/Grubhub outsourcing: "their ecommerce
   ends in delivery fees; ours ends in foot traffic."
 
-## 2b. Signal doctrine — all audits are good audits
+## 2b. Audit doctrine — moved
 
-The seed→enrichment→audit pipeline produces no waste; every outcome is
-routable signal:
-
-- **Deep profiles** → competitive/emerging intel. Platform dependencies fall
-  out of rich data — this is literally how NRS was discovered (a seeded
-  profile's tech/site signals exposed the register behind it).
-- **Thin, broken, unclaimed profiles** → the invisible set. The gap IS the
-  finding: "this merchant is undiscoverable" is itself the sales narrative
-  that drives claims.
-- **Even apparently complete profiles** → hidden surfaces still emerge under
-  audit (chains, platform ties, stale signals). "Invisible" describes what
-  hasn't been looked at yet, not just what looks thin.
-
-Bronze-standard triage therefore isn't a filter that discards — it's a
-classifier that routes every profile into either the product pitch
-(*"your profile is invisible — claim it"*) or the intel map (*"this store
-runs NRS"*). Every signal traces back to a **narrative** (who the store is,
-who serves it, who can't find it) and **discoverability** (the measurable
-gap between shelf and searcher).
-
-POS-provider detection note: public/photo signals cover only the
-*branded-hardware incumbent* set (NRS registers, Clover stations, Toast,
-Square stands). Software-native/emerging POS is invisible in public data by
-definition — the real per-merchant dataset requires an explicit probe at
-claim time (optional "which POS do you run?" + add-on chip clicks + OAuth
-connect as ground truth). The two layers cover disjoint populations.
+The signal doctrine ("all audits are good audits"), the Enerem worked audit,
+the discovery→gap-pass→forensic→report architecture, and the unsolicited-audit
+funnel now live in `docs/AUDIT_DOCTRINE_AND_FUNNEL_SPEC.md` — standalone
+doctrine + product spec, not partnership material. Relevant here only because
+the same doctrine is what surfaced NRS as competitive intel in the first place.
 
 ## 3. Proof milestones (gate for outreach)
 

@@ -90,6 +90,7 @@ const SURFACE_ROOTS: Record<string, SurfaceClass> = {
   '/customerlogin': 'storefront',
   '/services': 'storefront',
   '/policies': 'storefront',
+  '/about': 'storefront',
   // product (host-scoped, cross-tenant)
   '/products': 'product',
   // directory (platform host)
@@ -147,7 +148,7 @@ const SURFACE_ROOTS: Record<string, SurfaceClass> = {
 
 // Prefix roots get the /tenant/{id} prefix on a tenant host; pass-through
 // roots serve as-is. Kept explicit — this is a rewrite mechanic, not a class.
-export const STOREFRONT_PREFIX_ROOTS = ['/services', '/policies'];
+export const STOREFRONT_PREFIX_ROOTS = ['/services', '/policies', '/about'];
 
 /** Roots a tenant storefront host is allowed to serve (the B1 allowlist). */
 export const STOREFRONT_PASSTHROUGH_ROOTS: readonly string[] = Object.entries(SURFACE_ROOTS)

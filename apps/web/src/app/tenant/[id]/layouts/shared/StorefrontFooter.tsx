@@ -177,6 +177,11 @@ export default function StorefrontFooter({
                   </>
                 )}
                 <li>
+                  <Link href={sp('/about')} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
+                    About
+                  </Link>
+                </li>
+                <li>
                   <Link href={`${platformBase}/directory`} className="text-neutral-300 dark:text-neutral-400 hover:text-white transition-colors">
                     Browse Directory
                   </Link>
@@ -338,6 +343,11 @@ export default function StorefrontFooter({
                   </li>
                 </>
               )}
+              <li>
+                <Link href={sp('/about')} className="text-neutral-400 hover:text-white transition-colors">
+                  About
+                </Link>
+              </li>
               <li>
                 <Link href={`${platformBase}/directory`} className="text-neutral-400 hover:text-white transition-colors">
                   Browse Directory

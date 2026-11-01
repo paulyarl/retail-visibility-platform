@@ -277,13 +277,24 @@ export default function BusinessProfileCard({ profile, loading, onUpdate, tenant
           </div>
 
           {/* Edit Button */}
-          <div className="pt-4">
+          <div className="pt-4 space-y-3">
             <Button variant="gradient" style={{ color: 'white' }} size='lg' onClick={() => setIsEditModalOpen(true)} className="w-full">
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               Edit Business Profile
             </Button>
+            <p className="text-xs text-neutral-500 text-center">
+              Your description, logo, contact info, photos, and social links power your public{' '}
+              <a
+                href={`/tenant/${tenantId}/about`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 hover:underline font-medium"
+              >
+                About page →
+              </a>
+            </p>
           </div>
         </CardContent>
       </Card>
