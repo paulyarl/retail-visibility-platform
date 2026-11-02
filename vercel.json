@@ -2,5 +2,6 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": ".next",
   "installCommand": "pnpm install --filter=web --filter=shared",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- apps/web packages/shared shared pnpm-lock.yaml pnpm-workspace.yaml vercel.json"
 }
