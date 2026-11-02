@@ -4,6 +4,17 @@
 
 Complete payment processing API supporting authorize/capture and direct charge flows with Stripe integration, platform fee calculation, and comprehensive payment tracking.
 
+## Money models — platform-collects vs tenant-collects
+
+Two distinct money flows coexist; every provider integration belongs to one:
+
+| Model | Credentials | Code path | Use |
+|---|---|---|---|
+| **Platform-collects** | Platform-level env keys (`unifiedConfig`: `STRIPE_SECRET_KEY`, `PAYPAL_CLIENT_*`, `SQUARE_ACCESS_TOKEN`) | Bespoke checkout routes — `routes/checkout/{stripe,paypal,square}.ts`, platform storefront + BSaaS checkouts | The platform is the merchant of record |
+| **Tenant-collects** | Per-tenant rows in `tenant_payment_gateways` (encrypted `api_key_encrypted`/`api_secret_encrypted`/`webhook_secret_encrypted`) | `PaymentGatewayFactory` → `gateways/StripeGateway` (`PaymentGatewayInterface`) | The tenant is the merchant of record — funds land in the tenant's own provider account |
+
+Rules: a checkout is one or the other — never blend. Factory `GatewayType` status: `stripe` implemented, `manual` implemented, `paypal`/`square` throw (their money flow today runs platform-collects through the bespoke routes — do not "fix" the enum until a tenant-collects path is deliberately built; see `docs/PAYMENT_POS_READINESS_SPRINT_PLAN.md`).
+
 ## Base URL
 
 ```
