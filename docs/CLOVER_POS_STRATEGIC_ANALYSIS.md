@@ -498,6 +498,50 @@ Effective CAC: $15.63 per active customer
 
 ---
 
+## The Channel Play — POS as Distribution, NRS Minus Hardware (added 2026-11-02)
+
+The analysis above prices the integration; this section names the motion:
+**the integration is the acquisition channel, not a feature inside it.** The
+playbook is NRS's — they subsidized POS hardware into ~20K bodegas and let
+the device own distribution (see `NRS_INTEGRATION_PARTNERSHIP_SPEC.md`).
+RVP runs the same play without the COGS: the merchant's existing Clover
+catalog is the hardware that's already installed.
+
+**Mechanics:**
+
+1. **The distribution surface is the Clover App Market** — Clover merchants
+   browse it *inside the POS dashboard* searching "website", "online
+   ordering", "marketing". A listing there is the hardware-free equivalent
+   of NRS shipping a register: present at the moment of need, inside the
+   device the merchant already trusts. Square App Marketplace is the same
+   door into a larger, smaller-merchant base.
+2. **The ICP qualifier already exists** — the prospect machinery
+   (`mkt_prospect_queue`) filters for weak digital footprint. "Uses Clover"
+   layered on "no website" is the exact wedge cohort: *"You already typed
+   every product into your POS. Install this app and it's your website."*
+   Zero data entry is the strongest onboarding claim the category supports.
+3. **A live POS install doubles as verification** — a transacting Clover at
+   the claimed address is physicality proof (`CLAIM_VERIFICATION_SIGNALS`);
+   the wedge and the trust layer are the same action.
+4. **Sequencing: one founding partner before the marketplace.** Clover's
+   app review takes weeks and wants a production-proven integration. One
+   engaged merchant (comped tier + feedback loop) closes the
+   production-connect loop *and* yields the reference story the App Market
+   listing needs. The dev-partner pitch: free platform access + their
+   catalog auto-synced to a real web presence, read-only OAuth,
+   uninstall-anytime.
+5. **Qualification is already an SOP** — `pos_type` probing lives in
+   `docs/LocalBiz/OPERATOR_DISCOVERY_CALL_SPEC.md` (post-claim discovery
+   call) and is a parking-lot column on the prospect queue for pre-claim
+   outreach routing.
+
+**What changes:** nothing in the FREE/pricing math — that stands. What
+changes is where Clover merchant acquisition sits: App Market listing +
+POS-probe routing are *acquisition programs with dates*, not downstream
+effects of a feature shipping.
+
+---
+
 ## Retention & LTV Impact
 
 ### Without Clover Integration
