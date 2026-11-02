@@ -201,7 +201,6 @@ import behaviorTrackingRoutes from '../routes/behavior-tracking';
 import cloneRoutes from '../routes/clone';
 import queueRoutes from '../routes/queue-routes';
 import subscriptionBillingRoutes from '../routes/subscription-billing';
-import stripeWebhookRoutes from '../routes/stripe-webhook';
 import storeReviewsRoutes from '../routes/store-reviews';
 import brandPartnersRoutes from '../routes/brand-partners';
 import badgeRegistryRoutes from '../routes/badge-registry';
@@ -1299,15 +1298,6 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'billing',
     authLevel: 'public',
     comment: 'Subscription billing routes',
-  },
-
-  // ── Stripe webhooks (late mount) ─────────────────────────────────────
-  {
-    path: '/api/webhooks/stripe',
-    router: stripeWebhookRoutes,
-    domain: 'pre-middleware',
-    authLevel: 'webhook',
-    comment: 'Stripe webhook routes (late mount)',
   },
 
   // ── Badges ───────────────────────────────────────────────────────────
