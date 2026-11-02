@@ -1,5 +1,7 @@
-# Fly.io staging config for the RVP API — landing spot for all `staging`
-# branch commits per docs/STAGING_ENVIRONMENT_SPEC.md.
+# Fly.io staging config — RESTORE PATH ONLY since 2026-11-02.
+# Staging now lives on Railway (visible-shelf-api-staging, tranquil-beauty);
+# this app is scaled to 0. Redeploy here only if Railway is dropped —
+# see docs/STAGING_ENVIRONMENT_SPEC.md.
 # Build context is the repo root (same as apps/api/Dockerfile expects).
 # Secrets come from Doppler `stg` config → `fly secrets import`.
 

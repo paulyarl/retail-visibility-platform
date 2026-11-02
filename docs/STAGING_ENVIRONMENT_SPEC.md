@@ -4,12 +4,15 @@
 
 A true pre-production environment: prod-shaped code path, isolated data,
 disposable infrastructure. **The `staging` branch is the landing spot for all
-git commits** — every change deploys to Fly staging + Vercel preview first,
-then promotes to prod via merge to `main`. Railway is out of the loop
-permanently — not a fallback, not restored "when their builds come back."
-This staging exists to canary **migrations, env/secret changes, and
-third-party integrations** before they touch prod — not to be a second home
-for the app.
+git commits** — every change deploys to Railway staging + Vercel preview first,
+then promotes to prod via merge to `main`. **2026-11-02 reversal: staging
+moved back to Railway** (`visible-shelf-api-staging`, tranquil-beauty) — it
+keeps the Railway pipeline warm as a prod fallback and drops the Fly staging
+spend; Fly staging is scaled to 0 and retained as the restore path
+(`fly.staging.toml` + `fly deploy`). Env vars sync from Doppler `stg` via
+`railway variable set --skip-deploys`. This staging exists to canary
+**migrations, env/secret changes, and third-party integrations** before they
+touch prod — not to be a second home for the app.
 
 Design rule: staging holds **no production secrets**. Every credential in the
 staging env is a distinct, lower-blast-radius key (the restricted OpenAI
@@ -24,51 +27,51 @@ git: staging branch (ALL commits land here)
         ├──▶ Vercel Preview (persistent: www.visibleshelf.store)
         │      env: API_BASE_URL → aps.visibleshelf.store
         │
-        └──▶ Fly app: visibleshelf-api-staging (1 machine, ord)
-               env: local Supabase project (shared) + stg keys
+        └──▶ Railway: visible-shelf-api-staging (tranquil-beauty / staging env)
+               auto-deploys `staging` branch via GitHub integration
+               env: local Supabase project (shared) + Doppler stg vars
+               DNS: aps.visibleshelf.store → h8eyp4m3.up.railway.app (Vercel DNS)
+               Fly standby: visibleshelf-api-staging scaled to 0 (restore path)
 
 git: main branch (merge = promotion to production)
         │
         ├──▶ Vercel Production (www.visibleshelf.com)
-        └──▶ Fly app: visibleshelf-api (2 machines, ord)
-               env: prd Supabase project + prod Redis + prd keys
-
-Railway: decommissioned — no deploy target, no env writes, dormant only
-until services are formally retired.
+        ├──▶ Fly app: visibleshelf-api (1 machine, ord — scaled from 2, 2026-11-02)
+        │      env: prd Supabase project + prod Redis + prd keys
+        └──▶ Railway: visible-shelf-api-prod auto-deploys `main` too —
+               kept warm as a fallback, receives no DNS traffic
 ```
 
 ## Components
 
-### API — `visibleshelf-api-staging` ✅ live
+### API — Railway `visible-shelf-api-staging` ✅ live (since 2026-11-02)
 
-- Built: `fly.staging.toml` (repo root) — same Dockerfile, separate config
-  so `fly deploy --config fly.staging.toml` targets staging without
-  touching prod's `fly.toml`.
-- Fly created an HA pair on first deploy despite `min_machines_running = 0`
-  (first-deploy behavior). Both machines `auto_stop` on idle; destroy one
-  (`fly machine destroy <id>`) if strict single-machine spend is wanted.
-- `shared-cpu-1x`, 2 GB — right-sized for a canary (prod is 2× shared-cpu 4 GB).
-  Bump `[[vm]]` in `fly.staging.toml` if staging OOMs on AI workloads.
-- `primary_region = "ord"` (same as prod — keeps Upstash Redis same-region)
-- DNS: `aps.visibleshelf.store` is the established staging API hostname
-  (was Railway; Cloudflare-managed). Cert issued on the Fly app — repoint
-  the Cloudflare record from Railway → `66.241.125.31` (A) /
-  `2a09:8280:1::1c5:6355:0` (AAAA) or CNAME `visibleshelf-api-staging.fly.dev`.
-  The repoint IS the Railway cutover. Until then the app answers on
-  `https://visibleshelf-api-staging.fly.dev`.
-- Health: `https://visibleshelf-api-staging.fly.dev/api/health` → 200.
-- Secrets: `doppler secrets download --config stg --format env-no-quotes
-  --no-file | fly secrets import -a visibleshelf-api-staging`.
-- Deploys: auto via GitHub Actions on push to `staging`
-  (`.github/workflows/deploy-staging.yml` → `flyctl deploy --config
-  fly.staging.toml`), or manually: `pnpm deployapi:stg` /
-  `fly deploy --config fly.staging.toml`. Prod deploys likewise on push to
-  `main` (`deploy-production.yml` → `flyctl deploy`), or `pnpm deployapi`.
+- Project: `tranquil-beauty`, environment `staging`, service
+  `visible-shelf-api-staging` (repo-connected, auto-deploys `staging` branch —
+  no GH Action needed; `deploy-staging.yml` no longer has an api job).
+- Built from `apps/api/Dockerfile`; managed by Railway IaC
+  (`.railway/railway.ts`, `api` partial — `railway.toml`/`railway.json`
+  deleted 2026-11-02 ahead of the 2026-12-01 CaC cutoff). Change config via
+  `railway-iac.cmd config plan|apply --environment staging` (the `.cmd`
+  wrapper works around a Git-Bash `env._` poisoning bug in the SDK).
+- DNS: `aps.visibleshelf.store` CNAME → `h8eyp4m3.up.railway.app` — managed
+  in **Vercel DNS** (`vercel dns`, not Cloudflare). Custom domain + cert
+  already configured on the Railway service.
+- Health: `https://aps.visibleshelf.store/api/health` → 200.
+- Secrets: Doppler `stg` is source of truth → push with
+  `railway variable set KEY=VAL -s visible-shelf-api-staging -e staging
+  --skip-deploys` (batched pairs per call), then one `railway redeploy`.
+  Synced wholesale 2026-11-02 (143 vars).
+- Deploys: every push to `staging` auto-builds+deploys on Railway.
   `pnpm deployapi:promote` remains the manual full-pipeline path
   (stg → pause → merge → prod).
-- CI auth: repo secrets `FLY_API_TOKEN` (prod) + `FLY_API_TOKEN_STG`
-  (staging) — app-scoped deploy tokens (`fly tokens create deploy -a
-  <app>`), so a leaked token can't deploy across environments.
+- **Fly restore path** (if Railway is dropped again): `fly.staging.toml` +
+  `fly deploy -a visibleshelf-api-staging` (app scaled to 0, machines
+  destroyed; shared ingress IPs retained), `doppler ... stg | fly secrets
+  import`, Vercel DNS `aps` CNAME → `visibleshelf-api-staging.fly.dev`.
+- `GSC_SERVICE_ACCOUNT_JSON_B64` (gsc-reader SA, project visibleshelf-seo)
+  is now in Doppler `local`+`stg` — previously only lived on Fly
+  (write-only, unrecoverable); source of truth is the GCP console SA key.
 
 ### Web — Vercel Preview scope (already exists)
 
@@ -155,17 +158,18 @@ commit ──▶ staging branch ──▶ Fly stg + Vercel preview (auto/manual 
   `aps.visibleshelf.store` endpoints for test-mode verification.
 - **Rollback**: prod rollback stays `fly deploy` of the previous image —
   staging doesn't change that path.
-- **Railway retirement**: once the Fly staging app is verified, delete the
-  Railway services (they hold rotated-but-still-stored secrets — the env
-  store is the disclosed compromise surface; leaving it populated is
-  lingering exposure). Cancel/downgrade the Railway plan after services are
-  removed.
+- **Railway posture (revised 2026-11-02)**: Railway is the staging host AND a
+  warm prod fallback — both services auto-deploy (`staging`/`main`), env vars
+  synced from Doppler. The old "delete Railway services" retirement step is
+  void: keeping Railway in the loop is now the intent, which means its var
+  store must stay maintained from Doppler on every rotation.
 
 ## Cost
 
 | Piece | Cost |
 |---|---|
-| Fly staging machine (1× shared-cpu) | ~$2-4/mo |
+| Railway staging service | ~$0 marginal (existing plan; auto-stop unused) |
+| Fly staging (scaled to 0, restore path) | $0 (rootfs freed on machine destroy) |
 | Supabase staging project | $0 (shares local project) |
 | Redis namespace | $0 (shared instance) |
 | Vercel preview alias | $0 |

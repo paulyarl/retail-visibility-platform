@@ -49,43 +49,8 @@ jobs:
             echo "web=false" >> "$GITHUB_OUTPUT"
           fi
 
-  api:
-    needs: changes
-    if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: fly-deploy-staging
-      cancel-in-progress: false
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --ignore-scripts
-
-      # Compile on the runner (16GB) — remote builders OOM on the tsc type
-      # graph. The Dockerfile ships context dist/ when present and skips the
-      # remote compile, same as local standby deploys.
-      - name: Build API (tsc → dist)
-        run: pnpm -C apps/api build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-
-      - name: Setup flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Deploy to Fly staging
-        run: flyctl deploy --config fly.staging.toml
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_STG }}
+  # API staging deploy: handled by Railway's GitHub integration
+  # (visible-shelf-api-staging auto-deploys the `staging` branch).
+  # aps.visibleshelf.store → h8eyp4m3.up.railway.app (Vercel DNS).
+  # Fly staging app is scaled to 0; fly.staging.toml remains as the
+  # restore path if Railway is ever dropped again.
