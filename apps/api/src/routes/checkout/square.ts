@@ -20,20 +20,9 @@ const processSquarePayment = async (sourceId: string, amount: number, orderId: s
     ? 'https://connect.squareup.com' 
     : 'https://connect.squareupsandbox.com';
 
-  // Log environment variables (without exposing sensitive values)
-  console.log('[Square] Environment variables check:', {
-    hasAccessToken: !!accessToken,
-    hasLocationId: !!locationId,
-    environment,
-    accessTokenPrefix: accessToken ? `${accessToken.substring(0, 10)}...` : 'none',
-  });
-
   if (!accessToken || !locationId) {
     // Sandbox test mode - return mock payment
-    console.log('[Square] Using sandbox test mode - missing credentials:', {
-      missingAccessToken: !accessToken,
-      missingLocationId: !locationId,
-    });
+    logger.info('[Square] Missing Square credentials — returning sandbox mock payment', undefined, { environment });
     return {
       payment: {
         id: `sandbox_payment_${randomUUID()}`,
@@ -140,12 +129,7 @@ router.post('/process-payment', async (req, res) => {
     // Decrement stock and fulfill digital products via shared coordinator
     await PostPaymentFulfillment.run(orderId);
 
-    console.log('[Square] Payment processed successfully:', {
-      orderId,
-      paymentId,
-      squarePaymentId: payment.id,
-      amount,
-    });
+    logger.info('[Square] Payment processed successfully', undefined, { orderId, paymentId, squarePaymentId: payment.id });
 
     res.json({
       success: true,
@@ -209,7 +193,7 @@ router.post('/webhook', async (req, res) => {
     }
 
     const event = req.body;
-    console.log('[Square] Webhook event received:', event.type);
+    logger.info('[Square] Webhook event received', undefined, { type: event.type });
 
     // Handle different event types
     switch (event.type) {
@@ -238,7 +222,7 @@ router.post('/webhook', async (req, res) => {
             // Decrement stock and fulfill digital products when payment status changes to paid
             if (!wasPaid && isNowPaid) {
               await PostPaymentFulfillment.run(payment.order_id);
-              console.log(`[Square] Post-payment fulfillment completed for order ${payment.order_id}`);
+              logger.info('[Square] Post-payment fulfillment completed', undefined, { orderId: payment.order_id });
             }
           }
         }
@@ -249,12 +233,12 @@ router.post('/webhook', async (req, res) => {
         const refundData = event.data?.object?.refund;
         if (refundData) {
           // Handle refund events
-          console.log('[Square] Refund event:', refundData);
+          logger.info('[Square] Refund event received', undefined, { refundId: refundData.id, status: refundData.status });
         }
         break;
 
       default:
-        console.log('[Square] Unhandled webhook event type:', event.type);
+        logger.info('[Square] Unhandled webhook event type', undefined, { type: event.type });
     }
 
     res.json({ success: true });

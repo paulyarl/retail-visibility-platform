@@ -77,9 +77,13 @@ confirm → webhook → refund → ledger row` per provider, stg then prd.
 - **Security pass first**: strip the `console.log` "Environment variables
   check" credential-shape logging → `logger`, no cred-adjacent output.
 - Live-fire matrix stg→prd ($1 payment, confirm, refund).
-- Square webhook gap: today nothing receives Square events — decide
-  whether fulfillment is synchronous-enough or register a webhook
-  endpoint (checkout route + `routes/webhooks.ts` pattern).
+- Square webhook gap: a `/webhook` handler exists on the checkout router
+  but its HMAC check runs `crypto.hmac` over `JSON.stringify(req.body)` —
+  if the route is mounted behind global JSON parsing the bytes differ and
+  verification can never pass (same class of bug as the shadowed Stripe
+  handler). Needs a raw-body mount (bootstrap `express.raw` pattern like
+  `/api/webhooks`) or signature verification moved to the raw-payload
+  layer before any Square webhook is registered in the console.
 - Decide Square's scope: payments-live vs POS-only — whichever wins,
   `GatewayType`/factory text must stop lying ("not yet implemented" when
   the route exists).
