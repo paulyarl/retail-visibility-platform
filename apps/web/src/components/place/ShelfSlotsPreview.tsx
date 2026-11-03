@@ -39,9 +39,21 @@ interface ShelfSlotsPreviewProps {
    * falls back to the illustrative sample (client-only, unindexed).
    */
   items?: SourcedShelfItem[];
+  /**
+   * Card header framing for the unsourced (illustrative) sample. Defaults to
+   * the claim teaser shared with the entry-page slot teaser; `/place/about`
+   * passes the connect-preview framing instead, so the same five slots read
+   * as the outcome of step 2 rather than a standalone offer.
+   */
+  framing?: { heading: string; badge: string };
 }
 
-export default function ShelfSlotsPreview({ className = '', items }: ShelfSlotsPreviewProps) {
+const CLAIM_FRAMING = {
+  heading: 'Example shelf — claim to make it yours',
+  badge: 'Illustrative preview',
+};
+
+export default function ShelfSlotsPreview({ className = '', items, framing }: ShelfSlotsPreviewProps) {
   // Mount-gated: the sample items are illustrative, not real inventory.
   // Keeping them out of SSR prevents crawlers from indexing the teaser as
   // the business's actual products/prices (and 80 identical item lists
@@ -52,13 +64,16 @@ export default function ShelfSlotsPreview({ className = '', items }: ShelfSlotsP
     return <div className={`min-h-[280px] ${className}`} aria-hidden="true" />;
   }
 
-  return <ShelfSlotsContent items={items} className={className} />;
+  return <ShelfSlotsContent items={items} framing={framing} className={className} />;
 }
 
 /** The post-mount shelf body — exported so tests can render it without effects. */
-export function ShelfSlotsContent({ className = '', items }: ShelfSlotsPreviewProps) {
+export function ShelfSlotsContent({ className = '', items, framing }: ShelfSlotsPreviewProps) {
   const sourced = items && items.length > 0;
   const display = sourced ? items!.slice(0, 5) : SAMPLE_SHELF_ITEMS;
+  const header = sourced
+    ? { heading: 'What shoppers find here', badge: 'From public info' }
+    : framing ?? CLAIM_FRAMING;
 
   return (
     <div className={`bg-neutral-50 dark:bg-neutral-950 rounded-2xl p-6 border border-neutral-200 dark:border-neutral-800 shadow-sm ${className}`}>
@@ -66,11 +81,11 @@ export function ShelfSlotsContent({ className = '', items }: ShelfSlotsPreviewPr
         <div className="flex items-center gap-2">
           <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <span className="text-sm font-bold">
-            {sourced ? 'What shoppers find here' : 'Example shelf — claim to make it yours'}
+            {header.heading}
           </span>
         </div>
         <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
-          {sourced ? 'From public info' : 'Illustrative preview'}
+          {header.badge}
         </span>
       </div>
       <div className="space-y-3">

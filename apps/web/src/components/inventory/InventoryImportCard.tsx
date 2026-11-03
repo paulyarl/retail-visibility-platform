@@ -56,6 +56,7 @@ export default function InventoryImportCard({ tenantId }: { tenantId: string }) 
       </div>
       <p className="text-xs text-neutral-500">
         End of day: export your POS pricebook and upload it here — catalog and stock stay in sync.
+        No POS? Build the sheet yourself: name, price and stock are enough.
         Your Google stock reflects your latest upload.
         {lastImport?.at && (
           <span className="block mt-1 font-medium">

@@ -451,7 +451,16 @@ export default function TierUpgradePage() {
               Add-ons that run on what you already have
             </p>
             <AddonsStrip
-              items={options?.solutions?.length ? [...options.solutions, ...PRESENCE_ADDONS.slice(2)] : PRESENCE_ADDONS}
+              items={
+                options?.solutions?.length
+                  ? [
+                      ...options.solutions,
+                      ...PRESENCE_ADDONS.filter(
+                        (a) => !options.solutions!.some((s) => s.key === a.key),
+                      ),
+                    ]
+                  : PRESENCE_ADDONS
+              }
               hrefFor={(key) => `/t/${tenantId}${SOLUTION_SETTINGS_PATH[key] ?? '/settings/integrations'}`}
               className="mt-2"
             />

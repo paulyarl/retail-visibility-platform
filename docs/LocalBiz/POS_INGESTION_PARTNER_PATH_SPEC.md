@@ -10,7 +10,7 @@ NRS (National Retail Solutions) POS merchants hold rich catalog + stock data ins
 
 - **POS API path** (Clover, Square — exists) — the **platform pulls**: live stock, full automation
 - **File path** (NRS + every POS with a merchant export — **this spec**) — the **merchant pushes on a schedule**
-- **Manual path** (no POS, or a POS with no export) — the **merchant enters on demand** in the platform portal. The only path with **no external dependency**, and therefore the one that makes the vendor-agnostic claim literally true.
+- **Manual path** (no POS, or a POS with no export) — the **merchant enters on demand** in the platform portal: the item wizard (`/t/{tenantId}/items/create`), or a self-curated CSV through the generic importer (name, price and stock suffice; SKU is optional and falls back to name). The only path with **no external dependency**, and therefore the one that makes the vendor-agnostic claim literally true.
 
 **A path is defined by who initiates the data flow, not by the vendor.** Clover and Square are members of one path because they produce the same merchant action and the same failure mode; adding a POS vendor adds an adapter, not a path. A new path appears only when the initiative changes — a marketplace storefront feed or EDI would qualify, another register would not.
 

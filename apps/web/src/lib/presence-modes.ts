@@ -108,6 +108,7 @@ export const PRESENCE_SOLUTIONS: UpgradeSolution[] = [
 export const PRESENCE_ADDONS: UpgradeSolution[] = [
   { key: 'clover_pos', label: 'Clover POS', tagline: 'Sync your real catalog from the register you already run' },
   { key: 'square_pos', label: 'Square POS', tagline: 'Same catalog sync if your register is Square' },
+  { key: 'nrs_pos', label: 'NRS Pricebook', tagline: 'Upload your NRS pricebook export — catalog and stock stay in sync' },
   { key: 'gbp_sync', label: 'Google Business Profile', tagline: 'Hours, photos & reviews synced to Google' },
   { key: 'gmc_feed', label: 'Google Shopping feed', tagline: 'Products on Search, Shopping & Maps' },
   { key: 'reviews', label: 'Review management', tagline: 'Monitor and respond to customer reviews' },
@@ -121,6 +122,7 @@ export const PRESENCE_ADDONS: UpgradeSolution[] = [
 export const SOLUTION_SETTINGS_PATH: Record<string, string> = {
   clover_pos: '/settings/integrations/clover',
   square_pos: '/settings/integrations',
+  nrs_pos: '/settings/integrations/google',
   gbp_sync: '/settings/integrations/google',
   gmc_feed: '/settings/integrations/google',
   flyers: '/settings/flyers',

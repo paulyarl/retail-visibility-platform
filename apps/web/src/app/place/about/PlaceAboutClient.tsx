@@ -7,7 +7,6 @@ import ShelfSlotsPreview from '@/components/place/ShelfSlotsPreview';
 import {
   ShieldCheck,
   MapPin,
-  Tag,
   ShoppingBag,
   TrendingUp,
   ArrowRight,
@@ -21,7 +20,7 @@ import {
   Check,
 } from 'lucide-react';
 import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
-import { PRESENCE_ADDONS } from '@/lib/presence-modes';
+import { CONNECT_CONNECTIVE_LINE, PRESENCE_ADDONS } from '@/lib/presence-modes';
 import AddonsStrip from '@/components/AddonsStrip';
 
 function tierPrice(key: string): string {
@@ -112,8 +111,10 @@ export default function PlaceAboutClient() {
           </p>
 
           <p className="text-base text-violet-200/90 leading-relaxed max-w-3xl mb-10">
-            Claim your free store listing in 60 seconds. Put your in-stock inventory in front of local shoppers,
-            and turn online product searches into walk-in foot traffic. <strong>Zero delivery logistics, zero commissions.</strong>
+            Claim your free store listing in 60 seconds, then connect your inventory — approve the
+            Clover or Square connection, send your NRS pricebook, or add your items by hand. Your
+            products reach local shoppers and turn online product searches into walk-in foot traffic.
+            <strong> Zero delivery logistics, zero commissions.</strong>
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
@@ -130,7 +131,7 @@ export default function PlaceAboutClient() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12 pt-8 border-t border-white/15">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span className="text-sm text-violet-100 font-medium">Free 5-product shelf on claim</span>
+              <span className="text-sm text-violet-100 font-medium">Free 5-product shelf when you connect</span>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
@@ -139,6 +140,56 @@ export default function PlaceAboutClient() {
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
               <span className="text-sm text-violet-100 font-medium">0% commission on in-store sales</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── The Ladder: claim → connect → live ─── */}
+      <div className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
+        <div className="max-w-5xl mx-auto px-6 py-14">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Claim your page. Connect your inventory. See it live.
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400 text-base mt-3">
+              One path, three steps. Everything past step three is optional — many stores never need it.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-6 bg-neutral-50 dark:bg-neutral-950">
+              <div className="w-10 h-10 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mb-4">
+                1
+              </div>
+              <h3 className="text-base font-bold mb-2">Claim your page</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Two minutes, no credit card. Your hours, phone, photos and a web address you control.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-violet-200 dark:border-violet-800 ring-1 ring-violet-100 dark:ring-violet-900 p-6 bg-violet-50/50 dark:bg-violet-950/20">
+              <div className="w-10 h-10 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mb-4">
+                2
+              </div>
+              <h3 className="text-base font-bold mb-2">Connect your inventory</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Clover and Square sync straight from the register, NRS pricebooks upload in a click, and
+                with no POS you can walk items through the item wizard — name, price, variants, photos —
+                or import a CSV you build yourself. You only need the one you have — it unlocks your
+                first 5 products, free.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-6 bg-neutral-50 dark:bg-neutral-950">
+              <div className="w-10 h-10 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mb-4">
+                3
+              </div>
+              <h3 className="text-base font-bold mb-2">See it live</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Products on your page in minutes. On Google in days to weeks — Google sets that clock,
+                not us.
+              </p>
             </div>
           </div>
         </div>
@@ -221,31 +272,41 @@ export default function PlaceAboutClient() {
         </div>
       </div>
 
-      {/* ─── 5 Free Product Slots Showcase ─── */}
+      {/* ─── Connect Preview: the first 5 products ─── */}
       <div className="bg-white dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-800 py-16">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold mb-4">
-                <Tag className="w-3.5 h-3.5" />
-                Free With Your Claimed Listing
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-300 text-xs font-semibold mb-4">
+                <Package className="w-3.5 h-3.5" />
+                Step 2 — Connect Preview
               </div>
               <h2 className="text-3xl font-bold tracking-tight mb-4">
-                Put your 5 most-requested items online today.
+                This is what connecting looks like.
               </h2>
               <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed text-base mb-6">
-                Pick the 5 signature products that customers constantly call to ask about, or the specialty items
-                that chain supermarkets never stock.
+                Connect your inventory — Clover or Square sync straight from the register, an NRS
+                pricebook uploads in a click, or you add items in the dashboard: the item wizard walks
+                you through name, price, variants, photos and categories, or you curate a spreadsheet
+                yourself and import it when it&apos;s ready — and your first 5 products land on your page
+                like the sample shelf. Pick the items customers constantly call to ask about, or the
+                specialty items chain supermarkets never stock.
               </p>
               <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed text-base mb-8">
-                When local shoppers search for those items in your area, your store appears with actual prices
-                and an <strong>&quot;In-Stock at Store&quot;</strong> badge, pointing them straight to your register.
+                Shoppers searching those items nearby see your real prices and an{' '}
+                <strong>&quot;In-Stock at Store&quot;</strong> badge, pointing them straight to your register.
               </p>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                    <strong>Zero setup fee:</strong> Included automatically when you claim your place page.
+                    <strong>One path is enough:</strong> after you claim, connect on whichever you have — Clover, Square, NRS pricebook or manual entry (item wizard, or your own CSV) — and your first 5 slots are free.
+                  </span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                    <strong>Sample shelf above:</strong> those five items are illustrative — your catalog replaces them the moment you connect.
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -257,14 +318,16 @@ export default function PlaceAboutClient() {
                 <div className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                    <strong>Expand anytime:</strong> Ready to bring whole aisles online? Upgrade to 75 or 200+ products seamlessly.
+                    <strong>Expand anytime:</strong> Ready to bring whole aisles online? Every surface carries up to 200 products.
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="lg:col-span-6">
-              <ShelfSlotsPreview />
+              <ShelfSlotsPreview
+                framing={{ heading: 'Your page after you connect', badge: 'Sample shelf' }}
+              />
             </div>
           </div>
         </div>
@@ -277,9 +340,14 @@ export default function PlaceAboutClient() {
             Pick the surface that fits
           </h2>
           <p className="text-neutral-600 dark:text-neutral-400 text-base">
-            Your claimed listing is the free gateway. From there you choose where your products show up —
-            the rest is a step up from here, not a replacement. Every option works with the register you
-            already run — Clover POS and Square sync your real catalog.
+            <span className="font-semibold text-neutral-900 dark:text-white">
+              {CONNECT_CONNECTIVE_LINE}
+            </span>{' '}
+            Your claimed listing is the free gateway — connect once, then choose where your products
+            show up. The rest is a step up from here, not a replacement. Every option works with the
+            register you already run — Clover POS and Square sync your real catalog, NRS pricebooks
+            upload as a CSV, and a register with neither goes in by hand — the item wizard, or a CSV
+            you curate.
           </p>
         </div>
 
@@ -448,9 +516,10 @@ export default function PlaceAboutClient() {
             <div className="w-12 h-12 rounded-full bg-violet-600 text-white font-extrabold flex items-center justify-center mx-auto mb-4 text-lg shadow-md">
               3
             </div>
-            <h3 className="text-base font-bold mb-1">List 5 Signature Items</h3>
+            <h3 className="text-base font-bold mb-1">Connect Your Inventory</h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Add photos and prices of your 5 top products to start appearing in item-level search results.
+              Clover or Square connection, NRS pricebook upload, or items you add yourself — the item
+              wizard or a CSV you build. Your first 5 products appear on your page right away.
             </p>
           </div>
         </div>

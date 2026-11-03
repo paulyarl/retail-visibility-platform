@@ -28,11 +28,15 @@ Today the claim success screen opens with three paid modes and recommends commer
 
 | Layer | Term | Rule |
 | --- | --- | --- |
-| Merchant-facing copy | **connect** | one verb for all three mechanisms: pricebook export, Clover authorization, manual entry |
-| Mechanism description (sub-line) | "send your pricebook" · "approve the Clover connection" · "add your items" | names the *how*, never replaces the verb |
+| Merchant-facing copy | **connect** | one verb for every mechanism: Clover, Square, NRS pricebook, manual entry |
+| Mechanism description (sub-line) | "approve the Clover or Square connection" · "send your NRS pricebook" · "add your items (typed in, or a CSV you curate)" | names the *how*, never replaces the verb |
 | Internal / spec / API | ingestion, import, `inventory-import` | **unchanged** — do not rename technical surfaces for copy reasons |
 
-`connect` is the only word that appears on all three paths. That is the point: one script in the field, three pipes behind it.
+`connect` is the only word that appears on all four mechanisms. That is the point: one script in the field, three pipes behind it (API pull: Clover + Square; file push: NRS and any CSV export; manual entry — see `POS_INGESTION_PARTNER_PATH_SPEC.md` §1, *a path is defined by who initiates the data flow, not by the vendor*).
+
+**"By hand" is not only one-at-a-time typing.** The manual path has two real surfaces: the **item wizard** (`/t/{tenantId}/items/create` — 7 steps covering basic info, product type/variants, pricing, content, media, categories and review), and the **generic CSV importer** (merchant-built sheet; name, price and stock are enough, SKU optional with name as the fallback key). Copy names the wizard, not "type it in" — it is the robust no-POS path — and must not imply CSV requires a POS export, which would send the manual-path merchant back to retyping what they already have in a spreadsheet.
+
+**All four are first-class — never rank them.** Copy names the four mechanisms together and never implies an API connection is the "real" one. They are **alternatives, not a checklist**: availability varies by merchant (Clover, Square, NRS, or nothing but a sheet of paper), so the copy says *whichever you have*. The offer is **one path, after the claim**: connecting through any single available path unlocks the 5 free product slots — no path is worth more than another, and no merchant is asked to connect twice.
 
 ## 4. Pre-claim surfaces — "about the trio"
 
@@ -64,9 +68,11 @@ Per `AGENTS.md` the triad is three **peer** modes rendered as a picker, not a la
 
 The connective line is the fix. The triad previously read as three unrelated purchases; it now reads as three destinations reached through one step.
 
-### 4.3 `/features` and `/faq`
+### 4.3 `/features`, `/faq`, `/place/about`
 
 Anywhere the trio is described as a menu, prepend the ladder in one sentence: *claim your page → connect your inventory → see it live.* Do not add a fourth card; the ladder is a sentence, not a tier.
+
+`/place/about` is the pre-claim merchant story, so it carries the ladder as a **three-step band** directly under the hero — *Claim your page. Connect your inventory. See it live.* — with step 3 split into its two moments (page: minutes; Google: days to weeks) and a closing line that everything past step 3 is optional. Its triad intro uses `CONNECT_CONNECTIVE_LINE` verbatim, and the claim how-to ends on *Connect Your Inventory* (the three mechanisms as the sub-line) instead of *List 5 Signature Items*, which framed manual entry as the only path. The 5-free-slot showcase is the **connect preview**, not a standalone offer: *Step 2 — Connect Preview* / *This is what connecting looks like*, with the sample shelf labelled *Your page after you connect*. `ShelfSlotsPreview` takes a `framing` prop for that header so the entry-page claim teaser keeps its own *claim to make it yours* copy. The add-on strip there carries all four paths — `PRESENCE_ADDONS` lists `nrs_pos` beside `clover_pos`/`square_pos` — while the API's `GATEWAY_UPGRADE_SOLUTIONS` stays the two API-sync registers (it mirrors `PRESENCE_SOLUTIONS`, which feeds the "X and Y sync your real catalog" line). Because the two lists now differ by one entry, the upgrade page merges them by key rather than `PRESENCE_ADDONS.slice(2)`. Guard: `apps/web/src/app/place/about/place-about-connect.test.ts`.
 
 ## 5. Post-claim surfaces — the state gate
 
@@ -106,6 +112,7 @@ This is the default after a claim and the state almost every pioneer lands in.
 | Mode copy + taglines | `apps/web/src/lib/presence-modes.ts` | mirrors the API module — **edit both** |
 | Mode copy (API) | `apps/api/src/services/DirectoryPresenceUpgradeOptionsService.ts` | `ENTRY_PRESENCE_MODES` / `GATEWAY_UPGRADE_SOLUTIONS` |
 | Public triad + gateway strip | `apps/web/src/components/FeaturesShowcase.tsx` | `GatewayStrip` (priority 0), `TriadSection` (priority 1) |
+| `/place/about` ladder band | `apps/web/src/app/place/about/PlaceAboutClient.tsx` | three-step band under the hero + `CONNECT_CONNECTIVE_LINE`; guard `place-about-connect.test.ts` |
 | Triad label pins | `apps/web/src/components/FeaturesShowcase.test.ts` | three surface labels are asserted — update together |
 | Claim success screen | `apps/web/src/app/directory/claim/[token]/` + `ClaimUpgradeTeaser` | the state gate lives here |
 | Dashboard handoff | `TierUpgradeCard` | same copy source |

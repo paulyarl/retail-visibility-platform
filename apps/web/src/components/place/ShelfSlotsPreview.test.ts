@@ -42,4 +42,15 @@ describe('ShelfSlotsPreview', () => {
     );
     expect(withClass).toContain('w-full max-w-sm');
   });
+
+  it('renders caller-supplied framing for the illustrative sample (/place/about connect preview)', () => {
+    const body = renderToStaticMarkup(
+      createElement(ShelfSlotsContent, {
+        framing: { heading: 'Your page after you connect', badge: 'Sample shelf' },
+      }),
+    );
+    expect(body).toContain('Your page after you connect');
+    expect(body).toContain('Sample shelf');
+    expect(body).not.toContain('Example shelf — claim to make it yours');
+  });
 });
