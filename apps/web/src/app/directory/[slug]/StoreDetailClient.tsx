@@ -264,10 +264,10 @@ export default function StoreDetailClient({
   // default destination. The merchant's own website wins only when they have
   // opted in AND have no products of their own to show here; a merchant with a
   // catalog is better served by the surface that carries it.
-  const websiteHref =
-    actualProductCount > 0 || !(listing as any).useCustomWebsite || !(listing as any).website
+  const websiteHref: string | null =
+    actualProductCount > 0 || !listing.useCustomWebsite || !listing.website
       ? storefrontHomeUrl
-      : ((listing as any).website as string);
+      : listing.website;
 
   // Use NEXT_PUBLIC_ prefixed var for client-side access, fallback to window.location.origin
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';

@@ -26,10 +26,6 @@ const SRC = join(process.cwd(), 'src');
  */
 const KNOWN_DEBT = new Set([
   'lib/tiers.ts', // duplicate tier library — consolidate into lib/tiers/tier-features.ts
-  'components/tiers/TierComparisonTable.tsx', // own price map
-  'components/FeaturesSlider.tsx', // own price map
-  'app/(platform)/settings/admin/demo-tenants/page.tsx',
-  'app/(platform)/settings/admin/tier-system/page.tsx',
 ]);
 
 /** Not tier prices — excluded by domain, not by debt. */

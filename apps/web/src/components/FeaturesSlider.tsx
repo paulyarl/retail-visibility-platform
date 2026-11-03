@@ -2,56 +2,62 @@
 
 import { motion } from 'framer-motion';
 import { useState } from 'react';
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 
-// Business journey stages aligned with tier progression
+const price = (key: string) => `$${TIER_PRICING[key]}/mo`;
+
+// Business journey stages aligned with tier progression. Badges and prices are
+// read from the contract — never hand-typed — so this slider cannot drift from
+// the pricing page the way it did (retired "DISCOVERY" label, and a
+// "STOREFRONT" badge carrying Storefront+'s price).
 const businessJourney = [
   {
     icon: '🔎',
     title: 'Get Found on Google',
     description: 'Shoppers discover your products on Search, Shopping & Maps — instantly.',
     gradient: 'from-blue-500 to-indigo-600',
-    badge: 'DISCOVERY',
-    price: '$29/mo',
+    badge: TIER_DISPLAY_NAMES.discovery,
+    price: price('discovery'),
   },
   {
     icon: '🏪',
     title: 'Own Your Storefront',
     description: 'A branded presence inside the platform — browse, inquire, and connect.',
     gradient: 'from-indigo-500 to-purple-600',
-    badge: 'STOREFRONT',
-    price: '$59/mo',
+    badge: TIER_DISPLAY_NAMES.storefront,
+    price: price('storefront'),
   },
   {
     icon: '🤝',
     title: 'Capture Intent & Drive Foot Traffic',
     description: 'Deposit-based reservations guarantee serious buyers walk through your door.',
     gradient: 'from-purple-500 to-pink-600',
-    badge: 'COMMITMENT',
-    price: '$79/mo',
+    badge: TIER_DISPLAY_NAMES.commitment,
+    price: price('commitment'),
   },
   {
     icon: '🛒',
     title: 'Sell Online — Fully & Simply',
     description: 'Complete checkout, payment collection & delivery — pure e-commerce.',
     gradient: 'from-pink-500 to-rose-600',
-    badge: 'E-COMMERCE',
-    price: '$99/mo',
+    badge: TIER_DISPLAY_NAMES.ecommerce,
+    price: price('ecommerce'),
   },
   {
     icon: '🌐',
     title: 'Physical + Online — Unified Commerce',
     description: 'Let shoppers choose: pay in full for delivery OR deposit & pick up in store.',
     gradient: 'from-rose-500 to-orange-600',
-    badge: 'OMNICHANNEL',
-    price: '$149/mo',
+    badge: TIER_DISPLAY_NAMES.omnichannel,
+    price: price('omnichannel'),
   },
   {
     icon: '🏢',
     title: 'Complete Business Solution',
     description: 'Multi-location, enterprise-grade tools, custom contracts & white-label options.',
     gradient: 'from-orange-500 to-amber-600',
-    badge: 'ENTERPRISE',
-    price: '$499/mo',
+    badge: TIER_DISPLAY_NAMES.enterprise,
+    price: price('enterprise'),
   },
 ];
 

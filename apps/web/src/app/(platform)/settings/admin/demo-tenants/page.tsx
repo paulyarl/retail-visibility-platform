@@ -6,6 +6,7 @@ import { Button, TextInput, Select, Badge, Table, Modal, Group, Text, Stack } fr
 import { notifications } from '@mantine/notifications';
 import PageHeader from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 import AccessDenied from '@/components/AccessDenied';
 import {
   demoTenantAdminService,
@@ -627,16 +628,16 @@ export default function DemoTenantsAdminPage() {
             label="New Tier"
             placeholder="Select a tier"
             data={[
-              { value: 'discovery', label: 'Discovery ($29/mo)' },
-              { value: 'storefront', label: 'Storefront ($59/mo)' },
-              { value: 'commitment', label: 'Commitment ($79/mo)' },
-              { value: 'ecommerce', label: 'E-Commerce ($99/mo)' },
-              { value: 'omnichannel', label: 'Omnichannel ($149/mo)' },
-              { value: 'professional', label: 'Professional ($199/mo)' },
-              { value: 'chain_starter', label: 'Chain Starter ($299/mo)' },
-              { value: 'chain_professional', label: 'Chain Professional ($399/mo)' },
-              { value: 'enterprise', label: 'Enterprise ($499/mo)' },
-              { value: 'organization', label: 'Organization ($499/mo)' },
+              { value: 'discovery', label: `${TIER_DISPLAY_NAMES.discovery} ($${TIER_PRICING.discovery}/mo)` },
+              { value: 'storefront', label: `${TIER_DISPLAY_NAMES.storefront} ($${TIER_PRICING.storefront}/mo)` },
+              { value: 'commitment', label: `${TIER_DISPLAY_NAMES.commitment} ($${TIER_PRICING.commitment}/mo)` },
+              { value: 'ecommerce', label: `${TIER_DISPLAY_NAMES.ecommerce} ($${TIER_PRICING.ecommerce}/mo)` },
+              { value: 'omnichannel', label: `${TIER_DISPLAY_NAMES.omnichannel} ($${TIER_PRICING.omnichannel}/mo)` },
+              { value: 'professional', label: `${TIER_DISPLAY_NAMES.professional} ($${TIER_PRICING.professional}/mo)` },
+              { value: 'chain_starter', label: `${TIER_DISPLAY_NAMES.chain_starter} ($${TIER_PRICING.chain_starter}/mo)` },
+              { value: 'chain_professional', label: `${TIER_DISPLAY_NAMES.chain_professional} ($${TIER_PRICING.chain_professional}/mo)` },
+              { value: 'enterprise', label: `${TIER_DISPLAY_NAMES.enterprise} ($${TIER_PRICING.enterprise}/mo)` },
+              { value: 'organization', label: `${TIER_DISPLAY_NAMES.organization} ($${TIER_PRICING.organization}/mo)` },
             ]}
             value={tierValue}
             onChange={(val) => setTierValue(val || '')}

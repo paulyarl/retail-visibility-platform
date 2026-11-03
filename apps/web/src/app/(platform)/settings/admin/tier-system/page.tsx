@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input, Modal, ToastContainer } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { TIER_PRICING } from '@/lib/tiers/tier-features';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Edit2, Save, X, Plus, Trash2, Pause, ChevronDown, ChevronUp, CreditCard, Star } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -1703,10 +1704,10 @@ export default function TierSystemPage() {
                 <div className="font-medium text-amber-800 mb-2">V2 Strategy Reference:</div>
                 <div className="text-sm text-amber-700 space-y-1">
                   <div><strong>Discovery/Storefront:</strong> Commerce Disabled</div>
-                  <div><strong>Commitment:</strong> Deposit Only ($79/mo)</div>
-                  <div><strong>E-commerce:</strong> Full Payment ($99/mo)</div>
-                  <div><strong>Omnichannel:</strong> Both Options ($149/mo)</div>
-                  <div><strong>Enterprise:</strong> Both Options ($499/mo)</div>
+                  <div><strong>Commitment:</strong> Deposit Only (${TIER_PRICING.commitment}/mo)</div>
+                  <div><strong>E-commerce:</strong> Full Payment (${TIER_PRICING.ecommerce}/mo)</div>
+                  <div><strong>Omnichannel:</strong> Both Options (${TIER_PRICING.omnichannel}/mo)</div>
+                  <div><strong>Enterprise:</strong> Both Options (${TIER_PRICING.enterprise}/mo)</div>
                 </div>
               </div>
             </div>

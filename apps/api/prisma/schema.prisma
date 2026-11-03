@@ -7484,6 +7484,7 @@ model tenants {
   gbp_sync_history                                                                       gbp_sync_history[]
   gbp_sync_tracking                                                                      gbp_sync_tracking[]
   google_oauth_accounts_list                                                             google_oauth_accounts_list[]
+  inventory_imports                                                                      inventory_imports[]
   inventory_items                                                                        inventory_items[]
   inventory_sync_events_inventory_sync_events_location_idTotenants                       inventory_sync_events[]                  @relation("inventory_sync_events_location_idTotenants")
   inventory_sync_events_inventory_sync_events_tenant_idTotenants                         inventory_sync_events[]                  @relation("inventory_sync_events_tenant_idTotenants")
@@ -8761,6 +8762,23 @@ model gmc_item_sync_state {
   updated_at         DateTime          @default(now()) @db.Timestamptz(6)
   inventory_items    inventory_items   @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   product_variants   product_variants? @relation(fields: [product_variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model inventory_imports {
+  id              String   @id
+  tenant_id       String
+  format          String
+  row_count       Int      @default(0)
+  created_count   Int      @default(0)
+  updated_count   Int      @default(0)
+  unchanged_count Int      @default(0)
+  skipped_count   Int      @default(0)
+  absent_count    Int      @default(0)
+  errors          Json?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  tenants         tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_inventory_imports_tenant")
 }
 
 enum action {

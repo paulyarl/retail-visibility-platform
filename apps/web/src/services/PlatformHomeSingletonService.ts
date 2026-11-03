@@ -3500,6 +3500,36 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * Inventory CSV import — POS pricebook/catalog upload (spec §4).
+   */
+  async importInventoryCsv(tenantId: string, format: string, csv: string): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `/api/merchant/inventory-import`,
+      { method: 'POST', body: JSON.stringify({ tenantId, format, csv }) },
+      `platform-inventory-import-${tenantId}`
+    );
+    return result.data;
+  }
+
+  /**
+   * Last inventory import — the freshness label on the upload card.
+   */
+  async getLastInventoryImport(tenantId: string): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `/api/merchant/inventory-import/last?tenantId=${tenantId}`,
+      {},
+      `platform-last-import-${tenantId}`
+    );
+    return result.data;
+  }
+
+  /**
    * Trigger a GMC product sync — whole catalog, or a selected subset when
    * itemIds is provided (batch endpoint accepts the list).
    */

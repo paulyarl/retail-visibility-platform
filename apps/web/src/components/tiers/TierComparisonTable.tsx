@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { FEATURE_MAPPING, getFeaturesByTier } from '@/lib/tiers/feature-mapping';
+import { TIER_PRICING } from '@/lib/tiers/tier-features';
 
 interface TierComparisonTableProps {
   tiers?: string[];
@@ -216,17 +217,11 @@ export function TierComparisonTable({
 }
 
 // Helper functions
+// Prices come from the contract, never a local map — this table drifted once
+// already and there is no reason for it to hold its own copy.
 function getTierPrice(tier: string): string {
-  const prices = {
-    discovery: '$29/mo',
-    storefront: '$59/mo',
-    commitment: '$79/mo',
-    ecommerce: '$99/mo',
-    omnichannel: '$149/mo',
-    professional: '$199/mo',
-    enterprise: '$499/mo'
-  };
-  return prices[tier as keyof typeof prices] || '';
+  const value = TIER_PRICING[tier];
+  return value === undefined ? '' : `$${value}/mo`;
 }
 
 function getBenefitDescription(benefit: string): string {

@@ -280,6 +280,7 @@ import dashboardConsolidatedRoutes from '../routes/dashboard-consolidated';
 import promotionRoutes from '../routes/promotion';
 import tenantLimitsRoutes from '../routes/tenant-limits';
 import feedJobsRoutes from '../routes/feed-jobs';
+import inventoryImportRoutes from '../routes/inventory-import';
 import feedbackRoutes from '../routes/feedback';
 import cacheStatsRoutes from '../routes/cache-stats';
 import categoriesPlatformRoutes from '../routes/categories.platform';
@@ -1950,6 +1951,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'admin',
     authLevel: 'admin',
     comment: 'Feed jobs at /api/feed-jobs',
+  },
+  {
+    path: '/api/merchant',
+    router: inventoryImportRoutes,
+    domain: 'tenant',
+    authLevel: 'tenant',
+    comment: 'Inventory import at /api/merchant/inventory-import',
   },
   {
     path: '/api/feedback',

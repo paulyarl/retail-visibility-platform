@@ -10,6 +10,7 @@ import {
   ValidationResult,
 } from '@/services/GMCValidationService';
 import GmcSyncAvailabilityNotice from '@/components/google/GmcSyncAvailabilityNotice';
+import InventoryImportCard from '@/components/inventory/InventoryImportCard';
 import {
   CheckCircle,
   XCircle,
@@ -423,6 +424,8 @@ export default function ProductsTab({
           )}
         </div>
       )}
+
+      <InventoryImportCard tenantId={tenantId} />
 
       {/* SWIS checklist — the local surface needs the console steps + a selection */}
       {swisReadiness && !['ready', 'disconnected'].includes(swisReadiness.state) && (
