@@ -10,7 +10,7 @@ import { ShelfShader } from "./ShelfShader";
 // version switched subjects on beats 1–3 (page, "it", inventory), which is
 // what made it feel jumpy against a governing subject.
 const CAPABILITIES = [
-  "Find the page they live on.",
+  "Find the page that shows them.",
   "Claim it — and they're yours.",
   "Connect them in minutes.",
   "On your own website.",
