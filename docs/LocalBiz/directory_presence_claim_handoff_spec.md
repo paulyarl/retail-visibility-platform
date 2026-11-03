@@ -8,6 +8,8 @@ The current post-claim success screen (`DirectoryClaimClient.tsx`, `state === 's
 
 **Scope and supersession:** this spec supersedes §6.2 ("Claim success") of `docs/LocalBiz/directory_presence_progressive_upgrade_spec.md` for this screen. Dashboard `TierUpgradeCard` copy and the operator-approval cohort are out of scope (see "Operator-approval claims" below).
 
+**Superseding note (2026-11-03) — the connect gate comes first.** `docs/LocalBiz/CONNECT_LADDER_COPY_SPEC.md` §5 inserts a **state gate** ahead of this handoff. A merchant who has claimed but not connected inventory sees *"Your page is live → Connect your inventory"* — not a Presence Mode recommendation. The mode cards specified here render in **State B (connected)**, ordered by the ladder. Rationale: recommending a surface before the merchant has a catalog asks them to choose before they have seen anything work, and the triad's current primary is the deposit-checkout mode — a rung above what an unconnected merchant can act on.
+
 ## What's already free
 
 The free `directory_presence` claim gives the owner (verified against the tier feature set in `apps/web/src/lib/tiers/tier-features.ts`):

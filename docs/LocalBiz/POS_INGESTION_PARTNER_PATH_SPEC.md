@@ -12,6 +12,8 @@ NRS (National Retail Solutions) POS merchants hold rich catalog + stock data ins
 - **CSV path** (NRS + every POS with a merchant export — **this spec**) — periodic import, merchant-driven
 - **Manual path** (no POS, or a POS with no export) — the merchant maintains the catalog in the platform portal. The only path with **no external dependency**, and therefore the one that makes the vendor-agnostic claim literally true.
 
+**Terminology — one verb, three pipes.** Merchant-facing copy says **connect** for all three shapes ("Connect your inventory"), with the mechanism named underneath. Internal surfaces keep *ingestion* / *import* / `inventory-import` — do not rename technical surfaces for copy reasons. The binding copy contract, including the pre-claim and post-claim trio fixes, is `docs/LocalBiz/CONNECT_LADDER_COPY_SPEC.md`.
+
 The CSV path is not a workaround — it's the wedge. It requires **zero cooperation from the POS vendor**, so the platform can serve merchants on *any* register, then convert vendor partnerships (NRS) from a position of working proof.
 
 **The strategy in one line:** pioneer merchants prove SWIS live → pitch NRS "partner and it's your branded feature, or we keep converting your merchants" → NRS API access upgrades CSV tenants to live sync.
@@ -276,6 +278,19 @@ The pilot does not ship "it worked." It ships this matrix with evidence per row.
 | `gbp_management` — optional | only if reviews or posts are surfaced on the listing |
 
 This is what `PIONEER_RECRUITMENT_SPEC.md` §1's segmented cohort grants are for. A merchant who claims and hits a paywall is worse off than one never approached: they did the work, and the platform answered with a locked door.
+
+**Mechanism × capability matrix.** Integrations are capability modules (`capability_modules.integration_options`), and the trio is inert without them. Each ingestion mechanism needs a different set of keys:
+
+| Mechanism | Capability keys | Merchant toggle | Connection |
+| --- | --- | --- | --- |
+| 2a NRS (CSV) | none required — upload is self-serve | none | none |
+| 2b Clover | `integration_clover`, `integration_pos_on` | integration options | Clover OAuth grant |
+| 2c Manual | **none** | none | none |
+| Step 3 (SWIS) | `integration_gmc_sync`, `integration_google_merchant_center` | GMC settings | Merchant Center + GBP link |
+
+**Structural consequence:** 2c is the only ingestion path that needs no integration capability. A claimed tenant can therefore always complete the ladder through manual entry, provided `max_skus` is lifted and the GMC pair is granted. The integration modules decide **which mechanisms light up**, not whether the ladder is walkable — which is the difference between a paywall and a degraded path.
+
+**The three-state trap.** A capability key only becomes *effective* when three states line up: granted by tier (`allowed_*`), toggled by the merchant (`can_use_*`), and connected by credentials. Onboarding that walks only the first shows a button that does nothing; one that walks the first two errors on click. All three, or the merchant meets an inert control and concludes the product is broken.
 
 **Phase-1 artifacts (definition of done for the engagement motion):**
 1. Signed pilot agreement — `docs/LocalBiz/PIONEER_PILOT_AGREEMENT.md` (§11)

@@ -67,6 +67,30 @@ export const MODE_UNLOCK_COPY: Record<string, string> = {
     'A full, branded storefront browse experience with product catalog on your subdomain — add checkout anytime as an à-la-carte add-on.',
 };
 
+// Connect-state copy — the state gate (CONNECT_LADDER_COPY_SPEC §5).
+// State A is the claim moment: a freshly claimed seed has no inventory
+// (unclaimed seed products are forced inactive, migration 319), so the claim
+// screen is always State A and needs no connection signal. State B renders
+// only where a connection state is actually known.
+export const CONNECT_GATE_COPY = {
+  stateA: {
+    heading: 'Your page is live.',
+    body: 'Connect your inventory and it fills in — your products, prices and stock, on the page you now control.',
+    cta: 'Connect your inventory',
+    secondary: 'See what else is possible',
+  },
+  stateB: {
+    heading: 'Your inventory is connected.',
+    body: 'Your products are on your page. Next: put them in front of people searching nearby.',
+    cta: 'Put your products on Google',
+    secondary: 'See all options',
+  },
+} as const;
+
+// The one sentence that makes the triad read as three destinations reached
+// through one step, rather than three unrelated purchases.
+export const CONNECT_CONNECTIVE_LINE = 'All three start with connecting your inventory.';
+
 // Register-level solutions advertised alongside the triad — mirrors
 // GATEWAY_UPGRADE_SOLUTIONS in DirectoryPresenceUpgradeOptionsService (the
 // API module isn't importable from web, so edit both). Sold as merchant

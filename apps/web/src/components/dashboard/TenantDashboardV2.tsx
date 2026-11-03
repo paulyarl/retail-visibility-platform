@@ -312,6 +312,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               tenantData?.subscriptionTier === 'directory_presence' ||
               tier?.effective?.id === 'directory_presence'
             }
+            hasInventory={hasProducts}
           />
         </div>
 

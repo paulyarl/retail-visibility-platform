@@ -50,7 +50,7 @@ import directoryClaimPublicService, {
 } from '@/services/DirectoryClaimPublicService';
 import directoryPresenceUpgradeService from '@/services/DirectoryPresenceUpgradeService';
 import type { UpgradeSolution, UpgradeTierOption } from '@/services/DirectoryPresenceUpgradeService';
-import { FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, PRESENCE_ADDONS, SOLUTION_SETTINGS_PATH, sortPresenceModes } from '@/lib/presence-modes';
+import { CONNECT_CONNECTIVE_LINE, CONNECT_GATE_COPY, FALLBACK_PRESENCE_MODES, MODE_UNLOCK_COPY, PRESENCE_ADDONS, SOLUTION_SETTINGS_PATH, sortPresenceModes } from '@/lib/presence-modes';
 import AddonsStrip from '@/components/AddonsStrip';
 import customerAuthService from '@/services/CustomerAuthService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
@@ -842,7 +842,18 @@ export default function DirectoryClaimClient() {
                 )}
 
                 {/* Entry Presence mode teaser (claim handoff spec §2/§4) */}
-                <ClaimUpgradeTeaser options={claimResult?.upgradeOptions} solutions={claimResult?.solutions} solutionHref={solutionHref} />
+                <ClaimUpgradeTeaser
+                  options={claimResult?.upgradeOptions}
+                  solutions={claimResult?.solutions}
+                  solutionHref={solutionHref}
+                  connectHref={
+                    tenantId
+                      ? hasPlatformSession
+                        ? `/t/${tenantId}/items/create`
+                        : withReturnTo(`/t/${tenantId}/items/create`)
+                      : null
+                  }
+                />
 
                 {/* Directory Presence product allowance + entry step (E5, spec B-4) */}
                 <Alert color="blue" variant="light" icon={<IconShoppingCart size={16} />} w="100%">
@@ -900,8 +911,8 @@ export default function DirectoryClaimClient() {
 
                 <Group justify="center">
                   {upgradeHref && (
-                    <Button component={Link} href={upgradeHref} leftSection={<IconSparkles size={16} />}>
-                      Upgrade to Starter
+                    <Button component={Link} href={upgradeHref} variant="light" leftSection={<IconSparkles size={16} />}>
+                      See upgrade options
                     </Button>
                   )}
                   <Button
@@ -1275,61 +1286,86 @@ export default function DirectoryClaimClient() {
 // Live values come from the upgradeOptions embedded in the claim accept
 // response (or the authenticated refresh when a platform session exists);
 // the shared static fallback renders only when no options are available.
-function ClaimUpgradeTeaser({ options, solutions, solutionHref }: { options?: UpgradeTierOption[]; solutions?: UpgradeSolution[]; solutionHref?: (key: string) => string | null }) {
+function ClaimUpgradeTeaser({ options, solutions, solutionHref, connectHref }: { options?: UpgradeTierOption[]; solutions?: UpgradeSolution[]; solutionHref?: (key: string) => string | null; connectHref?: string | null }) {
   const isFallback = !options || options.length === 0;
   const sorted = sortPresenceModes(isFallback ? FALLBACK_PRESENCE_MODES : options);
+  // CONNECT_LADDER_COPY_SPEC §5 — the claim moment is always State A: a freshly
+  // claimed seed has no inventory, so no connection signal is needed here.
+  const [showModes, setShowModes] = useState(false);
 
   return (
     <Stack gap="xs">
-      <Text ta="center" fw={500}>
-        Pick the surface that fits
+      <Text ta="center" fw={700} size="lg">
+        {CONNECT_GATE_COPY.stateA.heading}
       </Text>
-      <Grid gap="md">
-        {sorted.map((mode) => (
-          <Grid.Col key={mode.tierKey} span={{ base: 12, md: 6, lg: 4 }}>
-            <Card withBorder radius="md" padding="md" h="100%" style={{ minHeight: 220 }}>
-              <Stack gap="xs" align="center" ta="center">
-                <Group gap="xs" justify="center">
-                  {mode.mode && (
-                    <Badge variant="light" color={mode.isPrimary ? 'blue' : 'gray'}>
-                      {mode.mode}
-                    </Badge>
-                  )}
-                  {mode.isPrimary && (
-                    <Text size="xs" fw={500} c="blue">
-                      Recommended
+      <Text ta="center" size="sm" c="dimmed">
+        {CONNECT_GATE_COPY.stateA.body}
+      </Text>
+      {connectHref && (
+        <Group justify="center" mt="xs">
+          <Button component={Link} href={connectHref} leftSection={<IconShoppingCart size={16} />}>
+            {CONNECT_GATE_COPY.stateA.cta}
+          </Button>
+        </Group>
+      )}
+      <Group justify="center">
+        <Button variant="subtle" size="xs" onClick={() => setShowModes((v) => !v)}>
+          {showModes ? 'Hide options' : CONNECT_GATE_COPY.stateA.secondary}
+        </Button>
+      </Group>
+
+      {showModes && (
+        <>
+          <Text ta="center" fw={500} mt="sm">
+            {CONNECT_CONNECTIVE_LINE}
+          </Text>
+          <Grid gap="md">
+            {sorted.map((mode) => (
+              <Grid.Col key={mode.tierKey} span={{ base: 12, md: 6, lg: 4 }}>
+                <Card withBorder radius="md" padding="md" h="100%" style={{ minHeight: 220 }}>
+                  <Stack gap="xs" align="center" ta="center">
+                    <Group gap="xs" justify="center">
+                      {mode.mode && (
+                        <Badge variant="light" color={mode.isPrimary ? 'blue' : 'gray'}>
+                          {mode.mode}
+                        </Badge>
+                      )}
+                      {mode.isPrimary && (
+                        <Text size="xs" fw={500} c="blue">
+                          Recommended
+                        </Text>
+                      )}
+                    </Group>
+                    <Text fw={700} size="lg">
+                      {mode.tagline || mode.displayName || mode.name}
                     </Text>
-                  )}
-                </Group>
-                <Text fw={700} size="lg">
-                  {mode.tagline || mode.displayName || mode.name}
-                </Text>
-                <Text size="sm" c="dimmed">
-                  {mode.displayName || mode.name} ·{' '}
-                  {isFallback ? `from $${mode.priceMonthly}/mo` : `$${mode.priceMonthly}/mo`}
-                </Text>
-                <Text size="sm" c="dimmed">
-                  {MODE_UNLOCK_COPY[mode.tierKey] ?? ''}
-                </Text>
-              </Stack>
-            </Card>
-          </Grid.Col>
-        ))}
-      </Grid>
-      <Card withBorder radius="md" padding="sm" bg="gray.0">
-        <Text size="sm" ta="center" fw={600}>
-          Add-ons that run on what you already have
-        </Text>
-        <AddonsStrip items={PRESENCE_ADDONS} hrefFor={solutionHref} className="mt-2" />
-        <Text size="xs" c="dimmed" ta="center" mt={6}>
-          {PRESENCE_ADDONS[0]?.tagline} — every option can add these as add-ons.
-        </Text>
-      </Card>
-      <Text size="xs" c="dimmed" ta="center">
-        Start with a surface — every option can add the others&apos; capabilities,
-        POS sync, coupons, funnels, and social selling as add-ons whenever you&apos;re
-        ready. No plan switch, no rebuild.
-      </Text>
+                    <Text size="sm" c="dimmed">
+                      {mode.displayName || mode.name} ·{' '}
+                      {isFallback ? `from $${mode.priceMonthly}/mo` : `$${mode.priceMonthly}/mo`}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {MODE_UNLOCK_COPY[mode.tierKey] ?? ''}
+                    </Text>
+                  </Stack>
+                </Card>
+              </Grid.Col>
+            ))}
+          </Grid>
+          <Card withBorder radius="md" padding="sm" bg="gray.0">
+            <Text size="sm" ta="center" fw={600}>
+              Add-ons that run on what you already have
+            </Text>
+            <AddonsStrip items={PRESENCE_ADDONS} hrefFor={solutionHref} className="mt-2" />
+            <Text size="xs" c="dimmed" ta="center" mt={6}>
+              {PRESENCE_ADDONS[0]?.tagline} — every option can add these as add-ons.
+            </Text>
+          </Card>
+          <Text size="xs" c="dimmed" ta="center">
+            Every option can add the others&apos; capabilities — POS sync, coupons, funnels
+            and social selling — as add-ons whenever you&apos;re ready. No plan switch, no rebuild.
+          </Text>
+        </>
+      )}
     </Stack>
   );
 }

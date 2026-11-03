@@ -40,7 +40,7 @@ This section is deliberately blunt. The pilot only produces a valid result if bo
 | --- | --- |
 | Complete the access checklist | Within 7 days of signature (Exhibit B) |
 | Perform the Google steps personally | Platform guides; Merchant clicks. Merchant must not hand over Google or NRS logins (§3.3) |
-| Export and upload the catalog | At least 5 business days per week during the pilot — portal login → Pricebook → Excel Download → upload. Roughly 5 minutes |
+| Connect your inventory | By the mechanism set out in Exhibit B: **NRS** — pricebook export and upload, at least 5 business days per week (~5 min); **Clover** — one authorization, then automatic; **manual** — initial entry of a starter catalog, then updates as stock changes |
 | Keep price and stock data accurate | Merchant is responsible for the truth of what they upload (§8) |
 | Attend a weekly check-in | 15 minutes, to log friction and blockers |
 | Tell Platform when something breaks | Rather than stopping silently — a lapsed routine is a finding, not a failure |
@@ -237,7 +237,9 @@ Shared with Merchant at end of term, with evidence per row. A failed row is a re
 | 9 | Upload routine holds | ≥5 consecutive business-day imports |
 | 10 | Setup friction captured | time-to-complete and every human step logged |
 
-## Exhibit B — Merchant access checklist
+## Exhibit B — Merchant access checklist (NRS variant)
+
+*Clover and manual-entry merchants substitute the ingestion steps for their own mechanism; every other item is unchanged.*
 
 - [ ] Pricebook export confirmed on the NRS plan (portal → Pricebook → Excel Download)
 - [ ] Business Profile visible in Merchant's own Google account

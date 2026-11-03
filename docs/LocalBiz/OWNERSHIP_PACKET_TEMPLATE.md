@@ -1,6 +1,6 @@
 # Ownership Packet — Leave-Behind Template
 
-**Status:** v0.1 (2026-11-03). Operator-facing field doc. One page, one ladder — **claim → feed → Google** — with three step-2 print variants (NRS CSV export, Clover API connect, platform-portal manual entry). All three are cold-door seed invitations; the register only changes the middle step, and the destination is the same. Companion to `POS_INGESTION_PARTNER_PATH_SPEC.md` §15.1 (Tier A artifacts), §17 (ownership access) and §17.11 (follow-up).
+**Status:** v0.1 (2026-11-03). Operator-facing field doc. One page, one ladder — **claim → feed → Google** — with three step-2 print variants by mechanism: **File** (NRS pricebook or any CSV export), **POS API** (Clover, Square), and **Manual** (sheet + quick count). All three are cold-door seed invitations; the mechanism only changes the middle step, and the destination is the same. Companion to `POS_INGESTION_PARTNER_PATH_SPEC.md` §15.1 (Tier A artifacts), §17 (ownership access) and §17.11 (follow-up).
 **Format:** one page, printed. The name goes at the top in large type — that is what makes it a courier object instead of a message (§17.1).
 
 ---
@@ -39,6 +39,10 @@ One frame, one ladder: **claim → feed → Google**. NRS and Clover are paralle
   and your customer reviews — the way a shopper sees you
   before they walk in.
 
+  Claim it and that page becomes yours: your own web
+  address to put on Google, Facebook or Yelp — or on a QR
+  code at the counter.
+
 
   One thing it does not show: what is on your shelves.
 
@@ -55,8 +59,8 @@ One frame, one ladder: **claim → feed → Google**. NRS and Clover are paralle
 
 
         1. Claim the page            ~2 min
-        2. [STEP 2 — see variant]    [effort]
-        3. Products on Google        we do the rest
+        2. Connect your inventory    [effort]
+        3. See it live               we do the rest
 
 
   Step three is the point: someone nearby searching for
@@ -83,10 +87,10 @@ One frame, one ladder: **claim → feed → Google**. NRS and Clover are paralle
 
 Drop one into the page. Same ladder, same destination; only the ingestion differs.
 
-**2a — NRS (CSV export)**
+**2a — File path (NRS pricebook, or any CSV export)**
 
 ```
-        2. Send us your pricebook    ~2 min, daily
+        2. Connect your inventory    ~2 min, daily
 
   Log in at nrsplus.com  →  Pricebook  →  Excel Download,
   then send it to us or upload it on the page above. We
@@ -94,10 +98,10 @@ Drop one into the page. Same ladder, same destination; only the ingestion differ
   Google stock reflects your latest upload.
 ```
 
-**2b — Clover (API connect)**
+**2b — POS API path (Clover, Square)**
 
 ```
-        2. Connect Clover            ~5 min, once
+        2. Connect your inventory    ~5 min, once
 
   Sign in to Clover, approve the connection, then pick
   which items to show. About five minutes, once. After
@@ -105,10 +109,10 @@ Drop one into the page. Same ladder, same destination; only the ingestion differ
   export to remember.
 ```
 
-**2c — Platform storefront (no POS, or a POS with no export)**
+**2c — Manual path (no POS, or a POS with no export)**
 
 ```
-        2. Add your items             ~20 min to start
+        2. Connect your inventory    ~20 min to start
 
   Add the items people actually search for — twenty is
   enough to start, and you can add more whenever you like.
@@ -137,20 +141,21 @@ Drop one into the page. Same ladder, same destination; only the ingestion differ
 
 ### What differs — step 2 only
 
-| Block | 2a — NRS | 2b — Clover | 2c — Portal |
+| Block | 2a — File | 2b — POS API | 2c — Manual |
 | --- | --- | --- | --- |
-| Ingestion | CSV export + upload | API connect | manual entry |
+| Ingestion | CSV export + upload | OAuth connect + sync | manual entry |
 | Effort | ~2 min, every business day | ~5 min, once | ~20 min to start, then incremental |
 | Freshness line | "reflects your latest upload" | "updates itself from your register" | "as current as your last edit" |
 | Failure mode | the routine lapses → data goes stale | the connection breaks → **silently** stops syncing | the catalog never gets populated |
 | Merchant gives up | a file | an access grant | time, once |
-| External dependency | NRS portal export | Clover OAuth | **none** |
+| External dependency | the POS export | the POS vendor's OAuth | **none** |
+| Members | NRS pricebook, any CSV export | Clover, Square *(NRS API later)* | sheet, quick count |
 
-**Clover's packet is the stronger pitch and the weaker control.** No daily ritual is the single best thing you can say to a seven-day grocery owner — it removes the compliance risk that makes the NRS path fragile. But a broken connection fails silently, where a missed upload at least leaves a timestamp. So the Clover pilot needs the connection-health check, not just the staleness cutoff (§13), and the read-back must report last-sync age the same way.
+**The API path is the stronger pitch and the weaker control.** No daily ritual is the single best thing you can say to a seven-day grocery owner — it removes the compliance risk that makes the file path fragile. But a broken connection fails silently, where a missed upload at least leaves a timestamp. So the API pilot needs the connection-health check, not just the staleness cutoff (§13), and the read-back must report last-sync age the same way.
 
-**Before printing a Clover packet, run the Clover kill test:** the merchant's Clover account must hold **item-level inventory with quantities**, not payments only. A merchant who runs Clover for card processing and types prices at the register has no catalog to sync, and the packet is a promise you cannot keep.
+**Before printing an API-path packet, run the connector kill test:** the merchant's POS account must hold **item-level inventory with quantities**, not payments only. A merchant who runs the register for card processing and keys prices at the till has no catalog to sync, and the packet is a promise you cannot keep. Run it per member — Clover and Square differ in inventory depth.
 
-### Clover access — what the merchant actually does
+### POS API access — what the merchant actually does
 
 **Yes, they log in to Clover — once, to approve.** It is an OAuth grant (`/oauth/authorize` → `/oauth/token`), not a dashboard workflow. After approval the platform reads inventory through `api.clover.com` with the stored token, and the merchant never opens the dashboard for this again.
 
@@ -242,6 +247,10 @@ The envelope is a **social device, not a security control.** It exists so the st
   hours, your category and your 54 reviews at 4.9 stars —
   the way a shopper sees you before they walk in.
 
+  Claim it and that page becomes yours: your own web
+  address to put on Google, Facebook or Yelp — or on a QR
+  code at the counter.
+
 
   One thing it does not show: what is on your shelves.
 
@@ -258,12 +267,13 @@ The envelope is a **social device, not a security control.** It exists so the st
 
 
         1. Claim the page            ~2 min
-        2. Send us your pricebook    ~2 min, daily
-        3. Products on Google        we do the rest
+        2. Connect your inventory    ~2 min, daily
+        3. See it live               we do the rest
 
 
-  Step three is the point: someone nearby searching for
-  Akabanga finds your store — not Walmart.
+  Step three is the point: Akabanga shows on your page
+  within the hour, then on Google — so someone nearby
+  searching for it finds your store, not Walmart.
 
 
   Log in at nrsplus.com  →  Pricebook  →  Excel Download,
