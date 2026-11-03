@@ -4,25 +4,17 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ShelfShader } from "./ShelfShader";
 
-// The rotation is the ladder, in order — find, claim, connect, then the Google
-// surface. Generic promises ("make yourself found") describe a state the
-// visitor is not in yet; each beat here names the next thing they do.
-//
-// Beat one says "Find", not "Claim": a seeded retailer claims, but one we have
-// never scanned has nothing to claim, and /directory carries both paths (claim
-// the listing we built, or add the business). "Find" is true for either.
-//
-// Claim gets its own beat because that is the moment the page becomes the
-// merchant's. The two "Your products on…" beats are deliberately parallel:
-// the merchant's own website and Google are peer visibility surfaces, and
-// both only become real after connect. Ending on Google alone would rank
-// rented distribution above the one surface they own.
+// The H1 sets the subject — products. Every beat below is a predicate on that
+// same subject, carried by pronouns ("they", "them"), so the rotation reads as
+// one sentence unfolding rather than five unrelated headlines. The earlier
+// version switched subjects on beats 1–3 (page, "it", inventory), which is
+// what made it feel jumpy against a governing subject.
 const CAPABILITIES = [
-  "Find your page.",
-  "Claim it — it's yours.",
-  "Connect your inventory.",
-  "Your products on your website.",
-  "Your products on Google.",
+  "Find the page they live on.",
+  "Claim it — and they're yours.",
+  "Connect them in minutes.",
+  "On your own website.",
+  "On Google.",
 ];
 
 const BASE_TEXT = "Make your products visible.";
