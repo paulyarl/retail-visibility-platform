@@ -260,6 +260,15 @@ export default function StoreDetailClient({
     listing.zipCode,
   ].filter(Boolean).join(', ');
 
+  // §18 — the resolved ladder (custom → subdomain → platform path) is the
+  // default destination. The merchant's own website wins only when they have
+  // opted in AND have no products of their own to show here; a merchant with a
+  // catalog is better served by the surface that carries it.
+  const websiteHref =
+    actualProductCount > 0 || !(listing as any).useCustomWebsite || !(listing as any).website
+      ? storefrontHomeUrl
+      : ((listing as any).website as string);
+
   // Use NEXT_PUBLIC_ prefixed var for client-side access, fallback to window.location.origin
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : process.env.WEB_URL) || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/${identifier}`;
@@ -321,6 +330,19 @@ export default function StoreDetailClient({
           />
           <DirectoryEntryEditorialLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {websiteHref && (
+              <div>
+                <a
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <Globe className="w-4 h-4" />
+                  Visit website
+                </a>
+              </div>
+            )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
@@ -344,6 +366,19 @@ export default function StoreDetailClient({
           />
           <DirectoryEntryImmersiveLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {websiteHref && (
+              <div>
+                <a
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <Globe className="w-4 h-4" />
+                  Visit website
+                </a>
+              </div>
+            )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
@@ -367,6 +402,19 @@ export default function StoreDetailClient({
           />
           <DirectoryEntryPremiumLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {websiteHref && (
+              <div>
+                <a
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <Globe className="w-4 h-4" />
+                  Visit website
+                </a>
+              </div>
+            )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
@@ -391,6 +439,19 @@ export default function StoreDetailClient({
           />
           <DirectoryEntryClassicLayout {...layoutProps} />
           <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            {websiteHref && (
+              <div>
+                <a
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <Globe className="w-4 h-4" />
+                  Visit website
+                </a>
+              </div>
+            )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
             <GbpPhotoGallerySection slug={identifier} />
