@@ -40,10 +40,10 @@ export default function PlatformSummaryBand() {
           Search and Shopping reach searchers you would never have met.
         </p>
         <p className="text-base sm:text-lg text-neutral-600 mb-4 sm:mb-5 leading-relaxed">
-          Every one of those surfaces ends in the same place. Your site, Google Shopping and Maps
-          all point the shopper at one thing: your counter — deposits, pickup, delivery, or full
-          online payment, all run straight off your shelves. Your store is the fulfillment center,
-          and it always was.
+          Every one of those surfaces ends in the same place. Your website, Google Shopping and Maps
+          all point the shopper at one thing: your counter — deposits, pickup, delivery, shipping,
+          or full online payment, all run straight off your shelves. Your store is the fulfillment
+          center, and it always was.
         </p>
         <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
           The store that was off the map gets found, and the product that was hidden on your shelf

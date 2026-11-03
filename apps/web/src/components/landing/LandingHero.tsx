@@ -212,7 +212,7 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
           <p className="text-gray-300/90 mt-4 sm:mt-6 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
             We build pages from public records — address, hours, reviews. Find yours and claim it,
             or add it if we&apos;re missing you. Then connect your inventory and your products show
-            up on your own site and on Google — before a shopper drives to the supermarket.
+            up on your own website and on Google — before a shopper drives to the supermarket.
           </p>
 
           {/* CTA buttons — claim is the primary top-of-funnel action */}
