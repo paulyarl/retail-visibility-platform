@@ -238,29 +238,83 @@ router.get("/public/tenant/:tenant_id", async (req, res) => {
 });
 
 // GET /tenant/:tenant_id/swis/preview
+// Contract: SwisPreviewItem {id, sku, title, price, currency, image_url,
+// availability, updated_at, brand?, categoryPath?, badges?} +
+// {items, total, page, limit, hasMore} (spec §7.3 response shape).
 router.get("/tenant/:tenant_id/swis/preview", async (req, res) => {
   try {
     const { tenant_id } = req.params;
-    const limit = parseInt(req.query.limit as string) || 12;
+    const rawLimit = parseInt(req.query.limit as string);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 24) : 12;
+    const rawPage = parseInt(req.query.page as string);
+    const page = Number.isFinite(rawPage) ? Math.max(rawPage, 1) : 1;
 
-    const items = await prisma.inventory_items.findMany({
-      where: {
-        tenant_id,
-        item_status: 'active',
-        visibility: 'public'
-      },
-      orderBy: { created_at: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        image_url: true,
-        sku: true,
+    const orderBy = (() => {
+      switch (String(req.query.sort || '')) {
+        case 'price_asc': return { price: 'asc' as const };
+        case 'price_desc': return { price: 'desc' as const };
+        case 'alpha_asc': return { name: 'asc' as const };
+        case 'updated_desc': return { updated_at: 'desc' as const };
+        default: return { created_at: 'desc' as const };
       }
-    });
+    })();
 
-    res.json({ items, total: items.length });
+    const where: any = {
+      tenant_id,
+      item_status: 'active',
+      visibility: 'public'
+    };
+
+    const [rows, total] = await Promise.all([
+      prisma.inventory_items.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          image_url: true,
+          sku: true,
+          brand: true,
+          category_path: true,
+          stock: true,
+          updated_at: true,
+        }
+      }),
+      prisma.inventory_items.count({ where }),
+    ]);
+
+    // Badges share the featured_products source used by the feed mapping
+    const badges = rows.length
+      ? await prisma.featured_products.findMany({
+          where: { inventory_item_id: { in: rows.map(r => r.id) }, is_active: true },
+          select: { inventory_item_id: true, featured_type: true },
+        })
+      : [];
+    const badgesByItem = new Map<string, string[]>();
+    for (const b of badges) {
+      const arr = badgesByItem.get(b.inventory_item_id) || [];
+      arr.push(b.featured_type);
+      badgesByItem.set(b.inventory_item_id, arr);
+    }
+
+    const items = rows.map(r => ({
+      id: r.id,
+      sku: r.sku,
+      title: r.name,
+      price: r.price,
+      currency: 'USD',
+      image_url: r.image_url,
+      availability: (r.stock ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
+      updated_at: r.updated_at,
+      brand: r.brand || undefined,
+      categoryPath: r.category_path || undefined,
+      badges: badgesByItem.get(r.id),
+    }));
+
+    res.json({ items, total, page, limit, hasMore: (page - 1) * limit + items.length < total });
   } catch (error) {
     logger.error('[GET /tenant/:tenant_id/swis/preview] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_swis_preview" });

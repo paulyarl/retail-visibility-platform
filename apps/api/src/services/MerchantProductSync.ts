@@ -447,7 +447,7 @@ export async function deleteFromMerchant(tenantId: string, itemId: string): Prom
 
     const item = await prisma.inventory_items.findUnique({
       where: { id: itemId },
-      select: { sku: true },
+      select: { sku: true, swis_listed: true },
     });
     if (!item) return { success: false, productId: itemId, offerId: '', error: 'Item not found' };
 
@@ -468,6 +468,25 @@ export async function deleteFromMerchant(tenantId: string, itemId: string): Prom
       } catch (err: any) {
         firstError = firstError || err?.message;
         logger.error(`[MerchantProductSync] Delete ${offerId} failed:`, undefined, { error: { name: err?.name || 'Error', message: err?.message || String(err), stack: err?.stack } });
+      }
+    }
+
+    // SWIS-selected items also drop their local inventory instances — an
+    // eligibility loss is a full removal, not an online-only one (spec §6.5).
+    if (item.swis_listed) {
+      const link = await prisma.google_merchant_links_list.findFirst({
+        where: { is_active: true, google_oauth_accounts_list: { tenant_id: tenantId } },
+        select: { store_code: true },
+      });
+      if (link?.store_code) {
+        for (const offerId of offerIds) {
+          try {
+            await deleteLocalInventory(ctx.token, ctx.merchantId, offerId, link.store_code, CONTENT_LANGUAGE, FEED_LABEL);
+          } catch (err: any) {
+            firstError = firstError || err?.message;
+            logger.error(`[MerchantProductSync] Local inventory delete ${offerId} failed:`, undefined, { error: { name: err?.name || 'Error', message: err?.message || String(err), stack: err?.stack } });
+          }
+        }
       }
     }
 
@@ -501,7 +520,7 @@ export async function upsertLocalInventoryForItem(
 
     const item = await prisma.inventory_items.findUnique({
       where: { id: itemId },
-      select: { sku: true, price_cents: true, sale_price_cents: true, stock_quantity: true },
+      select: { sku: true, price_cents: true, sale_price_cents: true, stock: true },
     });
     if (!item) return { success: false, productId: itemId, offerId: '', error: 'Item not found' };
 
@@ -509,8 +528,8 @@ export async function upsertLocalInventoryForItem(
     const inventory: LocalInventoryInput = {
       storeCode,
       price: { amountMicros: toMicros(item.price_cents), currencyCode: CURRENCY },
-      availability: mapAvailability(item.stock_quantity) === 'in_stock' ? 'IN_STOCK' : 'OUT_OF_STOCK',
-      quantity: Math.max(0, item.stock_quantity ?? 0),
+      availability: mapAvailability(item.stock) === 'in_stock' ? 'IN_STOCK' : 'OUT_OF_STOCK',
+      quantity: Math.max(0, item.stock ?? 0),
     };
     if (item.sale_price_cents != null && item.sale_price_cents < (item.price_cents ?? 0)) {
       inventory.salePrice = { amountMicros: toMicros(item.sale_price_cents), currencyCode: CURRENCY };

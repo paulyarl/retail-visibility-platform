@@ -1646,6 +1646,18 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     console.log('[PUT /items/:id] Final update data:', JSON.stringify(updateData));
 
     const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+    // Snapshot pre-update eligibility (spec §6.5 — the unified GMC feed filter)
+    const gmcEligible = (r: any) =>
+      r?.item_status === 'active' &&
+      r?.visibility === 'public' &&
+      ['physical', 'hybrid'].includes(r?.product_type);
+    const prevItem = await prisma.inventory_items.findUnique({
+      where: { id: itemId },
+      select: { item_status: true, visibility: true, product_type: true },
+    });
+    const wasEligible = gmcEligible(prevItem);
+
     const updated = await prisma.inventory_items.update({
       where: { id: itemId },
       data: updateData,
@@ -1653,6 +1665,28 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 
     if (!updated) {
       return res.status(400).json({ error: 'item_not_found' });
+    }
+
+    // Eligibility transitions → GMC removal / re-feed (fire-and-forget, same
+    // pattern as the trash/purge hooks). Loss covers item_status→inactive|
+    // archived|trashed, visibility→private, product_type off the syncable set.
+    const nowEligible = gmcEligible(updated);
+    if (wasEligible && !nowEligible) {
+      import('../services/MerchantProductSync').then(({ deleteFromMerchant }) => {
+        deleteFromMerchant(updated.tenant_id, itemId)
+          .then((result: any) => {
+            console.log(`[PUT /items/:id] GMC eligibility-loss removal for ${itemId}: ${result.success ? 'success' : 'failed - ' + result.error}`);
+          })
+          .catch((err: any) => console.error(`[PUT /items/:id] GMC removal failed for ${itemId}:`, err));
+      }).catch((err: any) => console.error('[PUT /items/:id] Failed to load MerchantProductSync:', err));
+    } else if (!wasEligible && nowEligible) {
+      import('../services/MerchantProductSync').then(({ syncProductToMerchant }) => {
+        syncProductToMerchant(updated.tenant_id, itemId)
+          .then((result: any) => {
+            console.log(`[PUT /items/:id] GMC re-feed for ${itemId}: ${result.success ? 'success' : 'failed - ' + result.error}`);
+          })
+          .catch((err: any) => console.error(`[PUT /items/:id] GMC re-feed failed for ${itemId}:`, err));
+      }).catch((err: any) => console.error('[PUT /items/:id] Failed to load MerchantProductSync:', err));
     }
 
     // Sync variants with parent item status
