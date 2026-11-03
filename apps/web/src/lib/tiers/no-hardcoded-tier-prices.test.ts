@@ -55,6 +55,8 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('tier price contract', () => {
+  // I/O bound: reads every .ts/.tsx under src. Vitest's 5s default is tight
+  // when the full suite is running in parallel, so give the walk room.
   it('has no hardcoded $NN/mo tier prices outside the known-debt ledger', () => {
     const offenders: string[] = [];
 
@@ -70,7 +72,7 @@ describe('tier price contract', () => {
     }
 
     expect(offenders).toEqual([]);
-  });
+  }, 60_000);
 
   it('keeps the known-debt ledger honest — every entry still has a literal to burn down', () => {
     const stale = [...KNOWN_DEBT].filter((rel) => {
