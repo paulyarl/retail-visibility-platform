@@ -799,6 +799,28 @@ function Home({ introRendered }: { introRendered: boolean }) {
                   </div>
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Already listed? It&apos;s yours</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">We seed the directory from public business info — claim your listing free in about two minutes</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Connect your inventory</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync from your register, upload a pricebook, or add twenty items by hand — your real shelves, not a placeholder</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
                       <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
                         <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -810,17 +832,6 @@ function Home({ introRendered }: { introRendered: boolean }) {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
-                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Already listed? It's yours</p>
-                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">We seed the directory from public business info — claim your listing free in about two minutes</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
                       <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
                         <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -828,7 +839,7 @@ function Home({ introRendered }: { introRendered: boolean }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-neutral-900 text-sm sm:text-base">Sell on your terms</p>
-                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Deposits, pickup, delivery, or full online checkout — switch it on when you're ready</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Deposits, pickup, delivery, or full online checkout — switch it on when you&apos;re ready</p>
                       </div>
                     </div>
                   </div>

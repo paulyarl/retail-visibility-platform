@@ -28,7 +28,6 @@ const KNOWN_DEBT = new Set([
   'lib/tiers.ts', // duplicate tier library — consolidate into lib/tiers/tier-features.ts
   'components/tiers/TierComparisonTable.tsx', // own price map
   'components/FeaturesSlider.tsx', // own price map
-  'components/dashboard/WhatYouCanDo.tsx', // carries a phantom $49 upgrade price
   'app/(platform)/settings/admin/demo-tenants/page.tsx',
   'app/(platform)/settings/admin/tier-system/page.tsx',
 ]);

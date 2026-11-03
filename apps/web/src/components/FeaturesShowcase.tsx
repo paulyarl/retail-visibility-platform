@@ -38,11 +38,11 @@ const businessJourney = [
   },
   {
     id: 'presence',
-    icon: '�',
+    icon: '🛍️',
     mode: 'commerce',
     surface: 'Platform storefront + checkout',
     title: 'Sell with deposit checkout',
-    description: 'An all-purpose storefront for your store and your products, with deposit checkout built in. Full online payment stays an add-on for when you want it.',
+    description: 'Connect your inventory and it fills in: an all-purpose storefront for your store and your products, with deposit checkout built in. Full online payment stays an add-on for when you want it.',
     subtext: 'Commerce mode — the deposit-commerce surface of the triad.',
     gradient: 'from-teal-500 to-cyan-600',
     badge: 'Storefront',
@@ -57,7 +57,7 @@ const businessJourney = [
     mode: 'google',
     surface: 'Third-party (Google)',
     title: 'Put your products on Google',
-    description: 'Your catalog goes to Search, Shopping and Maps, so a searcher finds the product before they find a competitor.',
+    description: 'Connect your inventory once and your catalog goes to Search, Shopping and Maps, so a searcher finds the product before they find a competitor.',
     subtext: 'SWIS mode — products to Google, no hosted storefront.',
     gradient: 'from-blue-500 to-indigo-600',
     badge: 'SWIS',
@@ -71,7 +71,7 @@ const businessJourney = [
     mode: 'platform',
     surface: 'Platform in-house marketplace',
     title: 'Showcase your full catalog',
-    description: 'A branded, browsable storefront inside the marketplace — browse, inquire, and connect.',
+    description: 'A branded, browsable storefront inside the marketplace — connect your inventory and shoppers can browse the whole catalog, inquire and contact you.',
     subtext: 'Platform mode — hosted catalog, no SWIS feed, no checkout.',
     gradient: 'from-indigo-500 to-purple-600',
     badge: 'Storefront+',
@@ -339,7 +339,7 @@ function TabsMode({ stages, className }: any) {
           <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
             Explore Your Growth Path
           </h3>
-          <p className="text-sm sm:text-base text-neutral-600">Click each tier to see the business model it unlocks</p>
+          <p className="text-sm sm:text-base text-neutral-600">Click each tier to see the business model it unlocks — all three presence surfaces start with connecting your inventory</p>
         </div>
 
         {/* Free gateway — the step before any tier */}

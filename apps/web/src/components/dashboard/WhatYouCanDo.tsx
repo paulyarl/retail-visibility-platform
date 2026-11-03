@@ -8,6 +8,7 @@ import {
   PLATFORM_PILLARS 
 } from "@/lib/features/feature-catalog";
 import { ResolvedTier } from "@/lib/tiers/tier-resolver";
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from "@/lib/tiers/tier-features";
 
 export interface WhatYouCanDoProps {
   tier: ResolvedTier;
@@ -306,10 +307,10 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h4 className="text-xl font-bold text-cyan-900">
-                    🚀 Add a Public Storefront? Upgrade to Starter
+                    🚀 Add a Public Storefront? Upgrade to {TIER_DISPLAY_NAMES.presence}
                   </h4>
                   <span className="px-2 py-0.5 bg-gradient-to-r from-cyan-200 to-blue-200 text-cyan-800 text-xs font-semibold rounded-full">
-                    $49/mo
+                    ${TIER_PRICING.presence}/mo
                   </span>
                 </div>
                 <p className="text-cyan-800 text-sm mb-4">
@@ -363,14 +364,14 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h4 className="text-xl font-bold text-blue-900">
-                    🚀 Ready to Go Live? Upgrade to Starter
+                    🚀 Ready to Go Live? Upgrade to {TIER_DISPLAY_NAMES.presence}
                   </h4>
                   <span className="px-2 py-0.5 bg-gradient-to-r from-blue-200 to-indigo-200 text-blue-800 text-xs font-semibold rounded-full">
-                    $49/mo
+                    ${TIER_PRICING.presence}/mo
                   </span>
                 </div>
                 <p className="text-blue-800 text-sm mb-4">
-                  Your trial ends soon! Upgrade to <strong>Starter</strong> to keep your storefront live and unlock more features.
+                  Your trial ends soon! Upgrade to <strong>{TIER_DISPLAY_NAMES.presence}</strong> to keep your storefront live and unlock more features.
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
@@ -423,7 +424,7 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
                     🚀 Level Up to Professional
                   </h4>
                   <span className="px-2 py-0.5 bg-gradient-to-r from-emerald-200 to-green-200 text-emerald-800 text-xs font-semibold rounded-full">
-                    $149/mo
+                    ${TIER_PRICING.professional}/mo
                   </span>
                 </div>
                 <p className="text-emerald-800 text-sm mb-4">

@@ -4,12 +4,17 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ShelfShader } from "./ShelfShader";
 
+// The rotation is the ladder, in order — find/claim, connect, then the Google
+// surface. Generic promises ("make yourself found") describe a state the
+// visitor is not in yet; each beat here names the next thing they do.
+//
+// Beat one says "Find", not "Claim": a seeded retailer claims, but one we have
+// never scanned has nothing to claim, and /directory carries both paths (claim
+// the listing we built, or add the business). "Find" is true for either.
 const CAPABILITIES = [
-  "Make yourself found.",
-  "Get found on Google.",
-  "Open your own storefront.",
-  "Sell online when you're ready.",
-  "Get found where shoppers look.",
+  "Find your page.",
+  "Connect your inventory.",
+  "Your products on Google.",
 ];
 
 const BASE_TEXT = "Make your products visible.";
@@ -205,9 +210,9 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
             <span className="inline-block w-[3px] h-[0.9em] ml-1 align-middle bg-white/70 animate-pulse" />
           </div>
           <p className="text-gray-300/90 mt-4 sm:mt-6 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
-            We list local shops from public info so shoppers can already find you — claim yours
-            and it becomes a full online presence: your storefront, your products, your tools,
-            your directory.
+            We build pages from public records — address, hours, reviews. Find yours and claim it,
+            or add it if we&apos;re missing you. Then connect your inventory and your products show
+            up on Google before a shopper drives to the supermarket.
           </p>
 
           {/* CTA buttons — claim is the primary top-of-funnel action */}
