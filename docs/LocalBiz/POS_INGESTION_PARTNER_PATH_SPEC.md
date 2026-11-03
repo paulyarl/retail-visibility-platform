@@ -74,6 +74,16 @@ Three rules that keep it honest:
 2. **EOD cadence ⇒ close-of-business stock** — local inventory shows what was on the shelf at close. Google's "in stock" carries that freshness honestly; don't oversell live.
 3. **Selection is still the merchant's** — the importer creates items as eligible candidates; `swis_listed` stays per-product opt-in via the ProductsTab checkboxes. Import ≠ auto-publish to Google.
 
+**Merchant how-to: getting the CSV (verified against NRS docs):**
+1. Log into the **NRS Merchant Portal** at `nrsplus.com` — portal-only; the register has no export
+2. **Pricebook** → **Excel Download** button (top-right) → Excel-friendly CSV, unfiltered for a full export
+3. File lands in Downloads → upload to the VisibleShelf import card
+
+Edge cases the mapper must cover:
+- **PLU items export without UPC/barcodes** (per NRS's label-printing doc) — key on SKU, fall back to PLU code or name; markets selling by weight/count hit this
+- **Price exports in cents** (`=D2/100` in their own formula) — divide by 100
+- Some analytics exports sit behind the **"Advanced Data"** premium feature — the pricebook download appears to be base-tier, but confirm on the pilot merchant's plan
+
 ## 7. The cascade — import activates the whole commerce stack
 
 The importer isn't a SWIS feeder — it's the **activation loader** for everything downstream. One upload lights three surfaces:
@@ -99,6 +109,12 @@ Not a website pitch, not a broken-profile repair, not a claim-seed pitch — all
 > "Your Clover already works. We connect it to Google so your shelves show 'in stock near you' on Google Maps. Small investment on your side, upside is new traffic + visibility on the surface only the chains had."
 
 The merchant keeps their hardware, keeps their workflow, spends maybe an hour on the checklist — and the result is *their* products where previously only big-box inventory appeared. No pain to diagnose, no defect to sell against — just a capability they never had.
+
+**Pioneer terms (decided 2026-11-03):**
+- **Pilot terms:** free for a fixed term, then negotiate — no preset post-pilot price; conversion conversation at term end
+- **Exclusivity:** non-exclusive, any category — no category/metro locks; keeps every option open
+- **Publicity:** name + metrics only — the store's name and results numbers are shareable, no photos or direct quotes without separate permission
+- **Exit:** full data removal + Google delisting — on termination, their products come off Google and catalog data is deleted (the delete path already exists: `deleteFromMerchant` + item removal)
 
 **Sequencing — proof before permission:**
 
