@@ -1019,4 +1019,154 @@ router.get('/google/merchant/product-sync-status', authenticateToken, checkTenan
   }
 });
 
+/**
+ * SWIS readiness — ordered prerequisite chain for the local surface (spec §6.2)
+ * GET /google/merchant/swis-readiness?tenantId=
+ */
+router.get('/google/merchant/swis-readiness', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const tenantId = (req.query.tenantId || req.query.tenant_id) as string;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'missing_tenantId', message: 'tenantId is required' });
+    }
+    const { evaluateSwisReadiness } = await import('../lib/google/swis-readiness');
+    const readiness = await evaluateSwisReadiness(tenantId);
+    res.json({ success: true, data: readiness });
+  } catch (error) {
+    logger.error('[SWIS Readiness] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'readiness_failed' });
+  }
+});
+
+/**
+ * Checklist confirmations — the console-only steps a merchant reports back
+ * (spec §7.1). All fields optional; only provided keys are written.
+ * PATCH /google/merchant/swis-setup { tenantId, gbpAccountUrl?, freeListingsEnabled?, storeCode?, swisEnabled? }
+ */
+router.patch('/google/merchant/swis-setup', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId, gbpAccountUrl, freeListingsEnabled, storeCode, swisEnabled } = req.body || {};
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ success: false, error: 'missing_tenantId', message: 'tenantId is required' });
+    }
+
+    const link = await prisma.google_merchant_links_list.findFirst({
+      where: { is_active: true, google_oauth_accounts_list: { tenant_id: tenantId } },
+      select: { id: true },
+    });
+    if (!link) {
+      return res.status(404).json({ success: false, error: 'no_merchant_link', message: 'No active merchant link' });
+    }
+
+    const data: Record<string, unknown> = { updated_at: new Date() };
+    if (gbpAccountUrl !== undefined) data.gbp_account_url = gbpAccountUrl;
+    if (freeListingsEnabled !== undefined) data.free_listings_enabled = !!freeListingsEnabled;
+    if (storeCode !== undefined) data.store_code = storeCode || null;
+    if (swisEnabled !== undefined) data.swis_enabled = !!swisEnabled;
+
+    await prisma.google_merchant_links_list.update({ where: { id: link.id }, data });
+
+    const { evaluateSwisReadiness } = await import('../lib/google/swis-readiness');
+    res.json({ success: true, data: await evaluateSwisReadiness(tenantId) });
+  } catch (error) {
+    logger.error('[SWIS Setup] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'swis_setup_failed' });
+  }
+});
+
+/**
+ * Per-product state management (spec §7.3): surface flags + item status flip.
+ * Writes the flag, then runs the matching sync/delete path:
+ *   - swis_listed true            → local inventory upsert (if ready)
+ *   - swis_listed false           → localInventories delete
+ *   - google_online_excluded true → deleteFromMerchant (eligibility-loss path)
+ *   - item_status→non-active      → deleteFromMerchant (same path)
+ * First swis_listed selection auto-flips link.swis_enabled (spec §7.3).
+ * PATCH /google/merchant/product-surfaces/:itemId { tenantId, swisListed?, googleOnlineExcluded?, itemStatus? }
+ */
+router.patch('/google/merchant/product-surfaces/:itemId', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { tenantId, swisListed, googleOnlineExcluded, itemStatus } = req.body || {};
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ success: false, error: 'missing_tenantId', message: 'tenantId is required' });
+    }
+
+    const item = await prisma.inventory_items.findFirst({
+      where: { id: itemId, tenant_id: tenantId },
+      select: { id: true, item_status: true },
+    });
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'item_not_found', message: 'Item not found for this tenant' });
+    }
+
+    const updates: Record<string, unknown> = { updated_at: new Date() };
+    if (swisListed !== undefined) updates.swis_listed = !!swisListed;
+    if (googleOnlineExcluded !== undefined) updates.google_online_excluded = !!googleOnlineExcluded;
+    if (itemStatus !== undefined && ['active', 'inactive'].includes(itemStatus)) updates.item_status = itemStatus;
+    if (Object.keys(updates).length > 1) {
+      await prisma.inventory_items.update({ where: { id: itemId }, data: updates });
+    }
+
+    // First selection auto-enables SWIS on the link (deny-by-default still
+    // holds per product — this only unlocks the account-level gate).
+    if (swisListed === true) {
+      await prisma.google_merchant_links_list.updateMany({
+        where: { swis_enabled: false, is_active: true, google_oauth_accounts_list: { tenant_id: tenantId } },
+        data: { swis_enabled: true, updated_at: new Date() },
+      });
+    }
+
+    const results: Record<string, unknown> = {};
+
+    if (swisListed === true) {
+      const { evaluateSwisReadiness } = await import('../lib/google/swis-readiness');
+      const readiness = await evaluateSwisReadiness(tenantId);
+      if (readiness.state === 'ready' && readiness.storeCode) {
+        const { upsertLocalInventoryForItem } = await import('../services/MerchantProductSync');
+        results.local = await upsertLocalInventoryForItem(tenantId, itemId, readiness.storeCode);
+      } else {
+        results.local = { success: false, error: `not_ready:${readiness.state}` };
+      }
+    } else if (swisListed === false) {
+      const link = await prisma.google_merchant_links_list.findFirst({
+        where: { is_active: true, google_oauth_accounts_list: { tenant_id: tenantId } },
+        select: { store_code: true },
+      });
+      if (link?.store_code) {
+        const { deleteLocalInventoryForItem } = await import('../services/MerchantProductSync');
+        results.localRemoved = await deleteLocalInventoryForItem(tenantId, itemId, link.store_code);
+      }
+    }
+
+    // Eligibility-loss removals — online delete (parent + variants + local)
+    if (googleOnlineExcluded === true || (itemStatus !== undefined && itemStatus !== 'active')) {
+      const { deleteFromMerchant } = await import('../services/MerchantProductSync');
+      results.onlineRemoved = await deleteFromMerchant(tenantId, itemId);
+      if (googleOnlineExcluded !== true && updates.item_status) {
+        // inactive flip also drops local inventory
+        const link = await prisma.google_merchant_links_list.findFirst({
+          where: { is_active: true, google_oauth_accounts_list: { tenant_id: tenantId } },
+          select: { store_code: true },
+        });
+        if (link?.store_code) {
+          const { deleteLocalInventoryForItem } = await import('../services/MerchantProductSync');
+          results.localRemoved = await deleteLocalInventoryForItem(tenantId, itemId, link.store_code);
+        }
+      }
+    }
+
+    // Re-inclusion / reactivation re-feeds via the normal path
+    if (googleOnlineExcluded === false || itemStatus === 'active') {
+      const { syncProductToMerchant } = await import('../services/MerchantProductSync');
+      results.online = await syncProductToMerchant(tenantId, itemId);
+    }
+
+    res.json({ success: true, data: results });
+  } catch (error) {
+    logger.error('[Product Surfaces] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'product_surfaces_failed' });
+  }
+});
+
 export default router;

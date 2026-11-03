@@ -88,6 +88,9 @@ interface MerchantSettings {
   fulfillmentMode?: string;
   pickupMethod?: string;
   pickupSla?: string;
+  /** spec §6.4: merchant opted in to broadcasting in-store stock */
+  swisEnabled?: boolean;
+  storeCode?: string;
 }
 
 /**
@@ -188,12 +191,14 @@ export function convertToProductInput(
 async function getMerchantSettings(tenantId: string): Promise<MerchantSettings> {
   const merchantLink = await prisma.google_merchant_links_list.findFirst({
     where: { is_active: true, google_oauth_accounts_list: { tenant_id: tenantId } },
-    select: { fulfillment_mode: true, pickup_only: true, pickup_method: true, pickup_sla: true },
+    select: { fulfillment_mode: true, pickup_only: true, pickup_method: true, pickup_sla: true, swis_enabled: true, store_code: true },
   });
   return {
     fulfillmentMode: merchantLink?.fulfillment_mode || (merchantLink?.pickup_only ? 'pickup_only' : 'standard'),
     pickupMethod: merchantLink?.pickup_method || undefined,
     pickupSla: merchantLink?.pickup_sla || undefined,
+    swisEnabled: merchantLink?.swis_enabled ?? false,
+    storeCode: merchantLink?.store_code || undefined,
   };
 }
 
@@ -208,25 +213,56 @@ async function resolveWebsiteUrl(tenantId: string): Promise<string | null> {
 }
 
 async function markItemSync(itemId: string, ok: boolean, error?: string): Promise<void> {
-  const item = await prisma.inventory_items.findUnique({ where: { id: itemId }, select: { metadata: true } });
+  const item = await prisma.inventory_items.findUnique({ where: { id: itemId }, select: { metadata: true, sku: true } });
   const metadata = { ...(item?.metadata as any || {}) };
   if (ok) {
     metadata.gmc_sync_error = null;
+    metadata.gmc_item_id = item?.sku || itemId;
   } else {
     metadata.gmc_sync_error = error || 'unknown_error';
   }
+  const now = new Date();
   await prisma.inventory_items.update({
     where: { id: itemId },
     data: {
       sync_status: ok ? 'success' : 'error',
-      synced_at: ok ? new Date() : null,
+      synced_at: ok ? now : null,
       metadata,
-      updated_at: new Date(),
+      updated_at: now,
     } as any,
   });
+
+  // Durable per-destination state (spec §6.5) — the retry job sweeps this,
+  // not the item row. Product-level rows carry product_variant_id NULL.
+  const stateId = `sync_${itemId}_online`;
+  const existing = await prisma.gmc_item_sync_state.findUnique({ where: { id: stateId } });
+  if (existing) {
+    await prisma.gmc_item_sync_state.update({
+      where: { id: stateId },
+      data: ok
+        ? { status: 'synced', last_synced_at: now, last_attempt_at: now, last_error: null, retry_count: 0, updated_at: now }
+        : { status: 'error', last_error: error || 'unknown_error', last_error_at: now, last_attempt_at: now, retry_count: { increment: 1 }, updated_at: now },
+    });
+  } else {
+    await prisma.gmc_item_sync_state.create({
+      data: {
+        id: stateId,
+        inventory_item_id: itemId,
+        destination: 'online',
+        google_id: item?.sku || itemId,
+        status: ok ? 'synced' : 'error',
+        last_error: ok ? null : (error || 'unknown_error'),
+        last_error_at: ok ? null : now,
+        retry_count: ok ? 0 : 1,
+        last_attempt_at: now,
+        last_synced_at: ok ? now : null,
+      },
+    });
+  }
 }
 
 async function syncOneItem(
+  tenantId: string,
   ctx: MerchantContext,
   dataSource: string,
   websiteUrl: string,
@@ -239,9 +275,12 @@ async function syncOneItem(
     take: 100,
   });
 
+  // spec §6.4: the local destination is per-product selection + account opt-in
+  const localActive = !!item.swis_listed && !!settings.swisEnabled && !!settings.storeCode;
+
   const inputs = [
-    convertToProductInput(item, websiteUrl, { ...settings, localDestinations: false }),
-    ...variants.map(v => convertToProductInput(item, websiteUrl, { ...settings, variant: v, localDestinations: false })),
+    convertToProductInput(item, websiteUrl, { ...settings, localDestinations: localActive }),
+    ...variants.map(v => convertToProductInput(item, websiteUrl, { ...settings, variant: v, localDestinations: localActive })),
   ];
 
   let variantsSynced = 0;
@@ -258,6 +297,13 @@ async function syncOneItem(
       variantsFailed++;
       logger.error(`[MerchantProductSync] Variant ${(input as any).offerId} failed:`, undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
     }
+  }
+
+  // Local inventory upsert for SWIS-selected items — per storeCode, parent
+  // offer only in v1 (variant local inventory uses the same path with the
+  // variant offerId; scheduled for the multi-offer pass).
+  if (localActive) {
+    await upsertLocalInventoryForItem(tenantId, item.id, settings.storeCode!);
   }
 
   return { success: true, productId: item.id, offerId, product, variantsSynced, variantsFailed };
@@ -286,7 +332,7 @@ export async function syncProductToMerchant(tenantId: string, itemId: string): P
 
     const dataSource = await ensurePrimaryDataSource(ctx.token, ctx.merchantId, CONTENT_LANGUAGE, FEED_LABEL);
     const settings = await getMerchantSettings(tenantId);
-    const result = await syncOneItem(ctx, dataSource, websiteUrl, settings, item);
+    const result = await syncOneItem(tenantId, ctx, dataSource, websiteUrl, settings, item);
     await markItemSync(itemId, true);
     result.validationWarnings = validation.issues
       .filter(i => i.severity === 'warning')
@@ -314,6 +360,7 @@ export async function batchSyncToMerchant(tenantId: string, itemIds?: string[]):
       item_status: 'active',
       visibility: 'public',
       product_type: { in: [...GMC_SYNCABLE_PRODUCT_TYPES] },
+      google_online_excluded: { not: true },
     };
     if (itemIds?.length) whereClause.id = { in: itemIds };
 
@@ -361,9 +408,8 @@ export async function batchSyncToMerchant(tenantId: string, itemIds?: string[]):
           continue;
         }
 
-        // Attach pre-fetched variants so syncOneItem doesn't re-query
         try {
-          const result = await syncOneItem(ctx, dataSource, websiteUrl, settings, item);
+          const result = await syncOneItem(tenantId, ctx, dataSource, websiteUrl, settings, item);
           await markItemSync(item.id, true);
           results[i] = result;
         } catch (err: any) {

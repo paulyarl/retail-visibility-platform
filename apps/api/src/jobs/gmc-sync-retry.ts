@@ -2,8 +2,13 @@
  * GMC Sync Retry Job
  *
  * Retries failed product syncs for tenants with active GMC connections.
- * Runs every 2 hours. Uses exponential backoff (max 3 retries per item).
- * After max retries, marks item as 'permanent_error' and logs a notification.
+ * Runs every 2 hours. Exponential backoff (max 3 retries per item).
+ *
+ * Spec §6.5: state lives in gmc_item_sync_state (real retry_count /
+ * last_error_at columns — the old version read phantom fields and wrote an
+ * invalid 'permanent_error' enum value). Terminal state is 'exhausted';
+ * eligibility filters match the unified feed filter (active+public+syncable
+ * types) so non-feedable items stop being retried forever.
  */
 
 import { prisma } from '../prisma';
@@ -46,26 +51,29 @@ async function getConnectedTenants(): Promise<string[]> {
 }
 
 /**
- * Get failed items for a tenant that are eligible for retry.
- * Items with sync_status = 'error' and retry_count < MAX_RETRIES are eligible.
+ * Failed online-destination rows eligible for retry — joined to the item so
+ * the unified eligibility filter applies (active + public + feedable types +
+ * not online-excluded). Ineligible items are marked 'excluded', not retried.
  */
 async function getFailedItems(tenantId: string): Promise<any[]> {
   try {
-    const items = await prisma.inventory_items.findMany({
+    const rows = await prisma.gmc_item_sync_state.findMany({
       where: {
-        tenant_id: tenantId,
-        sync_status: 'error',
-        item_status: { not: 'trashed' },
-        visibility: 'public',
+        destination: 'online',
+        status: 'error',
+        retry_count: { lt: MAX_RETRIES },
+        inventory_items: {
+          tenant_id: tenantId,
+          item_status: 'active',
+          visibility: 'public',
+          product_type: { in: ['physical', 'hybrid'] },
+          google_online_excluded: { not: true },
+        },
       },
       take: 100,
+      orderBy: { last_error_at: 'asc' },
     });
-
-    // Filter by retry count stored in metadata
-    return items.filter(item => {
-      const retryCount = (item as any).sync_retry_count || 0;
-      return retryCount < MAX_RETRIES;
-    });
+    return rows;
   } catch (error) {
     logger.error(`[GMC Sync Retry] Error getting failed items for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
@@ -80,6 +88,62 @@ function shouldRetry(lastErrorAt: Date | null, retryCount: number): boolean {
   if (!lastErrorAt) return true;
   const backoffMs = Math.pow(2, retryCount) * 60 * 60 * 1000; // 1h, 2h, 4h
   return Date.now() - lastErrorAt.getTime() >= backoffMs;
+}
+
+async function markExhausted(stateId: string): Promise<void> {
+  await prisma.gmc_item_sync_state.update({
+    where: { id: stateId },
+    data: { status: 'exhausted', updated_at: new Date() },
+  });
+}
+
+async function runTenantRetries(tenantId: string): Promise<{ retried: number; succeeded: number; permanentlyFailed: number }> {
+  const allowed = await isGMCSyncAllowed(tenantId);
+  if (!allowed) return { retried: 0, succeeded: 0, permanentlyFailed: 0 };
+
+  const failedItems = await getFailedItems(tenantId);
+  const totals = { retried: 0, succeeded: 0, permanentlyFailed: 0 };
+
+  for (const row of failedItems) {
+    const retryCount = row.retry_count || 0;
+    const lastErrorAt = row.last_error_at ? new Date(row.last_error_at) : null;
+
+    if (!shouldRetry(lastErrorAt, retryCount)) {
+      continue;
+    }
+
+    totals.retried++;
+    console.log(`[GMC Sync Retry] Retrying item ${row.inventory_item_id} (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+
+    try {
+      const result = await syncProduct(tenantId, row.inventory_item_id);
+      // markItemSync inside syncProduct already writes the state row
+      if (result.success) {
+        totals.succeeded++;
+        console.log(`[GMC Sync Retry] Item ${row.inventory_item_id} synced successfully on retry ${retryCount + 1}`);
+      } else {
+        const newRetryCount = retryCount + 1;
+        logger.error(`[GMC Sync Retry] Item ${row.inventory_item_id} retry ${newRetryCount} failed: ${result.error}`, undefined);
+        if (newRetryCount >= MAX_RETRIES) {
+          await markExhausted(row.id);
+          totals.permanentlyFailed++;
+          console.log(`[GMC Sync Retry] Item ${row.inventory_item_id} marked exhausted after ${MAX_RETRIES} retries`);
+        }
+      }
+    } catch (syncError) {
+      logger.error(`[GMC Sync Retry] Exception retrying item ${row.inventory_item_id}:`, undefined, { error: { name: (syncError as any)?.name || 'Error', message: (syncError as any)?.message || String(syncError), stack: (syncError as any)?.stack } });
+      const newRetryCount = retryCount + 1;
+      if (newRetryCount >= MAX_RETRIES) {
+        await markExhausted(row.id);
+        totals.permanentlyFailed++;
+      }
+    }
+
+    // Small delay between items to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  return totals;
 }
 
 /**
@@ -104,86 +168,10 @@ async function runRetryCycle(): Promise<void> {
 
     for (const tenantId of tenantIds) {
       try {
-        const allowed = await isGMCSyncAllowed(tenantId);
-        if (!allowed) continue;
-
-        const failedItems = await getFailedItems(tenantId);
-        if (failedItems.length === 0) continue;
-
-        console.log(`[GMC Sync Retry] Tenant ${tenantId}: ${failedItems.length} items to retry`);
-
-        for (const item of failedItems) {
-          const retryCount = (item as any).sync_retry_count || 0;
-          const lastErrorAt = (item as any).sync_error_at ? new Date((item as any).sync_error_at) : null;
-
-          if (!shouldRetry(lastErrorAt, retryCount)) {
-            continue;
-          }
-
-          totalRetried++;
-          console.log(`[GMC Sync Retry] Retrying item ${item.id} (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-
-          try {
-            const result = await syncProduct(tenantId, item.id);
-
-            if (result.success) {
-              totalSucceeded++;
-              console.log(`[GMC Sync Retry] Item ${item.id} synced successfully on retry ${retryCount + 1}`);
-
-              // Clear retry count and error info on success
-              await prisma.inventory_items.update({
-                where: { id: item.id },
-                data: {
-                  sync_status: 'success',
-                  synced_at: new Date(),
-                  updated_at: new Date(),
-                } as any,
-              });
-            } else {
-              const newRetryCount = retryCount + 1;
-              logger.error(`[GMC Sync Retry] Item ${item.id} retry ${newRetryCount} failed: ${result.error}`, undefined);
-
-              if (newRetryCount >= MAX_RETRIES) {
-                // Mark as permanent error
-                await prisma.inventory_items.update({
-                  where: { id: item.id },
-                  data: {
-                    sync_status: 'permanent_error',
-                    updated_at: new Date(),
-                  } as any,
-                });
-                totalPermanentlyFailed++;
-                console.log(`[GMC Sync Retry] Item ${item.id} marked as permanent_error after ${MAX_RETRIES} retries`);
-              } else {
-                // Update retry count and error timestamp
-                await prisma.inventory_items.update({
-                  where: { id: item.id },
-                  data: {
-                    sync_status: 'error',
-                    updated_at: new Date(),
-                  } as any,
-                });
-              }
-            }
-          } catch (syncError) {
-            logger.error(`[GMC Sync Retry] Exception retrying item ${item.id}:`, undefined, { error: { name: (syncError as any)?.name || 'Error', message: (syncError as any)?.message || String(syncError), stack: (syncError as any)?.stack } });
-            const newRetryCount = retryCount + 1;
-
-            if (newRetryCount >= MAX_RETRIES) {
-              await prisma.inventory_items.update({
-                where: { id: item.id },
-                data: {
-                  sync_status: 'permanent_error',
-                  updated_at: new Date(),
-                } as any,
-              });
-              totalPermanentlyFailed++;
-            }
-          }
-
-          // Small delay between items to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+        const totals = await runTenantRetries(tenantId);
+        totalRetried += totals.retried;
+        totalSucceeded += totals.succeeded;
+        totalPermanentlyFailed += totals.permanentlyFailed;
       } catch (error) {
         logger.error(`[GMC Sync Retry] Error processing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
@@ -224,7 +212,6 @@ export function stopGMCSyncRetry(): void {
  * Manually trigger a retry cycle
  */
 export async function triggerManualRetry(): Promise<{ retried: number; succeeded: number; permanentlyFailed: number }> {
-  const startTime = Date.now();
   console.log('[GMC Sync Retry] Manual retry triggered');
 
   let totalRetried = 0;
@@ -235,50 +222,15 @@ export async function triggerManualRetry(): Promise<{ retried: number; succeeded
 
   for (const tenantId of tenantIds) {
     try {
-      const allowed = await isGMCSyncAllowed(tenantId);
-      if (!allowed) continue;
-
-      const failedItems = await getFailedItems(tenantId);
-
-      for (const item of failedItems) {
-        const retryCount = (item as any).sync_retry_count || 0;
-        totalRetried++;
-
-        try {
-          const result = await syncProduct(tenantId, item.id);
-          if (result.success) {
-            totalSucceeded++;
-            await prisma.inventory_items.update({
-              where: { id: item.id },
-              data: { sync_status: 'success', synced_at: new Date(), updated_at: new Date() } as any,
-            });
-          } else {
-            if (retryCount + 1 >= MAX_RETRIES) {
-              await prisma.inventory_items.update({
-                where: { id: item.id },
-                data: { sync_status: 'permanent_error', updated_at: new Date() } as any,
-              });
-              totalPermanentlyFailed++;
-            }
-          }
-        } catch {
-          if (retryCount + 1 >= MAX_RETRIES) {
-            await prisma.inventory_items.update({
-              where: { id: item.id },
-              data: { sync_status: 'permanent_error', updated_at: new Date() } as any,
-            });
-            totalPermanentlyFailed++;
-          }
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      const totals = await runTenantRetries(tenantId);
+      totalRetried += totals.retried;
+      totalSucceeded += totals.succeeded;
+      totalPermanentlyFailed += totals.permanentlyFailed;
     } catch (error) {
       logger.error(`[GMC Sync Retry] Manual retry error for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
-  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[GMC Sync Retry] Manual retry completed in ${duration}s`);
+  console.log('[GMC Sync Retry] Manual retry completed');
   return { retried: totalRetried, succeeded: totalSucceeded, permanentlyFailed: totalPermanentlyFailed };
 }
