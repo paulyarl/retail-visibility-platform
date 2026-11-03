@@ -610,3 +610,25 @@ The packet is a planned-visit instrument. An unplanned visit is a different job:
 **Never pitch staff on an unplanned visit.** With no artifact to hand over, the message has nothing to travel on — the §17.9 failure with fewer excuses.
 
 **The customer role is a real access strategy.** Shopping there weekly makes you a known face, and it is the one channel where the owner may open the conversation themselves. It is slow, it works, and it must be genuine: a faked customer in a tight community is a story that travels faster than any referral.
+
+---
+
+## 18. Listing website precedence
+
+A claimed listing's public "website" is a resolved address, not a raw field. Precedence, highest first — a merchant's own domain shadows everything below it:
+
+| # | Source | Condition |
+| --- | --- | --- |
+| 1 | **Custom domain** | tenant has one configured |
+| 2 | **Subdomain** | tenant has one provisioned |
+| 3 | **Platform path** `/tenant/{id}` | storefront enabled, or the tenant has products |
+| 4 | **External website** | `directory_listings_list.website` AND `use_custom_website` true |
+| — | **nothing** | unclaimed seed, or claimed with none of the above |
+
+**Unclaimed seeds never render a website.** An unclaimed seed's `website` is unvetted public data — on the Dreamcast listing that field resolves to an Indonesian gambling page. The rule is structural, not a judgement call: `/place/[slug]` serves unclaimed seeds and must not emit a website link; `/directory/[slug]` serves claimed listings and may.
+
+**Why the platform path outranks the external site:** the platform surface is the one that carries the catalog, hours and reviews, so a shopper who follows it sees more than they would on an external page. The merchant's own domain still wins when they have one, because that is theirs outright.
+
+**Reuse, do not re-derive.** Levels 1–3 are already implemented once: `buildStorefrontEntries` (`apps/api/src/lib/sitemap.ts:246`) resolves custom domain → subdomain → platform path from `{ baseUrl, apex, tenants: [{ tenantId, subdomain, customDomain }] }`, and the storefront sitemaps call it today. The listing contact block should call the same resolver and treat the external website as the fallback beneath it — otherwise the sitemap and the listing can disagree about where a merchant lives, which is a NAP-class inconsistency with a URL instead of a phone number.
+
+Note the entitlement layer is separate: `resolveStorefrontDomains` (`services/resolvers/StorefrontDomainsResolver.ts`) answers *which levels are allowed*; `buildStorefrontEntries` answers *which address this tenant actually has*. The contact block needs the second, not the first.

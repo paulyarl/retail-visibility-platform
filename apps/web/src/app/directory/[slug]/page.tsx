@@ -7,6 +7,7 @@ import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabili
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import { clientLogger } from '@/lib/client-logger';
+import { canonicalStorefrontHome } from '@/lib/storefront-routing';
 
 import StoreDetailClient, { StoreComingSoon } from './StoreDetailClient';
 
@@ -192,6 +193,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     dirEntryOptions,
     info,
     idResolvedBySlug,
+    canonical,
   ] = await Promise.all([
     publicTenantInfoService.getTenantLogoFromDiscovery(listing.tenantId).catch(() => null),
     getBusinessProfile(listing.tenantId),
@@ -205,7 +207,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     publicUnifiedCapabilityService.getDirectoryEntryOptionsState(listing.tenantId).catch(() => null),
     tenantPublicService.getPublicTenantInfo(listing.tenantId).catch(() => null),
     publicDirectoryService.resolveBySlug(identifier).catch(() => null),
+    tenantPublicService.getStorefrontCanonical(identifier).catch(() => null),
   ]);
+
+  // §18 precedence (custom → subdomain → platform path) is resolved by the
+  // single shared ladder, not re-derived here. The external website is the
+  // fallback beneath it and is applied in the layout only when the merchant
+  // has opted in AND has no products of their own to show.
+  const storefrontHomeUrl = canonicalStorefrontHome(canonical, identifier);
 
   return (
     <StoreDetailClient
@@ -223,6 +232,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
       faqFlags={faqOptionFlags}
       crmFlags={crmOptionFlags}
       directoryEntryOptions={dirEntryOptions}
+      storefrontHomeUrl={storefrontHomeUrl}
     />
   );
 }

@@ -173,6 +173,8 @@ interface StoreDetailClientProps {
   faqFlags: PublicFaqOptionsFlags | null;
   crmFlags: PublicCrmOptionsFlags | null;
   directoryEntryOptions: DirectoryEntryOptionsState | null;
+  /** §18 resolved listing website — custom → subdomain → platform path. */
+  storefrontHomeUrl?: string | null;
 }
 
 export default function StoreDetailClient({
@@ -190,6 +192,7 @@ export default function StoreDetailClient({
   faqFlags,
   crmFlags,
   directoryEntryOptions,
+  storefrontHomeUrl,
 }: StoreDetailClientProps) {
   const [layoutPreview, setLayoutPreview] = useState<DirectoryEntryLayoutKey | null>(null);
 
@@ -302,6 +305,7 @@ export default function StoreDetailClient({
     demoExpiresAt: tenantInfo?.demoExpiresAt,
     directoryEntryOptions,
     isStorefrontEnabled,
+    storefrontHomeUrl,
   };
 
   switch (effectiveLayout) {
