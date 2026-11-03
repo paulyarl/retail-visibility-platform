@@ -3,5 +3,5 @@
   "outputDirectory": ".next",
   "installCommand": "pnpm install --filter=web --filter=shared",
   "framework": "nextjs",
-  "ignoreCommand": "git -C \"$(git rev-parse --show-toplevel)\" diff ${VERCEL_GIT_PREVIOUS_SHA:-HEAD^} HEAD --quiet -- apps/web packages/shared shared pnpm-lock.yaml pnpm-workspace.yaml vercel.json"
+  "ignoreCommand": "bash \"$(git rev-parse --show-toplevel)/scripts/vercel-ignore.sh\""
 }
