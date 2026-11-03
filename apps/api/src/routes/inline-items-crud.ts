@@ -1687,6 +1687,24 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
           })
           .catch((err: any) => console.error(`[PUT /items/:id] GMC re-feed failed for ${itemId}:`, err));
       }).catch((err: any) => console.error('[PUT /items/:id] Failed to load MerchantProductSync:', err));
+    } else if (nowEligible && (updateData.stock !== undefined || updateData.price !== undefined || updateData.price_cents !== undefined)) {
+      // Stock/price delta on a feed-eligible item — re-input the product and,
+      // for SWIS-listed items, push the fresh local-inventory instance so
+      // Google's live availability stays honest between batch syncs.
+      import('../services/MerchantProductSync').then(async (m) => {
+        m.syncProductToMerchant(updated.tenant_id, itemId)
+          .catch((err: any) => console.error(`[PUT /items/:id] GMC re-input failed for ${itemId}:`, err));
+        if (updated.swis_listed) {
+          const link = await prisma.google_merchant_links_list.findFirst({
+            where: { is_active: true, google_oauth_accounts_list: { tenant_id: updated.tenant_id } },
+            select: { store_code: true },
+          });
+          if (link?.store_code) {
+            m.upsertLocalInventoryForItem(updated.tenant_id, itemId, link.store_code)
+              .catch((err: any) => console.error(`[PUT /items/:id] local inventory push failed for ${itemId}:`, err));
+          }
+        }
+      }).catch((err: any) => console.error('[PUT /items/:id] Failed to load MerchantProductSync:', err));
     }
 
     // Sync variants with parent item status

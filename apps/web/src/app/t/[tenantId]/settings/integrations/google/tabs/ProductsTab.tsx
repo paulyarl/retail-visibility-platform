@@ -432,6 +432,9 @@ export default function ProductsTab({
               ? 'In-store (SWIS) is almost live — select products below'
               : 'In-store (SWIS) setup — complete the checklist to unlock'}
           </p>
+          <p className="text-xs text-violet-700 dark:text-violet-300">
+            Requires a storefront address on your Google Business Profile — service-area-only profiles can&apos;t use in-store listings.
+          </p>
           <ul className="space-y-1.5">
             {(swisReadiness.steps || []).map((step: any) => (
               <li key={step.key} className="flex items-center gap-2 text-sm">
