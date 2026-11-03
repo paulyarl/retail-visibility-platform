@@ -39,12 +39,15 @@ jobs:
       - name: Run API unit tests (Vitest)
         # Dummy Supabase creds — service constructors throw on missing config
         # at instantiation (DigitalAssetService); nothing here calls the API.
+        # DATABASE_URL: same pattern — getDirectPool() throws at import time
+        # when unset; a valid URL lets the pool construct lazily (no connect).
         env:
           SUPABASE_URL: https://ci-placeholder.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-key
           SUPABASE_ANON_KEY: ci-placeholder-key
           TOKEN_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
           MFA_ENCRYPTION_KEY: "1111111111111111111111111111111111111111111111111111111111111111"
+          DATABASE_URL: postgresql://ci-placeholder:ci-placeholder@localhost:5432/ci-placeholder
         run: pnpm -C apps/api test
 
   web-e2e:
