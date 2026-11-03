@@ -10,6 +10,7 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { useUTM } from '@/hooks/useUTM';
 import Image from 'next/image';
 import ChainPropagationCallout from '@/components/ChainPropagationCallout';
+import { TIER_PRICING } from '@/lib/tiers/tier-features';
 import CapabilityComparisonMatrix from '@/components/subscription/CapabilityComparisonMatrix';
 
 
@@ -442,18 +443,24 @@ const features = [
   }
 ];
 
-// Organized by the V3 layer model: Entry Presence (choose a visibility
-// surface) then Commerce (choose how customers pay). Prices/names mirror
-// apps/web/src/lib/tiers/tier-features.ts.
+// Contract-derived. Names follow TIER_DISPLAY_NAMES and prices follow
+// TIER_PRICING (apps/web/src/lib/tiers/tier-features.ts) — never hand-type a
+// price here; the fixture is the source of truth and the contract suites fail
+// on drift. The ladder reads: claim → connect → be found → sell.
+const money = (key: string) => {
+  const value = TIER_PRICING[key] ?? 0;
+  return value === 0 ? 'Free' : `$${value}`;
+};
+
 const tiers = [
   // ── Entry Presence — where you're visible ──────────────────────────────
   {
     name: 'Directory Presence',
     layer: 'presence',
-    price: 'Free',
+    price: money('directory_presence'),
     period: '',
-    tagline: "Put your store on the map",
-    description: 'A verified, claimable listing in the VisibleShelf directory — claim it free, verify hours, and activate 5 free shelf slots.',
+    tagline: 'A page that looks like a business',
+    description: 'A verified, claimable listing built from public business information — hours, address, phone, reviews and a web address to share. Claim it free, then connect your inventory when you are ready.',
     trial: 'Always free',
     features: [
       'Listed in the VisibleShelf directory',
@@ -471,33 +478,34 @@ const tiers = [
     color: 'from-emerald-500 to-teal-600'
   },
   {
-    name: 'Starter',
+    name: 'Storefront',
     layer: 'presence',
-    price: '$19',
+    price: money('presence'),
     period: '/month',
-    tagline: 'Own your directory listing',
-    description: 'The directory visibility surface — your logo, store story, photo gallery, and richer layouts.',
+    tagline: 'Sell from your page — deposit checkout',
+    description: 'Your own storefront with deposit checkout, so an online browse can become a committed store visit.',
     trial: '14-day free trial',
     features: [
       'Everything in Directory Presence',
-      'Owner-controlled listing: logo, about, gallery, social',
+      'Owner-controlled page: logo, about, gallery, social',
       'Editorial & immersive layouts',
-      'Your directory listing as the primary surface'
+      'Deposit checkout on your own page',
+      'Connect inventory from your POS or by hand'
     ],
-    excluded: ['Google visibility', 'Platform storefront', 'Any checkout'],
-    commerceMode: 'Payments: none',
+    excluded: ['Full online payment', 'Delivery / shipping'],
+    commerceMode: 'Payments: deposit only',
     cta: 'Start free trial',
     popular: false,
-    badge: 'DIRECTORY',
+    badge: 'STOREFRONT',
     color: 'from-blue-500 to-indigo-600'
   },
   {
-    name: 'Discovery',
+    name: 'SWIS',
     layer: 'presence',
-    price: '$29',
+    price: money('discovery'),
     period: '/month',
-    tagline: 'Get found on Google',
-    description: 'Item-level Google search & Maps visibility with real-time POS inventory sync.',
+    tagline: 'Your products on Google',
+    description: "Item-level Google visibility — connect your inventory once and your shelves appear in Search, Shopping and Maps / See What's In Store.",
     trial: '14-day free trial',
     features: [
       'Everything in Directory Presence',
@@ -515,15 +523,15 @@ const tiers = [
     color: 'from-green-500 to-emerald-600'
   },
   {
-    name: 'Storefront',
+    name: 'Storefront+',
     layer: 'presence',
-    price: '$59',
+    price: money('storefront'),
     period: '/month',
-    tagline: 'Open your digital storefront',
-    description: 'The branded digital storefront surface — shoppers browse your aisles, check prices, and contact you.',
+    tagline: 'Your full catalog, browsable',
+    description: 'The branded storefront at full scale — shoppers browse your aisles, check prices, and contact you.',
     trial: '14-day free trial',
     features: [
-      'Everything in Discovery',
+      'Everything in SWIS',
       'Branded mobile web storefront (PWA)',
       'Platform search & full aisle browse',
       'Up to 200 products indexed',
@@ -541,7 +549,7 @@ const tiers = [
   {
     name: 'Commitment',
     layer: 'commerce',
-    price: '$79',
+    price: money('commitment'),
     period: '/month',
     tagline: 'Take deposits, drive foot traffic',
     description: 'Deposit-based commerce for physical retailers — turn online item searches into committed store visits.',
@@ -563,9 +571,9 @@ const tiers = [
     color: 'from-green-500 to-emerald-600'
   },
   {
-    name: 'Storefront Checkout',
+    name: 'E-commerce',
     layer: 'commerce',
-    price: '$99',
+    price: money('ecommerce'),
     period: '/month',
     tagline: 'In-store pickup & direct online checkout',
     description: 'Complete online checkout for counter pickup and local orders with 0% marketplace commission.',
@@ -588,7 +596,7 @@ const tiers = [
   {
     name: 'Omnichannel',
     layer: 'commerce',
-    price: '$149',
+    price: money('omnichannel'),
     period: '/month',
     tagline: 'Every channel, unified at your counter',
     description: 'Deposit reservations or full payment, counter pickup, and real-time POS sync.',
@@ -663,7 +671,7 @@ export default function FeaturesPage() {
               <span className="text-primary-600">Turn local search into in-store foot traffic.</span>
             </h1>
             <p className="text-xl text-neutral-600 mb-8 max-w-3xl mx-auto">
-              Google knows your building, but can&apos;t see what&apos;s on your shelves. VisibleShelf brings your physical inventory online: start free with your claimed directory listing, index products on Google, and let nearby shoppers reserve for counter pickup with 0% commission.
+              Google knows your building, but can&apos;t see what&apos;s on your shelves. VisibleShelf brings your physical inventory online: start free with your claimed listing, connect your inventory so your shelves reach Google, and let nearby shoppers reserve for counter pickup with 0% commission.
             </p>
             <div className="flex items-center justify-center gap-4">
               <a href={withUTM('/directory/add-business')}>
@@ -1717,7 +1725,7 @@ export default function FeaturesPage() {
               <div className="bg-white border-2 border-neutral-200 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xl font-bold text-neutral-900">Chain Starter</h4>
-                  <Badge className="bg-blue-100 text-blue-800">$199/mo</Badge>
+                  <Badge className="bg-blue-100 text-blue-800">${TIER_PRICING.chain_starter}/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600 mb-4">Up to 5 locations • shared SKU pool</p>
                 <ul className="space-y-2 text-sm">
@@ -2836,7 +2844,7 @@ export default function FeaturesPage() {
           
           <div className="text-center">
             <p className="text-lg text-neutral-300 mb-6">
-              Start with a free listing. Add a surface when you're ready. Turn on commerce when it pays.
+              Start with a free listing. Connect your inventory. Turn on commerce when it pays.
             </p>
             <a href={withUTM('/directory/add-business')}>
               <Button size="lg" className="bg-white text-neutral-900 hover:bg-neutral-100">
@@ -3101,12 +3109,12 @@ export default function FeaturesPage() {
             Ready to bring your physical shelves online?
           </h2>
           <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
-            Your store may already be listed in our directory. Claim it free in 60 seconds, index your signature items, and turn nearby search into walk-in foot traffic.
+            Your store may already be listed in our directory. Claim it free in 60 seconds, connect your inventory, and your products reach Google — turning nearby search into walk-in foot traffic.
           </p>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <a href={withUTM('/directory/add-business')}>
               <Button size="lg" variant="secondary">
-                Claim Your Free Store Listing
+                Claim Your Free Listing
               </Button>
             </a>
             <Link href="/settings/contact">

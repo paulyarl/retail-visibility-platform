@@ -9,6 +9,7 @@ import { onboardingStateService } from '@/services/OnboardingStateService';
 import { getUTMParamsFromUrl, storeUTMParams } from '@/lib/utm';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { clientLogger } from '@/lib/client-logger';
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 
 /**
  * Auth0-Connected Signup Wizard
@@ -161,7 +162,7 @@ export default function SignupWizardPage() {
       image: '/images/wizard/step-08-get-started.png',
       iconImage: '/images/wizard/icon-08-get-started.png',
       title: "Directory — You May Already Be Listed",
-      description: "Your physical store may already have a place page built from public records. Claim it free in 60 seconds to verify your hours, phone, and address so nearby shoppers find you accurately. Plus, get 5 free product slots to showcase your signature items immediately. Upgrade to Starter ($19/mo) when you want enhanced brand layouts, photos, and your store story.",
+      description: "Your physical store may already have a place page built from public records. Claim it free in 60 seconds to verify your hours, phone, and address so nearby shoppers find you accurately. Plus, get 5 free product slots to showcase your signature items immediately. Upgrade when you want a storefront you control, then connect your inventory to reach Google.",
       highlight: "Free to claim • 5 free shelf slots • Zero risk"
     },
     {
@@ -224,38 +225,38 @@ export default function SignupWizardPage() {
       description: 'Claim your listing, verify store hours & phone, and activate 5 free shelf slots'
     },
     {
+      value: 'discovery',
+      label: `${TIER_DISPLAY_NAMES.discovery} ($${TIER_PRICING.discovery}/mo)`,
+      description: 'Your products on Google — connect your inventory and your shelves appear in Search, Shopping and Maps (75 products)'
+    },
+    {
       value: 'presence',
-      label: 'Starter ($19/mo)',
-      description: 'Enhance your listing with custom branding, store story, photo gallery, and richer layouts'
+      label: `${TIER_DISPLAY_NAMES.presence} ($${TIER_PRICING.presence}/mo)`,
+      description: 'Your own storefront with deposit checkout, custom branding, store story, photo gallery and richer layouts'
     },
-    { 
-      value: 'discovery', 
-      label: 'Discovery ($29/mo)',
-      description: 'Get found on Google with item-level search indexing and real-time POS sync (75 products)'
+    {
+      value: 'storefront',
+      label: `${TIER_DISPLAY_NAMES.storefront} ($${TIER_PRICING.storefront}/mo)`,
+      description: 'Full catalog browse with mobile storefront and customer contact (200 products)'
     },
-    { 
-      value: 'storefront', 
-      label: 'Storefront ($59/mo)',
-      description: 'Branded digital storefront with mobile browsing and customer contact (200 products)'
-    },
-    { 
-      value: 'commitment', 
-      label: 'Commitment ($79/mo)',
+    {
+      value: 'commitment',
+      label: `${TIER_DISPLAY_NAMES.commitment} ($${TIER_PRICING.commitment}/mo)`,
       description: 'Deposit-backed reservations that turn online item search into committed walk-in foot traffic'
     },
-    { 
-      value: 'ecommerce', 
-      label: 'Storefront Checkout ($99/mo)',
+    {
+      value: 'ecommerce',
+      label: `${TIER_DISPLAY_NAMES.ecommerce} ($${TIER_PRICING.ecommerce}/mo)`,
       description: 'Full online checkout for in-store counter pickup and local orders with 0% marketplace commission'
     },
-    { 
-      value: 'omnichannel', 
-      label: 'Omnichannel ($149/mo)',
+    {
+      value: 'omnichannel',
+      label: `${TIER_DISPLAY_NAMES.omnichannel} ($${TIER_PRICING.omnichannel}/mo)`,
       description: 'Unified commerce: counter pickup, deposit reservations, and real-time in-store inventory sync'
     },
-    { 
-      value: 'enterprise', 
-      label: 'Enterprise ($499/mo)',
+    {
+      value: 'enterprise',
+      label: `${TIER_DISPLAY_NAMES.enterprise} ($${TIER_PRICING.enterprise}/mo)`,
       description: 'Multi-location store network with centralized inventory, API access, and dedicated onboarding'
     }
   ];

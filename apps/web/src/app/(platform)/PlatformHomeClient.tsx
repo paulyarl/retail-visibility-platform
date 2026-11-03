@@ -1017,10 +1017,10 @@ function Home({ introRendered }: { introRendered: boolean }) {
           </div>
           <div className="flex-1 text-center sm:text-left">
             <h3 className="text-lg sm:text-xl font-bold text-neutral-900 mb-1">
-              Make your products visible — and make yourself found
+              Make your page yours — then your products on Google
             </h3>
             <p className="text-sm text-neutral-600">
-              Your business may already be listed — we seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming takes about two minutes and costs nothing — then you own the listing, show up on Google and your own storefront, and turn discovery into sales when you're ready.
+              Your business may already be listed — we seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming takes about two minutes and costs nothing, and the page becomes yours: hours, photos, reviews and a web address to share. Connect your inventory and it fills in; then your products reach Google. Turn discovery into sales when you&apos;re ready.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">

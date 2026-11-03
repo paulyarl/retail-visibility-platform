@@ -9,6 +9,7 @@ import { FeatureMappingDisplay } from '@/components/tiers/FeatureMappingDisplay'
 import { TierComparisonTable } from '@/components/tiers/TierComparisonTable';
 import { ContentConsistencyValidator } from '@/components/tiers/ContentConsistencyValidator';
 import { ChainPricingSection } from '@/components/tiers/ChainPricingSection';
+import { TIER_PRICING } from '@/lib/tiers/tier-features';
 
 
 export default function OfferingsPage() {
@@ -291,15 +292,15 @@ export default function OfferingsPage() {
             </button>
           </div>
           <Title order={2} mb="xs">What's Included at Each Level</Title>
-          <Text c="dimmed" mb="xl">Each tier builds on the previous one with clear progression: Discovery → Storefront → Commitment → E-commerce → Omnichannel → Enterprise. Tiers are aligned to business models, not just feature accumulation.</Text>
+          <Text c="dimmed" mb="xl">Each tier builds on the previous one with clear progression: SWIS → Storefront → Storefront+ → Commitment → E-commerce → Omnichannel → Enterprise. Prices are read from TIER_PRICING, never hand-typed. Tiers are aligned to business models, not just feature accumulation.</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Discovery ($29) */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔍</span>
-                <h3 className="font-bold text-blue-900 text-base">Discovery</h3>
-                <Badge variant="light" color="blue" size="xs">$29/mo</Badge>
+                <h3 className="font-bold text-blue-900 text-base">SWIS</h3>
+                <Badge variant="light" color="blue" size="xs">${TIER_PRICING.discovery}/mo</Badge>
               </div>
               <p className="text-xs text-blue-700 mb-2 italic">"I exist online"</p>
               <p className="text-xs text-blue-600 mb-3">People are finding my products on Google</p>
@@ -342,15 +343,15 @@ export default function OfferingsPage() {
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🏪</span>
-                <h3 className="font-bold text-purple-900 text-base">Storefront</h3>
-                <Badge variant="light" color="grape" size="xs">$59/mo</Badge>
+                <h3 className="font-bold text-purple-900 text-base">Storefront+</h3>
+                <Badge variant="light" color="grape" size="xs">${TIER_PRICING.storefront}/mo</Badge>
               </div>
               <p className="text-xs text-purple-700 mb-2 italic">"I have a store online"</p>
               <p className="text-xs text-purple-600 mb-3">Shoppers are browsing — but can't act on it</p>
               <ul className="space-y-1 text-xs text-purple-800">
                 <li className="flex items-start gap-1">
                   <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Everything in Discovery</span>
+                  <span>Everything in SWIS</span>
                 </li>
                 <li className="flex items-start gap-1">
                   <span className="text-purple-600 mt-0.5">+</span>
@@ -383,7 +384,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🛒</span>
                 <h3 className="font-bold text-green-900 text-base">Commitment</h3>
-                <Badge variant="light" color="green" size="xs">$79/mo</Badge>
+                <Badge variant="light" color="green" size="xs">${TIER_PRICING.commitment}/mo</Badge>
               </div>
               <p className="text-xs text-green-700 mb-2 italic">"I drive foot traffic"</p>
               <p className="text-xs text-green-600 mb-3">Deposit-only commerce for physical retailers</p>
@@ -427,7 +428,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">�️</span>
                 <h3 className="font-bold text-amber-900 text-base">E-commerce</h3>
-                <Badge variant="light" color="orange" size="xs">$99/mo</Badge>
+                <Badge variant="light" color="orange" size="xs">${TIER_PRICING.ecommerce}/mo</Badge>
               </div>
               <p className="text-xs text-amber-700 mb-2 italic">"I sell online"</p>
               <p className="text-xs text-amber-600 mb-3">Full-payment only for online merchants</p>
@@ -467,7 +468,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔄</span>
                 <h3 className="font-bold text-indigo-900 text-base">Omnichannel</h3>
-                <Badge variant="light" color="indigo" size="xs">$149/mo</Badge>
+                <Badge variant="light" color="indigo" size="xs">${TIER_PRICING.omnichannel}/mo</Badge>
               </div>
               <p className="text-xs text-indigo-700 mb-2 italic">"I sell everywhere"</p>
               <p className="text-xs text-indigo-600 mb-3">Physical + online — shopper chooses path</p>
@@ -511,7 +512,7 @@ export default function OfferingsPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🏢</span>
                 <h3 className="font-bold text-red-900 text-base">Enterprise</h3>
-                <Badge variant="light" color="red" size="xs">$499/mo</Badge>
+                <Badge variant="light" color="red" size="xs">${TIER_PRICING.enterprise}/mo</Badge>
               </div>
               <p className="text-xs text-red-700 mb-2 italic">"I run a business empire"</p>
               <p className="text-xs text-red-600 mb-3">Multi-location with enterprise tools</p>
@@ -554,7 +555,7 @@ export default function OfferingsPage() {
 
         <div className="mt-6 bg-green-50 border-2 border-green-300 rounded-lg p-4 text-center">
             <p className="text-sm font-semibold text-green-900">
-              💡 <strong>Chain pricing works the same way!</strong> Chain tiers follow the same 6-tier structure with massive discounts for multiple locations. Any organization can choose Discovery through Enterprise tiers.
+              💡 <strong>Chain pricing works the same way!</strong> Chain tiers follow the same 6-tier structure with massive discounts for multiple locations. Any organization can choose SWIS through Enterprise tiers.
             </p>
           </div>
 
@@ -568,8 +569,8 @@ export default function OfferingsPage() {
             <Card className="border-2 border-blue-200">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-bold text-blue-900">Discovery</h3>
-                  <Badge variant="light" color="blue">$29/mo</Badge>
+                  <h3 className="text-lg font-bold text-blue-900">SWIS</h3>
+                  <Badge variant="light" color="blue">${TIER_PRICING.discovery}/mo</Badge>
                 </div>
                 <p className="text-xs text-blue-700 italic mb-1">"I exist online"</p>
                 <p className="text-sm text-neutral-600">Get Found on Google</p>
@@ -608,8 +609,8 @@ export default function OfferingsPage() {
             <Card className="border-2 border-purple-200">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-bold text-purple-900">Storefront</h3>
-                  <Badge variant="light" color="grape">$59/mo</Badge>
+                  <h3 className="text-lg font-bold text-purple-900">Storefront+</h3>
+                  <Badge variant="light" color="grape">${TIER_PRICING.storefront}/mo</Badge>
                 </div>
                 <p className="text-xs text-purple-700 italic mb-1">"I have a store online"</p>
                 <p className="text-sm text-neutral-600">Own Your Platform Presence</p>
@@ -618,7 +619,7 @@ export default function OfferingsPage() {
                 <ul className="space-y-1 text-sm">
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5 text-xs">✓</span>
-                    <span>Everything in Discovery</span>
+                    <span>Everything in SWIS</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-purple-600 mt-0.5 text-xs">+</span>
@@ -652,7 +653,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-green-900">Commitment</h3>
-                  <Badge variant="light" color="green">$79/mo</Badge>
+                  <Badge variant="light" color="green">${TIER_PRICING.commitment}/mo</Badge>
                 </div>
                 <p className="text-xs text-green-700 italic mb-1">"I am selling online"</p>
                 <p className="text-sm text-neutral-600">Capture Intent and Drive Foot Traffic</p>
@@ -696,7 +697,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-amber-900">E-commerce</h3>
-                  <Badge variant="light" color="orange">$99/mo</Badge>
+                  <Badge variant="light" color="orange">${TIER_PRICING.ecommerce}/mo</Badge>
                 </div>
                 <p className="text-xs text-amber-700 italic mb-1">"I sell online"</p>
                 <p className="text-sm text-neutral-600">Full-payment only for online merchants</p>
@@ -732,7 +733,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-indigo-900">Omnichannel</h3>
-                  <Badge variant="light" color="indigo">$149/mo</Badge>
+                  <Badge variant="light" color="indigo">${TIER_PRICING.omnichannel}/mo</Badge>
                 </div>
                 <p className="text-xs text-indigo-700 italic mb-1">"I sell everywhere"</p>
                 <p className="text-sm text-neutral-600">Physical + online — shopper chooses path</p>
@@ -776,7 +777,7 @@ export default function OfferingsPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-red-900">Enterprise</h3>
-                  <Badge variant="light" color="red">$499/mo</Badge>
+                  <Badge variant="light" color="red">${TIER_PRICING.enterprise}/mo</Badge>
                 </div>
                 <p className="text-xs text-red-700 italic mb-1">"I run a complete business"</p>
                 <p className="text-sm text-neutral-600">Complete Business Solution</p>
@@ -1008,7 +1009,7 @@ export default function OfferingsPage() {
             
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-900">
-                💡 <strong>Pro Tip:</strong> Start with Google-Only ($29/mo) to test the platform, then upgrade to Starter when you're ready for a full storefront. Change plans from your subscription page anytime!
+                💡 <strong>Pro Tip:</strong> Start with the free Directory Presence listing, then connect your inventory and move up when your catalog is live. Change plans from your subscription page anytime!
               </p>
             </div>
           </div>

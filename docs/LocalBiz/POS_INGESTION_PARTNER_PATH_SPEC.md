@@ -581,11 +581,31 @@ The packet is a planned-visit instrument. An unplanned visit is a different job:
 | Field | Content |
 | --- | --- |
 | Name + mobile | the operator's, not a company switchboard |
+| Website (front) | a **card-specific** short URL — one page explaining the offer, not the general homepage |
 | One line | *"Your store's page — [short URL]"* |
-| QR | the **generic** claim entry (`/directory/add-business`) or the merchant's own listing — **never a claim token** |
+| QR (back) | a **find-your-store** entry (`/directory/add-business?ref=card`) that lets them search their own name — **never a claim token**, never the bare homepage |
 | Excluded | pricing, tier names, logo soup, taglines |
 
+**Why the QR must resolve to something of theirs.** A card is read in the owner's absence from you, so the scan has to pay off in one screen. Homepage → a stranger reads marketing. Find-your-store → they type their name and see their own listing, hours and reviews. The second one is the only version where the card does the selling without you in the room.
+
+**The `ref=card` parameter is the attribution.** A generic URL plus a ref tag gives you card-level tracking without a token — you trade per-merchant identity for distribution safety, and gain a count of how many cards converted. That is the whole reason the generic entry is worth choosing over a personalized one: a printed batch has no chain of custody, and an untracked card is indistinguishable from a lost one.
+
+**Label the QR.** An unlabelled square on the back of a card does not get scanned. One line above it — *"Scan to see your store's page"* — is the difference between a printed code and a used one.
+
 **Why never a token on a card.** A card is handed around, left on counters, photographed. The tokenized QR belongs to the sealed packet, where it is single-use, tracked, and travels once. Putting a token on a card converts a distribution artifact into a bearer credential with no chain of custody — the § QR specification mitigations stop applying the moment the card leaves your hand.
+
+**The card as proxy when ownership is unreachable.** When you cannot reach the owner, the card inverts the direction of contact: instead of you finding them, it gives them a way to find you. That is its real job, and it fails if the card is not **self-explanatory in your absence** — a card carrying only a name and number asks the owner to act on a conversation they never had. It must reference something of theirs: their store's page, or a QR that shows them their own listing.
+
+**Placement decides survival:**
+
+| Placement | Reaches the owner |
+| --- | --- |
+| **Mailed to the store address, addressed by name** | **highest** — business mail goes to whoever handles admin, usually the owner or family |
+| Handed to a *named* staff member with an explicit ask | best of the counter options; creates a small social obligation |
+| Taped to a back-room or office door | medium, where one exists |
+| Left loose on the counter | low — cleared, stacked, or binned |
+
+**The postal channel is underused and cheap.** A card or one-pager mailed to the storefront, addressed to the owner by name, bypasses the counter entirely — no gatekeeper, no timing window, one stamp. For a store you cannot get into at the right hour, it is the most reliable route to the owner's hands, and it pairs naturally with the §17.3 email follow-up: mail arrives in the same week the email does.
 
 **Never pitch staff on an unplanned visit.** With no artifact to hand over, the message has nothing to travel on — the §17.9 failure with fewer excuses.
 

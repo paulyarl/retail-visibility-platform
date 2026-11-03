@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 // import { Pagination } from '@/components/ui';
 // import Link from 'next/link';
 import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
+import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 // import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 // import ProductSearch from '@/components/storefront/ProductSearch';
@@ -758,7 +759,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
               Your <span className="font-semibold">Google-Only</span> plan focuses on Google Shopping feeds and doesn't include a public storefront.
             </p>
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 text-left">
-              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Upgrade to Starter ($49/mo) to unlock:</h3>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Upgrade to {TIER_DISPLAY_NAMES.storefront} (${TIER_PRICING.storefront}/mo) to unlock:</h3>
               <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-200">
                 <li className="flex items-center gap-2">
                   <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
