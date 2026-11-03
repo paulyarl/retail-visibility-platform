@@ -108,7 +108,7 @@ export const TIER_BADGE_CLASSES: Record<string, string> = {
 // starter, google_only, chain_enterprise render as raw keys).
 export const TENANT_TIER_DISPLAY_NAMES: Record<string, string> = {
   presence: 'Storefront',
-  discovery: 'SWIS',
+  discovery: 'Nearby',
   storefront: 'Storefront+',
   commitment: 'Commitment',
   ecommerce: 'E-commerce',

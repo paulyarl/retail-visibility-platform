@@ -236,7 +236,7 @@ export const TIER_DISPLAY_NAMES: Record<string, string> = {
   directory_presence: 'Directory Presence',
   presence: 'Storefront',
   starter: 'Starter',
-  discovery: 'SWIS',
+  discovery: 'Nearby',
   storefront: 'Storefront+',
   commitment: 'Commitment',
   ecommerce: 'E-commerce',

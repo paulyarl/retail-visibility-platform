@@ -1031,7 +1031,7 @@ function Home({ introRendered }: { introRendered: boolean }) {
               Make your page yours — then your products on Google
             </h3>
             <p className="text-sm text-neutral-600">
-              Your business may already be listed — we seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming takes about two minutes and costs nothing, and the page becomes yours: hours, photos, reviews and a web address to share. Connect your inventory and it fills in; then your products reach Google. Turn discovery into sales when you&apos;re ready.
+              Your business may already be listed — we seed the directory from public business information, so neighbors can find you before you ever sign up. Claiming takes about two minutes and costs nothing, and the page becomes yours: hours, photos, reviews and a web address to share. Connect your inventory and it fills in; then your products reach your site and Google. Turn discovery into sales when you&apos;re ready.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">

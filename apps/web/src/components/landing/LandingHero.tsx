@@ -232,7 +232,7 @@ export function LandingHero({ businessCount }: { businessCount?: number }) {
               className="w-full sm:w-auto px-6 py-3 rounded-xl text-black font-semibold hover:bg-gray-100 transition-colors"
               style={{ background: "rgba(255,255,255,0.95)" }}
             >
-              Find your store →
+              Find your page →
             </Link>
             <a
               href="https://visibleshelf.com/tenant/tid-25we5qgj"

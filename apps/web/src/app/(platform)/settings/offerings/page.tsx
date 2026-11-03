@@ -292,14 +292,14 @@ export default function OfferingsPage() {
             </button>
           </div>
           <Title order={2} mb="xs">What's Included at Each Level</Title>
-          <Text c="dimmed" mb="xl">Each tier builds on the previous one with clear progression: SWIS → Storefront → Storefront+ → Commitment → E-commerce → Omnichannel → Enterprise. Prices are read from TIER_PRICING, never hand-typed. Tiers are aligned to business models, not just feature accumulation.</Text>
+          <Text c="dimmed" mb="xl">Each tier builds on the previous one with clear progression: Nearby → Storefront → Storefront+ → Commitment → E-commerce → Omnichannel → Enterprise. Prices are read from TIER_PRICING, never hand-typed. Tiers are aligned to business models, not just feature accumulation.</Text>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Discovery ($29) */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🔍</span>
-                <h3 className="font-bold text-blue-900 text-base">SWIS</h3>
+                <h3 className="font-bold text-blue-900 text-base">Nearby</h3>
                 <Badge variant="light" color="blue" size="xs">${TIER_PRICING.discovery}/mo</Badge>
               </div>
               <p className="text-xs text-blue-700 mb-2 italic">"I exist online"</p>
@@ -351,7 +351,7 @@ export default function OfferingsPage() {
               <ul className="space-y-1 text-xs text-purple-800">
                 <li className="flex items-start gap-1">
                   <span className="text-purple-600 mt-0.5">✓</span>
-                  <span>Everything in SWIS</span>
+                  <span>Everything in Nearby</span>
                 </li>
                 <li className="flex items-start gap-1">
                   <span className="text-purple-600 mt-0.5">+</span>
@@ -555,7 +555,7 @@ export default function OfferingsPage() {
 
         <div className="mt-6 bg-green-50 border-2 border-green-300 rounded-lg p-4 text-center">
             <p className="text-sm font-semibold text-green-900">
-              💡 <strong>Chain pricing works the same way!</strong> Chain tiers follow the same 6-tier structure with massive discounts for multiple locations. Any organization can choose SWIS through Enterprise tiers.
+              💡 <strong>Chain pricing works the same way!</strong> Chain tiers follow the same 6-tier structure with massive discounts for multiple locations. Any organization can choose Nearby through Enterprise tiers.
             </p>
           </div>
 
@@ -569,7 +569,7 @@ export default function OfferingsPage() {
             <Card className="border-2 border-blue-200">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-bold text-blue-900">SWIS</h3>
+                  <h3 className="text-lg font-bold text-blue-900">Nearby</h3>
                   <Badge variant="light" color="blue">${TIER_PRICING.discovery}/mo</Badge>
                 </div>
                 <p className="text-xs text-blue-700 italic mb-1">"I exist online"</p>
@@ -619,7 +619,7 @@ export default function OfferingsPage() {
                 <ul className="space-y-1 text-sm">
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5 text-xs">✓</span>
-                    <span>Everything in SWIS</span>
+                    <span>Everything in Nearby</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-purple-600 mt-0.5 text-xs">+</span>

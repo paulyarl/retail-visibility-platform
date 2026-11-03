@@ -26,8 +26,8 @@ export const FALLBACK_PRESENCE_MODES: UpgradeTierOption[] = [
   },
   {
     tierKey: 'discovery',
-    name: 'SWIS',
-    displayName: 'SWIS',
+    name: 'Nearby',
+    displayName: 'Nearby',
     description: null,
     priceMonthly: 29,
     priceAnnual: 348,

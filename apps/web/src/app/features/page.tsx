@@ -500,7 +500,7 @@ const tiers = [
     color: 'from-blue-500 to-indigo-600'
   },
   {
-    name: 'SWIS',
+    name: 'Nearby',
     layer: 'presence',
     price: money('discovery'),
     period: '/month',
@@ -531,7 +531,7 @@ const tiers = [
     description: 'The branded storefront at full scale — shoppers browse your aisles, check prices, and contact you.',
     trial: '14-day free trial',
     features: [
-      'Everything in SWIS',
+      'Everything in Nearby',
       'Branded mobile web storefront (PWA)',
       'Platform search & full aisle browse',
       'Up to 200 products indexed',
@@ -671,7 +671,7 @@ export default function FeaturesPage() {
               <span className="text-primary-600">Turn local search into in-store foot traffic.</span>
             </h1>
             <p className="text-xl text-neutral-600 mb-8 max-w-3xl mx-auto">
-              Google knows your building, but can&apos;t see what&apos;s on your shelves. VisibleShelf brings your physical inventory online: start free with your claimed listing, connect your inventory so your shelves reach Google, and let nearby shoppers reserve for counter pickup with 0% commission.
+              A shopper nearby searches for what you carry — and finds the supermarket, not you. VisibleShelf brings your physical inventory online: start free with your claimed listing, connect your inventory so your shelves reach your site and Google, and let nearby shoppers reserve for counter pickup with 0% commission.
             </p>
             <div className="flex items-center justify-center gap-4">
               <a href={withUTM('/directory/add-business')}>

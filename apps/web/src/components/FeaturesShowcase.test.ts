@@ -73,7 +73,7 @@ describe('FeaturesShowcase', () => {
   it('uses the canonical tier names, not the retired marketing labels', () => {
     const html = render('hybrid');
     expect(html).toContain('Storefront+');
-    expect(html).toContain('SWIS');
+    expect(html).toContain('Nearby');
     expect(html).not.toContain('DISCOVERY');
   });
 

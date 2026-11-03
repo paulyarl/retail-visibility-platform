@@ -35,11 +35,15 @@ export default function PlatformSummaryBand() {
         <p className="text-base sm:text-lg text-neutral-600 mb-4 sm:mb-5 leading-relaxed">
           We put both on the map, starting free. Your business may already be in our directory from
           public information, and claiming it takes about two minutes. Then connect your inventory —
-          from your register, a pricebook, or by hand — and your catalog travels: the directory puts
-          it on our shelves, Google Search and Shopping put it in front of searchers, and your own
-          storefront gives it a home you own. When a shopper is ready to buy, that same storefront
-          doubles as the fulfillment center — deposits, pickup, delivery, or full online payment, all
-          run straight off your shelves.
+          from your register, a pricebook, or by hand — and your catalog travels: your own
+          storefront gives it a home you own, the directory puts it on our shelves, and Google
+          Search and Shopping reach searchers you would never have met.
+        </p>
+        <p className="text-base sm:text-lg text-neutral-600 mb-4 sm:mb-5 leading-relaxed">
+          Every one of those surfaces ends in the same place. Your site, Google Shopping and Maps
+          all point the shopper at one thing: your counter — deposits, pickup, delivery, or full
+          online payment, all run straight off your shelves. Your store is the fulfillment center,
+          and it always was.
         </p>
         <p className="text-base sm:text-lg text-neutral-600 mb-6 sm:mb-8 leading-relaxed">
           The store that was off the map gets found, and the product that was hidden on your shelf
