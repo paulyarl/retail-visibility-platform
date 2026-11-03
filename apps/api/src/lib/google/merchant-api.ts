@@ -3,13 +3,13 @@
  *
  * Spec: docs/LocalBiz/GMC_MERCHANT_API_SWIS_SPEC.md §5
  *
- * - Host: https://merchantapi.googleapis.com  (NOT shoppingcontent.googleapis.com)
+ * - Host: https://merchantapi.googleapis.com  (NOT shoppingcontent.googleapis.com — completion-gate-allow: doc reference)
  * - Resource identity: `name` fields, e.g. accounts/{account}/products/{product}
  *   where {product} = contentLanguage~feedLabel~offerId (or local~... for
  *   local-only products). Product inputs are written via productInputs:insert
  *   with a required `dataSource` query param.
  * - Prices are { amountMicros: int64-string, currencyCode }.
- * - No custombatch: callers run a concurrency-limited loop themselves.
+ * - No custombatch: callers run a concurrency-limited loop themselves. completion-gate-allow: doc reference
  *
  * Auth: same OAuth 'gmc' token as the Content API path (scope auth/content
  * covers Merchant API). Token/merchant-link resolution mirrors

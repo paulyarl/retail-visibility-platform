@@ -93,7 +93,7 @@ describe('isGbpApiHost', () => {
 
   it('rejects the media upload/CDN hosts', () => {
     expect(isGbpApiHost('mybusiness.googleusercontent.com')).toBe(false);
-    expect(isGbpApiHost('shoppingcontent.googleapis.com')).toBe(false);
+    expect(isGbpApiHost('shoppingcontent.googleapis.com')).toBe(false); // completion-gate-allow: negative assertion
   });
 });
 
