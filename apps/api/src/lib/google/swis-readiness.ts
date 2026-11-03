@@ -14,6 +14,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { findGoogleToken } from './token-store';
 
 export type SwisReadinessState =
   | 'disconnected'
@@ -51,12 +52,17 @@ export async function evaluateSwisReadiness(tenantId: string): Promise<SwisReadi
     };
   }
 
-  const hasGbpToken = await prisma.oauth_tokens.findFirst({
-    where: { tenant_id: tenantId, gateway_type: 'gbp' },
-    select: { id: true },
+  // GBP-side evidence: the tenant's linked location row + the 'gbp' token on
+  // its owning oauth account — the same resolution resolveGbpToken uses.
+  const gbpLocation = await prisma.gbp_locations_list.findFirst({
+    where: { tenant_id: tenantId },
+    select: { account_id: true },
   });
+  const gbpToken = gbpLocation
+    ? await findGoogleToken('gbp', { accountId: gbpLocation.account_id })
+    : null;
 
-  const gbpLinked = !!link.gbp_account_url && !!hasGbpToken;
+  const gbpLinked = !!link.gbp_account_url && !!gbpToken;
   const enrolled = !!link.free_listings_enabled;
   const storeCode = link.store_code || undefined;
   const optedIn = !!link.swis_enabled;
