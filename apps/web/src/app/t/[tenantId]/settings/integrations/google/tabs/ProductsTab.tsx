@@ -444,20 +444,30 @@ export default function ProductsTab({
                   {step.label}
                 </span>
                 {!step.done && step.key === 'link_gbp' && (
-                  <button
-                    onClick={() => confirmSwisStep({ gbpAccountUrl: 'merchant-confirmed' })}
-                    className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
-                  >
-                    Confirm linked
-                  </button>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-xs text-violet-700 dark:text-violet-300">
+                      Merchant Center → Settings → Access and services → Apps and services → link your Business Profile.
+                    </span>
+                    <button
+                      onClick={() => confirmSwisStep({ gbpAccountUrl: 'merchant-confirmed' })}
+                      className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
+                    >
+                      Confirm linked
+                    </button>
+                  </span>
                 )}
                 {!step.done && step.key === 'enroll' && (
-                  <button
-                    onClick={() => confirmSwisStep({ freeListingsEnabled: true })}
-                    className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
-                  >
-                    Confirm enabled
-                  </button>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-xs text-violet-700 dark:text-violet-300">
+                      Merchant Center → Settings → Add-ons → Free local listings (turn on).
+                    </span>
+                    <button
+                      onClick={() => confirmSwisStep({ freeListingsEnabled: true })}
+                      className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
+                    >
+                      Confirm enabled
+                    </button>
+                  </span>
                 )}
                 {!step.done && step.key === 'store_code' && (
                   <span className="inline-flex items-center gap-1">
@@ -465,6 +475,7 @@ export default function ProductsTab({
                       value={storeCodeDraft}
                       onChange={(e) => setStoreCodeDraft(e.target.value)}
                       placeholder="store code"
+                      title="Must match the Store code set on your Business Profile (business.google.com → location → Info → Store code). Default convention: vs-{your-subdomain}."
                       className="px-2 py-0.5 text-xs border border-violet-300 rounded w-24 bg-white dark:bg-neutral-800"
                     />
                     <button
