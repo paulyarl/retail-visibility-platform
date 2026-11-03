@@ -79,31 +79,28 @@ export async function getMerchantAccount(
   account_id: string,
   merchantId: string
 ): Promise<any | null> {
-  try {
-    const accessToken = await getValidAccessToken(account_id);
-    if (!accessToken) {
-      throw new Error('No valid access token');
-    }
-
-    // Merchant API uses accounts/{name} format
-    const response = await fetch(`${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('[GMC] Failed to fetch merchant account:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    logger.error('[GMC] Error getting merchant account:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return null;
+  const accessToken = await getValidAccessToken(account_id);
+  if (!accessToken) {
+    throw new Error('merchant_account_failed: no valid access token for account');
   }
+
+  const response = await fetch(`${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logger.error('[GMC] Failed to fetch merchant account:', undefined, {
+      status: response.status,
+      body: body.slice(0, 500),
+    });
+    throw new Error(`merchant_account_failed: ${response.status} ${body.slice(0, 300)}`);
+  }
+
+  return await response.json();
 }
 
 /**
@@ -115,35 +112,33 @@ export async function listProducts(
   merchantId: string,
   maxResults: number = 50
 ): Promise<any[]> {
-  try {
-    const accessToken = await getValidAccessToken(account_id);
-    if (!accessToken) {
-      throw new Error('No valid access token');
-    }
-
-    // Merchant API uses accounts/{account}/products format with pageSize
-    const response = await fetch(
-      `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products?pageSize=${maxResults}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('[GMC] Failed to fetch products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-      return [];
-    }
-
-    const data = await response.json() as { products?: any[] };
-    return data.products || [];
-  } catch (error) {
-    logger.error('[GMC] Error listing products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return [];
+  const accessToken = await getValidAccessToken(account_id);
+  if (!accessToken) {
+    throw new Error('products_failed: no valid access token for account');
   }
+
+  // Merchant API uses accounts/{account}/products format with pageSize
+  const response = await fetch(
+    `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products?pageSize=${maxResults}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    logger.error('[GMC] Failed to fetch products:', undefined, {
+      status: response.status,
+      body: body.slice(0, 500),
+    });
+    throw new Error(`products_failed: ${response.status} ${body.slice(0, 300)}`);
+  }
+
+  const data = await response.json() as { products?: any[] };
+  return data.products || [];
 }
 
 /**
@@ -155,34 +150,32 @@ export async function getProduct(
   merchantId: string,
   productId: string
 ): Promise<any | null> {
-  try {
-    const accessToken = await getValidAccessToken(account_id);
-    if (!accessToken) {
-      throw new Error('No valid access token');
-    }
-
-    // Merchant API uses accounts/{account}/products/{product} format
-    const response = await fetch(
-      `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products/${productId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('[GMC] Failed to fetch product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    logger.error('[GMC] Error getting product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return null;
+  const accessToken = await getValidAccessToken(account_id);
+  if (!accessToken) {
+    throw new Error('product_failed: no valid access token for account');
   }
+
+  // Merchant API uses accounts/{account}/products/{product} format
+  const response = await fetch(
+    `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products/${productId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    logger.error('[GMC] Failed to fetch product:', undefined, {
+      status: response.status,
+      body: body.slice(0, 500),
+    });
+    throw new Error(`product_failed: ${response.status} ${body.slice(0, 300)}`);
+  }
+
+  return await response.json();
 }
 
 /**
@@ -271,51 +264,51 @@ export async function getProductStats(
   pending: number;
   disapproved: number;
 } | null> {
-  try {
-    const accessToken = await getValidAccessToken(account_id);
-    if (!accessToken) {
-      throw new Error('No valid access token');
-    }
-
-    // Merchant API: fetch products with larger page size for stats
-    const response = await fetch(
-      `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products?pageSize=250`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json() as { products?: any[] };
-    const products = data.products || [];
-
-    const stats = {
-      total: products.length,
-      active: 0,
-      pending: 0,
-      disapproved: 0,
-    };
-
-    // Merchant API uses different status structure
-    products.forEach((product: any) => {
-      const status = product.productStatus?.itemLevelIssues || [];
-      const hasErrors = status.some((issue: any) => issue.severity === 'error');
-      const hasWarnings = status.some((issue: any) => issue.severity === 'warning');
-
-      if (hasErrors) stats.disapproved++;
-      else if (hasWarnings) stats.pending++;
-      else stats.active++;
-    });
-
-    return stats;
-  } catch (error) {
-    logger.error('[GMC] Error getting product stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    return null;
+  const accessToken = await getValidAccessToken(account_id);
+  if (!accessToken) {
+    throw new Error('product_stats_failed: no valid access token for account');
   }
+
+  // Merchant API: fetch products with larger page size for stats
+  const response = await fetch(
+    `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products?pageSize=250`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    logger.error('[GMC] Failed to fetch products for stats:', undefined, {
+      status: response.status,
+      body: body.slice(0, 500),
+    });
+    throw new Error(`product_stats_failed: ${response.status} ${body.slice(0, 300)}`);
+  }
+
+  const data = await response.json() as { products?: any[] };
+  const products = data.products || [];
+
+  const stats = {
+    total: products.length,
+    active: 0,
+    pending: 0,
+    disapproved: 0,
+  };
+
+  // Merchant API uses different status structure
+  products.forEach((product: any) => {
+    const status = product.productStatus?.itemLevelIssues || [];
+    const hasErrors = status.some((issue: any) => issue.severity === 'error');
+    const hasWarnings = status.some((issue: any) => issue.severity === 'warning');
+
+    if (hasErrors) stats.disapproved++;
+    else if (hasWarnings) stats.pending++;
+    else stats.active++;
+  });
+
+  return stats;
 }

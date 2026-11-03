@@ -4,14 +4,20 @@ import { prisma } from '../prisma';
 import { getEffectivePlatform } from '../utils/effectiveFlags';
 import { generateFeedPushJobId, generateQuickStart } from '../lib/id-generator';
 import { logger } from '../logger';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 
 const router = Router();
+
+// Registry labels this mount 'admin' but the tenant UI calls setup-status —
+// authentication is the floor for every route here; tenant scoping is enforced
+// per-route where a tenant id is present (setup-status, POST /, GET /).
+router.use(authenticateToken);
 
 /**
  * GET /api/feed-jobs/setup-status/:tenantId
  * Check if tenant has Google Merchant Center connected and ready for feed push
  */
-router.get('/setup-status/:tenantId', async (req, res) => {
+router.get('/setup-status/:tenantId', checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -121,7 +127,7 @@ const updateJobStatusSchema = z.object({
  * POST /api/feed-jobs
  * Create a new feed push job
  */
-router.post('/', async (req, res) => {
+router.post('/', checkTenantAccess, async (req, res) => {
   try {
     const body = createFeedJobSchema.parse(req.body);
 
@@ -279,7 +285,7 @@ router.post('/', async (req, res) => {
  * GET /api/feed-jobs
  * List feed push jobs with optional filters
  */
-router.get('/', async (req, res) => {
+router.get('/', checkTenantAccess, async (req, res) => {
   try {
     const {
       tenantId,

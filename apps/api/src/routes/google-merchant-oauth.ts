@@ -12,6 +12,7 @@ import { generateQuickStart } from '../lib/id-generator';
 import { evaluateGMCSyncGate, gmcSyncGateError } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const WEB_URL = unifiedConfig.webUrl;
  * Get Google Merchant Center connection status
  * GET /google/oauth/status
  */
-router.get('/google/oauth/status', async (req, res) => {
+router.get('/google/oauth/status', authenticateToken, checkTenantAccess, async (req, res) => {
   const startTime = Date.now();
   console.log(`[Google Merchant OAuth] Status check started for tenant: ${req.query.tenantId}`);
 
@@ -103,7 +104,7 @@ router.get('/google/oauth/status', async (req, res) => {
  * Initiate Google Merchant Center OAuth flow
  * GET /google/oauth/authorize
  */
-router.get('/google/oauth/authorize', async (req, res) => {
+router.get('/google/oauth/authorize', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.query;
 
@@ -255,7 +256,7 @@ router.get('/google/oauth/callback', async (req, res) => {
  * Disconnect Google Merchant Center
  * POST /google/oauth/disconnect
  */
-router.post('/google/oauth/disconnect', async (req, res) => {
+router.post('/google/oauth/disconnect', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.body;
 
@@ -300,7 +301,7 @@ router.post('/google/oauth/disconnect', async (req, res) => {
  * List available Merchant Center accounts
  * GET /google/oauth/merchants
  */
-router.get('/google/oauth/merchants', async (req, res) => {
+router.get('/google/oauth/merchants', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.query;
 
@@ -371,7 +372,7 @@ router.get('/google/oauth/merchants', async (req, res) => {
  * Link a Merchant Center account to this tenant
  * POST /google/oauth/link-merchant
  */
-router.post('/google/oauth/link-merchant', async (req, res) => {
+router.post('/google/oauth/link-merchant', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, merchantId, merchantName } = req.body;
 
@@ -480,7 +481,7 @@ router.post('/google/oauth/link-merchant', async (req, res) => {
  * Get GMC product sync status
  * GET /google/merchant/sync-status
  */
-router.get('/google/merchant/sync-status', async (req, res) => {
+router.get('/google/merchant/sync-status', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.query;
 
@@ -513,7 +514,7 @@ router.get('/google/merchant/sync-status', async (req, res) => {
  * Update GMC sync settings (pickup-only intent, etc.)
  * PATCH /google/merchant/settings
  */
-router.patch('/google/merchant/settings', async (req, res) => {
+router.patch('/google/merchant/settings', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, pickupOnly, pickupMethod, pickupSla, fulfillmentMode } = req.body;
 
@@ -620,7 +621,7 @@ router.patch('/google/merchant/settings', async (req, res) => {
  * Sync all products to Google Merchant Center
  * POST /google/merchant/sync
  */
-router.post('/google/merchant/sync', async (req, res) => {
+router.post('/google/merchant/sync', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, itemIds } = req.body;
 
@@ -689,7 +690,7 @@ router.post('/google/merchant/sync', async (req, res) => {
  * Sync a single product to Google Merchant Center
  * POST /google/merchant/sync/:itemId
  */
-router.post('/google/merchant/sync/:itemId', async (req, res) => {
+router.post('/google/merchant/sync/:itemId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { itemId } = req.params;
     const { tenantId } = req.body;
@@ -733,7 +734,7 @@ router.post('/google/merchant/sync/:itemId', async (req, res) => {
  * Update inventory/stock for a product
  * PATCH /google/merchant/inventory/:itemId
  */
-router.patch('/google/merchant/inventory/:itemId', async (req, res) => {
+router.patch('/google/merchant/inventory/:itemId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { itemId } = req.params;
     const { tenantId, quantity } = req.body;
@@ -778,7 +779,7 @@ router.patch('/google/merchant/inventory/:itemId', async (req, res) => {
  * Update price for a product
  * PATCH /google/merchant/price/:itemId
  */
-router.patch('/google/merchant/price/:itemId', async (req, res) => {
+router.patch('/google/merchant/price/:itemId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { itemId } = req.params;
     const { tenantId, priceCents, currency } = req.body;
@@ -823,7 +824,7 @@ router.patch('/google/merchant/price/:itemId', async (req, res) => {
  * Delete a product from Google Merchant Center
  * DELETE /google/merchant/product/:itemId
  */
-router.delete('/google/merchant/product/:itemId', async (req, res) => {
+router.delete('/google/merchant/product/:itemId', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { itemId } = req.params;
     const { tenantId } = req.body;
@@ -860,7 +861,7 @@ router.delete('/google/merchant/product/:itemId', async (req, res) => {
  * Get GMC validation report for all products
  * GET /google/merchant/validation-report
  */
-router.get('/google/merchant/validation-report', async (req, res) => {
+router.get('/google/merchant/validation-report', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.query;
 
@@ -930,7 +931,7 @@ router.get('/google/merchant/validation-report', async (req, res) => {
  * Get per-product GMC sync status
  * GET /google/merchant/product-sync-status
  */
-router.get('/google/merchant/product-sync-status', async (req, res) => {
+router.get('/google/merchant/product-sync-status', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId } = req.query;
     const statusFilter = (req.query.status as string) || 'all';

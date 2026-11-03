@@ -23,6 +23,7 @@ import {
 } from '../lib/google/gbp';
 import crypto from 'crypto';
 import { logger } from '../logger';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 
 const router = Router();
 
@@ -130,6 +131,10 @@ router.get('/google/callback', async (req, res) => {
     res.status(500).json({ error: 'oauth_callback_failed' });
   }
 });
+
+// Everything below is tenant-scoped — /google/auth + /google/callback above stay
+// public because they're the OAuth handshake itself.
+router.use(authenticateToken, checkTenantAccess);
 
 // GET /api/google/status
 router.get('/api/google/status', async (req, res) => {
