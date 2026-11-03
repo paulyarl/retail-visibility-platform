@@ -37,7 +37,7 @@ router.post('/sync-single', async (req, res) => {
       });
     }
     
-    const { syncProduct } = await import('../services/GMCProductSync');
+    const { syncProductToMerchant: syncProduct } = await import('../services/MerchantProductSync');
 
     const gate = await evaluateGMCSyncGate(tenantId);
     if (!gate.allowed) {
@@ -89,7 +89,7 @@ router.post('/sync-batch', async (req, res) => {
       });
     }
     
-    const { batchSyncProducts } = await import('../services/GMCProductSync');
+    const { batchSyncToMerchant: batchSyncProducts } = await import('../services/MerchantProductSync');
 
     const gate = await evaluateGMCSyncGate(tenantId);
     if (!gate.allowed) {
@@ -142,7 +142,7 @@ router.post('/update-inventory', async (req, res) => {
       });
     }
     
-    const { updateInventory } = await import('../services/GMCProductSync');
+    const { syncProductToMerchant: updateInventory } = await import('../services/MerchantProductSync');
 
     const gate = await evaluateGMCSyncGate(tenantId);
     if (!gate.allowed) {
@@ -151,7 +151,7 @@ router.post('/update-inventory', async (req, res) => {
     }
 
     const qty = quantity != null ? Number(quantity) : 0;
-    const result = await updateInventory(tenantId, productId, qty);
+    const result = await updateInventory(tenantId, productId);
     
     res.json({
       success: result.success,

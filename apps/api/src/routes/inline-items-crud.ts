@@ -1793,8 +1793,8 @@ router.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory
 
     // Fire-and-forget: delete from GMC if item was previously synced
     if (item.sync_status === 'success' || item.sync_status === 'error') {
-      import('../services/GMCProductSync').then(({ deleteProduct }) => {
-        deleteProduct(item.tenant_id, req.params.id)
+      import('../services/MerchantProductSync').then(({ deleteFromMerchant }) => {
+        deleteFromMerchant(item.tenant_id, req.params.id)
           .then((result: any) => {
             console.log(`[Delete Item] GMC deletion for ${req.params.id}: ${result.success ? 'success' : 'failed - ' + result.error}`);
           })
@@ -1898,8 +1898,8 @@ router.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, r
 
     // Fire-and-forget: delete from GMC if item was previously synced
     if (item.sync_status === 'success' || item.sync_status === 'error' || (item.sync_status as string) === 'permanent_error') {
-      import('../services/GMCProductSync').then(({ deleteProduct }) => {
-        deleteProduct(item.tenant_id, req.params.id)
+      import('../services/MerchantProductSync').then(({ deleteFromMerchant }) => {
+        deleteFromMerchant(item.tenant_id, req.params.id)
           .then((result: any) => {
             console.log(`[Purge Item] GMC deletion for ${req.params.id}: ${result.success ? 'success' : 'failed - ' + result.error}`);
           })

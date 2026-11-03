@@ -633,7 +633,8 @@ router.post('/google/merchant/sync', authenticateToken, checkTenantAccess, async
       });
     }
 
-    const { batchSyncProducts, getGMCSyncStatus } = await import('../services/GMCProductSync');
+    const { getGMCSyncStatus } = await import('../services/GMCProductSync');
+    const { batchSyncToMerchant: batchSyncProducts } = await import('../services/MerchantProductSync');
 
     // Check if tenant's tier allows GMC sync
     const gate = await evaluateGMCSyncGate(tenantId);
@@ -710,7 +711,7 @@ router.post('/google/merchant/sync/:itemId', authenticateToken, checkTenantAcces
       return res.status(status).json({ success: false, ...body });
     }
 
-    const { syncProduct } = await import('../services/GMCProductSync');
+    const { syncProductToMerchant: syncProduct } = await import('../services/MerchantProductSync');
     const result = await syncProduct(tenantId, itemId);
 
     res.json({
@@ -755,8 +756,8 @@ router.patch('/google/merchant/inventory/:itemId', authenticateToken, checkTenan
       });
     }
 
-    const { updateInventory } = await import('../services/GMCProductSync');
-    const result = await updateInventory(tenantId, itemId, quantity);
+    const { syncProductToMerchant: updateInventory } = await import('../services/MerchantProductSync');
+    const result = await updateInventory(tenantId, itemId);
 
     res.json({
       success: result.success,
@@ -800,8 +801,8 @@ router.patch('/google/merchant/price/:itemId', authenticateToken, checkTenantAcc
       });
     }
 
-    const { updatePrice } = await import('../services/GMCProductSync');
-    const result = await updatePrice(tenantId, itemId, priceCents, currency || 'USD');
+    const { syncProductToMerchant: updatePrice } = await import('../services/MerchantProductSync');
+    const result = await updatePrice(tenantId, itemId);
 
     res.json({
       success: result.success,
@@ -837,7 +838,7 @@ router.delete('/google/merchant/product/:itemId', authenticateToken, checkTenant
       });
     }
 
-    const { deleteProduct } = await import('../services/GMCProductSync');
+    const { deleteFromMerchant: deleteProduct } = await import('../services/MerchantProductSync');
     const result = await deleteProduct(tenantId, itemId);
 
     res.json({

@@ -7,7 +7,7 @@
  */
 
 import { prisma } from '../prisma';
-import { syncProduct } from '../services/GMCProductSync';
+import { syncProductToMerchant as syncProduct } from '../services/MerchantProductSync';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 import { logger } from '../logger';
 import { scheduleJob, stopJob } from './registry';

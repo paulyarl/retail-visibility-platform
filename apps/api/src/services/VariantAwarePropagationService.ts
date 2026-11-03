@@ -483,7 +483,7 @@ export class VariantAwarePropagationService extends BaseService {
     logger.info(`Handling GMC sync propagation for ${products.length} products`);
     
     try {
-      const { batchSyncProducts } = await import('./GMCProductSync');
+      const { batchSyncToMerchant: batchSyncProducts } = await import('./MerchantProductSync');
 
       const itemIds = request.productIds || products.map(p => p.id);
       const result = await batchSyncProducts(request.tenantId, itemIds);
