@@ -1,24 +1,27 @@
 /**
- * Google Merchant Center (GMC) Integration
- * ENH-2026-043
- * 
- * Read-only access to GMC data (v1)
- * Uses Merchant API (replaces deprecated Content API for Shopping)
+ * Google Merchant Center (GMC) read module — Merchant API.
+ *
+ * Spec: docs/LocalBiz/GMC_MERCHANT_API_SWIS_SPEC.md §5
+ * Reads go through lib/google/merchant-api.ts (merchantapi.googleapis.com).
+ * The only remaining Content API call is listMerchantAccounts' authinfo
+ * endpoint — no verified Merchant API equivalent for account discovery yet
+ * (spec open decision #2; interim until confirmed).
  */
 
 import { getValidGoogleAccessToken } from './token-store';
 import { prisma } from '../../prisma';
 import { generateQuickStart } from '../id-generator';
 import { logger } from '../../logger';
+import {
+  getMerchantAccount as apiGetMerchantAccount,
+  getProcessedProduct,
+  listProcessedProducts,
+} from './merchant-api';
 
-// Content API for Shopping v2.1 (stable, widely used)
-const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
-const CONTENT_API_VERSION = 'v2.1';
-const MERCHANT_API_VERSION = 'v2.1';
+// Content API for Shopping — INTERIM for account discovery only.
+const GMC_API_BASE = 'https://shoppingcontent.googleapis.com'; // completion-gate-allow: authinfo interim
+const CONTENT_API_VERSION = 'v2.1'; // completion-gate-allow: authinfo interim
 
-/**
- * Get valid access token (refresh if expired)
- */
 async function getValidAccessToken(account_id: string): Promise<string | null> {
   const token = await getValidGoogleAccessToken('gmc', { accountId: account_id });
   if (!token) {
@@ -28,8 +31,9 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 }
 
 /**
- * List merchant accounts using Content API authinfo endpoint
- * This returns all merchant accounts the authenticated user has access to
+ * List merchant accounts the authenticated user can access.
+ * INTERIM: still on Content API authinfo — Merchant API has no confirmed
+ * non-MCA discovery endpoint. See spec open decision.
  */
 export async function listMerchantAccounts(account_id: string): Promise<any[]> {
   const accessToken = await getValidAccessToken(account_id);
@@ -37,8 +41,7 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
     throw new Error('merchant_accounts_failed: no valid access token for account');
   }
 
-  // Content API authinfo endpoint returns all accounts the user has access to
-  const response = await fetch(`${GMC_API_BASE}/content/${CONTENT_API_VERSION}/accounts/authinfo`, {
+  const response = await fetch(`${GMC_API_BASE}/content/${CONTENT_API_VERSION}/accounts/authinfo`, { // completion-gate-allow: authinfo interim
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -59,11 +62,8 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
   }
 
   const data = await response.json() as { accountIdentifiers?: any[] };
-
-  // authinfo returns accountIdentifiers array with accountId
   const accountIds = data.accountIdentifiers || [];
 
-  // Return formatted accounts
   return accountIds.map((acc: any) => ({
     accountId: acc.aggregatorId || acc.merchantId,
     name: `Merchant ${acc.aggregatorId || acc.merchantId}`,
@@ -71,120 +71,49 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
   }));
 }
 
-/**
- * Get merchant account details
- * Uses Merchant API accounts.get endpoint
- */
+/** Get a merchant account — Merchant API accounts.get. */
 export async function getMerchantAccount(
   account_id: string,
-  merchantId: string
+  merchantId: string,
 ): Promise<any | null> {
   const accessToken = await getValidAccessToken(account_id);
   if (!accessToken) {
     throw new Error('merchant_account_failed: no valid access token for account');
   }
-
-  const response = await fetch(`${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    logger.error('[GMC] Failed to fetch merchant account:', undefined, {
-      status: response.status,
-      body: body.slice(0, 500),
-    });
-    throw new Error(`merchant_account_failed: ${response.status} ${body.slice(0, 300)}`);
-  }
-
-  return await response.json();
+  return apiGetMerchantAccount(accessToken, merchantId);
 }
 
-/**
- * List products in merchant account
- * Uses Merchant API products.list endpoint
- */
+/** List processed products — Merchant API products.list (paginated). */
 export async function listProducts(
   account_id: string,
   merchantId: string,
-  maxResults: number = 50
+  maxResults: number = 50,
 ): Promise<any[]> {
   const accessToken = await getValidAccessToken(account_id);
   if (!accessToken) {
     throw new Error('products_failed: no valid access token for account');
   }
-
-  // Merchant API uses accounts/{account}/products format with pageSize
-  const response = await fetch(
-    `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products?pageSize=${maxResults}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    logger.error('[GMC] Failed to fetch products:', undefined, {
-      status: response.status,
-      body: body.slice(0, 500),
-    });
-    throw new Error(`products_failed: ${response.status} ${body.slice(0, 300)}`);
-  }
-
-  const data = await response.json() as { products?: any[] };
-  return data.products || [];
+  const products = await listProcessedProducts(accessToken, merchantId, maxResults);
+  return products.slice(0, maxResults);
 }
 
-/**
- * Get product details
- * Uses Merchant API products.get endpoint
- */
+/** Get one processed product by offerId — Merchant API products.get. */
 export async function getProduct(
   account_id: string,
   merchantId: string,
-  productId: string
+  productId: string,
 ): Promise<any | null> {
   const accessToken = await getValidAccessToken(account_id);
   if (!accessToken) {
     throw new Error('product_failed: no valid access token for account');
   }
-
-  // Merchant API uses accounts/{account}/products/{product} format
-  const response = await fetch(
-    `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products/${productId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    logger.error('[GMC] Failed to fetch product:', undefined, {
-      status: response.status,
-      body: body.slice(0, 500),
-    });
-    throw new Error(`product_failed: ${response.status} ${body.slice(0, 300)}`);
-  }
-
-  return await response.json();
+  return getProcessedProduct(accessToken, merchantId, productId);
 }
 
-/**
- * Sync merchant account to database
- * Uses Merchant API response format
- */
+/** Sync merchant account row — Merchant API accounts.get + link upsert. */
 export async function syncMerchantAccount(
   account_id: string,
-  merchantId: string
+  merchantId: string,
 ): Promise<boolean> {
   try {
     const merchantData = await getMerchantAccount(account_id, merchantId);
@@ -192,14 +121,11 @@ export async function syncMerchantAccount(
       return false;
     }
 
-    // Merchant API returns different field names
     const merchantName = merchantData.accountName || merchantData.name || 'Unknown';
     const websiteUrl = merchantData.homepageUri || merchantData.websiteUrl || null;
 
-    // Upsert merchant link (schema has no composite unique on [account_id, merchant_id])
-    // Find existing by (account_id, merchant_id), then update by id; else create
     const existing = await prisma.google_merchant_links_list.findFirst({
-      where: { account_id: account_id, merchant_id: merchantId }, 
+      where: { account_id: account_id, merchant_id: merchantId },
       select: { id: true },
     });
 
@@ -207,7 +133,7 @@ export async function syncMerchantAccount(
       await prisma.google_merchant_links_list.update({
         where: { id: existing.id },
         data: {
-          merchant_name: merchantName, 
+          merchant_name: merchantName,
           website_url: websiteUrl,
           last_sync_at: new Date(),
           sync_status: 'success',
@@ -225,7 +151,7 @@ export async function syncMerchantAccount(
           website_url: websiteUrl,
           is_active: true,
           last_sync_at: new Date(),
-          sync_status: 'success', 
+          sync_status: 'success',
           created_at: new Date(),
           updated_at: new Date(),
         },
@@ -236,8 +162,7 @@ export async function syncMerchantAccount(
     return true;
   } catch (error) {
     logger.error('[GMC] Error syncing merchant account:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    
-    // Update sync status to error
+
     await prisma.google_merchant_links_list.updateMany({
       where: { account_id: account_id, merchant_id: merchantId },
       data: {
@@ -246,18 +171,19 @@ export async function syncMerchantAccount(
         updated_at: new Date(),
       },
     });
-    
+
     return false;
   }
 }
 
 /**
- * Get product statistics
- * Uses Merchant API products.list to calculate stats
+ * Product stats from processed products — Merchant API products.list.
+ * productStatus.itemLevelIssues exists on the processed product (unlike the
+ * old Content API products.list read), so error/warning counts are real now.
  */
 export async function getProductStats(
   account_id: string,
-  merchantId: string
+  merchantId: string,
 ): Promise<{
   total: number;
   active: number;
@@ -269,46 +195,16 @@ export async function getProductStats(
     throw new Error('product_stats_failed: no valid access token for account');
   }
 
-  // Merchant API: fetch products with larger page size for stats
-  const response = await fetch(
-    `${GMC_API_BASE}/${MERCHANT_API_VERSION}/accounts/${merchantId}/products?pageSize=250`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+  const products = await listProcessedProducts(accessToken, merchantId, 250);
 
-  if (!response.ok) {
-    const body = await response.text();
-    logger.error('[GMC] Failed to fetch products for stats:', undefined, {
-      status: response.status,
-      body: body.slice(0, 500),
-    });
-    throw new Error(`product_stats_failed: ${response.status} ${body.slice(0, 300)}`);
-  }
-
-  const data = await response.json() as { products?: any[] };
-  const products = data.products || [];
-
-  const stats = {
-    total: products.length,
-    active: 0,
-    pending: 0,
-    disapproved: 0,
-  };
-
-  // Merchant API uses different status structure
-  products.forEach((product: any) => {
-    const status = product.productStatus?.itemLevelIssues || [];
-    const hasErrors = status.some((issue: any) => issue.severity === 'error');
-    const hasWarnings = status.some((issue: any) => issue.severity === 'warning');
-
+  const stats = { total: products.length, active: 0, pending: 0, disapproved: 0 };
+  for (const product of products) {
+    const issues = product.productStatus?.itemLevelIssues || [];
+    const hasErrors = issues.some((i: any) => i.severity === 'error');
+    const hasWarnings = issues.some((i: any) => i.severity === 'warning');
     if (hasErrors) stats.disapproved++;
     else if (hasWarnings) stats.pending++;
     else stats.active++;
-  });
-
+  }
   return stats;
 }
