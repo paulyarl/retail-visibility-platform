@@ -956,6 +956,14 @@ router.get('/google/merchant/product-sync-status', authenticateToken, checkTenan
       where.sync_status = statusFilter;
     }
 
+    // Eligibility filter (spec §6.5): selectable = unified feed filter
+    if (req.query.selectable === 'true') {
+      where.item_status = 'active';
+      where.visibility = 'public';
+      where.product_type = { in: ['physical', 'hybrid'] };
+      where.google_online_excluded = { not: true };
+    }
+
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -976,6 +984,9 @@ router.get('/google/merchant/product-sync-status', authenticateToken, checkTenan
           price: true,
           product_type: true,
           metadata: true,
+          item_status: true,
+          swis_listed: true,
+          google_online_excluded: true,
         },
         orderBy: { title: 'asc' },
         skip: offset,
@@ -984,8 +995,28 @@ router.get('/google/merchant/product-sync-status', authenticateToken, checkTenan
       prisma.inventory_items.count({ where }),
     ]);
 
+    // Per-destination state rows (spec §6.5) for these items
+    const stateRows = items.length
+      ? await prisma.gmc_item_sync_state.findMany({
+          where: { inventory_item_id: { in: items.map(i => i.id) } },
+          select: { inventory_item_id: true, destination: true, status: true, last_error: true },
+        })
+      : [];
+    const stateByItem = new Map<string, Record<string, { status: string; last_error: string | null }>>();
+    for (const row of stateRows) {
+      const entry = stateByItem.get(row.inventory_item_id) || {};
+      entry[row.destination] = { status: row.status, last_error: row.last_error };
+      stateByItem.set(row.inventory_item_id, entry);
+    }
+
     const products = items.map((item) => {
       const meta = item.metadata as any;
+      const feedEligible =
+        item.item_status === 'active' &&
+        item.visibility === 'public' &&
+        ['physical', 'hybrid'].includes(item.product_type) &&
+        !item.google_online_excluded;
+      const dest = stateByItem.get(item.id) || {};
       return {
         id: item.id,
         title: item.title,
@@ -997,6 +1028,16 @@ router.get('/google/merchant/product-sync-status', authenticateToken, checkTenan
         productType: item.product_type || null,
         syncError: meta?.gmc_sync_error || null,
         gmcItemId: meta?.gmc_item_id || null,
+        itemStatus: item.item_status,
+        swisListed: item.swis_listed,
+        googleOnlineExcluded: item.google_online_excluded,
+        feedEligible,
+        destinations: {
+          online: dest.online?.status || null,
+          onlineError: dest.online?.last_error || null,
+          local: dest.local?.status || null,
+          localError: dest.local?.last_error || null,
+        },
       };
     });
 

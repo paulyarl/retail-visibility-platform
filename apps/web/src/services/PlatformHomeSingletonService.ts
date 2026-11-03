@@ -3443,6 +3443,79 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   /**
+   * SWIS readiness — the ordered prerequisite chain for the local surface
+   * (spec §6.2): connect → GBP↔MC link → free-local-listings enrollment →
+   * store code → product selection → ready.
+   */
+  async getSwisReadiness(tenantId: string): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `/api/google/merchant/swis-readiness?tenantId=${tenantId}`,
+      {},
+      `platform-swis-readiness-${tenantId}`
+    );
+    return result.data;
+  }
+
+  /**
+   * Checklist confirmations — the console-only SWIS steps a merchant reports
+   * back (GBP↔MC link, enrollment, store code, opt-in).
+   */
+  async patchSwisSetup(
+    tenantId: string,
+    body: { gbpAccountUrl?: string; freeListingsEnabled?: boolean; storeCode?: string; swisEnabled?: boolean }
+  ): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `/api/google/merchant/swis-setup`,
+      { method: 'PATCH', body: JSON.stringify({ tenantId, ...body }) },
+      `platform-swis-setup-${tenantId}`
+    );
+    return result.data;
+  }
+
+  /**
+   * Per-product state management (spec §7.3): surface flags + item status.
+   * Each change runs its matching path — local upsert on select, deletes on
+   * deselect/exclusion/inactivation, re-sync on re-inclusion.
+   */
+  async patchProductSurfaces(
+    tenantId: string,
+    itemId: string,
+    body: { swisListed?: boolean; googleOnlineExcluded?: boolean; itemStatus?: 'active' | 'inactive' }
+  ): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `/api/google/merchant/product-surfaces/${itemId}`,
+      { method: 'PATCH', body: JSON.stringify({ tenantId, ...body }) },
+      `platform-product-surfaces-${tenantId}-${itemId}`
+    );
+    return result.data;
+  }
+
+  /**
+   * Trigger a GMC product sync — whole catalog, or a selected subset when
+   * itemIds is provided (batch endpoint accepts the list).
+   */
+  async syncGMCProducts(tenantId: string, itemIds?: string[]): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `/api/google/merchant/sync`,
+      { method: 'POST', body: JSON.stringify({ tenantId, itemIds }) },
+      `platform-gmc-sync-${tenantId}`
+    );
+    return result.data;
+  }
+
+  /**
    * Get Square integration status
    */
   async getSquareStatus(tenantId: string): Promise<SquareStatus | null> {

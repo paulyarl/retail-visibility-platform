@@ -35,6 +35,16 @@ interface ProductSyncItem {
   productType: string | null;
   syncError: string | null;
   gmcItemId: string | null;
+  itemStatus: string;
+  swisListed: boolean;
+  googleOnlineExcluded: boolean;
+  feedEligible: boolean;
+  destinations: {
+    online: string | null;
+    onlineError: string | null;
+    local: string | null;
+    localError: string | null;
+  };
 }
 
 interface ProductsTabProps {
@@ -87,6 +97,9 @@ export default function ProductsTab({
   const [loadingValidation, setLoadingValidation] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [swisReadiness, setSwisReadiness] = useState<any>(null);
+  const [surfacePending, setSurfacePending] = useState<Set<string>>(new Set());
+  const [storeCodeDraft, setStoreCodeDraft] = useState('');
 
   const validationIndex = buildValidationIndex(validationReport);
 
@@ -169,6 +182,72 @@ export default function ProductsTab({
       loadValidation();
     }
   }, [syncResult, loadValidation]);
+
+  // SWIS readiness — the checklist that gates the In-store (SWIS) column
+  const fetchReadiness = useCallback(async () => {
+    try {
+      const result = await platformHomeService.getSwisReadiness(tenantId);
+      setSwisReadiness(result?.data || null);
+    } catch (err) {
+      clientLogger.error('Failed to fetch SWIS readiness:', { detail: err });
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (tenantId && gmcConnected) {
+      fetchReadiness();
+    }
+  }, [tenantId, gmcConnected, fetchReadiness]);
+
+  // Per-product surface/status writes (spec §7.3) — optimistic row update,
+  // then readiness refresh since a first selection flips swis_enabled.
+  async function patchSurface(
+    itemId: string,
+    patch: { swisListed?: boolean; googleOnlineExcluded?: boolean; itemStatus?: 'active' | 'inactive' }
+  ) {
+    setSurfacePending((prev) => new Set(prev).add(itemId));
+    try {
+      await platformHomeService.patchProductSurfaces(tenantId, itemId, patch);
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === itemId
+            ? {
+                ...p,
+                ...(patch.swisListed !== undefined ? { swisListed: patch.swisListed } : {}),
+                ...(patch.googleOnlineExcluded !== undefined ? { googleOnlineExcluded: patch.googleOnlineExcluded } : {}),
+                ...(patch.itemStatus !== undefined ? { itemStatus: patch.itemStatus } : {}),
+              }
+            : p
+        )
+      );
+      fetchReadiness();
+    } catch (err) {
+      clientLogger.error('Failed to update product surfaces:', { detail: err });
+    } finally {
+      setSurfacePending((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  }
+
+  // Console-step confirmations — the steps Google can't expose via API
+  async function confirmSwisStep(patch: {
+    gbpAccountUrl?: string;
+    freeListingsEnabled?: boolean;
+    storeCode?: string;
+    swisEnabled?: boolean;
+  }) {
+    try {
+      const result = await platformHomeService.patchSwisSetup(tenantId, patch);
+      setSwisReadiness(result?.data || null);
+    } catch (err) {
+      clientLogger.error('Failed to confirm SWIS step:', { detail: err });
+    }
+  }
+
+  const swisSelectable = ['pending_selection', 'ready'].includes(swisReadiness?.state);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -345,6 +424,68 @@ export default function ProductsTab({
         </div>
       )}
 
+      {/* SWIS checklist — the local surface needs the console steps + a selection */}
+      {swisReadiness && !['ready', 'disconnected'].includes(swisReadiness.state) && (
+        <div className="p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg space-y-2">
+          <p className="text-sm font-medium text-violet-900 dark:text-violet-100">
+            {swisReadiness.state === 'pending_selection'
+              ? 'In-store (SWIS) is almost live — select products below'
+              : 'In-store (SWIS) setup — complete the checklist to unlock'}
+          </p>
+          <ul className="space-y-1.5">
+            {(swisReadiness.steps || []).map((step: any) => (
+              <li key={step.key} className="flex items-center gap-2 text-sm">
+                {step.done ? (
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-neutral-300 flex-shrink-0" />
+                )}
+                <span className={step.done ? 'text-neutral-500' : 'text-violet-900 dark:text-violet-100 font-medium'}>
+                  {step.label}
+                </span>
+                {!step.done && step.key === 'link_gbp' && (
+                  <button
+                    onClick={() => confirmSwisStep({ gbpAccountUrl: 'merchant-confirmed' })}
+                    className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
+                  >
+                    Confirm linked
+                  </button>
+                )}
+                {!step.done && step.key === 'enroll' && (
+                  <button
+                    onClick={() => confirmSwisStep({ freeListingsEnabled: true })}
+                    className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
+                  >
+                    Confirm enabled
+                  </button>
+                )}
+                {!step.done && step.key === 'store_code' && (
+                  <span className="inline-flex items-center gap-1">
+                    <input
+                      value={storeCodeDraft}
+                      onChange={(e) => setStoreCodeDraft(e.target.value)}
+                      placeholder="store code"
+                      className="px-2 py-0.5 text-xs border border-violet-300 rounded w-24 bg-white dark:bg-neutral-800"
+                    />
+                    <button
+                      onClick={() => storeCodeDraft.trim() && confirmSwisStep({ storeCode: storeCodeDraft.trim() })}
+                      className="text-xs px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white rounded"
+                    >
+                      Save
+                    </button>
+                  </span>
+                )}
+                {!step.done && step.key === 'select' && (
+                  <span className="text-xs text-violet-700 dark:text-violet-300">
+                    Use the In-store (SWIS) column below.
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -352,9 +493,15 @@ export default function ProductsTab({
             {selectedIds.size} selected
           </span>
           <button
-            onClick={() => {
-              onSyncAll();
-              setSelectedIds(new Set());
+            onClick={async () => {
+              const ids = Array.from(selectedIds);
+              try {
+                await platformHomeService.syncGMCProducts(tenantId, ids);
+                setSelectedIds(new Set());
+                fetchProducts();
+              } catch (err) {
+                clientLogger.error('Failed to sync selected products:', { detail: err });
+              }
             }}
             className="text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium"
           >
@@ -387,6 +534,7 @@ export default function ProductsTab({
                 <th className="px-4 py-3">SKU</th>
                 <th className="px-4 py-3">Validation</th>
                 <th className="px-4 py-3">Sync Status</th>
+                <th className="px-4 py-3">Surfaces</th>
                 <th className="px-4 py-3">Last Synced</th>
                 <th className="px-4 py-3">Error</th>
               </tr>
@@ -394,14 +542,14 @@ export default function ProductsTab({
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center">
+                  <td colSpan={8} className="px-4 py-8 text-center">
                     <RefreshCw className="w-6 h-6 animate-spin text-neutral-400 mx-auto mb-2" />
                     <p className="text-sm text-neutral-500">Loading products...</p>
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center">
+                  <td colSpan={8} className="px-4 py-8 text-center">
                     <p className="text-sm text-neutral-500">No products found.</p>
                   </td>
                 </tr>
@@ -453,6 +601,58 @@ export default function ProductsTab({
                         <td className="px-4 py-3">
                           {getStatusBadge(product.syncStatus)}
                         </td>
+                        <td className="px-4 py-3">
+                          <div className="space-y-1 text-xs">
+                            <label className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+                              <input
+                                type="checkbox"
+                                disabled={surfacePending.has(product.id)}
+                                checked={!product.googleOnlineExcluded}
+                                onChange={(e) =>
+                                  patchSurface(product.id, { googleOnlineExcluded: !e.target.checked })
+                                }
+                                className="rounded border-neutral-300"
+                              />
+                              Shopping
+                            </label>
+                            <label
+                              className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400"
+                              title={
+                                !product.swisListed && !swisSelectable
+                                  ? `SWIS setup incomplete (${swisReadiness?.state || 'unknown'})`
+                                  : !product.feedEligible && !product.swisListed
+                                    ? 'Item not feed-eligible (needs active + public + physical/hybrid)'
+                                    : undefined
+                              }
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={
+                                  surfacePending.has(product.id) ||
+                                  (!product.swisListed && (!swisSelectable || !product.feedEligible))
+                                }
+                                checked={product.swisListed}
+                                onChange={(e) => patchSurface(product.id, { swisListed: e.target.checked })}
+                                className="rounded border-neutral-300"
+                              />
+                              In-store (SWIS)
+                            </label>
+                            {product.destinations?.local && (
+                              <div className="text-neutral-400">local: {product.destinations.local}</div>
+                            )}
+                            <button
+                              onClick={() =>
+                                patchSurface(product.id, {
+                                  itemStatus: product.itemStatus === 'active' ? 'inactive' : 'active',
+                                })
+                              }
+                              disabled={surfacePending.has(product.id)}
+                              className="text-blue-600 hover:underline disabled:opacity-50"
+                            >
+                              {product.itemStatus === 'active' ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-sm text-neutral-500">
                           {product.syncedAt
                             ? new Date(product.syncedAt).toLocaleDateString()
@@ -464,7 +664,7 @@ export default function ProductsTab({
                       </tr>
                       {validation && isExpanded && (
                         <tr className="bg-neutral-50 dark:bg-neutral-900/30">
-                          <td colSpan={7} className="px-4 py-3">
+                          <td colSpan={8} className="px-4 py-3">
                             <ul className="space-y-1">
                               {validation.issues.map((issue, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-xs">

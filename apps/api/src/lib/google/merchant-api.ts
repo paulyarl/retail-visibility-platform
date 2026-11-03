@@ -67,7 +67,12 @@ export async function getMerchantContext(tenantId: string): Promise<MerchantCont
       return null;
     }
 
-    return { token, merchantId: merchantLink.merchant_id, oauthAccountId: account!.id };
+    // Lazy developer registration — required once per GCP project before any
+    // Merchant API call; 409 means already-registered. Once per process per
+    // merchant, fire-and-forget so a slow Google call never gates the sync.
+    const ctx = { token, merchantId: merchantLink.merchant_id, oauthAccountId: account!.id };
+    ensureDeveloperRegistered(ctx).catch(() => { /* logged inside */ });
+    return ctx;
   } catch (error) {
     logger.error('[MerchantAPI] Error resolving context:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
@@ -312,6 +317,15 @@ export async function deleteLocalInventory(
 }
 
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
+
+const registeredMerchants = new Set<string>();
+const REGISTRATION_EMAIL = process.env.GMC_DEVELOPER_EMAIL || 'support@visibleshelf.com';
+
+async function ensureDeveloperRegistered(ctx: MerchantContext): Promise<void> {
+  if (registeredMerchants.has(ctx.merchantId)) return;
+  const ok = await registerDeveloper(ctx.token, ctx.merchantId, REGISTRATION_EMAIL);
+  if (ok) registeredMerchants.add(ctx.merchantId);
+}
 
 /**
  * One-time developer registration per GCP project (required before any
