@@ -2,12 +2,15 @@
 
 Status: PROPOSED | Date: 2026-11-03 | Depends on: `GMC_MERCHANT_API_SWIS_SPEC.md` (the downstream SWIS path is built and live)
 
+Rev v0.4 — §11–§14 specify the engagement motion (consent envelope + guided-hands rule, validation matrix with two pre-build kill tests, freshness automation + the `integration_gmc_local_autorefresh` capability key, Phase-1 gate and artifacts). §15–§16 add the day-1 deliverable/shareable inventory, the approach variants, and the measured product-search test. §17 adds ownership access — the phase before the door. The signable instrument is `docs/LocalBiz/PIONEER_PILOT_AGREEMENT.md`. Implementation stays gated behind the engagement motion.
+
 ## 1. Opportunity
 
-NRS (National Retail Solutions) POS merchants hold rich catalog + stock data inside their registers, but NRS provides **no Google local-inventory path** — that data never reaches Google surfaces. The platform's SWIS path (Merchant API + localInventories + checklist) is complete; what's missing is getting POS-locked data *into* `inventory_items`. Two ingestion shapes cover the whole segment:
+NRS (National Retail Solutions) POS merchants hold rich catalog + stock data inside their registers, but NRS provides **no Google local-inventory path** — that data never reaches Google surfaces. The platform's SWIS path (Merchant API + localInventories + checklist) is complete; what's missing is getting POS-locked data *into* `inventory_items`. Three ingestion shapes cover the whole segment:
 
 - **API path** (Clover/Square — exists) — live stock, full automation
 - **CSV path** (NRS + every POS with a merchant export — **this spec**) — periodic import, merchant-driven
+- **Manual path** (no POS, or a POS with no export) — the merchant maintains the catalog in the platform portal. The only path with **no external dependency**, and therefore the one that makes the vendor-agnostic claim literally true.
 
 The CSV path is not a workaround — it's the wedge. It requires **zero cooperation from the POS vendor**, so the platform can serve merchants on *any* register, then convert vendor partnerships (NRS) from a position of working proof.
 
@@ -26,7 +29,30 @@ The CSV path is not a workaround — it's the wedge. It requires **zero cooperat
 
 **Why Clover first:** zero build — the whole chain exists (Clover connector → inventory → Merchant API → localInventories), so the pilot is onboarding + Google's console steps, not engineering. The checklist friction it surfaces feeds the NRS-side build.
 
-**Why Jokkymore is the ideal NRS pilot:** real storefront + shelves, grocery/specialty-market category = the highest-frequency "in stock near me" query segment, active claimed GBP (54 reviews ⇒ verified profile), independent operator = fast decision.
+**Sequencing dependency:** the Clover merchant is still TBD. If none is in hand when the pilot starts, Jokkymore becomes pioneer #1 and the CSV importer moves onto the critical path instead of running in the pilot's dead time (§14). Naming a Clover merchant or accepting the swap is a decision, not a scheduling detail.
+
+**Clover pioneer qualification.** The Clover kill test is not the same as NRS's. What matters is whether the merchant's Clover account holds **item-level inventory with quantities** — not whether they take Clover payments. A merchant who runs Clover for card processing and keys prices at the register has no catalog to sync, and SWIS has nothing to publish.
+
+| Check | Pass | Fail |
+| --- | --- | --- |
+| Item catalog exists in Clover | items with SKUs/names | payments-only account |
+| Quantities tracked | on-hand counts per item | items listed, no stock |
+| Retail, not food service | SKU-based inventory | menu-based (restaurant) |
+| Independent, single storefront | owner-operated | chain/franchise |
+
+**Where to source them.** Clover pioneers come from the same **seed pipeline** as NRS — an unclaimed seed, invited to claim, where the claim is a **gate rather than the offer**. The destination is the Clover → SWIS proof (`docs/LocalBiz/OWNERSHIP_PACKET_TEMPLATE.md` Template B).
+
+Three routes, in order of yield:
+
+1. **Clover resellers and ISVs** in Indiana — they hold merchant books and want value-adds that make the hardware stickier. One introduction beats twenty doors.
+2. **SKU-based retail corridors** — convenience, specialty food, hardware, pet, liquor. Clover skews food service, so filter hard for retail with inventory.
+3. **Existing tenants already running Clover** — check the integration table first; the connector is built, so a warm start may already be sitting there.
+
+**The packet is one page for both.** Claim is step one, ingestion is step two, products-on-Google is the destination — NRS and Clover sit at the same level, differing only in how the catalog arrives (`docs/LocalBiz/OWNERSHIP_PACKET_TEMPLATE.md` carries the page plus two step-2 print variants). Clover is the easier yes and the harder control — a broken connection fails silently, so the pilot needs a connection-health check, not only the staleness cutoff in §13.
+
+**Why Jokkymore is the ideal NRS pilot:** real storefront + shelves, grocery/specialty-market category = the highest-frequency "in stock near me" query segment, a strong live listing (4.9★, 54 reviews, correct category, current hours), independent operator = fast decision.
+
+**Claim state is unverified, not assumed.** Review volume is not evidence of profile ownership — a POS vendor can syndicate a listing, and NRS does exactly that. SWIS needs GBP ownership to link Merchant Center and mint the store code, so the claim is a **pilot step confirmed at the door**, not a premise. See §12 kill test 2.
 
 **Parallel track:** build the NRS CSV importer *while* the Clover pilot works through Google's verification steps — the pilot's onboarding has natural dead time (merchant yes → GBP verify → checklist → first sync), so CSV lands in the gap instead of starting cold.
 
@@ -62,6 +88,15 @@ An **"Import products & stock"** card on the integrations page (or the products 
 - Last-import timestamp + result summary ("412 items updated, 3 errors")
 - **Freshness label** — the honest framing: *"Your Google stock reflects your latest upload"* — never pretend live on a daily file
 - Later (SOP reinforcement): a gentle "last upload was N days ago" nudge — the ritual only works if it sticks
+
+### 5.1 Manual-path affordances (no POS)
+
+The manual path needs two surfaces, and the first one is nearly free because the importer already exists:
+
+- **Downloadable stock sheet.** A platform-authored CSV with the `generic` column map — download, fill, upload. Same endpoint, same upsert, same report. Where the platform has already observed items publicly (a POS storefront page, a menu, a supplier record), the sheet ships **pre-filled with those names** so the merchant confirms and counts instead of typing.
+- **Quick count.** Search or select an item → enter the count → save. This is the recurring surface: designed for a phone held in one hand at the shelf, one list of items with a number field each, batch save, and a visible last-counted date per item.
+
+**Why the count path matters strategically.** Register quantities drift with shrinkage and unrecorded sales; a physical count does not. For an "in stock near you" surface, a weekly shelf walk may be *truer* than a live POS feed — at the cost of cadence. That inverts the usual ranking of the three ingestion paths: the manual path is not the consolation prize, it is the most accurate one when it is actually maintained.
 
 ## 6. Merchant SOP — the ritual
 
@@ -136,9 +171,333 @@ The merchant keeps their hardware, keeps their workflow, spends maybe an hour on
 | 3 | `last_import_at` + import log (result summary per import) | small table or `tenant_*_settings` row |
 | 4 | Upload card UI — file picker, format, last-import, freshness label | integrations page or products settings |
 | 5 | Tests: mapper edge cases, SKU upsert create/update/no-op, flag-not-delete on absence, auth scoping | `apps/api/src/services/__tests__/` |
+| 6 | `integration_gmc_local_autorefresh` capability key + `last_import_at` staleness cutoff in the 6h sync (§13) — fixture edit first, then code | `shared/tier-contract.json` → `apps/api/src/jobs/gmc-scheduled-sync.ts` |
 
 **Out of scope for v1:** scheduled/server-side pulls (manual upload only — the merchant's file cadence IS the freshness model); live stock deltas (NRS API is the partnership outcome, not a v1 assumption); auto-deletion of items missing from a re-upload.
 
 ## 10. The bigger claim this validates
 
 Every POS segment that vendors ignore has this same shape — the platform becomes the universal "register data → Google surfaces" pipe, vendor-agnostic by design. Jokkymore → NRS partnership → Clover pilot proves it on both ingestion models. That's the stage-of-validity jump: not one merchant on Google Maps, but the first working proof that the platform democratizes what only the chains had.
+
+---
+
+## 11. Consent & access — the guided-hands rule
+
+**The validity condition.** Every gate in this pilot needs access only the merchant holds: the NRS merchant portal, the Google Business Profile, the Merchant Center account. The platform cannot validate from outside; it can only instruct and verify.
+
+Therefore: **if the platform performs the steps, the pilot proves nothing.** The thing under test is whether an independent owner can complete the flow. Concierge posture (`PIONEER_RECRUITMENT_SPEC.md` §1) is a conversion tool and is explicitly out of bounds for this pilot — it destroys the evidence. Guided hands, not done-for-you.
+
+**Consent envelope — four grants, none of which is a credential:**
+
+| Grant | Mechanism | Revocation |
+| --- | --- | --- |
+| NRS pricebook export | merchant logs into `nrsplus.com` and downloads; the platform never holds the register login | merchant stops uploading |
+| Google Business Profile | merchant adds the platform as a **manager** on the profile | merchant removes manager |
+| Google Merchant Center | merchant-owned account; platform added as a user | merchant removes user |
+| Data & publicity | name + metrics shareable; no photos or direct quotes without separate permission (§8) | exit path (§8) |
+
+**Hard rule — no credential custody.** NRS portal credentials, the GBP login, and the MC login never leave the merchant. Beyond the ToS exposure, a pilot blocked on credential handover will not survive a security review, and it converts a validation exercise into an agency engagement.
+
+**Consent sheet (the Phase-1 artifact):** the signable form is `docs/LocalBiz/PIONEER_PILOT_AGREEMENT.md` — duration, expectations, access grants, privacy/data handling, benefits, fees, publicity, and the validation matrix as exhibits. This section is the design intent; that document is the instrument. Draft status: requires counsel review before signature.
+
+**Workload statement — said at the door, not in week three:**
+- ~1 hour of console steps (GBP manager add, MC account + business verification, store code, GBP↔MC link)
+- one pricebook export per business day for the pilot's duration (~5 min/day, three manual steps: portal login → Pricebook → Excel Download → upload)
+- the honest framing on freshness: local inventory reflects close-of-business stock, not live stock
+
+If that workload is more than the owner will sustain, the pilot should fail at the door — that is a cheaper failure than week three.
+
+---
+
+## 12. Validation matrix — the pilot's deliverable is a decision
+
+The pilot does not ship "it worked." It ships this matrix with evidence per row. **A failed row is worth more than a passed one** when it changes the scope of the NRS path, because it tells us whether the model generalizes or only worked for one merchant.
+
+| # | Assertion | Pass condition | If it fails |
+| --- | --- | --- | --- |
+| 1 | Pricebook export available on this merchant's plan | Excel Download present and not gated behind Advanced Data | **Kill test** — CSV wedge does not exist for this merchant |
+| 2 | GBP owned by the merchant | profile visible in the owner's own Business Profile list | **Kill test** — pilot opens with a claim; Google's verification clock is on the critical path |
+| 3 | Export carries on-hand quantity | quantity/stock column present with non-zero values | SWIS asserts *assortment*, not *availability* — narrow the merchant claim and demo language to "we carry this" |
+| 4 | Export carries stable SKU/PLU | ≥90% of rows resolve without name fallback | importer needs a stronger fallback; re-import loses idempotency on those rows |
+| 5 | Price format reconciles | 100 sampled rows match shelf price | Shopping eligibility blocked; price accuracy is a Merchant Center suspension risk |
+| 6 | `store_code` matches GBP | `localInventories` accepted and read back against the right location | SWIS cannot attribute inventory to the storefront |
+| 7 | Products live on Google | read-back shows N > 0 with active status | validation proof absent — demo not claimable |
+| 8 | SWIS renders | screenshot of a real SKU showing "in stock near you" | the NRS demo does not exist |
+| 9 | SOP holds | ≥5 consecutive daily imports, read from `last_import_at` | freshness claim narrows; ritual needs redesign |
+| 10 | Checklist friction captured | time-to-complete + every step that required a human, logged | NRS-side build scope is guesswork |
+
+**Kill tests 1 and 2 run before any build.** Both are merchant-side, both cost a phone call, and either can end the pilot at zero engineering cost. Running them second wastes the most expensive resource in the plan.
+
+**Evidence per row** — screenshot, exported file, read-back payload, or logged step — stored against the seed/campaign record so the NRS conversation can cite it rather than describe it.
+
+---
+
+## 13. Freshness automation and the capability key
+
+**The expiry is a floor, not a wall.** Google local inventory data expires after 14 days unrefreshed; each insert resets the clock and re-push is unconstrained. Any coverage beats the current state of zero.
+
+**Liveness ≠ accuracy.** Automation keeps listings *live*; only a fresh import keeps them *true*. A 6-hour job faithfully re-pushing a two-month-old pricebook produces the worse failure: Google asserting "in stock" for something sold out weeks ago, sending a customer across town. An honest drop beats a confident lie.
+
+**Capability key — `integration_gmc_local_autorefresh`**
+- Lives in `capability_modules.integration_options`, alongside `integration_gmc_sync`, `integration_google_merchant_center`, `integration_google_shopping`.
+- **Fixture-first**: edit `shared/tier-contract.json` before code; the contract suites (`tier-*`, `mv-shape-lint`) fail on drift, and any file declaring the key must be listed in `surface_files`.
+- **Soft gate, not tier gate**: tier grants the capability (`allowed_*`), the owner toggles it (`can_use_*` / `effective_*` — the R33 split). "Willing" is a merchant switch; the platform never opts in on their behalf.
+
+**Staleness cutoff — calibrated to the SOP, not to Google's ceiling.** Auto-refresh while `last_import_at` ≤ 3–4 days; past that, stop re-pushing and let the listings expire deliberately. On a daily SOP, a 14-day cutoff tolerates thirteen days of silent failure — the tripwire has to fire while the process is still recoverable.
+
+**Scheduler:** `jobs/gmc-scheduled-sync.ts` already runs at 6h, inside the window — extend it, do not replace it (`GMC_MERCHANT_API_SWIS_SPEC.md` §1.4).
+
+**Read-back contract:** `"N products live on Google · M with issues · last inventory import X days ago."` Liveness without freshness lets a pilot look successful while serving stale stock — and that failure surfaces as a one-star review, not a dashboard metric.
+
+---
+
+## 14. Phase-1 gate, sequencing, and artifacts
+
+**Gate order — implementation starts at step 4, not before:**
+
+| Step | Action | Owner | Exit |
+| --- | --- | --- | --- |
+| −1 | **Ownership access** — reach the decision-maker, not the counter (§17) | platform | owner engaged by name; second visit scheduled |
+| 0 | Door conversation + consent sheet signed | platform | pioneer agrees to the workload |
+| 1 | Kill tests 1 & 2 (§12) | merchant, guided | export confirmed + claim state known |
+| 2 | First CSV import → real catalog on the platform storefront | merchant, guided | surface 1 live, result summary captured |
+| 3 | Google console steps: GBP manager add → MC account → business verification → store code → GBP↔MC link | merchant, guided | checklist complete |
+| 4 | Merchant API migration complete → first SWIS sync | platform | read-back shows N > 0 |
+| 5 | Demo capture | platform | "in stock near you" screenshot for a real SKU |
+
+**Why step 2 precedes step 3.** Google's verification and propagation are slow. A pioneer who says yes and sees nothing for two weeks drifts, and the ritual dies before the payoff. The import gives an immediate, visible win — their real shelves on a storefront they control — which sustains them through the Google wait. It is also the answer to "what do I get for agreeing today."
+
+**The gate opens onto a locked door — the pioneer grant is load-bearing.** Claiming a seed lands the merchant on `directory_presence`: free, zero-price, and **without** `integration_clover`, `integration_gmc_sync`, or `integration_google_merchant_center`. It also caps `max_skus` at 5 — which would truncate the very catalog the pilot exists to prove. So the claim alone dead-ends at a paywall in the moment of maximum intent. The cohort must carry an explicit grant, applied **before** the packet is printed:
+
+| Grant | Why |
+| --- | --- |
+| `integration_clover` (Clover) or `integration_gmc_sync` + `integration_google_merchant_center` (NRS) | without it the connect step does not exist for the tenant |
+| `max_skus` lifted | a 5-SKU cap cannot carry a real pricebook |
+| `gbp_management` — optional | only if reviews or posts are surfaced on the listing |
+
+This is what `PIONEER_RECRUITMENT_SPEC.md` §1's segmented cohort grants are for. A merchant who claims and hits a paywall is worse off than one never approached: they did the work, and the platform answered with a locked door.
+
+**Phase-1 artifacts (definition of done for the engagement motion):**
+1. Signed pilot agreement — `docs/LocalBiz/PIONEER_PILOT_AGREEMENT.md` (§11)
+2. Completed access checklist — kill tests resolved, claim state recorded
+3. One successful import with its result summary
+4. `last_import_at` set and displayed in the portal
+
+Implementation — Merchant API migration, store code, local feed — begins when those four exist. Until then, the work is engagement, not engineering.
+
+**Anti-drift note:** if the field motion starts performing the merchant's steps "just to keep it moving," the pilot silently converts back into concierge and produces no validation evidence. The consent sheet exists to make that drift visible.
+
+---
+
+## 15. Day-1 deliverable and shareables
+
+**Principle: the approach lands something in the merchant's hand before any commitment.** The door ask is the 2-minute export, not the 90-day agreement. A signature is day 0; day-1 success is the owner seeing the gap themselves.
+
+### 15.1 Tier A — carried in, zero merchant cooperation
+
+Produced before the visit, from the existing seed and audit pipeline:
+
+| Artifact | What it is | Source | Why it works |
+| --- | --- | --- | --- |
+| Live listing URL | the seeded directory page for their store | seed pipeline + publish | "you're already on it" — proof, not a proposal |
+| Shelf card | name, address, hours, category, rating, photo — the shopper-facing view | seed listing | shows the storefront exists and is accurate |
+| Shelf report (1 page) | what the listing carries, and the single missing thing: no product visibility | `business_analysis` audit | concrete and self-verifiable |
+| The comparison | their NRS storefront beside what a Google product search returns | screenshots | the whole thesis in one image |
+| QR card | QR to the listing, sized for counter or window | `directory_entry_qr_on` | a physical object they keep |
+
+**Honesty gate on the listing URL.** "You're already listed" is only sayable when the seed is published and the URL resolves. Publish the seed before the visit or lead with the shelf report instead — the claim is the whole approach and it dies if the link is dead.
+
+**The shelf report is merchant-facing, not the internal audit.** Response rates, unanswered reviews, and deficiency scoring stay out of anything handed over. Those are conversation material, framed as findings, not a document left on a counter. The shareable artifacts are the listing, the QR, and the comparison.
+
+**The leave-behind is its own artifact.** Tier A's pieces are inputs; the printed one-pager the owner receives is `docs/LocalBiz/OWNERSHIP_PACKET_TEMPLATE.md` — addressed to the owner by name, ordered gift → gap → one ask, with no pricing and no audit content.
+
+### 15.2 Tier B — same session, if the merchant engages
+
+Requires their hands on their own portal, and produces the win that carries them through Google's slow weeks:
+
+1. Merchant logs into `nrsplus.com` → Pricebook → Excel Download (~2 minutes)
+2. Upload to the import card → result summary: "N items imported"
+3. Their real catalog live on a storefront they control — surface 1, no Google dependency
+
+This is the answer to "what do I get today." It should happen in the first visit if at all possible; it converts an abstract pilot into a visible one.
+
+### 15.3 What the merchant can share
+
+| Shareable | Audience | Note |
+| --- | --- | --- |
+| Listing URL | customers, family, co-owner | the practical artifact — they can text it |
+| QR card | in-store shoppers | window or counter; the only physical asset |
+| The comparison image | peers, other owners | the referral hook from `PIONEER_RECRUITMENT_SPEC.md` §1.2 |
+| Their own catalog page | customers | once Tier B lands |
+
+Not shareable: the validation matrix, the internal audit, read-back internals, and anything carrying a deficiency framing.
+
+---
+
+## 16. Approach variants
+
+One default, four alternates, one excluded. Pick by the prospect's posture, not by operator preference.
+
+| Variant | Best fit | Opener | Hand over | Handles | Risk |
+| --- | --- | --- | --- | --- | --- |
+| **A. Comparison** *(default)* | merchant already selling through a POS storefront | "You already sell online — that's for people who know you. On Google, the products come first and the store is what they land on." | the comparison image | "we already have a website" | needs a clean side-by-side or it looks like opinion |
+| **B. Category gap** | owner who thinks the category is too niche to be searched | "Nobody in Indianapolis shows African grocery inventory on Google. The chains show theirs." | shelf report | "nobody searches for this" | must be true in the market at the time — verify, don't assert |
+| **C. Pioneer standing** | owner who likes being first or local-prominent | "We're picking one NRS merchant to prove this works before we take it to NRS." | the agreement + the matrix | "why me" | can read as a beta with no payoff — always pair with Tier B |
+| **D. Peer proof** | any, once a reference exists | "A store like yours is already showing up when people search by item." | the live example | "does this actually work" | unavailable until the Clover pilot or a second NRS merchant lands — do not fake it |
+| **E. Same-catalog** | owner dismissive of marketing | "This isn't marketing. It's the catalog you already maintain, pointed at a different door." | their own NRS page | "I don't do advertising" | needs the export to land or it stays abstract |
+| ~~F. Price-led~~ | — | — | — | — | **Excluded.** Free is a term (§6), never the pitch (`PIONEER_RECRUITMENT_SPEC.md` §1.1) |
+
+**Selection rule.** NRS storefront present → A. Proud-of-being-first → C. Dismissive of marketing → E. Reference available → D (as an upgrade to A, not a replacement). B only with verified market evidence.
+
+**Do not open with:** "your products aren't online" (false — NRS lists them), "we'll build you a website" (they have one), or any traffic number.
+
+**Escalation path within a single visit.** A → the comparison is acknowledged → Tier B export → catalog live → then C (the pilot ask), because by that point the merchant has already seen something work. Never open with C; standing is a closing frame, not an opening one.
+
+### 16.1 The product-search test — variant B's qualifier
+
+Variant B needs no preparation and no argument. It is one search, on the merchant's own phone, for a product that is on their shelf.
+
+**Procedure**
+1. Hand the merchant their own phone. Location on. Google Maps, not Search.
+2. Search a signature product they actually carry — a named brand, not a commodity ("Akabanga chili oil", "Bournvita", "garri", not "rice").
+3. Ask where the results land. Then search the category ("African grocery") on the same phone.
+4. Screenshot both, note the date and the coordinates.
+
+**Measured baseline — Indianapolis, 2026-11-03, `@39.7801,-86.2885,12z`:**
+
+| Query | What Google Maps returned | Reading |
+| --- | --- | --- |
+| `African grocery` | 8 local results. **Jokkymore at #8** (Janjai #1, Saraga #2, Kaura #3, Royal African #4, Safari #5, Dreamcast #6, Rachel #7) | findable by category, mid-pack |
+| `Akabanga chili oil` | **three Walmart Supercenters** (Lafayette Rd, Avon, Plainfield) | the chain wins a product it very likely does not stock |
+| `Bournvita` | **one place card** — an Indian restaurant in Schaumburg, Illinois | no local grocery surfaced at all |
+| `garri` | an African restaurant (Toscana, W Washington St), then name-matches in Reykjavík, Bihar, Florida, Burbank, Port Harcourt and Oyo | Google is matching the *word*, not the shelf |
+
+This is the whole thesis in four searches: **category search finds the store; product search finds Walmart, a plastic surgeon, and a dance studio.** The store is discoverable by what it is and invisible by what it sells.
+
+**The honest limit.** The test proves *supply-side* absence — Google has no product data to match — not that demand exists. Do not let it drift into "people are searching for this and can't find you." The defensible line is: *Google cannot show what nobody has told it.*
+
+**What each outcome means**
+
+- **Lands on a chain** → the gap is widest; the chain is absorbing intent for inventory it may not carry.
+- **Lands on another independent** → the shelf is contested and someone else is taking the click; stronger urgency, weaker first-mover framing.
+- **Lands on nothing relevant** → nobody in the market has product-level presence; first-mover framing, and the demand question stays open.
+- **Lands on the merchant** → they already have local inventory data somewhere (a POS provider feeding Google). Variant B is dead for this prospect; use A.
+
+**Re-run after SWIS goes live.** The same query is the pilot's before/after measurement and the evidence for validation-matrix row 8. A baseline captured at the door, and the same query captured after the same sync, is the only proof that the pilot changed anything a customer can see.
+
+---
+
+## 17. Ownership access — getting past the counter
+
+**The insight is cheap; access is expensive.** Every gate in §11–§16 assumes a willing owner at the door. In this segment the counter is staffed by employees who route inquiries upward, and a verbal message handed to a cashier dies or mutates before it reaches anyone who can decide. Budget for access as a phase, not a moment.
+
+### 17.1 What gets carried to the back
+
+| Delivered | Reaches the owner | Why |
+| --- | --- | --- |
+| A printed page with the **owner's name** on it | Usually | it is addressed to a person, not a role |
+| A delivered asset ("your store is already on this") | Usually | it is a thing that exists, not a claim |
+| A question about their register or POS | Often | operationally urgent, and the register is the owner's domain |
+| "Someone wants to talk about marketing" | Rarely | no owner decision attached |
+| A brochure or a business card | Almost never | nothing to act on |
+
+**Design consequence:** never leave a pitch. Leave a named page and a working URL. The URL is the argument — it either resolves or it doesn't, and the staff member can see it. The artifact itself is specified in `docs/LocalBiz/OWNERSHIP_PACKET_TEMPLATE.md` (one page, owner's name at the top, gift → gap → one ask), and its QR carries the **claim URL** rather than the listing — so one scan both shows the owner their page and starts the claim, and a scanned packet becomes the only attributable interaction a piece of paper can produce.
+
+### 17.2 Timing
+
+| Window | Why |
+| --- | --- |
+| 07:00–09:00 | deliveries and receiving — the owner is often on the floor |
+| 20:00–21:00 | close and cash-out — owner present by necessity |
+| 11:00–17:00 | usually staffed; the worst window for a decision-maker |
+
+Do not assume a quiet weekday. A seven-day operation rotates the owner's off-day, so the "slow day" heuristic fails here.
+
+### 17.3 Direct channels, ranked
+
+1. **The business email on the listing.** For this segment it is frequently a personal Gmail read by the owner — the highest-yield channel and the cheapest to test.
+2. **The published phone, asking for the owner by name.** Naming a person converts a vendor call into a call about them.
+3. **WhatsApp**, where a number surfaces. Common in West African merchant networks and often answered by the owner directly.
+4. **A community intermediary** — the International Marketplace corridor organizations, a church, a supplier or importer who sells to these stores. A referral is worth ten cold visits.
+5. **In person, at 07:00 or 20:00.**
+6. **Social DMs** — usually staffed, often dead. Last.
+
+### 17.4 Know the name before you knock
+
+Owner names surface in public reviews, directory listings, and registry records. Using the name at the counter is the single highest-leverage move available: it changes "a vendor" into "someone who knows him." Cite the name; never cite the review it came from.
+
+### 17.5 The ask ladder
+
+| Touch | Ask |
+| --- | --- |
+| 1st | **Nothing.** Leave the named page, say when you will return |
+| 2nd | The 2-minute export (Tier B, §15.2) |
+| 3rd | The pilot agreement (§14, step 0) |
+
+Asking for a 90-day agreement on the first contact converts a gatekeeper problem into a rejection. The first visit's only job is to be remembered.
+
+### 17.6 Repetition budget
+
+Expect **3–5 touches** before ownership engagement, and log every one. `POST /presence-seeds/:id/touches` already exists with `channel: 'call' | 'sms'` — use it, so the sequence is a record rather than a memory. A single-visit conversion in this segment is the exception, not the target.
+
+### 17.7 Register
+
+Short sentences. No "digital marketing," "SEO," "GBP," "listing optimization." If the operator speaks a community language, use it — it changes the conversation more than any script. The written leave-behind should be readable by someone with limited English and no patience.
+
+### 17.8 The first pioneer unlocks the rest
+
+A referral from a named owner is the only thing that reliably beats a gatekeeper. This is why the first pilot matters more than its own metrics: it produces the sentence *"ask Kola, he's doing it"* — which no leave-behind can buy. Treat pioneer #1 as a sourcing asset for pioneers #2–10.
+
+### 17.9 Field note — the show-and-tell failure (Dreamcast, 2026-11-03)
+
+**What happened:** walked in, showed the manager on duty that the store's Google-listed website resolves to an Indonesian gambling page, was promised an escalation. Follow-up produced nothing.
+
+**Three failures, only one of which was the audience:**
+
+1. **No authority.** Correct diagnosis. A manager on duty cannot grant access, sign an agreement, or spend money.
+2. **Wrong message type.** A hijacked domain is a finding *about the person you are speaking to*. It reads as blame, so the rational response is to make it not-their-problem. Staff do not escalate threats to themselves.
+3. **No next step.** "I'll escalate it" has no owner, no date, and no artifact — a soft no with better manners.
+
+**Corrections:**
+
+- **Do not demand contact details from staff.** Demanding produces refusal. Ask a question staff can answer without risk: *"when is the owner usually in?"* / *"what's his name?"* Most will tell you.
+- **Do not ask staff to relay a message — hand them a sealed, named document.** Relaying makes them complicit; carrying an envelope makes them a courier.
+- **Lead with the gift, not the wound.** *"Your store is already listed here"* beats *"your website is hijacked."* The hijack belongs in the letter addressed to the owner, not in the counter conversation.
+
+**Target selection — the category leader is the worst first target.** Most reviews to protect, most staff between you and the decision, least upside from a vendor relationship. Dreamcast (4.9 / 605, hijacked domain) is a later demo or an NRS reference, not pioneer #1. Jokkymore is the right first target: owner-operated, reachable, and the NRS CSV path is the actual pilot.
+
+**What the visit still produced:** a named gatekeeper, a confirmed dead escalation path, and direct observation of layout and foot traffic. That is a routing map — a valid output, not a wasted visit.
+
+### 17.10 When the name is unavailable — public-record routes
+
+Ranked by yield for Indiana independents. All are business records; none require a paid people-search service.
+
+| # | Route | What it yields | Limit |
+| --- | --- | --- | --- |
+| 1 | **INBiz entity record** (via `indiana-company.com` / OpenCorporates mirrors — scrape-friendly) | entity name, formation date, principal office, **registered agent** | Indiana does not require LLC members/managers to be disclosed; the agent is a proxy, not proof. A service-company agent (CT, CSC, ZenCorp) is a dead end |
+| 2 | **Marion County food-establishment licensing** | permit holder / person in charge | county line only |
+| 3 | **Indiana ATC license registry** | individual permittee name | only if the store sells alcohol |
+| 4 | **USPTO trademark records** | owner of record | only if a mark is registered |
+| 5 | **Import / customs records** | importer of record, contact phone and email | sparse for domestic-supplied stores |
+| 6 | **Community intermediary** | a warm introduction | opt-in, partial coverage |
+
+**Worked example — Dreamcast.** `DREAMCAST AFRICAN MARKET INC`, Business ID 201806181263663, incorporated 2018-06-18, active; principal office 7125 Georgetown Rd; **registered agent: an individual, not a service**. One search, one name, from a government record.
+
+**Worked example — Jokkymore.** The customs record names `Jokky Moredchef Food Services` as importer of record with a contact phone and email, and shows **four shipments from Jokkymore African Foods Nigeria Ltd (Lagos) via Tangier**. This also independently corroborates the import-supply-chain claim that was only a discovery lead before.
+
+**The ethical line — stated once, held.** Public *business* records are legitimate B2B research. The registered agent's **residential address is not a visit target**. Use the name at the counter; do not drive to the home address. For an immigrant-owned business, an unsolicited home visit reads as a threat, and it converts a prospect into an adversary permanently — a cost no conversion recovers.
+
+**A name is a multiplier, not a prerequisite.** If nothing surfaces, address the letter *"To the owner of [entity name]"* and change the ask to scheduling: *"when is the owner usually in?"* Staff answer scheduling questions far more readily than identity questions.
+
+**Better than a name: a supply-chain fact.** Opening with *"you import from your own operation in Lagos"* proves real work and compliments the owner. It is the exact opposite of the hijack opener, and it is the strongest ownership-attention device in this playbook.
+
+### 17.11 The follow-up sequence
+
+**Rule: each touch escalates the channel's intimacy, never the volume.** Every touch carries information the previous one didn't, and no channel is used twice. Repeating the same message on a new channel is how a prospect becomes a nuisance.
+
+The operating sequence — six touches over 21 days (packet → SMS → phone → email → fresh packet → intermediary), sample copy, the warm branch when the claim QR fires, social-channel gates, and stop rules — lives in `docs/LocalBiz/OWNERSHIP_PACKET_TEMPLATE.md` § Follow-up, next to the artifact the operator is actually carrying. It is not duplicated here.
+
+Two rules from it that belong at the strategy level:
+
+- **The claim QR turns the sequence into an inbound.** If a claim request is filed, stop the scheduled touches and respond within 24 hours. The operator approval queue is the notification.
+- **A burnt owner in a tight community is not recoverable.** One SMS maximum, never two calls in a week, park for 90 days after six silent touches.
