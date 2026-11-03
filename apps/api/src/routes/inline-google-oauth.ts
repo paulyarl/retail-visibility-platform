@@ -134,7 +134,12 @@ router.get('/google/callback', async (req, res) => {
 
 // Everything below is tenant-scoped — /google/auth + /google/callback above stay
 // public because they're the OAuth handshake itself.
-router.use(authenticateToken, checkTenantAccess);
+// Path-scoped, not router.use(): an unscoped use() on a '/' mount would gate
+// every downstream route, not just this router's own paths.
+router.use('/api/google', authenticateToken, checkTenantAccess);
+router.use('/google/gmc', authenticateToken, checkTenantAccess);
+router.use('/google/gbp', authenticateToken, checkTenantAccess);
+router.use('/google/disconnect', authenticateToken, checkTenantAccess);
 
 // GET /api/google/status
 router.get('/api/google/status', async (req, res) => {
