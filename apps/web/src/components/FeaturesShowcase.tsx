@@ -25,8 +25,8 @@ const businessJourney = [
   {
     id: 'directory_presence',
     icon: '📍',
-    title: 'Get found in the directory',
-    description: 'We build the directory from public business information, so your listing may already be live. Claiming it takes about two minutes and costs nothing.',
+    title: 'A page that looks like a business',
+    description: 'Hours, address, phone, a photo and your category — the minimum a shopper needs before deciding to walk in. Built from public information, so it may already be live.',
     subtext: 'The free gateway — no account, no card, no developer.',
     gradient: 'from-teal-500 to-emerald-600',
     badge: 'Directory',
@@ -562,9 +562,10 @@ function TriadSection({ stages }: { stages: any[] }) {
           Pick the surface that fits
         </h4>
         <p className="text-sm sm:text-base text-neutral-600 max-w-2xl mx-auto">
-          Three ways to show up. Choose the one where your customers already look — the rest is a step
-          up from here, not a replacement. Every option runs on the register you already have — Clover
-          POS and Square sync your real catalog.
+          <span className="font-semibold text-neutral-900">All three start with connecting your
+          inventory.</span>{' '}
+          Choose where your customers already look — the rest is a step up from here, not a
+          replacement.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">

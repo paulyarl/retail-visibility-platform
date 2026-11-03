@@ -8,9 +8,11 @@ Rev v0.4 — §11–§14 specify the engagement motion (consent envelope + guide
 
 NRS (National Retail Solutions) POS merchants hold rich catalog + stock data inside their registers, but NRS provides **no Google local-inventory path** — that data never reaches Google surfaces. The platform's SWIS path (Merchant API + localInventories + checklist) is complete; what's missing is getting POS-locked data *into* `inventory_items`. Three ingestion shapes cover the whole segment:
 
-- **API path** (Clover/Square — exists) — live stock, full automation
-- **CSV path** (NRS + every POS with a merchant export — **this spec**) — periodic import, merchant-driven
-- **Manual path** (no POS, or a POS with no export) — the merchant maintains the catalog in the platform portal. The only path with **no external dependency**, and therefore the one that makes the vendor-agnostic claim literally true.
+- **POS API path** (Clover, Square — exists) — the **platform pulls**: live stock, full automation
+- **File path** (NRS + every POS with a merchant export — **this spec**) — the **merchant pushes on a schedule**
+- **Manual path** (no POS, or a POS with no export) — the **merchant enters on demand** in the platform portal. The only path with **no external dependency**, and therefore the one that makes the vendor-agnostic claim literally true.
+
+**A path is defined by who initiates the data flow, not by the vendor.** Clover and Square are members of one path because they produce the same merchant action and the same failure mode; adding a POS vendor adds an adapter, not a path. A new path appears only when the initiative changes — a marketplace storefront feed or EDI would qualify, another register would not.
 
 **Terminology — one verb, three pipes.** Merchant-facing copy says **connect** for all three shapes ("Connect your inventory"), with the mechanism named underneath. Internal surfaces keep *ingestion* / *import* / `inventory-import` — do not rename technical surfaces for copy reasons. The binding copy contract, including the pre-claim and post-claim trio fixes, is `docs/LocalBiz/CONNECT_LADDER_COPY_SPEC.md`.
 
@@ -269,6 +271,40 @@ The pilot does not ship "it worked." It ships this matrix with evidence per row.
 
 **Why step 2 precedes step 3.** Google's verification and propagation are slow. A pioneer who says yes and sees nothing for two weeks drifts, and the ritual dies before the payoff. The import gives an immediate, visible win — their real shelves on a storefront they control — which sustains them through the Google wait. It is also the answer to "what do I get for agreeing today."
 
+### 14.1 GBP claim + setup — the one-time service
+
+SWIS cannot run without a Google Business Profile the merchant controls: the Merchant Center account links to it, and `localInventories` is keyed by the store code it carries. For an unclaimed seed this is the **largest single obstacle** in the ladder — larger than the catalog, because it is the one step the platform cannot perform alone.
+
+**Three claim states, three different products:**
+
+| State | What it needs | What you sell |
+| --- | --- | --- |
+| Unclaimed | claim + verification (postcard or video) | **claim + setup** — one-time |
+| Claimed by the owner | category, hours, attributes, photos, description | **setup / optimization** — one-time |
+| Claimed by a third party | ownership recovery | **not a setup job** — recovery, often impossible. Qualify out early rather than sell into it |
+
+**DFY vs DIY:**
+
+| | DIY (guided) | DFY (managed) |
+| --- | --- | --- |
+| Who performs | merchant | platform, via manager access |
+| Cost to serve | low, scales | high, per-merchant attention |
+| Completion risk | high | low |
+| Verification | merchant | merchant — **unavoidable** |
+| Fits | pilot, scalable onboarding | paid one-time service for non-technical owners |
+
+**Verification is the hard boundary.** Google's identity checks — postcard, video, phone — must be completed by the merchant. No amount of DFY removes them. A service that promises *"we'll claim it for you"* promises something it cannot deliver; what it can deliver is everything **around** the verification: the category, hours, attributes, photos, description, service area, and the Merchant Center link and store code that follow.
+
+**Mechanism: manager access, never credentials.** Google supports adding a manager to a profile. That is the only legitimate DFY path — revocable, auditable, and already bound by the pilot agreement (§3.3).
+
+**The pilot tension, and how to resolve it.** The pilot runs guided hands because performing the steps would validate nothing about whether an owner can. The product should run DFY because that is what a non-technical owner will pay for. Not in conflict if sequenced: **the pilot generates the checklist and friction log that become the DFY SOP.** Validate guided, then productize — the same relationship as the validation matrix producing the vendor pitch.
+
+**Offer it post-discovery, never upfront.** The GBP service is not a door pitch. It is the answer to a blocker the merchant discovers at step 3 themselves: their products are on their page, and Google cannot see them until the profile is verified. The sequence does the qualifying work, and the offer prices against one specific outcome instead of a bundle — which is why it lands on a segment that refuses upfront commitments.
+
+**The free path must stay genuinely viable.** If DIY guidance is not actually workable, the post-discovery offer becomes a toll booth on the only road to Google — the "locked door" failure with a price attached, and the merchant will read it exactly that way. The offer is legitimate only while declining it still leaves a route.
+
+**What the pilot can and cannot measure.** Free for the term, so the pilot proves the blocker is real and the steps work. It cannot prove anyone will pay — willingness to pay is a second-cohort question, and reporting it as validated would be the same error as calling a claim a conversion.
+
 **The gate opens onto a locked door — the pioneer grant is load-bearing.** Claiming a seed lands the merchant on `directory_presence`: free, zero-price, and **without** `integration_clover`, `integration_gmc_sync`, or `integration_google_merchant_center`. It also caps `max_skus` at 5 — which would truncate the very catalog the pilot exists to prove. So the claim alone dead-ends at a paywall in the moment of maximum intent. The cohort must carry an explicit grant, applied **before** the packet is printed:
 
 | Grant | Why |
@@ -283,9 +319,9 @@ This is what `PIONEER_RECRUITMENT_SPEC.md` §1's segmented cohort grants are for
 
 | Mechanism | Capability keys | Merchant toggle | Connection |
 | --- | --- | --- | --- |
-| 2a NRS (CSV) | none required — upload is self-serve | none | none |
-| 2b Clover | `integration_clover`, `integration_pos_on` | integration options | Clover OAuth grant |
-| 2c Manual | **none** | none | none |
+| 2a File path | none required — upload is self-serve | none | none |
+| 2b POS API path | `integration_clover` / `integration_square`, `integration_pos_on` | integration options | vendor OAuth grant |
+| 2c Manual path | **none** | none | none |
 | Step 3 (SWIS) | `integration_gmc_sync`, `integration_google_merchant_center` | GMC settings | Merchant Center + GBP link |
 
 **Structural consequence:** 2c is the only ingestion path that needs no integration capability. A claimed tenant can therefore always complete the ladder through manual entry, provided `max_skus` is lifted and the GMC pair is granted. The integration modules decide **which mechanisms light up**, not whether the ladder is walkable — which is the difference between a paywall and a degraded path.
@@ -414,7 +450,8 @@ This is the whole thesis in four searches: **category search finds the store; pr
 | A delivered asset ("your store is already on this") | Usually | it is a thing that exists, not a claim |
 | A question about their register or POS | Often | operationally urgent, and the register is the owner's domain |
 | "Someone wants to talk about marketing" | Rarely | no owner decision attached |
-| A brochure or a business card | Almost never | nothing to act on |
+| A business card | Sometimes — but it carries **contact**, not a message | gives the owner a way back to you; it cannot carry an argument |
+| A brochure or flyer | Almost never | nothing to act on |
 
 **Design consequence:** never leave a pitch. Leave a named page and a working URL. The URL is the argument — it either resolves or it doesn't, and the staff member can see it. The artifact itself is specified in `docs/LocalBiz/OWNERSHIP_PACKET_TEMPLATE.md` (one page, owner's name at the top, gift → gap → one ask), and its QR carries the **claim URL** rather than the listing — so one scan both shows the owner their page and starts the claim, and a scanned packet becomes the only attributable interaction a piece of paper can produce.
 
@@ -516,3 +553,40 @@ Two rules from it that belong at the strategy level:
 
 - **The claim QR turns the sequence into an inbound.** If a claim request is filed, stop the scheduled touches and respond within 24 hours. The operator approval queue is the notification.
 - **A burnt owner in a tight community is not recoverable.** One SMS maximum, never two calls in a week, park for 90 days after six silent touches.
+
+### 17.12 Unplanned visits — reconnaissance, not delivery
+
+The packet is a planned-visit instrument. An unplanned visit is a different job: gathering the intelligence that makes the planned visit land. **Do not convert one into the other mid-conversation.**
+
+| | Planned visit | Unplanned visit |
+| --- | --- | --- |
+| Instrument | packet, sealed, named | none |
+| Objective | deliver + schedule the return | observe + be remembered |
+| Ask | nothing | nothing |
+| Success | packet accepted, return agreed | owner identified, rhythm learned |
+
+**What to observe:**
+
+- Who is behind the counter — owner signals: handles money and complaints, others defer to them, age, whether a name badge exists at all
+- Whether the owner is reachable at that hour, and who answers the phone
+- Foot traffic and dwell time
+- **Shelf reality** — are the products a catalog claims actually there? A pricebook can list Abonika and Akabanga while the shelf carries neither, and that gap changes what the pilot can honestly promise
+- Signage, posted hours, any existing QR code or listing sticker
+- Whether another vendor's card or flyer is already on the counter
+
+**The sixty-second rule.** If the owner appears and you have no packet, the entire conversation is: their name, one specific observation, **hand them the card**, and an exit that preserves the next visit. Nothing else. A half-pitch to an owner you surprised is worse than no pitch — it spends the surprise without buying anything.
+
+**The card.** It is the one artifact that survives a wallet, so it is the unplanned visit's whole delivery:
+
+| Field | Content |
+| --- | --- |
+| Name + mobile | the operator's, not a company switchboard |
+| One line | *"Your store's page — [short URL]"* |
+| QR | the **generic** claim entry (`/directory/add-business`) or the merchant's own listing — **never a claim token** |
+| Excluded | pricing, tier names, logo soup, taglines |
+
+**Why never a token on a card.** A card is handed around, left on counters, photographed. The tokenized QR belongs to the sealed packet, where it is single-use, tracked, and travels once. Putting a token on a card converts a distribution artifact into a bearer credential with no chain of custody — the § QR specification mitigations stop applying the moment the card leaves your hand.
+
+**Never pitch staff on an unplanned visit.** With no artifact to hand over, the message has nothing to travel on — the §17.9 failure with fewer excuses.
+
+**The customer role is a real access strategy.** Shopping there weekly makes you a known face, and it is the one channel where the owner may open the conversation themselves. It is slow, it works, and it must be genuine: a faked customer in a tight community is a story that travels faster than any referral.

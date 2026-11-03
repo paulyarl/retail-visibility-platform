@@ -25,17 +25,31 @@ happen in the same visit.
 
 ## 1. Cohort definition
 
-A business counts as a pioneer when ALL of:
+A business counts as a **pioneer** when ALL of:
 
 - Seed or listing claimed (`org_standing_mode` → `independent`)
+- **Inventory connected** by one of the three paths (POS API, file, manual) — the gate that makes the shelf shoppable, not merely present
+- ≥1 real product live on their storefront (inventory-derived, not a placeholder)
 - Storefront live at its canonical URL (`/tenant/{id}` / subdomain / domain)
-- ≥1 public product or a complete shelf card (NAP + hours + category + photo)
 - Indexed or in the sitemap discovery pipeline (automatic — verify, don't fix)
 - Storefront photo captured in person (verification evidence)
 
+A pioneer counts as **validated** when, in addition:
+
+- Products are live on Google — SWIS / local-inventory read-back shows N > 0
+- The before/after product-search test is captured (`POS_INGESTION_PARTNER_PATH_SPEC.md` §16.1)
+
+**Why the split.** Claiming and connecting are inside our control; Google's
+acceptance and propagation are not. A cohort measured only on *validated*
+reads as failure whenever Google is slow; a cohort measured only on *pioneer*
+reports success without ever reaching the destination. Track both, report
+both — the claim-era bar ("≥1 product or a complete shelf card") could be met
+without connecting anything at all, which is how a cohort looks green and
+proves nothing.
+
 **Paid conversion is NOT the pioneer bar.** The cohort proves the shelf
-works; the upgrade triad works it afterward. Target: 10 pioneers, ≥5
-distinct categories, ≥3 with no prior live shelf.
+works; the upgrade ladder works it afterward. Target: 10 pioneers, **≥5
+validated**, ≥5 distinct categories, ≥3 with no prior live shelf.
 
 **Success includes the engagement loop, not just the claim.** Pioneering
 is only successful if feedback handling and engagement are *integrated
