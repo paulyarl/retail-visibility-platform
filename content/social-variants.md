@@ -179,6 +179,128 @@ This week we shipped "slug insurance": dead public URLs now resolve back to thei
 
 ---
 
+## TikTok / Reels / YouTube Shorts — vertical video
+
+Tone: storytime dev-content. Hook in the first 2 seconds, one idea per
+beat, text-overlay carries the plot for muted viewers. ~40–50s.
+Visuals: screen recording for code/terminal beats, assets 1–7 from
+`visual-prompts.md` as B-roll, face-cam optional for hook/outro.
+
+**Script A — "The 404 that wasn't"**
+
+```
+BEAT      OVERLAY                          VO / ACTION
+0–3s      "Google remembered a URL         "So Google indexed a page that
+          my platform forgot."              my own platform forgot existed."
+3–9s      three dead slugs on screen,       "A listing got published, indexed,
+          red ✗ each                        deleted, then republished under a
+                                          different URL. Three old links —
+                                          all 404."
+9–16s     "URL = identity to a crawler"    "Here's the thing: to Google, a URL
+          vs "slug = attribute to us"       is an identity. To our platform,
+                                          it's just an editable field."
+16–24s    "Layer 1: write down the         "Fix one: every rename now records
+          rename"                           the old slug — deterministic trail.
+                                          Layer two: a matcher that revives
+                                          old spellings — but ONLY if exactly
+                                          one live page explains them."
+24–32s    the regexp snippet,             "Then production found the bug unit
+          "lower() runs AFTER the          tests couldn't: this line lowercased
+          replace — so capitals die"        AFTER stripping non-slug chars —
+                                          which silently ate every capital
+                                          letter. Capitalized business names
+                                          were invisible."
+32–40s    "SQL recalls. Code decides."     "Fix: SQL does zero normalization.
+                                          It just substring-matches the tokens
+                                          the code already cleaned."
+40–48s    308 matrix animation             "Now every rename leaves a permanent
+                                          redirect to the live page. A 404
+                                          handler turned out to be a product
+                                          decision — not an error page."
+          "full story in comments"
+```
+
+**Script B — one bug, one lesson (~30s)**
+
+```
+HOOK:     "This line of code silently ate capital letters."
+SHOW:     lower(regexp_replace(name,'[^a-z0-9]+','-','g'))
+EXPLAIN:  "'Not lowercase, not digit' — that class also matches uppercase.
+           The replace ran BEFORE the lower. 'Jokkymore African Market'
+           became '-okkymore-frican-arket' and every ILIKE pattern missed."
+PUNCHLINE:"The unit tests were all green — they tested the matcher, not
+           the SQL that feeds it. Precision was tested. Recall wasn't.
+           Fix: SQL does no normalization. Code cleans; SQL recalls."
+```
+
+## Instagram — carousel + Reels
+
+Reels = Script A verbatim. Carousel: 7 slides, 1:1 crops of the visual
+assets — copy below is the overlay/caption text.
+
+```
+SLIDE 1 (hero signpost)      "Google remembered a URL my platform forgot."
+SLIDE 2 (worldview split)    "Crawlers treat URLs as identities.
+                              Platforms treat slugs as editable fields."
+SLIDE 3 (rename trail)       "Layer 1: every rename writes the trail —
+                             old_slug → tenant. Bookkeeping, not guessing."
+SLIDE 4 (single-gate funnel) "Layer 2: a dead slug redirects only if
+                             EXACTLY ONE live page can explain it.
+                             Ambiguous = honest 404."
+SLIDE 5 (regexp bug)         "Shipped it. First slug still 404'd.
+                             The SQL ate every capital letter before
+                             lower() ever ran. 13 green tests missed it."
+SLIDE 6 (308 matrix)         "Fix: SQL recalls, code decides.
+                             Zero normalization in the query."
+SLIDE 7 (emblem shield)      "Now every rename leaves a permanent redirect.
+                             The indexed URL is a promise to a crawler —
+                             keep honoring it."
+Caption: storytime version of the LinkedIn post, first line = slide 1 hook.
+Hashtags: #softwareengineering #webdev #seo #buildinpublic #programming
+```
+
+## Threads — posts
+
+Tone: same voice as X but looser, more conversational, shorter thoughts —
+Threads rewards casual over structured. Three standalone options.
+
+```
+POST 1
+Google indexed a page my platform had already forgotten. Three dead URLs,
+one live listing. So we built slug insurance: renames write an
+old→new trail, and a matcher revives old spellings only when exactly one
+live page can explain them. Wrong 308 is worse than honest 404.
+
+POST 2
+Fun bug today: lower(regexp_replace(name,'[^a-z0-9]+','-','g')) — the
+replace runs BEFORE the lower, so "not lowercase letter" eats every
+capital. "Jokkymore African Market" became "-okkymore-frican-arket" and
+the query matched nothing. 13 green tests didn't see it because they
+tested the matcher, not the SQL feeding it.
+
+POST 3
+small thing that got me: Next's permanentRedirect() throws NEXT_REDIRECT —
+inside a try/catch your redirect just… vanishes. compute the target in the
+block, call the redirect after it. hours of my life, etc.
+```
+
+## YouTube Shorts
+
+Script A verbatim. Title: **"Google remembered a URL my platform forgot"**
+Description: one-line summary + link to the full case study.
+
+## Pinterest (optional)
+
+Pin description (links back to the article):
+
+```
+How a 404 became a platform insurance policy — dead-slug recovery via a
+rename trail + single-candidate inference, and the SQL bug that only
+production could find. #webdev #seo #programming
+```
+
+---
+
 # Content Category Ideas
 
 A taxonomy for ongoing pieces — each with seed material that already
