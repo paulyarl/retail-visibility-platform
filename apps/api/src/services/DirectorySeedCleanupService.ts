@@ -175,9 +175,25 @@ class DirectorySeedCleanupService {
    * containing a batch member) and which seeds get completeness rows.
    */
   async getCleanupReport(seedBatch?: string): Promise<CleanupReport> {
+    // Verdict ledger — keyed on (sorted seed_ids, match_key), mirrors the
+    // funnel's exclusion join but surfaces the verdict instead of hiding.
+    // Fetched first so verdict members (even suppressed ones) stay in the
+    // seed read — a resolved group is history and must remain visible after
+    // the loser leaves the live surfaces.
+    const verdictRows = await prisma.$queryRaw<any[]>`
+      SELECT seed_ids, match_key, verdict, merge_into, resolved_by, resolved_at, rationale
+      FROM mkt_prospect_dedup_verdicts
+    `;
+    const verdictByKey = new Map<string, any>(
+      verdictRows.map((v) => [`${v.match_key}:${(v.seed_ids as string[]).join(',')}`, v]),
+    );
+    const verdictSeedIds = [...new Set(verdictRows.flatMap((v) => v.seed_ids as string[]))];
+
     // All live seeds — suppressed is terminal (off every surface, never a
     // dup candidate); claimed stays in: it can be the keeper and operators
     // still need to see a live listing colliding with a real customer.
+    // Verdict participants ride the OR clause so resolved groups keep their
+    // full member set even after suppression.
     const seeds = await prisma.$queryRaw<any[]>`
       SELECT dps.id, dps.tenant_id, dps.listing_id, dps.status, dps.seed_batch,
              dps.category, dps.city AS seed_city, dps.state AS seed_state,
@@ -205,6 +221,7 @@ class DirectorySeedCleanupService {
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dps.status IS DISTINCT FROM 'suppressed'
+         OR dps.id = ANY(${verdictSeedIds}::text[])
     `;
 
     const toRef = (s: any): CleanupSeedRef => {
@@ -251,6 +268,9 @@ class DirectorySeedCleanupService {
     const phoneGroups = new Map<string, any[]>();
     const addressGroups = new Map<string, any[]>();
     for (const s of seeds) {
+      // Suppressed is never a dup candidate — it's in the read set only so
+      // verdicted groups keep their member history for display.
+      if (s.status === 'suppressed') continue;
       const phoneDigits = s.phone ? String(s.phone).replace(/[^0-9]/g, '') : '';
       if (phoneDigits.length >= 7) {
         const list = phoneGroups.get(phoneDigits) ?? [];
@@ -284,15 +304,7 @@ class DirectorySeedCleanupService {
       }
     }
 
-    // Verdict ledger — keyed on (sorted seed_ids, match_key), mirrors the
-    // funnel's exclusion join but surfaces the verdict instead of hiding.
-    const verdictRows = await prisma.$queryRaw<any[]>`
-      SELECT seed_ids, match_key, verdict, merge_into, resolved_by, resolved_at, rationale
-      FROM mkt_prospect_dedup_verdicts
-    `;
-    const verdictByKey = new Map<string, any>(
-      verdictRows.map((v) => [`${v.match_key}:${(v.seed_ids as string[]).join(',')}`, v]),
-    );
+    // (Verdict ledger fetched above the seed query — see verdictByKey.)
 
     // Chain candidacy — phone groups only (address_city groups are merge
     // territory: same address = same storefront, not a chain). Memberships
@@ -354,6 +366,34 @@ class DirectorySeedCleanupService {
         };
       })
       .sort((a, b) => Number(!!a.verdict) - Number(!!b.verdict));
+
+    // Resolved-and-applied history: once a loser is suppressed the group
+    // leaves candidate detection entirely — re-emit verdicted groups whose
+    // members are no longer all live so "resolved" stays visible instead
+    // of the group silently evaporating from the report.
+    const seedById = new Map(seeds.map((s) => [s.id as string, s]));
+    const liveGroupKeys = new Set(
+      duplicateGroups.map((g) => `${g.matchKey}:${g.seedIds.join(',')}`),
+    );
+    for (const v of verdictRows) {
+      const seedIds = v.seed_ids as string[];
+      if (liveGroupKeys.has(`${v.match_key}:${seedIds.join(',')}`)) continue;
+      const members = seedIds.map((id) => seedById.get(id)).filter(Boolean);
+      if (members.length < 2 || !inScope(members)) continue;
+      duplicateGroups.push({
+        matchKey: v.match_key as 'phone' | 'address_city',
+        seedIds,
+        seeds: members.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))).map(toRef),
+        chain: null,
+        verdict: {
+          verdict: v.verdict,
+          mergeInto: v.merge_into,
+          resolvedBy: v.resolved_by,
+          resolvedAt: v.resolved_at ? new Date(v.resolved_at).toISOString() : null,
+          rationale: v.rationale,
+        },
+      });
+    }
 
     // ── Completeness — scoped seeds only (batch filter applies here). ──
     const scopedSeeds = seedBatch ? seeds.filter((s) => s.seed_batch === seedBatch) : seeds;

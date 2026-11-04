@@ -205,6 +205,15 @@ function DuplicateGroupCard({
           (s) => s.seedId !== group.verdict!.mergeInto && s.status !== 'suppressed' && s.status !== 'claimed',
         )
       : [];
+  // Keeper-off-surface warning: suppressing the losers under a draft/
+  // suppressed keeper leaves the entity with NO live record — the operator
+  // should publish the keeper after applying, or revise the verdict to a
+  // live member first.
+  const keeperRef = group.seeds.find((s) => s.seedId === group.verdict?.mergeInto);
+  const keeperOffSurface =
+    group.verdict?.verdict === 'same_entity' &&
+    keeperRef !== undefined &&
+    !['published', 'invited', 'claimed'].includes(keeperRef.status);
 
   return (
     <div
@@ -242,7 +251,7 @@ function DuplicateGroupCard({
         {group.verdict && (
           <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/40 dark:text-green-300">
             {group.verdict.verdict === 'same_entity'
-              ? `resolved → kept ${group.verdict.mergeInto}`
+              ? `resolved → kept ${group.verdict.mergeInto}${pendingLosers.length === 0 ? ' · applied' : ' · suppression pending'}`
               : group.verdict.verdict === 'distinct_chain'
                 ? 'linked as chain'
                 : 'marked distinct'}
@@ -275,6 +284,14 @@ function DuplicateGroupCard({
             <ShieldAlert className="h-3.5 w-3.5" />
             Apply verdict — suppress {pendingLosers.length} loser{pendingLosers.length > 1 ? 's' : ''}
           </button>
+        )}
+        {locked && keeperOffSurface && (
+          <span
+            className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+            title="The kept seed is off the live surfaces — publish it on its seed page, or revise the verdict to keep a live member"
+          >
+            keeper is {keeperRef!.status} — nothing stays live
+          </span>
         )}
         {!locked && (
           <>
