@@ -127,10 +127,10 @@ export async function fetchLiveSeedSlugCandidates(requestedSlug: string): Promis
         AND dps.status IN ('published', 'invited', 'claimed')
         AND dll.slug IS NOT NULL
         AND (
-          lower(regexp_replace(coalesce(dll.business_name, ''), '[^a-z0-9]+', '-', 'g')) LIKE ANY($1::text[])
+          regexp_replace(lower(coalesce(dll.business_name, '')), '[^a-z0-9]+', '-', 'g') LIKE ANY($1::text[])
           OR EXISTS (
             SELECT 1 FROM unnest(dps.name_variants) v
-             WHERE lower(regexp_replace(v, '[^a-z0-9]+', '-', 'g')) LIKE ANY($1::text[])
+             WHERE regexp_replace(lower(v), '[^a-z0-9]+', '-', 'g') LIKE ANY($1::text[])
           )
         )
       LIMIT 250`,
