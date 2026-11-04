@@ -23,8 +23,9 @@
  *   - its tokens are a ≥2-token subset of the base (a truncated old slug).
  *
  * The fetch prefilter is deliberately cheap — any ≥3-char slug token
- * appearing in the slugified name or name_variants — so a crawler-hammered
- * 404 path stays one indexed query.
+ * appearing (case-insensitively) in the raw name or name_variants. The SQL
+ * does NO normalization: tokens arrive already slug-clean, so a plain ILIKE
+ * substring match is the entire recall layer — slugify lives only in JS.
  */
 
 import { getDirectPool } from '../../utils/db-pool';
@@ -127,10 +128,10 @@ export async function fetchLiveSeedSlugCandidates(requestedSlug: string): Promis
         AND dps.status IN ('published', 'invited', 'claimed')
         AND dll.slug IS NOT NULL
         AND (
-          regexp_replace(lower(coalesce(dll.business_name, '')), '[^a-z0-9]+', '-', 'g') LIKE ANY($1::text[])
+          dll.business_name ILIKE ANY($1::text[])
           OR EXISTS (
             SELECT 1 FROM unnest(dps.name_variants) v
-             WHERE regexp_replace(lower(v), '[^a-z0-9]+', '-', 'g') LIKE ANY($1::text[])
+             WHERE v ILIKE ANY($1::text[])
           )
         )
       LIMIT 250`,
