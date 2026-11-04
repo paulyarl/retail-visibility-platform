@@ -52,19 +52,23 @@ function PgBadge() {
   );
 }
 
-function SeedMiniRow({ seed, keeper, onPick, disabled }: {
+function SeedMiniRow({ seed, keeper, recommended, onPick, disabled }: {
   seed: CleanupSeedRef;
   keeper: boolean;
+  recommended?: boolean;
   onPick: () => void;
   disabled: boolean;
 }) {
+  const suppressed = seed.status === 'suppressed';
   return (
     <label
       className={`flex items-start gap-3 rounded-lg border px-3 py-2 text-sm ${
-        keeper
-          ? 'border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/40'
-          : 'border-gray-200 bg-white dark:border-neutral-700 dark:bg-neutral-800'
-      } ${disabled ? 'opacity-60' : 'cursor-pointer hover:border-blue-300'}`}
+        suppressed
+          ? 'border-gray-200 bg-gray-50 dark:border-neutral-800 dark:bg-neutral-900/60'
+          : keeper
+            ? 'border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/40'
+            : 'border-gray-200 bg-white dark:border-neutral-700 dark:bg-neutral-800'
+      } ${disabled || suppressed ? 'opacity-60' : 'cursor-pointer hover:border-blue-300'}`}
     >
       <input
         type="radio"
@@ -85,6 +89,11 @@ function SeedMiniRow({ seed, keeper, onPick, disabled }: {
           <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-600 dark:bg-neutral-700 dark:text-gray-300">
             {seed.status}
           </span>
+          {recommended && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Richest record in the group — recommended keeper">
+              recommended
+            </span>
+          )}
           {seed.hasActiveClaimToken && (
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
               live token
@@ -95,7 +104,7 @@ function SeedMiniRow({ seed, keeper, onPick, disabled }: {
               verify pending
             </span>
           )}
-          {seed.slug && (
+          {seed.slug && !suppressed && (
             <Link
               href={`/place/${seed.slug}`}
               target="_blank"
@@ -104,14 +113,57 @@ function SeedMiniRow({ seed, keeper, onPick, disabled }: {
               <ExternalLink className="h-3 w-3" /> public
             </Link>
           )}
+          {suppressed && (
+            <span className="inline-flex items-center gap-0.5 text-xs text-gray-400 dark:text-gray-500">
+              off public
+            </span>
+          )}
         </span>
         <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
           {seed.address || '—'} · {seed.city || '—'}, {seed.state || '—'} · {seed.phone || 'no phone'} ·{' '}
           {seed.category || '—'}
         </span>
+        {seed.richness && (
+          <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px]">
+            <RichChip on={seed.richness.descLen > 0}>desc {seed.richness.descLen}</RichChip>
+            <RichChip on={!!seed.phone}>phone</RichChip>
+            <RichChip on={seed.richness.hasWebsite}>web</RichChip>
+            <RichChip on={seed.richness.hasHours}>hours</RichChip>
+            <RichChip on={seed.richness.secondaryCats > 0}>cats {seed.richness.secondaryCats}</RichChip>
+            <RichChip on={seed.richness.attributes > 0}>attrs {seed.richness.attributes}</RichChip>
+            <RichChip on={seed.richness.keywords > 0}>kw {seed.richness.keywords}</RichChip>
+            <RichChip on={seed.richness.seoEnrichment}>seo</RichChip>
+            <span
+              className={`ml-auto rounded px-1.5 py-0.5 font-semibold ${
+                (seed.richnessScore ?? 0) >= 7
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                  : (seed.richnessScore ?? 0) >= 4
+                    ? 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+              }`}
+              title="Record weight — richer records make better keepers"
+            >
+              w{seed.richnessScore ?? 0}
+            </span>
+          </span>
+        )}
         <span className="block text-[11px] text-gray-400">{seed.seedBatch || 'no batch'}</span>
       </span>
     </label>
+  );
+}
+
+function RichChip({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return (
+    <span
+      className={`rounded px-1 py-0.5 font-medium ${
+        on
+          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+          : 'bg-gray-50 text-gray-400 line-through decoration-gray-300 dark:bg-neutral-800 dark:text-gray-500'
+      }`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -131,7 +183,13 @@ function DuplicateGroupCard({
   onRequestVerification: (group: CleanupDuplicateGroup) => void;
 }) {
   const claimedIds = group.seeds.filter((s) => s.status === 'claimed').map((s) => s.seedId);
-  const [keepId, setKeepId] = useState<string | null>(claimedIds[0] ?? null);
+  // Depth hint: the richest record is the recommended keeper (claimed
+  // still defaults first — it can't be suppressed and must stay live).
+  const richestId = group.seeds.reduce(
+    (best, s) => ((s.richnessScore ?? 0) > (best?.richnessScore ?? -1) ? s : best),
+    group.seeds[0] as CleanupSeedRef | undefined,
+  )?.seedId;
+  const [keepId, setKeepId] = useState<string | null>(claimedIds[0] ?? richestId ?? null);
   const resolved = !!group.verdict;
 
   return (
@@ -184,6 +242,7 @@ function DuplicateGroupCard({
             key={s.seedId}
             seed={s}
             keeper={keepId === s.seedId}
+            recommended={s.seedId === richestId && s.status !== 'claimed'}
             disabled={resolved || busy || s.status === 'suppressed'}
             onPick={() => setKeepId(s.seedId)}
           />

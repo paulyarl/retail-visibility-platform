@@ -3638,6 +3638,21 @@ export interface CleanupSeedRef {
   /** Prospect-queue lane for the seed's producing entry —
    *  'verify_then_outreach' renders as "verify pending". */
   queueStatus: string | null;
+  /** Thin/heavy signals for keeper picks — same columns the report
+   *  already selects, surfaced so the card shows *why* one record is
+   *  richer. */
+  richness: {
+    descLen: number;
+    hasWebsite: boolean;
+    hasHours: boolean;
+    secondaryCats: number;
+    attributes: number;
+    keywords: number;
+    seoEnrichment: boolean;
+    identityConfidence: string | null;
+  };
+  /** Composite weight for a recommended-keeper hint (display only). */
+  richnessScore: number;
 }
 
 export interface CleanupDuplicateGroup {

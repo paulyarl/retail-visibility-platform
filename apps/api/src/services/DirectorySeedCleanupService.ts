@@ -76,6 +76,22 @@ export interface CleanupSeedRef {
    *  seed was born campaign-side (no queue row). 'verify_then_outreach'
    *  renders as "verify pending" on the card. */
   queueStatus: string | null;
+  /** Thin/heavy signals for keeper picks — the same columns the report
+   *  already selects, surfaced so the card can show *why* one record is
+   *  richer instead of letting the operator pick the thinner twin. */
+  richness: {
+    descLen: number;
+    hasWebsite: boolean;
+    hasHours: boolean;
+    secondaryCats: number;
+    attributes: number;
+    keywords: number;
+    seoEnrichment: boolean;
+    identityConfidence: string | null;
+  };
+  /** Composite weight for a recommended-keeper hint (display only — the
+   *  operator still picks). phone/description/seo weigh most. */
+  richnessScore: number;
 }
 
 export interface CleanupDuplicateGroup {
@@ -191,23 +207,43 @@ class DirectorySeedCleanupService {
       WHERE dps.status IS DISTINCT FROM 'suppressed'
     `;
 
-    const toRef = (s: any): CleanupSeedRef => ({
-      seedId: s.id,
-      businessName: s.business_name,
-      address: s.address,
-      city: s.city ?? s.seed_city,
-      state: s.state ?? s.seed_state,
-      phone: s.phone,
-      category: s.category,
-      status: s.status,
-      seedBatch: s.seed_batch,
-      isPgBatch: this.isPgBatch(s.seed_batch),
-      slug: s.slug,
-      isPublished: !!s.is_published,
-      hasActiveClaimToken: !!s.has_active_claim_token,
-      primaryCampaignId: s.primary_campaign_id,
-      queueStatus: s.queue_status ?? null,
-    });
+    const toRef = (s: any): CleanupSeedRef => {
+      const descLen = typeof s.description === 'string' ? s.description.length : 0;
+      const secondaryCats = Array.isArray(s.secondary_categories) ? s.secondary_categories.length : 0;
+      const attributes = Array.isArray(s.attributes) ? s.attributes.length : 0;
+      const keywords = Array.isArray(s.keywords) ? s.keywords.length : 0;
+      const hasPhone = !!s.phone;
+      const hasWebsite = !!s.website;
+      const hasHours = !!s.business_hours;
+      const seoEnrichment = !!s.seo_enrichment;
+      const richnessScore =
+        (hasPhone ? 2 : 0) + (descLen > 0 ? 2 : 0) + (seoEnrichment ? 2 : 0) +
+        (hasWebsite ? 1 : 0) + (hasHours ? 1 : 0) + (keywords > 0 ? 1 : 0) +
+        Math.min(secondaryCats, 2) + Math.min(attributes, 3) + (s.is_published ? 1 : 0);
+      return {
+        seedId: s.id,
+        businessName: s.business_name,
+        address: s.address,
+        city: s.city ?? s.seed_city,
+        state: s.state ?? s.seed_state,
+        phone: s.phone,
+        category: s.category,
+        status: s.status,
+        seedBatch: s.seed_batch,
+        isPgBatch: this.isPgBatch(s.seed_batch),
+        slug: s.slug,
+        isPublished: !!s.is_published,
+        hasActiveClaimToken: !!s.has_active_claim_token,
+        primaryCampaignId: s.primary_campaign_id,
+        queueStatus: s.queue_status ?? null,
+        richness: {
+          descLen, hasWebsite, hasHours, secondaryCats, attributes,
+          keywords, seoEnrichment,
+          identityConfidence: s.identity_confidence ?? null,
+        },
+        richnessScore,
+      };
+    };
 
     // ── Duplicate groups — same normalizers as the funnel detection so
     // verdict keys (sorted seed_ids + match_key) line up and clear the
