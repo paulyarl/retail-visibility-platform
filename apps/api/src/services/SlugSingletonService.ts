@@ -35,6 +35,7 @@ import { basePrisma } from '../prisma';
 import { getDirectPool } from '../utils/db-pool';
 import { checkSubdomainAvailability, isReservedSubdomain, isValidSubdomainFormat } from '../lib/subdomain';
 import { isReservedPlaceSlug } from '../utils/slug';
+import { recordSlugAlias, clearSlugAliasFor } from './directory/slugAliases';
 import { generateTenantKey } from '../lib/id-generator';
 import {
   generateUniqueDirectorySlug,
@@ -338,6 +339,16 @@ class SlugSingletonService extends UniversalSingleton {
       if (existing && existing.tenant_id !== tenantId) {
         throw new Error(`Slug "${newSlug}" is already taken by another tenant`);
       }
+
+      // Dead-slug insurance (migration 375): record the vacated slug as an
+      // alias → tenant so dead URLs 308 deterministically, and clear any
+      // stale alias on the slug being assigned (slug recycling).
+      const prior = await basePrisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { slug: true },
+      });
+      await recordSlugAlias(tenantId, prior?.slug, newSlug);
+      await clearSlugAliasFor(newSlug);
 
       // Upsert in directory_settings_list (creates if doesn't exist)
       await basePrisma.directory_settings_list.upsert({

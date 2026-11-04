@@ -8335,6 +8335,17 @@ model directory_presence_events {
   @@index([surface, created_at(sort: Desc)], map: "idx_dpe_surface_created")
 }
 
+/// Dead-slug insurance (migration 375): every slug a tenant/listing vacates
+/// records the trail here so dead URLs resolve deterministically instead of
+/// by token inference. Accessed via raw SQL (services/directory/slugAliases).
+model slug_aliases {
+  old_slug    String   @id
+  tenant_id   String
+  replaced_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([tenant_id, replaced_at(sort: Desc)], map: "idx_slug_aliases_tenant")
+}
+
 /// City-level geography grid cache (intelligence discovery substrate).
 /// The sweep units (ZIPs + corridors + adjacent municipalities) are
 /// category-independent, so they are derived once per (city, state) market and

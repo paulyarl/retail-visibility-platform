@@ -58,6 +58,7 @@ import {
   SLUG_SURFACES,
   type SlugSurface,
 } from '../services/directory/seedSlugVariants';
+import { resolveSlugAlias } from '../services/directory/slugAliases';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1489,17 +1490,26 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
  * tokens) the response carries its slug and the page 308s to it. Zero or
  * ambiguous matches return null — the 404 stands.
  *
- * Response: { slug: string | null, candidates: number }
+ * Response: { slug: string | null, candidates: number, via: 'alias'|'variant'|null }
  */
+async function slugVariantPayload(requested: string, surface: SlugSurface) {
+  // Deterministic first: a recorded rename trail (migration 375) resolves
+  // even full renames to different tokens. Inference is the backstop for
+  // drift that predates the trail.
+  const aliasSlug = await resolveSlugAlias(requested, surface);
+  if (aliasSlug) return { slug: aliasSlug, candidates: 1, via: 'alias' as const };
+  const candidates = await fetchLiveSlugCandidates(requested, surface);
+  const slug = matchSeedSlugVariant(requested, candidates);
+  return { slug, candidates: candidates.length, via: slug ? ('variant' as const) : null };
+}
+
 router.get('/slug-variant/:slug', async (req: Request, res: Response) => {
   try {
     const requested = decodeURIComponent(req.params.slug).trim().toLowerCase();
     const surfaceParam = String(req.query.surface ?? 'place') as SlugSurface;
     const surface: SlugSurface = SLUG_SURFACES.includes(surfaceParam) ? surfaceParam : 'place';
-    const candidates = await fetchLiveSlugCandidates(requested, surface);
-    const slug = matchSeedSlugVariant(requested, candidates);
     res.setHeader('Cache-Control', 'public, max-age=300');
-    res.json({ slug, candidates: candidates.length });
+    res.json(await slugVariantPayload(requested, surface));
   } catch (error) {
     logger.error('[GET /api/public/directory/slug-variant/:slug] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
@@ -1515,10 +1525,8 @@ router.get('/slug-variant/:slug', async (req: Request, res: Response) => {
 router.get('/seed-slug-variant/:slug', async (req: Request, res: Response) => {
   try {
     const requested = decodeURIComponent(req.params.slug).trim().toLowerCase();
-    const candidates = await fetchLiveSlugCandidates(requested, 'place');
-    const slug = matchSeedSlugVariant(requested, candidates);
     res.setHeader('Cache-Control', 'public, max-age=300');
-    res.json({ slug, candidates: candidates.length });
+    res.json(await slugVariantPayload(requested, 'place'));
   } catch (error) {
     logger.error('[GET /api/public/directory/seed-slug-variant/:slug] Error:', undefined, {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },

@@ -52,6 +52,7 @@ import {
   evaluateSeedPublishability,
   type SeedPublishability,
 } from './directory/seedPublishability';
+import { recordSlugAlias, clearSlugAliasFor } from './directory/slugAliases';
 import {
   resolveSeedListingNarrative,
   type SeedListingNarrativeSource,
@@ -1682,7 +1683,7 @@ class DirectoryPresenceSeedService {
     const seed = await prisma.$queryRaw<any[]>`
       SELECT dps.tenant_id, dps.listing_id, dps.status AS seed_status,
              dl.phone, dl.address, dl.city, dl.state, dl.zip_code, dl.website,
-             dl.email, dl.primary_category, dl.secondary_categories
+             dl.email, dl.primary_category, dl.secondary_categories, dl.slug
       FROM directory_presence_seeds dps
       JOIN directory_listings_list dl ON dl.id = dps.listing_id
       WHERE dps.id = ${seedId} LIMIT 1
@@ -1909,6 +1910,11 @@ class DirectoryPresenceSeedService {
     // both stores. Only write when the new value is free there or already
     // this tenant's — never overwrite another tenant's settings slug.
     if (renamedSlug) {
+      // Dead-slug insurance (migration 375): the vacated listing slug becomes
+      // an alias → tenant so its old URLs 308 deterministically; the newly
+      // assigned slug drops any stale alias (slug recycling).
+      await recordSlugAlias(tenantId, seed[0].slug, renamedSlug);
+      await clearSlugAliasFor(renamedSlug);
       const settingsHolder = await prisma.directory_settings_list.findFirst({
         where: { slug: renamedSlug },
         select: { tenant_id: true },
