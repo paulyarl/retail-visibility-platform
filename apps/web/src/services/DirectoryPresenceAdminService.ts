@@ -3742,6 +3742,9 @@ export interface ResolveDuplicateGroupResult {
   alreadySuppressed: string[];
   tokensRevoked: number;
   verdictRecorded: boolean;
+  /** True when the keeper was a previously-suppressed record — revived to
+   *  'draft' by the resolve (republish goes through the seed page). */
+  revived: boolean;
 }
 
 export interface BackfillEnrichmentResult {

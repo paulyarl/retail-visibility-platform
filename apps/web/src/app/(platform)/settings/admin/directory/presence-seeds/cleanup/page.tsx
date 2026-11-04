@@ -266,7 +266,7 @@ function DuplicateGroupCard({
             seed={s}
             keeper={keepId === s.seedId}
             recommended={s.seedId === richestId && s.status !== 'claimed'}
-            disabled={locked || busy || s.status === 'suppressed'}
+            disabled={locked || busy}
             onPick={() => setKeepId(s.seedId)}
           />
         ))}
@@ -339,6 +339,14 @@ function DuplicateGroupCard({
                 claimed seeds can be kept but never suppressed
               </span>
             )}
+            {keepId &&
+              !['published', 'invited', 'claimed'].includes(
+                group.seeds.find((s) => s.seedId === keepId)?.status ?? '',
+              ) && (
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  selected keeper is off live surfaces — a suppressed pick revives to draft; publish it on its seed page
+                </span>
+              )}
           </>
         )}
         {resolved && (
@@ -564,7 +572,8 @@ function CleanupContent() {
         suppressSeedIds: suppressIds,
         matchKey: group.matchKey,
       });
-      return `Kept ${keepSeedId} — suppressed ${r.suppressed.length}, revoked ${r.tokensRevoked} token(s).`;
+      return `Kept ${keepSeedId} — suppressed ${r.suppressed.length}, revoked ${r.tokensRevoked} token(s).` +
+        (r.revived ? ' Keeper revived to draft — publish it on its seed page.' : '');
     });
 
   const handleMarkDistinct = (group: CleanupDuplicateGroup) =>

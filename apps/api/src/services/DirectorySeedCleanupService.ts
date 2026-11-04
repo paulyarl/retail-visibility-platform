@@ -521,6 +521,7 @@ class DirectorySeedCleanupService {
     alreadySuppressed: string[];
     tokensRevoked: number;
     verdictRecorded: boolean;
+    revived: boolean;
   }> {
     const { keepSeedId, matchKey, rationale } = input;
     const suppressSeedIds = [...new Set(input.suppressSeedIds)].filter((id) => id !== keepSeedId);
@@ -539,7 +540,10 @@ class DirectorySeedCleanupService {
 
     const keep = byId.get(keepSeedId);
     if (!keep) throw new Error('keep_seed_not_found');
-    if (keep.status === 'suppressed') throw new Error('keep_seed_suppressed');
+    // Dedup revision may pick a previously-suppressed record as keeper —
+    // revive it to 'draft' inside the transaction (never straight to a live
+    // surface: republish still goes through the publish gate).
+    const reviveKeep = keep.status === 'suppressed';
 
     const claimed = suppressSeedIds.filter((id) => byId.get(id)?.status === 'claimed');
     if (claimed.length > 0) {
@@ -557,6 +561,13 @@ class DirectorySeedCleanupService {
     const actorTag = ctx?.actorId ? `dup-resolve:${ctx.actorId}` : 'dup-resolve';
     const tokensRevoked = await prisma.$transaction(async (tx) => {
       let revoked = 0;
+      if (reviveKeep) {
+        await tx.$executeRaw`
+          UPDATE directory_presence_seeds
+          SET status = 'draft', updated_at = now()
+          WHERE id = ${keepSeedId}
+        `;
+      }
       for (const loserId of toSuppress) {
         await tx.$executeRaw`
           UPDATE directory_presence_seeds
@@ -657,6 +668,7 @@ class DirectorySeedCleanupService {
         tokensRevoked,
         matchKey,
         verdictRecorded,
+        revived: reviveKeep,
       },
     });
     logger.info('DirectorySeedCleanupService.resolveDuplicates', undefined, {
@@ -667,7 +679,7 @@ class DirectorySeedCleanupService {
       verdictRecorded,
     });
 
-    return { suppressed: toSuppress, alreadySuppressed, tokensRevoked, verdictRecorded };
+    return { suppressed: toSuppress, alreadySuppressed, tokensRevoked, verdictRecorded, revived: reviveKeep };
   }
 
   /**
