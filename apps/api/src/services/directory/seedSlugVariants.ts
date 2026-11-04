@@ -40,6 +40,17 @@ export interface SeedSlugCandidate {
   state: string | null;
 }
 
+/**
+ * Public surfaces a dead slug can be rescued on:
+ *   - place     → /place/{slug}     — unclaimed directory seeds
+ *   - directory → /directory/{slug} — claimed listings (indexable storefronts)
+ *   - tenant    → /tenant/{slug}    — path-tier storefronts
+ * Each queries its OWN source table — no MVs; the live record is the truth.
+ */
+export type SlugSurface = 'place' | 'directory' | 'tenant';
+
+export const SLUG_SURFACES: readonly SlugSurface[] = ['place', 'directory', 'tenant'];
+
 /** Tokens old slugs legitimately carry that aren't name or geo. */
 const GLUE_TOKENS = new Set([
   'llc', 'inc', 'co', 'ltd', 'corp', 'corporation', 'company', 'llp', 'lp',
@@ -106,20 +117,12 @@ export function matchSeedSlugVariant(
   return hits.length === 1 ? hits[0].slug! : null;
 }
 
-/**
- * Live published seeds plausibly related to the dead slug — the candidate set
- * `matchSeedSlugVariant` disambiguates. "Live" mirrors the places shelf
- * filter exactly: published listing, directory_seed origin, seed status in
- * the public lifecycle set (suppressed seeds never win a redirect).
- */
-export async function fetchLiveSeedSlugCandidates(requestedSlug: string): Promise<SeedSlugCandidate[]> {
-  const tokens = slugTokens(requestedSlug.trim().toLowerCase()).filter((t) => t.length >= 3);
-  if (tokens.length === 0) return [];
-  const patterns = tokens.map((t) => `%${t}%`);
+const CANDIDATE_LIMIT = 250;
 
-  const pool = getDirectPool();
-  const { rows } = await pool.query(
-    `SELECT dll.slug, dll.business_name, COALESCE(dps.name_variants, '{}') AS name_variants,
+const SURFACE_QUERIES: Record<SlugSurface, string> = {
+  // /place — live published seeds; mirrors the places shelf filter exactly
+  // (suppressed seeds never win a redirect).
+  place: `SELECT dll.slug, dll.business_name, COALESCE(dps.name_variants, '{}') AS name_variants,
             dps.city, dps.state
        FROM directory_presence_seeds dps
        JOIN directory_listings_list dll ON dll.id = dps.listing_id
@@ -134,9 +137,62 @@ export async function fetchLiveSeedSlugCandidates(requestedSlug: string): Promis
              WHERE v ILIKE ANY($1::text[])
           )
         )
-      LIMIT 250`,
-    [patterns],
-  );
+      LIMIT ${CANDIDATE_LIMIT}`,
+
+  // /directory — claimed listings on the source table (formerly-seeded ones
+  // keep their dps row → name_variants/geo still reachable).
+  directory: `SELECT dll.slug, dll.business_name, COALESCE(dps.name_variants, '{}') AS name_variants,
+            COALESCE(dll.city, dps.city) AS city, COALESCE(dll.state, dps.state) AS state
+       FROM directory_listings_list dll
+       LEFT JOIN directory_presence_seeds dps ON dps.listing_id = dll.id
+      WHERE dll.is_published = true
+        AND COALESCE(dll.listing_origin, 'claimed') <> 'directory_seed'
+        AND dll.slug IS NOT NULL
+        AND (
+          dll.business_name ILIKE ANY($1::text[])
+          OR EXISTS (
+            SELECT 1 FROM unnest(dps.name_variants) v
+             WHERE v ILIKE ANY($1::text[])
+          )
+        )
+      LIMIT ${CANDIDATE_LIMIT}`,
+
+  // /tenant — live tenants by slug/name on the tenants source table. Seed
+  // tenants are excluded (their /tenant page is a noindex claim-preview, not
+  // a storefront); hidden tenants never win a redirect. Formerly-seeded
+  // tenants keep variant/geo recall via the dps join.
+  tenant: `SELECT t.slug, t.name AS business_name, COALESCE(dps.name_variants, '{}') AS name_variants,
+            dps.city, dps.state
+       FROM tenants t
+       LEFT JOIN directory_presence_seeds dps ON dps.tenant_id = t.id
+      WHERE t.slug IS NOT NULL
+        AND COALESCE(t.org_standing_mode, 'independent') <> 'directory_seed'
+        AND COALESCE(t.directory_visible, true) = true
+        AND (
+          t.name ILIKE ANY($1::text[])
+          OR EXISTS (
+            SELECT 1 FROM unnest(dps.name_variants) v
+             WHERE v ILIKE ANY($1::text[])
+          )
+        )
+      LIMIT ${CANDIDATE_LIMIT}`,
+};
+
+/**
+ * Live records on `surface` plausibly related to the dead slug — the
+ * candidate set `matchSeedSlugVariant` disambiguates. Recall layer only:
+ * ILIKE substring on raw name/variant text, precision stays in JS.
+ */
+export async function fetchLiveSlugCandidates(
+  requestedSlug: string,
+  surface: SlugSurface = 'place',
+): Promise<SeedSlugCandidate[]> {
+  const tokens = slugTokens(requestedSlug.trim().toLowerCase()).filter((t) => t.length >= 3);
+  if (tokens.length === 0) return [];
+  const patterns = tokens.map((t) => `%${t}%`);
+
+  const pool = getDirectPool();
+  const { rows } = await pool.query(SURFACE_QUERIES[surface], [patterns]);
 
   return rows.map((r: any) => ({
     slug: r.slug ?? null,
@@ -146,3 +202,7 @@ export async function fetchLiveSeedSlugCandidates(requestedSlug: string): Promis
     state: r.state ?? null,
   }));
 }
+
+/** @deprecated use fetchLiveSlugCandidates(requestedSlug, 'place') */
+export const fetchLiveSeedSlugCandidates = (requestedSlug: string) =>
+  fetchLiveSlugCandidates(requestedSlug, 'place');

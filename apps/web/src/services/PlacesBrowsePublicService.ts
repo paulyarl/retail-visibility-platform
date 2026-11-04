@@ -402,17 +402,21 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
   }
 
   /**
-   * GET /api/public/directory/seed-slug-variant/:slug — dead /place slug
-   * recovery. Returns the single live seed slug the requested slug plausibly
-   * refers to (old spelling pre-rename/republish), or null when none/ambiguous.
-   * The place layout 308s to it; never returns the requested slug itself.
+   * GET /api/public/directory/slug-variant/:slug?surface= — dead-slug
+   * recovery on any public slug surface ('place' | 'directory' | 'tenant').
+   * Returns the single live record slug the requested slug plausibly refers
+   * to (old spelling pre-rename/republish), or null when none/ambiguous.
+   * Callers 308 to it; never returns the requested slug itself.
    */
-  async resolveSeedSlugVariant(slug: string): Promise<string | null> {
+  async resolveSlugVariant(
+    slug: string,
+    surface: 'place' | 'directory' | 'tenant' = 'place',
+  ): Promise<string | null> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        `/api/public/directory/seed-slug-variant/${encodeURIComponent(slug)}`,
+        `/api/public/directory/slug-variant/${encodeURIComponent(slug)}?surface=${surface}`,
         { method: 'GET' },
-        `seed-slug-variant-${slug}`,
+        `slug-variant-${surface}-${slug}`,
         5 * 60 * 1000,
       );
       if (!result.success) return null;
@@ -422,6 +426,11 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
     } catch {
       return null;
     }
+  }
+
+  /** /place dead-slug recovery — surface='place' form of resolveSlugVariant. */
+  async resolveSeedSlugVariant(slug: string): Promise<string | null> {
+    return this.resolveSlugVariant(slug, 'place');
   }
 
   /** GET /api/public/directory/location-enrichment — effective location SEO for city pages */

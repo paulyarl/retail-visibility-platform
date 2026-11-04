@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import React from 'react';
 import { permanentRedirect } from 'next/navigation';
 import { directoryService } from '@/services/DirectorySingletonService';
+import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 
 interface LayoutProps {
   params: Promise<{ slug: string }>;
@@ -73,16 +74,29 @@ export default async function DirectorySlugLayout({ params, children }: LayoutPr
   // live at /place/{slug}. /directory/{slug} is the canonical path for claimed
   // tenants (listing_origin != 'directory_seed'). Redirect seeds away so
   // there is a single canonical URL per listing.
+  //
+  // Dead slugs get one rescue attempt (same insurance as /place): a tenant
+  // slug rename orphans the old URL, so when exactly one live claimed listing
+  // explains the requested slug, 308 to its canonical slug. Zero or ambiguous
+  // matches fall through to the page's 404.
+  let redirectTo: string | null = null;
   try {
     const data = await directoryService.getDirectoryConsolidated(slug);
     const listing = data?.listing;
 
     if (listing && listing.listingOrigin === 'directory_seed') {
-      permanentRedirect(`/place/${listing.slug || slug}`);
+      redirectTo = `/place/${listing.slug || slug}`;
+    } else if (!listing) {
+      redirectTo = await placesBrowsePublicService.resolveSlugVariant(slug, 'directory');
+      if (redirectTo) redirectTo = `/directory/${redirectTo}`;
     }
   } catch {
     // If the lookup fails, fall through to the page which handles not-found.
   }
+
+  // permanentRedirect throws NEXT_REDIRECT — it must run outside the
+  // try/catch or a swallowed throw silently drops the redirect.
+  if (redirectTo) permanentRedirect(redirectTo);
 
   return <>{children}</>;
 }

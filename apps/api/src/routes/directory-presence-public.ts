@@ -53,8 +53,10 @@ import directoryPresenceAnalyticsService, {
 import { seedPublishableSql } from '../services/directory/seedPublishability';
 import { US_STATE_SLUG_TOKENS } from '../lib/usStateSlugTokens';
 import {
-  fetchLiveSeedSlugCandidates,
+  fetchLiveSlugCandidates,
   matchSeedSlugVariant,
+  SLUG_SURFACES,
+  type SlugSurface,
 } from '../services/directory/seedSlugVariants';
 import crypto from 'crypto';
 
@@ -1479,19 +1481,41 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/public/directory/seed-slug-variant/:slug — dead /place slug
- * recovery. A slug that no longer resolves (republished seed, slug edit,
- * old market push) is checked against the live seed set; when exactly ONE
- * live seed can explain it (name / name-variant / geo / legal tokens) the
- * response carries that seed's slug and the page 308s to it. Zero or
+ * GET /api/public/directory/slug-variant/:slug?surface=place|directory|tenant
+ * Dead-slug recovery for every public slug surface. A slug that no longer
+ * resolves (republished seed, slug edit, tenant rename, old market push) is
+ * checked against the live records on that surface's source table; when
+ * exactly ONE live record can explain it (name / name-variant / geo / legal
+ * tokens) the response carries its slug and the page 308s to it. Zero or
  * ambiguous matches return null — the 404 stands.
  *
  * Response: { slug: string | null, candidates: number }
  */
+router.get('/slug-variant/:slug', async (req: Request, res: Response) => {
+  try {
+    const requested = decodeURIComponent(req.params.slug).trim().toLowerCase();
+    const surfaceParam = String(req.query.surface ?? 'place') as SlugSurface;
+    const surface: SlugSurface = SLUG_SURFACES.includes(surfaceParam) ? surfaceParam : 'place';
+    const candidates = await fetchLiveSlugCandidates(requested, surface);
+    const slug = matchSeedSlugVariant(requested, candidates);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ slug, candidates: candidates.length });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/slug-variant/:slug] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ slug: null });
+  }
+});
+
+/**
+ * GET /api/public/directory/seed-slug-variant/:slug — /place-only form of the
+ * generic resolver above (kept for the deployed place layout).
+ */
 router.get('/seed-slug-variant/:slug', async (req: Request, res: Response) => {
   try {
     const requested = decodeURIComponent(req.params.slug).trim().toLowerCase();
-    const candidates = await fetchLiveSeedSlugCandidates(requested);
+    const candidates = await fetchLiveSlugCandidates(requested, 'place');
     const slug = matchSeedSlugVariant(requested, candidates);
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.json({ slug, candidates: candidates.length });

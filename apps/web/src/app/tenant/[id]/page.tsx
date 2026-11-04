@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import type { Metadata } from 'next';
 // import Image from 'next/image';
 // import { Pagination } from '@/components/ui';
@@ -38,6 +38,7 @@ import StorefrontClientWrapper from './StorefrontClientWrapper';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
@@ -613,6 +614,13 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // console.log('[TenantStorefrontPage] data:', data); 
 
   if (!data) {
+    // Dead-slug insurance (same rescue as /place and /directory): a tenant
+    // slug rename orphans the old /tenant/{slug}; when exactly one live
+    // tenant explains it, 308 to the canonical slug instead of 404ing.
+    const variant = await placesBrowsePublicService
+      .resolveSlugVariant(id, 'tenant')
+      .catch(() => null);
+    if (variant) permanentRedirect(`/tenant/${variant}`);
     notFound();
   }
 
