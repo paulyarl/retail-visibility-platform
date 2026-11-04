@@ -189,8 +189,22 @@ function DuplicateGroupCard({
     (best, s) => ((s.richnessScore ?? 0) > (best?.richnessScore ?? -1) ? s : best),
     group.seeds[0] as CleanupSeedRef | undefined,
   )?.seedId;
-  const [keepId, setKeepId] = useState<string | null>(claimedIds[0] ?? richestId ?? null);
+  const [keepId, setKeepId] = useState<string | null>(
+    claimedIds[0] ?? group.verdict?.mergeInto ?? richestId ?? null,
+  );
+  const [editing, setEditing] = useState(false);
   const resolved = !!group.verdict;
+  const locked = resolved && !editing;
+  // A same_entity verdict is only *applied* once its losers leave the live
+  // surfaces — a recorded-but-unsuppressed verdict (e.g. a verdict written
+  // via the dedup-verdicts route rather than resolve-duplicates) still
+  // offers the suppression step instead of sitting inert.
+  const pendingLosers =
+    group.verdict?.verdict === 'same_entity'
+      ? group.seeds.filter(
+          (s) => s.seedId !== group.verdict!.mergeInto && s.status !== 'suppressed' && s.status !== 'claimed',
+        )
+      : [];
 
   return (
     <div
@@ -243,60 +257,83 @@ function DuplicateGroupCard({
             seed={s}
             keeper={keepId === s.seedId}
             recommended={s.seedId === richestId && s.status !== 'claimed'}
-            disabled={resolved || busy || s.status === 'suppressed'}
+            disabled={locked || busy || s.status === 'suppressed'}
             onPick={() => setKeepId(s.seedId)}
           />
         ))}
       </div>
 
-      {!resolved && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {locked && pendingLosers.length > 0 && (
           <button
             type="button"
-            disabled={busy || !keepId}
-            onClick={() => keepId && onResolve(group, keepId)}
+            disabled={busy}
+            onClick={() => onResolve(group, group.verdict!.mergeInto!)}
+            title="The verdict was recorded but the losers are still live — apply the suppression now"
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
           >
             <ShieldAlert className="h-3.5 w-3.5" />
-            Keep selected — suppress {group.seeds.filter((s) => s.seedId !== keepId).length} other
-            {group.seeds.length > 2 ? 's' : ''}
+            Apply verdict — suppress {pendingLosers.length} loser{pendingLosers.length > 1 ? 's' : ''}
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onMarkDistinct(group)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-gray-300"
-          >
-            Not duplicates — mark distinct
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onRequestVerification(group)}
-            title="Signals can't settle this — route each member's queue entry to verify_then_outreach so a call resolves it"
-            className="inline-flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-300"
-          >
-            <PhoneCall className="h-3.5 w-3.5" />
-            Needs verification — call to settle
-          </button>
-          {group.chain && (
+        )}
+        {!locked && (
+          <>
+            <button
+              type="button"
+              disabled={busy || !keepId}
+              onClick={() => keepId && onResolve(group, keepId)}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <ShieldAlert className="h-3.5 w-3.5" />
+              Keep selected — suppress {group.seeds.filter((s) => s.seedId !== keepId).length} other
+              {group.seeds.length > 2 ? 's' : ''}
+            </button>
             <button
               type="button"
               disabled={busy}
-              onClick={() => onLinkChain(group)}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              onClick={() => onMarkDistinct(group)}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-gray-300"
             >
-              <Link2 className="h-3.5 w-3.5" />
-              Same chain — link {group.seeds.length} location{group.seeds.length > 2 ? 's' : ''}
+              Not duplicates — mark distinct
             </button>
-          )}
-          {claimedIds.length > 0 && (
-            <span className="text-xs text-red-600">
-              claimed seeds can be kept but never suppressed
-            </span>
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onRequestVerification(group)}
+              title="Signals can't settle this — route each member's queue entry to verify_then_outreach so a call resolves it"
+              className="inline-flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-300"
+            >
+              <PhoneCall className="h-3.5 w-3.5" />
+              Needs verification — call to settle
+            </button>
+            {group.chain && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onLinkChain(group)}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                Same chain — link {group.seeds.length} location{group.seeds.length > 2 ? 's' : ''}
+              </button>
+            )}
+            {claimedIds.length > 0 && (
+              <span className="text-xs text-red-600">
+                claimed seeds can be kept but never suppressed
+              </span>
+            )}
+          </>
+        )}
+        {resolved && (
+          <button
+            type="button"
+            onClick={() => setEditing((e) => !e)}
+            className="ml-auto text-xs text-gray-500 underline decoration-dotted hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            {editing ? 'Cancel revision' : 'Revise verdict'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
