@@ -51,6 +51,11 @@ import directoryPresenceAnalyticsService, {
   checkDirectoryPresenceRateLimit,
 } from '../services/DirectoryPresenceAnalyticsService';
 import { seedPublishableSql } from '../services/directory/seedPublishability';
+import { US_STATE_SLUG_TOKENS } from '../lib/usStateSlugTokens';
+import {
+  fetchLiveSeedSlugCandidates,
+  matchSeedSlugVariant,
+} from '../services/directory/seedSlugVariants';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1247,29 +1252,11 @@ router.get('/attribute-definitions', async (req: Request, res: Response) => {
 // ====================
 
 // Trailing-segment tokens that mark the state in a "{city}-{state}" shelf
-// slug. Postal codes AND full names map to the lowercase code — emitters slug
-// the raw stored state, which may be either form. The token must map here to
-// count as a state, so multi-word city names never mis-split ('south-bend'
-// stays a bare city; 'bluefield-west-virginia' → 'bluefield' + 'wv').
-const CITY_SLUG_STATE_TOKENS: Record<string, string> = {
-  al: 'al', alabama: 'al', ak: 'ak', alaska: 'ak', az: 'az', arizona: 'az',
-  ar: 'ar', arkansas: 'ar', ca: 'ca', california: 'ca', co: 'co', colorado: 'co',
-  ct: 'ct', connecticut: 'ct', de: 'de', delaware: 'de', dc: 'dc',
-  fl: 'fl', florida: 'fl', ga: 'ga', georgia: 'ga', hi: 'hi', hawaii: 'hi',
-  id: 'id', idaho: 'id', il: 'il', illinois: 'il', in: 'in', indiana: 'in',
-  ia: 'ia', iowa: 'ia', ks: 'ks', kansas: 'ks', ky: 'ky', kentucky: 'ky',
-  la: 'la', louisiana: 'la', me: 'me', maine: 'me', md: 'md', maryland: 'md',
-  ma: 'ma', massachusetts: 'ma', mi: 'mi', michigan: 'mi', mn: 'mn', minnesota: 'mn',
-  ms: 'ms', mississippi: 'ms', mo: 'mo', missouri: 'mo', mt: 'mt', montana: 'mt',
-  ne: 'ne', nebraska: 'ne', nv: 'nv', nevada: 'nv', nh: 'nh', 'new hampshire': 'nh',
-  nj: 'nj', 'new jersey': 'nj', nm: 'nm', 'new mexico': 'nm', ny: 'ny', 'new york': 'ny',
-  nc: 'nc', 'north carolina': 'nc', nd: 'nd', 'north dakota': 'nd', oh: 'oh', ohio: 'oh',
-  ok: 'ok', oklahoma: 'ok', or: 'or', oregon: 'or', pa: 'pa', pennsylvania: 'pa',
-  ri: 'ri', 'rhode island': 'ri', sc: 'sc', 'south carolina': 'sc', sd: 'sd', 'south dakota': 'sd',
-  tn: 'tn', tennessee: 'tn', tx: 'tx', texas: 'tx', ut: 'ut', utah: 'ut',
-  vt: 'vt', vermont: 'vt', va: 'va', virginia: 'va', wa: 'wa', washington: 'wa',
-  wv: 'wv', 'west virginia': 'wv', wi: 'wi', wisconsin: 'wi', wy: 'wy', wyoming: 'wy',
-};
+// slug. The token must map here to count as a state, so multi-word city
+// names never mis-split ('south-bend' stays a bare city; 'bluefield-west-
+// virginia' → 'bluefield' + 'wv'). The map lives in lib/usStateSlugTokens so
+// the seed slug-variant resolver shares it.
+const CITY_SLUG_STATE_TOKENS = US_STATE_SLUG_TOKENS;
 
 /** 'Coeur d'Alene' ⇄ 'coeur-d-alene' — slug and DB form share one normalization. */
 function normalizeCityForMatch(s: string): string {
@@ -1488,6 +1475,31 @@ router.get('/places/city/:citySlug', async (req: Request, res: Response) => {
       error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
     });
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * GET /api/public/directory/seed-slug-variant/:slug — dead /place slug
+ * recovery. A slug that no longer resolves (republished seed, slug edit,
+ * old market push) is checked against the live seed set; when exactly ONE
+ * live seed can explain it (name / name-variant / geo / legal tokens) the
+ * response carries that seed's slug and the page 308s to it. Zero or
+ * ambiguous matches return null — the 404 stands.
+ *
+ * Response: { slug: string | null, candidates: number }
+ */
+router.get('/seed-slug-variant/:slug', async (req: Request, res: Response) => {
+  try {
+    const requested = decodeURIComponent(req.params.slug).trim().toLowerCase();
+    const candidates = await fetchLiveSeedSlugCandidates(requested);
+    const slug = matchSeedSlugVariant(requested, candidates);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ slug, candidates: candidates.length });
+  } catch (error) {
+    logger.error('[GET /api/public/directory/seed-slug-variant/:slug] Error:', undefined, {
+      error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error) },
+    });
+    res.status(500).json({ slug: null });
   }
 });
 

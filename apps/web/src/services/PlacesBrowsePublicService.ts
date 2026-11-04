@@ -401,6 +401,29 @@ class PlacesBrowsePublicService extends PublicApiSingleton {
     return all.slice(0, max);
   }
 
+  /**
+   * GET /api/public/directory/seed-slug-variant/:slug — dead /place slug
+   * recovery. Returns the single live seed slug the requested slug plausibly
+   * refers to (old spelling pre-rename/republish), or null when none/ambiguous.
+   * The place layout 308s to it; never returns the requested slug itself.
+   */
+  async resolveSeedSlugVariant(slug: string): Promise<string | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/public/directory/seed-slug-variant/${encodeURIComponent(slug)}`,
+        { method: 'GET' },
+        `seed-slug-variant-${slug}`,
+        5 * 60 * 1000,
+      );
+      if (!result.success) return null;
+      const data = result.data?.data ?? result.data;
+      const resolved = data?.slug;
+      return typeof resolved === 'string' && resolved && resolved !== slug ? resolved : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** GET /api/public/directory/location-enrichment — effective location SEO for city pages */
   async getLocationEnrichment(
     city: string,
