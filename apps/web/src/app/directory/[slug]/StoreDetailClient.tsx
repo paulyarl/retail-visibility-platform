@@ -17,6 +17,7 @@ import {
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { GbpReviewsSection } from '@/components/gbp/GbpReviewsSection';
 import { GbpPostsSection } from '@/components/gbp/GbpPostsSection';
+import PlacePostsSection from '@/components/directory/PlacePostsSection';
 import { GbpPhotoGallerySection } from '@/components/gbp/GbpPhotoGallerySection';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
@@ -345,6 +346,7 @@ export default function StoreDetailClient({
             )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
+            <PlacePostsSection tenantId={listing.tenantId} />
             <GbpPhotoGallerySection slug={identifier} />
           </div>
           <PublicBotWidget
@@ -381,6 +383,7 @@ export default function StoreDetailClient({
             )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
+            <PlacePostsSection tenantId={listing.tenantId} />
             <GbpPhotoGallerySection slug={identifier} />
           </div>
           <PublicBotWidget
@@ -417,6 +420,7 @@ export default function StoreDetailClient({
             )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
+            <PlacePostsSection tenantId={listing.tenantId} />
             <GbpPhotoGallerySection slug={identifier} />
           </div>
           <PublicBotWidget
@@ -454,6 +458,7 @@ export default function StoreDetailClient({
             )}
             <GbpReviewsSection slug={identifier} />
             <GbpPostsSection slug={identifier} />
+            <PlacePostsSection tenantId={listing.tenantId} />
             <GbpPhotoGallerySection slug={identifier} />
           </div>
           <PublicBotWidget

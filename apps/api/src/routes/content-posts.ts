@@ -32,6 +32,7 @@ const postSchema = z.object({
   destinations: z.object({
     gbp: z.boolean().optional(),
     meta: z.array(z.enum(['meta_facebook', 'meta_instagram', 'meta_threads'])).optional(),
+    place: z.boolean().optional(),
   }),
 });
 
@@ -60,7 +61,7 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
     }
     const { body, mediaUrl, linkUrl, scheduledFor, destinations } = parsed.data;
 
-    if (!destinations.gbp && (!destinations.meta || destinations.meta.length === 0)) {
+    if (!destinations.gbp && !destinations.place && (!destinations.meta || destinations.meta.length === 0)) {
       return res.status(400).json({ success: false, error: 'no_destinations', message: 'Select at least one destination' });
     }
 
@@ -105,6 +106,23 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
           });
           results.push({ channel: 'gbp', ok: true, postId: post.id, scheduled: false });
         }
+      }
+    }
+
+    // ── Directory-entry destination (Phase 2: own surface, publishes immediately) ──
+    if (destinations.place) {
+      const entitled = await permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on');
+      if (!entitled) {
+        results.push({ channel: 'place', ok: false, error: 'directory_entry_posts_on is not enabled for this tier' });
+      } else {
+        const post = await prisma.tenant_place_posts.create({
+          data: {
+            id: newPostId(), tenant_id: tenantId, body,
+            media_url: mediaUrl || null,
+            status: 'PUBLISHED', published_at: new Date(),
+          },
+        });
+        results.push({ channel: 'place', ok: true, postId: post.id, scheduled: false });
       }
     }
 

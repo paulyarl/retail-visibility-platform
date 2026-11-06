@@ -4,6 +4,7 @@ import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { getTierFeatures } from '../services/TierService';
+import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
 import { logger } from '../logger';
 
 /**
@@ -58,6 +59,8 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       gbpByStatus,
       socialByStatus,
       caps,
+      placePostCount,
+      placeFeedEntitled,
     ] = await Promise.all([
       prisma.tenants.findUnique({ where: { id: tenantId }, select: { subscription_tier: true } }),
       prisma.tenant_directory_entry_settings.findUnique({ where: { tenant_id: tenantId } }),
@@ -75,6 +78,8 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       prisma.gbp_posts.groupBy({ by: ['status'], where: { tenant_id: tenantId }, _count: true }),
       prisma.social_posts.groupBy({ by: ['status'], where: { tenant_id: tenantId }, _count: true }),
       resolveEffectiveCapabilities(tenantId),
+      prisma.tenant_place_posts.count({ where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
+      permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on'),
     ]);
 
     // Module gates come from effective capabilities, NOT per-key hasFeature
@@ -213,7 +218,7 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       data: {
         surfaces: { live, total: channels.length },
         channels,
-        meta: { tierKey },
+        meta: { tierKey, placeFeed: { enabled: placeFeedEntitled, posts: placePostCount } },
       },
     });
   } catch (error) {

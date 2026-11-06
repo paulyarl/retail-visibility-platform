@@ -25,29 +25,32 @@ export interface ComposerResult {
 
 export default function ContentComposer({
   channels,
+  placeFeedEnabled,
   busy,
   onClose,
   onSubmit,
 }: {
   channels: ContentChannelCard[];
+  placeFeedEnabled: boolean;
   busy: boolean;
   onClose: () => void;
   onSubmit: (payload: {
     body: string;
     mediaUrl?: string;
     scheduledFor?: string;
-    destinations: { gbp?: boolean; meta?: string[] };
+    destinations: { gbp?: boolean; meta?: string[]; place?: boolean };
   }) => void;
 }) {
   const [body, setBody] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [scheduledFor, setScheduledFor] = useState('');
   const [gbp, setGbp] = useState(true);
+  const [place, setPlace] = useState(true);
   const [meta, setMeta] = useState<Set<string>>(new Set(['meta_facebook']));
 
   const gbpEnabled = channels.find((c) => c.key === 'google_gbp')?.capability.enabled ?? false;
   const socialEnabled = channels.find((c) => c.key === 'social_meta')?.capability.enabled ?? false;
-  const anyDestination = (gbpEnabled && gbp) || (socialEnabled && meta.size > 0);
+  const anyDestination = (placeFeedEnabled && place) || (gbpEnabled && gbp) || (socialEnabled && meta.size > 0);
   const canSubmit = body.trim().length > 0 && anyDestination && !busy;
 
   const toggleMeta = (key: string) =>
@@ -92,6 +95,10 @@ export default function ContentComposer({
         <div>
           <p className="text-xs font-medium text-gray-700 mb-2">Publish to</p>
           <div className="flex flex-wrap gap-2">
+            <label className={`inline-flex items-center gap-2 border rounded-full px-3 py-1.5 text-sm ${placeFeedEnabled ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'} ${place && placeFeedEnabled ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
+              <input type="checkbox" className="sr-only" checked={place && placeFeedEnabled} disabled={!placeFeedEnabled} onChange={() => setPlace(!place)} />
+              Directory listing{!placeFeedEnabled ? ' 🔒' : ''}
+            </label>
             <label className={`inline-flex items-center gap-2 border rounded-full px-3 py-1.5 text-sm ${gbpEnabled ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'} ${gbp && gbpEnabled ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
               <input type="checkbox" className="sr-only" checked={gbp && gbpEnabled} disabled={!gbpEnabled} onChange={() => setGbp(!gbp)} />
               Google Business Profile{!gbpEnabled ? ' 🔒' : ''}
@@ -129,7 +136,11 @@ export default function ContentComposer({
                 body: body.trim(),
                 mediaUrl: mediaUrl.trim() || undefined,
                 scheduledFor: scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
-                destinations: { gbp: gbpEnabled && gbp ? true : undefined, meta: socialEnabled && meta.size ? [...meta] : undefined },
+                destinations: {
+                  gbp: gbpEnabled && gbp ? true : undefined,
+                  meta: socialEnabled && meta.size ? [...meta] : undefined,
+                  place: placeFeedEnabled && place ? true : undefined,
+                },
               })
             }
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-medium rounded-xl px-5 py-2"

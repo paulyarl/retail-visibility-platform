@@ -845,4 +845,31 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
   }
 });
 
+/**
+ * GET /api/public/tenants/:tenantId/place-posts
+ * Public read of published directory-entry posts (TENANT_CONTENT_HUB_SPEC
+ * Phase 2). Gated server-side on directory_entry_posts_on — unentitled
+ * tenants return enabled:false + empty list rather than leaking content.
+ */
+router.get('/:tenantId/place-posts', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { permissionServiceFactory } = await import('../services/permissions/PermissionServiceFactory');
+    const enabled = await permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on');
+    if (!enabled) {
+      return res.json({ success: true, data: { enabled: false, posts: [] } });
+    }
+    const posts = await prisma.tenant_place_posts.findMany({
+      where: { tenant_id: tenantId, status: 'PUBLISHED' },
+      orderBy: [{ pinned: 'desc' }, { published_at: 'desc' }],
+      take: 20,
+      select: { id: true, body: true, media_url: true, pinned: true, published_at: true },
+    });
+    res.json({ success: true, data: { enabled: true, posts } });
+  } catch (error) {
+    logger.error('[GET /place-posts] Error:', undefined, { error: String(error) });
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
 export default router;

@@ -55,7 +55,7 @@ export class ContentHubService extends TenantApiSingleton {
       mediaUrl?: string;
       linkUrl?: string;
       scheduledFor?: string;
-      destinations: { gbp?: boolean; meta?: string[] };
+      destinations: { gbp?: boolean; meta?: string[]; place?: boolean };
     }
   ): Promise<{ posted: number; total: number; results: { channel: string; ok: boolean; scheduled?: boolean; error?: string }[] } | null> {
     const result = await this.makeDefaultRequest<{ success: boolean; data: any }>(

@@ -193,6 +193,7 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
       {composerOpen && summary && (
         <ContentComposer
           channels={summary.channels}
+          placeFeedEnabled={summary.meta?.placeFeed?.enabled ?? false}
           busy={composerBusy}
           onClose={() => setComposerOpen(false)}
           onSubmit={submitPost}

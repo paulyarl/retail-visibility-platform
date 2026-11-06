@@ -3340,6 +3340,23 @@ model social_posts {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// Owner-authored dated updates rendered on the claimed directory entry
+/// (/directory/<slug>) — TENANT_CONTENT_HUB_SPEC Phase 2, migration 375.
+model tenant_place_posts {
+  id           String    @id @db.VarChar(50)
+  tenant_id    String    @db.VarChar(255)
+  body         String
+  media_url    String?
+  status       String    @default("PUBLISHED") @db.VarChar(20)
+  pinned       Boolean   @default(false)
+  published_at DateTime? @default(now()) @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id, status, published_at(sort: Desc)], map: "idx_tpp_tenant_status_published")
+}
+
 model social_media {
   id           String   @id @db.VarChar(50)
   tenant_id    String   @db.VarChar(50)
@@ -7550,6 +7567,7 @@ model tenants {
   tenant_integration_settings                                                            tenant_integration_settings?
   tenant_payment_gateway_settings                                                        tenant_payment_gateway_settings?
   tenant_payment_gateways                                                                tenant_payment_gateways[]
+  tenant_place_posts                                                                     tenant_place_posts[]
   tenant_policy_template_usage                                                           tenant_policy_template_usage[]
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_product_types_settings                                                          tenant_product_types_settings?
