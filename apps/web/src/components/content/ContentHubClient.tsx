@@ -99,7 +99,7 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
     [tenantId]
   );
 
-  const nudge = summary ? topNudge(summary.channels) : null;
+  const nudge = summary ? (summary.meta?.topNudge ?? topNudge(summary.channels)) : null;
   const surfaces = summary?.surfaces;
 
   return (

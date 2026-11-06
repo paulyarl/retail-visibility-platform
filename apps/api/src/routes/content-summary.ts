@@ -61,6 +61,9 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       caps,
       placePostCount,
       placeFeedEntitled,
+      gbpLastPublished,
+      socialLastPublished,
+      placeLastPublished,
     ] = await Promise.all([
       prisma.tenants.findUnique({ where: { id: tenantId }, select: { subscription_tier: true } }),
       prisma.tenant_directory_entry_settings.findUnique({ where: { tenant_id: tenantId } }),
@@ -83,7 +86,20 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
         const de = c?.effective?.directory_entry as { is_flexible?: boolean } | undefined;
         return !!de?.is_flexible || permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on');
       }),
+      prisma.gbp_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
+      prisma.social_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
+      prisma.tenant_place_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
     ]);
+
+    // Phase 3 gap intelligence — staleness helpers. `freshness` is the ISO
+    // stamp of the channel's last publish; nudges escalate never → stale.
+    const daysSince = (d: Date | null | undefined) =>
+      d ? Math.floor((now.getTime() - new Date(d).getTime()) / 86400000) : null;
+    const staleNudge = (label: string, d: Date | null | undefined) => {
+      const days = daysSince(d);
+      return days != null && days > 45 ? `Last ${label} was ${days}d ago — fresh content tells Google the page is alive` : undefined;
+    };
+    const iso = (d: Date | null | undefined) => (d ? new Date(d).toISOString() : null);
 
     // Module gates come from effective capabilities, NOT per-key hasFeature
     // checks — enterprise tiers resolve modules through their flexible keys
@@ -150,7 +166,11 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
         metrics: { photos: photoCount },
         capability: { enabled: dirOpts.gallery_enabled || dirOpts.enabled, flexible: dirFlexible },
         editorHref: '/settings/directory',
-        nudge: photoCount === 0 ? 'Pages with photos rank higher and earn more clicks' : undefined,
+        nudge: photoCount === 0
+          ? itemCount > 0
+            ? 'Your catalog exists but no one has seen it — add photos'
+            : 'Pages with photos rank higher and earn more clicks'
+          : undefined,
       },
       (() => {
         const flyerCap = caps?.effective?.flyer as { enabled?: boolean } | null | undefined;
@@ -164,23 +184,35 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
           metrics: { live: flyerLive, scheduled: flyerScheduled, drafts: flyerDraft },
           capability: { enabled: flyerEnabled, flexible: !!F.flyer_flexible },
           editorHref: '/settings/flyers',
-          nudge: flyerEnabled && total === 0 ? 'Run your first flyer — it also surfaces on your listing' : undefined,
+          nudge: !flyerEnabled
+            ? undefined
+            : flyerDraft > 0 && flyerLive === 0
+              ? 'You have an unpublished flyer — set it live to surface it'
+              : total === 0
+                ? 'Run your first flyer — it also surfaces on your listing'
+                : undefined,
         } as ContentChannelCard;
       })(),
       (() => {
         const gbpPublished = gbpByStatus.find((r) => r.status === 'PUBLISHED')?._count ?? 0;
         const gbpScheduled = gbpByStatus.find((r) => r.status === 'SCHEDULED')?._count ?? 0;
         const socialPublished = socialByStatus.find((r) => r.status === 'PUBLISHED')?._count ?? 0;
-        const postsTotal = gbpPublished + gbpScheduled + socialPublished;
+        const postsTotal = gbpPublished + gbpScheduled + socialPublished + placePostCount;
+        const lastPostAt = [gbpLastPublished._max.published_at, socialLastPublished._max.published_at, placeLastPublished._max.published_at]
+          .filter((d): d is Date => !!d)
+          .sort((a, b) => b.getTime() - a.getTime())[0];
         return {
           key: 'posts_updates',
           label: 'Posts & updates',
-          rendersOn: ['Google Business Profile', 'Meta'],
+          rendersOn: ['Google Business Profile', 'Meta', 'Directory listing'],
           state: postsTotal > 0 ? 'active' : 'empty',
-          metrics: { published: gbpPublished + socialPublished, scheduled: gbpScheduled },
-          capability: { enabled: gbpGranted || socialGranted, flexible: gbpFlexible || socialFlexible },
+          metrics: { published: gbpPublished + socialPublished + placePostCount, scheduled: gbpScheduled },
+          freshness: iso(lastPostAt),
+          capability: { enabled: gbpGranted || socialGranted || placeFeedEntitled, flexible: gbpFlexible || socialFlexible },
           editorHref: '/settings/social-commerce',
-          nudge: postsTotal === 0 ? 'A dated post is fresh content on every channel it reaches' : undefined,
+          nudge: postsTotal === 0
+            ? 'A dated post is fresh content on every channel it reaches'
+            : staleNudge('post', lastPostAt),
         } as ContentChannelCard;
       })(),
       (() => {
@@ -192,9 +224,10 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
           rendersOn: ['Google Business Profile'],
           state: !gbpGranted ? 'locked' : published + scheduled > 0 ? 'active' : 'empty',
           metrics: { published, scheduled },
+          freshness: iso(gbpLastPublished._max.published_at),
           capability: { enabled: gbpGranted, flexible: gbpFlexible },
           editorHref: '/settings/gbp-category',
-          nudge: gbpGranted ? undefined : 'Unlock GBP posting and profile sync',
+          nudge: gbpGranted ? staleNudge('GBP post', gbpLastPublished._max.published_at) : 'Unlock GBP posting and profile sync',
         } as ContentChannelCard;
       })(),
       (() => {
@@ -208,20 +241,27 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
           // ungranted tenant sees "coming soon", never an error.
           state: socialGranted ? (published + scheduled > 0 ? 'active' : 'empty') : 'dark',
           metrics: { published, scheduled },
+          freshness: iso(socialLastPublished._max.published_at),
           capability: { enabled: socialGranted, flexible: socialFlexible },
           editorHref: '/settings/social-commerce',
-          nudge: socialGranted ? undefined : 'Social posting arrives after the pilot completes',
+          nudge: socialGranted ? staleNudge('social post', socialLastPublished._max.published_at) : 'Social posting arrives after the pilot completes',
         } as ContentChannelCard;
       })(),
     ];
 
     const live = channels.filter((c) => c.state === 'active').length;
+    // Header nudge priority: staleness > coverage gaps > empty-channel nudges.
+    const topNudge =
+      channels.find((c) => c.nudge?.includes('ago'))?.nudge ??
+      (flyerDraft > 0 && flyerLive === 0 ? 'You have an unpublished flyer — set it live to surface it' : undefined) ??
+      (itemCount > 0 && photoCount === 0 ? 'Your catalog exists but no one has seen it — add photos' : undefined) ??
+      channels.find((c) => c.nudge)?.nudge;
     res.json({
       success: true,
       data: {
         surfaces: { live, total: channels.length },
         channels,
-        meta: { tierKey, placeFeed: { enabled: placeFeedEntitled, posts: placePostCount } },
+        meta: { tierKey, placeFeed: { enabled: placeFeedEntitled, posts: placePostCount }, topNudge },
       },
     });
   } catch (error) {

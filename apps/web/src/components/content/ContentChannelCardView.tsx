@@ -46,6 +46,11 @@ export default function ContentChannelCardView({ card, tenantId, onToggleLever, 
         {metricSummary(card)}
         {card.detail ? <span className="text-gray-400"> — {card.detail}</span> : null}
       </div>
+      {card.freshness ? (
+        <div className="text-xs text-gray-400 -mt-1">
+          Last published {new Date(card.freshness).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        </div>
+      ) : null}
 
       {card.quickLevers && card.quickLevers.length > 0 ? (
         <div className="flex flex-wrap gap-2">
