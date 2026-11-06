@@ -79,7 +79,7 @@ social_posts row (platform='linkedin', target_ref=org URN)
 - **Tokens are member-scoped, not surface-scoped.** One member token posts to every page they administer (`author` URN does the switching). Token lives on the **account** row; surface rows carry only `target_ref` + `display_name` — no per-surface `access_token_enc`.
 - `social_posts.surface_connection_id` stays **NULL** on linkedin rows (FK is meta-scoped); `target_ref` = `urn:li:organization:{id}` is the resolution key — same as Meta rows today, which resolve by `target_ref` anyway.
 
-`resolveSurface` in `lib/social/surfaces.ts` gains a LinkedIn branch: `META_SURFACE_MAP` keeps serving meta platforms; `platform === 'linkedin'` joins `linkedin_surface_connections` → `linkedin_oauth_accounts_list` and returns the member token. The `ResolvedSurface` shape is unchanged.
+`resolveSurface` in `lib/social/surfaces.ts` gains a LinkedIn branch: `META_SURFACE_MAP` keeps serving meta platforms; `platform === 'linkedin'` joins `linkedin_surface_connections` → `linkedin_oauth_accounts_list` and returns the member token. The `ResolvedSurface` shape is unchanged — **but the expiry/revocation checks move to the account row**: `token_expires_at` and `reauthorization_required` live on `linkedin_oauth_accounts_list` (surface rows carry no token), so the LinkedIn branch returns null when the account token is expired or flagged — the `linkedinTokenRefresh` job owns renewal, same contract as the Threads leg.
 
 ---
 
@@ -100,6 +100,8 @@ Env: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REDIRECT_URI`, `L
 
 ### 4.1 Platform profile & connect flow
 
+**Entitlement gate — gap-sweep correction (2026-11-06): do NOT copy the Meta legs' `hasFeature` gate.** `permissionServiceFactory.hasFeature` resolves through `TenantPermissionContext` → exact-key `tenant_feature_overrides_list` lookup → a hardcoded ~8-key `tierFeatures` map. It sees **neither** `tier_features_list`, the `mv_tenant_effective_capabilities` MV, flexible expansion, nor purchases — so `hasFeature('social_posting_linkedin')` is true only for tenants holding an explicit per-key override. (The same is true of the existing `social_posting_meta`/`_instagram`/`_scheduler` call sites — a latent 403/skip bug for tier-entitled merchants; see §11 F1.) Gate LinkedIn endpoints on `resolveEffectiveCapabilities(tenantId).effective.social_posting.linkedin_enabled` / `.can_use_scheduler` — the same source `content-posts.ts` already uses — with `hasFeature` kept only as the override-grant OR-fallback, mirroring `content-posts.ts:139`.
+
 ```
 GET  /linkedin/authorize        → state{tenantId,nonce,ts} → LinkedIn consent URL
 GET  /linkedin/callback         → exchange → userinfo → upsert linkedin_oauth_accounts_list
@@ -109,7 +111,7 @@ POST /linkedin/select-surface   → {targetRef: 'urn:li:organization:123'} → s
 DELETE /linkedin/surfaces/:id   → disconnect one page (per-surface, Threads precedent)
 ```
 
-Same UX rules as Meta profile: surfaces resolve independently, per-surface disconnect, `reauthorizationRequired` surfaces as a banner when scopes/token lapse.
+Same UX rules as Meta profile: surfaces resolve independently, per-surface disconnect, `reauthorizationRequired` surfaces as a banner when scopes/token lapse. **Callback is unauthenticated by design** (browser redirect carries no customer token) — validate `state` only, exactly like `GET /meta/threads/callback`.
 
 ### 4.2 `linkedinAdapter` (`lib/social/linkedin.ts`)
 
@@ -206,18 +208,22 @@ Then `prisma db pull`/`generate` per AGENTS.md, plus fixture regeneration (§4.4
 
 ## 6. API Surface Changes
 
-`social-customer.ts` (mounted `/api/customer/marketing/social`) gains the §4.1 legs; existing endpoints extend by enum/flag only:
+`social-customer.ts` (mounted `/api/customer/marketing/social` — already registered in `routeRegistry.ts:1114`, **no new route mount needed**) gains the §4.1 legs; existing endpoints extend by enum/flag only:
 
 | Endpoint | Change |
 | :--- | :--- |
 | `GET /status` | response gains `linkedin: {connected, reauthorizationRequired, organizations: [{id,targetRef,displayName,memberRole}]}` beside `meta` |
-| `createPostSchema.platform` | enum += `'linkedin'`; `PLATFORM_SURFACE_KEY.linkedin = 'social_posting_linkedin'` |
+| `createPostSchema.platform` | enum (`:364`) += `'linkedin'`; `PLATFORM_SURFACE_KEY.linkedin = 'social_posting_linkedin'` (`:54`) |
+| `suggestSchema.platform` | enum (`:500`) += `'linkedin'` — **missed in v0.1**; plus a `linkedin` entry in `PLATFORM_RULES` (`social-post-suggest.ts:50`, professional ≤3000-char variant — the `SocialPlatform` type already accepts it) |
+| `settingsSchema` + `GET /settings` default | += `social_posting_linkedin_on` (`:618`,`:633`) — **missed in v0.1**; without it PUT drops the toggle and GET omits it |
 | `GET /posts` | `platform=linkedin` filter works free |
+| Per-platform + scheduler gates | Switch `hasFeature` calls to the §4.1 resolver-gate pattern (F1) — applies to the new linkedin legs AND opportunistically to the existing meta legs + `socialPostScheduler.hasSchedulerEntitlement` |
 
 `content-posts.ts` (content hub composer):
 
-- `destinations` gains `linkedin: z.boolean().optional()`; the no-destinations guard ORs it in.
-- New branch after the Meta loop: when `destinations.linkedin`, gate on `socialMod.linkedin_enabled` (+ `social_posting_scheduler` when `scheduledAt`), then **fan out to every connected org surface** — one `social_posts` row per `linkedin_surface_connections` row (`platform='linkedin'`, `target_ref`=org URN). Zero connected pages → `{channel:'linkedin', ok:false, error:'No connected LinkedIn page'}`. (A boolean that fans out per page matches the write-once model; per-page pickers in the composer are a v1.1 refinement.)
+- `postSchema.destinations` gains `linkedin: z.boolean().optional()`; the no-destinations guard (`:64`) ORs it in.
+- `socialMod` inline type (`:70-72`) += `linkedin_enabled`; `META_FEATURE_KEY` stays meta-only — the LinkedIn branch uses the module flag directly.
+- New branch after the Meta loop: when `destinations.linkedin`, gate on `socialMod.linkedin_enabled` (+ `can_use_scheduler` when `scheduledAt`), then **fan out to every connected org surface** — one `social_posts` row per `linkedin_surface_connections` row (`platform='linkedin'`, `target_ref`=org URN). Zero connected pages → `{channel:'linkedin', ok:false, error:'No connected LinkedIn page'}`. (A boolean that fans out per page matches the write-once model; per-page pickers in the composer are a v1.1 refinement.)
 
 ---
 
@@ -226,11 +232,12 @@ Then `prisma db pull`/`generate` per AGENTS.md, plus fixture regeneration (§4.4
 | Surface | Change |
 | :--- | :--- |
 | `ContentComposer.tsx` | LinkedIn chip beside the three `META_DESTINATIONS` — own flag (`linkedin` state) since it's not a Meta surface; gated on a `social_linkedin` channel card's `capability.enabled` (🔒 pattern); submits `destinations.linkedin` |
-| `content-summary.ts` | New `social_linkedin` channel card (`rendersOn: ['LinkedIn']`, state/metrics from `social_posts` grouped by platform — reuse `socialByStatus` but per-platform counts; `state:'dark'` until granted, matching `social_meta`) |
-| `apps/web/src/lib/content-hub.ts` | `ContentChannelCard` needs no type change; add `linkedin_enabled` passthrough if the card model stays `capability.enabled` |
-| `account/marketing/social` page | `SURFACES` += `{platform:'linkedin', surface:'organization_page', label:'LinkedIn Page'}`; second profile card "LinkedIn" beside "Meta platform profile" (surfaces keyed off `status.linkedin`) |
-| `SocialPostingService` (web) | `getStatus` type gains `linkedin`; `createPost.platform` union += `'linkedin'` |
-| `settings/integrations` | LinkedIn connect card (mirrors Meta card) — authorize → org-page picker → selected pages list; or a link into the social posting page's connect legs. Pick whichever the integrations index already structures (Meta precedent: `settings/integrations/meta/page.tsx`) |
+| `ContentHubService.ts` | `destinations` type (`:58`) += `linkedin?: boolean` |
+| `content-summary.ts` | New `social_linkedin` channel card (`rendersOn: ['LinkedIn']`, `state:'dark'` until granted — `social_meta` precedent). **Gap-sweep note:** `socialByStatus` (`:79`) is a status-only `groupBy` merging all platforms — LinkedIn needs platform-scoped counts → switch to `groupBy(['status','platform'])` or a second query |
+| `apps/web/src/lib/content-hub.ts` | `ContentChannelCard` needs no type change |
+| `account/marketing/social` page | `SURFACES` += `{platform:'linkedin', surface:'organization_page', label:'LinkedIn Page'}`; second profile card "LinkedIn" beside "Meta platform profile"; `Status` interface (`page.tsx:22`) += `linkedin` block. **Note:** the page is not linked in `CustomerSidebar` — the suite ships dark pending the dogfood gate; LinkedIn inherits that posture, no nav work |
+| `SocialPostingService` (web) | `SocialStatus` type += `linkedin`; `createPost.platform` is already `string` — no union change; **`disconnectSurface` hardcodes `/meta/surfaces/:id` (`:101`)** → add `disconnectLinkedInSurface` hitting `/linkedin/surfaces/:id` (or parameterize the path) |
+| `settings/integrations` | LinkedIn connect card in the Social Commerce section of `page.tsx` (`:353`) linking to the connect legs — or a `settings/integrations/linkedin/page.tsx` mirroring `meta/page.tsx` if a dedicated picker page is wanted. **Do not touch `page-new.tsx`** — an unrouted draft sibling (`page.tsx` wins) |
 
 ---
 
@@ -281,7 +288,34 @@ Then `prisma db pull`/`generate` per AGENTS.md, plus fixture regeneration (§4.4
 
 ---
 
-## 12. Current-State Audit Baseline (verified 2026-11-06)
+## 12. Gap Sweep Findings (2026-11-06)
+
+Every claim in this spec verified against the code on `staging` @ `0a0ad17a3`. Findings folded into the sections above; the table is the audit trail.
+
+| # | Finding | Severity | Disposition |
+| :--- | :--- | :--- | :--- |
+| F1 | **`hasFeature` is override-only for `social_posting_*` keys** — `TenantPermissionContext.hasFeature` checks exact-key `tenant_feature_overrides_list` then a hardcoded ~8-key `tierFeatures` map; it never sees `tier_features_list`, the MV, flexible expansion, or purchases. Every existing `hasFeature('social_posting_*')` call site (`/meta/select-surface:166`, `POST /posts:393`, `socialPostScheduler.hasSchedulerEntitlement:40`) therefore passes **only for explicit per-key overrides** — tier/flexible holders get 403/skip. | **High — latent bug in shipped code** | LinkedIn gates use `resolveEffectiveCapabilities` module flags (§4.1). Recommend fixing the three existing call sites to the resolver path in the same PR — verify first whether `tid-sud4ky1c` holds per-key overrides (`SELECT feature, granted FROM tenant_feature_overrides_list WHERE tenant_id='tid-sud4ky1c' AND feature LIKE 'social_posting%'`) — if its grant is `social_posting_flexible` only, scheduled Meta posts are silently skipping today |
+| F2 | `suggestSchema.platform` enum is meta-only (`social-customer.ts:500`) and `PLATFORM_RULES` lacks a linkedin entry | Medium | §6 — add enum value + prompt variant |
+| F3 | `settingsSchema`/`GET /settings` defaults lack `social_posting_linkedin_on` (`social-customer.ts:618,633`) | Medium | §6 — add column passthrough |
+| F4 | `SocialPostingService.disconnectSurface` hardcodes `/meta/surfaces/:id` (`SocialPostingService.ts:101`) | Low | §7 — new method or parameterized path |
+| F5 | `content-summary` `socialByStatus` is status-only `groupBy` — merges all social platforms | Low | §7 — platform-scoped counts for the linkedin card |
+| F6 | `ContentHubService` destinations type + `content-posts` `socialMod` inline type need linkedin fields | Low | §6/§7 |
+| F7 | `resolveSurface` expiry semantics differ — LinkedIn expiry/`reauthorization_required` live on the **account** row, not surface rows | Low | §3 — LinkedIn branch checks account fields |
+| F8 | No route-registry/mount work needed — legs live inside `social-customer` (mounted `/api/customer/marketing/social`, `routeRegistry.ts:1114`); callback is unauthenticated + state-validated (Threads precedent) | Info | §4.1/§6 |
+| F9 | `/account/marketing/social` exists but is **not in `CustomerSidebar`** — suite ships dark pending dogfood gate | Info | §7 — LinkedIn inherits posture; no nav work |
+| F10 | `page-new.tsx` unrouted draft sibling of integrations index — do not edit | Info | §7 |
+| F11 | `buildMerchantSoftGates` (`EffectiveCapabilityResolver.ts:1350`) has no `social_posting` gates at all — detail=full payload omits the module's merchant toggles | Low | Optional parity add (`gates.social_posting.*_on`) — not required for function |
+| F12 | `generateQuickStart(prefix)` accepts arbitrary prefixes — pick `loauth`/`lsurf`-style ids consistent with `msurf`/`spost`/`smed`/`tsps` | Info | §5 |
+| F13 | No existing tests for the social suite — `apps/api/src/tests/gbpPostScheduler.test.ts` + `gbp-post-suggest.test.ts` are the mirror patterns; adapter/resolver tests are greenfield | Info | §10 |
+| F14 | `surface_files` fixture: `SocialPostingResolver`/`social-customer`/`content-posts` are **not** listed — the guard only covers files declaring `TIER_*`/`DEFAULT_TIER`/trial-tier maps; new linkedin files declare none → no entries expected. Verify `mv-shape-lint`/`tier-*` suites stay green | Info | §4.4 |
+| F15 | Migration numbering: two `375_` files exist (`375_directory_entry_posts.sql`, `375_slug_aliases.sql`) → LinkedIn migration is **376**. No RLS precedent in migrations 370–375 — none needed | Info | §5 |
+| F16 | `enabled` in `EffectiveSocialPosting` must OR `canPostLinkedIn` or a LinkedIn-only tenant sees the module disabled | Low | §4.5 (already spec'd — confirmed necessary) |
+
+**Verified clean (no work needed):** `social_posts.platform VARCHAR(24)` + `target_ref VARCHAR(255)` fit; `surface_connection_id` stays NULL (FK is meta-scoped); `socialPostScheduler` dispatches by `getSocialAdapter` — zero scheduler changes; flexible expansion is automatic on **both** capability paths (`fetchRawCapabilities` merge + `mv_tenant_effective_capabilities` CTEs emit all `capability_features_list`-linked keys for `social_posting_flexible` holders — tier rows AND overrides) so `tid-sud4ky1c` (enterprise, `is_flexible:true` confirmed in its effective caps) resolves `linkedin_enabled` with **no extra grant** once the key is module-linked; `routeRegistry` needs no new mount; `resolveEffectiveCapabilities` is called in both summary (`:95`) and full (`:286`) paths so resolver changes flow everywhere.
+
+---
+
+## 13. Current-State Audit Baseline (verified 2026-11-06)
 
 | Claim | Verified state |
 | :--- | :--- |
@@ -295,5 +329,10 @@ Then `prisma db pull`/`generate` per AGENTS.md, plus fixture regeneration (§4.4
 | `social_posting` module + flexible resolution | ✅ Migration 372 + `SocialPostingResolver` — new key auto-resolves for flexible tiers |
 | Merchant soft-toggle table | ✅ `tenant_social_posting_settings` — gains `social_posting_linkedin_on` column |
 | Public media URLs | ✅ `social_media` pipeline exists — **but LinkedIn needs binary push, not URL ingest** (§4.2) |
-| Dogfood host | ✅ `tid-sud4ky1c` (flexible resolves the new key automatically) + `linkedin.com/company/visibleshelf` (app host + post target) |
+| Dogfood host | ✅ `tid-sud4ky1c` (enterprise, `is_flexible:true` in effective caps — resolves the new key automatically on both capability paths) + `linkedin.com/company/visibleshelf` (app host + post target) |
+| `hasFeature` entitlement path | ⚠️ **Override-only** — `TenantPermissionContext` checks exact-key overrides + a hardcoded tier map; never sees tier/MV/flexible/purchases. Existing `social_posting_*` call sites rely on it (F1) |
+| Suggest endpoint | ⚠️ `suggestSchema.platform` enum + `PLATFORM_RULES` are meta-only (F2) |
+| Settings PUT/GET | ⚠️ `settingsSchema` + GET defaults lack the linkedin toggle (F3) |
+| Web disconnect | ⚠️ `SocialPostingService.disconnectSurface` hardcodes `/meta/surfaces/:id` (F4) |
+| Social page nav | ⚠️ `/account/marketing/social` built but not in `CustomerSidebar` — ships dark (F9) |
 | LinkedIn Community Management access | ❌ Not requested — Phase 0 |
