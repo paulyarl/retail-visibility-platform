@@ -7156,16 +7156,17 @@ model tenant_social_commerce_options_settings {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_social_posting_settings {
-  id                        String   @id @db.VarChar(255)
-  tenant_id                 String   @unique @db.VarChar(255)
-  social_posting_enabled    Boolean  @default(true)
-  social_posting_meta_on    Boolean  @default(true)
-  social_posting_ig_on      Boolean  @default(true)
-  social_posting_threads_on Boolean  @default(true)
-  default_publish_time      String?  @db.VarChar(5)
-  created_at                DateTime @default(now()) @db.Timestamptz(6)
-  updated_at                DateTime @default(now()) @db.Timestamptz(6)
-  tenants                   tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_social_posting_settings_tenant")
+  id                         String   @id @db.VarChar(255)
+  tenant_id                  String   @unique @db.VarChar(255)
+  social_posting_enabled     Boolean  @default(true)
+  social_posting_meta_on     Boolean  @default(true)
+  social_posting_ig_on       Boolean  @default(true)
+  social_posting_threads_on  Boolean  @default(true)
+  default_publish_time       String?  @db.VarChar(5)
+  created_at                 DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime @default(now()) @db.Timestamptz(6)
+  social_posting_linkedin_on Boolean  @default(true)
+  tenants                    tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_social_posting_settings_tenant")
 
   @@index([tenant_id], map: "idx_social_posting_settings_tenant")
 }
@@ -7510,6 +7511,7 @@ model tenants {
   inventory_transfers_inventory_transfers_target_location_idTotenants                    inventory_transfers[]                    @relation("inventory_transfers_target_location_idTotenants")
   inventory_transfers_inventory_transfers_tenant_idTotenants                             inventory_transfers[]                    @relation("inventory_transfers_tenant_idTotenants")
   invitations                                                                            invitations[]
+  linkedin_oauth_accounts_list                                                           linkedin_oauth_accounts_list[]
   location_inventory_pools_location_inventory_pools_location_idTotenants                 location_inventory_pools[]               @relation("location_inventory_pools_location_idTotenants")
   location_inventory_pools_location_inventory_pools_tenant_idTotenants                   location_inventory_pools[]               @relation("location_inventory_pools_tenant_idTotenants")
   location_status_logs                                                                   location_status_logs[]
@@ -8808,6 +8810,44 @@ model inventory_imports {
   tenants         tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id, created_at(sort: Desc)], map: "idx_inventory_imports_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model linkedin_oauth_accounts_list {
+  id                           String                         @id @db.VarChar(50)
+  tenant_id                    String                         @db.VarChar(50)
+  linkedin_member_id           String                         @db.VarChar(64)
+  display_name                 String?                        @db.VarChar(255)
+  email                        String?                        @db.VarChar(255)
+  access_token_enc             String
+  refresh_token_enc            String?
+  token_expires_at             DateTime?                      @db.Timestamptz(6)
+  refresh_token_expires_at     DateTime?                      @db.Timestamptz(6)
+  scopes                       String[]                       @default([]) @db.VarChar
+  reauthorization_required     Boolean                        @default(false)
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  tenants                      tenants                        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  linkedin_surface_connections linkedin_surface_connections[]
+
+  @@unique([tenant_id, linkedin_member_id])
+  @@index([tenant_id], map: "idx_linkedin_oauth_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model linkedin_surface_connections {
+  id                           String                       @id @db.VarChar(50)
+  linkedin_oauth_account_id    String                       @db.VarChar(50)
+  surface                      String                       @default("organization_page") @db.VarChar(20)
+  target_ref                   String                       @db.VarChar(64)
+  display_name                 String?                      @db.VarChar(255)
+  member_role                  String?                      @db.VarChar(40)
+  connected_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  linkedin_oauth_accounts_list linkedin_oauth_accounts_list @relation(fields: [linkedin_oauth_account_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([linkedin_oauth_account_id, surface, target_ref])
+  @@index([linkedin_oauth_account_id], map: "idx_linkedin_surfaces_account")
 }
 
 enum action {

@@ -20,33 +20,39 @@ export function resolveSocialPosting(
   const canPostFacebook = moduleOn && (flexible || !!features.social_posting_meta);
   const canPostInstagram = moduleOn && (flexible || !!features.social_posting_instagram);
   const canPostThreads = moduleOn && (flexible || !!features.social_posting_threads);
+  const canPostLinkedIn = moduleOn && (flexible || !!features.social_posting_linkedin);
   const canUseScheduler = moduleOn && (flexible || !!features.social_posting_scheduler);
 
   // Soft gate — merchant toggles default ON
   const metaOn = merchantPrefs?.social_posting_meta_on !== false;
   const igOn = merchantPrefs?.social_posting_ig_on !== false;
   const threadsOn = merchantPrefs?.social_posting_threads_on !== false;
+  const linkedinOn = merchantPrefs?.social_posting_linkedin_on !== false;
   const masterOn = merchantPrefs?.social_posting_enabled !== false;
 
   const facebookEnabled = canPostFacebook && masterOn && metaOn;
   const instagramEnabled = canPostInstagram && masterOn && igOn;
   const threadsEnabled = canPostThreads && masterOn && threadsOn;
+  const linkedinEnabled = canPostLinkedIn && masterOn && linkedinOn;
 
   return {
-    enabled: moduleOn && (canPostFacebook || canPostInstagram || canPostThreads),
+    enabled: moduleOn && (canPostFacebook || canPostInstagram || canPostThreads || canPostLinkedIn),
     is_flexible: flexible,
     can_post_facebook: canPostFacebook,
     can_post_instagram: canPostInstagram,
     can_post_threads: canPostThreads,
+    can_post_linkedin: canPostLinkedIn,
     can_use_scheduler: canUseScheduler,
     facebook_enabled: facebookEnabled,
     instagram_enabled: instagramEnabled,
     threads_enabled: threadsEnabled,
+    linkedin_enabled: linkedinEnabled,
     merchant_preferences: {
       social_posting_enabled: masterOn,
       social_posting_meta_on: metaOn,
       social_posting_ig_on: igOn,
       social_posting_threads_on: threadsOn,
+      social_posting_linkedin_on: linkedinOn,
     },
     features: {},
   };

@@ -10,6 +10,11 @@
  *   GET  /meta/threads/authorize    — redirect into the Threads OAuth leg
  *   GET  /meta/threads/callback     — Threads token exchange → surface row
  *   DELETE /meta/surfaces/:id       — disconnect a single surface
+ *   GET  /linkedin/authorize        — LinkedIn OAuth leg (LINKEDIN_POSTING_SPEC §4.1)
+ *   GET  /linkedin/callback         — code exchange → member account row
+ *   GET  /linkedin/organizations    — administered company pages (ACL discovery)
+ *   POST /linkedin/select-surface   — persist an organization_page surface
+ *   DELETE /linkedin/surfaces/:id   — disconnect one org page
  *   GET  /posts                     — list posts
  *   POST /posts                     — create (immediate publish or schedule)
  *   DELETE /posts/:id               — cancel scheduled / best-effort remote delete
@@ -27,7 +32,8 @@ import { logger } from '../logger';
 import { prisma } from '../prisma';
 import { CustomerGBPAccessService } from '../services/CustomerGBPAccessService';
 import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
-import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import type { EffectiveSocialPosting } from '../services/resolvers/types';
 import { requireCustomerAuth, requirePlatformContext } from '../middleware/customer-auth';
 import { getSocialAdapter } from '../lib/social/registry';
 import { buildSocialPostSuggestPrompt, SOCIAL_POST_SUGGEST_SYSTEM } from '../lib/social/social-post-suggest';
@@ -39,6 +45,13 @@ import {
   getThreadsProfile,
   THREADS_SCOPES,
 } from '../lib/social/threads-oauth';
+import {
+  getLinkedInAuthorizationUrl,
+  exchangeLinkedInCode,
+  getLinkedInUserinfo,
+  getAdministeredOrganizations,
+  LINKEDIN_SCOPES,
+} from '../lib/linkedin/oauth';
 import { generateQuickStart } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
 import type { SocialPlatform } from '../lib/social/types';
@@ -55,11 +68,37 @@ const PLATFORM_SURFACE_KEY: Partial<Record<SocialPlatform, string>> = {
   meta_facebook: 'social_posting_meta',
   meta_instagram: 'social_posting_instagram',
   meta_threads: 'social_posting_threads',
+  linkedin: 'social_posting_linkedin',
+};
+
+type SocialHardGate = 'can_post_facebook' | 'can_post_instagram' | 'can_post_threads' | 'can_post_linkedin';
+
+const SOCIAL_PLATFORM_GATE: Record<string, SocialHardGate> = {
+  meta_facebook: 'can_post_facebook',
+  meta_instagram: 'can_post_instagram',
+  meta_threads: 'can_post_threads',
+  linkedin: 'can_post_linkedin',
 };
 
 async function resolveTenant(req: Request): Promise<{ tenantId: string }> {
   const customerId = (req as any).customerId as string;
   return customerGbpAccessService.resolveTenant(customerId);
+}
+
+// Entitlement gate — resolver module flags (tier/flexible/purchase/override
+// all visible) OR'd with the legacy hasFeature override check. hasFeature
+// alone is override-only and 403s tier/flexible holders (spec §12 F1).
+async function resolveSocialModule(tenantId: string): Promise<EffectiveSocialPosting | null> {
+  const caps = await resolveEffectiveCapabilities(tenantId);
+  return (caps?.effective?.social_posting as EffectiveSocialPosting | undefined) ?? null;
+}
+
+async function isPlatformEntitled(tenantId: string, platform: string): Promise<boolean> {
+  const socialMod = await resolveSocialModule(tenantId);
+  const gateKey = SOCIAL_PLATFORM_GATE[platform];
+  if (gateKey && socialMod?.[gateKey]) return true;
+  const featureKey = PLATFORM_SURFACE_KEY[platform as SocialPlatform];
+  return featureKey ? permissionServiceFactory.hasFeature(tenantId, featureKey) : false;
 }
 
 // ── /status — platform profile ───────────────────────────────────────────

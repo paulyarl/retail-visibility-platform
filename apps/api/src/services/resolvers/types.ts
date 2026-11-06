@@ -1124,6 +1124,7 @@ export interface SocialPostingMerchantSettings {
   social_posting_meta_on?: boolean | null;
   social_posting_ig_on?: boolean | null;
   social_posting_threads_on?: boolean | null;
+  social_posting_linkedin_on?: boolean | null;
 }
 
 export interface EffectiveSocialPosting {
@@ -1132,15 +1133,18 @@ export interface EffectiveSocialPosting {
   can_post_facebook: boolean;
   can_post_instagram: boolean;
   can_post_threads: boolean;
+  can_post_linkedin: boolean;
   can_use_scheduler: boolean;
   facebook_enabled: boolean;
   instagram_enabled: boolean;
   threads_enabled: boolean;
+  linkedin_enabled: boolean;
   merchant_preferences: {
     social_posting_enabled: boolean;
     social_posting_meta_on: boolean;
     social_posting_ig_on: boolean;
     social_posting_threads_on: boolean;
+    social_posting_linkedin_on: boolean;
   };
   features: Record<string, boolean>;
 }
