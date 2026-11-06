@@ -285,6 +285,19 @@ const LINKS: LinkDefinition[] = [
   },
 
   {
+    id: 'content-hub',
+    label: () => 'Content',
+    description: () => 'Every channel your content reaches',
+    href: (ctx) => `/t/${ctx.tenantId}/content`,
+    icon: 'Share2',
+    category: 'visibility',
+    // Permanent home — the hub is entitlement-free chrome; cards inside it
+    // carry their own per-channel lock states.
+    condition: () => true,
+    score: () => 90,
+  },
+
+  {
     id: 'items',
     label: () => 'Products',
     description: (ctx) => ctx.businessState.hasProducts
