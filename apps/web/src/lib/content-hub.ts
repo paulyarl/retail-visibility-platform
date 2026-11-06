@@ -54,14 +54,29 @@ export function topNudge(channels: ContentChannelCard[]): string | null {
   return null;
 }
 
+/** Metric key → display label (falls back to de-camelCased key). */
+const METRIC_LABELS: Record<string, string> = {
+  items: 'items',
+  photos: 'photos',
+  sectionsOn: 'sections on',
+  published: 'published',
+  scheduled: 'scheduled',
+  live: 'live',
+  drafts: 'drafts',
+};
+
+function metricLabel(key: string): string {
+  return METRIC_LABELS[key] ?? key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+}
+
 /** Human one-liner for a card's metrics ("124 items", "2 scheduled"). */
 export function metricSummary(card: ContentChannelCard): string {
   const entries = Object.entries(card.metrics).filter(([, v]) => v > 0);
   if (entries.length === 0) {
     const first = Object.keys(card.metrics)[0];
-    return first ? `0 ${first}` : '—';
+    return first ? `0 ${metricLabel(first)}` : '—';
   }
-  return entries.map(([k, v]) => `${v} ${k}`).join(' · ');
+  return entries.map(([k, v]) => `${v} ${metricLabel(k)}`).join(' · ');
 }
 
 /** Absolute tenant-internal href for a card's editor deep link. */

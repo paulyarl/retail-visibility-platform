@@ -4,7 +4,6 @@ import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { getTierFeatures } from '../services/TierService';
-import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
 import { logger } from '../logger';
 
 /**
@@ -42,11 +41,6 @@ interface ContentChannelCard {
   nudge?: string;
 }
 
-async function hasAnyFeature(tenantId: string, keys: string[]): Promise<boolean> {
-  const checks = await Promise.all(keys.map((k) => permissionServiceFactory.hasFeature(tenantId, k)));
-  return checks.some(Boolean);
-}
-
 // ── GET /:tenantId/content/summary ────────────────────────────────────────
 router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   const { tenantId } = req.params;
@@ -64,10 +58,6 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       gbpByStatus,
       socialByStatus,
       caps,
-      gbpGranted,
-      socialGranted,
-      gbpFlexible,
-      socialFlexible,
     ] = await Promise.all([
       prisma.tenants.findUnique({ where: { id: tenantId }, select: { subscription_tier: true } }),
       prisma.tenant_directory_entry_settings.findUnique({ where: { tenant_id: tenantId } }),
@@ -85,11 +75,20 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       prisma.gbp_posts.groupBy({ by: ['status'], where: { tenant_id: tenantId }, _count: true }),
       prisma.social_posts.groupBy({ by: ['status'], where: { tenant_id: tenantId }, _count: true }),
       resolveEffectiveCapabilities(tenantId),
-      hasAnyFeature(tenantId, ['gbp_management', 'gbp_management_flexible']),
-      hasAnyFeature(tenantId, ['social_posting_enabled', 'social_posting_flexible', 'social_posting_meta']),
-      permissionServiceFactory.hasFeature(tenantId, 'gbp_management_flexible'),
-      permissionServiceFactory.hasFeature(tenantId, 'social_posting_flexible'),
     ]);
+
+    // Module gates come from effective capabilities, NOT per-key hasFeature
+    // checks — enterprise tiers resolve modules through their flexible keys
+    // (e.g. gbp_management_flexible), which a literal feature-key lookup
+    // misses. Verified against tid-sud4ky1c (enterprise): gbp_management and
+    // social_posting both resolve enabled+flexible here while hasFeature()
+    // returned false for every individual key.
+    const gbpMod = caps?.effective?.gbp_management as { enabled?: boolean; is_flexible?: boolean } | undefined;
+    const socialMod = caps?.effective?.social_posting as { enabled?: boolean; is_flexible?: boolean } | undefined;
+    const gbpGranted = !!gbpMod?.enabled;
+    const gbpFlexible = !!gbpMod?.is_flexible;
+    const socialGranted = !!socialMod?.enabled;
+    const socialFlexible = !!socialMod?.is_flexible;
 
     const tierKey = tenant?.subscription_tier || 'starter';
     const tierFeatureKeys = await getTierFeatures(tierKey);

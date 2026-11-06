@@ -70,6 +70,11 @@ describe('metricSummary', () => {
     expect(metricSummary(card({ metrics: { photos: 0, sectionsOn: 0 } }))).toBe('0 photos');
   });
 
+  it('humanizes camelCase metric keys', () => {
+    expect(metricSummary(card({ metrics: { sectionsOn: 7 } }))).toBe('7 sections on');
+    expect(metricSummary(card({ metrics: { someNewMetric: 3 } }))).toBe('3 some new metric');
+  });
+
   it('renders a dash for empty metrics', () => {
     expect(metricSummary(card({ metrics: {} }))).toBe('—');
   });
