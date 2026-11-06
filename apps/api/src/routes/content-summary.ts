@@ -79,7 +79,10 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       prisma.social_posts.groupBy({ by: ['status'], where: { tenant_id: tenantId }, _count: true }),
       resolveEffectiveCapabilities(tenantId),
       prisma.tenant_place_posts.count({ where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
-      permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on'),
+      resolveEffectiveCapabilities(tenantId).then((c) => {
+        const de = c?.effective?.directory_entry as { is_flexible?: boolean } | undefined;
+        return !!de?.is_flexible || permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on');
+      }),
     ]);
 
     // Module gates come from effective capabilities, NOT per-key hasFeature

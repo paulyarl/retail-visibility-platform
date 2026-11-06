@@ -111,7 +111,10 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
 
     // ── Directory-entry destination (Phase 2: own surface, publishes immediately) ──
     if (destinations.place) {
-      const entitled = await permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on');
+      const deMod = caps?.effective?.directory_entry as { is_flexible?: boolean } | undefined;
+      const entitled =
+        !!deMod?.is_flexible ||
+        (await permissionServiceFactory.hasFeature(tenantId, 'directory_entry_posts_on'));
       if (!entitled) {
         results.push({ channel: 'place', ok: false, error: 'directory_entry_posts_on is not enabled for this tier' });
       } else {
