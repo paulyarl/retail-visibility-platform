@@ -9,23 +9,25 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { contentHubService } from '@/services/ContentHubService';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import { PlatformHomeSingletonService } from '@/services/PlatformHomeSingletonService';
 import { calculateSEOReadiness, type BusinessProfile } from '@/lib/validation/businessProfile';
 import { topNudge, type ContentSummaryPayload, type QuickLever } from '@/lib/content-hub';
 import ContentChannelCardView from './ContentChannelCardView';
+import ContentComposer from './ContentComposer';
 import { clientLogger } from '@/lib/client-logger';
 
 export default function ContentHubClient({ tenantId }: { tenantId: string }) {
-  const router = useRouter();
   const [summary, setSummary] = useState<ContentSummaryPayload | null>(null);
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leverBusy, setLeverBusy] = useState<string | null>(null);
   const [leverError, setLeverError] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerBusy, setComposerBusy] = useState(false);
+  const [composerFeedback, setComposerFeedback] = useState<string[] | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +74,31 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
     [tenantId]
   );
 
+  const submitPost = useCallback(
+    async (payload: Parameters<typeof contentHubService.postContent>[1]) => {
+      setComposerBusy(true);
+      setComposerFeedback(null);
+      try {
+        const res = await contentHubService.postContent(tenantId, payload);
+        if (!res) {
+          setComposerFeedback(['Publish failed — no destination accepted the post.']);
+          return;
+        }
+        setComposerFeedback(
+          res.results.map((r) => (r.ok ? `✓ ${r.channel}${r.scheduled ? ' — scheduled' : ' — published'}` : `✗ ${r.channel} — ${r.error ?? 'failed'}`))
+        );
+        if (res.posted > 0) {
+          const sum = await contentHubService.getSummary(tenantId);
+          setSummary(sum);
+          if (res.posted === res.total) setComposerOpen(false);
+        }
+      } finally {
+        setComposerBusy(false);
+      }
+    },
+    [tenantId]
+  );
+
   const nudge = summary ? topNudge(summary.channels) : null;
   const surfaces = summary?.surfaces;
 
@@ -88,7 +115,7 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
           </div>
           <button
             type="button"
-            onClick={() => router.push(`/t/${tenantId}/settings/social-commerce`)}
+            onClick={() => setComposerOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl px-4 py-2"
           >
             + New post
@@ -134,6 +161,13 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
           {leverError}
         </div>
       )}
+      {composerFeedback && (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 space-y-1">
+          {composerFeedback.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      )}
 
       {/* Channel grid */}
       {loading && !summary ? (
@@ -154,6 +188,15 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
             />
           ))}
         </div>
+      )}
+
+      {composerOpen && summary && (
+        <ContentComposer
+          channels={summary.channels}
+          busy={composerBusy}
+          onClose={() => setComposerOpen(false)}
+          onSubmit={submitPost}
+        />
       )}
     </div>
   );

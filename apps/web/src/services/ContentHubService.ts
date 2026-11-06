@@ -46,6 +46,30 @@ export class ContentHubService extends TenantApiSingleton {
     }
     return result.data?.data ?? null;
   }
+
+  /** Phase-1 unified composer — multiplexes into gbp_posts / social_posts. */
+  async postContent(
+    tenantId: string,
+    payload: {
+      body: string;
+      mediaUrl?: string;
+      linkUrl?: string;
+      scheduledFor?: string;
+      destinations: { gbp?: boolean; meta?: string[] };
+    }
+  ): Promise<{ posted: number; total: number; results: { channel: string; ok: boolean; scheduled?: boolean; error?: string }[] } | null> {
+    const result = await this.makeDefaultRequest<{ success: boolean; data: any }>(
+      `/api/tenants/${tenantId}/content/posts`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      `content-post-${tenantId}`
+    );
+    if (!result.success) {
+      clientLogger.error('[ContentHub] post failed:', { detail: result.error });
+      return null;
+    }
+    await this.invalidateServiceCaches(tenantId);
+    return result.data?.data ?? null;
+  }
 }
 
 export const contentHubService = ContentHubService.getInstance();
