@@ -676,8 +676,8 @@ export default function OnboardingWizard({
                 <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/settings/branding`)}>
                   🎨 Branding
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/profile-completeness`)}>
-                  Profile
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/content`)}>
+                  Content
                 </Button>
                 {ffCategory && (
                   <Button variant="secondary" size="sm" onClick={() => router.push(`/t/${tenantId}/categories`)}>

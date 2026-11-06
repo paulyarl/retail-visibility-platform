@@ -43,6 +43,7 @@ import GrowthTipCard from "./GrowthTipCard";
 import CapabilityShowcase from "./CapabilityShowcase";
 import ConstraintAlertBanner from "./ConstraintAlertBanner";
 import QuickLinksCard from "./QuickLinksCard";
+import ContentHubCard from "./ContentHubCard";
 import StoreAccessCard from "./StoreAccessCard";
 import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
 import type { TipContext } from "@/lib/growth-tips/tipEngine";
@@ -500,6 +501,11 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
           {/* Right (1/3) — Quick Links, Capabilities, System Status, Growth, Hours */}
           <div className="space-y-6">
+
+            {/* Content hub entry */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
+              <ContentHubCard tenantId={tenantId} />
+            </motion.div>
 
             {/* Quick Links */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.39 }}>

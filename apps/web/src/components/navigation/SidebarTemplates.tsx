@@ -184,6 +184,12 @@ export const TenantSidebarTemplate = () => {
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },
     {
+      label: 'Content',
+      href: '/t/[tenantId]/content',
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
+      hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
+    },
+    {
       label: 'Orders',
       href: '/t/[tenantId]/orders',
       icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
