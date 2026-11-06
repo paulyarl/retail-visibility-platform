@@ -4,9 +4,9 @@ Repeatable runbook for launching a directory market: **dress on staging, push to
 
 ## Why this flow exists
 
-A market push costs **~0.7–2 GB of Supabase egress** — almost all of it pipeline *reads* (prospect scan snapshots, enrichment, audit JSONB), not publish writes. On the Free plan (5 GB unified egress/billing cycle, shared across Database/Pooler/API), that's a budget line, not a footnote: baseline traffic eats ~1.5–2 GB, leaving room for ~2–3 full-cost pushes per cycle before the org risks restriction.
+A market push costs **~0.7–2 GB of Supabase egress** — almost all of it pipeline *reads* (prospect scan snapshots, enrichment, audit JSONB), not publish writes. That number is now a **cost model, not a quota risk**: since 2026-11-06 the **prd org is on Pro** (250 GB unified egress/cycle, then $0.09/GB — the Oct breach happened under Free's 5 GB and can't recur at push volumes). The **stg org is still on Free** (5 GB/cycle), so stg-side scan/dress days remain the only quota-bound work in this flow.
 
-Staging and production are **separate Supabase orgs, accounts, and quotas**. So staging does the expensive work — scans, audits, cleanups, briefings, triage — and production receives only the finished payload. Prd's per-market cost drops to the publish slice (KBs per seed). Production stays a storefront; staging is the workshop.
+Staging and production are **separate Supabase orgs, accounts, and quotas**. So staging does the expensive work — scans, audits, cleanups, briefings, triage — and production receives only the finished payload. Prd's per-market cost drops to the publish slice (KBs per seed). Production stays a storefront; staging is the workshop. Post-Pro this is no longer lockout-avoidance — it's still the right shape: heavy reads stay off the storefront, and every GB that runs on stg is a GB that never counts against prd's meter (or invoice).
 
 ```
 stg:  scan → audits → cleanups → briefings → triage → export-market-campaign
@@ -18,13 +18,13 @@ prd:  import-market-campaign → promote (proving-ground cockpit) → publishBat
 - Repo checkout with `apps/api/scripts/{export,import,revert}-market-*.cjs` (all plain Node + `pg`, no build)
 - Doppler access: `--config stg` (workshop) and `--config prd` (storefront). `--config local` points at the same DB as `stg`.
 - Platform-admin login on the prd web app (proving-ground cockpit + promote/publish panels)
-- Supabase org usage page open: `dashboard → org → usage` (egress, current cycle)
+- Supabase org usage page open: `dashboard → org → usage` (egress, current cycle) — the **stg** org's page is the one that still matters; prd is on Pro
 
 ## Phase 0 — Budget check (30 seconds)
 
-1. Usage page → uncached egress **Used in period** for the current cycle.
-2. Headroom = `5 GB − used`. A prd-side push via this flow costs well under ~100 MB, so once the workshop model is running, pushes are cheap on prd — the expensive part already ran on stg's quota.
-3. Still useful: schedule big stg-side scan/dress days early in the cycle so each env's burst lands where there's room. The cycle resets on the 6th of each month.
+1. **stg org** usage page → uncached egress **Used in period**. Headroom = `5 GB − used`. Stg-side scan/dress is the burst: budget ~1–2 GB per market dressed against what baseline leaves (~3 GB).
+2. **prd org** (Pro, 250 GB): a push via this flow costs well under ~100 MB publish-side — effectively free, no check needed under normal operation.
+3. Still useful: schedule big stg-side scan/dress days early in stg's billing cycle so the burst has the whole cycle's quota ahead of it (check the stg org's own cycle dates — not necessarily the same as prd's).
 
 ## Phase 1 — Dress the market on staging
 
@@ -33,7 +33,7 @@ Run the normal pipeline **entirely on stg**:
 - PG/discovery scan for the market (category × city)
 - Audits, enrichment, cleanups, briefings
 - Triage — promote/dismiss decisions; fix `category_fit`, `identity_confidence`, `verification`
-- Optional: a small sample publish on stg to eyeball pages/indexing before committing
+- Optional: a small sample publish to eyeball pages before committing. **Caveat: stg is not indexed in Search Console** — a stg sample validates page rendering and data only, not indexing. To check indexing, publish the sample on **prd** instead (trivial cost under Pro) and use Search Console URL Inspection on the live `/place/<slug>`. Deliberately indexing stg is a separate decision — verify the property + confirm it isn't noindexed — and is generally undesirable: it puts staging URLs in the SERP competing with prd.
 
 Nothing here touches prd. The deliverable is a triaged set of `mkt_prospect_queue` rows for the market, plus the city-scope campaign row (`scope='city'`, e.g. `"African Grocery Store" @ Fort Wayne`).
 
@@ -104,6 +104,8 @@ doppler run --config prd -- node scripts/db-rescue.cjs sql \
 ```
 
 Then eyeball one live `/place/<slug>` and the directory browse for the new city. Check the announce queue (`/api/admin/directory/presence-seeds/announce-queue`) if invites/announces should fire.
+
+For indexing verification (this is the step a stg sample can't cover): Search Console → **URL Inspection** on a sample live `/place/<slug>` — confirms crawlability, canonical, and index status on the real domain. Relevant for re-pushed markets especially: fresh seeds mint fresh slugs, so verify the new URLs rather than assuming the reverted market's old slugs carried over.
 
 ## Rollback
 
