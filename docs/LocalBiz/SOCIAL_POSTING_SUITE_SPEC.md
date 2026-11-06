@@ -299,7 +299,7 @@ Honest assessment, verified against `lib/tiktok/oauth.ts`: the existing integrat
 
 | Platform | API | OAuth | Posting surface | Notable constraint |
 | :--- | :--- | :--- | :--- | :--- |
-| LinkedIn | `api.linkedin.com/v2/ugcPosts` | New app; `w_member_social` (member) / `w_organization_social` (page) | Personal profile or Company Page | Org-page posting requires the merchant to be a page admin; token 60d refresh |
+| LinkedIn | `api.linkedin.com/rest/posts` (replaces legacy `v2/ugcPosts`; `Linkedin-Version` header required) | New app; `w_member_social` (member) / `w_organization_social` (page) | Personal profile or Company Page | Org-page posting requires a page-admin role + Community Management API product; token 60d refresh. **Full spec: `docs/LocalBiz/LINKEDIN_POSTING_SPEC.md`** |
 | Pinterest | `api.pinterest.com/v5/pins` | New app; `pins:write`, `boards:read` | Pins to boards | Standard access tier is free but rate-limited; board picker UX needed |
 | X (Twitter) | `api.x.com/2/tweets` | OAuth 2.0 PKCE; `tweet.write`, `offline.access` | Text + media posts | **Paid API tier required for write access** — real per-tenant economics question; likely last |
 
