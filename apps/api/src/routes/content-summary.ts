@@ -281,8 +281,7 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
           metrics: { published, scheduled },
           freshness: iso(socialLinkedInLastPublished._max.published_at),
           capability: { enabled: linkedinGranted, flexible: socialFlexible },
-          // Connect lives in the customer portal (member-token OAuth), not tenant settings
-          editorHref: '!/account/marketing/social',
+          editorHref: '/settings/linkedin',
           nudge: linkedinGranted ? staleNudge('LinkedIn post', socialLinkedInLastPublished._max.published_at) : 'Connect a LinkedIn company page to publish here',
         } as ContentChannelCard;
       })(),

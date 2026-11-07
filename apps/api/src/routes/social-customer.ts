@@ -426,6 +426,7 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
     if (!code || !state || typeof code !== 'string' || typeof state !== 'string') return fail('missing_params');
     const parsed = JSON.parse(Buffer.from(state, 'base64url').toString());
     const tenantId = parsed.tenantId as string;
+    const flow = parsed.flow as string | undefined;
     if (!tenantId) return fail('bad_state');
 
     const tokens = await exchangeLinkedInCode(code);
@@ -464,7 +465,13 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
       },
     });
 
-    res.redirect(`${unifiedConfig.webUrl}/settings/integrations/social?connected=linkedin`);
+    // flow:'tenant' (set by linkedin-tenant.ts authorize) returns the operator
+    // to their settings page; default keeps the portal destination.
+    res.redirect(
+      flow === 'tenant'
+        ? `${unifiedConfig.webUrl}/t/${tenantId}/settings/linkedin?connected=linkedin`
+        : `${unifiedConfig.webUrl}/settings/integrations/social?connected=linkedin`
+    );
   } catch (error: any) {
     logger.error('[social-customer] linkedin callback error', undefined, { error: error.message });
     fail('callback_failed');

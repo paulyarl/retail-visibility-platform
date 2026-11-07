@@ -70,6 +70,57 @@ export class ContentHubService extends TenantApiSingleton {
     await this.invalidateServiceCaches(tenantId);
     return result.data?.data ?? null;
   }
+
+  // ── Tenant-side LinkedIn connect (linkedin-tenant.ts routes) ────────────
+
+  async getLinkedInStatus(tenantId: string): Promise<{
+    entitled: boolean; connected: boolean; memberName: string | null;
+    reauthorizationRequired: boolean; tokenExpired: boolean;
+    surfaces: { id: string; surface: string; targetRef: string; displayName: string | null; memberRole: string | null }[];
+  } | null> {
+    const result = await this.makeDefaultRequest<{ success: boolean; data: any }>(
+      `/api/tenants/${tenantId}/linkedin/status`,
+      { method: 'GET' },
+      `linkedin-status-${tenantId}`
+    );
+    return result.success ? result.data?.data ?? null : null;
+  }
+
+  async getLinkedInAuthorizeUrl(tenantId: string): Promise<string | null> {
+    const result = await this.makeDefaultRequest<{ success: boolean; data: { url: string } }>(
+      `/api/tenants/${tenantId}/linkedin/authorize`,
+      { method: 'GET' },
+      `linkedin-auth-${tenantId}`
+    );
+    return result.success ? result.data?.data?.url ?? null : null;
+  }
+
+  async getLinkedInOrganizations(tenantId: string): Promise<{ connected: boolean; organizations: { urn: string; name: string; role: string }[] } | null> {
+    const result = await this.makeDefaultRequest<{ success: boolean; data: any }>(
+      `/api/tenants/${tenantId}/linkedin/organizations`,
+      { method: 'GET' },
+      `linkedin-orgs-${tenantId}`
+    );
+    return result.success ? result.data?.data ?? null : null;
+  }
+
+  async selectLinkedInSurface(tenantId: string, targetRef: string, displayName?: string): Promise<boolean> {
+    const result = await this.makeDefaultRequest<{ success: boolean }>(
+      `/api/tenants/${tenantId}/linkedin/select-surface`,
+      { method: 'POST', body: JSON.stringify({ targetRef, displayName }) },
+      `linkedin-select-${tenantId}`
+    );
+    return result.success;
+  }
+
+  async deleteLinkedInSurface(tenantId: string, surfaceId: string): Promise<boolean> {
+    const result = await this.makeDefaultRequest<{ success: boolean }>(
+      `/api/tenants/${tenantId}/linkedin/surfaces/${surfaceId}`,
+      { method: 'DELETE' },
+      `linkedin-del-${tenantId}`
+    );
+    return result.success;
+  }
 }
 
 export const contentHubService = ContentHubService.getInstance();

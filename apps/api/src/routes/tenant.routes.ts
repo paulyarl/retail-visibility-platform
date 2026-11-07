@@ -61,6 +61,7 @@ import tenantUserRoutes from './tenant-users';
 import tenantFlyerRoutes from './tenant-flyers';
 import contentSummaryRoutes from './content-summary';
 import contentPostsRoutes from './content-posts';
+import linkedinTenantRoutes from './linkedin-tenant';
 
 // ── Main tenant CRUD router — has /:id patterns, must be mounted LAST ───
 import tenantsRoutes from './tenants';
@@ -116,6 +117,7 @@ router.use('/', tenantUserRoutes);
 router.use('/', tenantFlyerRoutes);
 router.use('/', contentSummaryRoutes);
 router.use('/', contentPostsRoutes);
+router.use('/', linkedinTenantRoutes);
 
 // ── 3. Main tenant CRUD router — LAST ───────────────────────────────────
 // tenantsRoutes has /:id patterns (PATCH /:id, GET /:id/complete, etc.)
