@@ -215,6 +215,27 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
       }
     }
 
+    // ── LinkedIn destination (platform 'linkedin' — same social_posts scheduler pipeline) ──
+    if (destinations.linkedin) {
+      const linkedinGranted =
+        !!socialMod?.enabled &&
+        (!!socialMod?.linkedin_enabled || (await permissionServiceFactory.hasFeature(tenantId, 'social_posting_linkedin')));
+      if (!linkedinGranted) {
+        results.push({ channel: 'linkedin', ok: false, error: 'LinkedIn posting is not enabled' });
+      } else if (scheduledAt && !(await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler'))) {
+        results.push({ channel: 'linkedin', ok: false, error: 'scheduling requires the Social Post Scheduler capability' });
+      } else {
+        const post = await prisma.social_posts.create({
+          data: {
+            id: newPostId(), tenant_id: tenantId, platform: 'linkedin',
+            body, link_url: linkUrl || null,
+            status: 'SCHEDULED', scheduled_for: scheduledAt ?? new Date(), created_by: 'tenant',
+          },
+        });
+        results.push({ channel: 'linkedin', ok: true, postId: post.id, scheduled: true });
+      }
+    }
+
     const okCount = results.filter((r) => r.ok).length;
     res.status(okCount > 0 ? 200 : 502).json({
       success: okCount > 0,

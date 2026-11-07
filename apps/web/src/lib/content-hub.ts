@@ -86,5 +86,7 @@ export function metricSummary(card: ContentChannelCard): string {
 
 /** Absolute tenant-internal href for a card's editor deep link. */
 export function editorHref(card: ContentChannelCard, tenantId: string): string {
-  return `/t/${tenantId}${card.editorHref}`;
+  // '!' prefix = absolute path outside the tenant scope (e.g. the customer-
+  // portal social page where OAuth connect flows live).
+  return card.editorHref.startsWith('!') ? card.editorHref.slice(1) : `/t/${tenantId}${card.editorHref}`;
 }
