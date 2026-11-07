@@ -18,6 +18,7 @@ type Org = { urn: string; name: string; role: string };
 export default function LinkedInSettingsClient({ tenantId }: { tenantId: string }) {
   const searchParams = useSearchParams();
   const justConnected = searchParams.get('connected') === 'linkedin';
+  const oauthError = searchParams.get('error');
 
   const [status, setStatus] = useState<Status>(null);
   const [orgs, setOrgs] = useState<Org[] | null>(null);
@@ -85,6 +86,11 @@ export default function LinkedInSettingsClient({ tenantId }: { tenantId: string 
       <h1 className="text-2xl font-bold text-gray-900">LinkedIn</h1>
       <p className="text-sm text-gray-500 mt-1">Connect a company page to publish LinkedIn posts from Content.</p>
 
+      {oauthError && (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          LinkedIn connect failed: {oauthError}
+        </div>
+      )}
       {justConnected && (
         <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
           LinkedIn connected — select a company page below to start posting to it.

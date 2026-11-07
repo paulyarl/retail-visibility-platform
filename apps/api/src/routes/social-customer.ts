@@ -420,9 +420,27 @@ router.get('/linkedin/authorize', requireCustomerAuth, requirePlatformContext, a
 });
 
 router.get('/linkedin/callback', async (req: Request, res: Response) => {
-  const fail = (msg: string) => res.redirect(`${unifiedConfig.webUrl}/settings/integrations/social?error=${encodeURIComponent(msg)}`);
+  // Parse state first — error redirects need flow + tenantId too.
+  let stateTenant: string | null = null;
+  let stateFlow: string | null = null;
   try {
-    const { code, state } = req.query;
+    const s = typeof req.query.state === 'string' ? req.query.state : '';
+    const p = JSON.parse(Buffer.from(s, 'base64url').toString());
+    stateTenant = p.tenantId ?? null;
+    stateFlow = p.flow ?? null;
+  } catch { /* unparseable state — fall through to generic fail */ }
+  const fail = (msg: string) =>
+    res.redirect(
+      stateFlow === 'tenant' && stateTenant
+        ? `${unifiedConfig.webUrl}/t/${stateTenant}/settings/linkedin?error=${encodeURIComponent(msg)}`
+        : `${unifiedConfig.webUrl}/account/marketing/social?error=${encodeURIComponent(msg)}`
+    );
+  try {
+    const { code, state, error: oauthError, error_description: oauthErrorDesc } = req.query;
+    // LinkedIn refused — surface the provider's reason, not a generic error.
+    if (oauthError) {
+      return fail(typeof oauthErrorDesc === 'string' && oauthErrorDesc ? `${oauthError}:${oauthErrorDesc}` : String(oauthError));
+    }
     if (!code || !state || typeof code !== 'string' || typeof state !== 'string') return fail('missing_params');
     const parsed = JSON.parse(Buffer.from(state, 'base64url').toString());
     const tenantId = parsed.tenantId as string;
