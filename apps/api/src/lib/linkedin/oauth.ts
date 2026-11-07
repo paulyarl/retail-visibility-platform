@@ -17,7 +17,7 @@ import { logger } from '../../logger';
 const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID || '';
 const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET || '';
 const LINKEDIN_REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI || '';
-export const LINKEDIN_API_VERSION = process.env.LINKEDIN_API_VERSION || '202511';
+export const LINKEDIN_API_VERSION = process.env.LINKEDIN_API_VERSION || '202610';
 
 const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';

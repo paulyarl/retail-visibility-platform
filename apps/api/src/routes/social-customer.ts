@@ -442,7 +442,8 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
         tenant_id: tenantId,
         linkedin_member_id: userinfo.sub,
         display_name: userinfo.name || null,
-        email: userinfo.email || null,
+        // email intentionally unwritten — member-data minimization (LinkedIn
+        // Marketing API terms): sub + display name are all the record needs.
         access_token_enc: encryptToken(tokens.access_token),
         refresh_token_enc: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
         token_expires_at: tokens.expires_in ? new Date(now.getTime() + tokens.expires_in * 1000) : null,
@@ -453,7 +454,6 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
       },
       update: {
         display_name: userinfo.name || undefined,
-        email: userinfo.email || undefined,
         access_token_enc: encryptToken(tokens.access_token),
         refresh_token_enc: tokens.refresh_token ? encryptToken(tokens.refresh_token) : undefined,
         token_expires_at: tokens.expires_in ? new Date(now.getTime() + tokens.expires_in * 1000) : undefined,
