@@ -64,6 +64,9 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       gbpLastPublished,
       socialLastPublished,
       placeLastPublished,
+      socialByPlatformStatus,
+      socialMetaLastPublished,
+      socialLinkedInLastPublished,
     ] = await Promise.all([
       prisma.tenants.findUnique({ where: { id: tenantId }, select: { subscription_tier: true } }),
       prisma.tenant_directory_entry_settings.findUnique({ where: { tenant_id: tenantId } }),
@@ -89,6 +92,11 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       prisma.gbp_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
       prisma.social_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
       prisma.tenant_place_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED' } }),
+      // Platform-scoped splits — the social cards must not mislabel LinkedIn
+      // activity as Meta (and vice versa).
+      prisma.social_posts.groupBy({ by: ['status', 'platform'], where: { tenant_id: tenantId }, _count: true }),
+      prisma.social_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED', platform: { startsWith: 'meta_' } } }),
+      prisma.social_posts.aggregate({ _max: { published_at: true }, where: { tenant_id: tenantId, status: 'PUBLISHED', platform: 'linkedin' } }),
     ]);
 
     // Phase 3 gap intelligence — staleness helpers. `freshness` is the ISO
@@ -108,11 +116,12 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
     // social_posting both resolve enabled+flexible here while hasFeature()
     // returned false for every individual key.
     const gbpMod = caps?.effective?.gbp_management as { enabled?: boolean; is_flexible?: boolean } | undefined;
-    const socialMod = caps?.effective?.social_posting as { enabled?: boolean; is_flexible?: boolean } | undefined;
+    const socialMod = caps?.effective?.social_posting as { enabled?: boolean; is_flexible?: boolean; linkedin_enabled?: boolean; can_post_linkedin?: boolean } | undefined;
     const gbpGranted = !!gbpMod?.enabled;
     const gbpFlexible = !!gbpMod?.is_flexible;
     const socialGranted = !!socialMod?.enabled;
     const socialFlexible = !!socialMod?.is_flexible;
+    const linkedinGranted = !!socialMod?.enabled && !!socialMod?.linkedin_enabled;
 
     const tierKey = tenant?.subscription_tier || 'starter';
     const tierFeatureKeys = await getTierFeatures(tierKey);
@@ -146,7 +155,13 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
               { key: 'storefront_social_media', label: 'Social links', value: !!dirOpts.social_enabled, available: tierAllows('directory_entry_social_on') || !!F.directory_entry_social_enabled },
             ]
           : undefined,
-        nudge: dirOpts.enabled && !listing?.is_published ? 'Publish your listing to appear on the directory' : photoCount === 0 ? 'Add photos — pages with photos rank higher' : undefined,
+        nudge: dirOpts.enabled && !listing?.is_published
+          ? 'Publish your listing to appear on the directory'
+          : !listing?.description
+            ? 'Write your About — the one block of copy fully yours'
+            : photoCount === 0
+              ? 'Add photos — pages with photos rank higher'
+              : undefined,
       },
       {
         key: 'storefront_catalog',
@@ -231,8 +246,12 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
         } as ContentChannelCard;
       })(),
       (() => {
-        const published = socialByStatus.find((r) => r.status === 'PUBLISHED')?._count ?? 0;
-        const scheduled = socialByStatus.find((r) => r.status === 'SCHEDULED')?._count ?? 0;
+        const countFor = (status: string) =>
+          socialByPlatformStatus
+            .filter((r) => r.status === status && r.platform.startsWith('meta_'))
+            .reduce((sum, r) => sum + r._count, 0);
+        const published = countFor('PUBLISHED');
+        const scheduled = countFor('SCHEDULED');
         return {
           key: 'social_meta',
           label: 'Social (Meta)',
@@ -241,10 +260,29 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
           // ungranted tenant sees "coming soon", never an error.
           state: socialGranted ? (published + scheduled > 0 ? 'active' : 'empty') : 'dark',
           metrics: { published, scheduled },
-          freshness: iso(socialLastPublished._max.published_at),
+          freshness: iso(socialMetaLastPublished._max.published_at),
           capability: { enabled: socialGranted, flexible: socialFlexible },
           editorHref: '/settings/social-commerce',
-          nudge: socialGranted ? staleNudge('social post', socialLastPublished._max.published_at) : 'Social posting arrives after the pilot completes',
+          nudge: socialGranted ? staleNudge('social post', socialMetaLastPublished._max.published_at) : 'Social posting arrives after the pilot completes',
+        } as ContentChannelCard;
+      })(),
+      (() => {
+        const countFor = (status: string) =>
+          socialByPlatformStatus
+            .filter((r) => r.status === status && r.platform === 'linkedin')
+            .reduce((sum, r) => sum + r._count, 0);
+        const published = countFor('PUBLISHED');
+        const scheduled = countFor('SCHEDULED');
+        return {
+          key: 'social_linkedin',
+          label: 'Social (LinkedIn)',
+          rendersOn: ['LinkedIn company page'],
+          state: linkedinGranted ? (published + scheduled > 0 ? 'active' : 'empty') : 'dark',
+          metrics: { published, scheduled },
+          freshness: iso(socialLinkedInLastPublished._max.published_at),
+          capability: { enabled: linkedinGranted, flexible: socialFlexible },
+          editorHref: '/settings/social-commerce',
+          nudge: linkedinGranted ? staleNudge('LinkedIn post', socialLinkedInLastPublished._max.published_at) : 'Connect a LinkedIn company page to publish here',
         } as ContentChannelCard;
       })(),
     ];
@@ -261,7 +299,12 @@ router.get('/:tenantId/content/summary', authenticateToken, checkTenantAccess, a
       data: {
         surfaces: { live, total: channels.length },
         channels,
-        meta: { tierKey, placeFeed: { enabled: placeFeedEntitled, posts: placePostCount }, topNudge },
+        meta: {
+          tierKey,
+          placeFeed: { enabled: placeFeedEntitled, posts: placePostCount },
+          topNudge,
+          about: { text: listing?.description ?? null, editable: dirOpts.enabled },
+        },
       },
     });
   } catch (error) {

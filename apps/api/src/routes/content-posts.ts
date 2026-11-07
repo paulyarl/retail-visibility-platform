@@ -17,6 +17,9 @@ import { logger } from '../logger';
  *   - Meta  → social_posts SCHEDULED rows, one per platform
  *             (meta_facebook / meta_instagram / meta_threads); the
  *             socialPostScheduler picks them up on its next tick
+ *   - LinkedIn → social_posts SCHEDULED rows, one per connected
+ *             organization page (linkedin_surface_connections); the
+ *             member token rides linkedin_oauth_accounts_list
  *
  * Gates come from resolveEffectiveCapabilities (module-level flexible keys),
  * never per-key hasFeature for module on/off (see spec §11).
@@ -32,6 +35,7 @@ const postSchema = z.object({
   destinations: z.object({
     gbp: z.boolean().optional(),
     meta: z.array(z.enum(['meta_facebook', 'meta_instagram', 'meta_threads'])).optional(),
+    linkedin: z.boolean().optional(),
     place: z.boolean().optional(),
   }),
 });
@@ -61,15 +65,26 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
     }
     const { body, mediaUrl, linkUrl, scheduledFor, destinations } = parsed.data;
 
-    if (!destinations.gbp && !destinations.place && (!destinations.meta || destinations.meta.length === 0)) {
+    if (!destinations.gbp && !destinations.place && !destinations.linkedin && (!destinations.meta || destinations.meta.length === 0)) {
       return res.status(400).json({ success: false, error: 'no_destinations', message: 'Select at least one destination' });
     }
 
     const caps = await resolveEffectiveCapabilities(tenantId);
     const gbpMod = caps?.effective?.gbp_management as { enabled?: boolean } | undefined;
     const socialMod = caps?.effective?.social_posting as
-      | { enabled?: boolean; facebook_enabled?: boolean; instagram_enabled?: boolean; threads_enabled?: boolean }
+      | {
+          enabled?: boolean;
+          facebook_enabled?: boolean;
+          instagram_enabled?: boolean;
+          threads_enabled?: boolean;
+          linkedin_enabled?: boolean;
+          can_use_scheduler?: boolean;
+        }
       | undefined;
+
+    // Scheduler gate — resolver flag OR legacy override check (spec F1).
+    const hasSchedulerGate = async () =>
+      !!socialMod?.can_use_scheduler || await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler');
 
     const results: DestinationResult[] = [];
     const scheduledAt = scheduledFor ? new Date(scheduledFor) : null;
@@ -141,7 +156,7 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
         results.push({ channel: `meta:${platform}`, ok: false, error: `${platform} posting is not enabled` });
         continue;
       }
-      if (scheduledAt && !(await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler'))) {
+      if (scheduledAt && !(await hasSchedulerGate())) {
         results.push({ channel: `meta:${platform}`, ok: false, error: 'scheduling requires the Social Post Scheduler capability' });
         continue;
       }
@@ -159,6 +174,45 @@ router.post('/:tenantId/content/posts', authenticateToken, checkTenantAccess, as
         },
       });
       results.push({ channel: `meta:${platform}`, ok: true, postId: post.id, scheduled: true });
+    }
+
+    // ── LinkedIn destination — one social_posts row per connected org page ──
+    if (destinations.linkedin) {
+      const granted =
+        !!socialMod?.enabled &&
+        (!!socialMod?.linkedin_enabled ||
+          (await permissionServiceFactory.hasFeature(tenantId, 'social_posting_linkedin')));
+      if (!granted) {
+        results.push({ channel: 'linkedin', ok: false, error: 'linkedin posting is not enabled' });
+      } else if (scheduledAt && !(await hasSchedulerGate())) {
+        results.push({ channel: 'linkedin', ok: false, error: 'scheduling requires the Social Post Scheduler capability' });
+      } else {
+        const account = await prisma.linkedin_oauth_accounts_list.findFirst({
+          where: { tenant_id: tenantId },
+          include: { linkedin_surface_connections: true },
+        });
+        const orgs = account?.linkedin_surface_connections ?? [];
+        if (!orgs.length) {
+          results.push({ channel: 'linkedin', ok: false, error: 'no LinkedIn organization pages connected' });
+        } else {
+          for (const surface of orgs) {
+            const post = await prisma.social_posts.create({
+              data: {
+                id: newPostId(),
+                tenant_id: tenantId,
+                platform: 'linkedin',
+                target_ref: surface.target_ref,
+                body,
+                link_url: linkUrl || null,
+                status: 'SCHEDULED',
+                scheduled_for: scheduledAt ?? new Date(),
+                created_by: 'tenant',
+              },
+            });
+            results.push({ channel: `linkedin:${surface.display_name || surface.target_ref}`, ok: true, postId: post.id, scheduled: true });
+          }
+        }
+      }
     }
 
     const okCount = results.filter((r) => r.ok).length;

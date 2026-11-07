@@ -33,7 +33,12 @@ export interface ContentChannelCard {
 export interface ContentSummaryPayload {
   surfaces: { live: number; total: number };
   channels: ContentChannelCard[];
-  meta?: { tierKey?: string; placeFeed?: { enabled: boolean; posts: number }; topNudge?: string };
+  meta?: {
+    tierKey?: string;
+    placeFeed?: { enabled: boolean; posts: number };
+    topNudge?: string;
+    about?: { text: string | null; editable: boolean };
+  };
 }
 
 export const STATE_META: Record<ContentChannelState, { label: string; dot: string; badge: string }> = {

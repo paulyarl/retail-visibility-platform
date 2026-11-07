@@ -14,6 +14,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { permissionServiceFactory } from '../services/permissions/PermissionServiceFactory';
+import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { getSocialAdapter } from '../lib/social/registry';
 import { generateQuickStart } from '../lib/id-generator';
 import type { SocialPostDraft } from '../lib/social/types';
@@ -37,7 +38,11 @@ async function hasSchedulerEntitlement(tenantId: string): Promise<boolean> {
   const cached = entitlementCache.get(tenantId);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   try {
-    const value = await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler');
+    // Resolver first (tier/flexible/purchase aware) — hasFeature alone is
+    // override-only and skips scheduled posts for flexible tenants (spec F1).
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    const mod = caps?.effective?.social_posting as { can_use_scheduler?: boolean } | undefined;
+    const value = !!mod?.can_use_scheduler || await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler');
     entitlementCache.set(tenantId, { value, expiresAt: Date.now() + ENTITLEMENT_CACHE_TTL_MS });
     return value;
   } catch (error) {

@@ -107,13 +107,19 @@ router.get('/status', requireCustomerAuth, requirePlatformContext, async (req: R
   try {
     const { tenantId } = await resolveTenant(req);
 
-    const account = await prisma.meta_oauth_accounts_list.findFirst({
-      where: { tenant_id: tenantId },
-      include: {
-        meta_oauth_tokens_list: true,
-        meta_surface_connections: true,
-      },
-    });
+    const [account, linkedinAccount] = await Promise.all([
+      prisma.meta_oauth_accounts_list.findFirst({
+        where: { tenant_id: tenantId },
+        include: {
+          meta_oauth_tokens_list: true,
+          meta_surface_connections: true,
+        },
+      }),
+      prisma.linkedin_oauth_accounts_list.findFirst({
+        where: { tenant_id: tenantId },
+        include: { linkedin_surface_connections: true },
+      }),
+    ]);
 
     const tokenScopes = account?.meta_oauth_tokens_list?.scopes ?? [];
     const scopesMissing = META_POSTING_SCOPES.filter((s) => !tokenScopes.includes(s));
@@ -129,6 +135,17 @@ router.get('/status', requireCustomerAuth, requirePlatformContext, async (req: R
       };
     }
 
+    // LinkedIn: member account holds the token; surfaces are org pages.
+    const linkedinSurfaces: Record<string, any> = {};
+    for (const c of linkedinAccount?.linkedin_surface_connections ?? []) {
+      linkedinSurfaces[c.surface] = {
+        id: c.id,
+        targetRef: c.target_ref,
+        displayName: c.display_name,
+        connectedAt: c.connected_at,
+      };
+    }
+
     res.json({
       success: true,
       data: {
@@ -138,6 +155,13 @@ router.get('/status', requireCustomerAuth, requirePlatformContext, async (req: R
           scopesGranted: tokenScopes,
           scopesMissing,
           surfaces,
+        },
+        linkedin: {
+          connected: !!linkedinAccount,
+          memberName: linkedinAccount?.display_name ?? null,
+          reauthorizationRequired: linkedinAccount?.reauthorization_required ?? false,
+          tokenExpired: linkedinAccount?.token_expires_at ? linkedinAccount.token_expires_at <= new Date() : false,
+          surfaces: linkedinSurfaces,
         },
       },
     });
@@ -202,9 +226,12 @@ router.post('/meta/select-surface', requireCustomerAuth, requirePlatformContext,
     const { surface, pageId } = parsed.data;
     const { tenantId } = await resolveTenant(req);
 
-    const featureKey = surface === 'facebook_page' ? 'social_posting_meta' : 'social_posting_instagram';
-    if (!(await permissionServiceFactory.hasFeature(tenantId, featureKey))) {
-      return res.status(403).json({ success: false, error: 'entitlement_required', message: `${featureKey} is not enabled for this tenant` });
+    // Hard gate via resolver (F1 fix) — hasFeature is override-only.
+    const gateKey = surface === 'facebook_page' ? 'can_post_facebook' : 'can_post_instagram';
+    const socialMod = await resolveSocialModule(tenantId);
+    const legacyKey = surface === 'facebook_page' ? 'social_posting_meta' : 'social_posting_instagram';
+    if (!socialMod?.[gateKey] && !(await permissionServiceFactory.hasFeature(tenantId, legacyKey))) {
+      return res.status(403).json({ success: false, error: 'entitlement_required', message: `${legacyKey} is not enabled for this tenant` });
     }
 
     const account = await prisma.meta_oauth_accounts_list.findFirst({
@@ -375,6 +402,193 @@ router.delete('/meta/surfaces/:id', requireCustomerAuth, requirePlatformContext,
   }
 });
 
+// ── LinkedIn OAuth leg — member token + organization pages ───────────────
+
+router.get('/linkedin/authorize', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = await resolveTenant(req);
+    const socialMod = await resolveSocialModule(tenantId);
+    if (!socialMod?.can_post_linkedin && !(await permissionServiceFactory.hasFeature(tenantId, 'social_posting_linkedin'))) {
+      return res.status(403).json({ success: false, error: 'entitlement_required', message: 'LinkedIn posting is not enabled' });
+    }
+    const state = Buffer.from(JSON.stringify({ tenantId, ts: Date.now() })).toString('base64url');
+    res.json({ success: true, data: { url: getLinkedInAuthorizationUrl(state) } });
+  } catch (error: any) {
+    logger.error('[social-customer] GET /linkedin/authorize error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'authorize_failed', message: 'Failed to build LinkedIn auth URL' });
+  }
+});
+
+router.get('/linkedin/callback', async (req: Request, res: Response) => {
+  const fail = (msg: string) => res.redirect(`${unifiedConfig.webUrl}/settings/integrations/social?error=${encodeURIComponent(msg)}`);
+  try {
+    const { code, state } = req.query;
+    if (!code || !state || typeof code !== 'string' || typeof state !== 'string') return fail('missing_params');
+    const parsed = JSON.parse(Buffer.from(state, 'base64url').toString());
+    const tenantId = parsed.tenantId as string;
+    if (!tenantId) return fail('bad_state');
+
+    const tokens = await exchangeLinkedInCode(code);
+    if (!tokens?.access_token) return fail('exchange_failed');
+
+    const userinfo = await getLinkedInUserinfo(tokens.access_token);
+    if (!userinfo?.sub) return fail('userinfo_failed');
+
+    const now = new Date();
+    await prisma.linkedin_oauth_accounts_list.upsert({
+      where: { tenant_id_linkedin_member_id: { tenant_id: tenantId, linkedin_member_id: userinfo.sub } },
+      create: {
+        id: generateQuickStart('loauth'),
+        tenant_id: tenantId,
+        linkedin_member_id: userinfo.sub,
+        display_name: userinfo.name || null,
+        email: userinfo.email || null,
+        access_token_enc: encryptToken(tokens.access_token),
+        refresh_token_enc: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+        token_expires_at: tokens.expires_in ? new Date(now.getTime() + tokens.expires_in * 1000) : null,
+        refresh_token_expires_at: tokens.refresh_token_expires_in ? new Date(now.getTime() + tokens.refresh_token_expires_in * 1000) : null,
+        scopes: LINKEDIN_SCOPES,
+        reauthorization_required: false,
+        updated_at: now,
+      },
+      update: {
+        display_name: userinfo.name || undefined,
+        email: userinfo.email || undefined,
+        access_token_enc: encryptToken(tokens.access_token),
+        refresh_token_enc: tokens.refresh_token ? encryptToken(tokens.refresh_token) : undefined,
+        token_expires_at: tokens.expires_in ? new Date(now.getTime() + tokens.expires_in * 1000) : undefined,
+        refresh_token_expires_at: tokens.refresh_token_expires_in ? new Date(now.getTime() + tokens.refresh_token_expires_in * 1000) : undefined,
+        scopes: LINKEDIN_SCOPES,
+        reauthorization_required: false,
+        updated_at: now,
+      },
+    });
+
+    res.redirect(`${unifiedConfig.webUrl}/settings/integrations/social?connected=linkedin`);
+  } catch (error: any) {
+    logger.error('[social-customer] linkedin callback error', undefined, { error: error.message });
+    fail('callback_failed');
+  }
+});
+
+router.get('/linkedin/organizations', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = await resolveTenant(req);
+    const socialMod = await resolveSocialModule(tenantId);
+    if (!socialMod?.can_post_linkedin && !(await permissionServiceFactory.hasFeature(tenantId, 'social_posting_linkedin'))) {
+      return res.status(403).json({ success: false, error: 'entitlement_required', message: 'LinkedIn posting is not enabled' });
+    }
+
+    const account = await prisma.linkedin_oauth_accounts_list.findFirst({
+      where: { tenant_id: tenantId },
+      include: { linkedin_surface_connections: true },
+    });
+    if (!account) {
+      return res.json({ success: true, data: { connected: false, organizations: [], surfaces: [] } });
+    }
+
+    const token = decryptToken(account.access_token_enc);
+    const [orgs, tokenExpired] = await Promise.all([
+      getAdministeredOrganizations(token),
+      Promise.resolve(account.token_expires_at ? account.token_expires_at <= new Date() : false),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        connected: true,
+        memberName: account.display_name,
+        reauthorizationRequired: account.reauthorization_required,
+        tokenExpired,
+        organizations: orgs,
+        surfaces: account.linkedin_surface_connections.map((c) => ({
+          id: c.id, surface: c.surface, targetRef: c.target_ref, displayName: c.display_name, memberRole: c.member_role,
+        })),
+      },
+    });
+  } catch (error: any) {
+    logger.error('[social-customer] GET /linkedin/organizations error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'organizations_failed', message: 'Failed to list organizations' });
+  }
+});
+
+const selectLinkedInSurfaceSchema = z.object({
+  targetRef: z.string().regex(/^urn:li:organization:\d+$/, 'targetRef must be an organization URN'),
+});
+
+router.post('/linkedin/select-surface', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const parsed = selectLinkedInSurfaceSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_request', details: parsed.error.flatten() });
+    }
+    const { targetRef } = parsed.data;
+    const { tenantId } = await resolveTenant(req);
+
+    const socialMod = await resolveSocialModule(tenantId);
+    if (!socialMod?.can_post_linkedin && !(await permissionServiceFactory.hasFeature(tenantId, 'social_posting_linkedin'))) {
+      return res.status(403).json({ success: false, error: 'entitlement_required', message: 'LinkedIn posting is not enabled' });
+    }
+
+    const account = await prisma.linkedin_oauth_accounts_list.findFirst({ where: { tenant_id: tenantId } });
+    if (!account) {
+      return res.status(400).json({ success: false, error: 'not_connected', message: 'Connect LinkedIn first' });
+    }
+
+    // Verify the member administers this org via the ACL list. When the ACL
+    // call returns nothing (e.g. rw_organization_admin scope pending review),
+    // accept the URN shape — posts will surface a real LinkedIn 403 if wrong.
+    const token = decryptToken(account.access_token_enc);
+    const orgs = await getAdministeredOrganizations(token);
+    const match = orgs.find((o) => o.urn === targetRef);
+    if (orgs.length > 0 && !match) {
+      return res.status(404).json({ success: false, error: 'org_not_administered', message: 'Member does not administer that organization' });
+    }
+
+    const row = await prisma.linkedin_surface_connections.upsert({
+      where: {
+        linkedin_oauth_account_id_surface_target_ref: {
+          linkedin_oauth_account_id: account.id,
+          surface: 'organization_page',
+          target_ref: targetRef,
+        },
+      },
+      create: {
+        id: generateQuickStart('lsurf'),
+        linkedin_oauth_account_id: account.id,
+        surface: 'organization_page',
+        target_ref: targetRef,
+        display_name: match?.name || targetRef,
+        member_role: match?.role || null,
+      },
+      update: {
+        display_name: match?.name || undefined,
+        member_role: match?.role || undefined,
+        updated_at: new Date(),
+      },
+    });
+    res.json({ success: true, data: { surface: row } });
+  } catch (error: any) {
+    logger.error('[social-customer] POST /linkedin/select-surface error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'select_failed', message: 'Failed to connect organization page' });
+  }
+});
+
+router.delete('/linkedin/surfaces/:id', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = await resolveTenant(req);
+    const row = await prisma.linkedin_surface_connections.findFirst({
+      where: { id: req.params.id, linkedin_oauth_accounts_list: { tenant_id: tenantId } },
+    });
+    if (!row) return res.status(404).json({ success: false, error: 'not_found' });
+    await prisma.linkedin_surface_connections.delete({ where: { id: row.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('[social-customer] DELETE linkedin surface error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'delete_failed' });
+  }
+});
+
 // ── /posts — list + create + delete ─────────────────────────────────────
 
 router.get('/posts', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
@@ -400,7 +614,7 @@ router.get('/posts', requireCustomerAuth, requirePlatformContext, async (req: Re
 });
 
 const createPostSchema = z.object({
-  platform: z.enum(['meta_facebook', 'meta_instagram', 'meta_threads']),
+  platform: z.enum(['meta_facebook', 'meta_instagram', 'meta_threads', 'linkedin']),
   targetRef: z.string().optional(),
   body: z.string().min(1).max(63206),
   linkUrl: z.string().url().optional(),
@@ -427,15 +641,15 @@ router.post('/posts', requireCustomerAuth, requirePlatformContext, async (req: R
     const data = parsed.data;
     const { tenantId } = await resolveTenant(req);
 
-    // Per-platform entitlement
-    const featureKey = PLATFORM_SURFACE_KEY[data.platform];
-    if (featureKey && !(await permissionServiceFactory.hasFeature(tenantId, featureKey))) {
+    // Per-platform entitlement — resolver hard gate OR legacy override check
+    if (!(await isPlatformEntitled(tenantId, data.platform))) {
       return res.status(403).json({ success: false, error: 'entitlement_required', message: `${data.platform} posting is not enabled` });
     }
 
     // Scheduling is the premium key — immediate publish rides the module
     if (data.scheduledFor) {
-      const entitled = await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler');
+      const socialMod = await resolveSocialModule(tenantId);
+      const entitled = !!socialMod?.can_use_scheduler || await permissionServiceFactory.hasFeature(tenantId, 'social_posting_scheduler');
       if (!entitled) {
         return res.status(403).json({ success: false, error: 'scheduler_entitlement_required', message: 'Scheduled posting requires the scheduler capability' });
       }
@@ -536,7 +750,7 @@ router.delete('/posts/:id', requireCustomerAuth, requirePlatformContext, async (
 // ── /posts/suggest — dual-pattern AI copy ────────────────────────────────
 
 const suggestSchema = z.object({
-  platform: z.enum(['meta_facebook', 'meta_instagram', 'meta_threads']),
+  platform: z.enum(['meta_facebook', 'meta_instagram', 'meta_threads', 'linkedin']),
   photoDescription: z.string().optional().nullable(),
   tone: z.enum(['friendly', 'professional', 'playful', 'urgent', 'informative']).optional(),
   theme: z.enum(['problem_solution', 'announcement', 'offer', 'tip', 'seasonal', 'feature_highlight']).optional(),
@@ -659,6 +873,7 @@ const settingsSchema = z.object({
   social_posting_meta_on: z.boolean().optional(),
   social_posting_ig_on: z.boolean().optional(),
   social_posting_threads_on: z.boolean().optional(),
+  social_posting_linkedin_on: z.boolean().optional(),
   default_publish_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
 });
 
@@ -673,6 +888,7 @@ router.get('/settings', requireCustomerAuth, requirePlatformContext, async (req:
         social_posting_meta_on: true,
         social_posting_ig_on: true,
         social_posting_threads_on: true,
+        social_posting_linkedin_on: true,
         default_publish_time: null,
       },
     });

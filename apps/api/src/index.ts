@@ -587,6 +587,10 @@ if (process.env.NODE_ENV !== "test") {
         const { startMetaTokenRefresh } = await import('./jobs/metaTokenRefresh');
         startMetaTokenRefresh();
 
+        // LinkedIn token refresh (every 6h) — member OAuth tokens
+        const { startLinkedInTokenRefresh } = await import('./jobs/linkedinTokenRefresh');
+        startLinkedInTokenRefresh();
+
         // Model-B access drift — daily admins.list sweep on managed locations
         const { initializeGbpAdminDriftJob } = await import('./jobs/gbpAdminDrift');
         initializeGbpAdminDriftJob();

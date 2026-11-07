@@ -16,6 +16,7 @@ import { calculateSEOReadiness, type BusinessProfile } from '@/lib/validation/bu
 import { topNudge, type ContentSummaryPayload, type QuickLever } from '@/lib/content-hub';
 import ContentChannelCardView from './ContentChannelCardView';
 import ContentComposer from './ContentComposer';
+import ContentAboutEditor from './ContentAboutEditor';
 import { clientLogger } from '@/lib/client-logger';
 
 export default function ContentHubClient({ tenantId }: { tenantId: string }) {
@@ -188,6 +189,15 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
             />
           ))}
         </div>
+      )}
+
+      {summary && (
+        <ContentAboutEditor
+          tenantId={tenantId}
+          initialText={summary.meta?.about?.text ?? ''}
+          editable={summary.meta?.about?.editable ?? false}
+          onSaved={load}
+        />
       )}
 
       {composerOpen && summary && (

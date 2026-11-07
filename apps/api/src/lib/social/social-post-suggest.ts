@@ -63,6 +63,11 @@ const PLATFORM_RULES: Partial<Record<SocialPlatform, { label: string; maxChars: 
     maxChars: 450,
     style: 'One punchy thought — casual, no hashtags, no fluff. Must fit comfortably under the 500-char limit.',
   },
+  linkedin: {
+    label: 'LinkedIn company page post',
+    maxChars: 3000,
+    style: 'Professional B2B tone for a company page — concise value-led copy, 1-2 short paragraphs. Hashtags are optional (3 max); never use emojis excessively.',
+  },
 };
 
 export const SOCIAL_POST_SUGGEST_SYSTEM =
